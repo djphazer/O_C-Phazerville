@@ -24,6 +24,15 @@
 
 #ifdef ENABLE_APP_MIDI
 
+#include <Arduino.h>
+#include <EEPROM.h>
+#include <stdint.h>
+#include "OC_config.h"
+#include "OC_apps.h"
+#include "OC_menus.h"
+#include "OC_ui.h"
+#include "src/drivers/display.h"
+#include "util/util_settings.h"
 #include "HSApplication.h"
 #include "HSMIDI.h"
 
@@ -194,7 +203,7 @@ struct CaptainMIDILog {
 class CaptainMIDI : public SystemExclusiveHandler, public HSApplication,
     public settings::SettingsBase<CaptainMIDI, MIDI_SETTING_LAST> {
 public:
-    menu::ScreenCursor<menu::kScreenLines> cursor;
+    OC::menu::ScreenCursor<OC::menu::kScreenLines> cursor;
 
     void Start() {
         screen = 0;
@@ -419,8 +428,8 @@ private:
         gfxPrint(get_setup_number() + 1);
 
         // Iterate through the current range of settings
-        menu::SettingsList<menu::kScreenLines, 0, menu::kDefaultValueX - 1> settings_list(cursor);
-        menu::SettingsListItem list_item;
+        OC::menu::SettingsList<OC::menu::kScreenLines, 0, OC::menu::kDefaultValueX - 1> settings_list(cursor);
+        OC::menu::SettingsListItem list_item;
         while (settings_list.available())
         {
             bool suppress = 0; // Don't show the setting if it's not relevant

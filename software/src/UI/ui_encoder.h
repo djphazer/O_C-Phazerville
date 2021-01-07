@@ -23,6 +23,7 @@
 #ifndef UI_ENCODER_H_
 #define UI_ENCODER_H_
 
+#include <stdint.h>
 #include "../util/util_macros.h"
 
 namespace UI {

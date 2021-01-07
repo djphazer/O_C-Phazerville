@@ -18,6 +18,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#ifndef _HEM_ATTOFF_H_
+#define _HEM_ATTOFF_H_
+
+#include <Arduino.h>
+#include "OC_core.h"
+#include "HemisphereApplet.h"
+
 #define ATTENOFF_INCREMENTS 128
 #define ATTENOFF_MAX_LEVEL 63
 
@@ -143,3 +150,4 @@ private:
     }
 
 };
+#endif

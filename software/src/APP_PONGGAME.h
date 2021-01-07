@@ -22,6 +22,10 @@
 
 #ifdef ENABLE_APP_PONG
 
+#include <Arduino.h>
+#include "OC_config.h"
+#include "OC_apps.h"
+#include "OC_ui.h"
 #include "OC_DAC.h"
 #include "OC_ADC.h"
 #include "OC_digital_inputs.h"

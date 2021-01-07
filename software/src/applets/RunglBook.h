@@ -18,6 +18,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+// Modified by Samuel Burt 2023
+
+#include <Arduino.h>
+#include "OC_core.h"
+#include "HemisphereApplet.h"
+
 class RunglBook : public HemisphereApplet {
 public:
 

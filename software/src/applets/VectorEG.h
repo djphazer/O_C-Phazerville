@@ -18,6 +18,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#ifndef _HEM_VECTOR_EG_H_
+#define _HEM_VECTOR_EG_H_
+
+#include <Arduino.h>
+#include "OC_core.h"
+#include "HemisphereApplet.h"
 #include "vector_osc/HSVectorOscillator.h"
 #include "vector_osc/WaveformManager.h"
 
@@ -181,3 +187,4 @@ private:
     int ones(int n) {return (n / 100);}
     int hundredths(int n) {return (n % 100);}
 };
+#endif

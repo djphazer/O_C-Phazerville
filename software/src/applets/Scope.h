@@ -18,7 +18,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <Arduino.h>
+#include "OC_core.h"
+#include "HemisphereApplet.h"
+
 #define SCOPE_CURRENT_SETTING_TIMEOUT 50001
+const uint8_t HEM_PPQN_VALUES[] = {1, 2, 4, 8, 16, 24};
 
 class Scope : public HemisphereApplet {
 public:

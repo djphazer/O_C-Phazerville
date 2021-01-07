@@ -20,6 +20,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#ifndef _HEM_ASR_H_
+#define _HEM_ASR_H_
+
+#include <Arduino.h>
+#include "OC_core.h"
+#include "OC_scales.h"
+#include "HemisphereApplet.h"
 #include "HSRingBufferManager.h" // Singleton Ring Buffer manager
 
 class ASR : public HemisphereApplet {
@@ -148,3 +155,4 @@ private:
     }
 
 };
+#endif

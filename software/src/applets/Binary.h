@@ -18,6 +18,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#ifndef _HEM_BIN_H_
+#define _HEM_BIN_H_
+
+#include <Arduino.h>
+#include "OC_core.h"
+#include "HemisphereApplet.h"
 #include "SegmentDisplay.h"
 
 class Binary : public HemisphereApplet {
@@ -95,3 +101,4 @@ private:
         gfxRect(1, 58, ProportionCV(ViewOut(1), 62), 6);
     }
 };
+#endif

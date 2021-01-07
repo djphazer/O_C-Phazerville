@@ -1,5 +1,10 @@
 #include "HemisphereApplet.h"
 
+IOFrame HS::frame;
+
+int HemisphereApplet::cursor_countdown[2];
+int HemisphereApplet::cursor[2];
+
 void HemisphereApplet::BaseStart(bool hemisphere_) {
     hemisphere = hemisphere_;
 
@@ -44,7 +49,7 @@ void HemisphereApplet::BaseView() {
     gfxHeader(applet_name());
     // If active, draw the full screen view instead of the application screen
     if (full_screen) this->DrawFullScreen();
-    else View();
+    else this->View();
 }
 
 /*
@@ -73,7 +78,4 @@ bool HemisphereApplet::Clock(int ch, bool physical) {
     }
     return clocked;
 }
-
-int HemisphereApplet::cursor_countdown[2];
-int HemisphereApplet::cursor[2];
 

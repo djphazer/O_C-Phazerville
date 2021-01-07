@@ -18,12 +18,17 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#ifndef _HEM_APP_HEMISPHERE_H_
+#define _HEM_APP_HEMISPHERE_H_
+
 #include "OC_DAC.h"
 #include "OC_digital_inputs.h"
 #include "OC_visualfx.h"
+#include "OC_apps.h"
+#include "OC_ui.h"
+
 #include "OC_patterns.h"
 #include "src/drivers/FreqMeasure/OC_FreqMeasure.h"
-namespace menu = OC::menu;
 
 #include "HemisphereApplet.h"
 #include "HSApplication.h"
@@ -172,6 +177,8 @@ HemispherePreset *hem_active_preset = 0;
 
 using namespace HS;
 
+void ReceiveManagerSysEx();
+
 class HemisphereManager : public HSApplication {
 public:
     enum PopupType {
@@ -216,12 +223,12 @@ public:
                 doSave = 1;
             hem_active_preset->SetAppletId(h, HS::available_applets[index].id);
 
-            uint64_t data = HS::available_applets[index].instance[h].OnDataRequest();
+            uint64_t data = HS::available_applets[index].instance[h]->OnDataRequest();
             if (data != applet_data[h]) doSave = 1;
             applet_data[h] = data;
             hem_active_preset->SetData(h, data);
         }
-        uint64_t data = HS::clock_setup_applet.instance[0].OnDataRequest();
+        uint64_t data = HS::clock_setup_applet.instance[0]->OnDataRequest();
         if (data != clock_data) doSave = 1;
         clock_data = data;
         hem_active_preset->SetClockData(data);
@@ -245,14 +252,14 @@ public:
         hem_active_preset = (HemispherePreset*)(hem_presets + id);
         if (hem_active_preset->is_valid()) {
             clock_data = hem_active_preset->GetClockData();
-            HS::clock_setup_applet.instance[0].OnDataReceive(clock_data);
+            HS::clock_setup_applet.instance[0]->OnDataReceive(clock_data);
 
             for (int h = 0; h < 2; h++)
             {
                 int index = get_applet_index_by_id( hem_active_preset->GetAppletId(h) );
                 applet_data[h] = hem_active_preset->GetData(h);
                 SetApplet(h, index);
-                HS::available_applets[index].instance[h].OnDataReceive(applet_data[h]);
+                HS::available_applets[index].instance[h]->OnDataReceive(applet_data[h]);
             }
         }
         preset_id = id;
@@ -262,7 +269,7 @@ public:
     // does not modify the preset, only the manager
     void SetApplet(int hemisphere, int index) {
         my_applet[hemisphere] = index;
-        HS::available_applets[index].instance[hemisphere].BaseStart(hemisphere);
+        HS::available_applets[index].instance[hemisphere]->BaseStart(hemisphere);
     }
 
     void ChangeApplet(int h, int dir) {
@@ -312,7 +319,7 @@ public:
         CheckPresetTriggers();
 
         // Clock Setup applet handles internal clock duties
-        HS::clock_setup_applet.instance[0].Controller();
+        HS::clock_setup_applet.instance[0]->Controller();
 
         // execute Applets
         for (int h = 0; h < 2; h++)
@@ -343,7 +350,7 @@ public:
                     }
                 }
             }
-            HS::available_applets[index].instance[h].BaseController();
+            HS::available_applets[index].instance[h]->BaseController();
         }
     }
 
@@ -379,16 +386,16 @@ public:
             DrawConfigMenu();
         }
         else if (clock_setup) {
-            HS::clock_setup_applet.instance[0].View();
+            HS::clock_setup_applet.instance[0]->View();
         }
         else if (help_hemisphere > -1) {
             int index = my_applet[help_hemisphere];
-            HS::available_applets[index].instance[help_hemisphere].BaseView();
+            HS::available_applets[index].instance[help_hemisphere]->BaseView();
         } else {
             for (int h = 0; h < 2; h++)
             {
                 int index = my_applet[h];
-                HS::available_applets[index].instance[h].BaseView();
+                HS::available_applets[index].instance[h]->BaseView();
             }
 
             if (clock_m->IsRunning()) {
@@ -421,7 +428,7 @@ public:
         // button down
         if (down) {
             // Clock Setup is more immediate for manual triggers
-            if (clock_setup) HS::clock_setup_applet.instance[0].OnButtonPress();
+            if (clock_setup) HS::clock_setup_applet.instance[0]->OnButtonPress();
             // TODO: consider a new OnButtonDown handler for applets
             return;
         }
@@ -432,7 +439,7 @@ public:
         } else if (!clock_setup) {
             // regular applets get button release
             int index = my_applet[h];
-            HS::available_applets[index].instance[h].OnButtonPress();
+            HS::available_applets[index].instance[h]->OnButtonPress();
         }
     }
 
@@ -509,12 +516,12 @@ public:
         }
 
         if (clock_setup) {
-            HS::clock_setup_applet.instance[0].OnEncoderMove(event.value);
+            HS::clock_setup_applet.instance[0]->OnEncoderMove(event.value);
         } else if (select_mode == h) {
             ChangeApplet(h, event.value);
         } else {
             int index = my_applet[h];
-            HS::available_applets[index].instance[h].OnEncoderMove(event.value);
+            HS::available_applets[index].instance[h]->OnEncoderMove(event.value);
         }
     }
 
@@ -540,12 +547,12 @@ public:
     void SetHelpScreen(int hemisphere) {
         if (help_hemisphere > -1) { // Turn off the previous help screen
             int index = my_applet[help_hemisphere];
-            HS::available_applets[index].instance[help_hemisphere].ToggleHelpScreen();
+            HS::available_applets[index].instance[help_hemisphere]->ToggleHelpScreen();
         }
 
         if (hemisphere > -1) { // Turn on the next hemisphere's screen
             int index = my_applet[hemisphere];
-            HS::available_applets[index].instance[hemisphere].ToggleHelpScreen();
+            HS::available_applets[index].instance[hemisphere]->ToggleHelpScreen();
         }
 
         help_hemisphere = hemisphere;
@@ -914,3 +921,5 @@ void HEMISPHERE_handleButtonEvent(const UI::Event &event) {
 void HEMISPHERE_handleEncoderEvent(const UI::Event &event) {
     manager.DelegateEncoderMovement(event);
 }
+
+#endif

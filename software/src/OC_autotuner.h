@@ -1,6 +1,7 @@
 #ifndef OC_AUTOTUNER_H
 #define OC_AUTOTUNER_H
 
+#include "OC_calibration.h"
 #include "OC_autotune.h"
 #include "OC_options.h"
 #include "OC_visualfx.h"

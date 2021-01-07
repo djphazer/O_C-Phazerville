@@ -18,6 +18,14 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <Arduino.h>
+#include <EEPROM.h>
+#include <stdint.h>
+#include <stdint.h>
+#include "OC_config.h"
+#include "OC_apps.h"
+#include "OC_ui.h"
+#include "src/drivers/display.h"
 #include "HSMIDI.h"
 
 class Backup: public SystemExclusiveHandler {

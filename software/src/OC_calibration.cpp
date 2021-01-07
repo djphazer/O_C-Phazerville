@@ -6,7 +6,23 @@
 *
 */
 
+#include "OC_core.h"
+#include "OC_apps.h"
+#include "OC_DAC.h"
+#include "OC_debug.h"
+#include "OC_gpio.h"
+#include "OC_ADC.h"
 #include "OC_calibration.h"
+#include "OC_digital_inputs.h"
+#include "OC_menus.h"
+#include "OC_strings.h"
+#include "OC_ui.h"
+#include "OC_options.h"
+#include "src/drivers/display.h"
+#include "src/drivers/ADC/OC_util_ADC.h"
+#include "util/util_debugpins.h"
+#include "OC_calibration.h"
+#include "VBiasManager.h"
 namespace menu = OC::menu;
 
 using OC::DAC;
@@ -433,6 +449,166 @@ const CalibrationStep calibration_steps[CALIBRATION_STEP_LAST] = {
   { CALIBRATION_EXIT, "Calibration complete", "Save values? ", select_help, end_footer, CALIBRATE_NONE, 0, OC::Strings::no_yes, 0, 1 }
 };
 
+void calibration_draw(const CalibrationState &state) {
+  GRAPHICS_BEGIN_FRAME(true);
+  const CalibrationStep *step = state.current_step;
+
+  /*
+  graphics.drawLine(0, 10, 127, 10);
+  graphics.drawLine(0, 12, 127, 12);
+  graphics.setPrintPos(1, 2);
+  */
+  menu::DefaultTitleBar::Draw();
+  graphics.print(step->title);
+
+  weegfx::coord_t y = menu::CalcLineY(0);
+
+  static constexpr weegfx::coord_t kValueX = menu::kDisplayWidth - 30;
+
+  graphics.setPrintPos(menu::kIndentDx, y + 2);
+  switch (step->calibration_type) {
+    case CALIBRATE_OCTAVE:
+    case CALIBRATE_SCREENSAVER:
+    #ifdef VOR
+    case CALIBRATE_VBIAS_BIPOLAR:
+    case CALIBRATE_VBIAS_ASYMMETRIC:
+    #endif
+      graphics.print(step->message);
+      graphics.setPrintPos(kValueX, y + 2);
+      graphics.print((int)state.encoder_value, 5);
+      menu::DrawEditIcon(kValueX, y, state.encoder_value, step->min, step->max);
+      break;
+      
+    case CALIBRATE_ADC_OFFSET:
+      graphics.print(step->message);
+      graphics.setPrintPos(kValueX, y + 2);
+      graphics.print((int)OC::ADC::value(static_cast<ADC_CHANNEL>(step->index)), 5);
+      menu::DrawEditIcon(kValueX, y, state.encoder_value, step->min, step->max);
+      break;
+
+    case CALIBRATE_DISPLAY:
+      graphics.print(step->message);
+      graphics.setPrintPos(kValueX, y + 2);
+      graphics.pretty_print((int)state.encoder_value, 2);
+      menu::DrawEditIcon(kValueX, y, state.encoder_value, step->min, step->max);
+      graphics.drawFrame(0, 0, 128, 64);
+      break;
+
+    case CALIBRATE_ADC_1V:
+    case CALIBRATE_ADC_3V:
+      graphics.setPrintPos(menu::kIndentDx, y + 2);
+      graphics.print(step->message);
+      y += menu::kMenuLineH;
+      graphics.setPrintPos(menu::kIndentDx, y + 2);
+      graphics.print((int)OC::ADC::value(ADC_CHANNEL_1), 2);
+      break;
+
+    case CALIBRATE_NONE:
+    default:
+      if (CALIBRATION_EXIT != step->step) {
+        graphics.setPrintPos(menu::kIndentDx, y + 2);
+        graphics.print(step->message);
+        if (step->value_str)
+          graphics.print(step->value_str[state.encoder_value]);
+      } else {
+        graphics.setPrintPos(menu::kIndentDx, y + 2);
+        if (calibration_data_loaded && state.used_defaults)
+            graphics.print("Overwrite? ");
+        else
+          graphics.print("Save? ");
+        if (step->value_str)
+          graphics.print(step->value_str[state.encoder_value]);
+
+        if (state.used_defaults && calibration_data_loaded) {
+          y += menu::kMenuLineH;
+          graphics.setPrintPos(menu::kIndentDx, y + 2);
+          graphics.print("NB replaces existing!");
+        }
+      }
+      break;
+  }
+
+  y += menu::kMenuLineH;
+  graphics.setPrintPos(menu::kIndentDx, y + 2);
+  if (step->help)
+    graphics.print(step->help);
+ 
+  // NJM: display encoder direction config on first and last screens
+  if (step->step == HELLO || step->step == CALIBRATION_EXIT) {
+      y += menu::kMenuLineH;
+      graphics.setPrintPos(menu::kIndentDx, y + 2);
+      graphics.print("Encoders: ");
+      graphics.print(OC::Strings::encoder_config_strings[ OC::calibration_data.encoder_config() ]);
+  }
+
+  weegfx::coord_t x = menu::kDisplayWidth - 22;
+  y = 2;
+  for (int input = OC::DIGITAL_INPUT_1; input < OC::DIGITAL_INPUT_LAST; ++input) {
+    uint8_t state = (digital_input_displays[input].getState() + 3) >> 2;
+    if (state)
+      graphics.drawBitmap8(x, y, 4, OC::bitmap_gate_indicators_8 + (state << 2));
+    x += 5;
+  }
+
+  graphics.drawStr(1, menu::kDisplayHeight - menu::kFontHeight - 3, step->footer);
+
+  static constexpr uint16_t step_width = (menu::kDisplayWidth << 8 ) / (CALIBRATION_STEP_LAST - 1);
+  graphics.drawRect(0, menu::kDisplayHeight - 2, (state.step * step_width) >> 8, 2);
+
+  GRAPHICS_END_FRAME();
+}
+
+/* DAC output etc */ 
+
+void calibration_update(CalibrationState &state) {
+
+  CONSTRAIN(state.encoder_value, state.current_step->min, state.current_step->max);
+  const CalibrationStep *step = state.current_step;
+
+  switch (step->calibration_type) {
+    case CALIBRATE_NONE:
+      DAC::set_all_octave(0);
+      break;
+    case CALIBRATE_OCTAVE:
+      OC::calibration_data.dac.calibrated_octaves[step_to_channel(step->step)][step->index + DAC::kOctaveZero] =
+        state.encoder_value;
+      DAC::set_all_octave(step->index);
+      break;
+    #ifdef VOR
+    case CALIBRATE_VBIAS_BIPOLAR:
+      /* set 0V @ bipolar range */
+      DAC::set_all_octave(5);
+      OC::calibration_data.v_bias = (OC::calibration_data.v_bias & 0xFFFF0000) | state.encoder_value;
+      DAC::set_Vbias(0xFFFF & OC::calibration_data.v_bias);
+      break;
+    case CALIBRATE_VBIAS_ASYMMETRIC:
+      /* set 0V @ asym. range */
+      DAC::set_all_octave(3);
+      OC::calibration_data.v_bias = (OC::calibration_data.v_bias & 0xFFFF) | (state.encoder_value << 16);
+      DAC::set_Vbias(OC::calibration_data.v_bias >> 16);
+    break;
+    #endif
+    case CALIBRATE_ADC_OFFSET:
+      OC::calibration_data.adc.offset[step->index] = state.encoder_value;
+      DAC::set_all_octave(0);
+      break;
+    case CALIBRATE_ADC_1V:
+      DAC::set_all_octave(1);
+      break;
+    case CALIBRATE_ADC_3V:
+      DAC::set_all_octave(3);
+      break;
+    case CALIBRATE_DISPLAY:
+      OC::calibration_data.display_offset = state.encoder_value;
+      display::AdjustOffset(OC::calibration_data.display_offset);
+      break;
+    case CALIBRATE_SCREENSAVER:
+      DAC::set_all_octave(0);
+      OC::calibration_data.screensaver_timeout = state.encoder_value;
+      break;
+  }
+}
+
 /*     loop calibration menu until done       */
 void OC::Ui::Calibrate() {
 
@@ -612,166 +788,6 @@ void OC::Ui::Calibrate() {
     calibration_save();
   } else {
     SERIAL_PRINTLN("Calibration complete (but don't save)");
-  }
-}
-
-void calibration_draw(const CalibrationState &state) {
-  GRAPHICS_BEGIN_FRAME(true);
-  const CalibrationStep *step = state.current_step;
-
-  /*
-  graphics.drawLine(0, 10, 127, 10);
-  graphics.drawLine(0, 12, 127, 12);
-  graphics.setPrintPos(1, 2);
-  */
-  menu::DefaultTitleBar::Draw();
-  graphics.print(step->title);
-
-  weegfx::coord_t y = menu::CalcLineY(0);
-
-  static constexpr weegfx::coord_t kValueX = menu::kDisplayWidth - 30;
-
-  graphics.setPrintPos(menu::kIndentDx, y + 2);
-  switch (step->calibration_type) {
-    case CALIBRATE_OCTAVE:
-    case CALIBRATE_SCREENSAVER:
-    #ifdef VOR
-    case CALIBRATE_VBIAS_BIPOLAR:
-    case CALIBRATE_VBIAS_ASYMMETRIC:
-    #endif
-      graphics.print(step->message);
-      graphics.setPrintPos(kValueX, y + 2);
-      graphics.print((int)state.encoder_value, 5);
-      menu::DrawEditIcon(kValueX, y, state.encoder_value, step->min, step->max);
-      break;
-      
-    case CALIBRATE_ADC_OFFSET:
-      graphics.print(step->message);
-      graphics.setPrintPos(kValueX, y + 2);
-      graphics.print((int)OC::ADC::value(static_cast<ADC_CHANNEL>(step->index)), 5);
-      menu::DrawEditIcon(kValueX, y, state.encoder_value, step->min, step->max);
-      break;
-
-    case CALIBRATE_DISPLAY:
-      graphics.print(step->message);
-      graphics.setPrintPos(kValueX, y + 2);
-      graphics.pretty_print((int)state.encoder_value, 2);
-      menu::DrawEditIcon(kValueX, y, state.encoder_value, step->min, step->max);
-      graphics.drawFrame(0, 0, 128, 64);
-      break;
-
-    case CALIBRATE_ADC_1V:
-    case CALIBRATE_ADC_3V:
-      graphics.setPrintPos(menu::kIndentDx, y + 2);
-      graphics.print(step->message);
-      y += menu::kMenuLineH;
-      graphics.setPrintPos(menu::kIndentDx, y + 2);
-      graphics.print((int)OC::ADC::value(ADC_CHANNEL_1), 2);
-      break;
-
-    case CALIBRATE_NONE:
-    default:
-      if (CALIBRATION_EXIT != step->step) {
-        graphics.setPrintPos(menu::kIndentDx, y + 2);
-        graphics.print(step->message);
-        if (step->value_str)
-          graphics.print(step->value_str[state.encoder_value]);
-      } else {
-        graphics.setPrintPos(menu::kIndentDx, y + 2);
-        if (calibration_data_loaded && state.used_defaults)
-            graphics.print("Overwrite? ");
-        else
-          graphics.print("Save? ");
-        if (step->value_str)
-          graphics.print(step->value_str[state.encoder_value]);
-
-        if (state.used_defaults && calibration_data_loaded) {
-          y += menu::kMenuLineH;
-          graphics.setPrintPos(menu::kIndentDx, y + 2);
-          graphics.print("NB replaces existing!");
-        }
-      }
-      break;
-  }
-
-  y += menu::kMenuLineH;
-  graphics.setPrintPos(menu::kIndentDx, y + 2);
-  if (step->help)
-    graphics.print(step->help);
- 
-  // NJM: display encoder direction config on first and last screens
-  if (step->step == HELLO || step->step == CALIBRATION_EXIT) {
-      y += menu::kMenuLineH;
-      graphics.setPrintPos(menu::kIndentDx, y + 2);
-      graphics.print("Encoders: ");
-      graphics.print(OC::Strings::encoder_config_strings[ OC::calibration_data.encoder_config() ]);
-  }
-
-  weegfx::coord_t x = menu::kDisplayWidth - 22;
-  y = 2;
-  for (int input = OC::DIGITAL_INPUT_1; input < OC::DIGITAL_INPUT_LAST; ++input) {
-    uint8_t state = (digital_input_displays[input].getState() + 3) >> 2;
-    if (state)
-      graphics.drawBitmap8(x, y, 4, OC::bitmap_gate_indicators_8 + (state << 2));
-    x += 5;
-  }
-
-  graphics.drawStr(1, menu::kDisplayHeight - menu::kFontHeight - 3, step->footer);
-
-  static constexpr uint16_t step_width = (menu::kDisplayWidth << 8 ) / (CALIBRATION_STEP_LAST - 1);
-  graphics.drawRect(0, menu::kDisplayHeight - 2, (state.step * step_width) >> 8, 2);
-
-  GRAPHICS_END_FRAME();
-}
-
-/* DAC output etc */ 
-
-void calibration_update(CalibrationState &state) {
-
-  CONSTRAIN(state.encoder_value, state.current_step->min, state.current_step->max);
-  const CalibrationStep *step = state.current_step;
-
-  switch (step->calibration_type) {
-    case CALIBRATE_NONE:
-      DAC::set_all_octave(0);
-      break;
-    case CALIBRATE_OCTAVE:
-      OC::calibration_data.dac.calibrated_octaves[step_to_channel(step->step)][step->index + DAC::kOctaveZero] =
-        state.encoder_value;
-      DAC::set_all_octave(step->index);
-      break;
-    #ifdef VOR
-    case CALIBRATE_VBIAS_BIPOLAR:
-      /* set 0V @ bipolar range */
-      DAC::set_all_octave(5);
-      OC::calibration_data.v_bias = (OC::calibration_data.v_bias & 0xFFFF0000) | state.encoder_value;
-      DAC::set_Vbias(0xFFFF & OC::calibration_data.v_bias);
-      break;
-    case CALIBRATE_VBIAS_ASYMMETRIC:
-      /* set 0V @ asym. range */
-      DAC::set_all_octave(3);
-      OC::calibration_data.v_bias = (OC::calibration_data.v_bias & 0xFFFF) | (state.encoder_value << 16);
-      DAC::set_Vbias(OC::calibration_data.v_bias >> 16);
-    break;
-    #endif
-    case CALIBRATE_ADC_OFFSET:
-      OC::calibration_data.adc.offset[step->index] = state.encoder_value;
-      DAC::set_all_octave(0);
-      break;
-    case CALIBRATE_ADC_1V:
-      DAC::set_all_octave(1);
-      break;
-    case CALIBRATE_ADC_3V:
-      DAC::set_all_octave(3);
-      break;
-    case CALIBRATE_DISPLAY:
-      OC::calibration_data.display_offset = state.encoder_value;
-      display::AdjustOffset(OC::calibration_data.display_offset);
-      break;
-    case CALIBRATE_SCREENSAVER:
-      DAC::set_all_octave(0);
-      OC::calibration_data.screensaver_timeout = state.encoder_value;
-      break;
   }
 }
 

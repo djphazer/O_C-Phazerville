@@ -43,6 +43,7 @@
 #include "extern/dspinst.h"
 
 namespace menu = OC::menu;
+extern uint_fast8_t MENU_REDRAW;
 
 #ifdef BUCHLA_4U
  #define DQ_OFFSET_X 22

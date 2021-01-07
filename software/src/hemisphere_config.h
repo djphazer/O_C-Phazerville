@@ -15,7 +15,7 @@
 class_name class_name ## _instance[2]
 
 #define DECLARE_APPLET(id, categories, class_name) \
-{ id, categories, class_name ## _instance }
+{ id, categories, { &class_name ## _instance[0], &class_name ## _instance[1] } }
 
 #include "applets/ADSREG.h"
 #include "applets/ADEG.h"

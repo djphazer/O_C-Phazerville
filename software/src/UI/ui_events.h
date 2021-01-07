@@ -23,6 +23,9 @@
 #ifndef UI_EVENTS_H_
 #define UI_EVENTS_H_
 
+#include <Arduino.h>
+#include <stdint.h>
+
 namespace UI {
 
 enum EventType {

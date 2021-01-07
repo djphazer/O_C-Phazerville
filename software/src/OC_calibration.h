@@ -16,6 +16,8 @@
 
 //#define CALIBRATION_LOAD_LEGACY
 
+void calibration_load();
+
 namespace OC {
 
 // Originally, this was a single bit that would reverse both encoders.

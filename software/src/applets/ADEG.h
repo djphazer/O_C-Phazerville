@@ -18,8 +18,15 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#ifndef _HEM_ADEG_H_
+#define _HEM_ADEG_H_
+
 #define HEM_ADEG_MAX_VALUE 255
 #define HEM_ADEG_MAX_TICKS 33333
+
+#include <Arduino.h>
+#include "OC_core.h"
+#include "HemisphereApplet.h"
 
 class ADEG : public HemisphereApplet {
 public:
@@ -165,3 +172,4 @@ private:
     }
 };
 
+#endif

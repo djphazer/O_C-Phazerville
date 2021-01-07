@@ -18,6 +18,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <Arduino.h>
+#include "OC_apps.h"
+#include "OC_strings.h"
+#include "OC_ui.h"
+#include "UI/ui_events.h"
+
 #include "HSApplication.h"
 #include "HSMIDI.h"
 #include "vector_osc/HSVectorOscillator.h"

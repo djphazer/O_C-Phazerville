@@ -18,6 +18,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <Arduino.h>
+#include <EEPROM.h>
+#include "OC_apps.h"
+#include "OC_ui.h"
 #include "HSApplication.h"
 #include "OC_strings.h"
 

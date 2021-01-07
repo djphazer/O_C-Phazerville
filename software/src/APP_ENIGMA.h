@@ -20,7 +20,17 @@
 
 #ifdef ENABLE_APP_ENIGMA
 
+#include <Arduino.h>
+#include <EEPROM.h>
+#include <stdint.h>
+#include <stdint.h>
+#include "OC_config.h"
+#include "OC_apps.h"
+#include "OC_ui.h"
+#include "src/drivers/display.h"
+#include "OC_strings.h"
 #include "HSApplication.h"
+
 #include "HSMIDI.h"
 #include "enigma/TuringMachine.h"
 #include "enigma/TuringMachineState.h"

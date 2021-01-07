@@ -18,6 +18,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <Arduino.h>
+#include "OC_core.h"
+#include "HemisphereApplet.h"
+
 class ClockSetup : public HemisphereApplet {
 public:
 
@@ -341,5 +345,4 @@ private:
     }
 };
 
-ClockSetup ClockSetup_instance[2]; // TODO
-
+ClockSetup ClockSetup_instance[2];

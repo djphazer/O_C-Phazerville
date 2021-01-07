@@ -17,7 +17,12 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+#ifndef _HEM_BOOTSNCAT_H_
+#define _HEM_BOOTSNCAT_H_
 
+#include <Arduino.h>
+#include "OC_core.h"
+#include "HemisphereApplet.h"
 #include "vector_osc/HSVectorOscillator.h"
 #include "vector_osc/WaveformManager.h"
 
@@ -199,3 +204,4 @@ private:
         eg[ch].SetFrequency(1000 - Proportion(decay[ch], BNC_MAX_PARAM, 900));
     }
 };
+#endif

@@ -19,6 +19,9 @@
 // SOFTWARE.
 
 // Logarhythm: Added triplets output (3 triggers per 4 input clocks) to the unused 2nd output
+#include <Arduino.h>
+#include "OC_core.h"
+#include "HemisphereApplet.h"
 
 class Shuffle : public HemisphereApplet {
 public:

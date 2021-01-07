@@ -1,8 +1,12 @@
 #ifndef OC_CORE_H_
 #define OC_CORE_H_
 
+#include <Arduino.h>
 #include <stdint.h>
 #include "OC_config.h"
+#include "OC_strings.h"
+#include "OC_ui.h"
+#include "OC_menus.h"
 #include "util/util_debugpins.h"
 #include "src/drivers/display.h"
 

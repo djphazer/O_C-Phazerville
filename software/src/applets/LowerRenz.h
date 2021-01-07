@@ -21,6 +21,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <Arduino.h>
+#include "OC_core.h"
+#include "HemisphereApplet.h"
 #include "streams_lorenz_generator.h"
 #include "util/util_math.h"
 #include "HSLorenzGeneratorManager.h" // Singleton Lorenz manager

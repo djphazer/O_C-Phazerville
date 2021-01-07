@@ -18,6 +18,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <Arduino.h>
+#include "OC_core.h"
+#include "HemisphereApplet.h"
+
 // Logical gate functions and typedef to function pointer
 #define HEMISPHERE_NUMBER_OF_LOGIC 7
 bool hem_AND(bool s1, bool s2) {return s1 & s2;}

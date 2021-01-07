@@ -26,9 +26,12 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#ifndef _HEM_APPLET_H_
+#define _HEM_APPLET_H_
 
 #include <Arduino.h>
 #include "OC_core.h"
+
 #include "OC_digital_inputs.h"
 #include "OC_DAC.h"
 #include "OC_ADC.h"
@@ -95,7 +98,7 @@ namespace HS {
 typedef struct Applet {
   int id;
   uint8_t categories;
-  HemisphereApplet* instance;
+  HemisphereApplet* instance[2];
   /*
   void (*Start)(bool); // Initialize when selected
   void (*Controller)(bool, bool);  // Interrupt Service Routine
@@ -114,10 +117,7 @@ typedef struct {
     uint8_t x, y, w;
 } AppletParam;
 
-static IOFrame frame;
-
-extern Applet available_applets[];
-extern Applet clock_setup_applet;
+extern IOFrame frame;
 
 }
 
@@ -421,3 +421,4 @@ private:
     bool full_screen;
 };
 
+#endif // _HEM_APPLET_H_

@@ -18,6 +18,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <Arduino.h>
+#include "OC_core.h"
+#include "HemisphereApplet.h"
+
 // Arithmetic functions and typedef to function pointer
 #define HEMISPHERE_NUMBER_OF_CALC 7
 int hem_MIN(int v1, int v2) {return (v1 < v2) ? v1 : v2;}

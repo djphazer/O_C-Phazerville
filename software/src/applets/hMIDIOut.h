@@ -20,6 +20,12 @@
 
 // See https://www.pjrc.com/teensy/td_midi.html
 
+#include <Arduino.h>
+#include "OC_core.h"
+#include "HemisphereApplet.h"
+#include "HSMIDI.h"
+#include "applets/hMIDIIn.h"
+
 // The functions available for each output
 #define HEM_MIDI_CC_IN 0
 #define HEM_MIDI_AT_IN 1

@@ -35,6 +35,8 @@
 #include "extern/dspinst.h"
 
 namespace menu = OC::menu; // Ugh. This works for all .ino files
+extern uint_fast8_t MENU_REDRAW;
+using OC::DUMMY;
 
 #define NUM_ASR_CHANNELS 0x4
 #define ASR_MAX_ITEMS 256 // = ASR ring buffer size.
@@ -846,6 +848,51 @@ void ASR_isr() {
   asr.update();
 }
 
+void ASR_topButton() {
+  if (asr.octave_toggle())
+    asr.change_value(ASR_SETTING_OCTAVE, 1);
+  else
+    asr.change_value(ASR_SETTING_OCTAVE, -1);
+}
+
+void ASR_lowerButton() {
+   asr.manual_freeze();
+}
+
+void ASR_rightButton() {
+
+  switch (asr.enabled_setting_at(asr_state.cursor_pos())) {
+
+      case ASR_SETTING_MASK: {
+        int scale = asr.get_scale(DUMMY);
+        if (OC::Scales::SCALE_NONE != scale)
+          asr_state.scale_editor.Edit(&asr, scale);
+        }
+      break;
+      default:
+        asr_state.cursor.toggle_editing();
+      break;
+  }
+}
+
+void ASR_leftButton() {
+
+  if (asr_state.left_encoder_value != asr.get_scale(DUMMY))
+    asr.set_scale(asr_state.left_encoder_value);
+}
+
+void ASR_leftButtonLong() {
+
+  int scale = asr_state.left_encoder_value;
+  asr.set_scale(asr_state.left_encoder_value);
+  if (scale != OC::Scales::SCALE_NONE)
+      asr_state.scale_editor.Edit(&asr, scale);
+}
+
+void ASR_downButtonLong() {
+   asr.toggle_delay_mechanics();
+}
+
 void ASR_handleButtonEvent(const UI::Event &event) {
   if (asr_state.scale_editor.active()) {
     asr_state.scale_editor.HandleButtonEvent(event);
@@ -916,52 +963,6 @@ void ASR_handleEncoderEvent(const UI::Event &event) {
       asr_state.cursor.Scroll(event.value);
     }
   }
-}
-
-
-void ASR_topButton() {
-  if (asr.octave_toggle())
-    asr.change_value(ASR_SETTING_OCTAVE, 1);
-  else
-    asr.change_value(ASR_SETTING_OCTAVE, -1);
-}
-
-void ASR_lowerButton() {
-   asr.manual_freeze();
-}
-
-void ASR_rightButton() {
-
-  switch (asr.enabled_setting_at(asr_state.cursor_pos())) {
-
-      case ASR_SETTING_MASK: {
-        int scale = asr.get_scale(DUMMY);
-        if (OC::Scales::SCALE_NONE != scale)
-          asr_state.scale_editor.Edit(&asr, scale);
-        }
-      break;
-      default:
-        asr_state.cursor.toggle_editing();
-      break;
-  }
-}
-
-void ASR_leftButton() {
-
-  if (asr_state.left_encoder_value != asr.get_scale(DUMMY))
-    asr.set_scale(asr_state.left_encoder_value);
-}
-
-void ASR_leftButtonLong() {
-
-  int scale = asr_state.left_encoder_value;
-  asr.set_scale(asr_state.left_encoder_value);
-  if (scale != OC::Scales::SCALE_NONE)
-      asr_state.scale_editor.Edit(&asr, scale);
-}
-
-void ASR_downButtonLong() {
-   asr.toggle_delay_mechanics();
 }
 
 size_t ASR_save(void *storage) {

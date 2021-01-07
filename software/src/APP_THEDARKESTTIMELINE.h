@@ -24,6 +24,19 @@
 
 #ifdef ENABLE_APP_DARKEST_TIMELINE
 
+#include <Arduino.h>
+#include <EEPROM.h>
+#include <stdint.h>
+#include "OC_core.h"
+#include "OC_config.h"
+#include "OC_apps.h"
+#include "OC_patterns.h"
+#include "OC_strings.h"
+#include "OC_menus.h"
+#include "OC_ui.h"
+#include "src/drivers/display.h"
+
+#include "HemisphereApplet.h"
 #include "util/util_settings.h"
 #include "OC_DAC.h"
 #include "braids_quantizer.h"

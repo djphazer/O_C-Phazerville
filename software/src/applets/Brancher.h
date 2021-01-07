@@ -18,6 +18,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#ifndef _HEM_BRANCHER_H_
+#define _HEM_BRANCHER_H_
+
+#include <Arduino.h>
+#include "OC_core.h"
+#include "HemisphereApplet.h"
+
 class Brancher : public HemisphereApplet {
 public:
 
@@ -100,3 +107,4 @@ private:
         gfxFrame(9 + (32 * choice), 42, 13, 13);
 	}
 };
+#endif
