@@ -126,7 +126,8 @@ size_t Settings_save(void *storage) {return 0;}
 size_t Settings_restore(const void *storage) {return 0;}
 
 void Settings_isr() {
-	return Settings_instance.BaseController();
+// skip the Controller to avoid I/O conflict with Calibration
+  return;
 }
 
 void Settings_handleAppEvent(OC::AppEvent event) {
