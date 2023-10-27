@@ -81,7 +81,12 @@ public:
             clock_m->SyncTrig( clock_sync );
 
         // ------------ //
-        if (clock_m->IsRunning() && clock_m->MIDITock()) usbMIDI.sendRealTime(usbMIDI.Clock);
+        if (clock_m->IsRunning() && clock_m->MIDITock()) {
+            usbMIDI.sendRealTime(usbMIDI.Clock);
+            #ifdef USB_MIDI_HOST
+            usbHostMIDI.sendRealTime(usbMIDI.Clock);
+            #endif
+        }
 
         // 4 internal clock flashers
         for (int i = 0; i < 4; ++i) {

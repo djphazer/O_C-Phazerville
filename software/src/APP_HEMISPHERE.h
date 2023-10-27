@@ -306,13 +306,14 @@ public:
         return select_mode > -1;
     }
 
-    void ProcessMIDI() {
+    template <typename T>
+    void ProcessMIDI(T device) {
         HS::IOFrame &f = HS::frame;
 
-        while (usbMIDI.read()) {
-            const int message = usbMIDI.getType();
-            const int data1 = usbMIDI.getData1();
-            const int data2 = usbMIDI.getData2();
+        while (device.read()) {
+            const int message = device.getType();
+            const int data1 = device.getData1();
+            const int data2 = device.getData2();
 
             if (message == usbMIDI.SystemExclusive) {
                 ReceiveManagerSysEx();
@@ -320,12 +321,12 @@ public:
             }
 
             if (message == usbMIDI.ProgramChange) {
-                int slot = usbMIDI.getData1();
+                int slot = device.getData1();
                 if (slot < HEM_NR_OF_PRESETS) LoadFromPreset(slot);
                 continue;
             }
 
-            f.MIDIState.ProcessMIDIMsg(usbMIDI.getChannel(), message, data1, data2);
+            f.MIDIState.ProcessMIDIMsg(device.getChannel(), message, data1, data2);
         }
     }
 
@@ -340,7 +341,11 @@ public:
 
     void Controller() {
         // top-level MIDI-to-CV handling - alters frame outputs
-        ProcessMIDI();
+        ProcessMIDI(usbMIDI);
+        #ifdef USB_MIDI_HOST
+        ProcessMIDI(usbHostMIDI);
+        #endif
+
         CheckPresetTriggers();
 
         // Clock Setup applet handles internal clock duties
