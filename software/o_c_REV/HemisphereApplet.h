@@ -112,6 +112,12 @@ typedef struct Applet {
   void (*OnDataReceive)(bool, uint64_t); // Send a data int to the applet
 } Applet;
 
+// editable by cursor, and CV assignable
+typedef struct {
+    uint8_t &p; int min, max;
+    uint8_t x, y, w;
+} AppletParam;
+
 Applet available_applets[] = HEMISPHERE_APPLETS;
 Applet clock_setup_applet = DECLARE_APPLET(9999, 0x01, ClockSetup);
 
@@ -131,6 +137,7 @@ using namespace HS;
 class HemisphereApplet {
 public:
     static int cursor_countdown[2];
+    static int cursor[2];
 
     virtual const char* applet_name(); // Maximum of 9 characters
     virtual void Start();
@@ -141,7 +148,7 @@ public:
         hemisphere = hemisphere_;
 
         // Initialize some things for startup
-        help_active = 0;
+        full_screen = 0;
         cursor_countdown[hemisphere] = HEMISPHERE_CURSOR_TICKS;
 
         // Shutdown FTM capture on Digital 4, used by Tuner
@@ -190,7 +197,7 @@ public:
 
     /* Help Screen Toggle */
     void HelpScreen() {
-        help_active = 1 - help_active;
+        full_screen = 1 - full_screen;
     }
 
     /* Check cursor blink cycle. */
@@ -205,6 +212,7 @@ public:
     virtual void DrawFullScreen() {
         SetHelp();
 
+        // TODO: standard CV input assignment stuff, capture the cursor somehow
         for (int section = 0; section < 4; section++)
         {
             int y = section * 12 + 16;
@@ -494,8 +502,9 @@ protected:
 
 private:
     bool applet_started; // Allow the app to maintain state during switching
-    bool help_active;
+    bool full_screen;
 };
 
 int HemisphereApplet::cursor_countdown[2];
+int HemisphereApplet::cursor[2];
 
