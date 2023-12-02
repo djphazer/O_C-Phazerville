@@ -68,6 +68,7 @@
     DECLARE_APPLET( 19, 0x01, Slew), \
     DECLARE_APPLET( 46, 0x08, Squanch), \
     DECLARE_APPLET( 61, 0x01, Stairs), \
+    DECLARE_APPLET( 74, 0x08, Strum), \
     DECLARE_APPLET(  3, 0x10, Switch), \
     DECLARE_APPLET( 60, 0x02, TB_3PO), \
     DECLARE_APPLET( 13, 0x40, TLNeuron), \
