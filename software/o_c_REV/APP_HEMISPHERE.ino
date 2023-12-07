@@ -53,9 +53,9 @@ enum HEMISPHERE_SETTINGS {
 };
 
 static constexpr int HEMISPHERE_AVAILABLE_APPLETS = ARRAY_SIZE(HS::available_applets);
-static const int HEM_NR_OF_PRESETS = 4;
+static const int HEM_NR_OF_PRESETS = 8;
 
-static const char * hem_preset_name[HEM_NR_OF_PRESETS] = { "A", "B", "C", "D" };
+static const char * hem_preset_name[HEM_NR_OF_PRESETS] = { "A", "B", "C", "D", "E", "F", "G", "H" };
 
 /* Hemisphere Preset
  * - conveniently store/recall multiple configurations
@@ -281,7 +281,7 @@ public:
 
             if (message == usbMIDI.ProgramChange) {
                 int slot = usbMIDI.getData1();
-                if (slot < 4) LoadFromPreset(slot);
+                if (slot < HEM_NR_OF_PRESETS) LoadFromPreset(slot);
                 continue;
             }
 
@@ -676,17 +676,21 @@ private:
 
     void DrawPresetSelector() {
         gfxHeader("Hemisphere Presets");
-        int y = 5 + preset_cursor*10;
+        int y = 5 + constrain(preset_cursor,1,5)*10;
         gfxPrint(1, y, (config_cursor == SAVE_PRESET) ? "Save" : "Load");
         gfxIcon(26, y, RIGHT_ICON);
-        for (int i = 0; i < HEM_NR_OF_PRESETS; ++i) {
-            y = 15 + i*10;
+        const int top = constrain(preset_cursor - 4, 1, HEM_NR_OF_PRESETS) - 1;
+        y = 15;
+        for (int i = top; i < HEM_NR_OF_PRESETS && i < top + 5; ++i)
+        {
             gfxPrint(35, y, hem_preset_name[i]);
 
             if (!hem_presets[i].is_valid())
                 gfxPrint(" (empty)");
             else if (i == preset_id)
                 gfxIcon(45, y, ZAP_ICON);
+
+            y += 10;
         }
     }
 
