@@ -426,7 +426,7 @@ public:
         // clock triggers
         if (useTock && clock_m->GetMultiply(ch + io_offset) != 0)
             clocked = clock_m->Tock(ch + io_offset);
-        else if (trigger_mapping[ch + io_offset])
+        else if (trigger_mapping[ch + io_offset] > 0 && trigger_mapping[ch + io_offset] < 5)
             clocked = frame.clocked[ trigger_mapping[ch + io_offset] - 1 ];
 
         // Try to eat a boop
@@ -445,7 +445,7 @@ public:
 
     bool Gate(int ch) {
         const int t = trigger_mapping[ch + io_offset];
-        return t ? frame.gate_high[t - 1] : false;
+        return (t && t < 5) ? frame.gate_high[t - 1] : false;
     }
 
     void GateOut(int ch, bool high) {

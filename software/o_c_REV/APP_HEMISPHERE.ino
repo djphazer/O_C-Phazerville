@@ -289,9 +289,19 @@ public:
         }
     }
 
+    void CheckPresetTriggers() {
+        for (int i = 0; i < 4; ++i) {
+            if (HS::trigger_mapping[i] > 4 && HS::frame.clocked[i]) {
+                LoadFromPreset(HS::trigger_mapping[i] - 5);
+                break;
+            }
+        }
+    }
+
     void Controller() {
         // top-level MIDI-to-CV handling - alters frame outputs
         ProcessMIDI();
+        CheckPresetTriggers();
 
         // Clock Setup applet handles internal clock duties
         HS::clock_setup_applet.Controller(LEFT_HEMISPHERE, 0);

@@ -140,7 +140,7 @@ public:
         case TRIG2:
         case TRIG3:
         case TRIG4:
-            HS::trigger_mapping[cursor-TRIG1] = constrain( HS::trigger_mapping[cursor-TRIG1] + direction, 0, 4);
+            HS::trigger_mapping[cursor-TRIG1] = constrain( HS::trigger_mapping[cursor-TRIG1] + direction, 0, 12);
             break;
 
         case BOOP1:
@@ -287,7 +287,7 @@ private:
             }
 
             // Physical trigger input mappings
-            gfxPrint(1 + x, y + 13, OC::Strings::trigger_input_names_none[ HS::trigger_mapping[ch] ] );
+            gfxPrint(1 + x, y + 13, OC::Strings::trigger_input_settings[ HS::trigger_mapping[ch] ] );
 
             // Manual trigger buttons
             gfxIcon(4 + x, 47, (button_ticker && ch == cursor-BOOP1)?BTN_ON_ICON:BTN_OFF_ICON);

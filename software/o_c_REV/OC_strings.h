@@ -28,6 +28,7 @@ namespace OC {
     extern const char * const VOR_offsets[];    
     extern const char * const trigger_input_names[];
     extern const char * const trigger_input_names_none[];
+    extern const char * const trigger_input_settings[];
     extern const char * const cv_input_names[];
     extern const char * const cv_input_names_none[];
     extern const char * const no_yes[];
