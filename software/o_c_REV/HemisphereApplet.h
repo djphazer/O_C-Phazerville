@@ -120,8 +120,9 @@ static IOFrame frame;
 int octave_max = 5;
 
 int select_mode = -1;
-uint8_t modal_edit_mode = 2; // 0=old behavior, 1=modal editing, 2=modal with wraparound
-static void CycleEditMode() { ++modal_edit_mode %= 3; }
+bool cursor_wrap = 0;
+//uint8_t modal_edit_mode = 2; // 0=old behavior, 1=modal editing, 2=modal with wraparound
+//static void CycleEditMode() { ++modal_edit_mode %= 3; }
 
 }
 
@@ -218,17 +219,12 @@ public:
 
     // handle modal edit mode toggle or cursor advance
     void CursorAction(int &cursor, int max) {
-        if (modal_edit_mode) {
-            isEditing = !isEditing;
-        } else {
-            cursor++;
-            cursor %= max + 1;
-            ResetCursor();
-        }
+        isEditing = !isEditing;
+        ResetCursor();
     }
     void MoveCursor(int &cursor, int direction, int max) {
         cursor += direction;
-        if (modal_edit_mode == 2) { // wrap cursor
+        if (cursor_wrap) {
             if (cursor < 0) cursor = max;
             else cursor %= max + 1;
         } else {
@@ -237,7 +233,7 @@ public:
         ResetCursor();
     }
     bool EditMode() {
-        return (isEditing || !modal_edit_mode);
+        return (isEditing);
     }
 
     // Override HSUtils function to only return positive values
