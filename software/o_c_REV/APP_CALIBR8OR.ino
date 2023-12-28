@@ -248,7 +248,7 @@ public:
         ProcessMIDI();
 
         // ClockSetup applet handles internal clock duties
-        HS::clock_setup_applet.Controller(0, 0);
+        HS::clock_setup_applet.instance[0].Controller();
 
         // -- core processing --
         for (int ch = 0; ch < NR_OF_CHANNELS; ++ch) {
@@ -283,7 +283,7 @@ public:
 
     void View() {
         if (clock_setup) {
-            HS::clock_setup_applet.View(0);
+            HS::clock_setup_applet.instance[0].View();
             return;
         }
 
@@ -371,7 +371,7 @@ public:
         if ( event.control == OC::CONTROL_BUTTON_DOWN || event.control == OC::CONTROL_BUTTON_UP)
             UpOrDownButtonPress(event.control == OC::CONTROL_BUTTON_UP);
         else if (clock_setup) // pass button down to Clock Setup
-            HS::clock_setup_applet.OnButtonPress(0);
+            HS::clock_setup_applet.instance[0].OnButtonPress();
     }
 
     void UpOrDownButtonPress(bool up) {
@@ -407,7 +407,7 @@ public:
     // Left encoder: Octave or VScaling + Scale Select
     void OnLeftEncoderMove(int direction) {
         if (clock_setup) {
-            HS::clock_setup_applet.OnEncoderMove(0, direction);
+            HS::clock_setup_applet.instance[0].OnEncoderMove(direction);
             return;
         }
         if (preset_select) {
@@ -446,7 +446,7 @@ public:
     // Right encoder: Semitones or Bias Offset + Root Note
     void OnRightEncoderMove(int direction) {
         if (clock_setup) {
-            HS::clock_setup_applet.OnEncoderMove(0, direction);
+            HS::clock_setup_applet.instance[0].OnEncoderMove(direction);
             return;
         }
         if (preset_select) {

@@ -7,16 +7,9 @@
  *
  */
 
+#include "HSMIDI.h"
+
 namespace HS {
-
-braids::Quantizer quantizer[4]; // global shared quantizers
-int quant_scale[4];
-int root_note[4];
-
-bool auto_save_enabled = false;
-int trigger_mapping[] = { 1, 2, 3, 4 };
-uint8_t trig_length = 10; // in ms, multiplier for HEMISPHERE_CLOCK_TICKS
-uint8_t screensaver_mode = 2; // 0 = blank, 1 = Meters, 2 = Zaps
 
 typedef struct MIDILogEntry {
     int message;

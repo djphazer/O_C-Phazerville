@@ -11,6 +11,153 @@
 // * Category filtering is deprecated at 1.8, but I'm leaving the per-applet categorization
 // alone to avoid breaking forked codebases by other developers.
 
+#define CREATE_APPLET(class_name) \
+class_name class_name ## _instance[2]
+
+#define DECLARE_APPLET(id, categories, class_name) \
+{ id, categories, class_name ## _instance }
+
+#include "applets/ADSREG.h"
+#include "applets/ADEG.h"
+#include "applets/ASR.h"
+#include "applets/AttenuateOffset.h"
+#include "applets/Binary.h"
+#include "applets/BootsNCat.h"
+#include "applets/Brancher.h"
+#include "applets/BugCrack.h"
+#include "applets/Burst.h"
+#include "applets/Button.h"
+#include "applets/CVRecV2.h"
+#include "applets/Calculate.h"
+#include "applets/Calibr8.h"
+#include "applets/Carpeggio.h"
+#include "applets/Chordinator.h"
+#include "applets/ClockDivider.h"
+#include "applets/ClockSetup.h"
+#include "applets/ClockSkip.h"
+#include "applets/Compare.h"
+#include "applets/DivSeq.h"
+#include "applets/DrumMap.h"
+#include "applets/DualQuant.h"
+#include "applets/DualTM.h"
+#include "applets/EbbAndLfo.h"
+#include "applets/EnigmaJr.h"
+#include "applets/EnvFollow.h"
+#include "applets/EuclidX.h"
+#include "applets/GameOfLife.h"
+#include "applets/GateDelay.h"
+#include "applets/GatedVCA.h"
+#include "applets/LoFiPCM.h"
+#include "applets/Logic.h"
+#include "applets/LowerRenz.h"
+#include "applets/Metronome.h"
+#include "applets/MixerBal.h"
+#include "applets/MultiScale.h"
+#include "applets/Palimpsest.h"
+#include "applets/Pigeons.h"
+#include "applets/PolyDiv.h"
+#include "applets/ProbabilityDivider.h"
+#include "applets/ProbabilityMelody.h"
+#include "applets/ResetClock.h"
+#include "applets/RndWalk.h"
+#include "applets/RunglBook.h"
+#include "applets/ScaleDuet.h"
+#include "applets/Schmitt.h"
+#include "applets/Scope.h"
+#include "applets/SequenceX.h"
+#include "applets/ShiftGate.h"
+#include "applets/Shredder.h"
+#include "applets/Shuffle.h"
+#include "applets/Slew.h"
+#include "applets/Squanch.h"
+#include "applets/Stairs.h"
+#include "applets/Strum.h"
+#include "applets/Switch.h"
+#include "applets/TB3PO.h"
+#include "applets/TLNeuron.h"
+#include "applets/Trending.h"
+#include "applets/TrigSeq.h"
+#include "applets/TrigSeq16.h"
+#include "applets/Tuner.h"
+#include "applets/VectorEG.h"
+#include "applets/VectorLFO.h"
+#include "applets/VectorMod.h"
+#include "applets/VectorMorph.h"
+#include "applets/Voltage.h"
+#include "applets/hMIDIIn.h"
+#include "applets/hMIDIOut.h"
+
+CREATE_APPLET(ADSREG);
+CREATE_APPLET(ADEG);
+CREATE_APPLET(AttenuateOffset);
+CREATE_APPLET(BugCrack);
+CREATE_APPLET(DrumMap);
+CREATE_APPLET(DualTM);
+CREATE_APPLET(EbbAndLfo);
+CREATE_APPLET(EuclidX);
+CREATE_APPLET(hMIDIIn);
+CREATE_APPLET(hMIDIOut);
+CREATE_APPLET(Pigeons);
+CREATE_APPLET(Stairs);
+CREATE_APPLET(TB_3PO);
+CREATE_APPLET(Voltage);
+
+CREATE_APPLET(Calibr8);
+CREATE_APPLET(DivSeq);
+CREATE_APPLET(PolyDiv);
+
+CREATE_APPLET(ASR);
+CREATE_APPLET(Binary);
+CREATE_APPLET(BootsNCat);
+CREATE_APPLET(Brancher);
+CREATE_APPLET(Burst);
+CREATE_APPLET(Button);
+CREATE_APPLET(Calculate);
+CREATE_APPLET(Carpeggio);
+CREATE_APPLET(Chordinator);
+CREATE_APPLET(ClockDivider);
+CREATE_APPLET(ClockSkip);
+CREATE_APPLET(Compare);
+CREATE_APPLET(CVRecV2);
+CREATE_APPLET(DualQuant);
+CREATE_APPLET(EnigmaJr);
+CREATE_APPLET(EnvFollow);
+CREATE_APPLET(GameOfLife);
+CREATE_APPLET(GateDelay);
+CREATE_APPLET(GatedVCA);
+CREATE_APPLET(LoFiPCM);
+CREATE_APPLET(Logic);
+CREATE_APPLET(LowerRenz);
+CREATE_APPLET(Metronome);
+CREATE_APPLET(MixerBal);
+CREATE_APPLET(MultiScale);
+CREATE_APPLET(Palimpsest);
+CREATE_APPLET(ProbabilityDivider);
+CREATE_APPLET(ProbabilityMelody);
+CREATE_APPLET(ResetClock);
+CREATE_APPLET(RndWalk);
+CREATE_APPLET(RunglBook);
+CREATE_APPLET(ScaleDuet);
+CREATE_APPLET(Schmitt);
+CREATE_APPLET(Scope);
+CREATE_APPLET(SequenceX);
+CREATE_APPLET(ShiftGate);
+CREATE_APPLET(Shredder);
+CREATE_APPLET(Shuffle);
+CREATE_APPLET(Slew);
+CREATE_APPLET(Squanch);
+CREATE_APPLET(Strum);
+CREATE_APPLET(Switch);
+CREATE_APPLET(TLNeuron);
+CREATE_APPLET(Trending);
+CREATE_APPLET(TrigSeq);
+CREATE_APPLET(TrigSeq16);
+CREATE_APPLET(Tuner);
+CREATE_APPLET(VectorEG);
+CREATE_APPLET(VectorLFO);
+CREATE_APPLET(VectorMod);
+CREATE_APPLET(VectorMorph);
+
 //////////////////  id  cat   class name
 #define HEMISPHERE_APPLETS { \
     DECLARE_APPLET(  8, 0x01, ADSREG), \

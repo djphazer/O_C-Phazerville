@@ -271,6 +271,4 @@ public:
     bool Cycle(int ch = 0) {return cycle;}
 };
 
-ClockManager *ClockManager::instance = 0;
-
 #endif // CLOCK_MANAGER_H

@@ -27,10 +27,15 @@
 
 #pragma once
 
-#include "HSicons.h"
-#include "HSClockManager.h"
+#include <Arduino.h>
+#include "OC_core.h"
+#include "OC_digital_inputs.h"
+#include "OC_DAC.h"
+#include "OC_ADC.h"
 #include "src/drivers/FreqMeasure/OC_FreqMeasure.h"
 #include "util/util_math.h"
+#include "HSicons.h"
+#include "HSClockManager.h"
 
 #define LEFT_HEMISPHERE 0
 #define RIGHT_HEMISPHERE 1
@@ -65,14 +70,7 @@ HEMISPHERE_HELP_CVS = 1,
 HEMISPHERE_HELP_OUTS = 2,
 HEMISPHERE_HELP_ENCODER = 3
 };
-const char * HEM_HELP_SECTION_NAMES[4] = {"Dig", "CV", "Out", "Enc"};
-
-// Simulated fixed floats by multiplying and dividing by powers of 2
-#ifndef int2simfloat
-#define int2simfloat(x) (x << 14)
-#define simfloat2int(x) (x >> 14)
-typedef int32_t simfloat;
-#endif
+static const char * HEM_HELP_SECTION_NAMES[4] = {"Dig", "CV", "Out", "Enc"};
 
 // Hemisphere-specific macros
 #define BottomAlign(h) (62 - h)
@@ -86,22 +84,19 @@ typedef int32_t simfloat;
 #define HEMISPHERE_PULSE_ANIMATION_TIME 500
 #define HEMISPHERE_PULSE_ANIMATION_TIME_LONG 1200
 
-#define DECLARE_APPLET(id, categories, class_name) \
-{ id, categories, class_name ## _Start, class_name ## _Controller, class_name ## _View, \
-  class_name ## _OnButtonPress, class_name ## _OnEncoderMove, class_name ## _ToggleHelpScreen, \
-  class_name ## _OnDataRequest, class_name ## _OnDataReceive \
-}
-
-#include "hemisphere_config.h"
-#include "braids_quantizer.h"
+#include "OC_scales.h"
 #include "HSUtils.h"
 #include "HSIOFrame.h"
+
+class HemisphereApplet;
 
 namespace HS {
 
 typedef struct Applet {
   int id;
   uint8_t categories;
+  HemisphereApplet* instance;
+  /*
   void (*Start)(bool); // Initialize when selected
   void (*Controller)(bool, bool);  // Interrupt Service Routine
   void (*View)(bool);  // Draw main view
@@ -110,6 +105,7 @@ typedef struct Applet {
   void (*ToggleHelpScreen)(bool); // Help Screen has been requested
   uint64_t (*OnDataRequest)(bool); // Get a data int from the applet
   void (*OnDataReceive)(bool, uint64_t); // Send a data int to the applet
+  */
 } Applet;
 
 // editable by cursor, and CV assignable
@@ -118,17 +114,10 @@ typedef struct {
     uint8_t x, y, w;
 } AppletParam;
 
-Applet available_applets[] = HEMISPHERE_APPLETS;
-Applet clock_setup_applet = DECLARE_APPLET(9999, 0x01, ClockSetup);
-
 static IOFrame frame;
 
-int octave_max = 5;
-
-int select_mode = -1;
-bool cursor_wrap = 0;
-//uint8_t modal_edit_mode = 2; // 0=old behavior, 1=modal editing, 2=modal with wraparound
-//static void CycleEditMode() { ++modal_edit_mode %= 3; }
+extern Applet available_applets[];
+extern Applet clock_setup_applet;
 
 }
 
@@ -139,76 +128,25 @@ public:
     static int cursor_countdown[2];
     static int cursor[2];
 
-    virtual const char* applet_name(); // Maximum of 9 characters
-    virtual void Start();
-    virtual void Controller();
-    virtual void View();
+    virtual const char* applet_name() = 0; // Maximum of 9 characters
+    virtual void Start() = 0;
+    virtual void Controller() = 0;
+    virtual void View() = 0;
+    virtual uint64_t OnDataRequest() = 0;
+    virtual void OnDataReceive(uint64_t data) = 0;
+    virtual void OnButtonPress() = 0;
+    virtual void OnEncoderMove(int direction) = 0;
 
-    void BaseStart(bool hemisphere_) {
-        hemisphere = hemisphere_;
-
-        // Initialize some things for startup
-        full_screen = 0;
-        cursor_countdown[hemisphere] = HEMISPHERE_CURSOR_TICKS;
-
-        // Shutdown FTM capture on Digital 4, used by Tuner
-#ifdef FLIP_180
-        if (hemisphere == 0)
-#else
-        if (hemisphere == 1)
-#endif
-        {
-            FreqMeasure.end();
-            OC::DigitalInputs::reInit();
-        }
-
-        // Maintain previous app state by skipping Start
-        if (!applet_started) {
-            applet_started = true;
-            Start();
-            ForEachChannel(ch) {
-                Out(ch, 0); // reset outputs
-            }
-        }
-    }
-
-    void BaseController(bool master_clock_on = false) {
-        // I moved the IO-related stuff to the parent HemisphereManager app.
-        // The IOFrame gets loaded before calling Controllers, and outputs are handled after.
-        // -NJM
-
-        // Cursor countdowns. See CursorBlink(), ResetCursor(), gfxCursor()
-        if (--cursor_countdown[hemisphere] < -HEMISPHERE_CURSOR_TICKS) cursor_countdown[hemisphere] = HEMISPHERE_CURSOR_TICKS;
-
-        Controller();
-    }
-
-    void BaseView() {
-        //if (HS::select_mode == hemisphere)
-        gfxHeader(applet_name());
-        // If active, draw the full screen view instead of the application screen
-        if (full_screen) this->DrawFullScreen();
-        else View();
-    }
+    void BaseStart(bool hemisphere_);
+    void BaseController();
+    void BaseView();
 
     // Screensavers are deprecated in favor of screen blanking, but the BaseScreensaverView() remains
     // to avoid breaking applets based on the old boilerplate
     void BaseScreensaverView() {}
 
     /* Help Screen Toggle */
-    void HelpScreen() {
-        full_screen = 1 - full_screen;
-    }
-
-    /* Check cursor blink cycle. */
-    bool CursorBlink() {
-        return (cursor_countdown[hemisphere] > 0);
-    }
-
-    void ResetCursor() {
-        cursor_countdown[hemisphere] = HEMISPHERE_CURSOR_TICKS;
-    }
-
+    void ToggleHelpScreen() { full_screen = 1 - full_screen; }
     virtual void DrawFullScreen() {
         SetHelp();
 
@@ -225,6 +163,10 @@ public:
         }
     }
 
+    /* Check cursor blink cycle. */
+    bool CursorBlink() { return (cursor_countdown[hemisphere] > 0); }
+    void ResetCursor() { cursor_countdown[hemisphere] = HEMISPHERE_CURSOR_TICKS; }
+
     // handle modal edit mode toggle or cursor advance
     void CursorAction(int &cursor, int max) {
         isEditing = !isEditing;
@@ -240,6 +182,92 @@ public:
         }
         ResetCursor();
     }
+
+    // Buffered I/O functions
+    int ViewIn(int ch) {return frame.inputs[io_offset + ch];}
+    int ViewOut(int ch) {return frame.outputs[io_offset + ch];}
+    int ClockCycleTicks(int ch) {return frame.cycle_ticks[io_offset + ch];}
+    bool Changed(int ch) {return frame.changed_cv[io_offset + ch];}
+
+    //////////////// Offset I/O methods
+    ////////////////////////////////////////////////////////////////////////////////
+    int In(int ch) {
+        return frame.inputs[io_offset + ch];
+    }
+
+    // Apply small center detent to input, so it reads zero before a threshold
+    int DetentedIn(int ch) {
+        return (In(ch) > (HEMISPHERE_CENTER_CV + HEMISPHERE_CENTER_DETENT) || In(ch) < (HEMISPHERE_CENTER_CV - HEMISPHERE_CENTER_DETENT))
+            ? In(ch) : HEMISPHERE_CENTER_CV;
+    }
+    int SmoothedIn(int ch) {
+        ADC_CHANNEL channel = (ADC_CHANNEL)(ch + io_offset);
+        return OC::ADC::value(channel);
+    }
+
+    bool Clock(int ch, bool physical = 0);
+
+    bool Gate(int ch) {
+        const int t = trigger_mapping[ch + io_offset];
+        return (t && t < 5) ? frame.gate_high[t - 1] : false;
+    }
+    void Out(int ch, int value, int octave = 0) {
+        frame.Out( (DAC_CHANNEL)(ch + io_offset), value + (octave * (12 << 7)));
+    }
+
+    void SmoothedOut(int ch, int value, int kSmoothing) {
+        DAC_CHANNEL channel = (DAC_CHANNEL)(ch + io_offset);
+        value = (frame.outputs_smooth[channel] * (kSmoothing - 1) + value) / kSmoothing;
+        frame.outputs[channel] = frame.outputs_smooth[channel] = value;
+    }
+    void ClockOut(const int ch, const int ticks = HEMISPHERE_CLOCK_TICKS * trig_length) {
+        frame.ClockOut( (DAC_CHANNEL)(io_offset + ch), ticks);
+    }
+
+    void GateOut(int ch, bool high) {
+        Out(ch, 0, (high ? PULSE_VOLTAGE : 0));
+    }
+
+
+    braids::Quantizer* GetQuantizer(int ch) {
+        return &HS::quantizer[io_offset + ch];
+    }
+    int Quantize(int ch, int cv, int root, int transpose) {
+        return HS::quantizer[io_offset + ch].Process(cv, root, transpose);
+    }
+    int QuantizerLookup(int ch, int note) {
+        return HS::quantizer[io_offset + ch].Lookup(note) + (HS::root_note[io_offset+ch] << 7);
+    }
+    void QuantizerConfigure(int ch, int scale, uint16_t mask = 0xffff) {
+        HS::quant_scale[io_offset + ch] = scale;
+        HS::quantizer[io_offset + ch].Configure(OC::Scales::GetScale(scale), mask);
+    }
+    int GetScale(int ch) {
+        return HS::quant_scale[io_offset + ch];
+    }
+    int GetRootNote(int ch) {
+        return HS::root_note[io_offset + ch];
+    }
+    int SetRootNote(int ch, int root) {
+        return (HS::root_note[io_offset + ch] = root);
+    }
+    void NudgeScale(int ch, int dir) {
+        const int max = OC::Scales::NUM_SCALES;
+        int &s = HS::quant_scale[io_offset + ch];
+
+        s+= dir;
+        if (s >= max) s = 0;
+        if (s < 0) s = max - 1;
+        QuantizerConfigure(ch, s);
+    }
+
+    // Standard bi-polar CV modulation scenario
+    template <typename T>
+    void Modulate(T &param, const int ch, const int min = 0, const int max = 255) {
+        int cv = DetentedIn(ch);
+        param = constrain(param + Proportion(cv, HEMISPHERE_MAX_INPUT_CV, max), min, max);
+    }
+
     bool EditMode() {
         return (isEditing);
     }
@@ -354,123 +382,11 @@ public:
         if (EditMode() && is_cursor) gfxInvert(x-1, y, len+3, 8);
     }
 
-    //////////////// Offset I/O methods
-    ////////////////////////////////////////////////////////////////////////////////
-    int In(int ch) {
-        return frame.inputs[io_offset + ch];
-    }
-
-    // Apply small center detent to input, so it reads zero before a threshold
-    int DetentedIn(int ch) {
-        return (In(ch) > (HEMISPHERE_CENTER_CV + HEMISPHERE_CENTER_DETENT) || In(ch) < (HEMISPHERE_CENTER_CV - HEMISPHERE_CENTER_DETENT))
-            ? In(ch) : HEMISPHERE_CENTER_CV;
-    }
-
-    int SmoothedIn(int ch) {
-        ADC_CHANNEL channel = (ADC_CHANNEL)(ch + io_offset);
-        return OC::ADC::value(channel);
-    }
-
-    braids::Quantizer* GetQuantizer(int ch) {
-        return &HS::quantizer[io_offset + ch];
-    }
-    int Quantize(int ch, int cv, int root, int transpose) {
-        return HS::quantizer[io_offset + ch].Process(cv, root, transpose);
-    }
-    int QuantizerLookup(int ch, int note) {
-        return HS::quantizer[io_offset + ch].Lookup(note) + (HS::root_note[io_offset+ch] << 7);
-    }
-    void QuantizerConfigure(int ch, int scale, uint16_t mask = 0xffff) {
-        HS::quant_scale[io_offset + ch] = scale;
-        HS::quantizer[io_offset + ch].Configure(OC::Scales::GetScale(scale), mask);
-    }
-    int GetScale(int ch) {
-        return HS::quant_scale[io_offset + ch];
-    }
-    int GetRootNote(int ch) {
-        return HS::root_note[io_offset + ch];
-    }
-    int SetRootNote(int ch, int root) {
-        return (HS::root_note[io_offset + ch] = root);
-    }
-    void NudgeScale(int ch, int dir) {
-        const int max = OC::Scales::NUM_SCALES;
-        int &s = HS::quant_scale[io_offset + ch];
-
-        s+= dir;
-        if (s >= max) s = 0;
-        if (s < 0) s = max - 1;
-        QuantizerConfigure(ch, s);
-    }
-
-    // Standard bi-polar CV modulation scenario
-    template <typename T>
-    void Modulate(T &param, const int ch, const int min = 0, const int max = 255) {
-        int cv = DetentedIn(ch);
-        param = constrain(param + Proportion(cv, HEMISPHERE_MAX_INPUT_CV, max), min, max);
-    }
-
-    void Out(int ch, int value, int octave = 0) {
-        frame.Out( (DAC_CHANNEL)(ch + io_offset), value + (octave * (12 << 7)));
-    }
-
-    void SmoothedOut(int ch, int value, int kSmoothing) {
-        DAC_CHANNEL channel = (DAC_CHANNEL)(ch + io_offset);
-        value = (frame.outputs_smooth[channel] * (kSmoothing - 1) + value) / kSmoothing;
-        frame.outputs[channel] = frame.outputs_smooth[channel] = value;
-    }
-
-    /*
-     * Has the specified Digital input been clocked this cycle?
-     *
-     * If physical is true, then logical clock types (master clock forwarding and metronome) will
-     * not be used.
-     */
-    bool Clock(int ch, bool physical = 0) {
-        bool clocked = 0;
-        ClockManager *clock_m = clock_m->get();
-        bool useTock = (!physical && clock_m->IsRunning());
-
-        // clock triggers
-        if (useTock && clock_m->GetMultiply(ch + io_offset) != 0)
-            clocked = clock_m->Tock(ch + io_offset);
-        else if (trigger_mapping[ch + io_offset] > 0 && trigger_mapping[ch + io_offset] < 5)
-            clocked = frame.clocked[ trigger_mapping[ch + io_offset] - 1 ];
-
-        // Try to eat a boop
-        clocked = clocked || clock_m->Beep(io_offset + ch);
-
-        if (clocked) {
-            frame.cycle_ticks[io_offset + ch] = OC::CORE::ticks - frame.last_clock[io_offset + ch];
-            frame.last_clock[io_offset + ch] = OC::CORE::ticks;
-        }
-        return clocked;
-    }
-
-    void ClockOut(const int ch, const int ticks = HEMISPHERE_CLOCK_TICKS * trig_length) {
-        frame.ClockOut( (DAC_CHANNEL)(io_offset + ch), ticks);
-    }
-
-    bool Gate(int ch) {
-        const int t = trigger_mapping[ch + io_offset];
-        return (t && t < 5) ? frame.gate_high[t - 1] : false;
-    }
-
-    void GateOut(int ch, bool high) {
-        Out(ch, 0, (high ? PULSE_VOLTAGE : 0));
-    }
-
-    // Buffered I/O functions
-    int ViewIn(int ch) {return frame.inputs[io_offset + ch];}
-    int ViewOut(int ch) {return frame.outputs[io_offset + ch];}
-    int ClockCycleTicks(int ch) {return frame.cycle_ticks[io_offset + ch];}
-    bool Changed(int ch) {return frame.changed_cv[io_offset + ch];}
-
 protected:
     bool hemisphere; // Which hemisphere (0, 1) this applet uses
     bool isEditing = false; // modal editing toggle
     const char* help[4];
-    virtual void SetHelp();
+    virtual void SetHelp() = 0;
 
     /* Forces applet's Start() method to run the next time the applet is selected. This
      * allows an applet to start up the same way every time, regardless of previous state.
@@ -504,7 +420,4 @@ private:
     bool applet_started; // Allow the app to maintain state during switching
     bool full_screen;
 };
-
-int HemisphereApplet::cursor_countdown[2];
-int HemisphereApplet::cursor[2];
 
