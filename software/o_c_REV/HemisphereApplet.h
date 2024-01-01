@@ -179,8 +179,8 @@ public:
     void BaseView() {
         //if (HS::select_mode == hemisphere)
         gfxHeader(applet_name());
-        // If help is active, draw the help screen instead of the application screen
-        if (help_active) DrawHelpScreen();
+        // If active, draw the full screen view instead of the application screen
+        if (full_screen) this->DrawFullScreen();
         else View();
     }
 
@@ -202,7 +202,7 @@ public:
         cursor_countdown[hemisphere] = HEMISPHERE_CURSOR_TICKS;
     }
 
-    void DrawHelpScreen() {
+    virtual void DrawFullScreen() {
         SetHelp();
 
         for (int section = 0; section < 4; section++)

@@ -60,7 +60,7 @@ public:
 
             if (--sample_countdown < 1) {
                 sample_countdown = sample_ticks;
-                sample_num = LoopInt(++sample_num, 63);
+                ++sample_num %= 128;
 
                 for (int n = 0; n < 2; n++) {
                   int sample = Proportion(In(n) + HEMISPHERE_MAX_INPUT_CV, 2*HEMISPHERE_MAX_INPUT_CV, 255);
@@ -70,6 +70,15 @@ public:
             }
 
             ForEachChannel(ch) Out(ch, In(ch));
+        }
+    }
+
+    void DrawFullScreen() {
+        int thing = (current_display == 4) ? -1 : (current_display & 0x2);
+        if (hemisphere == LEFT_HEMISPHERE) {
+            DrawInput(thing, 127, 63);
+        } else {
+            DrawInput(thing);
         }
     }
 
@@ -146,17 +155,13 @@ private:
     // Scope
     int current_display;
     int current_setting;
-    uint8_t snapshot[2][64];
+    uint8_t snapshot[2][128];
     int sample_ticks; // Ticks between samples
     int sample_countdown; // Last time a sample was taken
     int sample_num; // Current sample number at the start
     int last_encoder_move; // The last the the sample_ticks value was changed
     int last_scope_tick; // Used to auto-calculate sample countdown
 
-    int LoopInt(int n, int max) {
-        return n > max ? 0 : n;
-    }
-    
     void DrawBPM() {
         gfxPrint(9, 15, "BPM ");
         gfxPrint(bpm / 4);
@@ -195,22 +200,22 @@ private:
         gfxPrintVoltage(last_cv);
     }
 
-    void DrawInput(int input) {
-        int max = input < 0 ? 54 : 28;
-        for (int s = 0; s < 64; s++)
+    void DrawInput(const int input, const int width = 63, int height = 28) {
+        if (input < 0) height = 54;
+        for (int s = 0; s <= width; s++)
         {
-            int n = s + sample_num;
+            int n = (sample_num + s) % 128;
             int px, py;
-            if (n > 63) n -= 64;
             if (input < 0) { // X-Y mode
-                px = Proportion(snapshot[0][n], 255, 63);
-                py = Proportion(snapshot[1][n], 255, max);
-                gfxPixel(px, constrain((max - py) + 10, 0, 63));
+                px = Proportion(snapshot[0][n], 255, width);
+                py = Proportion(snapshot[1][n], 255, height);
+                py = constrain((height - py) + 10, 0, 63);
             } else {
-                px = n;
-                py = Proportion(snapshot[input][n], 255, max);
-                gfxPixel(px, (max - py) + 24);
+                px = n % width;
+                py = Proportion(snapshot[input][n], 255, height);
+                py = constrain((height - py) + (63 - height), 0, 63);
             }
+            gfxPixel(px, py);
         }
     }
 };
