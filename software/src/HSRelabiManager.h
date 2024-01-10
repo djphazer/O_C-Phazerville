@@ -46,7 +46,7 @@ class RelabiManager {
         registered[RIGHT_HEMISPHERE] = 0;
 
         // Initialize gate states
-        for (int i = 0; i < 4; i++) {
+        for (uint8_t i = 0; i < 4; i++) {
             gateStates[i] = false;
         }
     }
@@ -69,20 +69,18 @@ public:
             && (t - registered[RIGHT_HEMISPHERE] < 160));
     }
 
-    void WriteValues(int value1, int value2, int value3, int value4) {
+    void WriteValues(int value1, int value2, int value3) {
         // Update individual variables
         lfo1 = value1;
         lfo2 = value2;
         lfo3 = value3;
-        lfo4 = value4;
     }
 
-    void ReadValues(int &value1, int &value2, int &value3, int &value4) const {
+    void ReadValues(int &value1, int &value2, int &value3) const {
         // Read values into the referenced variables
         value1 = lfo1;
         value2 = lfo2;
         value3 = lfo3;
-        value4 = lfo4;
     }
 
     void WriteGates(bool gates[4]) {
@@ -96,7 +94,8 @@ public:
             gates[i] = gateStates[i];
         }
     }
+
+
 };
 
 RelabiManager *RelabiManager::instance = 0;
-
