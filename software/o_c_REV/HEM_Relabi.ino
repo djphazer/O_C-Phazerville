@@ -50,12 +50,12 @@ public:
             xmodKnob[count] = xmod[count];
             osc[count] = WaveformManager::VectorOscillatorFromWaveform(35);
             osc[count].SetFrequency(freq[count]);
-            #ifdef BUCHLA_4U
-              osc[count].Offset((12 << 7) * 4);
-              osc[count].SetScale((12 << 7) * 4);
-            #else
-              osc[count].SetScale((12 << 7) * 6);
-            #endif
+            // #ifdef BUCHLA_4U
+            //   osc[count].Offset((12 << 7) * 4);
+            //   osc[count].SetScale((12 << 7) * 4);
+            // #else
+            //   osc[count].SetScale((12 << 7) * 6);
+            // #endif
         }
     }
 
@@ -111,15 +111,19 @@ public:
                     }
                     oldClock = Clock(0);
 
-                    
                         cvIn = 10000.0 * pow(max(((cvIn / 100.0) + 1.0), 0.01) / 2.0, 1.0); //set range for cvIn to be 0 to 10000
                         for (uint8_t lfo = 0; lfo < 4; lfo++) {
+
+                            osc[lfo].SetScale(1000);
                             // multiply an lfo's set frequency by the first cv input and by the crossmodulation amount multipled with the previous sample value of the preceding oscillator. Scale it and then add the lfo's set frequency times the cv input.
-                            simfloat crossMod = (2 * xmod[lfo] * (((sample[(lfo + 3) % 4]) / 90.0)) / 100.0) - xmod[lfo];
-                            simfloat setFreq =  (static_cast<float>(mulLink) / divLink * cvIn / 2500.0 * (freq[lfo] * crossMod/100 + freq[lfo])) * 16; 
+                            //simfloat crossMod = (static_cast<float>(2.0) * xmod[lfo] * (sample[(lfo + 3) % 4]) / 921600.0) - static_cast<float>(1.0);
+                            simfloat crossMod = (static_cast<float>(xmod[0]) / 100.0) * ((static_cast<float>(sample[3]) * 2.0) - 1000.0) / 100.0;
+                            if (crossMod < 0) {crossMod = -1 * crossMod;}
+                            simfloat setFreq =  static_cast<float>(mulLink) / divLink * (cvIn / 2500.0 * ((freq[lfo] * crossMod) + freq[lfo])) * 16; 
                             displayFreq[lfo] = setFreq;
                             osc[lfo].SetFrequency(setFreq);
-                            sample[lfo] = 4608 + (osc[lfo].Next()/ 2);
+                            //sample[lfo] = osc[lfo].Next() + 3;
+                            sample[lfo] = 503 + (osc[lfo].Next()/ 2);
                         }
                     
                     if (manager->IsLinked() && hemisphere == LEFT_HEMISPHERE) {
@@ -162,10 +166,10 @@ public:
             gfxPrint(32, 26, "C3");
             gfxPrint(47, 26, "C4");
                     
-            gfxRect(2, 62 - (sample[0] / 400), 13, (sample[0] / 400));
-            gfxRect(17, 62 - (sample[1] / 400), 13, (sample[1] / 400));
-            gfxRect(32, 62 - (sample[2] / 400), 13, (sample[2] / 400));
-            gfxRect(47, 62 - (sample[3] / 400), 13, (sample[3] / 400));
+            gfxRect(2, 62 - (sample[0] / 40), 13, (sample[0] / 40));
+            gfxRect(17, 62 - (sample[1] / 40), 13, (sample[1] / 40));
+            gfxRect(32, 62 - (sample[2] / 40), 13, (sample[2] / 40));
+            gfxRect(47, 62 - (sample[3] / 40), 13, (sample[3] / 40));
 
             switch (selectedParam) {
             case 0:
@@ -211,12 +215,18 @@ public:
         gfxPrint(1, 46, "PHAS");
         gfxPrint(1, 55, phase[selectedChannel]);
 
-        
-        
-        gfxRect(31, 62 - (sample[0] / 600), 5, (sample[0] / 600));
-        gfxRect(37, 62 - (sample[1] / 600), 5, (sample[1] / 600));
-        gfxRect(43, 62 - (sample[2] / 600), 5, (sample[2] / 600));
-        gfxRect(49, 62 - (sample[3] / 600), 5, (sample[3] / 600));
+        //WORKING ON DISPLAYING INFORMATION ABOUT WHAT'S HAPPENING WITH CROSS MODULATION. I think the bit depth is 9216. I'm trying to make this bipolar.
+        //gfxPrint(31, 46, (static_cast<float>(2.0) * xmod[0] * (sample[3]) / 9216.0) - static_cast<float>(4608.0));
+        float crossMod = (static_cast<float>(xmod[0]) / 100.0) * ((static_cast<float>(sample[3]) * 2.0) - 1000.0) / 10;
+        //gfxPrint(31, 46, crossMod);
+        //gfxPrint(31, 55, osc[3].Next());
+        //gfxPrint(31, 55, sample[3]);
+        //gfxPrint(31, 55, displayFreq[0]);
+
+        gfxRect(31, 62 - (sample[0] / 60), 5, (sample[0] / 60));
+        gfxRect(37, 62 - (sample[1] / 60), 5, (sample[1] / 60));
+        gfxRect(43, 62 - (sample[2] / 60), 5, (sample[2] / 60));
+        gfxRect(49, 62 - (sample[3] / 60), 5, (sample[3] / 60));
 
             
             switch (selectedParam) {
@@ -268,9 +278,7 @@ public:
                     freqLinkMul = freqKnobMul;
                     break;
                 case 1: //Global frequency divider
-                    freqKnobDiv += direction;
-                    freqKnobDiv = freqKnobDiv + 65;
-                    freqKnobDiv = freqKnobDiv % 65; 
+                    freqKnobDiv = (freqKnobDiv + 64 + direction - 1) % 64 + 1;  // Cycle from 1 to 64
                     freqLinkDiv = freqKnobDiv;
                     break;
             }
@@ -369,7 +377,7 @@ private:
     uint8_t clkDiv = 0; // clkDiv allows us to calculate every other tick to save cycles
     uint8_t clkDivDisplay = 0; // clkDivDisplay allows us to update the display fewer times per second
     uint8_t oldClock = 0;
-    int displayFreq[ch];
+    simfloat displayFreq[ch];
     uint8_t freqLinkMul;
     uint8_t freqKnobMul;
     uint8_t freqLinkDiv;
