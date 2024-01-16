@@ -214,6 +214,7 @@ struct PassenChord {
 };
 
 namespace menu = OC::menu;
+using OC::DUMMY;
 
 class PASSENCORE : public settings::SettingsBase<PASSENCORE, PASSENCORE_SETTING_LAST> {
   public:
@@ -569,6 +570,14 @@ void PASSENCORE::find_passing_chord() {
   take_top_four();
 }
 
+int chromatic_tone(int32_t sample) {
+  int ret = (sample>>7)%12;
+  if (ret < 0) {
+    return ret + 12;
+  }
+  return ret;
+}
+
 void PASSENCORE::score_by_root() {
   bool root = false;
   int root_sample = 0;
@@ -590,15 +599,6 @@ void PASSENCORE::score_by_root() {
       }
     }
   }
-}
-
-
-int chromatic_tone(int32_t sample) {
-  int ret = (sample>>7)%12;
-  if (ret < 0) {
-    return ret + 12;
-  }
-  return ret;
 }
 
 void PASSENCORE::score_by_bass() {
