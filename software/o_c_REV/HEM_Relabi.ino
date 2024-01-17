@@ -42,6 +42,7 @@ public:
         freqLinkDiv = 1;
         freqKnobMul = 1;
         freqKnobDiv = 1;
+        bipolar = true;
 
         for (uint8_t count = 0; count < 4; count++) {
             if (freq[count] > 2000) {freqKnob[count] = (freq[count] - 2000) / 100 + 380;}
@@ -93,8 +94,8 @@ public:
 
                 // Linked: Receive lfo values from RelabiManager
                 manager->ReadValues(sample[0], sample[1], sample[2], sample[3]);
-                wave1 = (static_cast<float>(sample[2]) + HEMISPHERE_CENTER_CV + HEMISPHERE_3V_CV);
-                wave2 = (static_cast<float>(sample[3]) + HEMISPHERE_CENTER_CV + HEMISPHERE_3V_CV);
+                wave1 = (static_cast<float>(sample[2]));
+                wave2 = (static_cast<float>(sample[3]));
 
 
 
@@ -142,11 +143,17 @@ public:
                     
                     // CV1 outputs LFO1 // CV2 outputs LFO2
 
-                    wave1 = (static_cast<float>(sample[0]) + HEMISPHERE_CENTER_CV + HEMISPHERE_3V_CV); 
-                    wave2 = (static_cast<float>(sample[1]) * HEMISPHERE_CENTER_CV + HEMISPHERE_3V_CV);
-
+                    
+                        wave1 = (static_cast<float>(sample[0]) /*+ HEMISPHERE_CENTER_CV + HEMISPHERE_3V_CV*/); 
+                        wave2 = (static_cast<float>(sample[1]) /*+ HEMISPHERE_CENTER_CV + HEMISPHERE_3V_CV*/);
                     
                 }
+
+                
+            if (!bipolar) {
+                wave1 = wave1 + HEMISPHERE_CENTER_CV + HEMISPHERE_3V_CV;
+                wave2 = wave2 + HEMISPHERE_CENTER_CV + HEMISPHERE_3V_CV;
+               }
 
             Out(0, wave1);
             Out(1, wave2);
@@ -197,8 +204,17 @@ public:
             //gfxPrint(35, 2, sample[0]);
             
             // Display OSC label and value
-                gfxPrint(15, 15, "OSC");
-                gfxPrint(35, 15, selectedChannel);
+                gfxPrint(1, 15, "OSC");
+                gfxPrint(21, 15, selectedChannel);
+
+            // Display POLARITY
+                gfxPrint(31, 15, "POL");
+                if (bipolar) {
+                    gfxPrint("+-");
+                } else {
+                    gfxPrint("+");
+                        }
+
             
             // Display FREQ label and value
             gfxPrint(1, 26, "FREQ");
@@ -242,19 +258,19 @@ public:
             
             switch (selectedParam) {
             case 0:
-                gfxCursor(15, 23, 30);
+                gfxCursor(1, 23, 30);
                 break;
             case 1:
-                gfxCursor(1, 43, 30);
+                gfxCursor(31, 23, 30);
                 break;
             case 2:
-                gfxCursor(31, 43, 30);
+                gfxCursor(1, 43, 30);
                 break;
             case 3:
-                gfxCursor(1, 63, 30);
+                gfxCursor(31, 43, 30);
                 break;
             case 4:
-                gfxCursor(31, 63, 30);
+                gfxCursor(1, 63, 30);
                 break;
             }
         }
@@ -268,7 +284,7 @@ public:
             ResetCursor();
         } else {
             ++cursor;
-            cursor = cursor % 4;
+            cursor = cursor % 5;
             selectedParam = cursor;
             ResetCursor();
         }
@@ -298,10 +314,13 @@ public:
                 //Not linked or left hemisphere: controls select LFO, freq, xmod, and phase.
             
                 case 0: // Cycle through parameters when selecting OSC
-                    selectedChannel = selectedChannel + direction + 4;
-                    selectedChannel = selectedChannel % 4;
+                    selectedChannel = selectedChannel + direction + 5;
+                    selectedChannel = selectedChannel % 5;
                     break;
-                case 1: // FREQ (0-20.0)
+                case 1: // POLARITY(+ or +-)
+                    bipolar = (bipolar + direction + 2) % 2;
+                    break;
+                case 2: // FREQ (0-20.0)
                     freqKnob[selectedChannel] += direction;
                     if (freqKnob[selectedChannel] < 0) {freqKnob[selectedChannel] = 510;}
                     if (freqKnob[selectedChannel] > 510) {freqKnob[selectedChannel] = 0;}
@@ -315,13 +334,13 @@ public:
                             freq[selectedChannel] = 2000 + ((freqKnob[selectedChannel] - 380) * 100);
                         }
                     break;
-                case 2: // XMOD (0-100)
+                case 3: // XMOD (0-100)
                     xmodKnob[selectedChannel] += (direction);
                     xmodKnob[selectedChannel] = xmodKnob[selectedChannel] + 401;
                     xmodKnob[selectedChannel] = xmodKnob[selectedChannel] % 401;
                     xmod[selectedChannel] = xmodKnob[selectedChannel];
                     break;
-                case 3: // PHAS (0-100)
+                case 4: // PHAS (0-100)
                     phase[selectedChannel] += direction;
                     phase[selectedChannel] = phase[selectedChannel] + 101;
                     phase[selectedChannel] = phase[selectedChannel] % 101;
@@ -396,6 +415,7 @@ private:
     uint8_t mulLink;
     uint8_t divLink;
     bool linked;
+    bool bipolar;
 };
 
 
