@@ -50,12 +50,7 @@ public:
             xmodKnob[count] = xmod[count];
             osc[count] = WaveformManager::VectorOscillatorFromWaveform(35);
             osc[count].SetFrequency(freq[count]);
-            // #ifdef BUCHLA_4U
-            //   osc[count].Offset((12 << 7) * 4);
-            //   osc[count].SetScale((12 << 7) * 4);
-            // #else
-            //   osc[count].SetScale((12 << 7) * 6);
-            // #endif
+
         }
     }
 
@@ -74,14 +69,20 @@ public:
 
         if (clkDiv == clkCalc) {
 
+
+
+
             if (linked && hemisphere == LEFT_HEMISPHERE) {
-                // Linked: read the frequency multiplier from the right hemispher to the left hemisphere from RelabiManager.
+                // Linked: read the frequency multiplier from the right hemisphere to the left hemisphere from RelabiManager.
                 manager->ReadMul(mulLink);
                 manager->ReadDiv(divLink);
             } else {
                 mulLink = 1;
                 divLink = 1;
             }
+
+
+
 
             if (linked && hemisphere == RIGHT_HEMISPHERE) {
            
@@ -92,12 +93,17 @@ public:
 
                 // Linked: Receive lfo values from RelabiManager
                 manager->ReadValues(sample[0], sample[1], sample[2], sample[3]);
-                wave1 = sample[2];
-                wave2 = sample[3];
+                wave1 = (static_cast<float>(sample[2]) + HEMISPHERE_CENTER_CV + HEMISPHERE_3V_CV);
+                wave2 = (static_cast<float>(sample[3]) + HEMISPHERE_CENTER_CV + HEMISPHERE_3V_CV);
+
+
+
+
 
                 } else {
 
                     cvIn = (In(0))/51.15;
+                    //Proportion(DetentedIn(0), HEMISPHERE_3V_CV, 3000
                     
                     if (oldClock != Clock(0)) { //Clock(0) is TRIG1 port
                         if (oldClock == 1) {
@@ -114,16 +120,18 @@ public:
                         cvIn = 10000.0 * pow(max(((cvIn / 100.0) + 1.0), 0.01) / 2.0, 1.0); //set range for cvIn to be 0 to 10000
                         for (uint8_t lfo = 0; lfo < 4; lfo++) {
 
-                            osc[lfo].SetScale(1000);
+                            osc[lfo].SetScale(HEMISPHERE_3V_CV);
                             // multiply an lfo's set frequency by the first cv input and by the crossmodulation amount multipled with the previous sample value of the preceding oscillator. Scale it and then add the lfo's set frequency times the cv input.
-                            //simfloat crossMod = (static_cast<float>(2.0) * xmod[lfo] * (sample[(lfo + 3) % 4]) / 921600.0) - static_cast<float>(1.0);
-                            simfloat crossMod = (static_cast<float>(xmod[0]) / 100.0) * ((static_cast<float>(sample[3]) * 2.0) - 1000.0) / 100.0;
-                            if (crossMod < 0) {crossMod = -1 * crossMod;}
-                            simfloat setFreq =  static_cast<float>(mulLink) / divLink * (cvIn / 2500.0 * ((freq[lfo] * crossMod) + freq[lfo])) * 16; 
+                            //float crossMod = (static_cast<float>(2.0) * xmod[lfo] * (sample[(lfo + 3) % 4]) / 921600.0) - static_cast<float>(1.0);
+                            float ratioLink = static_cast<float>(mulLink) / static_cast<float>(divLink);
+                            float crossMod = (static_cast<float>(xmod[lfo]) / 100.0) * ((static_cast<float>(sample[(lfo + 3) % 4]) + HEMISPHERE_3V_CV) / (2 * HEMISPHERE_3V_CV));
+
+                            // if (crossMod < 0) {crossMod = -1 * crossMod;} // Uncomment to get cross modulation based on amplitude instead of bipolar FM.
+                            
+                            float setFreq =  ratioLink * (static_cast<float>(cvIn) / 2500.0 * ((freq[lfo] * crossMod) + freq[lfo])) * 16; 
                             displayFreq[lfo] = setFreq;
                             osc[lfo].SetFrequency(setFreq);
-                            //sample[lfo] = osc[lfo].Next() + 3;
-                            sample[lfo] = 503 + (osc[lfo].Next()/ 2);
+                            sample[lfo] = osc[lfo].Next();
                         }
                     
                     if (manager->IsLinked() && hemisphere == LEFT_HEMISPHERE) {
@@ -133,8 +141,11 @@ public:
                     }
                     
                     // CV1 outputs LFO1 // CV2 outputs LFO2
-                    wave1 = sample[0];
-                    wave2 = sample[1]; 
+
+                    wave1 = (static_cast<float>(sample[0]) + HEMISPHERE_CENTER_CV + HEMISPHERE_3V_CV); 
+                    wave2 = (static_cast<float>(sample[1]) * HEMISPHERE_CENTER_CV + HEMISPHERE_3V_CV);
+
+                    
                 }
 
             Out(0, wave1);
@@ -165,11 +176,12 @@ public:
             gfxPrint(17, 26, "C2");
             gfxPrint(32, 26, "C3");
             gfxPrint(47, 26, "C4");
-                    
-            gfxRect(2, 62 - (sample[0] / 40), 13, (sample[0] / 40));
-            gfxRect(17, 62 - (sample[1] / 40), 13, (sample[1] / 40));
-            gfxRect(32, 62 - (sample[2] / 40), 13, (sample[2] / 40));
-            gfxRect(47, 62 - (sample[3] / 40), 13, (sample[3] / 40));
+
+            int bar[4];
+            for (int i = 0; i < 4; ++i) {
+                bar[i] = 14.0 * (sample[i] + HEMISPHERE_3V_CV) / HEMISPHERE_3V_CV;        
+                gfxRect(2 + (15 * i), 62 - bar[i], 13, bar[i]);
+            };
 
             switch (selectedParam) {
             case 0:
@@ -182,13 +194,15 @@ public:
 
         }else {
 
+            //gfxPrint(35, 2, sample[0]);
+            
             // Display OSC label and value
                 gfxPrint(15, 15, "OSC");
                 gfxPrint(35, 15, selectedChannel);
             
             // Display FREQ label and value
             gfxPrint(1, 26, "FREQ");
-            simfloat fDisplay = freq[selectedChannel];
+            float fDisplay = freq[selectedChannel];
             gfxPrint(1, 35, ones(fDisplay));
             if (fDisplay < 2000) {
                 if (fDisplay < 199) {
@@ -215,18 +229,15 @@ public:
         gfxPrint(1, 46, "PHAS");
         gfxPrint(1, 55, phase[selectedChannel]);
 
-        //WORKING ON DISPLAYING INFORMATION ABOUT WHAT'S HAPPENING WITH CROSS MODULATION. I think the bit depth is 9216. I'm trying to make this bipolar.
-        //gfxPrint(31, 46, (static_cast<float>(2.0) * xmod[0] * (sample[3]) / 9216.0) - static_cast<float>(4608.0));
-        float crossMod = (static_cast<float>(xmod[0]) / 100.0) * ((static_cast<float>(sample[3]) * 2.0) - 1000.0) / 10;
-        //gfxPrint(31, 46, crossMod);
-        //gfxPrint(31, 55, osc[3].Next());
-        //gfxPrint(31, 55, sample[3]);
-        //gfxPrint(31, 55, displayFreq[0]);
 
-        gfxRect(31, 62 - (sample[0] / 60), 5, (sample[0] / 60));
-        gfxRect(37, 62 - (sample[1] / 60), 5, (sample[1] / 60));
-        gfxRect(43, 62 - (sample[2] / 60), 5, (sample[2] / 60));
-        gfxRect(49, 62 - (sample[3] / 60), 5, (sample[3] / 60));
+
+
+        int bar[4];
+        for (int i = 0; i < 4; ++i) {
+            bar[i] = 8.0 * (sample[i] + HEMISPHERE_3V_CV) / HEMISPHERE_3V_CV;       
+            gfxRect(31 + (6 * i), 62 - bar[i], 5, bar[i]);
+        };
+
 
             
             switch (selectedParam) {
@@ -306,8 +317,8 @@ public:
                     break;
                 case 2: // XMOD (0-100)
                     xmodKnob[selectedChannel] += (direction);
-                    xmodKnob[selectedChannel] = xmodKnob[selectedChannel] + 101;
-                    xmodKnob[selectedChannel] = xmodKnob[selectedChannel] % 101;
+                    xmodKnob[selectedChannel] = xmodKnob[selectedChannel] + 401;
+                    xmodKnob[selectedChannel] = xmodKnob[selectedChannel] % 401;
                     xmod[selectedChannel] = xmodKnob[selectedChannel];
                     break;
                 case 3: // PHAS (0-100)
@@ -358,16 +369,16 @@ private:
     constexpr static uint8_t ch = 4;
     constexpr static uint8_t numParams = 5;
     uint8_t selectedOsc;
-    simfloat freq[ch]; // in centihertz
-    uint8_t xmod[ch];
-    uint8_t selectedXmod;
+    float freq[ch]; // in centihertz
+    uint16_t xmod[ch];
+    //uint8_t selectedXmod;
     uint8_t phase[ch];
     int selectedChannel = 0;
     uint8_t selectedParam = 0;
     int sample[ch];
-    simfloat outFreq[ch];
-    simfloat freqKnob[4];
-    simfloat cvIn;
+    float outFreq[ch];
+    float freqKnob[4];
+    float cvIn;
     uint16_t xmodKnob[4];
     uint8_t countLimit = 0;
     int waveform_number[4];    
@@ -377,7 +388,7 @@ private:
     uint8_t clkDiv = 0; // clkDiv allows us to calculate every other tick to save cycles
     uint8_t clkDivDisplay = 0; // clkDivDisplay allows us to update the display fewer times per second
     uint8_t oldClock = 0;
-    simfloat displayFreq[ch];
+    float displayFreq[ch];
     uint8_t freqLinkMul;
     uint8_t freqKnobMul;
     uint8_t freqLinkDiv;
