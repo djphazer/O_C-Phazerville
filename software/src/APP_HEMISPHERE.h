@@ -40,8 +40,26 @@ ClockManager *ClockManager::instance = 0;
 
 #include "hemisphere_config.h"
 namespace HS {
-Applet available_applets[] = HEMISPHERE_APPLETS;
-Applet clock_setup_applet = DECLARE_APPLET(9999, 0x01, ClockSetup);
+  const Applet available_applets[] = HEMISPHERE_APPLETS;
+  const Applet clock_setup_applet = DECLARE_APPLET(9999, 0x01, ClockSetup);
+  static constexpr int HEMISPHERE_AVAILABLE_APPLETS = ARRAY_SIZE(HS::available_applets);
+
+  int get_applet_index_by_id(int id) {
+      int index = 0;
+      for (int i = 0; i < HEMISPHERE_AVAILABLE_APPLETS; i++)
+      {
+          if (available_applets[i].id == id) index = i;
+      }
+      return index;
+  }
+
+  int get_next_applet_index(int index, int dir) {
+      index += dir;
+      if (index >= HEMISPHERE_AVAILABLE_APPLETS) index = 0;
+      if (index < 0) index = HEMISPHERE_AVAILABLE_APPLETS - 1;
+
+      return index;
+  }
 }
 
 // The settings specify the selected applets, and 64 bits of data for each applet,
@@ -65,8 +83,7 @@ enum HEMISPHERE_SETTINGS {
     HEMISPHERE_SETTING_LAST
 };
 
-static constexpr int HEMISPHERE_AVAILABLE_APPLETS = ARRAY_SIZE(HS::available_applets);
-static const int HEM_NR_OF_PRESETS = 8;
+static constexpr int HEM_NR_OF_PRESETS = 8;
 
 static const char * hem_preset_name[HEM_NR_OF_PRESETS] = { "A", "B", "C", "D", "E", "F", "G", "H" };
 
@@ -79,6 +96,10 @@ public:
     int GetAppletId(int h) {
         return (h == LEFT_HEMISPHERE) ? values_[HEMISPHERE_SELECTED_LEFT_ID]
                                       : values_[HEMISPHERE_SELECTED_RIGHT_ID];
+    }
+    HemisphereApplet* GetApplet(int h) {
+      int idx = HS::get_applet_index_by_id( GetAppletId(h) );
+      return HS::available_applets[idx].instance[h];
     }
     void SetAppletId(int h, int id) {
         apply_value(h, id);
@@ -196,8 +217,8 @@ public:
             quantizer[i].Configure(OC::Scales::GetScale(quant_scale[i]), 0xffff);
         }
 
-        SetApplet(0, get_applet_index_by_id(18)); // DualTM
-        SetApplet(1, get_applet_index_by_id(15)); // EuclidX
+        SetApplet(0, HS::get_applet_index_by_id(18)); // DualTM
+        SetApplet(1, HS::get_applet_index_by_id(15)); // EuclidX
     }
 
     void Resume() {
@@ -256,7 +277,7 @@ public:
 
             for (int h = 0; h < 2; h++)
             {
-                int index = get_applet_index_by_id( hem_active_preset->GetAppletId(h) );
+                int index = HS::get_applet_index_by_id( hem_active_preset->GetAppletId(h) );
                 applet_data[h] = hem_active_preset->GetData(h);
                 SetApplet(h, index);
                 HS::available_applets[index].instance[h]->OnDataReceive(applet_data[h]);
@@ -273,7 +294,7 @@ public:
     }
 
     void ChangeApplet(int h, int dir) {
-        int index = get_next_applet_index(my_applet[h], dir);
+        int index = HS::get_next_applet_index(my_applet[h], dir);
         SetApplet(select_mode, index);
     }
 
@@ -652,7 +673,7 @@ private:
         }
 
         // --- Config Selection
-        gfxHeader("Hemisphere Config");
+        gfxHeader("Config");
         gfxPrint(1, 15, "Preset: ");
         gfxPrint(48, 15, "Load");
         gfxIcon(100, 15, HS::auto_save_enabled ? CHECK_ON_ICON : CHECK_OFF_ICON );
@@ -700,41 +721,33 @@ private:
     }
 
     void DrawPresetSelector() {
-        gfxHeader("Hemisphere Presets");
+        gfxHeader((config_cursor == SAVE_PRESET) ? "Save" : "Load");
+        gfxPrint(30, 1, "Preset");
+        gfxDottedLine(16, 11, 16, 63);
+
         int y = 5 + constrain(preset_cursor,1,5)*10;
-        gfxPrint(1, y, (config_cursor == SAVE_PRESET) ? "Save" : "Load");
-        gfxIcon(26, y, RIGHT_ICON);
+        gfxIcon(0, y, RIGHT_ICON);
         const int top = constrain(preset_cursor - 4, 1, HEM_NR_OF_PRESETS) - 1;
         y = 15;
         for (int i = top; i < HEM_NR_OF_PRESETS && i < top + 5; ++i)
         {
-            gfxPrint(35, y, hem_preset_name[i]);
+            if (i == preset_id)
+              gfxIcon(8, y, ZAP_ICON);
+            else
+              gfxPrint(8, y, hem_preset_name[i]);
 
             if (!hem_presets[i].is_valid())
-                gfxPrint(" (empty)");
-            else if (i == preset_id)
-                gfxIcon(45, y, ZAP_ICON);
+                gfxPrint(18, y, "(empty)");
+            else {
+                gfxPrint(18, y, hem_presets[i].GetApplet(0)->applet_name());
+                gfxPrint(", ");
+                gfxPrint(hem_presets[i].GetApplet(1)->applet_name());
+            }
 
             y += 10;
         }
     }
 
-    int get_applet_index_by_id(int id) {
-        int index = 0;
-        for (int i = 0; i < HEMISPHERE_AVAILABLE_APPLETS; i++)
-        {
-            if (HS::available_applets[i].id == id) index = i;
-        }
-        return index;
-    }
-
-    int get_next_applet_index(int index, int dir) {
-        index += dir;
-        if (index >= HEMISPHERE_AVAILABLE_APPLETS) index = 0;
-        if (index < 0) index = HEMISPHERE_AVAILABLE_APPLETS - 1;
-
-        return index;
-    }
 };
 
 // TOTAL EEPROM SIZE: 4 * 26 bytes

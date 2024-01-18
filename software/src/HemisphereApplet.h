@@ -40,8 +40,6 @@
 #include "HSicons.h"
 #include "HSClockManager.h"
 
-#define LEFT_HEMISPHERE 0
-#define RIGHT_HEMISPHERE 1
 #ifdef BUCHLA_4U
 #define PULSE_VOLTAGE 8
 #define HEMISPHERE_MAX_CV 15360
@@ -66,6 +64,11 @@
 #define HEMISPHERE_ADC_LAG 33
 #define HEMISPHERE_CHANGE_THRESHOLD 32
 
+enum HEM_SIDE {
+LEFT_HEMISPHERE = 0,
+RIGHT_HEMISPHERE = 1,
+};
+
 // Codes for help system sections
 enum HEM_HELP_SECTIONS {
 HEMISPHERE_HELP_DIGITALS = 0,
@@ -82,10 +85,10 @@ static const char * HEM_HELP_SECTION_NAMES[4] = {"Dig", "CV", "Out", "Enc"};
 #define gfx_offset (hemisphere * 64) // Graphics offset, based on the side
 #define io_offset (hemisphere * 2) // Input/Output offset, based on the side
 
-#define HEMISPHERE_SIM_CLICK_TIME 1000
-#define HEMISPHERE_DOUBLE_CLICK_TIME 8000
-#define HEMISPHERE_PULSE_ANIMATION_TIME 500
-#define HEMISPHERE_PULSE_ANIMATION_TIME_LONG 1200
+static constexpr uint32_t HEMISPHERE_SIM_CLICK_TIME = 1000;
+static constexpr uint32_t HEMISPHERE_DOUBLE_CLICK_TIME = 8000;
+static constexpr uint32_t HEMISPHERE_PULSE_ANIMATION_TIME = 500;
+static constexpr uint32_t HEMISPHERE_PULSE_ANIMATION_TIME_LONG = 1200;
 
 #include "OC_scales.h"
 #include "HSUtils.h"
@@ -99,16 +102,6 @@ typedef struct Applet {
   int id;
   uint8_t categories;
   HemisphereApplet* instance[2];
-  /*
-  void (*Start)(bool); // Initialize when selected
-  void (*Controller)(bool, bool);  // Interrupt Service Routine
-  void (*View)(bool);  // Draw main view
-  void (*OnButtonPress)(bool); // Encoder button has been pressed
-  void (*OnEncoderMove)(bool, int); // Encoder has been rotated
-  void (*ToggleHelpScreen)(bool); // Help Screen has been requested
-  uint64_t (*OnDataRequest)(bool); // Get a data int from the applet
-  void (*OnDataReceive)(bool, uint64_t); // Send a data int to the applet
-  */
 } Applet;
 
 // editable by cursor, and CV assignable
@@ -129,6 +122,7 @@ public:
     static int cursor[2];
 
     virtual const char* applet_name() = 0; // Maximum of 9 characters
+
     virtual void Start() = 0;
     virtual void Controller() = 0;
     virtual void View() = 0;
