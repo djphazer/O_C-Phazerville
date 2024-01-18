@@ -153,6 +153,9 @@ public:
             if (!bipolar) {
                 wave1 = wave1 + HEMISPHERE_CENTER_CV + HEMISPHERE_3V_CV;
                 wave2 = wave2 + HEMISPHERE_CENTER_CV + HEMISPHERE_3V_CV;
+               } else {
+                wave1 = wave1;
+                wave2 = wave2;
                }
 
             Out(0, wave1);
@@ -314,8 +317,8 @@ public:
                 //Not linked or left hemisphere: controls select LFO, freq, xmod, and phase.
             
                 case 0: // Cycle through parameters when selecting OSC
-                    selectedChannel = selectedChannel + direction + 5;
-                    selectedChannel = selectedChannel % 5;
+                    selectedChannel = selectedChannel + direction + 4;
+                    selectedChannel = selectedChannel % 4;
                     break;
                 case 1: // POLARITY(+ or +-)
                     bipolar = (bipolar + direction + 2) % 2;
