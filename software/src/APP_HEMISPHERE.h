@@ -203,6 +203,7 @@ void ReceiveManagerSysEx();
 class HemisphereManager : public HSApplication {
 public:
     enum PopupType {
+      MENU_POPUP,
       CLOCK_POPUP, PRESET_POPUP,
     };
     void Start() {
@@ -381,38 +382,80 @@ public:
     }
 
     void DrawPopup() {
+      if (popup_type == MENU_POPUP) {
+        graphics.clearRect(73, 25, 54, 38);
+        graphics.drawFrame(74, 26, 52, 36);
+      } else {
         graphics.clearRect(24, 23, 80, 18);
         graphics.drawFrame(25, 24, 78, 16);
-
         graphics.setPrintPos(29, 28);
+      }
 
-        switch (popup_type) {
-          case CLOCK_POPUP:
-            graphics.print("Clock ");
-            if (clock_m->IsRunning())
-              graphics.print("Start");
-            else
-              graphics.print(clock_m->IsPaused() ? "Armed" : "Stop");
+      switch (popup_type) {
+        case MENU_POPUP:
+          gfxPrint(78, 30, "Load");
+          gfxPrint(78, 40, config_cursor == AUTO_SAVE ? "(auto)" : "Save");
+          gfxPrint(78, 50, "Config");
+
+          switch (config_cursor) {
+            case LOAD_PRESET:
+            case SAVE_PRESET:
+              gfxIcon(104, 30 + (config_cursor-LOAD_PRESET)*10, LEFT_ICON);
+              break;
+            case AUTO_SAVE:
+              if (CursorBlink())
+                gfxIcon(114, 40, HS::auto_save_enabled ? CHECK_ON_ICON : CHECK_OFF_ICON );
+              break;
+            case CONFIG_DUMMY:
+              gfxIcon(115, 50, RIGHT_ICON);
+              break;
+            default: break;
+          }
+
+          break;
+        case CLOCK_POPUP:
+          graphics.print("Clock ");
+          if (clock_m->IsRunning())
+            graphics.print("Start");
+          else
+            graphics.print(clock_m->IsPaused() ? "Armed" : "Stop");
           break;
 
-          case PRESET_POPUP:
-            graphics.print("> Preset ");
-            graphics.print(hem_preset_name[preset_id]);
+        case PRESET_POPUP:
+          graphics.print("> Preset ");
+          graphics.print(hem_preset_name[preset_id]);
           break;
-        }
+      }
     }
 
     void View() {
+        bool draw_applets = true;
+
         if (config_menu) {
+          if (preset_cursor) {
+            DrawPresetSelector();
+            draw_applets = false;
+          }
+          else if (config_cursor > CONFIG_DUMMY) {
             DrawConfigMenu();
+            draw_applets = false;
+          }
+          else {
+            PokePopup(MENU_POPUP);
+            // but still draw the applets
+          }
         }
         else if (clock_setup) {
-            HS::clock_setup_applet.instance[0]->View();
+          HS::clock_setup_applet.instance[0]->View();
+          draw_applets = false;
         }
         else if (help_hemisphere > -1) {
-            int index = my_applet[help_hemisphere];
-            HS::available_applets[index].instance[help_hemisphere]->BaseView();
-        } else {
+          int index = my_applet[help_hemisphere];
+          HS::available_applets[index].instance[help_hemisphere]->BaseView();
+          draw_applets = false;
+        }
+
+        if (draw_applets) {
             for (int h = 0; h < 2; h++)
             {
                 int index = my_applet[h];
@@ -599,6 +642,7 @@ private:
     enum HEMConfigCursor {
         LOAD_PRESET, SAVE_PRESET,
         AUTO_SAVE,
+        CONFIG_DUMMY, // past this point goes full screen
         TRIG_LENGTH,
         SCREENSAVER_MODE,
         CURSOR_MODE,
@@ -666,20 +710,10 @@ private:
     }
 
     void DrawConfigMenu() {
-        // --- Preset Selector
-        if (preset_cursor) {
-            DrawPresetSelector();
-            return;
-        }
-
         // --- Config Selection
         gfxHeader("Config");
-        gfxPrint(1, 15, "Preset: ");
-        gfxPrint(48, 15, "Load");
-        gfxIcon(100, 15, HS::auto_save_enabled ? CHECK_ON_ICON : CHECK_OFF_ICON );
-        gfxPrint(48, 25, "Save   (auto)");
 
-        gfxPrint(1, 35, "Trig Length: ");
+        gfxPrint(1, 15, "Trig Length: ");
         gfxPrint(HS::trig_length);
         gfxPrint("ms");
 
@@ -690,32 +724,23 @@ private:
         "Zips"
         #endif
         };
-        gfxPrint(1, 45, "Screensaver:  ");
+        gfxPrint(1, 25, "Screensaver:  ");
         gfxPrint( ssmodes[HS::screensaver_mode] );
 
         const char * cursor_mode_name[3] = { "modal", "modal+wrap" };
-        gfxPrint(1, 55, "Cursor:  ");
+        gfxPrint(1, 35, "Cursor:  ");
         gfxPrint(cursor_mode_name[HS::cursor_wrap]);
         
         switch (config_cursor) {
-        case LOAD_PRESET:
-        case SAVE_PRESET:
-            gfxIcon(73, 15 + (config_cursor - LOAD_PRESET)*10, LEFT_ICON);
-            break;
-
-        case AUTO_SAVE:
-            gfxIcon(90, 15, RIGHT_ICON);
-            break;
-
         case TRIG_LENGTH:
-            if (isEditing) gfxInvert(79, 34, 25, 9);
-            else gfxCursor(80, 43, 24);
+            if (isEditing) gfxInvert(79, 14, 25, 9);
+            else gfxCursor(80, 23, 24);
             break;
         case SCREENSAVER_MODE:
-            gfxIcon(73, 45, RIGHT_ICON);
+            gfxIcon(73, 25, RIGHT_ICON);
             break;
         case CURSOR_MODE:
-            gfxIcon(43, 55, RIGHT_ICON);
+            gfxIcon(43, 35, RIGHT_ICON);
             break;
         }
     }
