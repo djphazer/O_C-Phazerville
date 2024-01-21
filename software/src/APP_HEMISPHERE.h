@@ -85,8 +85,6 @@ enum HEMISPHERE_SETTINGS {
 
 static constexpr int HEM_NR_OF_PRESETS = 8;
 
-static const char * hem_preset_name[HEM_NR_OF_PRESETS] = { "A", "B", "C", "D", "E", "F", "G", "H" };
-
 /* Hemisphere Preset
  * - conveniently store/recall multiple configurations
  */
@@ -423,7 +421,7 @@ public:
 
         case PRESET_POPUP:
           graphics.print("> Preset ");
-          graphics.print(hem_preset_name[preset_id]);
+          graphics.print(OC::Strings::capital_letters[preset_id]);
           break;
       }
     }
@@ -759,7 +757,7 @@ private:
             if (i == preset_id)
               gfxIcon(8, y, ZAP_ICON);
             else
-              gfxPrint(8, y, hem_preset_name[i]);
+              gfxPrint(8, y, OC::Strings::capital_letters[i]);
 
             if (!hem_presets[i].is_valid())
                 gfxPrint(18, y, "(empty)");

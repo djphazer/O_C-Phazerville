@@ -167,12 +167,11 @@ private:
     int cursor = 0; // Which output is currently being edited
 
     void DrawSelector() {
-        static const char * chan_name[] = { "A", "B", "C", "D" };
         ForEachChannel(ch)
         {
             const int y = 15 + (ch * 24);
 
-            gfxPrint(1, y, chan_name[ch+hemisphere*2]);
+            gfxPrint(1, y, OC::Strings::capital_letters[ch+hemisphere*2]);
             ForEachChannel(d) {
               const int s = divmult[ch*2 + d].steps;
 
