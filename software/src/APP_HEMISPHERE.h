@@ -442,15 +442,20 @@ public:
             PokePopup(MENU_POPUP);
             // but still draw the applets
           }
+
+          if (!draw_applets && popup_type == MENU_POPUP) popup_tick = 0; // cancel popup
         }
-        else if (clock_setup) {
-          HS::clock_setup_applet.instance[0]->View();
-          draw_applets = false;
-        }
-        else if (help_hemisphere > -1) {
-          int index = my_applet[help_hemisphere];
-          HS::available_applets[index].instance[help_hemisphere]->BaseView();
-          draw_applets = false;
+
+        if (draw_applets) {
+          if (clock_setup) {
+            HS::clock_setup_applet.instance[0]->View();
+            draw_applets = false;
+          }
+          else if (help_hemisphere > -1) {
+            int index = my_applet[help_hemisphere];
+            HS::available_applets[index].instance[help_hemisphere]->BaseView();
+            draw_applets = false;
+          }
         }
 
         if (draw_applets) {
@@ -515,7 +520,10 @@ public:
                 if (preset_cursor) {
                     preset_cursor = 0;
                 }
-                else config_menu = 0;
+                else {
+                  config_menu = 0;
+                  popup_tick = 0;
+                }
             }
             return;
         }
