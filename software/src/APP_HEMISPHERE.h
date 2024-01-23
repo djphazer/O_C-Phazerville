@@ -288,13 +288,12 @@ public:
 
     // does not modify the preset, only the manager
     void SetApplet(int hemisphere, int index) {
-        my_applet[hemisphere] = index;
+        next_applet[hemisphere] = my_applet[hemisphere] = index;
         HS::available_applets[index].instance[hemisphere]->BaseStart(hemisphere);
     }
-
     void ChangeApplet(int h, int dir) {
-        int index = HS::get_next_applet_index(my_applet[h], dir);
-        SetApplet(select_mode, index);
+        int index = HS::get_next_applet_index(next_applet[h], dir);
+        next_applet[h] = index;
     }
 
     bool SelectModeEnabled() {
@@ -344,6 +343,9 @@ public:
         // execute Applets
         for (int h = 0; h < 2; h++)
         {
+            if (my_applet[h] != next_applet[h]) {
+              SetApplet(h, next_applet[h]);
+            }
             int index = my_applet[h];
             if (HS::available_applets[index].id != 150) // not MIDI In
             {
@@ -632,6 +634,7 @@ private:
     int preset_id = 0;
     int preset_cursor = 0;
     int my_applet[2]; // Indexes to available_applets
+    int next_applet[2]; // queued from UI thread, handled by Controller
     uint64_t clock_data, applet_data[2]; // cache of applet data
     bool clock_setup;
     bool config_menu;
