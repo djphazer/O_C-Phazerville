@@ -99,8 +99,8 @@ class HemisphereApplet;
 namespace HS {
 
 typedef struct Applet {
-  int id;
-  uint8_t categories;
+  const int id;
+  const uint8_t categories;
   HemisphereApplet* instance[2];
 } Applet;
 

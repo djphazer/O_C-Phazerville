@@ -40,17 +40,17 @@ ClockManager *ClockManager::instance = 0;
 
 #include "hemisphere_config.h"
 namespace HS {
-  const Applet available_applets[] = HEMISPHERE_APPLETS;
-  const Applet clock_setup_applet = DECLARE_APPLET(9999, 0x01, ClockSetup);
-  static constexpr int HEMISPHERE_AVAILABLE_APPLETS = ARRAY_SIZE(HS::available_applets);
+  static constexpr Applet available_applets[] = HEMISPHERE_APPLETS;
+  static constexpr int HEMISPHERE_AVAILABLE_APPLETS = ARRAY_SIZE(available_applets);
+  static constexpr Applet clock_setup_applet = DECLARE_APPLET(9999, 0x01, ClockSetup);
 
-  int get_applet_index_by_id(int id) {
-      int index = 0;
-      for (int i = 0; i < HEMISPHERE_AVAILABLE_APPLETS; i++)
-      {
-          if (available_applets[i].id == id) index = i;
-      }
-      return index;
+  constexpr int get_applet_index_by_id(const int& id) {
+    int index = 0;
+    for (int i = 0; i < HEMISPHERE_AVAILABLE_APPLETS; i++)
+    {
+        if (available_applets[i].id == id) index = i;
+    }
+    return index;
   }
 
   int get_next_applet_index(int index, int dir) {
