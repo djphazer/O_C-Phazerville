@@ -83,7 +83,13 @@ enum HEMISPHERE_SETTINGS {
     HEMISPHERE_SETTING_LAST
 };
 
+#if defined(MOAR_PRESETS)
+static constexpr int HEM_NR_OF_PRESETS = 16;
+#elif defined(PEWPEWPEW)
 static constexpr int HEM_NR_OF_PRESETS = 8;
+#else
+static constexpr int HEM_NR_OF_PRESETS = 4;
+#endif
 
 /* Hemisphere Preset
  * - conveniently store/recall multiple configurations
