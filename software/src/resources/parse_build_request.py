@@ -4,6 +4,7 @@ comment_text = os.environ['GH_COMMENT']
 
 flags = comment_text.replace(',', ' ').replace(';', ' ').split()
 custom_defines = "-DCUSTOM_BUILD"
+pewcount = 0
 
 for item in flags:
     f = item.strip().upper()
@@ -57,8 +58,17 @@ for item in flags:
         custom_defines += " -DENABLE_APP_REFERENCES"
     if f.startswith('GRIDS2'):
         custom_defines += " -DDRUMMAP_GRIDS2"
+    if f.startswith('MOAR_PRESETS'):
+        custom_defines += " -DMOAR_PRESETS"
+    if f.startswith('PEWPEWPEW'):
+        custom_defines += " -DPEWPEWPEW"
+    elif f.startswith('PEW'):
+        pewcount += 1
 
     #TODO proper lookup table
+
+if pewcount > 2:
+    custom_defines += " -DPEWPEWPEW"
 
 print(custom_defines)
 os.environ["CUSTOM_BUILD_FLAGS"] = custom_defines
