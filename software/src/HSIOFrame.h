@@ -20,17 +20,17 @@ typedef struct MIDILogEntry {
 // shared IO Frame, updated every tick
 // this will allow chaining applets together, multiple stages of processing
 typedef struct IOFrame {
-    bool clocked[4];
-    bool gate_high[4];
-    int inputs[4];
-    int outputs[4];
-    int outputs_smooth[4];
-    int clock_countdown[4];
-    int adc_lag_countdown[4]; // Time between a clock event and an ADC read event
-    uint32_t last_clock[4]; // Tick number of the last clock observed by the child class
-    uint32_t cycle_ticks[4]; // Number of ticks between last two clocks
-    bool changed_cv[4]; // Has the input changed by more than 1/8 semitone since the last read?
-    int last_cv[4]; // For change detection
+    bool clocked[ADC_CHANNEL_LAST];
+    bool gate_high[ADC_CHANNEL_LAST];
+    int inputs[ADC_CHANNEL_LAST];
+    int outputs[DAC_CHANNEL_LAST];
+    int outputs_smooth[DAC_CHANNEL_LAST];
+    int clock_countdown[DAC_CHANNEL_LAST];
+    int adc_lag_countdown[ADC_CHANNEL_LAST]; // Time between a clock event and an ADC read event
+    uint32_t last_clock[ADC_CHANNEL_LAST]; // Tick number of the last clock observed by the child class
+    uint32_t cycle_ticks[ADC_CHANNEL_LAST]; // Number of ticks between last two clocks
+    bool changed_cv[ADC_CHANNEL_LAST]; // Has the input changed by more than 1/8 semitone since the last read?
+    int last_cv[ADC_CHANNEL_LAST]; // For change detection
 
     /* MIDI message queue/cache */
     struct {
@@ -207,8 +207,9 @@ typedef struct IOFrame {
         gate_high[1] = OC::DigitalInputs::read_immediate<OC::DIGITAL_INPUT_2>();
         gate_high[2] = OC::DigitalInputs::read_immediate<OC::DIGITAL_INPUT_3>();
         gate_high[3] = OC::DigitalInputs::read_immediate<OC::DIGITAL_INPUT_4>();
+        // T41 TODO: calculate for inputs 4-7 as well
 
-        ForAllChannels(i) {
+        for (int i = 0; i < ADC_CHANNEL_LAST; ++i) {
             // Set CV inputs
             inputs[i] = OC::ADC::raw_pitch_value(ADC_CHANNEL(i));
             if (abs(inputs[i] - last_cv[i]) > HEMISPHERE_CHANGE_THRESHOLD) {
@@ -223,7 +224,7 @@ typedef struct IOFrame {
         }
     }
     void Send() {
-        ForAllChannels(i) {
+        for (int i = 0; i < DAC_CHANNEL_LAST; ++i) {
             OC::DAC::set_pitch(DAC_CHANNEL(i), outputs[i], 0);
         }
     }

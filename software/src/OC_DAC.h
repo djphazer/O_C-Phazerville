@@ -25,7 +25,11 @@ static inline void dac8568_set_channel(uint32_t channel, uint32_t data) {
 extern void SPI_init();
 
 enum DAC_CHANNEL {
-  DAC_CHANNEL_A, DAC_CHANNEL_B, DAC_CHANNEL_C, DAC_CHANNEL_D, DAC_CHANNEL_LAST
+  DAC_CHANNEL_A, DAC_CHANNEL_B, DAC_CHANNEL_C, DAC_CHANNEL_D,
+#if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
+  DAC_CHANNEL_E, DAC_CHANNEL_F, DAC_CHANNEL_G, DAC_CHANNEL_H,
+#endif
+  DAC_CHANNEL_LAST
 };
 
 enum OutputVoltageScaling {
@@ -233,7 +237,10 @@ public:
         dac8568_set_channel(1, values_[DAC_CHANNEL_B]);
         dac8568_set_channel(2, values_[DAC_CHANNEL_C]);
         dac8568_set_channel(3, values_[DAC_CHANNEL_D]);
-        // TODO, other 4 channels....
+        dac8568_set_channel(4, values_[DAC_CHANNEL_E]);
+        dac8568_set_channel(5, values_[DAC_CHANNEL_F]);
+        dac8568_set_channel(6, values_[DAC_CHANNEL_G]);
+        dac8568_set_channel(7, values_[DAC_CHANNEL_H]);
       } else {
     #endif
         set8565_CHA(values_[DAC_CHANNEL_A]);

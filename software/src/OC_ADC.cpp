@@ -527,7 +527,10 @@ static void Init_Teensy41_ADC33131D_chip() {
       update<ADC_CHANNEL_2>(sum[1] * mult / count);
       update<ADC_CHANNEL_3>(sum[2] * mult / count);
       update<ADC_CHANNEL_4>(sum[3] * mult / count);
-      // TODO: other 4 channels...
+      update<ADC_CHANNEL_5>(sum[4] * mult / count);
+      update<ADC_CHANNEL_6>(sum[5] * mult / count);
+      update<ADC_CHANNEL_7>(sum[6] * mult / count);
+      update<ADC_CHANNEL_8>(sum[7] * mult / count);
       old_poffset = (old_poffset + count * sizeof(adc33131_frame_t)) % sizeof(adc_buffer);
     }
     return;
