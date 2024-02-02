@@ -205,8 +205,8 @@ void DAC::choose_calibration_data() {
   }
 }
 /*static*/
-uint8_t DAC::get_voltage_scaling(uint8_t channel_id) {
-  return DAC_scaling[channel_id];
+OutputVoltageScaling DAC::get_voltage_scaling(uint8_t channel_id) {
+  return OutputVoltageScaling(DAC_scaling[channel_id]);
 }
 /*static*/
 void DAC::set_scaling(uint8_t scaling, uint8_t channel_id) {

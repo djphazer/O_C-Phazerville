@@ -78,7 +78,7 @@ public:
   static void choose_calibration_data();
   static void set_scaling(uint8_t scaling, uint8_t channel_id);
   static void restore_scaling(uint32_t scaling);
-  static uint8_t get_voltage_scaling(uint8_t channel_id);
+  static OutputVoltageScaling get_voltage_scaling(uint8_t channel_id);
   static uint32_t store_scaling();
   static void set_Vbias(uint32_t data);
   static void init_Vbias();
@@ -133,11 +133,11 @@ public:
 
   // Specialised versions with voltage scaling
 
-  static int32_t semitone_to_scaled_voltage_dac(DAC_CHANNEL channel, int32_t semi, int32_t octave_offset, uint8_t voltage_scaling) {
+  static int32_t semitone_to_scaled_voltage_dac(DAC_CHANNEL channel, int32_t semi, int32_t octave_offset, OutputVoltageScaling voltage_scaling) {
     return pitch_to_scaled_voltage_dac(channel, semi << 7, octave_offset, voltage_scaling);
   }
   
-  static int32_t pitch_to_scaled_voltage_dac(DAC_CHANNEL channel, int32_t pitch, int32_t octave_offset, uint8_t voltage_scaling) {
+  static int32_t pitch_to_scaled_voltage_dac(DAC_CHANNEL channel, int32_t pitch, int32_t octave_offset, OutputVoltageScaling voltage_scaling) {
     pitch += (octave_offset * 12) << 7;
 
  
@@ -196,7 +196,7 @@ public:
 
   // Set channel to semitone value
   template <DAC_CHANNEL channel>
-  static void set_voltage_scaled_semitone(int32_t semitone, int32_t octave_offset, uint8_t voltage_scaling) {
+  static void set_voltage_scaled_semitone(int32_t semitone, int32_t octave_offset, OutputVoltageScaling voltage_scaling) {
     set<channel>(semitone_to_scaled_voltage_dac(channel, semitone, octave_offset, voltage_scaling));
   }
 
