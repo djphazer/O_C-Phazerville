@@ -522,19 +522,34 @@ public:
             gfxPrint(60, 55, "[CLEAR]");
     }
 
-    void DrawInterface() {
+    void DrawTabs() {
         // Draw channel tabs
+        const size_t w = 128 / DAC_CHANNEL_LAST;
         for (int i = 0; i < DAC_CHANNEL_LAST; ++i) {
-            gfxLine(i*32, 13, i*32, 22); // vertical line on left
-            if (channel[i].clocked_mode) gfxIcon(2 + i*32, 14, CLOCK_ICON);
-            if (channel[i].clocked_mode == SAMPLE_AND_HOLD) gfxIcon(22 + i*32, 14, STAIRS_ICON);
-            gfxPrint(i*32 + 13, 14, i+1);
+          const size_t x = i * w;
+            gfxLine(x, 13, x, 22); // vertical line on left
+
+            const size_t center_x = x + w/2 - 3;
+            switch (channel[i].clocked_mode) {
+              case CONTINUOUS:
+                gfxPrint(center_x, 14, i+1);
+                break;
+              case TRIG_TRANS:
+                gfxIcon(center_x, 14, CLOCK_ICON);
+                break;
+              case SAMPLE_AND_HOLD:
+                gfxIcon(center_x, 14, STAIRS_ICON);
+                break;
+            }
 
             if (i == sel_chan)
-                gfxInvert(1 + i*32, 13, 31, 11);
+                gfxInvert(1 + x, 13, w - 1, 11);
         }
         gfxLine(127, 13, 127, 22); // vertical line
         gfxLine(0, 23, 127, 23);
+    }
+    void DrawInterface() {
+        DrawTabs();
 
         // Draw parameters for selected channel
         int y = 32;
