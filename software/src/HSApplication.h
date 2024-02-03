@@ -94,27 +94,29 @@ public:
     // general screensaver view, visualizing inputs and outputs
     void BaseScreensaver(bool notenames = 0) {
         gfxDottedLine(0, 32, 127, 32, 3); // horizontal baseline
-        for (int ch = 0; ch < 4; ++ch)
+        const size_t w = 128 / DAC_CHANNEL_LAST;
+        for (int ch = 0; ch < DAC_CHANNEL_LAST; ++ch)
         {
             if (notenames) {
                 // approximate notes being output
-                gfxPrint(8 + 32*ch, 55, midi_note_numbers[MIDIQuantizer::NoteNumber(HS::frame.outputs[ch])] );
+                gfxPrint(2 + w*ch, 55, midi_note_numbers[MIDIQuantizer::NoteNumber(HS::frame.outputs[ch])] );
             }
 
             // trigger/gate indicators
-            if (HS::frame.gate_high[ch]) gfxIcon(11 + 32*ch, 0, CLOCK_ICON);
+            if (HS::frame.gate_high[ch]) gfxIcon(4 + w*ch, 0, CLOCK_ICON);
 
             // input
             int height = ProportionCV(HS::frame.inputs[ch], 32);
             int y = constrain(32 - height, 0, 32);
-            gfxFrame(3 + (32 * ch), y, 6, abs(height));
+            const int w_ = (w - 4) / 2;
+            gfxFrame(2 + (w * ch), y, w_, abs(height));
 
             // output
             height = ProportionCV(HS::frame.outputs[ch], 32);
             y = constrain(32 - height, 0, 32);
-            gfxInvert(11 + (32 * ch), y, 12, abs(height));
+            gfxInvert(3 + w_ + (w * ch), y, w_, abs(height));
 
-            gfxDottedLine(32 * ch, 0, 32*ch, 63, 3); // vertical divider, left side
+            gfxDottedLine(w * ch, 0, w*ch, 63, 3); // vertical divider, left side
         }
         gfxDottedLine(127, 0, 127, 63, 3); // vertical line, right side
     }
