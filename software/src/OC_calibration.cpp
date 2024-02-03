@@ -778,6 +778,20 @@ void OC::Ui::Calibrate() {
             calibration_state.used_defaults = true;
           }
           break;
+#ifdef VOR
+        case DAC_A_VOLT_7:
+#else
+        case DAC_A_VOLT_6:
+#endif
+          if (calibration_state.used_defaults) {
+            // copy DAC A to the rest of them, to make life easier
+            for (int ch = 1; ch < DAC_CHANNEL_LAST; ++ch) {
+              for (int i = 0; i < OCTAVES; ++i) {
+                OC::calibration_data.dac.calibrated_octaves[ch][i] = OC::calibration_data.dac.calibrated_octaves[0][i];
+              }
+            }
+          }
+          break;
         case ADC_PITCH_C4:
           if (calibration_state.adc_1v && calibration_state.adc_3v) {
             OC::ADC::CalibratePitch(calibration_state.adc_1v, calibration_state.adc_3v);
