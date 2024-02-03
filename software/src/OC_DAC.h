@@ -216,10 +216,8 @@ public:
 
   // Set all channels to integer voltage value, where 0 = 0V, 1 = 1V
   static void set_all_octave(int v) {
-    set_octave(DAC_CHANNEL_A, v);
-    set_octave(DAC_CHANNEL_B, v);
-    set_octave(DAC_CHANNEL_C, v);
-    set_octave(DAC_CHANNEL_D, v);
+    for (int i = DAC_CHANNEL_A; i < DAC_CHANNEL_LAST; ++i)
+      set_octave(DAC_CHANNEL(i), v);
   }
 
   static uint32_t get_zero_offset(DAC_CHANNEL channel) {
@@ -252,10 +250,8 @@ public:
     #endif
 
     size_t tail = history_tail_;
-    history_[DAC_CHANNEL_A][tail] = values_[DAC_CHANNEL_A];
-    history_[DAC_CHANNEL_B][tail] = values_[DAC_CHANNEL_B];
-    history_[DAC_CHANNEL_C][tail] = values_[DAC_CHANNEL_C];
-    history_[DAC_CHANNEL_D][tail] = values_[DAC_CHANNEL_D];
+    for (int i = DAC_CHANNEL_A; i < DAC_CHANNEL_LAST; ++i)
+      history_[i][tail] = values_[i];
     history_tail_ = (tail + 1) % kHistoryDepth;
   }
 
