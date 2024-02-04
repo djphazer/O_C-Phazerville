@@ -383,20 +383,25 @@ public:
 
     void OnButtonDown(const UI::Event &event) {
         // check for clock setup secret combo (dual press)
-        if ( event.control == OC::CONTROL_BUTTON_DOWN || event.control == OC::CONTROL_BUTTON_UP)
-            UpOrDownButtonPress(event.control == OC::CONTROL_BUTTON_UP);
-        else if (clock_setup) // pass button down to Clock Setup
-            HS::clock_setup_applet.instance[0]->OnButtonPress();
-    }
+        const bool dual = (event.mask == (OC::CONTROL_BUTTON_UP | OC::CONTROL_BUTTON_DOWN));
+        const bool hemisphere = (event.control == OC::CONTROL_BUTTON_UP) ? LEFT_HEMISPHERE : RIGHT_HEMISPHERE;
 
-    void UpOrDownButtonPress(bool up) {
-        if (OC::CORE::ticks - click_tick < HEMISPHERE_DOUBLE_CLICK_TIME && up != first_click) {
-            // show clock setup if both buttons pressed quickly
-            clock_setup = 1;
-            click_tick = 0;
-        } else {
-            click_tick = OC::CORE::ticks;
-            first_click = up;
+        switch (event.control) {
+          case OC::CONTROL_BUTTON_DOWN:
+          case OC::CONTROL_BUTTON_UP:
+            if ( dual ) {
+              clock_setup = 1;
+              click_tick = 0;
+            } else {
+              first_click = hemisphere;
+              click_tick = OC::CORE::ticks;
+            }
+            break;
+          case OC::CONTROL_BUTTON_L:
+          case OC::CONTROL_BUTTON_R:
+            if (clock_setup) // pass button down to Clock Setup
+              HS::clock_setup_applet.instance[0]->OnButtonPress();
+            break;
         }
     }
 
