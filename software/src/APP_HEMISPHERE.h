@@ -947,13 +947,11 @@ void HEMISPHERE_screensaver() {
 void HEMISPHERE_handleButtonEvent(const UI::Event &event) {
     switch (event.type) {
     case UI::EVENT_BUTTON_DOWN:
-        #ifdef VOR
         if (event.control == OC::CONTROL_BUTTON_M) {
             manager.ToggleClockRun();
             OC::ui.SetButtonIgnoreMask(); // ignore release and long-press
             break;
         }
-        #endif
     case UI::EVENT_BUTTON_PRESS:
         if (event.control == OC::CONTROL_BUTTON_UP || event.control == OC::CONTROL_BUTTON_DOWN) {
             manager.DelegateSelectButtonPush(event);

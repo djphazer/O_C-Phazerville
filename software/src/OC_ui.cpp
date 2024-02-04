@@ -30,6 +30,8 @@ void Ui::Init() {
 
 #if defined(VOR)
   static const int button_pins[] = { but_top, but_bot, butL, butR, but_mid };
+#elif defined(ARDUINO_TEENSY41)
+  static const int button_pins[] = { but_top, but_bot, butL, butR, but_mid, but_top2, but_bot2 };
 #else
   static const int button_pins[] = { but_top, but_bot, butL, butR };
 #endif

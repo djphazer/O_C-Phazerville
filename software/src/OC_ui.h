@@ -31,19 +31,20 @@ enum UiControl {
   CONTROL_BUTTON_R    = 0x8,
 #endif
 
-#ifdef VOR
-  CONTROL_BUTTON_M    = 0x10,
-  CONTROL_ENCODER_L   = 0x20,
-  CONTROL_ENCODER_R   = 0x40,
+  // not all of these are present on all hardware...
+  // but it probably doesn't hurt to include in the enum
+  CONTROL_BUTTON_M     = 0x10,
+  CONTROL_BUTTON_UP2   = 0x20,
+  CONTROL_BUTTON_DOWN2 = 0x40,
 
-  CONTROL_LAST = 6,
+  CONTROL_ENCODER_L   = 0x100,
+  CONTROL_ENCODER_R   = 0x200,
+
+#if defined(VOR)
   CONTROL_BUTTON_LAST = 5,
+#elif defined(ARDUINO_TEENSY41)
+  CONTROL_BUTTON_LAST = 7,
 #else
-  CONTROL_BUTTON_MASK = 0xf,
-  CONTROL_ENCODER_L   = 0x10,
-  CONTROL_ENCODER_R   = 0x20,
-
-  CONTROL_LAST = 5,
   CONTROL_BUTTON_LAST = 4,
 #endif
 };
