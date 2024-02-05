@@ -188,15 +188,16 @@ typedef struct IOFrame {
     } MIDIState;
 
     // --- Soft IO ---
-    void Out(DAC_CHANNEL channel, int value) {
+    int Out(DAC_CHANNEL channel, int value) {
+        int diff = value - outputs[channel];
         outputs[channel] = value;
+        return diff;
     }
     void ClockOut(DAC_CHANNEL ch, const int pulselength = HEMISPHERE_CLOCK_TICKS * HS::trig_length) {
         clock_countdown[ch] = pulselength;
         outputs[ch] = PULSE_VOLTAGE * (12 << 7);
     }
 
-    // TODO: Hardware IO should be extracted
     // --- Hard IO ---
     void Load() {
         clocked[0] = OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_1>();

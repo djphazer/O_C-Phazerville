@@ -206,7 +206,12 @@ public:
         return (t && t < 5) ? frame.gate_high[t - 1] : false;
     }
     void Out(int ch, int value, int octave = 0) {
+#ifdef ARDUINO_TEENSY41
+        const int diff = frame.Out( (DAC_CHANNEL)(ch + io_offset), value + (octave * (12 << 7)));
+        if (abs(diff) > HEMISPHERE_CHANGE_THRESHOLD) ClockOut(ch + 4);
+#else
         frame.Out( (DAC_CHANNEL)(ch + io_offset), value + (octave * (12 << 7)));
+#endif
     }
 
     void SmoothedOut(int ch, int value, int kSmoothing) {
