@@ -278,7 +278,7 @@ void restore_app_data() {
 
     const App *app = apps::find(chunk->id);
     if (!app) {
-      SERIAL_PRINTLN("App %02x not found, ignoring chunk...", app->id);
+      SERIAL_PRINTLN("App %02x not found, ignoring chunk...", chunk->id);
       if (!chunk->length)
         break;
       data += chunk->length;
