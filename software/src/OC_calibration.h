@@ -65,9 +65,15 @@ struct CalibrationData {
 };
 
 #ifndef ARDUINO_TEENSY41
+// 4 channels of I/O
 static_assert(sizeof(DAC::CalibrationData) == 88, "DAC::CalibrationData size changed!");
 static_assert(sizeof(ADC::CalibrationData) == 12, "ADC::CalibrationData size changed!");
 static_assert(sizeof(CalibrationData) == 116, "Calibration data size changed!");
+#else
+// 8 channels of I/O
+static_assert(sizeof(DAC::CalibrationData) == 176, "DAC::CalibrationData size changed!");
+static_assert(sizeof(ADC::CalibrationData) == 20, "ADC::CalibrationData size changed!");
+static_assert(sizeof(CalibrationData) == 212, "Calibration data size changed!");
 #endif
 
 typedef PageStorage<EEPROMStorage, EEPROM_CALIBRATIONDATA_START, EEPROM_CALIBRATIONDATA_END, CalibrationData> CalibrationStorage;
