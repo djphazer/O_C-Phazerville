@@ -609,7 +609,7 @@ public:
 
 // TOTAL EEPROM SIZE: 4 * 29 bytes
 SETTINGS_DECLARE(Calibr8orPreset, CAL8_SETTING_LAST) {
-    {0, 0, 1, "validity flag", NULL, settings::STORAGE_TYPE_U4},
+    {0, 0, 1, "validity flag", NULL, settings::STORAGE_TYPE_U8},
 
     {0, 0, 65535, "Scale A", NULL, settings::STORAGE_TYPE_U16},
     {0, 0, 65535, "CV Scaling Factor A", NULL, settings::STORAGE_TYPE_U16},
@@ -674,7 +674,7 @@ constexpr size_t Calibr8or_storageSize() {
 
 size_t Calibr8or_save(void *storage) {
     size_t used = 0;
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < NR_OF_PRESETS; ++i) {
         used += cal8_presets[i].Save(static_cast<char*>(storage) + used);
     }
     return used;
@@ -682,7 +682,7 @@ size_t Calibr8or_save(void *storage) {
 
 size_t Calibr8or_restore(const void *storage) {
     size_t used = 0;
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < NR_OF_PRESETS; ++i) {
         used += cal8_presets[i].Restore(static_cast<const char*>(storage) + used);
     }
     Calibr8or_instance.LoadPreset();
