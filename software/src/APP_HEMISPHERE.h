@@ -762,7 +762,7 @@ private:
         switch (config_cursor) {
         case SAVE_PRESET:
         case LOAD_PRESET:
-            ShowPresetSelector();
+            preset_cursor = preset_id + 1;
             break;
 
         case AUTO_SAVE:
