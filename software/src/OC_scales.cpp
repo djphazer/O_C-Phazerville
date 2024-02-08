@@ -346,4 +346,7 @@ const char* const voltage_scalings[] = {
     " 2V/O"  // 2V/oct Buchla
     } ;
 
+static_assert( ARRAY_SIZE(scale_names) == ARRAY_SIZE(scale_names_short), "Different number of long vs. short scale names!");
+static_assert( ARRAY_SIZE(scale_names) == (ARRAY_SIZE(braids::scales) + Scales::SCALE_USER_LAST), "Mismatched number of scale definitions!");
+
 }; // namespace OC
