@@ -27,20 +27,17 @@
 // * MIDI note/CV quantizer functions
 //////////////////////////////////////////////////////////////////////////
 
-#if defined(ARDUINO_TEENSY40) || defined(ARDUINO_TEENSY41)
-#define USB_MIDI_HOST
-#endif 
-
 #ifndef HSMIDI_H
 #define HSMIDI_H
 
 // Teensyduino USB MIDI Library message numbers
 // See https://www.pjrc.com/teensy/td_midi.html
 
-#ifdef USB_MIDI_HOST
+#if defined(ARDUINO_TEENSY40) || defined(ARDUINO_TEENSY41)
+#define USB_MIDI_HOST
 #include <USBHost_t36.h>
-USBHost thisUSB;
-MIDIDevice usbHostMIDI(thisUSB);
+static USBHost thisUSB;
+static MIDIDevice usbHostMIDI(thisUSB);
 #endif
 
 #define HEM_MIDI_NOTE_ON usbMIDI.NoteOn
