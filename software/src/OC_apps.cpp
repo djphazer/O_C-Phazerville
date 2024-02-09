@@ -236,7 +236,7 @@ void save_app_data() {
 
   size_t start_app = random(NUM_AVAILABLE_APPS);
   for (size_t i = 0; i < NUM_AVAILABLE_APPS; ++i) {
-    const auto &app = available_apps[(start_app + i) % NUM_AVAILABLE_APPS];
+    const App &app = available_apps[(start_app + i) % NUM_AVAILABLE_APPS];
     size_t storage_size = app.storageSize() + sizeof(AppChunkHeader);
     if (storage_size & 1) ++storage_size; // Align chunks on 2-byte boundaries
     if (storage_size > sizeof(AppChunkHeader) && app.Save) {
@@ -278,29 +278,32 @@ void restore_app_data() {
 
     const App *app = apps::find(chunk->id);
     if (!app) {
-      SERIAL_PRINTLN("App %02x not found, ignoring chunk...", chunk->id);
+      SERIAL_PRINTLN("App %02x not found, ignoring chunk... skipping %u", chunk->id, chunk->length);
       if (!chunk->length)
         break;
       data += chunk->length;
       continue;
     }
-    size_t expected_length = app->storageSize() + sizeof(AppChunkHeader);
-    if (expected_length & 0x1) ++expected_length;
+    const size_t expected_length = ((app->storageSize() + sizeof(AppChunkHeader) + 1) >> 1) << 1; // round up
+    //if (expected_length & 0x1) ++expected_length;
     if (chunk->length != expected_length) {
       SERIAL_PRINTLN("* %s (%02x): chunk length %u != %u (storageSize=%u), skipping...", app->name, chunk->id, chunk->length, expected_length, app->storageSize());
       data += chunk->length;
       continue;
     }
 
+    size_t restored = 0;
     if (app->Restore) {
+        restored = app->Restore(chunk + 1);
       #ifdef PRINT_DEBUG
         SERIAL_PRINTLN("* %s (%02x): Restored %u from %u (chunk length %u)...", app->name, chunk->id, app->Restore(chunk + 1), chunk->length - sizeof(AppChunkHeader), chunk->length);
       #else
-        app->Restore(chunk + 1);
       #endif
     }
-    restored_bytes += chunk->length;
-    data += chunk->length;
+    restored = ((restored + sizeof(AppChunkHeader) + 1) >> 1) << 1; // round up
+
+    restored_bytes += restored;
+    data += restored;
   }
 
   SERIAL_PRINTLN("App data restored: %u, expected %u", restored_bytes, app_settings.used);
