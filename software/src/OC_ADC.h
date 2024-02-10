@@ -27,7 +27,7 @@ enum ADC_CHANNEL {
 };
 
 #define DMA_BUF_SIZE 16
-#define DMA_NUM_CH ADC_CHANNEL_LAST
+#define DMA_NUM_CH 4
 
 namespace OC {
 

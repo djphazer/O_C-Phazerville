@@ -44,9 +44,9 @@ uint8_t pad(int range, int number);
 
 namespace HS {
 
-extern braids::Quantizer quantizer[4]; // global shared quantizers
-extern int quant_scale[4];
-extern int root_note[4];
+extern braids::Quantizer quantizer[DAC_CHANNEL_LAST]; // global shared quantizers
+extern int quant_scale[DAC_CHANNEL_LAST];
+extern int root_note[DAC_CHANNEL_LAST];
 
 extern int octave_max;
 

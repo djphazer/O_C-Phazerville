@@ -4,9 +4,9 @@
 
 namespace HS {
 
-braids::Quantizer quantizer[4]; // global shared quantizers
-int quant_scale[4];
-int root_note[4];
+braids::Quantizer quantizer[DAC_CHANNEL_LAST]; // global shared quantizers
+int quant_scale[DAC_CHANNEL_LAST];
+int root_note[DAC_CHANNEL_LAST];
 
 int octave_max = 5;
 

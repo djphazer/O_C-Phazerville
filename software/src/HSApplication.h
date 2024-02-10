@@ -73,7 +73,7 @@ public:
 
     void BaseStart() {
         // Initialize some things for startup
-        for (uint8_t ch = 0; ch < 4; ch++)
+        for (uint8_t ch = 0; ch < DAC_CHANNEL_LAST; ch++)
         {
             frame.clock_countdown[ch]  = 0;
             frame.inputs[ch] = 0;
