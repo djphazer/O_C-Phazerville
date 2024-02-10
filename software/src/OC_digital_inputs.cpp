@@ -112,11 +112,21 @@ void OC::DigitalInputs::Init() {
   bitmask[3] = digitalPinToBitMask(TR4);
   for (unsigned int i=0; i < 4; i++) {
     unsigned int bitnum = __builtin_ctz(bitmask[i]);
+#ifdef ARDUINO_TEENSY41
+    if (bitnum < 16) {
+      // rising edge detect, bits 0-15
+      port[i]->ICR1 = (port[i]->ICR1 & ~(0x03 << (bitnum * 2))) | (0x02 << (bitnum * 2));
+    } else {
+      // rising edge detect, bits 16-31
+      port[i]->ICR2 = (port[i]->ICR2 & ~(0x03 << ((bitnum - 16) * 2))) | (0x02 << ((bitnum-16) * 2));
+    }
+#else
     if (bitnum < 16) {
       port[i]->ICR1 |= (0x03 << (bitnum * 2)); // falling edge detect, bits 0-15
     } else {
       port[i]->ICR2 |= (0x03 << ((bitnum - 16) * 2)); // falling edge detect, bits 16-31
     }
+#endif
     port[i]->ISR = bitmask[i]; // clear any prior detected edge
   }
 }

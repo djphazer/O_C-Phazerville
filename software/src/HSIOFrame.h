@@ -208,11 +208,16 @@ typedef struct IOFrame {
         gate_high[1] = OC::DigitalInputs::read_immediate<OC::DIGITAL_INPUT_2>();
         gate_high[2] = OC::DigitalInputs::read_immediate<OC::DIGITAL_INPUT_3>();
         gate_high[3] = OC::DigitalInputs::read_immediate<OC::DIGITAL_INPUT_4>();
-        // T41 TODO: calculate for inputs 4-7 as well
-
         for (int i = 0; i < ADC_CHANNEL_LAST; ++i) {
             // Set CV inputs
             inputs[i] = OC::ADC::raw_pitch_value(ADC_CHANNEL(i));
+#ifdef ARDUINO_TEENSY41
+            // T41: calculate gates/clocks for inputs 4-7 as well
+            if (i<4) {
+              gate_high[i+4] = inputs[i] > (12 << 7);
+              clocked[i+4] = (gate_high[i+4] && last_cv[i] < (12 << 7));
+            }
+#endif
             if (abs(inputs[i] - last_cv[i]) > HEMISPHERE_CHANGE_THRESHOLD) {
                 changed_cv[i] = 1;
                 last_cv[i] = inputs[i];
