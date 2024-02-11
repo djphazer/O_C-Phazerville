@@ -28,7 +28,7 @@
  * The CV input logic as well as the name were copied from a separate rewrite by adegani.
  */
 
-#include "bjorklund.h"
+#include "../bjorklund.h"
 
 const int NUM_PARAMS = 5;
 const int PARAM_SIZE = 6;

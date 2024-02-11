@@ -21,8 +21,8 @@
 // Modified by Samuel Burt 2023
 
 #include <Arduino.h>
-#include "OC_core.h"
-#include "HemisphereApplet.h"
+#include "../OC_core.h"
+#include "../HemisphereApplet.h"
 
 class RunglBook : public HemisphereApplet {
 public:

@@ -21,7 +21,7 @@
 /* original 8-step mod by Logarhythm, adapted by djphazer
  */
 
-#include "HSMIDI.h"
+#include "../HSMIDI.h"
 
 class SequenceX : public HemisphereApplet {
 public:

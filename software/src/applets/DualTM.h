@@ -30,9 +30,9 @@
  * Heavily adapted as DualTM from ShiftReg/TM by djphazer (Nicholas J. Michalek)
  */
 
-#include "braids_quantizer.h"
-#include "braids_quantizer_scales.h"
-#include "OC_scales.h"
+#include "../braids_quantizer.h"
+#include "../braids_quantizer_scales.h"
+#include "../OC_scales.h"
 
 #define TM2_MAX_SCALE OC::Scales::NUM_SCALES
 

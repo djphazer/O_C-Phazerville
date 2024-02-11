@@ -18,8 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "bjorklund.h"
-#include "braids_quantizer.h"
+#include "../bjorklund.h"
+#include "../braids_quantizer.h"
 
 class Strum : public HemisphereApplet {
 public:

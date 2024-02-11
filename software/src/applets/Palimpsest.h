@@ -19,8 +19,8 @@
 // SOFTWARE.
 
 #include <Arduino.h>
-#include "OC_core.h"
-#include "HemisphereApplet.h"
+#include "../OC_core.h"
+#include "../HemisphereApplet.h"
 
 #define HEM_PALIMPSEST_MAX_VALUE 100
 

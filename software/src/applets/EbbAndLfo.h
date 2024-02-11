@@ -1,4 +1,4 @@
-#include "resources/tideslite.h"
+#include "../resources/tideslite.h"
 
 class EbbAndLfo : public HemisphereApplet {
 public:

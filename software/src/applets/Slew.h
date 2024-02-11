@@ -19,8 +19,8 @@
 // SOFTWARE.
 
 #include <Arduino.h>
-#include "OC_core.h"
-#include "HemisphereApplet.h"
+#include "../OC_core.h"
+#include "../HemisphereApplet.h"
 
 #define HEM_SLEW_MAX_VALUE 200
 #define HEM_SLEW_MAX_TICKS 64000

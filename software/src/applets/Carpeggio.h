@@ -21,10 +21,10 @@
 // SOFTWARE.
 
 #include <Arduino.h>
-#include "OC_core.h"
-#include "HemisphereApplet.h"
-#include "hem_arp_chord.h"
-#include "HSMIDI.h"
+#include "../OC_core.h"
+#include "../HemisphereApplet.h"
+#include "../hem_arp_chord.h"
+#include "../HSMIDI.h"
 #define HEM_CARPEGGIO_ANIMATION_SPEED 500
 
 class Carpeggio : public HemisphereApplet {

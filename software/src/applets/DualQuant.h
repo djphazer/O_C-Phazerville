@@ -21,12 +21,12 @@
 // SOFTWARE.
 
 #include <Arduino.h>
-#include "OC_core.h"
-#include "HemisphereApplet.h"
-#include "OC_strings.h"
-#include "braids_quantizer.h"
-#include "braids_quantizer_scales.h"
-#include "OC_scales.h"
+#include "../OC_core.h"
+#include "../HemisphereApplet.h"
+#include "../OC_strings.h"
+#include "../braids_quantizer.h"
+#include "../braids_quantizer_scales.h"
+#include "../OC_scales.h"
 
 class DualQuant : public HemisphereApplet {
 public:

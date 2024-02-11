@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "HSProbLoopLinker.h" // singleton for linking ProbDiv and ProbMelo
+#include "../HSProbLoopLinker.h" // singleton for linking ProbDiv and ProbMelo
 
 #define HEM_PROB_MEL_MAX_WEIGHT 10
 #define HEM_PROB_MEL_MAX_RANGE 60

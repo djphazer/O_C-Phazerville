@@ -19,9 +19,9 @@
 // SOFTWARE.
 
 #include <Arduino.h>
-#include "OC_core.h"
-#include "HemisphereApplet.h"
-#include "SegmentDisplay.h"
+#include "../OC_core.h"
+#include "../HemisphereApplet.h"
+#include "../SegmentDisplay.h"
 #define CVREC_MAX_STEP 384
 
 const char* const CVRecV2_MODES[4] = {

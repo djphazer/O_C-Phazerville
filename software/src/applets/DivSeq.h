@@ -21,7 +21,7 @@
 
 /* Used ProbDiv applet from benirose as a template */
 
-#include "HSProbLoopLinker.h" // singleton for linking ProbDiv and ProbMelo
+#include "../HSProbLoopLinker.h" // singleton for linking ProbDiv and ProbMelo
 
 class DivSeq : public HemisphereApplet {
 public:

@@ -19,7 +19,7 @@
 // SOFTWARE.
 
 // Hijacking ProbDiv triggers, if available, by pretending to be ProbMeloD ;)
-#include "HSProbLoopLinker.h"
+#include "../HSProbLoopLinker.h"
 
 class Pigeons : public HemisphereApplet {
 public:

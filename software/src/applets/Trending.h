@@ -19,8 +19,8 @@
 // SOFTWARE.
 
 #include <Arduino.h>
-#include "OC_core.h"
-#include "HemisphereApplet.h"
+#include "../OC_core.h"
+#include "../HemisphereApplet.h"
 
 #define TRENDING_MAX_SENS 124
 

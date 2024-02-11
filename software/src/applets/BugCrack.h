@@ -19,9 +19,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "vector_osc/HSVectorOscillator.h"
-#include "vector_osc/WaveformManager.h"
-#include "tiny_dsp.h"
+#include "../vector_osc/HSVectorOscillator.h"
+#include "../vector_osc/WaveformManager.h"
+#include "../tiny_dsp.h"
 
 #define BNC_MAX_PARAM 63
 #define CH_KICK 0

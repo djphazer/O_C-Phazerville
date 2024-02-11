@@ -19,10 +19,10 @@
 // SOFTWARE.
 
 #include <Arduino.h>
-#include "OC_core.h"
-#include "HemisphereApplet.h"
-#include "vector_osc/HSVectorOscillator.h"
-#include "vector_osc/WaveformManager.h"
+#include "../OC_core.h"
+#include "../HemisphereApplet.h"
+#include "../vector_osc/HSVectorOscillator.h"
+#include "../vector_osc/WaveformManager.h"
 
 class VectorMod : public HemisphereApplet {
 public:

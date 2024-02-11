@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "OC_core.h"
+#include "../OC_core.h"
 
 #define PROB_UP 500
 #define PROB_DN 500

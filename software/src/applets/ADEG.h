@@ -25,8 +25,8 @@
 #define HEM_ADEG_MAX_TICKS 33333
 
 #include <Arduino.h>
-#include "OC_core.h"
-#include "HemisphereApplet.h"
+#include "../OC_core.h"
+#include "../HemisphereApplet.h"
 
 class ADEG : public HemisphereApplet {
 public:

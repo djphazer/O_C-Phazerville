@@ -22,8 +22,8 @@
 #define _HEM_ATTOFF_H_
 
 #include <Arduino.h>
-#include "OC_core.h"
-#include "HemisphereApplet.h"
+#include "../OC_core.h"
+#include "../HemisphereApplet.h"
 
 #define ATTENOFF_INCREMENTS 128
 #define ATTENOFF_MAX_LEVEL 63

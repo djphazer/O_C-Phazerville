@@ -22,11 +22,11 @@
 // SOFTWARE.
 
 #include <Arduino.h>
-#include "OC_core.h"
-#include "HemisphereApplet.h"
-#include "streams_lorenz_generator.h"
-#include "util/util_math.h"
-#include "HSLorenzGeneratorManager.h" // Singleton Lorenz manager
+#include "../OC_core.h"
+#include "../HemisphereApplet.h"
+#include "../streams_lorenz_generator.h"
+#include "../util/util_math.h"
+#include "../HSLorenzGeneratorManager.h" // Singleton Lorenz manager
 
 class LowerRenz : public HemisphereApplet {
 public:

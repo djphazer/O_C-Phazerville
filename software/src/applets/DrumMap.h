@@ -21,9 +21,9 @@
 // SOFTWARE.
 
 #ifdef DRUMMAP_GRIDS2
-#include "grids2_resources.h"
+#include "../grids2_resources.h"
 #else
-#include "grids_resources.h"
+#include "../grids_resources.h"
 #endif
 
 #define HEM_DRUMMAP_PULSE_ANIMATION_TICKS 1000

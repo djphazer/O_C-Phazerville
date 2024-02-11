@@ -1,7 +1,7 @@
 
 #include <Arduino.h>
-#include "OC_core.h"
-#include "HemisphereApplet.h"
+#include "../OC_core.h"
+#include "../HemisphereApplet.h"
 
 class ShiftGate : public HemisphereApplet {
 public:

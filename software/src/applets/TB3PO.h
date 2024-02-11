@@ -27,9 +27,9 @@
 // Contributions:
 // Thanks to Github/Muffwiggler user Qiemem for adding reseed(), to break the small cycle of available seed values that was occurring in practice
 
-#include "braids_quantizer.h"
-#include "braids_quantizer_scales.h"
-#include "OC_scales.h"
+#include "../braids_quantizer.h"
+#include "../braids_quantizer_scales.h"
+#include "../OC_scales.h"
 
 #define ACID_HALF_STEPS 16
 #define ACID_MAX_STEPS 32

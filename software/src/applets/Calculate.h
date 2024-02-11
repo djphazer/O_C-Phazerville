@@ -19,8 +19,8 @@
 // SOFTWARE.
 
 #include <Arduino.h>
-#include "OC_core.h"
-#include "HemisphereApplet.h"
+#include "../OC_core.h"
+#include "../HemisphereApplet.h"
 
 // Arithmetic functions and typedef to function pointer
 #define HEMISPHERE_NUMBER_OF_CALC 7

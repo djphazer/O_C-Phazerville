@@ -27,10 +27,10 @@
 // in this code.
 
 #include <Arduino.h>
-#include "OC_core.h"
-#include "OC_strings.h"
-#include "HemisphereApplet.h"
-#include "src/drivers/FreqMeasure/OC_FreqMeasure.h"
+#include "../OC_core.h"
+#include "../OC_strings.h"
+#include "../HemisphereApplet.h"
+#include "../src/drivers/FreqMeasure/OC_FreqMeasure.h"
 
 static constexpr double HEM_TUNER_AaboveMidCtoC0 = 0.03716272234383494188492;
 

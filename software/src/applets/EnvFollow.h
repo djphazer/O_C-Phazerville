@@ -19,8 +19,8 @@
 // SOFTWARE.
 
 #include <Arduino.h>
-#include "OC_core.h"
-#include "HemisphereApplet.h"
+#include "../OC_core.h"
+#include "../HemisphereApplet.h"
 
 #define HEM_ENV_FOLLOWER_SAMPLES 166
 #define HEM_ENV_FOLLOWER_MAXSPEED 16
