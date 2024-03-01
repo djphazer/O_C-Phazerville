@@ -811,7 +811,10 @@ private:
         // --- Config Selection
         gfxHeader("Config");
 
-        gfxPrint(1, 15, "Trig Length: ");
+        gfxIcon(1, 15 + (config_cursor-LOAD_PRESET)*10, LEFT_ICON);
+        gfxPrint(10, 25, " Presets");
+        
+        gfxPrint(1, 25, "Trig Length: ");
         gfxPrint(HS::trig_length);
         gfxPrint("ms");
 
@@ -822,11 +825,11 @@ private:
         "Zips"
         #endif
         };
-        gfxPrint(1, 25, "Screensaver:  ");
+        gfxPrint(1, 35, "Screensaver:  ");
         gfxPrint( ssmodes[HS::screensaver_mode] );
 
         const char * cursor_mode_name[3] = { "modal", "modal+wrap" };
-        gfxPrint(1, 35, "Cursor:  ");
+        gfxPrint(1, 45, "Cursor:  ");
         gfxPrint(cursor_mode_name[HS::cursor_wrap]);
         
         switch (config_cursor) {
