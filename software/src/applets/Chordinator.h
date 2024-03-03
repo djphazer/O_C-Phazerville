@@ -132,10 +132,10 @@ public:
 
 protected:
   void SetHelp() {
-    help[HEMISPHERE_HELP_DIGITALS] = "Sample, Lrn/Sync";
-    help[HEMISPHERE_HELP_CVS] = "Weight, Signal";
-    help[HEMISPHERE_HELP_OUTS] = "Sampled out, Thru";
-    help[HEMISPHERE_HELP_ENCODER] = "Scl,root,wght,lrn";
+    help[HEMISPHERE_HELP_DIGITALS] = "S&H Sig, S&H Wgt";
+    help[HEMISPHERE_HELP_CVS] = "Signal, Weight";
+    help[HEMISPHERE_HELP_OUTS] = "Sig Thru, Scl Deg";
+    help[HEMISPHERE_HELP_ENCODER] = "Scale, Root, Mask";
   }
 
 private:
