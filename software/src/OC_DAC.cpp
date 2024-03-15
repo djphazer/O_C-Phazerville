@@ -438,7 +438,7 @@ void OC::DAC::DAC8568_Vref_enable() {
   Serial.println("DAC8568 Vref enable");
   SPI.begin();
   IOMUXC_SW_MUX_CTL_PAD_GPIO_B0_00 = 3; // DAC CS pin controlled by SPI
-  SPI.beginTransaction(SPISettings(24000000, MSBFIRST, SPI_MODE0));
+  SPI.beginTransaction(SPISettings(24000000, MSBFIRST, SPI_MODE1));
   LPSPI4_TCR = (LPSPI4_TCR & 0xF8000000) | LPSPI_TCR_FRAMESZ(31)
     | LPSPI_TCR_PCS(0) | LPSPI_TCR_RXMSK;
   delayMicroseconds(10);
