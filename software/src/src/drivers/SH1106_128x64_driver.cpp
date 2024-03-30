@@ -47,7 +47,7 @@ static bool page_dma_active = false;
 // Teensy 4.1 has large SPI FIFO, so FIFO and interrupt is used rather than DMA
 #elif defined(__IMXRT1062__)
 static void spi_sendpage_isr();
-static int sendpage_state;
+static volatile int sendpage_state; // 0: inactive, 1..4: active
 static int sendpage_count;
 static const uint32_t *sendpage_src;
 #endif
@@ -198,7 +198,10 @@ void SH1106_128x64_Driver::Flush() {
     SPI0_SR = 0xFF0F0000;
   }
 #endif // __MK20DX256__
-#endif // DMA_PAGE_TRANSFER
+#elif defined(__IMXRT1062__)
+  // The same scenario as above can occur with the ISR-driven transfer
+  while (sendpage_state) { }
+#endif
 }
 
 static uint8_t empty_page[SH1106_128x64_Driver::kPageSize];
@@ -252,7 +255,7 @@ void SH1106_128x64_Driver::SendPage(uint_fast8_t index, const uint8_t *data) {
 /*static*/
 void SH1106_128x64_Driver::SendPage(uint_fast8_t index, const uint8_t *data) {
   SH1106_data_start_seq[2] = 0xb0 | index;
-  sendpage_state = 0;
+  sendpage_state = 1;
   sendpage_src = (const uint32_t *)data; // frame buffer is 32 bit aligned
   sendpage_count = kPageSize >> 2; // number of 32 bit words to write into FIFO
   #if defined(ARDUINO_TEENSY41)
@@ -277,7 +280,7 @@ static void spi_sendpage_isr() {
   #endif
   uint32_t status = lpspi->SR;
   lpspi->SR = status; // clear interrupt status flags
-  if (sendpage_state == 0) {
+  if (sendpage_state == 1) {
     // begin command phase
     digitalWriteFast(OLED_DC, LOW);
     digitalWriteFast(OLED_CS, OLED_CS_ACTIVE);
@@ -285,11 +288,11 @@ static void spi_sendpage_isr() {
       | LPSPI_TCR_PCS(3) | LPSPI_TCR_RXMSK;
     lpspi->TDR = (SH1106_data_start_seq[0] << 16) | (SH1106_data_start_seq[1] << 8)
       | SH1106_data_start_seq[2];
-    sendpage_state = 1;
+    sendpage_state = 2;
     lpspi->IER = LPSPI_IER_TCIE; // run spi_sendpage_isr() when command complete
     return; // FIFO loaded with 3 byte command
   }
-  if (sendpage_state == 1) {
+  if (sendpage_state == 2) {
     // begin data phase
     digitalWriteFast(OLED_DC, HIGH);
     lpspi->CR |= LPSPI_CR_RRF | LPSPI_CR_RTF; // clear FIFO
@@ -297,9 +300,9 @@ static void spi_sendpage_isr() {
     const size_t nbits = SH1106_128x64_Driver::kPageSize * 8;
     lpspi->TCR = (lpspi->TCR & 0xF8000000) | LPSPI_TCR_FRAMESZ(nbits-1)
       | LPSPI_TCR_PCS(3) | LPSPI_TCR_RXMSK | LPSPI_TCR_BYSW;
-    sendpage_state = 2;
+    sendpage_state = 3;
   }
-  if (sendpage_state == 2) {
+  if (sendpage_state == 3) {
     // feed display data into the FIFO
     if (!(status & LPSPI_SR_TDF)) return;
     const int fifo_space = 16 - (lpspi->FSR & 0x1F);
@@ -319,13 +322,14 @@ static void spi_sendpage_isr() {
         asm volatile ("dsb":::"memory");
       }
       sendpage_count = 0;
-      sendpage_state = 3;
+      sendpage_state = 4;
     }
     return;
   } else {
     // finished
     digitalWriteFast(OLED_CS, OLED_CS_INACTIVE);
     lpspi->IER = 0;
+    sendpage_state = 0;
   }
 }
 #endif // __IMXRT1062__
