@@ -16,6 +16,7 @@
 
 #define HEMISPHERE_APPLETS { \
     DECLARE_APPLET( 47, 0x09, ASR), \
+    DECLARE_APPLET( 56, 0x10, AttenuateOffset), \
     DECLARE_APPLET( 41, 0x41, Binary), \
     DECLARE_APPLET( 55, 0x80, BootsNCat), \
     DECLARE_APPLET( 51, 0x80, BugCrack), \
@@ -24,6 +25,7 @@
     DECLARE_APPLET(  6, 0x04, ClockDivider), \
     DECLARE_APPLET( 28, 0x04, ClockSkip), \
     DECLARE_APPLET( 30, 0x10, Compare), \
+    DECLARE_APPLET(  9, 0x08, DualQuant), \
     DECLARE_APPLET( 18, 0x02, DualTM), \
     DECLARE_APPLET( 42, 0x11, EnvFollow), \
     DECLARE_APPLET( 15, 0x02, EuclidX), \
@@ -41,6 +43,7 @@
     DECLARE_APPLET( 48, 0x45, ShiftGate), \
     DECLARE_APPLET( 19, 0x01, Slew), \
     DECLARE_APPLET( 61, 0x01, Stairs), \
+    DECLARE_APPLET( 13, 0x40, TLNeuron), \
     DECLARE_APPLET( 39, 0x80, Tuner), \
     DECLARE_APPLET( 43, 0x10, Voltage), \
 }
