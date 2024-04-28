@@ -25,10 +25,10 @@
 #define ACC_MIN_B 0
 #define ACC_MAX_B 15
 
-class Accumulator : public HemisphereApplet {
+class Cumulus : public HemisphereApplet {
 public:
 
-    enum AccCursor {
+    enum CumuCursor {
         OPERATION,
         CONSTANT_B,
         OUTMODE,
@@ -48,8 +48,7 @@ public:
     };
 
     const char* applet_name() {
-        return "Accumulate";
-        return "Cummulus"
+        return "Cumulus";
     }
 
     void Start() {
@@ -117,7 +116,7 @@ public:
             return;
         }
 
-        switch ((AccCursor)cursor) {
+        switch ((CumuCursor)cursor) {
         case OPERATION:
             accoperator = (AccOperator) constrain( + direction, 0, OP_LAST - 1);
             break;

@@ -42,6 +42,7 @@ class_name class_name ## _instance[2]
 #include "applets/BugCrack.h"
 #include "applets/Burst.h"
 #include "applets/Button.h"
+#include "applets/Cumulus.h"
 #include "applets/CVRecV2.h"
 #include "applets/Calculate.h"
 #include "applets/Calibr8.h"
@@ -105,6 +106,8 @@ class_name class_name ## _instance[2]
 #include "applets/hMIDIIn.h"
 #include "applets/hMIDIOut.h"
 
+
+CREATE_APPLET(Cumulus);
 CREATE_APPLET(ADSREG);
 CREATE_APPLET(ADEG);
 CREATE_APPLET(AttenuateOffset);
@@ -194,6 +197,7 @@ CREATE_APPLET(VectorMorph);
     DECLARE_APPLET(  6, 0x04, ClockDivider), \
     DECLARE_APPLET( 28, 0x04, ClockSkip), \
     DECLARE_APPLET( 30, 0x10, Compare), \
+    DECLARE_APPLET( 74, 0x40, Cumulus), \
     DECLARE_APPLET( 24, 0x02, CVRecV2), \
     DECLARE_APPLET( 68, 0x06, DivSeq), \
     DECLARE_APPLET( 57, 0x02, DrumMap), \
