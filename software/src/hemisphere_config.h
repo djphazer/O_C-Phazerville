@@ -80,7 +80,7 @@ class_name class_name ## _instance[2]
 #include "applets/ResetClock.h"
 #include "applets/RndWalk.h"
 #include "applets/RunglBook.h"
-#include "applets/ScaleDuet.h"
+// #include "applets/ScaleDuet.h"
 #include "applets/Schmitt.h"
 #include "applets/Scope.h"
 #include "applets/SequenceX.h"
@@ -155,7 +155,7 @@ CREATE_APPLET(ProbabilityMelody);
 CREATE_APPLET(ResetClock);
 CREATE_APPLET(RndWalk);
 CREATE_APPLET(RunglBook);
-CREATE_APPLET(ScaleDuet);
+// CREATE_APPLET(ScaleDuet);
 CREATE_APPLET(Schmitt);
 CREATE_APPLET(Scope);
 CREATE_APPLET(SequenceX);
@@ -221,7 +221,7 @@ CREATE_APPLET(VectorMorph);
     DECLARE_APPLET( 70, 0x14, ResetClock), \
     DECLARE_APPLET( 69, 0x01, RndWalk), \
     DECLARE_APPLET( 44, 0x01, RunglBook), \
-    DECLARE_APPLET( 26, 0x08, ScaleDuet), \
+    // DECLARE_APPLET( 26, 0x08, ScaleDuet),
     DECLARE_APPLET( 40, 0x40, Schmitt), \
     DECLARE_APPLET( 23, 0x80, Scope), \
     DECLARE_APPLET( 14, 0x02, SequenceX), \
