@@ -30,8 +30,8 @@ public:
 
     enum CumuCursor {
         OPERATION,
-        CONSTANT_B,
         OUTMODE,
+        CONSTANT_B,
         LAST_CURSOR,
     };
 
@@ -53,7 +53,7 @@ public:
 
     void Start() {
         cursor = 0;
-        accoperator = ADD;
+        accoperator = WXOR_LSHIFT;
         acc_register = 0;
         b_constant = 0;
 
@@ -79,7 +79,7 @@ public:
                 break; 
             case WXOR_LSHIFT:
                 mask = (b_constant << 4) | b_constant;
-                acc_register ^= mask;
+                acc_register ^= b_constant;
                 acc_register = (acc_register << 1) | (acc_register >> 7);
             default:
                 break;
@@ -102,8 +102,8 @@ public:
     }
 
     void View() {
-        DrawSelector();
         DrawIndicator();
+        DrawSelector();
     }
 
     void OnButtonPress() {
@@ -118,7 +118,7 @@ public:
 
         switch ((CumuCursor)cursor) {
         case OPERATION:
-            accoperator = (AccOperator) constrain( + direction, 0, OP_LAST - 1);
+            accoperator = (AccOperator) constrain(accoperator + direction, 0, OP_LAST - 1);
             break;
         case CONSTANT_B:
             b_constant = constrain(b_constant + direction, ACC_MIN_B, ACC_MAX_B);
@@ -163,10 +163,35 @@ private:
 
     SegmentDisplay segment;
 
+    const char* OP_NAMES[OP_LAST] = {"z+b", "z-b", "(z^b)<<1"};
+    const char* OUTMODE_NAMES[OUTMODE_LAST] = {" 1-0 "};
 
-    void DrawSelector() {}
+
+    void DrawSelector() {
+        gfxBitmap(1, 15, 8, CLOCK_ICON);
+        gfxPrint(12, 15, OP_NAMES[accoperator]);
+
+        gfxBitmap(1, 24, 8, PLAY_ICON);
+        gfxPrint(12, 24, OUTMODE_NAMES[outmode]);
+
+        switch ((CumuCursor)cursor) {
+        case OPERATION: gfxCursor(12, 23, 48); break;
+        case OUTMODE:   gfxCursor(12, 32, 48); break;
+        case CONSTANT_B:    gfxCursor(12, 48, 49); break;
+            break;
+        default:
+            break;
+        }
+    }
 
     void DrawIndicator() {
+        gfxPrint(1, 40, "B");
+        gfxPrint(1, 49, "Z");
 
+        for (int i = 0; i < 8; i++) {
+            gfxPrint(12 + (i * 6), 40, (b_constant >> i) & 1);
+            gfxPrint(12 + (i * 6), 51, (acc_register >> i) & 1);
+        }
+        
     }
 };
