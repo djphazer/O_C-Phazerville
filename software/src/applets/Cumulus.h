@@ -20,8 +20,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "../SegmentDisplay.h"
-
 #define ACC_MIN_B 0
 #define ACC_MAX_B 15
 
@@ -30,7 +28,8 @@ public:
 
     enum CumuCursor {
         OPERATION,
-        OUTMODE,
+        OUTMODE_A,
+        OUTMODE_B,
         CONSTANT_B,
         LAST_CURSOR,
     };
@@ -38,7 +37,8 @@ public:
     enum AccOperator {
         ADD,
         SUB,
-        WXOR_LSHIFT, // wide xor with rotl
+        MUL,
+        XOR_LSHIFT, //xor with rotl
         OP_LAST
     };
 
@@ -53,11 +53,9 @@ public:
 
     void Start() {
         cursor = 0;
-        accoperator = WXOR_LSHIFT;
+        accoperator = ADD;
         acc_register = 0;
         b_constant = 0;
-
-        segment.Init(SegmentSize::TINY_SEGMENTS);
     }
 
 
@@ -71,27 +69,18 @@ public:
 
         if (Clock(0)) {
             switch ((AccOperator)accoperator) {
-            case ADD:
-                acc_register += b_constant;
-                break;
-            case SUB:
-                acc_register -= b_constant;
-                break; 
-            case WXOR_LSHIFT:
-                mask = (b_constant << 4) | b_constant;
+            case ADD:   acc_register += b_constant; break;
+            case SUB:   acc_register -= b_constant; break;
+            case MUL:   acc_register *= b_constant; break;
+            case XOR_LSHIFT:
                 acc_register ^= b_constant;
                 acc_register = (acc_register << 1) | (acc_register >> 7);
             default:
                 break;
             }
 
-            switch ((OutputMode)outmode) {
-            case SINGLE:
-                GateOut(0, acc_register & 1);
-                GateOut(1, (acc_register >> 1) & 1);
-                break;
-            default:
-                break;
+            ForEachChannel(ch) {
+                GateOut(ch, (acc_register >> outmode[ch]) & 1);
             }
         }
 
@@ -112,7 +101,7 @@ public:
 
     void OnEncoderMove(int direction) {
         if (!EditMode()) {
-            MoveCursor(cursor, direction, LAST_CURSOR);
+            MoveCursor(cursor, direction, LAST_CURSOR - 1);
             return;
         }
 
@@ -123,8 +112,11 @@ public:
         case CONSTANT_B:
             b_constant = constrain(b_constant + direction, ACC_MIN_B, ACC_MAX_B);
             break;
-        case OUTMODE:
+        case OUTMODE_A:
+            outmode[0] = constrain(outmode[0] + direction, 0, 7);
             break;
+        case OUTMODE_B:
+            outmode[1] = constrain(outmode[1] + direction, 0, 7);
         default:
             break;
         }
@@ -145,15 +137,15 @@ protected:
     //                                    "------------------" <-- Size Guide      
         help[HEMISPHERE_HELP_DIGITALS] =  "1=Clock 2=Reset";
         help[HEMISPHERE_HELP_CVS] =       "1=CONSTANT ";
-        help[HEMISPHERE_HELP_OUTS] =      "A= B=";
-        help[HEMISPHERE_HELP_ENCODER] =   "Mode: Outs / Ops";
+        help[HEMISPHERE_HELP_OUTS] =      "Assignable";
+        help[HEMISPHERE_HELP_ENCODER] =   "Select/Push 2 Edit";
     //                                    "------------------" <-- Size Guide       
     }
 
 private:
     int cursor;
     AccOperator accoperator;
-    OutputMode outmode;
+    int outmode[2] = {1, 0};
 
     uint8_t b_constant;
     uint8_t b_mod;
@@ -161,23 +153,26 @@ private:
     uint8_t acc_register;
     uint8_t mask;
 
-    SegmentDisplay segment;
-
-    const char* OP_NAMES[OP_LAST] = {"z+b", "z-b", "(z^b)<<1"};
-    const char* OUTMODE_NAMES[OUTMODE_LAST] = {" 1-0 "};
+    const char* OP_NAMES[OP_LAST] = {"z+k", "z-k", "z*k","(z^k)<<1"};
 
 
     void DrawSelector() {
         gfxBitmap(1, 15, 8, CLOCK_ICON);
         gfxPrint(12, 15, OP_NAMES[accoperator]);
 
-        gfxBitmap(1, 24, 8, PLAY_ICON);
-        gfxPrint(12, 24, OUTMODE_NAMES[outmode]);
+        gfxPrint(1, 25, "A:");
+        gfxPrint(15, 25, outmode[0]);
+
+        gfxPrint(32, 25, "B:");
+        gfxPrint(47, 25, outmode[1]);
+
+        gfxLine(0, 36, 63, 36);
 
         switch ((CumuCursor)cursor) {
-        case OPERATION: gfxCursor(12, 23, 48); break;
-        case OUTMODE:   gfxCursor(12, 32, 48); break;
-        case CONSTANT_B:    gfxCursor(12, 48, 49); break;
+        case OPERATION: gfxCursor(11, 23, 50); break;
+        case OUTMODE_A: gfxCursor(14, 33, 16); break;
+        case OUTMODE_B: gfxCursor(46, 33, 16); break;
+        case CONSTANT_B:    gfxCursor(36, 48, 25); break;
             break;
         default:
             break;
@@ -185,13 +180,18 @@ private:
     }
 
     void DrawIndicator() {
-        gfxPrint(1, 40, "B");
-        gfxPrint(1, 49, "Z");
+        gfxPrint(1, 40, "k");
+        gfxPrint(1, 52, "Z");
 
         for (int i = 0; i < 8; i++) {
-            gfxPrint(12 + (i * 6), 40, (b_constant >> i) & 1);
-            gfxPrint(12 + (i * 6), 51, (acc_register >> i) & 1);
+            gfxPrint(12 + (i * 6), 52, (acc_register >> (7 - i)) & 1);
+            
+            if (i > 3) gfxPrint(12 + (i * 6), 40, (b_constant >> (7 - i)) & 1);
         }
+
+        gfxLine((7 - outmode[0]) * 6 + 13, 50, (7 - outmode[0]) * 6 + 17, 50);
+        gfxLine((7 - outmode[1]) * 6 + 13, 60, (7 - outmode[1]) * 6 + 17, 60);
+
         
     }
 };
