@@ -37,7 +37,7 @@ public:
     enum AccOperator {
         ADD,
         SUB,
-        MUL,
+        MULADD1,
         XOR_LSHIFT, //xor with rotl
         OP_LAST
     };
@@ -71,7 +71,7 @@ public:
             switch ((AccOperator)accoperator) {
             case ADD:   acc_register += b_constant; break;
             case SUB:   acc_register -= b_constant; break;
-            case MUL:   acc_register *= b_constant; break;
+            case MULADD1:   acc_register = acc_register * b_constant + 1; break;
             case XOR_LSHIFT:
                 acc_register ^= b_constant;
                 acc_register = (acc_register << 1) | (acc_register >> 7);
@@ -153,11 +153,11 @@ private:
     uint8_t acc_register;
     uint8_t mask;
 
-    const char* OP_NAMES[OP_LAST] = {"z+k", "z-k", "z*k","(z^k)<<1"};
+    const char* OP_NAMES[OP_LAST] = {"z+k", "z-k", "z*k+1","(z^k)<<1"};
 
 
     void DrawSelector() {
-        gfxBitmap(1, 15, 8, CLOCK_ICON);
+        gfxBitmap(1, 15, 8, BEAKER_ICON);
         gfxPrint(12, 15, OP_NAMES[accoperator]);
 
         gfxPrint(1, 25, "A:");
