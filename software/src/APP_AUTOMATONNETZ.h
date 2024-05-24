@@ -171,6 +171,7 @@ enum EOutputAMode {
   OUTPUTA_MODE_TRIG,
   OUTPUTA_MODE_ARP,
   OUTPUTA_MODE_STRUM,
+  OUTPUT_TUNE_ALL,
   OUTPUTA_MODE_LAST
 };
 
@@ -338,7 +339,8 @@ const char * const outputa_mode_names[] = {
   "root",
   "trig",
   "arp",
-  "strm"
+  "strm",
+  "tune"
 };
 
 const char * const clear_mode_names[] = {
@@ -468,6 +470,14 @@ void AutomatonnetzState::update_outputs(bool chord_changed, int transpose, int i
   inversion += ((OC::ADC::value<ADC_CHANNEL_4>() + 255) >> 9);
   CONSTRAIN(inversion, CELL_MIN_INVERSION * 2, CELL_MAX_INVERSION * 2);
 
+  if (output_mode() == OUTPUT_TUNE_ALL) {
+    OC::DAC::set_voltage_scaled_semitone<DAC_CHANNEL_A>(tonnetz_state.outputs(0), 0, OC::DAC::get_voltage_scaling(DAC_CHANNEL_A));
+    OC::DAC::set_voltage_scaled_semitone<DAC_CHANNEL_B>(tonnetz_state.outputs(0), 0, OC::DAC::get_voltage_scaling(DAC_CHANNEL_B));
+    OC::DAC::set_voltage_scaled_semitone<DAC_CHANNEL_C>(tonnetz_state.outputs(0), 0, OC::DAC::get_voltage_scaling(DAC_CHANNEL_C));
+    OC::DAC::set_voltage_scaled_semitone<DAC_CHANNEL_D>(tonnetz_state.outputs(0), 0, OC::DAC::get_voltage_scaling(DAC_CHANNEL_D));
+    return;
+  }
+
   tonnetz_state.render(root, inversion);
 
   switch (output_mode()) {
@@ -486,6 +496,7 @@ void AutomatonnetzState::update_outputs(bool chord_changed, int transpose, int i
       if (!strum_inhibit_)
           OC::DAC::set_voltage_scaled_semitone<DAC_CHANNEL_A>(tonnetz_state.outputs(arp_index_ + 1), octave(), OC::DAC::get_voltage_scaling(DAC_CHANNEL_A));
       break;
+    case OUTPUT_TUNE_ALL:
     case OUTPUTA_MODE_LAST:
     default:
       break;
