@@ -171,6 +171,7 @@ enum EOutputAMode {
   OUTPUTA_MODE_TRIG,
   OUTPUTA_MODE_ARP,
   OUTPUTA_MODE_STRUM,
+  OUTPUTA_TUNE_ALL,
   OUTPUTA_MODE_LAST
 };
 
@@ -338,7 +339,8 @@ const char * const outputa_mode_names[] = {
   "root",
   "trig",
   "arp",
-  "strm"
+  "strm",
+  "tune"
 };
 
 const char * const clear_mode_names[] = {
@@ -461,7 +463,13 @@ void AutomatonnetzState::Reset() {
 }
 
 void AutomatonnetzState::update_outputs(bool chord_changed, int transpose, int inversion) {
-
+  if (output_mode() == OUTPUTA_TUNE_ALL) {
+    OC::DAC::set_voltage_scaled_semitone<DAC_CHANNEL_A>(tonnetz_state.outputs(0), 0, OC::DAC::get_voltage_scaling(DAC_CHANNEL_A));
+    OC::DAC::set_voltage_scaled_semitone<DAC_CHANNEL_B>(tonnetz_state.outputs(0), 0, OC::DAC::get_voltage_scaling(DAC_CHANNEL_B));
+    OC::DAC::set_voltage_scaled_semitone<DAC_CHANNEL_C>(tonnetz_state.outputs(0), 0, OC::DAC::get_voltage_scaling(DAC_CHANNEL_C));
+    OC::DAC::set_voltage_scaled_semitone<DAC_CHANNEL_D>(tonnetz_state.outputs(0), 0, OC::DAC::get_voltage_scaling(DAC_CHANNEL_D));
+    return;
+  }
   int32_t root =
       quantizer.Process(OC::ADC::raw_pitch_value(ADC_CHANNEL_1)) + transpose;
 
