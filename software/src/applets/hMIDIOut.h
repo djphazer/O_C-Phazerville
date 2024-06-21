@@ -109,10 +109,13 @@ public:
                 // Modulation wheel
                 if (function == HEM_MIDI_CC_IN) {
                     int value = ProportionCV(In(1), 127);
-                    usbMIDI.sendControlChange(1, value, channel + 1);
-                    usbMIDI.send_now();
-                    UpdateLog(HEM_MIDI_CC, value, 0);
-                    last_tick = OC::CORE::ticks;
+                    if (value != last_cc) {
+                      usbMIDI.sendControlChange(1, value, channel + 1);
+                      usbMIDI.send_now();
+                      last_cc = value;
+                      UpdateLog(HEM_MIDI_CC, value, 0);
+                      last_tick = OC::CORE::ticks;
+                    }
                 }
 
                 // Aftertouch
@@ -217,6 +220,7 @@ private:
     int last_note; // Last MIDI note number awaiting not off
     int last_velocity;
     int last_channel; // The last Note On channel, just in case the channel is changed before release
+    int last_cc; // Last modulation wheel sent
     bool gated; // The most recent gate status
     bool legato_on; // The note handler may currently respond to legato note changes
     int last_tick; // Most recent MIDI message sent
