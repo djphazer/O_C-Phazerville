@@ -109,29 +109,38 @@ public:
                 // Modulation wheel
                 if (function == HEM_MIDI_CC_IN) {
                     int value = ProportionCV(In(1), 127);
-                    usbMIDI.sendControlChange(1, value, channel + 1);
-                    usbMIDI.send_now();
-                    UpdateLog(HEM_MIDI_CC, value, 0);
-                    last_tick = OC::CORE::ticks;
+                    if (value != last_cc) {
+                      usbMIDI.sendControlChange(1, value, channel + 1);
+                      usbMIDI.send_now();
+                      last_cc = value;
+                      UpdateLog(HEM_MIDI_CC, value, 0);
+                      last_tick = OC::CORE::ticks;
+                    }
                 }
 
                 // Aftertouch
                 if (function == HEM_MIDI_AT_IN) {
                     int value = ProportionCV(In(1), 127);
-                    usbMIDI.sendAfterTouch(value, channel + 1);
-                    usbMIDI.send_now();
-                    UpdateLog(HEM_MIDI_AFTERTOUCH, value, 0);
-                    last_tick = OC::CORE::ticks;
+                    if (value != last_at) {
+                      usbMIDI.sendAfterTouch(value, channel + 1);
+                      usbMIDI.send_now();
+                      last_at = value;
+                      UpdateLog(HEM_MIDI_AFTERTOUCH, value, 0);
+                      last_tick = OC::CORE::ticks;
+                    }
                 }
 
                 // Pitch Bend
                 if (function == HEM_MIDI_PB_IN) {
                     uint16_t bend = Proportion(In(1) + HEMISPHERE_3V_CV, HEMISPHERE_3V_CV * 2, 16383);
                     bend = constrain(bend, 0, 16383);
-                    usbMIDI.sendPitchBend(bend, channel + 1);
-                    usbMIDI.send_now();
-                    UpdateLog(HEM_MIDI_PITCHBEND, bend - 8192, 0);
-                    last_tick = OC::CORE::ticks;
+                    if (bend != last_bend) {
+                      usbMIDI.sendPitchBend(bend, channel + 1);
+                      usbMIDI.send_now();
+                      last_bend = bend;
+                      UpdateLog(HEM_MIDI_PITCHBEND, bend - 8192, 0);
+                      last_tick = OC::CORE::ticks;
+                    }
                 }
             }
         }
@@ -217,6 +226,9 @@ private:
     int last_note; // Last MIDI note number awaiting not off
     int last_velocity;
     int last_channel; // The last Note On channel, just in case the channel is changed before release
+    int last_cc; // Last modulation wheel sent
+    int last_at; // Last aftertouch sent
+    int last_bend; // Last pitch bend sent
     bool gated; // The most recent gate status
     bool legato_on; // The note handler may currently respond to legato note changes
     int last_tick; // Most recent MIDI message sent
