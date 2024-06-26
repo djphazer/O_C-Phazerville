@@ -39,10 +39,8 @@ enum OutputVoltageScaling {
   VOLTAGE_SCALING_CARLOS_GAMMA,  // 3
   VOLTAGE_SCALING_BOHLEN_PIERCE, // 4
   VOLTAGE_SCALING_QUARTERTONE,   // 5
-  #ifdef BUCHLA_SUPPORT
-    VOLTAGE_SCALING_1_2V_PER_OCT,  // 6
-    VOLTAGE_SCALING_2V_PER_OCT,    // 7
-  #endif
+  VOLTAGE_SCALING_1_2V_PER_OCT,  // 6
+  VOLTAGE_SCALING_2V_PER_OCT,    // 7
   VOLTAGE_SCALING_LAST  
 } ;
 
@@ -164,14 +162,12 @@ public:
       case VOLTAGE_SCALING_QUARTERTONE:   // Quartertone scaling (just down-scales to 0.5V/oct)
           pitch = pitch >> 1;
           break;
-      #ifdef BUCHLA_SUPPORT
       case VOLTAGE_SCALING_1_2V_PER_OCT:  // 1.2V/oct
           pitch = (pitch * 19661) >> 14;
           break;
       case VOLTAGE_SCALING_2V_PER_OCT:    // 2V/oct
           pitch = pitch << 1;
           break;
-      #endif    
       default: 
           break;
     }
@@ -207,6 +203,10 @@ public:
   // Set channel to pitch value
   static void set_pitch(DAC_CHANNEL channel, int32_t pitch, int32_t octave_offset) {
     set(channel, pitch_to_dac(channel, pitch, octave_offset));
+  }
+  // use voltage scaling
+  static void set_pitch_scaled(DAC_CHANNEL channel, int32_t pitch, int32_t octave_offset) {
+    set(channel, pitch_to_scaled_voltage_dac(channel, pitch, octave_offset, get_voltage_scaling(channel)));
   }
 
   // Set integer voltage value, where 0 = 0V, 1 = 1V

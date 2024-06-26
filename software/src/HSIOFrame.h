@@ -360,7 +360,7 @@ typedef struct IOFrame {
     }
     void Send() {
         for (int i = 0; i < DAC_CHANNEL_LAST; ++i) {
-            OC::DAC::set_pitch(DAC_CHANNEL(i), outputs[i], 0);
+            OC::DAC::set_pitch_scaled(DAC_CHANNEL(i), outputs[i], 0);
         }
         if (autoMIDIOut) MIDIState.Send(outputs);
 

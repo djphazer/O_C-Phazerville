@@ -445,19 +445,17 @@ void ReferenceChannel::RenderScreensaver(weegfx::coord_t start_x, uint8_t chan) 
   int32_t pitch = last_pitch_ ;
   int32_t unscaled_pitch = last_pitch_ ;
 
-  #ifdef BUCHLA_SUPPORT
-    switch (OC::DAC::get_voltage_scaling(chan)) {
-      
-        case VOLTAGE_SCALING_1_2V_PER_OCT: // 1.2V/oct
-            pitch = (pitch * 19661) >> 14 ;
-            break;
-        case VOLTAGE_SCALING_2V_PER_OCT: // 2V/oct
-            pitch = pitch << 1 ;
-            break;
-        default: // 1V/oct
-            break;
-     }
-   #endif 
+  switch (OC::DAC::get_voltage_scaling(chan)) {
+    
+      case VOLTAGE_SCALING_1_2V_PER_OCT: // 1.2V/oct
+          pitch = (pitch * 19661) >> 14 ;
+          break;
+      case VOLTAGE_SCALING_2V_PER_OCT: // 2V/oct
+          pitch = pitch << 1 ;
+          break;
+      default: // 1V/oct
+          break;
+  }
 
   pitch += (OC::DAC::kOctaveZero * 12) << 7;
   unscaled_pitch += (OC::DAC::kOctaveZero * 12) << 7;
@@ -482,21 +480,17 @@ void ReferenceChannel::RenderScreensaver(weegfx::coord_t start_x, uint8_t chan) 
   graphics.drawHLine(start_x + 16, y, 8);
   graphics.drawBitmap8(start_x + 28, 34 - unscaled_octave * 2 - 1, OC::kBitmapLoopMarkerW, OC::bitmap_loop_markers_8 + OC::kBitmapLoopMarkerW); // was 60
 
-  #ifdef BUCHLA_SUPPORT
-    // Try and round to 3 digits
-    switch (OC::DAC::get_voltage_scaling(chan)) {
-      
-        case VOLTAGE_SCALING_1_2V_PER_OCT: // 1.2V/oct
-            semitone = (semitone * 10000 + 40) / 100;
-            break;
-        case VOLTAGE_SCALING_2V_PER_OCT: // 2V/oct
-        default: // 1V/oct
-            semitone = (semitone * 10000 + 50) / 120;
-            break;
-     }
-   #else
-    semitone = (semitone * 10000 + 50) / 120;
-   #endif
+  // Try and round to 3 digits
+  switch (OC::DAC::get_voltage_scaling(chan)) {
+    
+      case VOLTAGE_SCALING_1_2V_PER_OCT: // 1.2V/oct
+          semitone = (semitone * 10000 + 40) / 100;
+          break;
+      case VOLTAGE_SCALING_2V_PER_OCT: // 2V/oct
+      default: // 1V/oct
+          semitone = (semitone * 10000 + 50) / 120;
+          break;
+  }
    
   semitone %= 1000;
   octave -= OC::DAC::kOctaveZero;

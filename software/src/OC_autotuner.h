@@ -41,7 +41,6 @@ const char* const AT_steps[] = {
 //  constexpr float target_multipliers[OCTAVES] = { 0.125f, 0.25f, 0.5f, 1.0f, 2.0f, 4.0f, 8.0f, 16.0f, 32.0f, 64.0f };
 #endif
 
-#ifdef BUCHLA_SUPPORT
   constexpr float target_multipliers_1V2[OCTAVES] = {
     0.1767766952966368931843f,
     0.3149802624737182976666f,
@@ -67,7 +66,6 @@ const char* const AT_steps[] = {
     5.6568542494923805818985f,
     8.0f
   };
-#endif
 
 namespace OC {
 
