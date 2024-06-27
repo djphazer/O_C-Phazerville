@@ -150,4 +150,6 @@ namespace HS {
   void NudgeRootNote(int ch, int dir);
   void NudgeScale(int ch, int dir);
   void QuantizerEdit(int ch);
+  void DrawPopup(const int config_cursor, const int preset_id, const bool blink);
+
 }

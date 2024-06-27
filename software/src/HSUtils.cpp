@@ -83,6 +83,73 @@ namespace HS {
     q_edit = true;
   }
 
+  void DrawPopup(const int config_cursor, const int preset_id, const bool blink) {
+
+    enum ConfigCursor {
+        LOAD_PRESET, SAVE_PRESET,
+        AUTO_SAVE,
+        CONFIG_DUMMY, // past this point goes full screen
+    };
+
+    if (HS::popup_type == MENU_POPUP) {
+      graphics.clearRect(73, 25, 54, 38);
+      graphics.drawFrame(74, 26, 52, 36);
+    } else {
+      graphics.clearRect(23, 23, 82, 18);
+      graphics.drawFrame(24, 24, 80, 16);
+      graphics.setPrintPos(28, 28);
+    }
+
+    switch (HS::popup_type) {
+      case MENU_POPUP:
+        gfxPrint(78, 30, "Load");
+        gfxPrint(78, 40, config_cursor == AUTO_SAVE ? "(auto)" : "Save");
+        gfxPrint(78, 50, "Config");
+
+        switch (config_cursor) {
+          case LOAD_PRESET:
+          case SAVE_PRESET:
+            gfxIcon(104, 30 + (config_cursor-LOAD_PRESET)*10, LEFT_ICON);
+            break;
+          case AUTO_SAVE:
+            if (blink)
+              gfxIcon(114, 40, HS::auto_save_enabled ? CHECK_ON_ICON : CHECK_OFF_ICON );
+            break;
+          case CONFIG_DUMMY:
+            gfxIcon(115, 50, RIGHT_ICON);
+            break;
+          default: break;
+        }
+
+        break;
+      case CLOCK_POPUP:
+        graphics.print("Clock ");
+        if (HS::clock_m.IsRunning())
+          graphics.print("Start");
+        else
+          graphics.print(HS::clock_m.IsPaused() ? "Armed" : "Stop");
+        break;
+
+      case PRESET_POPUP:
+        graphics.print("> Preset ");
+        graphics.print(OC::Strings::capital_letters[preset_id]);
+        break;
+      case QUANTIZER_POPUP:
+        graphics.print("Q");
+        graphics.print(HS::qview + 1);
+        graphics.print(":");
+        graphics.print(OC::scale_names_short[ HS::quant_scale[HS::qview] ]);
+        graphics.print(" ");
+        graphics.print(OC::Strings::note_names[ HS::root_note[HS::qview] ]);
+        if (HS::q_octave[HS::qview] >= 0) graphics.print("+");
+        graphics.print(HS::q_octave[HS::qview]);
+        if (HS::q_edit) {
+          gfxInvert(23, 23, 82, 18);
+        }
+        break;
+    }
+  }
+
 } // namespace HS
 
 //////////////// Hemisphere-like graphics methods for easy porting

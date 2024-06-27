@@ -222,10 +222,6 @@ void QuadrantSysExHandler();
 
 class QuadAppletManager : public HSApplication {
 public:
-    enum PopupType {
-      MENU_POPUP,
-      CLOCK_POPUP, PRESET_POPUP,
-    };
     void Start() {
         //select_mode = -1; // Not selecting
 
@@ -408,58 +404,6 @@ public:
         }
     }
 
-    inline void PokePopup(PopupType pop) {
-      popup_type = pop;
-      popup_tick = OC::CORE::ticks;
-    }
-
-    void DrawPopup() {
-      if (popup_type == MENU_POPUP) {
-        graphics.clearRect(73, 25, 54, 38);
-        graphics.drawFrame(74, 26, 52, 36);
-      } else {
-        graphics.clearRect(24, 23, 80, 18);
-        graphics.drawFrame(25, 24, 78, 16);
-        graphics.setPrintPos(29, 28);
-      }
-
-      switch (popup_type) {
-        case MENU_POPUP:
-          gfxPrint(78, 30, "Load");
-          gfxPrint(78, 40, config_cursor == AUTO_SAVE ? "(auto)" : "Save");
-          gfxPrint(78, 50, "Config");
-
-          switch (config_cursor) {
-            case LOAD_PRESET:
-            case SAVE_PRESET:
-              gfxIcon(104, 30 + (config_cursor-LOAD_PRESET)*10, LEFT_ICON);
-              break;
-            case AUTO_SAVE:
-              if (CursorBlink())
-                gfxIcon(114, 40, HS::auto_save_enabled ? CHECK_ON_ICON : CHECK_OFF_ICON );
-              break;
-            case CONFIG_DUMMY:
-              gfxIcon(115, 50, RIGHT_ICON);
-              break;
-            default: break;
-          }
-
-          break;
-        case CLOCK_POPUP:
-          graphics.print("Clock ");
-          if (HS::clock_m.IsRunning())
-            graphics.print("Start");
-          else
-            graphics.print(HS::clock_m.IsPaused() ? "Armed" : "Stop");
-          break;
-
-        case PRESET_POPUP:
-          graphics.print("> Preset ");
-          graphics.print(OC::Strings::capital_letters[preset_id]);
-          break;
-      }
-    }
-
     void View() {
         bool draw_applets = true;
 
@@ -476,9 +420,10 @@ public:
             DrawConfigMenu();
             draw_applets = false;
           }
-
-          // if (!draw_applets && popup_type == MENU_POPUP) popup_tick = 0; // cancel popup
         }
+
+        if (HS::q_edit)
+          PokePopup(QUANTIZER_POPUP);
 
         if (draw_applets) {
           if (clock_setup) {
@@ -513,11 +458,14 @@ public:
 
             if (select_mode % 2 == LEFT_HEMISPHERE) graphics.drawFrame(0, 0, 64, 64);
             if (select_mode % 2 == RIGHT_HEMISPHERE) graphics.drawFrame(64, 0, 64, 64);
+
+            // vertical separator
+            graphics.drawLine(63, 0, 63, 63, 2);
         }
 
         // Overlay popup window last
-        if (OC::CORE::ticks - popup_tick < HEMISPHERE_CURSOR_TICKS) {
-            DrawPopup();
+        if (OC::CORE::ticks - HS::popup_tick < HEMISPHERE_CURSOR_TICKS) {
+          HS::DrawPopup(config_cursor, preset_id, CursorBlink());
         }
     }
 
@@ -562,7 +510,7 @@ public:
         if (config_menu) {
             // cancel preset select, or config screen on select button release
             config_menu = 0;
-            popup_tick = 0;
+            HS::popup_tick = 0;
             return;
         }
 
@@ -608,7 +556,7 @@ public:
         if (config_menu && !down) {
             // cancel preset select, or config screen on select button release
             config_menu = 0;
-            popup_tick = 0;
+            HS::popup_tick = 0;
             return;
         }
 
@@ -675,6 +623,15 @@ public:
     void DelegateEncoderMovement(const UI::Event &event) {
         int h = (event.control == OC::CONTROL_ENCODER_L) ? LEFT_HEMISPHERE : RIGHT_HEMISPHERE;
         HEM_SIDE slot = HEM_SIDE(view_slot[h]*2 + h);
+        if (HS::q_edit) {
+          if (h == LEFT_HEMISPHERE) {
+            HS::NudgeScale(HS::qview, event.value);
+          } else {
+            HS::NudgeRootNote(HS::qview, event.value);
+          }
+          return;
+        }
+
         if (config_menu || preset_cursor) {
             ConfigEncoderAction(h, event.value);
             return;
@@ -738,6 +695,19 @@ public:
                 OC::ui.SetButtonIgnoreMask(); // ignore release and long-press
                 break;
             }
+            if (HS::q_edit) {
+              if (event.control == OC::CONTROL_BUTTON_UP)
+                ++HS::q_octave[HS::qview];
+              else if (event.control == OC::CONTROL_BUTTON_DOWN)
+                --HS::q_octave[HS::qview];
+              else
+                HS::q_edit = false;
+
+              CONSTRAIN(HS::q_octave[HS::qview], -5, 5);
+              OC::ui.SetButtonIgnoreMask();
+              break;
+            }
+            // most button-down events fall through here
         case UI::EVENT_BUTTON_PRESS:
             if (event.control == OC::CONTROL_BUTTON_L || event.control == OC::CONTROL_BUTTON_R) {
                 DelegateEncoderPush(event);
@@ -771,8 +741,6 @@ private:
 
     int help_hemisphere; // Which of the hemispheres (if any) is in help mode, or -1 if none
     uint32_t click_tick; // Measure time between clicks for double-click
-    uint32_t popup_tick; // for button feedback
-    PopupType popup_type = PRESET_POPUP;
     HEM_SIDE first_click; // The first button pushed of a double-click set, to see if the same one is pressed
 
     enum QuadrantsConfigCursor {
