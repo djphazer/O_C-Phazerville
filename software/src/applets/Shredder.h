@@ -163,7 +163,7 @@ protected:
         help[HEMISPHERE_HELP_DIGITALS] = "1=Clock 2=Reset";
         help[HEMISPHERE_HELP_CVS]      = "1=X     2=Y";
         help[HEMISPHERE_HELP_OUTS]     = "A=Ch 1  B=Ch 2";
-        help[HEMISPHERE_HELP_ENCODER]  = "DblClk to Shred";
+        help[HEMISPHERE_HELP_ENCODER]  = "AuxButton to Shred";
         //                               "------------------" <-- Size Guide
     }
     
