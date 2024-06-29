@@ -774,7 +774,8 @@ private:
         case CVMAP6:
         case CVMAP7:
         case CVMAP8:
-            HS::cvmapping[config_cursor-CVMAP1] = constrain( HS::cvmapping[config_cursor-CVMAP1] + dir, 0, ADC_CHANNEL_LAST);
+            HS::cvmapping[config_cursor-CVMAP1] =
+              constrain( HS::cvmapping[config_cursor-CVMAP1] + dir, 0, ADC_CHANNEL_LAST + DAC_CHANNEL_LAST);
             break;
         case TRIG_LENGTH:
             HS::trig_length = (uint32_t) constrain( int(HS::trig_length + dir), 1, 127);
