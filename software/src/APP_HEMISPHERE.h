@@ -25,6 +25,7 @@
 #include "OC_visualfx.h"
 #include "OC_apps.h"
 #include "OC_ui.h"
+#include "util/util_semitone_quantizer.h"
 
 #include "OC_patterns.h"
 #include "src/drivers/FreqMeasure/OC_FreqMeasure.h"

@@ -49,6 +49,10 @@ enum CLEAR_FRAME { CLEAR_FRAME_DISABLE, CLEAR_FRAME_ENABLE };
 // - Makes some assumptions based on fixed size and pixel orientation
 class Graphics {
 public:
+
+  static constexpr coord_t kFixedFontW = 6;
+  static constexpr coord_t kFixedFontH = 8;
+
   static constexpr uint8_t kWidth = 128;
   static constexpr uint8_t kHeight = 64;
   static constexpr size_t kFrameSize = kWidth * kHeight / 8;
@@ -107,6 +111,7 @@ public:
 
   // Print string at absolute coords, doesn't move print pos
   void drawStr(coord_t x, coord_t y, const char *str);
+  void drawStrClipX(coord_t x, coord_t y, const char *str, coord_t clipx, coord_t clipw);
 
   // Might be time-consuming
   void printf(const char *fmt, ...); // warnings ahoy -> __attribute__((format(printf, 2, 3)));

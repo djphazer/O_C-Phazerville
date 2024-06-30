@@ -627,4 +627,14 @@ void Graphics::drawStr(coord_t x, coord_t y, const char *s)
   }
 }
 
+void Graphics::drawStrClipX(coord_t x, coord_t y, const char *s, coord_t clipx, coord_t clipw)
+{
+  auto maxx = clipx + clipw;
+  while (*s && x < maxx) {
+    //draw_char(*s++, x, y, clipx, maxx);
+    blit_char<PIXEL_OP_OR>(*s++, x, y);
+    x += kFixedFontW;
+  }
+}
+
 }  // namespace weegfx

@@ -477,7 +477,7 @@ void draw_app_menu(const menu::ScreenCursor<5> &cursor) {
     graphics.print(app_container[current]->name());
 #endif
     if (global_settings.current_app_id == app_container[current]->id())
-      graphics.drawBitmap8(item.x + 2, item.y + 1, 8, ZAP_ICON);
+      graphics.drawBitmap8(0, item.y + 1, 8, ZAP_ICON);
     item.DrawCustom();
   }
 
