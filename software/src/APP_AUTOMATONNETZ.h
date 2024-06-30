@@ -55,15 +55,15 @@
 //
 // TODO With fast clocking, trigger out mode might not provide a rising edge
 
-#ifdef ENABLE_APP_AUTOMATONNETZ
-
 #include "util/util_grid.h"
 #include "util/util_ringbuffer.h"
 #include "util/util_settings.h"
+#include "util/util_semitone_quantizer.h"
 #include "util/util_sync.h"
-#include "tonnetz/tonnetz_state.h"
+#include "src/tonnetz/tonnetz_state.h"
 #include "OC_bitmaps.h"
 #include "OC_menus.h"
+#include "OC_pitch_utils.h"
 #include "OC_trigger_delays.h"
 
 #define FRACTIONAL_BITS 24
@@ -102,6 +102,17 @@ enum CellEventMasks {
   CELL_EVENT_ALL = 0x7
 };
 
+const char *cell_event_masks[] = {
+  "none",
+  "rT__", // 0x1
+  "r_O_", // 0x2
+  "rTO_", // 0x1 + 0x2
+  "r__I", // 0x4
+  "rT_I", // 0x4 + 0x1
+  "r_OI", // 0x4 + 0x2
+  "rTOI", // 0x4 + 0x2 + 0x1
+};
+
 #define CELL_MAX_INVERSION 3
 #define CELL_MIN_INVERSION -3
 
@@ -134,26 +145,17 @@ public:
     if (masks & CELL_EVENT_RAND_INVERSION)
       apply_value(CELL_SETTING_INVERSION, CELL_MIN_INVERSION + random(2*CELL_MAX_INVERSION + 1));
   }
-};
 
-const char *cell_event_masks[] = {
-  "none",
-  "rT__", // 0x1
-  "r_O_", // 0x2
-  "rTO_", // 0x1 + 0x2
-  "r__I", // 0x4
-  "rT_I", // 0x4 + 0x1
-  "r_OI", // 0x4 + 0x2
-  "rTOI", // 0x4 + 0x2 + 0x1
-};
 
-// TOTAL EEPROM SIZE: 25 * 4 bytes
-SETTINGS_DECLARE(TransformCell, CELL_SETTING_LAST) {
-  {0, tonnetz::TRANSFORM_NONE, tonnetz::TRANSFORM_LAST, "Trfm", tonnetz::transform_names_str, settings::STORAGE_TYPE_U8},
-  {0, -12, 12, "Offs", NULL, settings::STORAGE_TYPE_I8},
-  {0, CELL_MIN_INVERSION, CELL_MAX_INVERSION, "Inv", NULL, settings::STORAGE_TYPE_I8},
-  {0, CELL_EVENT_NONE, CELL_EVENT_ALL, "Muta", cell_event_masks, settings::STORAGE_TYPE_U8}
+  // TOTAL EEPROM SIZE: 25 * 4 bytes
+  SETTINGS_ARRAY_DECLARE() {{
+    {0, tonnetz::TRANSFORM_NONE, tonnetz::TRANSFORM_LAST, "Trfm", tonnetz::transform_names_str, settings::STORAGE_TYPE_U8},
+    {0, -12, 12, "Offs", NULL, settings::STORAGE_TYPE_I8},
+    {0, CELL_MIN_INVERSION, CELL_MAX_INVERSION, "Inv", NULL, settings::STORAGE_TYPE_I8},
+    {0, CELL_EVENT_NONE, CELL_EVENT_ALL, "Muta", cell_event_masks, settings::STORAGE_TYPE_U8}
+  }};
 };
+SETTINGS_ARRAY_DEFINE(TransformCell);
 
 enum GridSettings {
   GRID_SETTING_DX,
@@ -188,6 +190,27 @@ enum UserAction {
   USER_ACTION_CLOCK,
 };
 
+// needed for Automatonnetz to work with or without Harrington 1200 compiled in the build
+#ifdef ENABLE_APP_H1200
+extern const char * const mode_names[];
+#else
+const char * const mode_names[] = {
+  "Maj", "Min"
+};
+#endif
+
+const char * const outputa_mode_names[] = {
+  "root",
+  "trig",
+  "arp",
+  "strm",
+  "tune"
+};
+
+const char * const clear_mode_names[] = {
+  "zero", "rT", "rTev"
+};
+
 class AutomatonnetzState : public settings::SettingsBase<AutomatonnetzState, GRID_SETTING_LAST> {
 public:
 
@@ -204,15 +227,12 @@ public:
     trigger_delays_.Init();
     strum_inhibit_ = false;
 
-    ui.selected_cell = 0; //memset(&ui, 0, sizeof(ui));
-    ui.edit_cell = false;
-    ui.cell_cursor.Init(CELL_SETTING_TRANSFORM, CELL_SETTING_LAST - 1);
-    ui.grid_cursor.Init(GRID_SETTING_DX, GRID_SETTING_LAST - 1);
-
     history_ = 0;
     cell_transpose_ = cell_inversion_ = 0;
     user_actions_.Init();
     critical_section_.Init();
+
+    std::fill(output_values_, output_values_ + 4, 0);
   }
 
   void ClearGrid() {
@@ -273,7 +293,7 @@ public:
 
   // End of settings
 
-  void ISR();
+  void Process(OC::IOFrame *ioframe);
   void Reset();
 
   inline void AddUserAction(UserAction action) {
@@ -290,16 +310,8 @@ public:
   TransformCell cells_[GRID_CELLS];
   CellGrid<TransformCell, GRID_DIMENSION, FRACTIONAL_BITS, (GRID_EPSILON != 0)> grid;
 
-  OC::SemitoneQuantizer quantizer;
+  util::SemitoneQuantizer quantizer;
   TonnetzState tonnetz_state;
-
-  struct {
-    int selected_cell;
-    bool edit_cell;
-
-    menu::ScreenCursor<menu::kScreenLines> grid_cursor;
-    menu::ScreenCursor<menu::kScreenLines> cell_cursor;
-  } ui;
 
 private:
 
@@ -319,66 +331,35 @@ private:
   util::RingBuffer<uint32_t, 4> user_actions_;
   util::CriticalSection critical_section_;
 
+  int32_t output_values_[4];
+
   void update_trigger_out();
-  void update_outputs(bool chord_changed, int transpose, int inversion);
+  void update_outputs(bool chord_changed, int32_t pitch, int transpose, int inversion);
   void push_history(uint32_t pos) {
     history_ = (history_ << 8) | (pos & 0xff);
   }
+
+  // TOTAL EEPROM SIZE: 6 bytes
+  SETTINGS_ARRAY_DECLARE() {{
+    {8, 0, 8*GRID_DIMENSION - 1, "dx", NULL, settings::STORAGE_TYPE_I8},
+    {4, 0, 8*GRID_DIMENSION - 1, "dy", NULL, settings::STORAGE_TYPE_I8},
+    {MODE_MAJOR, 0, MODE_LAST-1, "Mode", mode_names, settings::STORAGE_TYPE_U8},
+    #ifdef BUCHLA_4U
+    {0, 0, 7, "Oct", NULL, settings::STORAGE_TYPE_I8},
+    #else
+    {0, -3, 3, "Oct", NULL, settings::STORAGE_TYPE_I8},
+    #endif
+    { 0, 0, OC::kNumDelayTimes - 1, "TrDly", OC::Strings::trigger_delay_times, settings::STORAGE_TYPE_U8 },
+    {OUTPUTA_MODE_ROOT, OUTPUTA_MODE_ROOT, OUTPUTA_MODE_LAST - 1, "OutA", outputa_mode_names, settings::STORAGE_TYPE_U4},
+    {CLEAR_MODE_ZERO, CLEAR_MODE_ZERO, CLEAR_MODE_LAST - 1, "Clr", clear_mode_names, settings::STORAGE_TYPE_U4},
+  }};
 };
+SETTINGS_ARRAY_DEFINE(AutomatonnetzState);
 
-// needed for Automatonnetz to work with or without Harrington 1200 compiled in the build
-#ifdef ENABLE_APP_H1200
-extern const char * const mode_names[];
-#else
-const char * const mode_names[] = {
-  "Maj", "Min"
-};
-#endif
-
-const char * const outputa_mode_names[] = {
-  "root",
-  "trig",
-  "arp",
-  "strm",
-  "tune"
-};
-
-const char * const clear_mode_names[] = {
-  "zero", "rT", "rTev"
-};
-
-// TOTAL EEPROM SIZE: 6 bytes
-SETTINGS_DECLARE(AutomatonnetzState, GRID_SETTING_LAST) {
-  {8, 0, 8*GRID_DIMENSION - 1, "dx", NULL, settings::STORAGE_TYPE_I8},
-  {4, 0, 8*GRID_DIMENSION - 1, "dy", NULL, settings::STORAGE_TYPE_I8},
-  {MODE_MAJOR, 0, MODE_LAST-1, "Mode", mode_names, settings::STORAGE_TYPE_U8},
-  #ifdef NORTHERNLIGHT
-  {0, 0, 7, "Oct", NULL, settings::STORAGE_TYPE_I8},
-  #else
-  {0, -3, 3, "Oct", NULL, settings::STORAGE_TYPE_I8},
-  #endif
-  { 0, 0, OC::kNumDelayTimes - 1, "TrDly", OC::Strings::trigger_delay_times, settings::STORAGE_TYPE_U8 },
-  {OUTPUTA_MODE_ROOT, OUTPUTA_MODE_ROOT, OUTPUTA_MODE_LAST - 1, "OutA", outputa_mode_names, settings::STORAGE_TYPE_U4},
-  {CLEAR_MODE_ZERO, CLEAR_MODE_ZERO, CLEAR_MODE_LAST - 1, "Clr", clear_mode_names, settings::STORAGE_TYPE_U4},
-};
-
-AutomatonnetzState automatonnetz_state;
-
-void Automatonnetz_init() {
-  automatonnetz_state.Init();
-  automatonnetz_state.ClearGrid(CLEAR_MODE_RAND_TRANSFORM);
-  automatonnetz_state.Reset();
-}
-
-static constexpr size_t Automatonnetz_storageSize() {
-  return AutomatonnetzState::storageSize() +
-    GRID_CELLS * TransformCell::storageSize();
-}
-
-void FASTRUN AutomatonnetzState::ISR() {
+void FASTRUN AutomatonnetzState::Process(OC::IOFrame *ioframe) {
   update_trigger_out();
 
-  uint32_t triggers = OC::DigitalInputs::clocked();
+  uint32_t triggers = ioframe->digital_inputs.triggered();
   triggers = trigger_delays_.Process(triggers, OC::trigger_delay_ticks[get_trigger_delay()]);
 
   bool reset = false;
@@ -393,7 +374,7 @@ void FASTRUN AutomatonnetzState::ISR() {
     }
   }
 
-  if ((triggers & TRIGGER_MASK_GRID) && OC::DigitalInputs::read_immediate<OC::DIGITAL_INPUT_3>())
+  if ((triggers & TRIGGER_MASK_GRID) && ioframe->digital_inputs.raised<OC::DIGITAL_INPUT_3>())
     reset = true;
 
   bool update = false;
@@ -438,7 +419,7 @@ void FASTRUN AutomatonnetzState::ISR() {
     strum_inhibit_ = false;
   } else if ((triggers & TRIGGER_MASK_ARP) &&
              !reset &&
-             !OC::DigitalInputs::read_immediate<OC::DIGITAL_INPUT_4>()) {
+             !ioframe->digital_inputs.raised<OC::DIGITAL_INPUT_4>()) {
     ++arp_index_;
     if (arp_index_ >= 3) {
       arp_index_ = 0;
@@ -446,8 +427,21 @@ void FASTRUN AutomatonnetzState::ISR() {
     }
   }
 
-  if ((triggers & TRIGGER_MASK_GRID) || (triggers & TRIGGER_MASK_ARP))
-    update_outputs(chord_changed, cell_transpose_, cell_inversion_);
+  if ((triggers & TRIGGER_MASK_GRID) || (triggers & TRIGGER_MASK_ARP)) {
+    update_outputs(
+        chord_changed,
+        ioframe->cv.pitch_values[ADC_CHANNEL_1],
+        cell_transpose_,
+        cell_inversion_ + ioframe->cv.ScaledValue<8>(ADC_CHANNEL_4));
+  }
+
+  if (OUTPUTA_MODE_TRIG == output_mode())
+    ioframe->outputs.set_gate_value(DAC_CHANNEL_A, output_values_[DAC_CHANNEL_A]);
+  else
+    ioframe->outputs.set_pitch_value(DAC_CHANNEL_A, output_values_[DAC_CHANNEL_A]);
+  ioframe->outputs.set_pitch_value(DAC_CHANNEL_B, output_values_[DAC_CHANNEL_B]);
+  ioframe->outputs.set_pitch_value(DAC_CHANNEL_C, output_values_[DAC_CHANNEL_C]);
+  ioframe->outputs.set_pitch_value(DAC_CHANNEL_D, output_values_[DAC_CHANNEL_D]);
 }
 
 void AutomatonnetzState::Reset() {
@@ -459,10 +453,10 @@ void AutomatonnetzState::Reset() {
   const TransformCell &current_cell = grid.current_cell();
   cell_transpose_ = current_cell.transpose();
   cell_inversion_ = current_cell.inversion();
-  update_outputs(true, cell_transpose_, cell_inversion_);
+  update_outputs(true, 0, cell_transpose_, cell_inversion_);
 }
 
-void AutomatonnetzState::update_outputs(bool chord_changed, int transpose, int inversion) {
+void AutomatonnetzState::update_outputs(bool chord_changed, int32_t pitch, int transpose, int inversion) {
   if (output_mode() == OUTPUTA_TUNE_ALL) {
     OC::DAC::set_voltage_scaled_semitone<DAC_CHANNEL_A>(tonnetz_state.outputs(0), 0, OC::DAC::get_voltage_scaling(DAC_CHANNEL_A));
     OC::DAC::set_voltage_scaled_semitone<DAC_CHANNEL_B>(tonnetz_state.outputs(0), 0, OC::DAC::get_voltage_scaling(DAC_CHANNEL_B));
@@ -470,38 +464,36 @@ void AutomatonnetzState::update_outputs(bool chord_changed, int transpose, int i
     OC::DAC::set_voltage_scaled_semitone<DAC_CHANNEL_D>(tonnetz_state.outputs(0), 0, OC::DAC::get_voltage_scaling(DAC_CHANNEL_D));
     return;
   }
-  int32_t root =
-      quantizer.Process(OC::ADC::raw_pitch_value(ADC_CHANNEL_1)) + transpose;
 
-  inversion += ((OC::ADC::value<ADC_CHANNEL_4>() + 255) >> 9);
+  int32_t root = quantizer.Process(pitch) + transpose;
   CONSTRAIN(inversion, CELL_MIN_INVERSION * 2, CELL_MAX_INVERSION * 2);
 
   tonnetz_state.render(root, inversion);
 
   switch (output_mode()) {
     case OUTPUTA_MODE_ROOT:
-      OC::DAC::set_voltage_scaled_semitone<DAC_CHANNEL_A>(tonnetz_state.outputs(0), octave(), OC::DAC::get_voltage_scaling(DAC_CHANNEL_A));
+      output_values_[DAC_CHANNEL_A] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(0), octave());
       break;
     case OUTPUTA_MODE_TRIG:
       if (chord_changed) {
         trigger_out_ticks_ = kTriggerOutTicks;
-        OC::DAC::set_octave(DAC_CHANNEL_A, 5);
+        output_values_[DAC_CHANNEL_A] = OC::PitchUtils::PitchFromOctave(5);
       }
       break;
     case OUTPUTA_MODE_ARP:
-      OC::DAC::set_voltage_scaled_semitone<DAC_CHANNEL_A>(tonnetz_state.outputs(arp_index_ + 1), octave(), OC::DAC::get_voltage_scaling(DAC_CHANNEL_A));
+      output_values_[DAC_CHANNEL_A] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(arp_index_ + 1), octave());
     case OUTPUTA_MODE_STRUM:
       if (!strum_inhibit_)
-          OC::DAC::set_voltage_scaled_semitone<DAC_CHANNEL_A>(tonnetz_state.outputs(arp_index_ + 1), octave(), OC::DAC::get_voltage_scaling(DAC_CHANNEL_A));
+        output_values_[DAC_CHANNEL_A] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(arp_index_ + 1), octave());
       break;
     case OUTPUTA_MODE_LAST:
     default:
       break;
   }
 
-  OC::DAC::set_voltage_scaled_semitone<DAC_CHANNEL_B>(tonnetz_state.outputs(1), octave(), OC::DAC::get_voltage_scaling(DAC_CHANNEL_B));
-  OC::DAC::set_voltage_scaled_semitone<DAC_CHANNEL_C>(tonnetz_state.outputs(2), octave(), OC::DAC::get_voltage_scaling(DAC_CHANNEL_C));
-  OC::DAC::set_voltage_scaled_semitone<DAC_CHANNEL_D>(tonnetz_state.outputs(3), octave(), OC::DAC::get_voltage_scaling(DAC_CHANNEL_D));
+  output_values_[DAC_CHANNEL_B] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(1), octave());
+  output_values_[DAC_CHANNEL_C] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(2), octave());
+  output_values_[DAC_CHANNEL_D] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(3), octave());
 }
 
 void AutomatonnetzState::update_trigger_out() {
@@ -509,17 +501,73 @@ void AutomatonnetzState::update_trigger_out() {
     uint32_t ticks = trigger_out_ticks_;
     --ticks;
     if (!ticks)
-      OC::DAC::set_octave(DAC_CHANNEL_A, 0);
+      output_values_[DAC_CHANNEL_A] = 0;
     trigger_out_ticks_ = ticks;
   }
 }
 
-void Automatonnetz_loop() {
+namespace OC {
+
+OC_APP_TRAITS(AppAutomatonnetz, TWOCCS("AT"), "Automatonnetz", "Vectors");
+class OC_APP_CLASS(AppAutomatonnetz) {
+public:
+  OC_APP_INTERFACE_DECLARE(AppAutomatonnetz);
+  OC_APP_STORAGE_SIZE(AutomatonnetzState::storageSize() + GRID_CELLS * TransformCell::storageSize());
+
+private:
+  AutomatonnetzState automatonnetz_state;
+
+  struct {
+    int selected_cell;
+    bool edit_cell;
+
+    menu::ScreenCursor<menu::kScreenLines> grid_cursor;
+    menu::ScreenCursor<menu::kScreenLines> cell_cursor;
+  } ui;
+
+  void DrawCellMenu() const;
+  void DrawGridMenu() const;
+};
+
+void AppAutomatonnetz::Init() {
+  automatonnetz_state.Init();
+  automatonnetz_state.ClearGrid(CLEAR_MODE_RAND_TRANSFORM);
+  automatonnetz_state.Reset();
+
+  memset(&ui, 0, sizeof(ui));
+  ui.cell_cursor.Init(CELL_SETTING_TRANSFORM, CELL_SETTING_LAST - 1);
+  ui.grid_cursor.Init(GRID_SETTING_DX, GRID_SETTING_LAST - 1);
 }
 
-void FASTRUN Automatonnetz_isr() {
+void AppAutomatonnetz::Loop() {
+}
+
+void FASTRUN AppAutomatonnetz::Process(IOFrame *ioframe) {
   // All user actions, etc. handled in ::Update
-  automatonnetz_state.ISR();
+  automatonnetz_state.Process(ioframe);
+}
+
+void AppAutomatonnetz::GetIOConfig(IOConfig &ioconfig) const
+{
+  ioconfig.digital_inputs[DIGITAL_INPUT_1].set("Clock");
+  ioconfig.digital_inputs[DIGITAL_INPUT_2].set("Arp");
+  ioconfig.digital_inputs[DIGITAL_INPUT_3].set("Reset");
+  ioconfig.digital_inputs[DIGITAL_INPUT_4].set("!Strum");
+
+  ioconfig.cv[ADC_CHANNEL_1].set("Root pitch");
+  ioconfig.cv[ADC_CHANNEL_4].set("Inversion");
+
+  switch (automatonnetz_state.output_mode()) {
+  case OUTPUTA_MODE_ROOT:  ioconfig.outputs[DAC_CHANNEL_A].set("Root", OUTPUT_MODE_PITCH); break;
+  case OUTPUTA_MODE_TRIG:  ioconfig.outputs[DAC_CHANNEL_A].set("Trig", OUTPUT_MODE_GATE); break;
+  case OUTPUTA_MODE_ARP:   ioconfig.outputs[DAC_CHANNEL_A].set("Arp", OUTPUT_MODE_PITCH); break;
+  case OUTPUTA_MODE_STRUM: ioconfig.outputs[DAC_CHANNEL_A].set("Strum", OUTPUT_MODE_PITCH); break;
+  default: break;
+  }
+
+  ioconfig.outputs[DAC_CHANNEL_B].set("1", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[DAC_CHANNEL_C].set("2", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[DAC_CHANNEL_D].set("3", OUTPUT_MODE_PITCH);
 }
 
 static const weegfx::coord_t kGridXStart = 0;
@@ -529,27 +577,25 @@ static const weegfx::coord_t kGridW = 12;
 static const weegfx::coord_t kMenuStartX = 62;
 static const weegfx::coord_t kLineHeight = 11;
 
-namespace automatonnetz {
-
-void draw_cell_menu() {
+void AppAutomatonnetz::DrawCellMenu() const {
 
   menu::TitleBar<kMenuStartX, 1, 2>::Draw();
   graphics.print("CELL ");
-  graphics.print(automatonnetz_state.ui.selected_cell / 5 + 1);
+  graphics.print(ui.selected_cell / 5 + 1);
   graphics.print(',');
-  graphics.print(automatonnetz_state.ui.selected_cell % 5 + 1);
+  graphics.print(ui.selected_cell % 5 + 1);
 
-  const TransformCell &cell = automatonnetz_state.grid.at(automatonnetz_state.ui.selected_cell);
+  const TransformCell &cell = automatonnetz_state.grid.at(ui.selected_cell);
 
-  menu::SettingsList<menu::kScreenLines, kMenuStartX, menu::kDefaultMenuEndX - 25> settings_list(automatonnetz_state.ui.cell_cursor);
+  menu::SettingsList<menu::kScreenLines, kMenuStartX, menu::kDefaultMenuEndX - 25> settings_list(ui.cell_cursor);
   menu::SettingsListItem list_item;
   while (settings_list.available()) {
     const int current = settings_list.Next(list_item);
-    list_item.DrawDefault(cell.get_value(current), TransformCell::value_attr(current));
+    list_item.DrawDefault(cell.get_value(current), TransformCell::value_attributes(current));
   }
 }
 
-void draw_grid_menu() {
+void AppAutomatonnetz::DrawGridMenu() const {
   EMode mode = automatonnetz_state.tonnetz_state.current_chord().mode();
   int outputs[4];
   automatonnetz_state.tonnetz_state.get_outputs(outputs);
@@ -564,12 +610,12 @@ void draw_grid_menu() {
   else
     graphics.print('-');
 
-  menu::SettingsList<menu::kScreenLines, kMenuStartX, menu::kDefaultMenuEndX - 25> settings_list(automatonnetz_state.ui.grid_cursor);
+  menu::SettingsList<menu::kScreenLines, kMenuStartX, menu::kDefaultMenuEndX - 25> settings_list(ui.grid_cursor);
   menu::SettingsListItem list_item;
   while (settings_list.available()) {
     const int current = settings_list.Next(list_item);
     const int value = automatonnetz_state.get_value(current);
-    const settings::value_attr &attr = AutomatonnetzState::value_attr(current);
+    const auto &attr = AutomatonnetzState::value_attributes(current);
 
     if (current <= GRID_SETTING_DY) {
       const int integral = value / 8;
@@ -587,9 +633,7 @@ void draw_grid_menu() {
   }
 }
 
-}; // namespace automatonnetz
-
-void Automatonnetz_menu() {
+void AppAutomatonnetz::DrawMenu() const {
   uint16_t row = 0, col = 0;
   for (int i = 0; i < GRID_CELLS; ++i) {
 
@@ -600,7 +644,7 @@ void Automatonnetz_menu() {
     graphics.setPrintPos(x + 3, y + 3);
     graphics.print(tonnetz::transform_names[cell.transform()]);
 
-    if (i == automatonnetz_state.ui.selected_cell)
+    if (i == ui.selected_cell)
       graphics.drawFrame(x, y, kGridW, kGridH);
 
     if (col < GRID_DIMENSION - 1) {
@@ -616,10 +660,10 @@ void Automatonnetz_menu() {
                       kGridYStart + current_pos.y * kGridH + 1,
                       kGridW - 2, kGridH - 2);
 
-  if (automatonnetz_state.ui.edit_cell)
-    automatonnetz::draw_cell_menu();
+  if (ui.edit_cell)
+    DrawCellMenu();
   else
-    automatonnetz::draw_grid_menu();
+    DrawGridMenu();
 }
 
 static const weegfx::coord_t kScreenSaverGridX = kGridXStart + kGridW / 2;
@@ -634,7 +678,7 @@ inline vec2<size_t> extract_pos(uint32_t history) {
   return vec2<size_t>((history & 0xff) / GRID_DIMENSION, (history & 0xff) % GRID_DIMENSION);
 }
 
-void Automatonnetz_screensaver() {
+void AppAutomatonnetz::DrawScreensaver() const {
   int outputs[4];
   automatonnetz_state.tonnetz_state.get_outputs(outputs);
   uint32_t cell_history = automatonnetz_state.history();
@@ -661,85 +705,86 @@ void Automatonnetz_screensaver() {
   }
 }
 
-static size_t Automatonnetz_save(void *dest) {
-  char *storage = static_cast<char *>(dest);
-  size_t used = automatonnetz_state.Save(storage);
+size_t AppAutomatonnetz::SaveAppData(util::StreamBufferWriter &stream_buffer) const {
+  automatonnetz_state.Save(stream_buffer);
   for (size_t cell = 0; cell < GRID_CELLS; ++cell)
-    used += automatonnetz_state.cells_[cell].Save(storage + used);
+    automatonnetz_state.cells_[cell].Save(stream_buffer);
 
-  return used;
+  return stream_buffer.written();
 }
 
-static size_t Automatonnetz_restore(const void *dest) {
-  const char *storage = static_cast<const char *>(dest);
-  size_t used = automatonnetz_state.Restore(storage);
+size_t AppAutomatonnetz::RestoreAppData(util::StreamBufferReader &stream_buffer) {
+  automatonnetz_state.Restore(stream_buffer);
   for (size_t cell = 0; cell < GRID_CELLS; ++cell)
-    used += automatonnetz_state.cells_[cell].Restore(storage + used);
+    automatonnetz_state.cells_[cell].Restore(stream_buffer);
 
-  return used;
+  return stream_buffer.read();
 }
 
-void Automatonnetz_handleAppEvent(OC::AppEvent event) {
+void AppAutomatonnetz::HandleAppEvent(AppEvent event) {
   switch (event) {
-    case OC::APP_EVENT_RESUME:
-      OC::ui.encoder_enable_acceleration(OC::CONTROL_ENCODER_L, false);
+    case APP_EVENT_RESUME:
+      OC::ui.encoder_enable_acceleration(CONTROL_ENCODER_L, false);
       automatonnetz_state.AddUserAction(USER_ACTION_RESET);
       break;
-    case OC::APP_EVENT_SUSPEND:
-    case OC::APP_EVENT_SCREENSAVER_ON:
-    case OC::APP_EVENT_SCREENSAVER_OFF:
+    case APP_EVENT_SUSPEND:
+    case APP_EVENT_SCREENSAVER_ON:
+    case APP_EVENT_SCREENSAVER_OFF:
       break;
   }
 }
 
-void Automatonnetz_handleButtonEvent(const UI::Event &event) {
+void AppAutomatonnetz::HandleButtonEvent(const UI::Event &event) {
   if (UI::EVENT_BUTTON_PRESS == event.type) {
     switch (event.control) {
-      case OC::CONTROL_BUTTON_UP:
+      case CONTROL_BUTTON_UP:
         automatonnetz_state.AddUserAction(USER_ACTION_RESET);
         break;
-      case OC::CONTROL_BUTTON_DOWN:
+      case CONTROL_BUTTON_DOWN:
         automatonnetz_state.AddUserAction(USER_ACTION_CLOCK);
         break;
-      case OC::CONTROL_BUTTON_L:
-        automatonnetz_state.ui.edit_cell = !automatonnetz_state.ui.edit_cell;
+      case CONTROL_BUTTON_L:
+        ui.edit_cell = !ui.edit_cell;
         break;
-      case OC::CONTROL_BUTTON_R:
-        if (automatonnetz_state.ui.edit_cell)
-          automatonnetz_state.ui.cell_cursor.toggle_editing();
+      case CONTROL_BUTTON_R:
+        if (ui.edit_cell)
+          ui.cell_cursor.toggle_editing();
         else
-          automatonnetz_state.ui.grid_cursor.toggle_editing();
+          ui.grid_cursor.toggle_editing();
         break;
     }
-  } else if (UI::EVENT_BUTTON_LONG_PRESS == event.type && OC::CONTROL_BUTTON_L == event.control) {
+  } else if (UI::EVENT_BUTTON_LONG_PRESS == event.type && CONTROL_BUTTON_L == event.control) {
       automatonnetz_state.ClearGrid();
       // Forcing reset might make critical section even less necesary...
       automatonnetz_state.AddUserAction(USER_ACTION_RESET);
   }
 }
 
-void Automatonnetz_handleEncoderEvent(const UI::Event &event) {
+void AppAutomatonnetz::HandleEncoderEvent(const UI::Event &event) {
 
-  if (OC::CONTROL_ENCODER_L == event.control) {
-    int selected = automatonnetz_state.ui.selected_cell + event.value;
+  if (CONTROL_ENCODER_L == event.control) {
+    int selected = ui.selected_cell + event.value;
     CONSTRAIN(selected, 0, GRID_CELLS - 1);
-    automatonnetz_state.ui.selected_cell = selected;
-  } else if (OC::CONTROL_ENCODER_R == event.control) {
-    if (automatonnetz_state.ui.edit_cell) {
-      if (automatonnetz_state.ui.cell_cursor.editing()) {
-        TransformCell &cell = automatonnetz_state.grid.mutable_cell(automatonnetz_state.ui.selected_cell);
-        cell.change_value(automatonnetz_state.ui.cell_cursor.cursor_pos(), event.value);
+    ui.selected_cell = selected;
+  } else if (CONTROL_ENCODER_R == event.control) {
+    if (ui.edit_cell) {
+      if (ui.cell_cursor.editing()) {
+        TransformCell &cell = automatonnetz_state.grid.mutable_cell(ui.selected_cell);
+        cell.change_value(ui.cell_cursor.cursor_pos(), event.value);
       } else {
-        automatonnetz_state.ui.cell_cursor.Scroll(event.value);
+        ui.cell_cursor.Scroll(event.value);
       }
     } else {
-      if (automatonnetz_state.ui.grid_cursor.editing()) {
-        automatonnetz_state.change_value(automatonnetz_state.ui.grid_cursor.cursor_pos(), event.value);
+      if (ui.grid_cursor.editing()) {
+        automatonnetz_state.change_value(ui.grid_cursor.cursor_pos(), event.value);
       } else {
-        automatonnetz_state.ui.grid_cursor.Scroll(event.value);
+        ui.grid_cursor.Scroll(event.value);
       }
     }
   }
 }
 
-#endif // ENABLE_APP_AUTOMATONNETZ
+void AppAutomatonnetz::DrawDebugInfo() const {
+}
+
+} // namespace OC
