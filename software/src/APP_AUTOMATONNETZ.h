@@ -458,10 +458,10 @@ void AutomatonnetzState::Reset() {
 
 void AutomatonnetzState::update_outputs(bool chord_changed, int32_t pitch, int transpose, int inversion) {
   if (output_mode() == OUTPUTA_TUNE_ALL) {
-    OC::DAC::set_voltage_scaled_semitone<DAC_CHANNEL_A>(tonnetz_state.outputs(0), 0, OC::DAC::get_voltage_scaling(DAC_CHANNEL_A));
-    OC::DAC::set_voltage_scaled_semitone<DAC_CHANNEL_B>(tonnetz_state.outputs(0), 0, OC::DAC::get_voltage_scaling(DAC_CHANNEL_B));
-    OC::DAC::set_voltage_scaled_semitone<DAC_CHANNEL_C>(tonnetz_state.outputs(0), 0, OC::DAC::get_voltage_scaling(DAC_CHANNEL_C));
-    OC::DAC::set_voltage_scaled_semitone<DAC_CHANNEL_D>(tonnetz_state.outputs(0), 0, OC::DAC::get_voltage_scaling(DAC_CHANNEL_D));
+    output_values_[DAC_CHANNEL_A] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(0), 0);
+    output_values_[DAC_CHANNEL_B] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(0), 0);
+    output_values_[DAC_CHANNEL_C] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(0), 0);
+    output_values_[DAC_CHANNEL_D] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(0), 0);
     return;
   }
 

@@ -312,7 +312,7 @@ struct SettingsListItem {
     auto ty = y + kTextDy;
     graphics.setPrintPos(tx, ty);
     if (max_chars)
-      graphics.drawStrClipX(tx, ty, name_string, tx, max_chars * weegfx::Graphics::kFixedFontW);
+      graphics.drawStrClipX(tx, ty, name_string, tx, max_chars * weegfx::kFixedFontW);
     else
       graphics.print(name_string);
   }

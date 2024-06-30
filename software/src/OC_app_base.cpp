@@ -26,6 +26,8 @@
 #include "OC_apps.h"
 #include "OC_global_settings.h"
 #include "OC_io_settings_menu.h"
+#include "OC_calibration.h"
+#include "VBiasManager.h"
 
 namespace OC {
 
@@ -70,8 +72,12 @@ UiMode AppBase::DispatchEvent(const UI::Event &event)
 {
   UiMode mode = UI_MODE_MENU;
   if (!io_settings_menu.active()) {
-// TODO: VOR/Vbias button gestures
-#if 0
+
+    switch (event.type) {
+      case UI::EVENT_ENCODER:
+        HandleEncoderEvent(event);
+        break;
+
       case UI::EVENT_BUTTON_PRESS:
 #ifdef VOR
         if (OC::CONTROL_BUTTON_M == event.control) {
@@ -79,8 +85,9 @@ UiMode AppBase::DispatchEvent(const UI::Event &event)
             vbias_m->AdvanceBias();
         } else
 #endif
-        app->HandleButtonEvent(event);
+        HandleButtonEvent(event);
         break;
+
       case UI::EVENT_BUTTON_DOWN:
 #ifdef VOR
         // dual encoder press
@@ -88,18 +95,16 @@ UiMode AppBase::DispatchEvent(const UI::Event &event)
         {
             VBiasManager *vbias_m = vbias_m->get();
             vbias_m->AdvanceBias();
-            SetButtonIgnoreMask(); // ignore release and long-press
+            ui.SetButtonIgnoreMask(); // ignore release and long-press
+            break;
         }
-        else
 #endif
-            app->HandleButtonEvent(event);
+      case UI::EVENT_BUTTON_LONG_PRESS:
+      default:
+        HandleButtonEvent(event);
         break;
-#endif
+    }
 
-    if (UI::EVENT_BUTTON_PRESS == event.type)
-      HandleButtonEvent(event);
-    else if (UI::EVENT_ENCODER == event.type)
-      HandleEncoderEvent(event);
   } else {
     mode = io_settings_menu.DispatchEvent(event);
   }
