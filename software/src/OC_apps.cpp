@@ -52,8 +52,8 @@ namespace menu = OC::menu;
 
 #endif
 
-// #include "APP_CALIBR8OR.h"
-// #include "APP_SCENES.h"
+#include "APP_CALIBR8OR.h"
+#include "APP_SCENES.h"
 #include "APP_ASR.h"
 #include "APP_H1200.h"
 #include "APP_AUTOMATONNETZ.h"
@@ -201,11 +201,14 @@ enum GlobalSettingsDataKeys : uint16_t {
 // triage all code (minus any dangling static parts). (Yeah, this still relies
 // on the fugly .ino compilation method, don't @ me).
 static AppContainer<void // this space intentionally left blank
-#if 0
-  , Calibr8or
-#endif
 #ifndef NO_HEMISPHERE
   , AppHemisphere
+#endif
+#ifdef ENABLE_APP_CALIBR8OR
+  , AppCalibr8or
+#endif
+#ifdef ENABLE_APP_SCENES
+  , AppScenery
 #endif
 #ifdef ENABLE_APP_ASR
   , AppASR
