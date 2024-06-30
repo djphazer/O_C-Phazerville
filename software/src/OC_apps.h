@@ -1,4 +1,4 @@
-// Copyright (c) 2016 Patrick Dowling
+// Copyright (c) 2016-2019 Patrick Dowling
 //
 // Author: Patrick Dowling (pld@gurkenkiste.com)
 //
@@ -23,11 +23,25 @@
 #ifndef OC_APP_H_
 #define OC_APP_H_
 
-#include "UI/ui_events.h"
+#include "OC_options.h"
+#include "OC_io.h"
+#include "OC_ui.h"
+#include "src/UI/ui_events.h"
 #include "util/util_turing.h"
 #include "util/util_misc.h"
 
+#ifdef OC_DEBUG_APPS
+# define APPS_SERIAL_PRINTLN(msg, ...) serial_printf(msg "\n", ##__VA_ARGS__)
+#else
+# define APPS_SERIAL_PRINTLN(...)
+#endif
+
 namespace OC {
+
+void draw_save_message(uint8_t c);
+void SaveAppData();
+
+static inline void save_app_data() { SaveAppData(); }
 
 enum AppEvent {
   APP_EVENT_SUSPEND,
@@ -36,58 +50,120 @@ enum AppEvent {
   APP_EVENT_SCREENSAVER_OFF
 };
 
-// This is a very poor-man's application "switching" framework, which has
-// evolved out of the original (single-app) firmware.
+// The original "app" interface was built around structs filled with function
+// pointers, i.e. without any form of "this" pointer. Mainly because that's
+// how it evolved out of the original (single-app) firmware and protoapps.
 //
-// Using an interface class and virtual functions would probably provide a
-// cleaner interface, but it's not worth bothering now.
+// Adding the IO settings to each app, and having them be able to access it
+// from within meant either:
+// a) adding it as a parameter to all functions, or
+// b) biting the refactoring bullet.
 //
-// The additional call overhead of virtual functions can be avoided using a
-// thunk table or other means, if it's in any way measurable. Only the ISR
-// function is in a critical path anyway.
+// Obviously, the choice was c).
 //
-struct App {
-  uint16_t id;
-	const char *name;
+// Using virtual functions make it (slightly) less trivial to instantiate an
+// app (i.e. it can't just be an array of app) but that's the price to pay...
+//
+// It's possible there might be optimized ways of calling the virtual functions
+// but only the ISR (Process) is in the critical path.
+//
+class AppBase {
+public:
+  virtual ~AppBase() { }
+  
+  inline uint16_t id() const { return id_; }
+  inline const char *name() const { return name_; }
 
-  void (*Init)(); // one-time init
-  size_t (*storageSize)(); // binary size of storage requirements
-  size_t (*Save)(void *);
-  size_t (*Restore)(const void *);
+  IOSettings &mutable_io_settings() { return io_settings_; }
+  const IOSettings &io_settings() const { return io_settings_; }
 
-  void (*HandleAppEvent)(AppEvent); // Generic event handler
+  void InitDefaults();
+  size_t storage_size() const { return IOSettings::storageSize() + appdata_storage_size(); }
+  size_t Save(util::StreamBufferWriter &) const;
+  size_t Restore(util::StreamBufferReader &);
+  void Draw(UiMode ui_mode) const;
+  UiMode DispatchEvent(const UI::Event &);
+  void DispatchAppEvent(AppEvent);
+  void EditIOSettings();
+  void DispatchLoop();
 
-  void (*loop)(); // main loop function
-  void (*DrawMenu)(); 
-  void (*DrawScreensaver)();
+  // Main implementation interface for derived classes
+  virtual void Init() = 0;
+  virtual size_t appdata_storage_size() const = 0;
+  virtual size_t SaveAppData(util::StreamBufferWriter &) const = 0;
+  virtual size_t RestoreAppData(util::StreamBufferReader &) = 0;
+  virtual void HandleAppEvent(AppEvent) = 0;
+  virtual void Loop() = 0;
+  virtual void DrawMenu() const = 0;
+  virtual void DrawScreensaver() const = 0;
+  virtual void HandleButtonEvent(const UI::Event &) = 0;
+  virtual void HandleEncoderEvent(const UI::Event &) = 0;
+  virtual void Process(IOFrame *ioframe) = 0;
+  virtual void GetIOConfig(IOConfig &) const = 0;
+  virtual void DrawDebugInfo() const = 0;
 
-  void (*HandleButtonEvent)(const UI::Event &);
-  void (*HandleEncoderEvent)(const UI::Event &);
+private:
+  const uint16_t id_;
+  const char * const name_;
+  const char * const boring_name_;
 
-  void (*isr)();
-};
+protected:
+  IOSettings io_settings_;
 
-namespace apps {
+  AppBase(uint16_t appid, const char *const appname, const char *const boring_name)
+  : id_(appid), name_(appname), boring_name_(boring_name) { }
 
-  extern const App *current_app;
-
-  void Init(bool reset_settings);
-
-  inline void ISR() __attribute__((always_inline));
-  inline void ISR() {
-    if (current_app && current_app->isr)
-      current_app->isr();
+  virtual bool io_settings_allowed() const {
+    return true;
   }
 
-  const App *find(uint16_t id);
-  int index_of(uint16_t id);
-  void set_current_app(int index);
+  uint32_t io_settings_status_mask() const;
 
-}; // namespace apps
+  DISALLOW_COPY_AND_ASSIGN(AppBase);
+};
 
 void draw_save_message(uint8_t c);
 void save_app_data();
 void start_calibration();
+
+template <typename T, typename Traits> class AppBaseImpl : public AppBase {
+public:
+  static constexpr uint16_t kAppId = Traits::id;
+  static constexpr const char *const kAppName = Traits::app_name;
+  static constexpr const char *const kBoringAppName = Traits::boring_app_name;
+protected:
+  AppBaseImpl() : AppBase(kAppId, kAppName, kBoringAppName) { }
+};
+
+#define OC_APP_TRAITS(clazz, app_id, name, boring_name) \
+struct MACRO_CONCAT(clazz, Traits) { \
+  static constexpr uint16_t id = app_id; \
+  static constexpr const char *const app_name = name; \
+  static constexpr const char *const boring_app_name = boring_name; \
+}
+
+#define OC_APP_CLASS(clazz) \
+clazz : public OC::AppBaseImpl<clazz, MACRO_CONCAT(clazz, Traits)>
+
+#define OC_APP_INTERFACE_DECLARE(clazz) \
+public: \
+  clazz() : OC::AppBaseImpl<clazz, MACRO_CONCAT(clazz, Traits)>() { } \
+  virtual void Init() final; \
+  virtual size_t appdata_storage_size() const final { return kAppDataStorageSize; } \
+  virtual size_t SaveAppData(util::StreamBufferWriter &) const final; \
+  virtual size_t RestoreAppData(util::StreamBufferReader &) final; \
+  virtual void HandleAppEvent(OC::AppEvent) final; \
+  virtual void Loop() final; \
+  virtual void DrawMenu() const final; \
+  virtual void DrawScreensaver() const final; \
+  virtual void HandleButtonEvent(const UI::Event &) final; \
+  virtual void HandleEncoderEvent(const UI::Event &) final; \
+  virtual void Process(OC::IOFrame *ioframe) final; \
+  virtual void GetIOConfig(OC::IOConfig &) const final; \
+  virtual void DrawDebugInfo() const final
+
+#define OC_APP_STORAGE_SIZE(s) \
+  static constexpr size_t kAppDataStorageSize = s;
 
 }; // namespace OC
 

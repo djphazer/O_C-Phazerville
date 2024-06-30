@@ -74,7 +74,7 @@ public:
   }
 
   void Close();
-  void Draw();
+  void Draw() const;
   void HandleButtonEvent(const UI::Event &event);
   void HandleEncoderEvent(const UI::Event &event);
 
@@ -107,7 +107,7 @@ private:
 };
 
 template <typename Owner>
-void ChordEditor<Owner>::Draw() {
+void ChordEditor<Owner>::Draw() const {
     
     weegfx::coord_t w = 128;
     weegfx::coord_t x = 0;
@@ -199,7 +199,7 @@ void ChordEditor<Owner>::Draw() {
               graphics.setPrintPos(x + 4, y + 7);
             graphics.print(base_note_names[chord_base_note_]);
             // indicate if note is out-of-range:
-            if (chord_base_note_ > (uint8_t)OC::Scales::GetScale(owner_->get_scale(DUMMY)).num_notes) {
+            if (chord_base_note_ > (uint8_t)OC::Scales::GetScale(owner_->get_scale()).num_notes) {
               graphics.drawBitmap8(x + 3, y + 25, 4, OC::bitmap_indicator_4x8);
               graphics.drawBitmap8(x + 14, y + 25, 4, OC::bitmap_indicator_4x8);
             }
@@ -314,7 +314,7 @@ void ChordEditor<Owner>::HandleEncoderEvent(const UI::Event &event) {
 	      case 3: // base note
 	      {
 	        chord_base_note_ += event.value;
-          const OC::Scale &scale_def = OC::Scales::GetScale(owner_->get_scale(DUMMY));
+          const OC::Scale &scale_def = OC::Scales::GetScale(owner_->get_scale());
 	        CONSTRAIN(chord_base_note_, 0, (uint8_t)scale_def.num_notes);
 	        edit_user_chord_->base_note = chord_base_note_;
 	      }

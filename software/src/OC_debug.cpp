@@ -2,6 +2,7 @@
 #include "HSicons.h"
 #include "OC_ADC.h"
 #include "OC_digital_inputs.h"
+#include "OC_app_switcher.h"
 #include "OC_config.h"
 #include "OC_core.h"
 #include "OC_debug.h"
@@ -11,7 +12,7 @@
 #include "OC_strings.h"
 #include "util/util_math.h"
 #include "util/util_misc.h"
-#include "extern/dspinst.h"
+#include "src/extern/dspinst.h"
 
 #ifdef ARDUINO_TEENSY41
 #include <Audio.h>
@@ -82,7 +83,7 @@ static void debug_menu_core() {
                   debug::cycles_to_us(DEBUG::UI_cycles.value()),
                   debug::cycles_to_us(DEBUG::UI_cycles.max_value()));
 
-#ifdef OC_UI_DEBUG
+#ifdef OC_DEBUG_UI
   graphics.setPrintPos(2, 42);
   graphics.printf("UI   !%lu #%lu", DEBUG::UI_queue_overflow, DEBUG::UI_event_count);
   graphics.setPrintPos(2, 52);
@@ -102,6 +103,20 @@ static void debug_menu_version()
 #else
   graphics.print(" PROD");
 #endif
+
+#ifdef IO_10V
+  graphics.drawStr(2, y, "IO_1OV"); y += 10;
+#endif
+#ifdef BUCHLA_SUPPORT
+  graphics.drawStr(2, y, "BUCHLA_SUPPORT"); y += 10;
+#endif
+#ifdef BUCHLA_cOC
+  graphics.drawStr(2, y, "BUCHLA_cOC"); y += 10;
+#endif
+#ifdef BUCHLA_4U
+  graphics.drawStr(2, y, "BUCHLA_4U"); y += 10;
+#endif
+
 #ifdef USB_SERIAL
   graphics.setPrintPos(2, 42);
   graphics.print("USB_SERIAL");
@@ -206,6 +221,28 @@ static void debug_menu_pewpewpew() {
 }
 #endif
 
+#ifdef OC_DEBUG_ADC_STATS
+static void debug_menu_adc2() {
+  weegfx::coord_t y = 12;
+  for (int channel = ADC_CHANNEL_1; channel < ADC_CHANNEL_LAST; ++channel) {
+    auto &stats = ADC::get_channel_stats(static_cast<ADC_CHANNEL>(channel));
+    graphics.setPrintPos(2, y);
+    graphics.printf("CV%d %5d %5d", channel + 1, stats.min, stats.max);
+    y += 10;
+  }
+}
+#endif
+
+static void debug_menu_app() {
+  auto app = app_switcher.current_app();
+  if (app) {
+    graphics.print(app->name());
+    app->DrawDebugInfo();
+  } else {
+    graphics.print("?");
+  }
+}
+
 struct DebugMenu {
   const char *title;
   void (*display_fn)();
@@ -215,7 +252,10 @@ static const DebugMenu debug_menus[] = {
   { " CORE", debug_menu_core },
   { " VERS", debug_menu_version },
   { " GFX", debug_menu_gfx },
-  { " ADC (raw)", debug_menu_adc },
+  { " ADC", debug_menu_adc },
+#ifdef OC_DEBUG_ADC_STATS
+  { " ADC min/max", debug_menu_adc2 },
+#endif
 #ifdef ARDUINO_TEENSY41
   { " ADC (value)", debug_menu_adc_value },
   { " AUDIO", debug_menu_audio },
@@ -241,6 +281,7 @@ static const DebugMenu debug_menus[] = {
 #ifdef ASR_DEBUG  
   { " ASR", ASR_debug },
 #endif // ASR_DEBUG
+  { " ", debug_menu_app },
 #ifdef PEWPEWPEW
   { " ", debug_menu_pewpewpew },
 #endif
