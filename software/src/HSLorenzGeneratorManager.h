@@ -24,6 +24,8 @@
 // the same time. So this class creates a singleton instance to allow two
 // hemispheres to share a single Lorenz generator.
 
+#include "src/extern/streams_lorenz_generator.h"
+
 #define LORENZ_PROCESS_TICKS 16
 
 class LorenzGeneratorManager {

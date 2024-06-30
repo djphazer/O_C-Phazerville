@@ -68,12 +68,12 @@ public:
 
     virtual void Start() = 0;
     virtual void Controller() = 0;
-    virtual void View() = 0;
+    virtual void View() const = 0;
     virtual void Resume() = 0;
 
-    void BaseController() {
+    void BaseController(OC::IOFrame *ioframe) {
         // Load the IO frame from CV inputs
-        HS::frame.Load();
+        HS::frame.Load(ioframe);
 
         // Cursor countdowns. See CursorBlink(), ResetCursor(), gfxCursor()
         if (--cursor_countdown < -HSAPPLICATION_CURSOR_TICKS) cursor_countdown = HSAPPLICATION_CURSOR_TICKS;
@@ -81,7 +81,7 @@ public:
         Controller();
 
         // set outputs from IO frame
-        HS::frame.Send();
+        HS::frame.Send(ioframe);
     }
 
     void BaseStart() {
@@ -101,13 +101,12 @@ public:
         Start();
     }
 
-    void BaseView() {
+    void BaseView() const {
         View();
-        last_view_tick = OC::CORE::ticks;
     }
 
     // "Meters" screensaver view, visualizing inputs and outputs
-    void BaseScreensaver(bool notenames = 0) {
+    void BaseScreensaver(bool notenames = 0) const {
         const int h = 32 + (OC::DAC::kOctaveZero == 0)*31;
         const int w = 128 / DAC_CHANNEL_COUNT;
 
@@ -340,5 +339,4 @@ protected:
 
 private:
     int cursor_countdown; // Timer for cursor blinkin'
-    uint32_t last_view_tick; // Time since the last view, for activating screen blanking
 };

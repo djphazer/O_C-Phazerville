@@ -348,3 +348,79 @@ void HS::MIDIFrame::Send(const SlewedValue *outvals) {
     // I think this can cause the UI to lag and miss input
     //usbMIDI.send_now();
 }
+
+void HS::IOFrame::Load(OC::IOFrame *ioframe) {
+    auto triggers = ioframe->digital_inputs.triggered();
+
+    for (int i = 0; i < ADC_CHANNEL_COUNT; ++i) {
+        // Set CV inputs
+        inputs[i] = ioframe->cv.pitch_values[i];
+
+        if (i < OC::DIGITAL_INPUT_LAST) {
+          gate_high[i] = ioframe->digital_inputs.raised(static_cast<OC::DigitalInput>(i));
+        }
+
+        // calculate gates/clocks for all ADC inputs as well
+        gate_high[OC::DIGITAL_INPUT_LAST + i] = inputs[i] > GATE_THRESHOLD;
+
+        // some calculations for change detection
+        if (abs(inputs[i] - last_cv[i]) > HEMISPHERE_CHANGE_THRESHOLD) {
+            changed_cv[i] = 1;
+            last_cv[i] = inputs[i];
+        } else changed_cv[i] = 0;
+    }
+
+    // Handle clock pulse timing
+    for (int i = 0; i < DAC_CHANNEL_COUNT; ++i) {
+        if (clock_countdown[i] > 0) {
+            if (--clock_countdown[i] == 0) Out(i, 0);
+        }
+    }
+    for (int i = 0; i < MIDIMAP_MAX; ++i) {
+        MIDIMapping& m = MIDIState.mapping[i];
+        if (m.trigout_countdown > 0) {
+            if (--m.trigout_countdown == 0) m.output = 0;
+        }
+    }
+
+    // pre-calculate clock triggers
+    static constexpr int offset = OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_COUNT;
+    for (int ch = 0; ch < APPLET_SLOTS * 2; ++ch) {
+      bool result = 0;
+      const size_t virt_chan = (ch) % (APPLET_SLOTS * 2);
+
+      // clock triggers
+      // TODO: implement div/mult within DigitalInputMap and get rid of
+      //       this call to clock_m
+      if (clock_m.IsRunning() && clock_m.GetMultiply(virt_chan) != 0)
+          result = clock_m.Tock(virt_chan);
+      else {
+          result = trigmap[ch].Clock();
+      }
+
+      // Try to eat a boop
+      result = result || clock_m.Beep(virt_chan);
+
+      if (result) {
+          cycle_ticks[ch] = OC::CORE::ticks - last_clock[ch];
+          last_clock[ch] = OC::CORE::ticks;
+      }
+
+      clocked[ch] = result;
+    }
+}
+
+void HS::IOFrame::Send(OC::IOFrame *ioframe) {
+    const DAC_CHANNEL chan[DAC_CHANNEL_COUNT] = {
+      DAC_CHANNEL_A, DAC_CHANNEL_B, DAC_CHANNEL_C, DAC_CHANNEL_D,
+#ifdef ARDUINO_TEENSY41
+      DAC_CHANNEL_E, DAC_CHANNEL_F, DAC_CHANNEL_G, DAC_CHANNEL_H,
+#endif
+    };
+    for (int i = 0; i < DAC_CHANNEL_COUNT; ++i) {
+      outputs[i].push(output_slew[i]);
+      ioframe->outputs.set_pitch_value(chan[i], outputs[i].get(output_atten[i]));
+    }
+
+    if (autoMIDIOut) MIDIState.Send(outputs);
+}

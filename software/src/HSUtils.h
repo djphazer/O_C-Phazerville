@@ -78,6 +78,7 @@ namespace HS {
   static constexpr uint32_t HEMISPHERE_PULSE_ANIMATION_TIME_LONG = 1200;
 
   enum PopupType {
+    POPUP_NONE,
     MENU_POPUP,
     CLOCK_POPUP, PRESET_POPUP,
     QUANTIZER_POPUP,
