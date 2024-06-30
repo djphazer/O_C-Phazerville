@@ -143,7 +143,7 @@ private:
 AppletRegistry reg{
     DeclareApplet<ADSREG>{8, 0x01},
     DeclareApplet<ADEG>{34, 0x01},
-    DeclareApplet<ASR>{47, 0x09},
+    DeclareApplet<MiniASR>{47, 0x09},
     DeclareApplet<AttenuateOffset>{56, 0x10},
 #ifdef PEWPEWPEW
     DeclareApplet<Binary>{41, 0x41},
