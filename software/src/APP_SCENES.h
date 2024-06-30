@@ -23,8 +23,6 @@
  * Also similar to Mutable Instruments Frames
  */
 
-#ifdef ENABLE_APP_SCENES
-
 #include "OC_apps.h"
 #include "HSApplication.h"
 #include "HSMIDI.h"
@@ -654,7 +652,7 @@ static size_t ScenesApp_restore(const void *storage) {
     return used;
 }
 
-void ScenesApp_isr() { return ScenesApp_instance.BaseController(); }
+void ScenesApp_process(OC::IOFrame *) { return ScenesApp_instance.BaseController(); }
 
 void ScenesApp_handleAppEvent(OC::AppEvent event) {
     switch (event) {
@@ -728,5 +726,3 @@ void ScenesApp_handleEncoderEvent(const UI::Event &event) {
     // Right encoder turned
     if (event.control == OC::CONTROL_ENCODER_R) ScenesApp_instance.OnRightEncoderMove(event.value);
 }
-
-#endif // ENABLE_APP_SCENES

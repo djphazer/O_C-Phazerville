@@ -1768,7 +1768,7 @@ static size_t QUADRANTS_restore(const void *storage) {
     return used;
 }
 
-void FASTRUN QUADRANTS_isr() {
+void FASTRUN QUADRANTS_process(OC::IOFrame *) {
     quad_manager.BaseController();
 }
 
