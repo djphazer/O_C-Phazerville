@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "../peaks_bytebeat.h"
+#include "../src/extern/peaks_bytebeat.h"
 #include "../util/util_history.h"
 
 class BitBeat : public HemisphereApplet {
