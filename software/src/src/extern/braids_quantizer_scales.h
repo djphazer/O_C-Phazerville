@@ -348,6 +348,9 @@ const Scale scales[] = {
   { 12 << 7, 7, { 0, 128, 384, 512, 768, 1024, 1152} },
 
   } ;
+
+static constexpr int kNumScales = sizeof(scales) / sizeof(scales[0]);
+
 }// namespace braids
 
 #endif  // BRAIDS_QUANTIZER_SCALES_H_

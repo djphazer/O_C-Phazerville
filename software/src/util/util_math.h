@@ -38,6 +38,13 @@
 #define MOD_8(n, div) \
   FAST_FP_MOD(n, div, 8)
 
+inline int32_t SSAT16(int32_t value) __attribute__((always_inline));
+inline int32_t SSAT16(int32_t value) {
+  int32_t result;
+  __asm("ssat %0, %1, %2" : "=r" (result) : "I" (16),  "r" (value));
+  return result;
+}
+
 inline uint32_t USAT16(uint32_t value) __attribute__((always_inline));
 inline uint32_t USAT16(uint32_t value) {
   uint32_t result;
@@ -66,6 +73,15 @@ static inline uint32_t multiply_u32xu32_rshift(uint32_t a, uint32_t b, uint32_t 
   uint32_t lo, hi;
   asm volatile("umull %0, %1, %2, %3" : "=r" (lo), "=r" (hi) : "r" (a), "r" (b));
   return (lo >> shift) | (hi << (32 - shift));
+}
+
+
+static inline uint32_t uhadd16(uint32_t a, uint32_t b) __attribute__((always_inline, unused));
+static inline uint32_t uhadd16(uint32_t a, uint32_t b)
+{
+  uint32_t out;
+  asm volatile("uhadd16 %0, %1, %2" : "=r" (out) : "r" (a), "r" (b));
+  return out;
 }
 
 template <typename T, T smoothing>

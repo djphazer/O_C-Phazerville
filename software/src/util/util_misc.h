@@ -13,8 +13,12 @@ struct FOURCC
 template <uint32_t a, uint32_t b>
 struct TWOCC
 {
-	static constexpr uint16_t value = (((a & 0xff) << 8) | (b & 0xff));
+  static constexpr uint16_t value = (((a & 0xff) << 8) | (b & 0xff));
 };
+
+constexpr uint16_t TWOCCS(const char s[3]) {
+  return (((s[0] & 0xff) << 8) | (s[1] & 0xff));
+}
 
 void serial_printf(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 

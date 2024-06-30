@@ -20,55 +20,67 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef UTIL_BUTTON_H_
-#define UTIL_BUTTON_H_
+#ifndef UI_EVENTS_QUEUE_H_
+#define UI_EVENTS_QUEUE_H_
 
 #include <Arduino.h>
-#include "../util/util_macros.h"
+#include "ui_events.h"
+#include "../../util/util_ringbuffer.h"
 
 namespace UI {
 
-// Basic button/switch wrapper that has 7 bits of debouncing on press/release.
-class Button {
+// Event queue for UI events
+// Meant for single producer/single consumer setting
+//
+// Yes, looks similar to stmlib::EventQueue, but hey, it's a queue for UI events.
+template <size_t size = 16>
+class EventQueue {
 public:
-  Button() { }
 
-  void Init(uint8_t pin, uint8_t pin_mode) {
-    pin_ = pin;
-    pinMode(pin, pin_mode);
-    state_ = 0xff;
+  EventQueue() { }
+
+  void Init() {
+    events_.Init();
+    last_event_time_ = 0;
   }
 
-  // @return True if pressed
-  uint8_t Poll() {
-    uint8_t state = (state_ << 1) | digitalReadFast(pin_);
-    state_ = state;
-    return !(state & 0x01);
+  inline void Flush() {
+    events_.Flush();
   }
 
-  inline bool pressed() const {
-    return state_ == 0x00;
+  inline bool available() const {
+    return events_.readable();
   }
 
-  inline bool just_pressed() const {
-    return state_ == 0x80;
+  template <typename... Args>
+  inline void PushEvent(Args&&... args) {
+    events_.EmplaceWrite(std::forward<Args>(args)...);
+    Poke();
   }
 
-  inline bool released() const {
-    return state_ == 0x7f;
+  inline Event PullEvent() {
+    return std::move(events_.Read());
   }
 
-  bool read_immediate() const {
-    return !digitalReadFast(pin_);
+  inline void Poke() {
+    last_event_time_ = millis();
+  }
+
+  inline uint32_t idle_time() const {
+    return millis() - last_event_time_;
+  }
+
+  // More for debugging purposes
+  inline bool writable() const {
+    return events_.writable();
   }
 
 private:
-  int pin_;
-  uint8_t state_;
 
-  DISALLOW_COPY_AND_ASSIGN(Button);
+  util::RingBuffer<Event, size> events_;
+  uint32_t last_event_time_;
 };
 
 }; // namespace UI
 
-#endif // UTIL_BUTTON_H_
+#endif // UI_EVENTS_QUEUE_H_

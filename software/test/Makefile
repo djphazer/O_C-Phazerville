@@ -5,6 +5,8 @@
 OC_SRC_DIR = ../o_c_REV/
 BUILD_DIR = ./build/
 
+DEFINES = TESTING
+
 RM    = rm -f
 RMDIR = rmdir
 MKDIR = mkdir -p
@@ -14,14 +16,17 @@ AR    = ar -r
 
 CPPFLAGS += -I$(OC_SRC_DIR) -I$(GTEST_DIR)include -Wall -Werror -std=c++11
 
+CPPFLAGS += $(addprefix -D, $(DEFINES))
+
 # GTEST
 GTEST_DIR = ./gtest/googletest/
 LIBGTEST = $(BUILD_DIR)libgtest.a
 
 # SOURCE FILES
-OC_CPP_FILES = $(OC_SRC_DIR)braids_quantizer.cpp
+OC_CPP_FILES = $(OC_SRC_DIR)braids_quantizer.cpp \
+	$(OC_SRC_DIR)/src/util/util_settings.cpp
 
-VPATH = . $(OC_SRC_DIR)
+VPATH = . $(OC_SRC_DIR) $(OC_SRC_DIR)/src/util
 CPP_FILES = $(notdir $(wildcard *.cpp)) $(notdir $(OC_CPP_FILES))
 OBJ_FILES = $(CPP_FILES:.cpp=.o)
 OBJS      = $(patsubst %,$(BUILD_DIR)%,$(OBJ_FILES))
