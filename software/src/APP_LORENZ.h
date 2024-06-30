@@ -24,9 +24,7 @@
 
 // Lorenz and Rössler generator app
 
-#ifdef ENABLE_APP_LORENZ
-
-#include "streams_lorenz_generator.h"
+#include "src/extern/streams_lorenz_generator.h"
 #include "util/util_math.h"
 #include "OC_digital_inputs.h"
 
@@ -69,8 +67,14 @@ const char * const lorenz_output_names[] = {
   "Lx1xRx2",
 };
 
+const char* const lorenz_freq_range_names[5] = {
+ "sloth",  "lazy",  "slow", "med", "fast", 
+};
+
 class LorenzGenerator : public settings::SettingsBase<LorenzGenerator, LORENZ_SETTING_LAST> {
 public:
+
+  void Init();
 
   uint16_t get_freq1() const {
     return values_[LORENZ_SETTING_FREQ1];
@@ -112,8 +116,6 @@ public:
     return values_[LORENZ_SETTING_OUT_D];
   }
 
-  void Init();
-
   void freeze() {
     frozen_ = true;
   }
@@ -129,14 +131,26 @@ public:
   streams::LorenzGenerator lorenz;
   bool frozen_;
 
-  // ISR update is at 16.666kHz, we don't need it that fast so smooth the values to ~1Khz
-  static constexpr int32_t kSmoothing = 16;
-
-  SmoothedValue<int32_t, kSmoothing> cv_freq1;
-  SmoothedValue<int32_t, kSmoothing> cv_freq2;
-  SmoothedValue<int32_t, kSmoothing> cv_rho1;
-  SmoothedValue<int32_t, kSmoothing> cv_rho2;
+  // TOTAL EEPROM SIZE: 9 bytes
+  SETTINGS_ARRAY_DECLARE() {{
+    #ifdef NORTHERNLIGHT
+    { 0, 0, 255, "Freq 1", NULL, settings::STORAGE_TYPE_U8 },
+    { 0, 0, 255, "Freq 2", NULL, settings::STORAGE_TYPE_U8 },
+    #else
+    { 128, 0, 255, "Freq 1", NULL, settings::STORAGE_TYPE_U8 },
+    { 128, 0, 255, "Freq 2", NULL, settings::STORAGE_TYPE_U8 },
+    #endif
+    { 63, 4, 127, "Rho/c 1", NULL, settings::STORAGE_TYPE_U8 }, 
+    { 63, 4, 127, "Rho/c 2", NULL, settings::STORAGE_TYPE_U8 }, 
+    { 2, 0, 4, "LFreq 1 Rng", lorenz_freq_range_names, settings::STORAGE_TYPE_U4 },
+    { 2, 0, 4, "LFreq 2 Rng", lorenz_freq_range_names, settings::STORAGE_TYPE_U4 },
+    {streams::LORENZ_OUTPUT_X1, streams::LORENZ_OUTPUT_X1, streams::LORENZ_OUTPUT_LAST - 1, "Out A ", lorenz_output_names, settings::STORAGE_TYPE_U8},
+    {streams::LORENZ_OUTPUT_Y1, streams::LORENZ_OUTPUT_X1, streams::LORENZ_OUTPUT_LAST - 1, "Out B ", lorenz_output_names, settings::STORAGE_TYPE_U8},
+    {streams::LORENZ_OUTPUT_X2, streams::LORENZ_OUTPUT_X1, streams::LORENZ_OUTPUT_LAST - 1, "Out C ", lorenz_output_names, settings::STORAGE_TYPE_U8},
+    {streams::LORENZ_OUTPUT_Y2, streams::LORENZ_OUTPUT_X1, streams::LORENZ_OUTPUT_LAST - 1, "Out D ", lorenz_output_names, settings::STORAGE_TYPE_U8},
+  }};
 };
+SETTINGS_ARRAY_DEFINE(LorenzGenerator);
 
 void LorenzGenerator::Init() {
   InitDefaults();
@@ -145,234 +159,251 @@ void LorenzGenerator::Init() {
   frozen_= false;
 }
 
-const char* const lorenz_freq_range_names[5] = {
- "sloth",  "lazy",  "slow", "med", "fast",
+namespace OC {
+
+OC_APP_TRAITS(AppLorenzGenerator, TWOCCS("LR"), "Low-rents", "Lorenz");
+class OC_APP_CLASS(AppLorenzGenerator) {
+public:
+  OC_APP_INTERFACE_DECLARE(AppLorenzGenerator);
+  OC_APP_STORAGE_SIZE(LorenzGenerator::storageSize());
+
+private:
+  LorenzGenerator lorenz_generator_;
+
+  // ISR update is at 16.666kHz, we don't need it that fast so smooth the values to ~1Khz
+  static constexpr int32_t kSmoothing = 16;
+
+  SmoothedValue<int32_t, kSmoothing> cv_freq1;
+  SmoothedValue<int32_t, kSmoothing> cv_freq2;
+  SmoothedValue<int32_t, kSmoothing> cv_rho1;
+  SmoothedValue<int32_t, kSmoothing> cv_rho2;
+
+  int selected_generator_;
+  menu::ScreenCursor<menu::kScreenLines> cursor_;
+
+  void HandleTopButton();
+  void HandleLowerButton();
+  void HandleRightButton();
+  void HandleLeftButton();
 };
 
-// TOTAL EEPROM SIZE: 9 bytes
-SETTINGS_DECLARE(LorenzGenerator, LORENZ_SETTING_LAST) {
-  #ifdef NORTHERNLIGHT
-  { 0, 0, 255, "Freq 1", NULL, settings::STORAGE_TYPE_U8 },
-  { 0, 0, 255, "Freq 2", NULL, settings::STORAGE_TYPE_U8 },
-  #else
-  { 128, 0, 255, "Freq 1", NULL, settings::STORAGE_TYPE_U8 },
-  { 128, 0, 255, "Freq 2", NULL, settings::STORAGE_TYPE_U8 },
-  #endif
-  { 63, 4, 127, "Rho/c 1", NULL, settings::STORAGE_TYPE_U8 },
-  { 63, 4, 127, "Rho/c 2", NULL, settings::STORAGE_TYPE_U8 },
-  { 2, 0, 4, "LFreq 1 Rng", lorenz_freq_range_names, settings::STORAGE_TYPE_U4 },
-  { 2, 0, 4, "LFreq 2 Rng", lorenz_freq_range_names, settings::STORAGE_TYPE_U4 },
-  {streams::LORENZ_OUTPUT_X1, streams::LORENZ_OUTPUT_X1, streams::LORENZ_OUTPUT_LAST - 1, "Out A ", lorenz_output_names, settings::STORAGE_TYPE_U8},
-  {streams::LORENZ_OUTPUT_Y1, streams::LORENZ_OUTPUT_X1, streams::LORENZ_OUTPUT_LAST - 1, "Out B ", lorenz_output_names, settings::STORAGE_TYPE_U8},
-  {streams::LORENZ_OUTPUT_X2, streams::LORENZ_OUTPUT_X1, streams::LORENZ_OUTPUT_LAST - 1, "Out C ", lorenz_output_names, settings::STORAGE_TYPE_U8},
-  {streams::LORENZ_OUTPUT_Y2, streams::LORENZ_OUTPUT_X1, streams::LORENZ_OUTPUT_LAST - 1, "Out D ", lorenz_output_names, settings::STORAGE_TYPE_U8},
-};
+void AppLorenzGenerator::Init() {
+  lorenz_generator_.Init();
 
-LorenzGenerator lorenz_generator;
-struct {
-  bool selected_generator;
+  selected_generator_ = 0; 
+  cursor_.Init(LORENZ_SETTING_RHO1, LORENZ_SETTING_LAST - 1);
+}
 
-  menu::ScreenCursor<menu::kScreenLines> cursor;
-} lorenz_generator_state;
 
-void FASTRUN LORENZ_isr() {
+void FASTRUN AppLorenzGenerator::Process(OC::IOFrame *ioframe) {
 
-  bool reset1_phase = OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_1>();
-  bool reset2_phase = OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_2>();
-  bool reset_both_phase = OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_3>();
-  bool freeze = OC::DigitalInputs::read_immediate<OC::DIGITAL_INPUT_4>();
+  bool reset1_phase = ioframe->digital_inputs.triggered(OC::DIGITAL_INPUT_1);
+  bool reset2_phase = ioframe->digital_inputs.triggered(OC::DIGITAL_INPUT_2);
+  bool reset_both_phase = ioframe->digital_inputs.triggered(OC::DIGITAL_INPUT_3);
+  bool freeze = ioframe->digital_inputs.raised(OC::DIGITAL_INPUT_4);
 
 #ifdef ARDUINO_TEENSY41
-  lorenz_generator.cv_freq1.push(OC::ADC::value<ADC_CHANNEL_5>());
-  lorenz_generator.cv_rho1.push(OC::ADC::value<ADC_CHANNEL_6>());
-  lorenz_generator.cv_freq2.push(OC::ADC::value<ADC_CHANNEL_7>());
-  lorenz_generator.cv_rho2.push(OC::ADC::value<ADC_CHANNEL_8>());
+  cv_freq1.push(ioframe->cv.values[ADC_CHANNEL_5]);
+  cv_rho1.push(ioframe->cv.values[ADC_CHANNEL_6]);
+  cv_freq2.push(ioframe->cv.values[ADC_CHANNEL_7]);
+  cv_rho2.push(ioframe->cv.values[ADC_CHANNEL_8]);
 #else
-  lorenz_generator.cv_freq1.push(OC::ADC::value<ADC_CHANNEL_1>());
-  lorenz_generator.cv_rho1.push(OC::ADC::value<ADC_CHANNEL_2>());
-  lorenz_generator.cv_freq2.push(OC::ADC::value<ADC_CHANNEL_3>());
-  lorenz_generator.cv_rho2.push(OC::ADC::value<ADC_CHANNEL_4>());
+  cv_freq1.push(ioframe->cv.values[ADC_CHANNEL_1]);
+  cv_rho1.push(ioframe->cv.values[ADC_CHANNEL_2]);
+  cv_freq2.push(ioframe->cv.values[ADC_CHANNEL_3]);
+  cv_rho2.push(ioframe->cv.values[ADC_CHANNEL_4]);
 #endif
 
   // Range in settings is (0-256] so this gets scaled to (0,65535]
   // CV value is 12 bit so also needs scaling
 
-  int32_t freq1 = SCALE8_16(lorenz_generator.get_freq1()) + (lorenz_generator.cv_freq1.value() * 16);
+  int32_t freq1 = SCALE8_16(lorenz_generator_.get_freq1()) + (cv_freq1.value() * 16);
   freq1 = USAT16(freq1);
 
-  int32_t freq2 = SCALE8_16(lorenz_generator.get_freq2()) + (lorenz_generator.cv_freq2.value() * 16);
+  int32_t freq2 = SCALE8_16(lorenz_generator_.get_freq2()) + (cv_freq2.value() * 16);
   freq2 = USAT16(freq2);
 
   const int32_t rho_lower_limit = 4 << 8 ;
   const int32_t rho_upper_limit = 127 << 8 ;
 
-  int32_t rho1 = SCALE8_16(lorenz_generator.get_rho1()) + (lorenz_generator.cv_rho1.value() * 16) ;
+  int32_t rho1 = SCALE8_16(lorenz_generator_.get_rho1()) + (cv_rho1.value() * 16) ;
   if (rho1 < rho_lower_limit) rho1 = rho_lower_limit;
   else if (rho1 > rho_upper_limit) rho1 = rho_upper_limit ;
-  lorenz_generator.lorenz.set_rho1(USAT16(rho1));
+  lorenz_generator_.lorenz.set_rho1(USAT16(rho1));
 
-  int32_t rho2 = SCALE8_16(lorenz_generator.get_rho2()) + (lorenz_generator.cv_rho2.value() * 16) ;
+  int32_t rho2 = SCALE8_16(lorenz_generator_.get_rho2()) + (cv_rho2.value() * 16) ;
   if (rho2 < rho_lower_limit) rho2 = rho_lower_limit;
   else if (rho2 > rho_upper_limit) rho2 = rho_upper_limit ;
-  lorenz_generator.lorenz.set_rho2(USAT16(rho2));
+  lorenz_generator_.lorenz.set_rho2(USAT16(rho2));
 
-  uint8_t out_a = lorenz_generator.get_out_a() ;
-  lorenz_generator.lorenz.set_out_a(out_a);
+  uint8_t out_a = lorenz_generator_.get_out_a() ;
+  lorenz_generator_.lorenz.set_out_a(out_a);
 
-  uint8_t out_b = lorenz_generator.get_out_b() ;
-  lorenz_generator.lorenz.set_out_b(out_b);
+  uint8_t out_b = lorenz_generator_.get_out_b() ;
+  lorenz_generator_.lorenz.set_out_b(out_b);
 
-  uint8_t out_c = lorenz_generator.get_out_c() ;
-  lorenz_generator.lorenz.set_out_c(out_c);
+  uint8_t out_c = lorenz_generator_.get_out_c() ;
+  lorenz_generator_.lorenz.set_out_c(out_c);
 
-  uint8_t out_d = lorenz_generator.get_out_d() ;
-  lorenz_generator.lorenz.set_out_d(out_d);
+  uint8_t out_d = lorenz_generator_.get_out_d() ;
+  lorenz_generator_.lorenz.set_out_d(out_d);
 
   if (reset_both_phase) {
     reset1_phase = true ;
     reset2_phase = true ;
   }
-  if (!freeze && !lorenz_generator.frozen())
-    lorenz_generator.lorenz.Process(freq1, freq2, reset1_phase, reset2_phase, lorenz_generator.get_freq_range1(), lorenz_generator.get_freq_range2());
+  if (!freeze && !lorenz_generator_.frozen())
+    lorenz_generator_.lorenz.Process(freq1, freq2, reset1_phase, reset2_phase, lorenz_generator_.get_freq_range1(), lorenz_generator_.get_freq_range2());
 
-  OC::DAC::set<DAC_CHANNEL_A>(lorenz_generator.lorenz.dac_code(0));
-  OC::DAC::set<DAC_CHANNEL_B>(lorenz_generator.lorenz.dac_code(1));
-  OC::DAC::set<DAC_CHANNEL_C>(lorenz_generator.lorenz.dac_code(2));
-  OC::DAC::set<DAC_CHANNEL_D>(lorenz_generator.lorenz.dac_code(3));
+  ioframe->outputs.set_raw_value(DAC_CHANNEL_A, lorenz_generator_.lorenz.dac_code(0));
+  ioframe->outputs.set_raw_value(DAC_CHANNEL_B, lorenz_generator_.lorenz.dac_code(1));
+  ioframe->outputs.set_raw_value(DAC_CHANNEL_C, lorenz_generator_.lorenz.dac_code(2));
+  ioframe->outputs.set_raw_value(DAC_CHANNEL_D, lorenz_generator_.lorenz.dac_code(3));
 }
 
-void LORENZ_init() {
-  lorenz_generator_state.selected_generator = 0;
-  lorenz_generator_state.cursor.Init(LORENZ_SETTING_RHO1, LORENZ_SETTING_LAST - 1);
-  lorenz_generator.Init();
+size_t AppLorenzGenerator::SaveAppData(util::StreamBufferWriter &stream_buffer) const {
+  lorenz_generator_.Save(stream_buffer);
+  return stream_buffer.written();
 }
 
-static constexpr size_t LORENZ_storageSize() {
-  return LorenzGenerator::storageSize();
+size_t AppLorenzGenerator::RestoreAppData(util::StreamBufferReader &stream_buffer) {
+  lorenz_generator_.Restore(stream_buffer);
+  return stream_buffer.read();
 }
 
-static size_t LORENZ_save(void *storage) {
-  return lorenz_generator.Save(storage);
+void AppLorenzGenerator::Loop() {
 }
 
-static size_t LORENZ_restore(const void *storage) {
-  return lorenz_generator.Restore(storage);
-}
-
-void LORENZ_loop() {
-}
-
-void LORENZ_menu() {
+void AppLorenzGenerator::DrawMenu() const {
 
   menu::DualTitleBar::Draw();
   graphics.print("Freq1 ");
-  int32_t freq1 = SCALE8_16(lorenz_generator.get_freq1()) + (lorenz_generator.cv_freq1.value() * 16);
+  int32_t freq1 = SCALE8_16(lorenz_generator_.get_freq1()) + (cv_freq1.value() * 16);
   freq1 = USAT16(freq1);
   graphics.print(freq1 >> 8);
 
   menu::DualTitleBar::SetColumn(1);
   graphics.print("Freq2 ");
-  int32_t freq2 = SCALE8_16(lorenz_generator.get_freq2()) + (lorenz_generator.cv_freq2.value() * 16);
+  int32_t freq2 = SCALE8_16(lorenz_generator_.get_freq2()) + (cv_freq2.value() * 16);
   freq2 = USAT16(freq2);
   graphics.print(freq2 >> 8);
 
-  menu::DualTitleBar::Selected(lorenz_generator_state.selected_generator);
+  menu::DualTitleBar::Selected(selected_generator_);
 
-  menu::SettingsList<menu::kScreenLines, 0, menu::kDefaultValueX - 12> settings_list(lorenz_generator_state.cursor);
+  menu::SettingsList<menu::kScreenLines, 0, menu::kDefaultValueX - 12> settings_list(cursor_);
   menu::SettingsListItem list_item;
   while (settings_list.available()) {
     const int current = settings_list.Next(list_item);
-    list_item.DrawDefault(lorenz_generator.get_value(current), LorenzGenerator::value_attr(current));
+    list_item.DrawDefault(lorenz_generator_.get_value(current), LorenzGenerator::value_attributes(current));
   }
 }
 
-void LORENZ_screensaver() {
+void AppLorenzGenerator::DrawScreensaver() const {
   OC::vectorscope_render();
 }
 
-void LORENZ_handleAppEvent(OC::AppEvent event) {
+void AppLorenzGenerator::HandleAppEvent(AppEvent event) {
   switch (event) {
-    case OC::APP_EVENT_RESUME:
+    case APP_EVENT_RESUME:
       break;
-    case OC::APP_EVENT_SUSPEND:
-    case OC::APP_EVENT_SCREENSAVER_ON:
-    case OC::APP_EVENT_SCREENSAVER_OFF:
+    case APP_EVENT_SUSPEND:
+    case APP_EVENT_SCREENSAVER_ON:
+    case APP_EVENT_SCREENSAVER_OFF:
       break;
   }
 }
 
-void LORENZ_topButton() {
-  if (lorenz_generator_state.selected_generator) {
-    lorenz_generator.change_value(LORENZ_SETTING_FREQ2, 32);
+void AppLorenzGenerator::HandleTopButton() {
+  if (selected_generator_) {
+    lorenz_generator_.change_value(LORENZ_SETTING_FREQ2, 32);
   } else {
-    lorenz_generator.change_value(LORENZ_SETTING_FREQ1, 32);
+    lorenz_generator_.change_value(LORENZ_SETTING_FREQ1, 32);
   }
 }
 
-void LORENZ_lowerButton() {
-  if (lorenz_generator_state.selected_generator) {
-    lorenz_generator.change_value(LORENZ_SETTING_FREQ2, -32);
+void AppLorenzGenerator::HandleLowerButton() {
+  if (selected_generator_) {
+    lorenz_generator_.change_value(LORENZ_SETTING_FREQ2, -32);
   } else {
-    lorenz_generator.change_value(LORENZ_SETTING_FREQ1, -32);
+    lorenz_generator_.change_value(LORENZ_SETTING_FREQ1, -32);
   }
 }
 
-void LORENZ_rightButton() {
-  lorenz_generator_state.cursor.toggle_editing();
+void AppLorenzGenerator::HandleRightButton() {
+  cursor_.toggle_editing();
 }
 
-void LORENZ_leftButton() {
-  lorenz_generator_state.selected_generator = 1 - lorenz_generator_state.selected_generator;
+void AppLorenzGenerator::HandleLeftButton() {
+  selected_generator_ = 1 - selected_generator_;
 }
 
-void LORENZ_handleButtonEvent(const UI::Event &event) {
+void AppLorenzGenerator::HandleButtonEvent(const UI::Event &event) {
   if (UI::EVENT_BUTTON_PRESS == event.type) {
     switch (event.control) {
-      case OC::CONTROL_BUTTON_UP:
-        LORENZ_topButton();
+      case CONTROL_BUTTON_UP:
+        HandleTopButton();
         break;
-      case OC::CONTROL_BUTTON_DOWN:
-        LORENZ_lowerButton();
+      case CONTROL_BUTTON_DOWN:
+        HandleLowerButton();
         break;
-      case OC::CONTROL_BUTTON_L:
-        LORENZ_leftButton();
+      case CONTROL_BUTTON_L:
+        HandleLeftButton();
         break;
-      case OC::CONTROL_BUTTON_R:
-        LORENZ_rightButton();
+      case CONTROL_BUTTON_R:
+        HandleRightButton();
         break;
     }
   }
 }
 
-void LORENZ_handleEncoderEvent(const UI::Event &event) {
+void AppLorenzGenerator::HandleEncoderEvent(const UI::Event &event) {
 
-  if (OC::CONTROL_ENCODER_L == event.control) {
-    if (lorenz_generator_state.selected_generator) {
-      lorenz_generator.change_value(LORENZ_SETTING_FREQ2, event.value);
+  if (CONTROL_ENCODER_L == event.control) {
+    if (selected_generator_) {
+      lorenz_generator_.change_value(LORENZ_SETTING_FREQ2, event.value);
     } else {
-      lorenz_generator.change_value(LORENZ_SETTING_FREQ1, event.value);
+      lorenz_generator_.change_value(LORENZ_SETTING_FREQ1, event.value);
     }
-  } else if (OC::CONTROL_ENCODER_R == event.control) {
-    if (lorenz_generator_state.cursor.editing()) {
-      lorenz_generator.change_value(lorenz_generator_state.cursor.cursor_pos(), event.value);
+  } else if (CONTROL_ENCODER_R == event.control) {
+    if (cursor_.editing()) {
+      lorenz_generator_.change_value(cursor_.cursor_pos(), event.value);
     } else {
-      lorenz_generator_state.cursor.Scroll(event.value);
+      cursor_.Scroll(event.value);
     }
   }
 }
 
-void LORENZ_debug() {
+void AppLorenzGenerator::GetIOConfig(IOConfig &ioconfig) const
+{
+  ioconfig.digital_inputs[DIGITAL_INPUT_1].set("Reset 1");
+  ioconfig.digital_inputs[DIGITAL_INPUT_2].set("Reset 2");
+  ioconfig.digital_inputs[DIGITAL_INPUT_3].set("Reset 1&2");
+  ioconfig.digital_inputs[DIGITAL_INPUT_4].set("Freeze");
+
+  ioconfig.cv[ADC_CHANNEL_1].set("Freq1");
+  ioconfig.cv[ADC_CHANNEL_2].set("Rho1");
+  ioconfig.cv[ADC_CHANNEL_3].set("Freq2");
+  ioconfig.cv[ADC_CHANNEL_4].set("Rho2");
+
+  ioconfig.outputs[DAC_CHANNEL_A].set(lorenz_output_names[lorenz_generator_.get_out_a()], OUTPUT_MODE_RAW);
+  ioconfig.outputs[DAC_CHANNEL_B].set(lorenz_output_names[lorenz_generator_.get_out_b()], OUTPUT_MODE_RAW);
+  ioconfig.outputs[DAC_CHANNEL_C].set(lorenz_output_names[lorenz_generator_.get_out_c()], OUTPUT_MODE_RAW);
+  ioconfig.outputs[DAC_CHANNEL_D].set(lorenz_output_names[lorenz_generator_.get_out_d()], OUTPUT_MODE_RAW);
+}
+
+void AppLorenzGenerator::DrawDebugInfo() const {
+#ifdef LORENZ_DEBUG
   graphics.setPrintPos(2, 12);
-  graphics.print(lorenz_generator.cv_freq1.value());
+  graphics.print(cv_freq1.value());
   graphics.print(" ");
-  int32_t value = SCALE8_16(lorenz_generator.get_freq1());
+  int32_t value = SCALE8_16(lorenz_generator_.get_freq1());
   graphics.print(value);
   graphics.setPrintPos(2, 22);
-  graphics.print(lorenz_generator.cv_freq2.value());
+  graphics.print(cv_freq2.value());
   graphics.print(" ");
-  value = SCALE8_16(lorenz_generator.get_freq2());
+  value = SCALE8_16(lorenz_generator_.get_freq2());
   graphics.print(value);
-
+#endif
 }
 
-#endif // ENABLE_APP_LORENZ
+} // namespace OC

@@ -23,15 +23,15 @@
 //
 // Trigger-driven Neo-Riemannian Tonnetz transformations to generate chords
 
-#ifdef ENABLE_APP_H1200
-
 #include "OC_bitmaps.h"
+#include "OC_pitch_utils.h"
 #include "OC_strings.h"
 #include "OC_trigger_delays.h"
-#include "tonnetz/tonnetz_state.h"
+#include "src/tonnetz/tonnetz_state.h"
 #include "util/util_settings.h"
 #include "util/util_ringbuffer.h"
-#include "bjorklund.h"
+#include "util/util_semitone_quantizer.h"
+#include "src/extern/bjorklund.h"
 
 extern uint_fast8_t MENU_REDRAW;
 
@@ -154,6 +154,53 @@ enum H1200EuclCvMappings {
   H1200_EUCL_CV_MAPPING_H_EUCLIDEAN_OFFSET,
   H1200_EUCL_CV_MAPPING_LAST
 } ;
+
+const char * const output_mode_names[] = {
+  "Chord",
+  "Tune"
+};
+
+const char * const plr_trigger_mode_names[] = {
+  "P>L>R",
+  "L>R>P",
+  "R>P>L",
+  "P>R>L",
+  "R>L>P",
+  "L>P>R",
+};
+
+const char * const nsh_trigger_mode_names[] = {
+  "N>S>H",
+  "S>H>N",
+  "H>N>S",
+  "N>H>S",
+  "H>S>N",
+  "S>N>H",
+};
+
+const char * const trigger_type_names[] = {
+  "PLR",
+  "NSH",
+  "Eucl",
+};
+
+const char * const mode_names[] = {
+  "Maj", "Min"
+};
+
+const char* const h1200_cv_sampling[2] = {
+  "Cont", "Trig"
+};
+
+const char* const h1200_eucl_cv_mappings[] = {
+  "None",
+  "Plen", "Pfil", "Poff",
+  "Llen", "Lfil", "Loff",
+  "Rlen", "Rfil", "Roff",
+  "Nlen", "Nfil", "Noff",
+  "Slen", "Sfil", "Soff",
+  "Hlen", "Hfil", "Hoff",
+};
 
 class H1200Settings : public settings::SettingsBase<H1200Settings, H1200_SETTING_LAST> {
 public:
@@ -385,99 +432,53 @@ private:
   int num_enabled_settings_;
   bool manual_mode_change_;
   H1200Setting enabled_settings_[H1200_SETTING_LAST];
-};
 
-const char * const output_mode_names[] = {
-  "Chord",
-  "Tune"
+  // TOTAL EEPROM SIZE: 37 bytes
+  SETTINGS_ARRAY_DECLARE() {{
+    {0, -11, 11, "Transpose", NULL, settings::STORAGE_TYPE_I8},
+    {H1200_CV_SOURCE_NONE, H1200_CV_SOURCE_NONE, H1200_CV_SOURCE_LAST-1, "Transpose CV", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U8},
+    #ifdef NORTHERNLIGHT
+    {0, 0, 7, "Octave", NULL, settings::STORAGE_TYPE_I8},
+    #else
+    {0, -3, 3, "Octave", NULL, settings::STORAGE_TYPE_I8},
+    #endif
+    {H1200_CV_SOURCE_NONE, H1200_CV_SOURCE_NONE, H1200_CV_SOURCE_LAST-1, "Octave CV", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U8},
+    {MODE_MAJOR, 0, MODE_LAST-1, "Root mode", mode_names, settings::STORAGE_TYPE_U8},
+    {0, -3, 3, "Inversion", NULL, settings::STORAGE_TYPE_I8},
+    {H1200_CV_SOURCE_NONE, H1200_CV_SOURCE_NONE, H1200_CV_SOURCE_LAST-1, "Inversion CV", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U8},
+    {TRANSFORM_PRIO_XPLR, 0, TRANSFORM_PRIO_PLR_LAST-1, "PLR Priority", plr_trigger_mode_names, settings::STORAGE_TYPE_U8},
+    {H1200_CV_SOURCE_NONE, H1200_CV_SOURCE_NONE, H1200_CV_SOURCE_LAST-1, "PLR Prior CV", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U8},
+    {TRANSFORM_PRIO_XNSH, 0, TRANSFORM_PRIO_NSH_LAST-1, "NSH Priority", nsh_trigger_mode_names, settings::STORAGE_TYPE_U8},
+    {H1200_CV_SOURCE_NONE, H1200_CV_SOURCE_NONE, H1200_CV_SOURCE_LAST-1, "NSH Prior CV", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U8},
+    {H1200_CV_SAMPLING_CONT, H1200_CV_SAMPLING_CONT, H1200_CV_SAMPLING_LAST-1, "CV sampling", h1200_cv_sampling, settings::STORAGE_TYPE_U8},
+    {OUTPUT_CHORD_VOICING, 0, OUTPUT_MODE_LAST-1, "Output mode", output_mode_names, settings::STORAGE_TYPE_U8},
+    { 0, 0, OC::kNumDelayTimes - 1, "Trigger delay", OC::Strings::trigger_delay_times, settings::STORAGE_TYPE_U8 },
+    {H1200_TRIGGER_TYPE_PLR, 0, H1200_TRIGGER_TYPE_LAST-1, "Trigger type", trigger_type_names, settings::STORAGE_TYPE_U8},
+    {H1200_EUCL_CV_MAPPING_NONE, H1200_EUCL_CV_MAPPING_NONE, H1200_EUCL_CV_MAPPING_LAST-1, "Eucl CV1 map", h1200_eucl_cv_mappings, settings::STORAGE_TYPE_U8},
+    {H1200_EUCL_CV_MAPPING_NONE, H1200_EUCL_CV_MAPPING_NONE, H1200_EUCL_CV_MAPPING_LAST-1, "Eucl CV2 map", h1200_eucl_cv_mappings, settings::STORAGE_TYPE_U8},
+    {H1200_EUCL_CV_MAPPING_NONE, H1200_EUCL_CV_MAPPING_NONE, H1200_EUCL_CV_MAPPING_LAST-1, "Eucl CV3 map", h1200_eucl_cv_mappings, settings::STORAGE_TYPE_U8},
+    {H1200_EUCL_CV_MAPPING_NONE, H1200_EUCL_CV_MAPPING_NONE, H1200_EUCL_CV_MAPPING_LAST-1, "Eucl CV4 map", h1200_eucl_cv_mappings, settings::STORAGE_TYPE_U8},
+    { 8, 2, 32,  " P EuLeng", NULL, settings::STORAGE_TYPE_U8 },
+    { 0, 0, 32,  " P EuFill", NULL, settings::STORAGE_TYPE_U8 },
+    { 0, 0, 31,  " P EuOffs", NULL, settings::STORAGE_TYPE_U8 },
+    { 8, 2, 32,  " L EuLeng", NULL, settings::STORAGE_TYPE_U8 },
+    { 0, 0, 32,  " L EuFill", NULL, settings::STORAGE_TYPE_U8 },
+    { 0, 0, 31,  " L EuOffs", NULL, settings::STORAGE_TYPE_U8 },
+    { 8, 2, 32,  " R EuLeng", NULL, settings::STORAGE_TYPE_U8 },
+    { 0, 0, 32,  " R EuFill", NULL, settings::STORAGE_TYPE_U8 },
+    { 0, 0, 31,  " R EuOffs", NULL, settings::STORAGE_TYPE_U8 },
+    { 8, 2, 32,  " N EuLeng", NULL, settings::STORAGE_TYPE_U8 },
+    { 0, 0, 32,  " N EuFill", NULL, settings::STORAGE_TYPE_U8 },
+    { 0, 0, 31,  " N EuOffs", NULL, settings::STORAGE_TYPE_U8 },
+    { 8, 2, 32,  " S EuLeng", NULL, settings::STORAGE_TYPE_U8 },
+    { 0, 0, 32,  " S EuFill", NULL, settings::STORAGE_TYPE_U8 },
+    { 0, 0, 31,  " S EuOffs", NULL, settings::STORAGE_TYPE_U8 },
+    { 8, 2, 32,  " H EuLeng", NULL, settings::STORAGE_TYPE_U8 },
+    { 0, 0, 32,  " H EuFill", NULL, settings::STORAGE_TYPE_U8 },
+    { 0, 0, 31,  " H EuOffs", NULL, settings::STORAGE_TYPE_U8 },
+  }};
 };
-
-const char * const plr_trigger_mode_names[] = {
-  "P>L>R",
-  "L>R>P",
-  "R>P>L",
-  "P>R>L",
-  "R>L>P",
-  "L>P>R",
-};
-
-const char * const nsh_trigger_mode_names[] = {
-  "N>S>H",
-  "S>H>N",
-  "H>N>S",
-  "N>H>S",
-  "H>S>N",
-  "S>N>H",
-};
-
-const char * const trigger_type_names[] = {
-  "PLR",
-  "NSH",
-  "Eucl",
-};
-
-const char * const mode_names[] = {
-  "Maj", "Min"
-};
-
-const char* const h1200_cv_sampling[2] = {
-  "Cont", "Trig"
-};
-
-const char* const h1200_eucl_cv_mappings[] = {
-  "None", 
-  "Plen", "Pfil", "Poff",
-  "Llen", "Lfil", "Loff",
-  "Rlen", "Rfil", "Roff",
-  "Nlen", "Nfil", "Noff",
-  "Slen", "Sfil", "Soff",
-  "Hlen", "Hfil", "Hoff",  
-};
-
-// TOTAL EEPROM SIZE: 37 bytes
-SETTINGS_DECLARE(H1200Settings, H1200_SETTING_LAST) {
-  {0, -11, 11, "Transpose", NULL, settings::STORAGE_TYPE_I8},
-  {H1200_CV_SOURCE_NONE, H1200_CV_SOURCE_NONE, H1200_CV_SOURCE_LAST-1, "Transpose CV", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U8},
-  #ifdef NORTHERNLIGHT
-  {0, 0, 7, "Octave", NULL, settings::STORAGE_TYPE_I8},
-  #else
-  {0, -3, 3, "Octave", NULL, settings::STORAGE_TYPE_I8},
-  #endif
-  {H1200_CV_SOURCE_NONE, H1200_CV_SOURCE_NONE, H1200_CV_SOURCE_LAST-1, "Octave CV", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U8},
-  {MODE_MAJOR, 0, MODE_LAST-1, "Root mode", mode_names, settings::STORAGE_TYPE_U8},
-  {0, -3, 3, "Inversion", NULL, settings::STORAGE_TYPE_I8},
-  {H1200_CV_SOURCE_NONE, H1200_CV_SOURCE_NONE, H1200_CV_SOURCE_LAST-1, "Inversion CV", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U8},
-  {TRANSFORM_PRIO_XPLR, 0, TRANSFORM_PRIO_PLR_LAST-1, "PLR Priority", plr_trigger_mode_names, settings::STORAGE_TYPE_U8},
-  {H1200_CV_SOURCE_NONE, H1200_CV_SOURCE_NONE, H1200_CV_SOURCE_LAST-1, "PLR Prior CV", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U8},
-  {TRANSFORM_PRIO_XNSH, 0, TRANSFORM_PRIO_NSH_LAST-1, "NSH Priority", nsh_trigger_mode_names, settings::STORAGE_TYPE_U8},
-  {H1200_CV_SOURCE_NONE, H1200_CV_SOURCE_NONE, H1200_CV_SOURCE_LAST-1, "NSH Prior CV", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U8},
-  {H1200_CV_SAMPLING_CONT, H1200_CV_SAMPLING_CONT, H1200_CV_SAMPLING_LAST-1, "CV sampling", h1200_cv_sampling, settings::STORAGE_TYPE_U8},
-  {OUTPUT_CHORD_VOICING, 0, OUTPUT_MODE_LAST-1, "Output mode", output_mode_names, settings::STORAGE_TYPE_U8},
-  { 0, 0, OC::kNumDelayTimes - 1, "Trigger delay", OC::Strings::trigger_delay_times, settings::STORAGE_TYPE_U8 },
-  {H1200_TRIGGER_TYPE_PLR, 0, H1200_TRIGGER_TYPE_LAST-1, "Trigger type", trigger_type_names, settings::STORAGE_TYPE_U8},
-  {H1200_EUCL_CV_MAPPING_NONE, H1200_EUCL_CV_MAPPING_NONE, H1200_EUCL_CV_MAPPING_LAST-1, "Eucl CV1 map", h1200_eucl_cv_mappings, settings::STORAGE_TYPE_U8},
-  {H1200_EUCL_CV_MAPPING_NONE, H1200_EUCL_CV_MAPPING_NONE, H1200_EUCL_CV_MAPPING_LAST-1, "Eucl CV2 map", h1200_eucl_cv_mappings, settings::STORAGE_TYPE_U8},
-  {H1200_EUCL_CV_MAPPING_NONE, H1200_EUCL_CV_MAPPING_NONE, H1200_EUCL_CV_MAPPING_LAST-1, "Eucl CV3 map", h1200_eucl_cv_mappings, settings::STORAGE_TYPE_U8},
-  {H1200_EUCL_CV_MAPPING_NONE, H1200_EUCL_CV_MAPPING_NONE, H1200_EUCL_CV_MAPPING_LAST-1, "Eucl CV4 map", h1200_eucl_cv_mappings, settings::STORAGE_TYPE_U8},
-  { 8, 2, 32,  " P EuLeng", NULL, settings::STORAGE_TYPE_U8 },
-  { 0, 0, 32,  " P EuFill", NULL, settings::STORAGE_TYPE_U8 },
-  { 0, 0, 31,  " P EuOffs", NULL, settings::STORAGE_TYPE_U8 },
-  { 8, 2, 32,  " L EuLeng", NULL, settings::STORAGE_TYPE_U8 },
-  { 0, 0, 32,  " L EuFill", NULL, settings::STORAGE_TYPE_U8 },
-  { 0, 0, 31,  " L EuOffs", NULL, settings::STORAGE_TYPE_U8 },
-  { 8, 2, 32,  " R EuLeng", NULL, settings::STORAGE_TYPE_U8 },
-  { 0, 0, 32,  " R EuFill", NULL, settings::STORAGE_TYPE_U8 },
-  { 0, 0, 31,  " R EuOffs", NULL, settings::STORAGE_TYPE_U8 },
-  { 8, 2, 32,  " N EuLeng", NULL, settings::STORAGE_TYPE_U8 },
-  { 0, 0, 32,  " N EuFill", NULL, settings::STORAGE_TYPE_U8 },
-  { 0, 0, 31,  " N EuOffs", NULL, settings::STORAGE_TYPE_U8 },
-  { 8, 2, 32,  " S EuLeng", NULL, settings::STORAGE_TYPE_U8 },
-  { 0, 0, 32,  " S EuFill", NULL, settings::STORAGE_TYPE_U8 },
-  { 0, 0, 31,  " S EuOffs", NULL, settings::STORAGE_TYPE_U8 },
-  { 8, 2, 32,  " H EuLeng", NULL, settings::STORAGE_TYPE_U8 },
-  { 0, 0, 32,  " H EuFill", NULL, settings::STORAGE_TYPE_U8 },
-  { 0, 0, 31,  " H EuOffs", NULL, settings::STORAGE_TYPE_U8 },
-};
+SETTINGS_ARRAY_DEFINE(H1200Settings);
 
 static constexpr uint32_t TRIGGER_MASK_TR1 = OC::DIGITAL_INPUT_1_MASK;
 static constexpr uint32_t TRIGGER_MASK_P = OC::DIGITAL_INPUT_2_MASK;
@@ -533,7 +534,8 @@ public:
     h_euclidean_length_ = 8;
     h_euclidean_fill_ = 0;
     h_euclidean_offset_ = 0;
-    
+
+    std::fill(output_values_, output_values_ + 4, 0);
   }
 
   void map_euclidean_cv(uint8_t cv_mapping, int channel_cv) {
@@ -628,32 +630,32 @@ public:
 
     switch (output_mode) {
     case OUTPUT_CHORD_VOICING: {
-      OC::DAC::set_voltage_scaled_semitone<DAC_CHANNEL_A>(tonnetz_state.outputs(0), 0, OC::DAC::get_voltage_scaling(DAC_CHANNEL_A));
-      OC::DAC::set_voltage_scaled_semitone<DAC_CHANNEL_B>(tonnetz_state.outputs(1), 0, OC::DAC::get_voltage_scaling(DAC_CHANNEL_B));
-      OC::DAC::set_voltage_scaled_semitone<DAC_CHANNEL_C>(tonnetz_state.outputs(2), 0, OC::DAC::get_voltage_scaling(DAC_CHANNEL_C));
-      OC::DAC::set_voltage_scaled_semitone<DAC_CHANNEL_D>(tonnetz_state.outputs(3), 0, OC::DAC::get_voltage_scaling(DAC_CHANNEL_D));
+      output_values_[0] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(0), 0);
+      output_values_[1] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(1), 0);
+      output_values_[2] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(2), 0);
+      output_values_[3] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(3), 0);
     }
     break;
     case OUTPUT_TUNE: {
-      OC::DAC::set_voltage_scaled_semitone<DAC_CHANNEL_A>(tonnetz_state.outputs(0), 0, OC::DAC::get_voltage_scaling(DAC_CHANNEL_A));
-      OC::DAC::set_voltage_scaled_semitone<DAC_CHANNEL_B>(tonnetz_state.outputs(0), 0, OC::DAC::get_voltage_scaling(DAC_CHANNEL_B));
-      OC::DAC::set_voltage_scaled_semitone<DAC_CHANNEL_C>(tonnetz_state.outputs(0), 0, OC::DAC::get_voltage_scaling(DAC_CHANNEL_C));
-      OC::DAC::set_voltage_scaled_semitone<DAC_CHANNEL_D>(tonnetz_state.outputs(0), 0, OC::DAC::get_voltage_scaling(DAC_CHANNEL_D));
+      output_values_[0] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(0), 0);
+      output_values_[1] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(0), 0);
+      output_values_[2] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(0), 0);
+      output_values_[3] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(0), 0);
     }
     break;
     default: break;
     }
   }
 
-  menu::ScreenCursor<menu::kScreenLines> cursor;
-  menu::ScreenCursor<menu::kScreenLines> cursor_state;
+  OC::menu::ScreenCursor<OC::menu::kScreenLines> cursor;
+  OC::menu::ScreenCursor<OC::menu::kScreenLines> cursor_state;
   bool display_notes;
 
   inline int cursor_pos() const {
     return cursor.cursor_pos();
   }
-  
-  OC::SemitoneQuantizer quantizer;
+
+  util::SemitoneQuantizer quantizer;
   TonnetzState tonnetz_state;
   util::RingBuffer<H1200::UiAction, 4> ui_actions;
   OC::TriggerDelays<OC::kMaxTriggerDelayTicks> trigger_delays_;  
@@ -678,13 +680,45 @@ public:
   uint8_t h_euclidean_length_  ;
   uint8_t h_euclidean_fill_  ;
   uint8_t h_euclidean_offset_  ;
- 
+
+  int32_t output_values_[4];
 };
 
 H1200State h1200_state;
 
-void FASTRUN H1200_clock(uint32_t triggers) {
+namespace OC {
 
+// Instantiate an app for the OC::Framework
+OC_APP_TRAITS(AppH1200, TWOCCS("HA"), "Harrington 1200", "Triads");
+class OC_APP_CLASS(AppH1200) {
+public:
+  OC_APP_INTERFACE_DECLARE(AppH1200);
+  OC_APP_STORAGE_SIZE(H1200Settings::storageSize());
+
+private:
+  void HandleTopButton();
+  void HandleLowerButton();
+  void HandleRightButton();
+  void HandleLeftButton();
+  void HandleLeftButtonLong();
+  void HandleDownButtonLong();
+};
+
+void /*FASTRUN*/ AppH1200::Process(OC::IOFrame *ioframe) {
+  uint32_t triggers = ioframe->digital_inputs.triggered();
+
+  while (h1200_state.ui_actions.readable()) {
+    switch (h1200_state.ui_actions.Read()) {
+      case H1200::ACTION_FORCE_UPDATE:
+        triggers |= TRIGGER_MASK_DIRTY;
+        break;
+      case H1200::ACTION_MANUAL_RESET:
+        triggers |= TRIGGER_MASK_RESET;
+        break;
+      default:
+        break;
+    }
+  }
   triggers = h1200_state.trigger_delays_.Process(triggers, OC::trigger_delay_ticks[h1200_settings.get_trigger_delay()]);
   
   // Reset has priority
@@ -709,100 +743,34 @@ void FASTRUN H1200_clock(uint32_t triggers) {
   uint8_t nsh_transform_priority_ = h1200_settings.get_nsh_transform_priority();
 
   if (triggers || (h1200_settings.get_cv_sampling() == H1200_CV_SAMPLING_CONT)) {
-        switch (h1200_settings.get_root_offset_cv_src()) {
-          case H1200_CV_SOURCE_CV1:
-            root_ += h1200_state.quantizer.Process(OC::ADC::raw_pitch_value(ADC_CHANNEL_1));
-            break ;
-          case H1200_CV_SOURCE_CV2:
-            root_ += h1200_state.quantizer.Process(OC::ADC::raw_pitch_value(ADC_CHANNEL_2));
-            break ;
-          case H1200_CV_SOURCE_CV3:
-            root_ += h1200_state.quantizer.Process(OC::ADC::raw_pitch_value(ADC_CHANNEL_3));
-            break ;
-          case H1200_CV_SOURCE_CV4:
-            root_ += h1200_state.quantizer.Process(OC::ADC::raw_pitch_value(ADC_CHANNEL_4));
-            break ;
-          default:
-            break; 
-        } 
-      
-        switch (h1200_settings.get_octave_cv_src()) {
-          case H1200_CV_SOURCE_CV1:
-            octave_ += ((OC::ADC::value<ADC_CHANNEL_1>() + 255) >> 9);
-            break ;
-          case H1200_CV_SOURCE_CV2:
-            octave_ += ((OC::ADC::value<ADC_CHANNEL_2>() + 255) >> 9);
-            break ;
-          case H1200_CV_SOURCE_CV3:
-            octave_ += ((OC::ADC::value<ADC_CHANNEL_3>() + 255) >> 9);
-            break ;
-          case H1200_CV_SOURCE_CV4:
-            octave_ += ((OC::ADC::value<ADC_CHANNEL_4>() + 255) >> 9);
-            break ;
-          default:
-            break; 
-        }
-        #ifdef NORTHERNLIGHT
-          CONSTRAIN(octave_, 0, 7);
-        #else
-          CONSTRAIN(octave_, -3, 3);
-        #endif
-      
-        switch (h1200_settings.get_inversion_cv_src()) {
-          case H1200_CV_SOURCE_CV1:
-            inversion_ += ((OC::ADC::value<ADC_CHANNEL_1>() + 255) >> 9);
-            break ;
-          case H1200_CV_SOURCE_CV2:
-            inversion_ += ((OC::ADC::value<ADC_CHANNEL_2>() + 255) >> 9);
-            break ;
-          case H1200_CV_SOURCE_CV3:
-            inversion_ += ((OC::ADC::value<ADC_CHANNEL_3>() + 255) >> 9);
-            break ;
-          case H1200_CV_SOURCE_CV4:
-            inversion_ += ((OC::ADC::value<ADC_CHANNEL_4>() + 255) >> 9);
-            break ;
-          default:
-            break; 
-        } 
-        CONSTRAIN(inversion_,-H1200State::kMaxInversion, H1200State::kMaxInversion);
-      
-        switch (h1200_settings.get_transform_priority_cv_src()) {
-          case H1200_CV_SOURCE_CV1:
-            plr_transform_priority_ += ((OC::ADC::value<ADC_CHANNEL_1>() + 255) >> 9);
-            break ;
-          case H1200_CV_SOURCE_CV2:
-            plr_transform_priority_ += ((OC::ADC::value<ADC_CHANNEL_2>() + 255) >> 9);
-            break ;
-          case H1200_CV_SOURCE_CV3:
-            plr_transform_priority_ += ((OC::ADC::value<ADC_CHANNEL_3>() + 255) >> 9);
-            break ;
-          case H1200_CV_SOURCE_CV4:
-            plr_transform_priority_ += ((OC::ADC::value<ADC_CHANNEL_4>() + 255) >> 9);
-            break ;
-          default:
-            break; 
-        } 
-      
-        CONSTRAIN(plr_transform_priority_, TRANSFORM_PRIO_XPLR, TRANSFORM_PRIO_PLR_LAST-1);
-        
-        switch (h1200_settings.get_nsh_transform_priority_cv_src()) {
-          case H1200_CV_SOURCE_CV1:
-            nsh_transform_priority_ += ((OC::ADC::value<ADC_CHANNEL_1>() + 255) >> 9);
-            break ;
-          case H1200_CV_SOURCE_CV2:
-            nsh_transform_priority_ += ((OC::ADC::value<ADC_CHANNEL_2>() + 255) >> 9);
-            break ;
-          case H1200_CV_SOURCE_CV3:
-            nsh_transform_priority_ += ((OC::ADC::value<ADC_CHANNEL_3>() + 255) >> 9);
-            break ;
-          case H1200_CV_SOURCE_CV4:
-            nsh_transform_priority_ += ((OC::ADC::value<ADC_CHANNEL_4>() + 255) >> 9);
-            break ;
-          default:
-            break; 
-        } 
-      
-        CONSTRAIN(nsh_transform_priority_, TRANSFORM_PRIO_XNSH, TRANSFORM_PRIO_NSH_LAST-1);
+
+    auto cv_src = h1200_settings.get_root_offset_cv_src();
+    if (cv_src)
+      root_ += h1200_state.quantizer.Process(ioframe->cv.pitch_values[cv_src - H1200_CV_SOURCE_CV1]);
+
+    cv_src = h1200_settings.get_octave_cv_src();
+    if (cv_src)
+      octave_ += ioframe->cv.ScaledValue<8>(cv_src - H1200_CV_SOURCE_CV1);
+#ifdef NORTHERNLIGHT
+      CONSTRAIN(octave_, 0, 7);
+#else
+      CONSTRAIN(octave_, -3, 3);
+#endif
+
+    cv_src = h1200_settings.get_inversion_cv_src();
+    if (cv_src)
+      inversion_ += ioframe->cv.ScaledValue<8>(cv_src - H1200_CV_SOURCE_CV1);
+    CONSTRAIN(inversion_,-H1200State::kMaxInversion, H1200State::kMaxInversion);
+
+    cv_src = h1200_settings.get_transform_priority_cv_src();
+    if (cv_src)
+      plr_transform_priority_ += ioframe->cv.ScaledValue<8>(cv_src - H1200_CV_SOURCE_CV1);
+    CONSTRAIN(plr_transform_priority_, TRANSFORM_PRIO_XPLR, TRANSFORM_PRIO_PLR_LAST-1);
+
+    cv_src = h1200_settings.get_nsh_transform_priority_cv_src();
+    if (cv_src)
+      nsh_transform_priority_ += ioframe->cv.ScaledValue<8>(cv_src - H1200_CV_SOURCE_CV1);
+    CONSTRAIN(nsh_transform_priority_, TRANSFORM_PRIO_XNSH, TRANSFORM_PRIO_NSH_LAST-1);
   }
 
   if (h1200_settings.get_trigger_type() == H1200_TRIGGER_TYPE_PLR) {
@@ -916,12 +884,11 @@ void FASTRUN H1200_clock(uint32_t triggers) {
       h1200_state.h_euclidean_fill_ = h1200_settings.get_h_euclidean_fill() ;
       h1200_state.h_euclidean_offset_ = h1200_settings.get_h_euclidean_offset() ;
 
-      int channel_1_cv_ = ((OC::ADC::value<ADC_CHANNEL_1>() + 127) >> 8);
-      int channel_2_cv_ = ((OC::ADC::value<ADC_CHANNEL_2>() + 127) >> 8);
-      int channel_3_cv_ = ((OC::ADC::value<ADC_CHANNEL_3>() + 127) >> 8);
-      int channel_4_cv_ = ((OC::ADC::value<ADC_CHANNEL_4>() + 127) >> 8);
+      int channel_1_cv_ = ioframe->cv.ScaledValue<16>(ADC_CHANNEL_1);
+      int channel_2_cv_ = ioframe->cv.ScaledValue<16>(ADC_CHANNEL_2);
+      int channel_3_cv_ = ioframe->cv.ScaledValue<16>(ADC_CHANNEL_3);
+      int channel_4_cv_ = ioframe->cv.ScaledValue<16>(ADC_CHANNEL_4);
 
- 
       h1200_state.map_euclidean_cv(h1200_settings.get_euclidean_cv1_mapping(), channel_1_cv_) ;
       h1200_state.map_euclidean_cv(h1200_settings.get_euclidean_cv2_mapping(), channel_2_cv_) ;
       h1200_state.map_euclidean_cv(h1200_settings.get_euclidean_cv3_mapping(), channel_3_cv_) ;
@@ -1003,34 +970,44 @@ void FASTRUN H1200_clock(uint32_t triggers) {
  }
 
   // Finally, we're ready to actually render the triad transformation!
-  if (triggers || (h1200_settings.get_cv_sampling() == H1200_CV_SAMPLING_CONT)) h1200_state.Render(root_, inversion_, octave_, h1200_settings.output_mode());
+  if (triggers || (h1200_settings.get_cv_sampling() == H1200_CV_SAMPLING_CONT))
+    h1200_state.Render(root_, inversion_, octave_, h1200_settings.output_mode());
 
   if (triggers)
     MENU_REDRAW = 1;
+
+  ioframe->outputs.set_pitch_values(h1200_state.output_values_);
 }
 
-void H1200_init() {
+void AppH1200::GetIOConfig(OC::IOConfig &ioconfig) const
+{
+  ioconfig.outputs[DAC_CHANNEL_A].set("ROOT", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[DAC_CHANNEL_B].set("+1", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[DAC_CHANNEL_C].set("+2", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[DAC_CHANNEL_D].set("+3", OUTPUT_MODE_PITCH);
+}
+
+void AppH1200::Init() {
   h1200_settings.Init();
   h1200_state.Init();
   h1200_settings.update_enabled_settings();
   h1200_state.cursor.AdjustEnd(h1200_settings.num_enabled_settings() - 1);
 }
 
-static constexpr size_t H1200_storageSize() {
-  return H1200Settings::storageSize();
+size_t AppH1200::SaveAppData(util::StreamBufferWriter &stream_buffer) const {
+  h1200_settings.Save(stream_buffer);
+  return stream_buffer.written();
 }
 
-static size_t H1200_save(void *storage) {
-  return h1200_settings.Save(storage);
-}
-
-static size_t H1200_restore(const void *storage) {
+size_t AppH1200::RestoreAppData(util::StreamBufferReader &stream_buffer) {
+  h1200_settings.Restore(stream_buffer);
   h1200_settings.update_enabled_settings();
   h1200_state.cursor.AdjustEnd(h1200_settings.num_enabled_settings() - 1);
-  return h1200_settings.Restore(storage);
+
+  return stream_buffer.read();
 }
 
-void H1200_handleAppEvent(OC::AppEvent event) {
+void AppH1200::HandleAppEvent(OC::AppEvent event) {
   switch (event) {
     case OC::APP_EVENT_RESUME:
       h1200_state.cursor.set_editing(false);
@@ -1045,29 +1022,10 @@ void H1200_handleAppEvent(OC::AppEvent event) {
   }
 }
 
-void H1200_isr() {
-  uint32_t triggers = OC::DigitalInputs::clocked();
-
-  while (h1200_state.ui_actions.readable()) {
-    switch (h1200_state.ui_actions.Read()) {
-      case H1200::ACTION_FORCE_UPDATE:
-        triggers |= TRIGGER_MASK_DIRTY;
-        break;
-      case H1200::ACTION_MANUAL_RESET:
-        triggers |= TRIGGER_MASK_RESET;
-        break;
-      default:
-        break;
-    }
-  }
-
-  H1200_clock(triggers);
+void AppH1200::Loop() {
 }
 
-void H1200_loop() {
-}
-
-void H1200_handleButtonEvent(const UI::Event &event) {
+void AppH1200::HandleButtonEvent(const UI::Event &event) {
   if (UI::EVENT_BUTTON_PRESS == event.type) {
     switch (event.control) {
       case OC::CONTROL_BUTTON_UP:
@@ -1091,7 +1049,7 @@ void H1200_handleButtonEvent(const UI::Event &event) {
   }
 }
 
-void H1200_handleEncoderEvent(const UI::Event &event) {
+void AppH1200::HandleEncoderEvent(const UI::Event &event) {
 
   if (OC::CONTROL_ENCODER_L == event.control) {
     if (h1200_settings.change_value(H1200_SETTING_INVERSION, event.value))
@@ -1130,7 +1088,7 @@ void H1200_handleEncoderEvent(const UI::Event &event) {
   }
 }
 
-void H1200_menu() {
+void AppH1200::DrawMenu() const {
 
   /* show mode change instantly, because it's somewhat confusing (inconsistent?) otherwise */
   const EMode current_mode = h1200_settings.mode(); // const EMode current_mode = h1200_state.tonnetz_state.current_chord().mode();
@@ -1161,13 +1119,13 @@ void H1200_menu() {
 
     const int setting = h1200_settings.enabled_setting_at(settings_list.Next(list_item));
     const int value = h1200_settings.get_value(setting);
-    const settings::value_attr &attr = H1200Settings::value_attr(setting); 
+    const auto &attr = H1200Settings::value_attributes(setting);
 
     list_item.DrawDefault(value, attr);
   }
 }
 
-void H1200_screensaver() {
+void AppH1200::DrawScreensaver() const {
   uint8_t y = 0;
   static const uint8_t x_col_0 = 66;
   static const uint8_t x_col_1 = 66 + 24;
@@ -1205,14 +1163,15 @@ void H1200_screensaver() {
   OC::visualize_pitch_classes(normalized, note_circle_x, note_circle_y);
 }
 
-#ifdef H1200_DEBUG  
-void H1200_debug() {
+void AppH1200::DrawDebugInfo() const {
+#ifdef H1200_DEBUG
   int cv = OC::ADC::value<ADC_CHANNEL_4>();
   int scaled = ((OC::ADC::value<ADC_CHANNEL_4>() + 127) >> 8);
 
   graphics.setPrintPos(2, 12);
   graphics.printf("I: %4d %4d", cv, scaled);
-}
 #endif // H1200_DEBUG
 
-#endif // ENABLE_APP_H1200
+}
+
+} // namespace OC

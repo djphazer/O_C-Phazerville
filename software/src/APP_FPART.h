@@ -25,8 +25,6 @@
 // SOFTWARE.
 //
 // FPART: a 4-channel step sequencer with staff-like visualisation.
-// To use, add to OC_app.ino app array:
-//   DECLARE_APP('F','P', "4 Parts", FPART, FPART_isr),
 //
 // Calling the files/classes "4-Part" (w/ number) causes errors,
 // so the admittedly unattractive "fpart" it is (for now)...
@@ -557,7 +555,7 @@ static size_t FPART_restore(const void *storage) {
   return fpart_instance.Restore(storage);
 }
 
-void FPART_isr() {
+void FPART_process(OC::IOFrame *) {
   // call class's isr function
   fpart_instance.ISR();
   //first the digital inputs (clocks/triggers)

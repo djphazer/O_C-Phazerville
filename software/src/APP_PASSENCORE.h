@@ -22,15 +22,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifdef ENABLE_APP_PASSENCORE
-
 #include <algorithm>
 
 #include "OC_apps.h"
 #include "util/util_settings.h"
 #include "util/util_trigger_delay.h"
-#include "braids_quantizer.h"
-#include "braids_quantizer_scales.h"
 #include "OC_menus.h"
 #include "OC_scales.h"
 #include "OC_scale_edit.h"
@@ -212,8 +208,6 @@ struct PassenChord {
     }
   }
 };
-
-using OC::DUMMY;
 
 class PASSENCORE : public settings::SettingsBase<PASSENCORE, PASSENCORE_SETTING_LAST> {
   public:
@@ -1004,7 +998,7 @@ static size_t PASSENCORE_save(void *storage) {
   return passencore_instance.Save(storage);
 }
 
-void PASSENCORE_isr() {
+void PASSENCORE_process(OC::IOFrame *) {
   return passencore_instance.ISR();
 }
 
@@ -1126,5 +1120,3 @@ static size_t PASSENCORE_restore(const void *storage) {
   passencore_instance.set_scale(passencore_state.left_encoder_value);
   return storage_size;
 }
-
-#endif // ENABLE_APP_PASSENCORE

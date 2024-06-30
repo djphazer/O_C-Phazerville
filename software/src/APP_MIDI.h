@@ -24,8 +24,6 @@
 //
 // Adapted for T4.x and 8-channel hardware by djphazer
 
-#ifdef ENABLE_APP_MIDI
-
 #include <Arduino.h>
 #include <EEPROM.h>
 #include <stdint.h>
@@ -1138,7 +1136,7 @@ static size_t MIDI_restore(const void *storage) {
 }
 #endif
 
-void MIDI_isr() {
+void MIDI_process(OC::IOFrame *) {
 	return captain_midi_instance.BaseController();
 }
 
@@ -1189,6 +1187,3 @@ void MIDI_handleEncoderEvent(const UI::Event &event) {
         captain_midi_instance.SwitchScreenOrLogView(event.value);
     }
 }
-
-
-#endif
