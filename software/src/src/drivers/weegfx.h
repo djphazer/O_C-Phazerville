@@ -109,7 +109,7 @@ public:
   void drawStr(coord_t x, coord_t y, const char *str);
 
   // Might be time-consuming
-  void printf(const char *fmt, ...) __attribute__((format(printf, 2, 3)));
+  void printf(const char *fmt, ...); // warnings ahoy -> __attribute__((format(printf, 2, 3)));
 
   inline void drawAlignedByte(coord_t x, coord_t y, uint8_t byte) __attribute__((always_inline));
 

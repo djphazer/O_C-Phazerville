@@ -39,7 +39,7 @@
 
 namespace HS {
 
-const uint8_t TURING_MACHINE_COUNT = 40; // Five banks of eight
+static constexpr int TURING_MACHINE_COUNT = 20; // Five banks of eight
 
 struct TuringMachine {
     uint16_t reg; // 16-bit shift register containing data
@@ -62,7 +62,7 @@ struct TuringMachine {
     }
 };
 
-DMAMEM TuringMachine user_turing_machines[TURING_MACHINE_COUNT];
+extern TuringMachine user_turing_machines[TURING_MACHINE_COUNT];
 
 }; // namespace HS
 

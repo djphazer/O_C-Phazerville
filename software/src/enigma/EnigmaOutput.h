@@ -23,8 +23,6 @@
 #ifndef ENIGMAOUTPUT_H
 #define ENIGMAOUTPUT_H
 
-#include "../braids_quantizer.h"
-#include "../braids_quantizer_scales.h"
 #include "../OC_scales.h"
 
 enum EnigmaOutputType {

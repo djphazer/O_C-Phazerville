@@ -27,9 +27,9 @@
 // Multistage envelope.
 
 #include "peaks_multistage_envelope.h"
-#include "extern/stmlib_utils_dsp.h"
+#include "stmlib_utils_dsp.h"
 #include "peaks_resources.h"
-#include "util/util_misc.h"
+#include "../../util/util_misc.h"
 
 namespace peaks {
 

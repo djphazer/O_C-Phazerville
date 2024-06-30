@@ -31,7 +31,7 @@
 #ifndef FRAMES_POLY_LFO_H_
 #define FRAMES_POLY_LFO_H_
 
-#include "util/util_macros.h"
+#include "../../util/util_macros.h"
 //#include "stmlib/stmlib.h"
 //#include "frames/keyframer.h"
 #include "peaks_pattern_predictor.h"
@@ -134,7 +134,7 @@ class PolyLfo {
   
   void Init();
   void Render(int32_t frequency, bool reset_phase, bool tempo_sync, uint8_t freq_mult);
-  void RenderPreview(uint16_t shape, uint16_t *buffer, size_t size);
+  void RenderPreview(uint16_t shape, uint16_t *buffer, size_t size) const;
 
   inline void set_freq_range(uint16_t freq_range) {
    freq_range_ = freq_range;
@@ -241,19 +241,19 @@ class PolyLfo {
     sync_ = sync;
   }
 
-  inline int get_sync() {
+  inline int get_sync() const {
     return static_cast<int>(sync_);
   }
 
-  inline long get_sync_phase_increment() {
+  inline long get_sync_phase_increment() const {
     return sync_phase_increment_;
   }
 
-  inline float get_freq_ch1() {
+  inline float get_freq_ch1() const {
     return(static_cast<float>(16666.6666666666666666667f * static_cast<double>(phase_increment_ch1_) / static_cast<double>(0xffffffff)));
   }
 
-  inline long get_sync_counter() {
+  inline long get_sync_counter() const {
     return sync_counter_;
   }
 

@@ -35,7 +35,7 @@
 #ifndef STREAMS_LORENZ_GENERATOR_H_
 #define STREAMS_LORENZ_GENERATOR_H_
 
-#include "util/util_macros.h"
+#include "../../util/util_macros.h"
 // #include "stmlib/stmlib.h"
 // #include "streams/meta_parameters.h"
 
