@@ -74,7 +74,7 @@ enum ScenesSettings {
     SCENES_SETTING_LAST
 };
 
-class ScenesAppPreset : public settings::SettingsBase<ScenesAppPreset, SCENES_SETTING_LAST> {
+class ScenePreset : public settings::SettingsBase<ScenePreset, SCENES_SETTING_LAST> {
 public:
 
     bool is_valid() {
@@ -107,13 +107,42 @@ public:
         }
     }
 
-};
+  // TOTAL EEPROM SIZE: 264 bytes
+  SETTINGS_ARRAY_DECLARE() {{
+    {0, 0, 255, "Flags", NULL, settings::STORAGE_TYPE_U8},
 
-ScenesAppPreset scene_presets[NR_OF_SCENE_PRESETS];
+    {0, 0, 65535, "Scene1ValA", NULL, settings::STORAGE_TYPE_U16},
+    {0, 0, 65535, "Scene1ValB", NULL, settings::STORAGE_TYPE_U16},
+    {0, 0, 65535, "Scene1ValC", NULL, settings::STORAGE_TYPE_U16},
+    {0, 0, 65535, "Scene1ValD", NULL, settings::STORAGE_TYPE_U16},
+
+    {0, 0, 65535, "Scene2ValA", NULL, settings::STORAGE_TYPE_U16},
+    {0, 0, 65535, "Scene2ValB", NULL, settings::STORAGE_TYPE_U16},
+    {0, 0, 65535, "Scene2ValC", NULL, settings::STORAGE_TYPE_U16},
+    {0, 0, 65535, "Scene2ValD", NULL, settings::STORAGE_TYPE_U16},
+
+    {0, 0, 65535, "Scene3ValA", NULL, settings::STORAGE_TYPE_U16},
+    {0, 0, 65535, "Scene3ValB", NULL, settings::STORAGE_TYPE_U16},
+    {0, 0, 65535, "Scene3ValC", NULL, settings::STORAGE_TYPE_U16},
+    {0, 0, 65535, "Scene3ValD", NULL, settings::STORAGE_TYPE_U16},
+
+    {0, 0, 65535, "Scene4ValA", NULL, settings::STORAGE_TYPE_U16},
+    {0, 0, 65535, "Scene4ValB", NULL, settings::STORAGE_TYPE_U16},
+    {0, 0, 65535, "Scene4ValC", NULL, settings::STORAGE_TYPE_U16},
+    {0, 0, 65535, "Scene4ValD", NULL, settings::STORAGE_TYPE_U16},
+  }};
+};
+SETTINGS_ARRAY_DEFINE(ScenePreset);
+
+ScenePreset scene_presets[NR_OF_SCENE_PRESETS];
 static const char * scene_preset_id[] = { "A", "B", "C", "D" };
 
-class ScenesApp : public HSApplication {
+OC_APP_TRAITS(AppScenery, TWOCCS("SX"), "Scenery", "Scenes");
+class OC_APP_CLASS(AppScenery), public HSApplication {
 public:
+  OC_APP_INTERFACE_DECLARE(AppScenery);
+  OC_APP_STORAGE_SIZE( ScenePreset::storageSize() * NR_OF_SCENE_PRESETS );
+
 
 	void Start() {
         // make sure to turn this off, just in case
@@ -255,7 +284,7 @@ public:
         else right_accel = SCENE_ACCEL_MIN;
     }
 
-    void View() {
+    void View() const {
         gfxHeader("Scenes");
 
         if (preset_select) {
@@ -414,7 +443,7 @@ private:
         old_val = (old_val * (s - 1) + new_val) / s;
     }
 
-    void DrawPresetSelector() {
+    void DrawPresetSelector() const {
         // index is the currently loaded preset (0-3)
         // preset_select is current selection (1-4, 5=clear)
         int y = 5 + 10*preset_select;
@@ -432,7 +461,7 @@ private:
             gfxPrint(60, 55, "[CLEAR]");
     }
 
-    void DrawInterface() {
+    void DrawInterface() const {
         for (int i = 0; i < NR_OF_SCENE_CHANNELS; ++i) {
             gfxPrint(i*32 + 13, 14, i+1);
         }
@@ -479,84 +508,75 @@ private:
     }
 };
 
-// TOTAL EEPROM SIZE: 264 bytes
-SETTINGS_DECLARE(ScenesAppPreset, SCENES_SETTING_LAST) {
-    {0, 0, 255, "Flags", NULL, settings::STORAGE_TYPE_U8},
-
-    {0, 0, 65535, "Scene1ValA", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Scene1ValB", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Scene1ValC", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Scene1ValD", NULL, settings::STORAGE_TYPE_U16},
-
-    {0, 0, 65535, "Scene2ValA", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Scene2ValB", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Scene2ValC", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Scene2ValD", NULL, settings::STORAGE_TYPE_U16},
-
-    {0, 0, 65535, "Scene3ValA", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Scene3ValB", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Scene3ValC", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Scene3ValD", NULL, settings::STORAGE_TYPE_U16},
-
-    {0, 0, 65535, "Scene4ValA", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Scene4ValB", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Scene4ValC", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Scene4ValD", NULL, settings::STORAGE_TYPE_U16},
-};
-
-
-ScenesApp ScenesApp_instance;
-
 // App stubs
-void ScenesApp_init() { ScenesApp_instance.BaseStart(); }
-
-static constexpr size_t ScenesApp_storageSize() {
-    return ScenesAppPreset::storageSize() * NR_OF_SCENE_PRESETS;
+void AppScenery::Init() {
+  BaseStart();
 }
 
-static size_t ScenesApp_save(void *storage) {
-    size_t used = 0;
-    for (int i = 0; i < 4; ++i) {
-        used += scene_presets[i].Save(static_cast<char*>(storage) + used);
-    }
-    return used;
+size_t AppScenery::SaveAppData(util::StreamBufferWriter &stream_buffer) const {
+  for (int i = 0; i < NR_OF_SCENE_PRESETS; ++i) {
+    scene_presets[i].Save(stream_buffer);
+  }
+  return stream_buffer.written();
 }
 
-static size_t ScenesApp_restore(const void *storage) {
-    size_t used = 0;
-    for (int i = 0; i < 4; ++i) {
-        used += scene_presets[i].Restore(static_cast<const char*>(storage) + used);
-    }
-    ScenesApp_instance.LoadPreset();
-    return used;
+size_t AppScenery::RestoreAppData(util::StreamBufferReader &stream_buffer) {
+  for (int i = 0; i < 4; ++i) {
+    scene_presets[i].Restore(stream_buffer);
+  }
+  LoadPreset();
+  return stream_buffer.read();
 }
 
-void ScenesApp_process(OC::IOFrame *) { return ScenesApp_instance.BaseController(); }
+void AppScenery::Process(OC::IOFrame *ioframe) {
+  BaseController(ioframe);
+}
 
-void ScenesApp_handleAppEvent(OC::AppEvent event) {
+void AppScenery::GetIOConfig(OC::IOConfig &ioconfig) const
+{
+  using namespace OC;
+  ioconfig.digital_inputs[DIGITAL_INPUT_1].set("Scene 1");
+  ioconfig.digital_inputs[DIGITAL_INPUT_2].set("Scene 2");
+  ioconfig.digital_inputs[DIGITAL_INPUT_3].set("Scene 3");
+  ioconfig.digital_inputs[DIGITAL_INPUT_4].set("Scene 4");
+
+  ioconfig.cv[ADC_CHANNEL_1].set("Smooth Select");
+  ioconfig.cv[ADC_CHANNEL_2].set("Bias");
+  ioconfig.cv[ADC_CHANNEL_3].set("Slew");
+  ioconfig.cv[ADC_CHANNEL_4].set("RndScn4");
+
+  ioconfig.outputs[DAC_CHANNEL_A].set("Out A", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[DAC_CHANNEL_B].set("Out B", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[DAC_CHANNEL_C].set("Out C", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[DAC_CHANNEL_D].set("Out D", OUTPUT_MODE_PITCH);
+}
+void AppScenery::HandleAppEvent(OC::AppEvent event) {
     switch (event) {
     case OC::APP_EVENT_RESUME:
-        //ScenesApp_instance.Resume();
+        //Resume();
         break;
 
     case OC::APP_EVENT_SUSPEND:
     case OC::APP_EVENT_SCREENSAVER_ON:
-        ScenesApp_instance.Suspend();
+        Suspend();
         break;
 
     default: break;
     }
 }
 
-void ScenesApp_loop() {} // Deprecated
+void AppScenery::Loop() {} // Deprecated
 
-void ScenesApp_menu() { ScenesApp_instance.BaseView(); }
+void AppScenery::DrawMenu() const { BaseView(); }
 
-void ScenesApp_screensaver() {
-    ScenesApp_instance.BaseScreensaver();
+void AppScenery::DrawScreensaver() const {
+    BaseScreensaver();
+}
+void AppScenery::DrawDebugInfo() const {
+  // TODO:
 }
 
-void ScenesApp_handleButtonEvent(const UI::Event &event) {
+void AppScenery::HandleButtonEvent(const UI::Event &event) {
     // For left encoder, handle press and long press
     // For right encoder, only handle press (long press is reserved)
     // For up button, handle only press (long press is reserved)
@@ -567,24 +587,24 @@ void ScenesApp_handleButtonEvent(const UI::Event &event) {
     case UI::EVENT_BUTTON_PRESS: {
         switch (event.control) {
         case OC::CONTROL_BUTTON_L:
-            ScenesApp_instance.OnLeftButtonPress();
+            OnLeftButtonPress();
             break;
         case OC::CONTROL_BUTTON_R:
-            ScenesApp_instance.OnRightButtonPress();
+            OnRightButtonPress();
             break;
         case OC::CONTROL_BUTTON_DOWN:
         case OC::CONTROL_BUTTON_UP:
-            ScenesApp_instance.SwitchChannel(event.control == OC::CONTROL_BUTTON_DOWN);
+            SwitchChannel(event.control == OC::CONTROL_BUTTON_DOWN);
             break;
         default: break;
         }
     } break;
     case UI::EVENT_BUTTON_LONG_PRESS:
         if (event.control == OC::CONTROL_BUTTON_L) {
-            ScenesApp_instance.OnLeftButtonLongPress();
+            OnLeftButtonLongPress();
         }
         if (event.control == OC::CONTROL_BUTTON_DOWN) {
-            ScenesApp_instance.OnDownButtonLongPress();
+            OnDownButtonLongPress();
         }
         break;
 
@@ -592,10 +612,10 @@ void ScenesApp_handleButtonEvent(const UI::Event &event) {
     }
 }
 
-void ScenesApp_handleEncoderEvent(const UI::Event &event) {
+void AppScenery::HandleEncoderEvent(const UI::Event &event) {
     // Left encoder turned
-    if (event.control == OC::CONTROL_ENCODER_L) ScenesApp_instance.OnLeftEncoderMove(event.value);
+    if (event.control == OC::CONTROL_ENCODER_L) OnLeftEncoderMove(event.value);
 
     // Right encoder turned
-    if (event.control == OC::CONTROL_ENCODER_R) ScenesApp_instance.OnRightEncoderMove(event.value);
+    if (event.control == OC::CONTROL_ENCODER_R) OnRightEncoderMove(event.value);
 }

@@ -260,13 +260,14 @@ SETTINGS_ARRAY_DEFINE(Calibr8orPreset);
 
 Calibr8orPreset cal8_presets[NR_OF_PRESETS];
 
-OC_APP_TRAITS(Calibr8or, TWOCCS("C8"), "Calibr8or", "Calibrator");
-class OC_APP_CLASS(Calibr8or), public HSApplication {
+OC_APP_TRAITS(AppCalibr8or, TWOCCS("C8"), "Calibr8or", "Calibrator");
+class OC_APP_CLASS(AppCalibr8or), public HSApplication {
 public:
-  OC_APP_INTERFACE_DECLARE(Calibr8or);
+  OC_APP_INTERFACE_DECLARE(AppCalibr8or);
   OC_APP_STORAGE_SIZE( Calibr8orPreset::storageSize() * NR_OF_PRESETS );
 
-  OC::Autotuner<Cal8ChannelConfig> autotuner;
+  // TODO: refactor Autotuner, again...
+  //OC::Autotuner<Cal8ChannelConfig> autotuner;
 
 	void Start() {
     for (int i = DAC_CHANNEL_A; i < DAC_CHANNEL_LAST; ++i) {
@@ -281,7 +282,7 @@ public:
     // This initializes the global HS Quantizers
     ClearPreset();
 
-    autotuner.Init();
+    //autotuner.Init();
 	}
 	
     void ClearPreset() {
@@ -463,10 +464,12 @@ public:
             return;
         }
 
+        /*
         if (autotuner.active()) {
             autotuner.Draw();
             return;
         }
+        */
 
         gfxHeader("Calibr8or");
 
@@ -515,11 +518,13 @@ public:
     void OnLeftButtonLongPress() {
         if (preset_select) return;
 
+        /*
         if (edit_mode) {
             FreqMeasure.begin();
             autotuner.Open(&channel[sel_chan]);
             return;
         }
+        */
 
         // Toggle triggered transpose mode
         ++channel[sel_chan].clocked_mode %= NR_OF_CLOCKMODES;
@@ -787,20 +792,16 @@ public:
 
 
 // App stubs
-void Calibr8or::Init() { BaseStart(); }
+void AppCalibr8or::Init() { BaseStart(); }
 
-static constexpr size_t Calibr8or_storageSize() {
-    return Calibr8orPreset::storageSize() * NR_OF_PRESETS;
-}
-
-size_t Calibr8or::SaveAppData(util::StreamBufferWriter &stream_buffer) const {
+size_t AppCalibr8or::SaveAppData(util::StreamBufferWriter &stream_buffer) const {
     for (int i = 0; i < NR_OF_PRESETS; ++i) {
         cal8_presets[i].Save(stream_buffer);
     }
   return stream_buffer.written();
 }
 
-size_t Calibr8or::RestoreAppData(util::StreamBufferReader &stream_buffer) {
+size_t AppCalibr8or::RestoreAppData(util::StreamBufferReader &stream_buffer) {
     for (int i = 0; i < NR_OF_PRESETS; ++i) {
         cal8_presets[i].Restore(stream_buffer);
     }
@@ -808,16 +809,37 @@ size_t Calibr8or::RestoreAppData(util::StreamBufferReader &stream_buffer) {
   return stream_buffer.read();
 }
 
-void Calibr8or::Process(OC::IOFrame *ioframe) {
+void AppCalibr8or::Process(OC::IOFrame *ioframe) {
+    /*
     if (autotuner.active()) {
       //autotuner.ISR();
       autotuner.Tick();
       return;
     }
+    */
     BaseController(ioframe);
 }
 
-void Calibr8or::HandleAppEvent(OC::AppEvent event) {
+void AppCalibr8or::GetIOConfig(OC::IOConfig &ioconfig) const
+{
+  using namespace OC;
+  ioconfig.digital_inputs[DIGITAL_INPUT_1].set("Ch1 Clk");
+  ioconfig.digital_inputs[DIGITAL_INPUT_2].set("Ch2 Clk");
+  ioconfig.digital_inputs[DIGITAL_INPUT_3].set("Ch3 Clk");
+  ioconfig.digital_inputs[DIGITAL_INPUT_4].set("Ch4 Clk");
+
+  ioconfig.cv[ADC_CHANNEL_1].set("Ch1 CV");
+  ioconfig.cv[ADC_CHANNEL_2].set("Ch2 CV");
+  ioconfig.cv[ADC_CHANNEL_3].set("Ch3 CV");
+  ioconfig.cv[ADC_CHANNEL_4].set("Ch4 CV");
+
+  ioconfig.outputs[DAC_CHANNEL_A].set("Ch1", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[DAC_CHANNEL_B].set("Ch2", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[DAC_CHANNEL_C].set("Ch3", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[DAC_CHANNEL_D].set("Ch4", OUTPUT_MODE_PITCH);
+}
+
+void AppCalibr8or::HandleAppEvent(OC::AppEvent event) {
     switch (event) {
     case OC::APP_EVENT_RESUME:
         Resume();
@@ -832,19 +854,24 @@ void Calibr8or::HandleAppEvent(OC::AppEvent event) {
     }
 }
 
-void Calibr8or::Loop() {} // Deprecated
+void AppCalibr8or::Loop() {} // Deprecated
 
-void Calibr8or::DrawMenu() const { BaseView(); }
+void AppCalibr8or::DrawMenu() const { BaseView(); }
 
-void Calibr8or::DrawScreensaver() const {
+void AppCalibr8or::DrawScreensaver() const {
     BaseScreensaver(true);
 }
+void AppCalibr8or::DrawDebugInfo() const {
+  // TODO:
+}
 
-void Calibr8or::HandleButtonEvent(const UI::Event &event) {
+void AppCalibr8or::HandleButtonEvent(const UI::Event &event) {
+  /*
   if (autotuner.active()) {
     autotuner.HandleButtonEvent(event);
     return;
   }
+  */
   
     // For left encoder, handle press and long press
     // For right encoder, only handle press (long press is reserved)
@@ -903,11 +930,13 @@ void Calibr8or::HandleButtonEvent(const UI::Event &event) {
     }
 }
 
-void Calibr8or::HandleEncoderEvent(const UI::Event &event) {
+void AppCalibr8or::HandleEncoderEvent(const UI::Event &event) {
+  /*
   if (autotuner.active()) {
     autotuner.HandleEncoderEvent(event);
     return;
   }
+  */
 
     // Q-editor popup takes precedence
     if (HS::q_edit) {
