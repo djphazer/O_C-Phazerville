@@ -1,4 +1,4 @@
-// Copyright (c) 2016 Patrick Dowling
+// Copyright (c) 2016-2019 Patrick Dowling
 //
 // Author: Patrick Dowling (pld@gurkenkiste.com)
 //
@@ -28,14 +28,18 @@
 #include "OC_menus.h"
 #include "OC_config.h"
 #include "OC_digital_inputs.h"
-#include "OC_autotune.h"
+#include "OC_storage.h"
+#include "OC_app_switcher.h"
+#include "OC_global_settings.h"
+#include "util/util_misc.h"
+
+
 #include "OC_calibration.h"
 #include "OC_patterns.h"
-#include "enigma/TuringMachine.h"
 #include "src/drivers/FreqMeasure/OC_FreqMeasure.h"
 #include "util/util_misc.h"
 #include "util/util_pagestorage.h"
-#include "util/EEPROMStorage.h"
+#include "src/drivers/EEPROMStorage.h"
 #include "PhzConfig.h"
 #include "VBiasManager.h"
 #include "HSClockManager.h"
@@ -52,193 +56,138 @@ namespace menu = OC::menu;
 
 #endif
 
-#include "APP_CALIBR8OR.h"
-#include "APP_SCENES.h"
+// #include "APP_CALIBR8OR.h"
+// #include "APP_SCENES.h"
 #include "APP_ASR.h"
 #include "APP_H1200.h"
 #include "APP_AUTOMATONNETZ.h"
+#include "APP_SEQ.h"
 #include "APP_QQ.h"
 #include "APP_DQ.h"
 #include "APP_POLYLFO.h"
 #include "APP_LORENZ.h"
 #include "APP_ENVGEN.h"
-#include "APP_SEQ.h"
 #include "APP_BBGEN.h"
 #include "APP_BYTEBEATGEN.h"
 #include "APP_CHORDS.h"
 #include "APP_REFS.h"
-#include "APP_PASSENCORE.h"
-#include "APP_MIDI.h"
-#include "APP_THEDARKESTTIMELINE.h"
-#include "APP_ENIGMA.h"
-#include "APP_NeuralNetwork.h"
-#include "APP_SCALEEDITOR.h"
+// #include "APP_PASSENCORE.h"
+// #include "APP_MIDI.h"
+// #include "APP_THEDARKESTTIMELINE.h"
+// #include "APP_ENIGMA.h"
+// #include "APP_NeuralNetwork.h"
+// #include "APP_SCALEEDITOR.h"
 #ifndef NO_HEMISPHERE
-#include "APP_WAVEFORMEDITOR.h"
+// #include "APP_WAVEFORMEDITOR.h"
 #endif
-#include "APP_PONGGAME.h"
-#include "APP_Backup.h"
-#include "APP_SETTINGS.h"
+// #include "APP_PONGGAME.h"
+// #include "APP_Backup.h"
+// #include "APP_SETTINGS.h"
 
-#define DECLARE_APP(a, b, name, prefix) \
-{ TWOCC<a,b>::value, name, \
-  prefix ## _init, prefix ## _storageSize, prefix ## _save, prefix ## _restore, \
-  prefix ## _handleAppEvent, \
-  prefix ## _loop, prefix ## _menu, prefix ## _screensaver, \
-  prefix ## _handleButtonEvent, \
-  prefix ## _handleEncoderEvent, \
-  prefix ## _isr \
-}
-
+/*
 // The order here is not inconsequential.
 // Each app's Start() method is called in sequence.
 // For example, the default quantizer settings from Hemisphere
 // are overwritten when Calibr8or loads its settings
-static constexpr OC::App available_apps[] = {
-  DECLARE_APP('S','E', "Setup / About", Settings),
+static constexpr OC::App app_container[] = {
+  DECLARE_APP("SE", "Setup / About", Settings),
 
 #ifndef NO_HEMISPHERE
   #ifdef ARDUINO_TEENSY41
-  DECLARE_APP('Q','S', "Quadrants", QUADRANTS),
+  DECLARE_APP("QS", "Quadrants", QUADRANTS),
   #else
-  DECLARE_APP('H','S', "Hemispheres", HEMISPHERE),
+  DECLARE_APP("HS", "Hemisphere", HEMISPHERE),
   #endif
 #endif
 
   #ifdef ENABLE_APP_CALIBR8OR
-  DECLARE_APP('C','8', "Calibr8or", Calibr8or),
+  DECLARE_APP("C8", "Calibr8or", Calibr8or),
   #endif
   #ifdef ENABLE_APP_SCENES
-  DECLARE_APP('S','X', "Scenery", ScenesApp),
+  DECLARE_APP("SX", "Scenes", ScenesApp),
   #endif
 
   #ifdef ENABLE_APP_ASR
-  DECLARE_APP('A','S', "CopierMaschine", ASR),
+  DECLARE_APP("AS", "CopierMaschine", ASR),
   #endif
   #ifdef ENABLE_APP_H1200
-  DECLARE_APP('H','A', "Harrington 1200", H1200),
+  DECLARE_APP("HA", "Harrington 1200", H1200),
   #endif
   #ifdef ENABLE_APP_AUTOMATONNETZ
-  DECLARE_APP('A','T', "Automatonnetz", Automatonnetz),
+  DECLARE_APP("AT", "Automatonnetz", Automatonnetz),
   #endif
   #ifdef ENABLE_APP_QUANTERMAIN
-  DECLARE_APP('Q','Q', "Quantermain", QQ),
+  DECLARE_APP("QQ", "Quantermain", QQ),
   #endif
   #ifdef ENABLE_APP_METAQ
-  DECLARE_APP('M','!', "Meta-Q", DQ),
+  DECLARE_APP("DQ", "Meta-Q", DQ),
   #endif
   #ifdef ENABLE_APP_POLYLFO
-  DECLARE_APP('P','L', "Quadraturia", POLYLFO),
+  DECLARE_APP("PL", "Quadraturia", POLYLFO),
   #endif
   #ifdef ENABLE_APP_LORENZ
-  DECLARE_APP('L','R', "Low-rents", LORENZ),
+  DECLARE_APP("LR", "Low-rents", LORENZ),
   #endif
   #ifdef ENABLE_APP_PIQUED
-  DECLARE_APP('E','G', "Piqued", ENVGEN),
+  DECLARE_APP("EG", "Piqued", ENVGEN),
   #endif
   #ifdef ENABLE_APP_SEQUINS
-  DECLARE_APP('S','Q', "Sequins", SEQ),
+  DECLARE_APP("SQ", "Sequins", SEQ),
   #endif
   #ifdef ENABLE_APP_BBGEN
-  DECLARE_APP('B','B', "Dialectic Pong", BBGEN),
+  DECLARE_APP("BB", "Dialectic Pong", BBGEN),
   #endif
   #ifdef ENABLE_APP_BYTEBEATGEN
-  DECLARE_APP('B','Y', "Viznutcracker", BYTEBEATGEN),
+  DECLARE_APP("BY", "Viznutcracker", BYTEBEATGEN),
   #endif
   #ifdef ENABLE_APP_CHORDS
-  DECLARE_APP('A','C', "Acid Curds", CHORDS),
+  DECLARE_APP("AC", "Acid Curds", CHORDS),
   #endif
   #ifdef ENABLE_APP_FPART
-  DECLARE_APP('F','P', "4 Parts", FPART),
+  DECLARE_APP("FP", "4 Parts", FPART),
   #endif
   #ifdef ENABLE_APP_PASSENCORE
   // boring name version
-  // DECLARE_APP('P','Q', "Tension", PASSENCORE),
-  DECLARE_APP('P','Q', "Passencore", PASSENCORE),
+  // DECLARE_APP("PQ", "Tension", PASSENCORE),
+  DECLARE_APP("PQ", "Passencore", PASSENCORE),
   #endif
   #ifdef ENABLE_APP_MIDI
-  DECLARE_APP('M','I', "Captain MIDI", MIDI),
+  DECLARE_APP("MI", "Captain MIDI", MIDI),
   #endif
   #ifdef ENABLE_APP_DARKEST_TIMELINE
-  DECLARE_APP('D','2', "Darkest Timeline", TheDarkestTimeline),
+  DECLARE_APP("D2", "Darkest Timeline", TheDarkestTimeline),
   #endif
   #ifdef ENABLE_APP_ENIGMA
-  DECLARE_APP('E','N', "Enigma", EnigmaTMWS),
+  DECLARE_APP("EN", "Enigma", EnigmaTMWS),
   #endif
   #ifdef ENABLE_APP_NEURAL_NETWORK
-  DECLARE_APP('N','N', "Neural Net", NeuralNetwork),
+  DECLARE_APP("NN", "Neural Net", NeuralNetwork),
   #endif
-  DECLARE_APP('S','C', "Scale Editor", SCALEEDITOR),
+  DECLARE_APP("SC", "Scale Editor", SCALEEDITOR),
 #ifndef NO_HEMISPHERE
-  DECLARE_APP('W','A', "Waveform Editor", WaveformEditor),
+  DECLARE_APP("WA", "Waveform Editor", WaveformEditor),
 #endif
   #ifdef ENABLE_APP_PONG
-  DECLARE_APP('P','O', "Pong", PONGGAME),
+  DECLARE_APP("PO", "Pong", PONGGAME),
   #endif
   #ifdef ENABLE_APP_REFERENCES
-  DECLARE_APP('R','F', "References", REFS),
+  DECLARE_APP("RF", "References", REFS),
   #endif
-
-  // SysEx backup needs to be updated for T4.x
-  DECLARE_APP('B','R', "Backup / Restore", Backup),
+  DECLARE_APP("BR", "Backup / Restore", Backup),
 };
-
-static constexpr int NUM_AVAILABLE_APPS = ARRAY_SIZE(available_apps);
+*/
 
 namespace OC {
 
-// Global settings are stored separately to actual app setings.
-// The theory is that they might not change as often.
-struct GlobalSettings {
-  static constexpr uint32_t FOURCC = FOURCC<'O','C','S',2>::value;
+// NOTE These are slightly wasteful, in that the PageStorage implementation and
+// the local data both retain a copy of the data. Removing this would in theory
+// reclaim some memory, although RAM isn't currently an issue.
+/*extern*/ GlobalSettings global_settings;
+/*extern*/ AppSwitcher app_switcher;
+static AppData app_data;
+static GlobalSettingsStorage global_settings_storage;
+static AppDataStorage app_data_storage;
 
-  bool encoders_enable_acceleration;
-  bool reserved0;
-  bool reserved1;
-  uint32_t DAC_scaling;
-  uint16_t current_app_id;
-
-#ifdef __IMXRT1062__
-#else
-  OC::Scale user_scales[OC::Scales::SCALE_USER_COUNT];
-  OC::Pattern user_patterns[OC::Patterns::PATTERN_USER_COUNT];
-  // These both occupy 160 bytes
-#ifdef ENABLE_APP_CHORDS
-  OC::Chord user_chords[OC::Chords::CHORDS_USER_COUNT];
-#else
-  HS::TuringMachine user_turing_machines[HS::TURING_MACHINE_COUNT];
-#endif
-#ifndef NO_HEMISPHERE
-  HS::VOSegment user_waveforms[HS::VO_SEGMENT_COUNT];
-#endif
-  OC::Autotune_data auto_calibration_data[DAC_CHANNEL_LAST];
-
-  HS::QuantEngineSettings q_engines[QUANT_CHANNEL_COUNT];
-  HS::MIDIMapSettings midi_maps[MIDIMAP_MAX];
-#endif
-};
-
-// App settings are packed into a single blob of binary data; each app's chunk
-// gets its own header with id and the length of the entire chunk. This makes
-// this a bit more flexible during development.
-// Chunks are aligned on 2-byte boundaries for arbitrary reasons (thankfully M4
-// allows unaligned access...)
-struct AppChunkHeader {
-  uint16_t id;
-  uint16_t length;
-} __attribute__((packed));
-
-struct AppData {
-  static constexpr uint32_t FOURCC = FOURCC<'O','C','A',4>::value;
-
-  static constexpr size_t kAppDataSize = EEPROM_APPDATA_BINARY_SIZE;
-  char data[kAppDataSize];
-  size_t used;
-};
-
-using AppDataStorage = PageStorage<EEPROMStorage, EEPROM_APPDATA_START, EEPROM_APPDATA_END, AppData>;
-
-DMAMEM GlobalSettings global_settings;
 #ifdef __IMXRT1062__
 enum GlobalSettingsDataKeys : uint16_t {
   // upper 8 bits of key, non-zero
@@ -254,22 +203,68 @@ enum GlobalSettingsDataKeys : uint16_t {
   SCALE_METADATA = 0xff,
   SCALE_NOTEDATA = 0,
 };
-#else
-static_assert(sizeof(GlobalSettings) < (EEPROM_GLOBALSETTINGS_END - EEPROM_GLOBALSETTINGS_START), "GlobalSettings EEPROM size overflow");
-
-using GlobalSettingsStorage = PageStorage<EEPROMStorage, EEPROM_GLOBALSETTINGS_START, EEPROM_GLOBALSETTINGS_END, GlobalSettings>;
-DMAMEM GlobalSettingsStorage global_settings_storage;
 #endif
 
-DMAMEM AppData app_settings;
-DMAMEM AppDataStorage app_data_storage;
+// Instantiate the available apps.
+// Any type not listed here should not exist, i.e. the linker should be able to
+// triage all code (minus any dangling static parts). (Yeah, this still relies
+// on the fugly .ino compilation method, don't @ me).
+static AppContainer<void // this space intentionally left blank
+#if 0
+  , Calibr8or
+#endif
+#ifndef NO_HEMISPHERE
+  , AppHemisphere
+#endif
+#ifdef ENABLE_APP_ASR
+  , AppASR
+#endif
+#ifdef ENABLE_APP_H1200
+  , AppH1200
+#endif
+#ifdef ENABLE_APP_AUTOMATONNETZ
+  , AppAutomatonnetz
+#endif
+#ifdef ENABLE_APP_QUANTERMAIN
+  , AppQuadQuantizer
+#endif
+#ifdef ENABLE_APP_METAQ
+  , AppDualQuantizer
+#endif
+#ifdef ENABLE_APP_POLYLFO
+  , AppPolyLfo
+#endif
+#ifdef ENABLE_APP_LORENZ
+  , AppLorenzGenerator
+#endif
+#ifdef ENABLE_APP_PIQUED
+  , AppQuadEnvelopeGenerator
+#endif
+#ifdef ENABLE_APP_SEQUINS
+  , AppDualSequencer
+#endif
+#ifdef ENABLE_APP_BBGEN
+  , AppQuadBouncingBalls
+#endif
+#ifdef ENABLE_APP_BYTEBEATGEN
+  , AppQuadByteBeats
+#endif
+#ifdef ENABLE_APP_CHORDS
+  , AppChordQuantizer
+#endif
+#ifdef ENABLE_APP_REFERENCES
+  , AppReferences
+#endif
+> app_container;
+static_assert(decltype(app_container)::TotalAppDataStorageSize() < AppData::kAppDataSize,
+              "Apps use too much EEPROM space!");
 
 static constexpr int DEFAULT_APP_INDEX = 1;
-static const uint16_t DEFAULT_APP_ID = available_apps[DEFAULT_APP_INDEX].id;
+static constexpr uint16_t DEFAULT_APP_ID = decltype(app_container)::GetAppIDAtIndex<DEFAULT_APP_INDEX>();
 
 FLASHMEM
-void save_global_settings() {
-  SERIAL_PRINTLN("Saving global settings...");
+static void SaveGlobalSettings() {
+  APPS_SERIAL_PRINTLN("Save global settings");
 
 #ifdef __IMXRT1062__
   //PhzConfig::clear_config();
@@ -368,7 +363,7 @@ void save_global_settings() {
   }
 
   PhzConfig::save_config(); // save to default config file
-#else
+#else // --- Teensy 3.2
   memcpy(global_settings.user_scales, OC::user_scales, sizeof(OC::user_scales));
   memcpy(global_settings.user_patterns, OC::user_patterns, sizeof(OC::user_patterns));
 #ifdef ENABLE_APP_CHORDS
@@ -379,9 +374,6 @@ void save_global_settings() {
 #ifndef NO_HEMISPHERE
   memcpy(global_settings.user_waveforms, HS::user_waveforms, sizeof(HS::user_waveforms));
 #endif
-  memcpy(global_settings.auto_calibration_data, OC::auto_calibration_data, sizeof(OC::auto_calibration_data));
-  // scaling settings:
-  global_settings.DAC_scaling = OC::DAC::store_scaling();
 
   for (int i = 0; i < QUANT_CHANNEL_COUNT; ++i) {
     global_settings.q_engines[i].scale = HS::q_engine[i].scale;
@@ -400,170 +392,168 @@ void save_global_settings() {
   }
 
   global_settings_storage.Save(global_settings);
-  SERIAL_PRINTLN("Saved global settings: page_index %d", global_settings_storage.page_index());
+  APPS_SERIAL_PRINTLN("Saved global settings: page_index %d", global_settings_storage.page_index());
 #endif
 }
 
+/* old eeprom space checking logic
 static constexpr size_t total_storage_size() {
     size_t used = 0;
-    for (size_t i = 0; i < NUM_AVAILABLE_APPS; ++i) {
-        used += available_apps[i].storageSize() + sizeof(AppChunkHeader);
+    for (size_t i = 0; i < app_container.num_apps(); ++i) {
+        used += app_container[i]->storage_size() + sizeof(AppChunkHeader);
         if (used & 1) ++used; // align on 2-byte boundaries
     }
     return used;
 }
-
 static constexpr size_t totalsize = total_storage_size();
 static_assert(totalsize < OC::AppData::kAppDataSize, "EEPROM Allocation Exceeded");
+*/
 
 FLASHMEM
-void save_app_data() {
-  save_global_settings(); // yeah, why not
+static void SaveAppData() {
+  SaveGlobalSettings(); // yeah, why not
+  APPS_SERIAL_PRINTLN("Save app data... (%u bytes available)", OC::AppData::kAppDataSize);
 
-  SERIAL_PRINTLN("Save app data... (%u bytes available)", OC::AppData::kAppDataSize);
+  app_data.used = 0;
+  uint8_t *data = app_data.data;
+  uint8_t *data_end = data + OC::AppData::kAppDataSize;
 
-  app_settings.used = 0;
-  char *data = app_settings.data;
-  char *data_end = data + OC::AppData::kAppDataSize;
-
-  size_t start_app = random(NUM_AVAILABLE_APPS);
-  for (size_t i = 0; i < NUM_AVAILABLE_APPS; ++i) {
-    const App &app = available_apps[(start_app + i) % NUM_AVAILABLE_APPS];
-    size_t storage_size = app.storageSize() + sizeof(AppChunkHeader);
+  size_t start_app = random(app_container.num_apps());
+  for (size_t i = 0; i < app_container.num_apps(); ++i) {
+    const auto app = app_container[(start_app + i) % app_container.num_apps()];
+    size_t storage_size = app->storage_size() + sizeof(AppChunkHeader);
     if (storage_size & 1) ++storage_size; // Align chunks on 2-byte boundaries
-    if (storage_size > sizeof(AppChunkHeader) && app.Save) {
+    if (storage_size > sizeof(AppChunkHeader)) {
       if (data + storage_size > data_end) {
-        SERIAL_PRINTLN("%s: ERROR: %u BYTES NEEDED, %u BYTES AVAILABLE OF %u BYTES TOTAL", app.name, storage_size, data_end - data, AppData::kAppDataSize);
+        APPS_SERIAL_PRINTLN("%s: ERROR: %u BYTES NEEDED, %u BYTES AVAILABLE OF %u BYTES TOTAL", app->name(), storage_size, data_end - data, AppData::kAppDataSize);
         continue;
       }
 
       AppChunkHeader *chunk = reinterpret_cast<AppChunkHeader *>(data);
-      chunk->id = app.id;
+      chunk->id = app->id();
       chunk->length = storage_size;
-      #ifdef PRINT_DEBUG
-        SERIAL_PRINTLN("* %s (%02x) : Saved %u bytes... (%u)", app.name, app.id, app.Save(chunk + 1), storage_size);
-      #else
-        app.Save(chunk + 1);
-      #endif
-      app_settings.used += chunk->length;
-      data += chunk->length;
+
+      util::StreamBufferWriter stream_buffer{chunk + 1, chunk->length};
+      auto result = app->Save(stream_buffer);
+      if (stream_buffer.overflow()) {
+        APPS_SERIAL_PRINTLN("* %s (%02x) : Save overflowed, result=%u, skipping app...", 
+                            app->name(), app->id(), result);
+      } else {
+        APPS_SERIAL_PRINTLN("* %s (%02x) : Saved %u bytes... (%u)",
+                            app->name(), app->id(), result, storage_size);
+        app_data.used += chunk->length;
+        data += chunk->length;
+      }
+      (void)result;
     }
   }
-  SERIAL_PRINTLN("App settings used: %u/%u", app_settings.used, EEPROM_APPDATA_BINARY_SIZE);
-  app_data_storage.Save(app_settings);
-  SERIAL_PRINTLN("Saved app settings in page_index %d", app_data_storage.page_index());
+  APPS_SERIAL_PRINTLN("App settings used: %u/%u", app_data.used, EEPROM_APPDATA_BINARY_SIZE);
+  app_data_storage.Save(app_data);
+  APPS_SERIAL_PRINTLN("Saved app settings in page_index %d", app_data_storage.page_index());
 }
 
 FLASHMEM
-void restore_app_data() {
-  SERIAL_PRINTLN("Restoring app data from page_index %d, used=%u", app_data_storage.page_index(), app_settings.used);
+static void RestoreAppData() {
+  APPS_SERIAL_PRINTLN("Restoring app data from page_index %d, used=%u", app_data_storage.page_index(), app_data.used);
 
-  const char *data = app_settings.data;
-  const char *data_end = data + app_settings.used;
+  const uint8_t *data = app_data.data;
+  const uint8_t *data_end = data + app_data.used;
   size_t restored_bytes = 0;
 
   while (data < data_end) {
     const AppChunkHeader *chunk = reinterpret_cast<const AppChunkHeader *>(data);
     if (data + chunk->length > data_end) {
-      SERIAL_PRINTLN("App chunk length %u exceeds available space (%u)", chunk->length, data_end - data);
+      APPS_SERIAL_PRINTLN("App chunk length %u exceeds available space (%u)", chunk->length, data_end - data);
+      break;
+    }
+    if (!chunk->id || !chunk->length) {
+      APPS_SERIAL_PRINTLN("Invalid app chunk id=%02x, length=%d, stopping restore", chunk->id, chunk->length);
       break;
     }
 
-    const App *app = apps::find(chunk->id);
+    auto app = app_container.FindAppByID(chunk->id);
     if (!app) {
-      SERIAL_PRINTLN("App %02x not found, ignoring chunk... skipping %u", chunk->id, chunk->length);
+      APPS_SERIAL_PRINTLN("App %02x not found, ignoring chunk... skipping %u", chunk->id, chunk->length);
       if (!chunk->length)
         break;
       data += chunk->length;
       continue;
     }
-    const size_t expected_length = ((app->storageSize() + sizeof(AppChunkHeader) + 1) >> 1) << 1; // round up
-    //if (expected_length & 0x1) ++expected_length;
+    size_t expected_length = app->storage_size() + sizeof(AppChunkHeader);
+    if (expected_length & 0x1) ++expected_length;
     if (chunk->length != expected_length) {
-      SERIAL_PRINTLN("* %s (%02x): chunk length %u != %u (storageSize=%u), skipping...", app->name, chunk->id, chunk->length, expected_length, app->storageSize());
+      APPS_SERIAL_PRINTLN("* %s (%02x): chunk length %u != %u (storage_size=%u), skipping...", app->name(), chunk->id, chunk->length, expected_length, app->storage_size());
       data += chunk->length;
       continue;
     }
 
-    size_t restored = 0;
-    if (app->Restore) {
-        restored = app->Restore(chunk + 1);
-      #ifdef PRINT_DEBUG
-        SERIAL_PRINTLN("* %s (%02x): Restored %u from %u (chunk length %u)...", app->name, chunk->id, restored, chunk->length - sizeof(AppChunkHeader), chunk->length);
-      #endif
+    util::StreamBufferReader stream_buffer{chunk + 1, chunk->length};
+    auto result = app->Restore(stream_buffer);
+    if (stream_buffer.underflow()) {
+      APPS_SERIAL_PRINTLN("* %s (%02x): Restore underflow, result=%u, re-init",
+                          app->name(), chunk->id, result);
+      app->InitDefaults();
+    } else {
+      APPS_SERIAL_PRINTLN("* %s (%02x): Restored %u from %u (chunk length %u)...",
+                          app->name(), chunk->id, result, chunk->length - sizeof(AppChunkHeader), chunk->length);
+      restored_bytes += chunk->length;
     }
-    restored = ((restored + sizeof(AppChunkHeader) + 1) >> 1) << 1; // round up
+    (void)result;
 
-    restored_bytes += restored;
-    data += restored;
+    data += chunk->length;
   }
 
-  SERIAL_PRINTLN("App data restored: %u, expected %u", restored_bytes, app_settings.used);
+  APPS_SERIAL_PRINTLN("App data restored: %u, expected %u", restored_bytes, app_data.used);
 }
 
-namespace apps {
-
 FLASHMEM
-void set_current_app(int index) {
-  current_app = &available_apps[index];
-  global_settings.current_app_id = current_app->id;
+void AppSwitcher::set_current_app(size_t index)
+{
+  current_app_ = app_container[index];
+  global_settings.current_app_id = current_app_->id();
   #ifdef VOR
   VBiasManager *vbias_m = vbias_m->get();
-  vbias_m->SetStateForApp(current_app);
+  vbias_m->SetStateForApp(current_app_);
   #endif
 }
 
-const App *current_app = &available_apps[DEFAULT_APP_INDEX];
-
-const App *find(uint16_t id) {
-  for (auto &app : available_apps)
-    if (app.id == id) return &app;
-  return nullptr;
-}
-
-int index_of(uint16_t id) {
-  int i = 0;
-  for (const auto &app : available_apps) {
-    if (app.id == id) return i;
-    ++i;
-  }
-  return i;
-}
-
 FLASHMEM
-void Init(bool reset_settings) {
+void AppSwitcher::Init(bool reset_settings) {
+
+  APPS_SERIAL_PRINTLN("Init");
+  app_container.for_each([](AppBase *app) {
+    APPS_SERIAL_PRINTLN("> %s", app->name());
+    app->InitDefaults();
+  });
+
+  current_app_ = app_container[DEFAULT_APP_INDEX];
 
   SERIAL_PRINTLN("[App Initializations]");
 
   Scales::Init();
-  AUTOTUNE::Init();
   HS::Init();
-  for (auto &app : available_apps) {
-    SERIAL_PRINTLN("Starting App: %s", app.name);
-    app.Init();
-  }
-
 #ifndef NO_HEMISPHERE
   HS::showhide_cursor.Init(0, HEMISPHERE_AVAILABLE_APPLETS - 1);
 #endif
   HS::frame.Init();
 
-  global_settings.current_app_id = DEFAULT_APP_ID;
+  global_settings.Init();
   global_settings.encoders_enable_acceleration = OC_ENCODERS_ENABLE_ACCELERATION_DEFAULT;
   global_settings.reserved0 = false;
   global_settings.reserved1 = false;
-  global_settings.DAC_scaling = VOLTAGE_SCALING_1V_PER_OCT;
+  global_settings.reserved2 = 0U;
+  global_settings.current_app_id = DEFAULT_APP_ID;
   memset(HS::user_turing_machines, 0, sizeof(HS::user_turing_machines));
 
   if (reset_settings) {
     if (ui.ConfirmReset()) {
-      SERIAL_PRINTLN("Erase EEPROM ...");
+      APPS_SERIAL_PRINTLN("Erase EEPROM ...");
       EEPtr d = EEPROM_GLOBALSETTINGS_START;
       size_t len = EEPROMStorage::LENGTH - EEPROM_GLOBALSETTINGS_START;
       while (len--)
         *d++ = 0;
-      SERIAL_PRINTLN("...done");
-      SERIAL_PRINTLN("Skip settings, using defaults...");
+      APPS_SERIAL_PRINTLN("...done");
+      APPS_SERIAL_PRINTLN("Skip settings, using defaults...");
 #ifdef __IMXRT1062__
       PhzConfig::eraseFiles();
 #else
@@ -686,17 +676,17 @@ void Init(bool reset_settings) {
       }
     }
 
-#else
-    SERIAL_PRINTLN("Load global settings: size: %u, PAGESIZE=%u, PAGES=%u, LENGTH=%u",
+#else // Teensy 3.2
+    APPS_SERIAL_PRINTLN("Load global settings: size: %u, PAGESIZE=%u, PAGES=%u, LENGTH=%u",
                   sizeof(GlobalSettings),
                   GlobalSettingsStorage::PAGESIZE,
                   GlobalSettingsStorage::PAGES,
                   GlobalSettingsStorage::LENGTH);
 
     if (!global_settings_storage.Load(global_settings)) {
-      SERIAL_PRINTLN("Settings invalid, using defaults!");
+      APPS_SERIAL_PRINTLN("Settings invalid, using defaults!");
     } else {
-      SERIAL_PRINTLN("Loaded settings from page_index %d, current_app_id is %02x",
+      APPS_SERIAL_PRINTLN("Loaded settings from page_index %d, current_app_id is %02x",
                     global_settings_storage.page_index(),global_settings.current_app_id);
       memcpy(user_scales, global_settings.user_scales, sizeof(user_scales));
       memcpy(user_patterns, global_settings.user_patterns, sizeof(user_patterns));
@@ -708,9 +698,6 @@ void Init(bool reset_settings) {
 #ifndef NO_HEMISPHERE
       memcpy(HS::user_waveforms, global_settings.user_waveforms, sizeof(HS::user_waveforms));
 #endif
-      memcpy(auto_calibration_data, global_settings.auto_calibration_data, sizeof(auto_calibration_data));
-      DAC::choose_calibration_data(); // either use default data, or auto_calibration_data
-      DAC::restore_scaling(global_settings.DAC_scaling); // recover output scaling settings
 
       // restore q_engines and midi_maps
       for (int i = 0; i < QUANT_CHANNEL_COUNT; ++i) {
@@ -735,16 +722,16 @@ void Init(bool reset_settings) {
 #endif
 
     // old school EEPROM storage for legacy apps
-    SERIAL_PRINTLN("Load app data: size is %u, PAGESIZE=%u, PAGES=%u, LENGTH=%u",
+    APPS_SERIAL_PRINTLN("Load app data: size is %u, PAGESIZE=%u, PAGES=%u, LENGTH=%u",
                   sizeof(AppData),
                   AppDataStorage::PAGESIZE,
                   AppDataStorage::PAGES,
                   AppDataStorage::LENGTH);
 
-    if (!app_data_storage.Load(app_settings)) {
-      SERIAL_PRINTLN("Data not loaded, using defaults!");
+    if (!app_data_storage.Load(app_data)) {
+      APPS_SERIAL_PRINTLN("Data not loaded, using defaults!");
     } else {
-      restore_app_data();
+      RestoreAppData();
     }
   }
 
@@ -758,23 +745,20 @@ void Init(bool reset_settings) {
     HS::user_turing_machines[i].Validate();
   }
 
-  int current_app_index = apps::index_of(global_settings.current_app_id);
-  if (current_app_index < 0 || current_app_index >= NUM_AVAILABLE_APPS) {
-    SERIAL_PRINTLN("App id %02x not found, using default!", global_settings.current_app_id);
+  auto current_app_index = app_container.IndexOfAppByID(global_settings.current_app_id);
+  if (current_app_index >= app_container.num_apps()) {
+    APPS_SERIAL_PRINTLN("App id %02x not found, using default!", global_settings.current_app_id);
     current_app_index = DEFAULT_APP_INDEX;
   }
 
-  SERIAL_PRINTLN("Encoder acceleration: %s", global_settings.encoders_enable_acceleration ? "enabled" : "disabled");
+  APPS_SERIAL_PRINTLN("Encoder acceleration: %s", global_settings.encoders_enable_acceleration ? "enabled" : "disabled");
   ui.encoders_enable_acceleration(global_settings.encoders_enable_acceleration);
 
   set_current_app(current_app_index);
-  current_app->HandleAppEvent(APP_EVENT_RESUME);
+  current_app_->DispatchAppEvent(APP_EVENT_RESUME);
 
   delay(100);
 }
-
-}; // namespace apps
-
 
 void draw_save_message(uint8_t c) {
   GRAPHICS_BEGIN_FRAME(true);
@@ -794,8 +778,8 @@ bool Ui::AppSettings(bool drawmenu) {
 
   // --- state change: entering App Menu
   if (!opened) {
-    cursor.Init(0, NUM_AVAILABLE_APPS - 1);
-    cursor.Scroll(apps::index_of(global_settings.current_app_id));
+    cursor.Init(0, app_container.num_apps() - 1);
+    cursor.Scroll(app_container.IndexOfAppByID(global_settings.current_app_id));
     opened = true;
   }
 
@@ -814,11 +798,14 @@ bool Ui::AppSettings(bool drawmenu) {
          ++current, item.y += menu::kMenuLineH) {
       item.selected = current == cursor.cursor_pos();
       item.SetPrintPos();
-      graphics.movePrintPos(weegfx::kFixedFontW, 0);
-      graphics.print(available_apps[current].name);
-
-      if (global_settings.current_app_id == available_apps[current].id)
-        graphics.drawBitmap8(0, item.y + 1, 8, ZAP_ICON);
+      graphics.movePrintPos(weegfx::Graphics::kFixedFontW, 0);
+#ifdef BORING_APP_NAMES
+      graphics.print(app_container[current]->boring_name());
+#else
+      graphics.print(app_container[current]->name());
+#endif
+      if (global_settings.current_app_id == app_container[current]->id())
+        graphics.drawBitmap8(item.x + 2, item.y + 1, 8, ZAP_ICON);
 
       item.DrawCustom();
     }
@@ -867,7 +854,7 @@ bool Ui::AppSettings(bool drawmenu) {
       case CONTROL_BUTTON_DOWN:
         if (UI::EVENT_BUTTON_PRESS == event.type) {
             bool enabled = !global_settings.encoders_enable_acceleration;
-            SERIAL_PRINTLN("Encoder acceleration: %s", enabled ? "enabled" : "disabled");
+            APPS_SERIAL_PRINTLN("Encoder acceleration: %s", enabled ? "enabled" : "disabled");
             ui.encoders_enable_acceleration(enabled);
             global_settings.encoders_enable_acceleration = enabled;
         }
@@ -889,11 +876,11 @@ bool Ui::AppSettings(bool drawmenu) {
   delay(1);
 
   if (change_app) {
-    apps::set_current_app(cursor.cursor_pos());
+    app_switcher.set_current_app(cursor.cursor_pos());
     FreqMeasure.end();
     OC::DigitalInputs::reInit();
     if (save) {
-      save_app_data();
+      SaveAppData();
       // draw message:
       int cnt = 0;
       while(idle_time() < SETTINGS_SAVE_TIMEOUT_MS)
@@ -906,7 +893,7 @@ bool Ui::AppSettings(bool drawmenu) {
   OC::ui.encoders_enable_acceleration(global_settings.encoders_enable_acceleration);
 
   // Restore state
-  apps::current_app->HandleAppEvent(APP_EVENT_RESUME);
+  app_switcher.current_app()->DispatchAppEvent(APP_EVENT_RESUME);
   CORE::app_isr_enabled = true;
 
   opened = false;
