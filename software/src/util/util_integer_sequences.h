@@ -51,8 +51,6 @@ public:
   	// msb_pos_ = 0;
   	bit_sum_ = 0;
   	pending_bit_ = 0;
-  	uint32_t _seed = OC::ADC::value<ADC_CHANNEL_1>() + OC::ADC::value<ADC_CHANNEL_2>() + OC::ADC::value<ADC_CHANNEL_3>() + OC::ADC::value<ADC_CHANNEL_4>();
-    randomSeed(_seed);
   }
 
   uint16_t Clock() {

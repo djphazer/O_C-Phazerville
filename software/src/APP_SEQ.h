@@ -18,8 +18,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifdef ENABLE_APP_SEQUINS
-
 #include "util/util_settings.h"
 #include "util/util_trigger_delay.h"
 #include "OC_apps.h"
@@ -34,24 +32,20 @@
 #include "OC_scale_edit.h"
 #include "OC_input_map.h"
 #include "OC_input_maps.h"
-#include "braids_quantizer.h"
-#include "braids_quantizer_scales.h"
-#include "extern/dspinst.h"
+#include "src/extern/braids_quantizer.h"
 #include "util/util_arp.h"
-#include "peaks_multistage_envelope.h"
+#include "src/extern/peaks_multistage_envelope.h"
 
-using OC::DUMMY;
+static constexpr uint8_t NUM_CHANNELS = 2;
+static constexpr uint8_t MULT_MAX = 26;    // max multiplier
+static constexpr uint8_t MULT_BY_ONE = 19; // default multiplication
+static constexpr uint8_t PULSEW_MAX = 255; // max pulse width [ms]
 
-const uint8_t NUM_CHANNELS = 2;
-const uint8_t MULT_MAX = 26;    // max multiplier
-const uint8_t MULT_BY_ONE = 19; // default multiplication
-const uint8_t PULSEW_MAX = 255; // max pulse width [ms]
-
-const uint32_t SCALE_PULSEWIDTH = 58982; // 0.9 for signed_multiply_32x16b
-const uint32_t TICKS_TO_MS = 43691; // 0.6667f : fraction, if TU_CORE_TIMER_RATE = 60 us : 65536U * ((1000 / TU_CORE_TIMER_RATE) - 16)
-const uint32_t TICK_JITTER = 0xFFFFFFF;  // 1/16 : threshold/double triggers reject -> ext_frequency_in_ticks_
-const uint32_t TICK_SCALE  = 0xC0000000; // 0.75 for signed_multiply_32x32
-const uint32_t COPYTIMEOUT = 200000; // in ticks
+static constexpr uint32_t SCALE_PULSEWIDTH = 58982; // 0.9 for signed_multiply_32x16b
+static constexpr uint32_t TICKS_TO_MS = 43691; // 0.6667f : fraction, if TU_CORE_TIMER_RATE = 60 us : 65536U * ((1000 / TU_CORE_TIMER_RATE) - 16)
+static constexpr uint32_t TICK_JITTER = 0xFFFFFFF;  // 1/16 : threshold/double triggers reject -> ext_frequency_in_ticks_
+static constexpr uint32_t TICK_SCALE  = 0xC0000000; // 0.75 for signed_multiply_32x32
+static constexpr uint32_t COPYTIMEOUT = 200000; // in ticks
 
 void SEQ_leftButton();
 void SEQ_leftButtonLong();
@@ -271,10 +265,64 @@ enum SQ_AUX_MODES {
   SQ_AUX_MODES_LAST
 };
 
+const char* const SEQ_CHANNEL_TRIGGER_sources[] = {
+  "TR1", "TR3", " - "
+};
+
+const char* const reset_trigger_sources[] = {
+  "RST2", "RST4", " - ", "=HI2", "=LO2", "=HI4", "=LO4"
+};
+
+const char* const display_multipliers[] = {
+  "/64", "/63", "/62", "/49", "/48", "/47", "/33", "/32", "/31", "/17", "/16", "/15", "/8", "/7", "/6", "/5", "/4", "/3", "/2", "-", "x2", "x3", "x4", "x5", "x6", "x7", "x8"
+};
+
+const char* const modes[] = {
+  "gate", "copy", "AD", "ADR", "ADSR",
+};
+
+const char* const cv_ranges[] = {
+  " 5V", "10V"
+};
+
+const char* const arp_directions[] = {
+  "up", "down", "u/d", "rnd"
+};
+
+const char* const arp_range[] = {
+  "1", "2", "3", "4"
+};
+
 uint64_t ext_frequency[SEQ_CHANNEL_TRIGGER_NONE + 1];
 
-class SEQ_Channel : public settings::SettingsBase<SEQ_Channel, SEQ_CHANNEL_SETTING_LAST> {
+class SEQ_Channel
+: public settings::SettingsBase<SEQ_Channel, SEQ_CHANNEL_SETTING_LAST>
+, public OC::ScaleEditorEventHandler {
 public:
+
+  // ScaleEditorEventHandler
+  int get_scale(int /*slot_index*/) const final {
+    return get_scale();
+  }
+
+  uint16_t get_scale_mask(int /*slot_index*/) const final {
+    return get_scale_mask();
+  }
+
+  void update_scale_mask(uint16_t mask, int /*slot_index*/) final {
+    apply_value(SEQ_CHANNEL_SETTING_SCALE_MASK, mask); // Should automatically be updated
+    force_scale_update_ = true;
+  }
+
+  void scale_changed() final {
+    force_scale_update_ = true;
+  }
+
+  void set_scale(int scale) {
+     apply_value(SEQ_CHANNEL_SETTING_SCALE, scale);
+  }
+  // End ScaleEditorEventHandler
+
 
   uint8_t get_menu_page() const {
     return menu_page_;
@@ -724,40 +772,12 @@ public:
     apply_value(SEQ_CHANNEL_SETTING_ENV_LOOPS_CV_SOURCE, 0);
   }
 
-  int get_scale(uint8_t dummy) const {
+  int get_scale() const {
     return values_[SEQ_CHANNEL_SETTING_SCALE];
   }
 
-  void set_scale(int scale) {
-     apply_value(SEQ_CHANNEL_SETTING_SCALE, scale);
-  }
-
-  // dummy
-  int get_scale_select() const {
-    return 0;
-  }
-
-  // dummy
-  void set_scale_at_slot(int scale, uint16_t mask, int root, int transpose, uint8_t scale_slot) {
-
-  }
-
-  // dummy
-  int get_transpose(uint8_t DUMMY) const {
-    return 0;
-  }
-
-  int get_scale_mask(uint8_t scale_select) const {
+  int get_scale_mask() const {
     return values_[SEQ_CHANNEL_SETTING_SCALE_MASK];
-  }
-
-  void scale_changed() {
-    force_scale_update_ = true;
-  }
-
-  void update_scale_mask(uint16_t mask, uint16_t dummy) {
-    force_scale_update_ = true;
-    apply_value(SEQ_CHANNEL_SETTING_SCALE_MASK, mask); // Should automatically be updated
   }
 
   void update_inputmap(int num_slots, uint8_t range) {
@@ -813,20 +833,18 @@ public:
     sequence_manual_ = display_num_sequence_;
     sequence_advance_state_ = false;
     pendulum_fwd_ = true;
-    uint32_t _seed = OC::ADC::value<ADC_CHANNEL_1>() + OC::ADC::value<ADC_CHANNEL_2>() + OC::ADC::value<ADC_CHANNEL_3>() + OC::ADC::value<ADC_CHANNEL_4>();
-    randomSeed(_seed);
     clock_display_.Init();
     arpeggiator_.Init();
-    update_enabled_settings(0);
+    update_enabled_settings();
   }
 
   bool rotate_scale(int32_t mask_rotate) {
 
-    uint16_t  scale_mask = get_scale_mask(DUMMY);
-    const int scale = get_scale(DUMMY);
+    uint16_t  scale_mask = get_scale_mask();
+    const int scale = get_scale();
 
     if (mask_rotate)
-      scale_mask = OC::ScaleEditor<SEQ_Channel>::RotateMask(scale_mask, OC::Scales::GetScale(scale).num_notes, mask_rotate);
+      scale_mask = OC::ScaleEditor::RotateMask(scale_mask, OC::Scales::GetScale(scale).num_notes, mask_rotate);
 
     if (last_scale_mask_ != scale_mask) {
 
@@ -842,11 +860,11 @@ public:
 
   bool update_scale(bool force) {
 
-    const int scale = get_scale(DUMMY);
+    const int scale = get_scale();
 
     if (force || last_scale_ != scale) {
 
-      uint16_t  scale_mask = get_scale_mask(DUMMY);
+      uint16_t  scale_mask = get_scale_mask();
       force_scale_update_ = false;
       last_scale_ = scale;
       last_scale_mask_ = scale_mask;
@@ -868,14 +886,14 @@ public:
 
   /* main channel update below: */
 
-  inline void Update(uint32_t triggers, DAC_CHANNEL dac_channel) {
-
+  inline void Update(const OC::IOFrame *ioframe)
+  {
      // increment channel ticks ..
      subticks_++;
 
      int8_t _clock_source, _reset_source = 0x0, _aux_mode, _playmode;
      int8_t _multiplier = 0x0;
-     bool _none, _triggered, _tock, _sync, _continuous;
+     bool _triggered, _tock, _sync, _continuous;
      uint32_t _subticks = 0x0, prev_channel_frequency_in_ticks_ = 0x0;
 
      // core channel parameters --
@@ -891,9 +909,14 @@ public:
      update_scale(force_scale_update_);
 
      // clocked ?
-     _none = SEQ_CHANNEL_TRIGGER_NONE == _clock_source;
      // TR1 or TR3?
-     _triggered = _clock_source ? (!_none && (triggers & (1 << OC::DIGITAL_INPUT_3))) : (!_none && (triggers & (1 << OC::DIGITAL_INPUT_1)));
+     if (SEQ_CHANNEL_TRIGGER_NONE != _clock_source) {
+      _triggered = _clock_source
+          ? ioframe->digital_inputs.triggered<OC::DIGITAL_INPUT_3>()
+          : ioframe->digital_inputs.triggered<OC::DIGITAL_INPUT_1>();
+     } else {
+      _triggered = false;
+     }
      _tock = false;
      _sync = false;
 
@@ -923,7 +946,7 @@ public:
          _multiplier = get_multiplier();
 
          if (get_mult_cv_source()) {
-            _multiplier += (OC::ADC::value(static_cast<ADC_CHANNEL>(get_mult_cv_source() - 1)) + 127) >> 8;
+            _multiplier += ioframe->cv.ScaledValue<16>(get_mult_cv_source() - 1);
             CONSTRAIN(_multiplier, 0, MULT_MAX);
          }
 
@@ -957,8 +980,10 @@ public:
          _reset_source = get_reset_source();
 
          if (_reset_source < SEQ_CHANNEL_TRIGGER_NONE && !reset_pending_) {
-
-            uint8_t reset_state_ = !_reset_source ? digitalReadFast(TR2) : digitalReadFast(TR4); // TR1, TR3 are main clock sources
+            // TR1, TR3 are main clock sources
+            uint8_t reset_state_ = !_reset_source
+              ? ioframe->digital_inputs.raised<OC::DIGITAL_INPUT_2>()
+              : ioframe->digital_inputs.raised<OC::DIGITAL_INPUT_4>();
 
             // ?
             if (reset_state_ < prev_reset_state_) {
@@ -1059,29 +1084,29 @@ public:
 
          // mask CV ?
          if (get_scale_mask_cv_source()) {
-            int16_t _rotate = (OC::ADC::value(static_cast<ADC_CHANNEL>(get_scale_mask_cv_source() - 1)) + 127) >> 8;
+            int16_t _rotate = ioframe->cv.ScaledValue<16>(get_scale_mask_cv_source() - 1);
             rotate_scale(_rotate);
          }
 
          // finally, process trigger + output:
-         if (process_num_seq_channel(_playmode, reset_pending_)) {
+         if (process_num_seq_channel(ioframe, _playmode, reset_pending_)) {
 
             // turn on gate
             gate_state_ = ON;
 
             int8_t _octave = get_octave();
             if (get_octave_cv_source())
-              _octave += (OC::ADC::value(static_cast<ADC_CHANNEL>(get_octave_cv_source() - 1)) + 255) >> 9;
+              _octave += ioframe->cv.ScaledValue<8>(get_octave_cv_source() - 1);
 
             int8_t _transpose = 0x0;
             if (get_transpose_cv_source()) {
-              _transpose += (OC::ADC::value(static_cast<ADC_CHANNEL>(get_transpose_cv_source() - 1)) + 64) >> 7;
+              _transpose += ioframe->cv.ScaledValue<32>(get_transpose_cv_source() - 1);
               CONSTRAIN(_transpose, -12, 12);
             }
 
             int8_t _root = get_root(0x0);
             if (get_root_cv_source()) {
-              _root += (OC::ADC::value(static_cast<ADC_CHANNEL>(get_root_cv_source() - 1)) + 127) >> 8;
+              _root += ioframe->cv.ScaledValue<16>(get_root_cv_source() - 1);
               CONSTRAIN(_root, 0, 11);
             }
 
@@ -1093,14 +1118,14 @@ public:
 
               int8_t arp_range = get_arp_range();
               if (get_arp_range_cv_source()) {
-                arp_range += (OC::ADC::value(static_cast<ADC_CHANNEL>(get_arp_range_cv_source() - 1)) + 255) >> 9;
+                arp_range += ioframe->cv.ScaledValue<8>(get_arp_range_cv_source() - 1);
                 CONSTRAIN(arp_range, 0, 4);
               }
               arpeggiator_.set_range(arp_range);
 
               int8_t arp_direction = get_arp_direction();
               if (get_arp_direction_cv_source()) {
-                arp_direction += (OC::ADC::value(static_cast<ADC_CHANNEL>(get_arp_direction_cv_source() - 1)) + 255) >> 9;
+                arp_direction += ioframe->cv.ScaledValue<8>(get_arp_direction_cv_source() - 1);
                 CONSTRAIN(arp_direction, 0, 4);
               }
               arpeggiator_.set_direction(arp_direction);
@@ -1124,23 +1149,23 @@ public:
                 case ENV_ADR:
                 case ENV_ADSR:
                   if (get_attack_duration_cv()) {
-                    _attack += OC::ADC::value(static_cast<ADC_CHANNEL>(get_attack_duration_cv() - 1)) << 3;
+                    _attack += ioframe->cv.ScaledValue<4096>(get_attack_duration_cv() - 1) << 3;
                     USAT16(_attack) ;
                   }
                   if (get_decay_duration_cv()) {
-                    _decay += OC::ADC::value(static_cast<ADC_CHANNEL>(get_decay_duration_cv() - 1)) << 3;
+                    _decay += ioframe->cv.ScaledValue<4096>(get_decay_duration_cv() - 1) << 3;
                     USAT16(_decay);
                   }
                   if (get_sustain_level_cv()) {
-                    _sustain += OC::ADC::value(static_cast<ADC_CHANNEL>(get_sustain_level_cv() - 1)) << 4;
+                    _sustain += ioframe->cv.ScaledValue<4096>(get_sustain_level_cv() - 1) << 3;
                     CONSTRAIN(_sustain, 0, 65534);
                   }
                   if (get_release_duration_cv()) {
-                    _release += OC::ADC::value(static_cast<ADC_CHANNEL>(get_release_duration_cv() - 1)) << 3;
+                    _release += ioframe->cv.ScaledValue<4096>(get_release_duration_cv() - 1) << 3;
                     USAT16(_release) ;
                   }
                   if (get_env_loops_cv_source()) {
-                    _loops += OC::ADC::value(static_cast<ADC_CHANNEL>(get_env_loops_cv_source() - 1)) ;
+                    _loops += ioframe->cv.ScaledValue<4096>(get_env_loops_cv_source() - 1);
                     CONSTRAIN(_loops,1<<8, 65534) ;
                   }
                   // set the specified reset behaviours
@@ -1160,7 +1185,7 @@ public:
                 {
                   int8_t _octave_aux = _octave + get_octave_aux();
                   if (get_octave_aux_cv_source())
-                    _octave_aux += (OC::ADC::value(static_cast<ADC_CHANNEL>(get_octave_aux_cv_source() - 1)) + 255) >> 9;
+                    _octave_aux += ioframe->cv.ScaledValue<8>(get_octave_aux_cv_source() - 1);
 
                   if (_playmode != PM_ARP)
                     step_pitch_aux_ = get_pitch_at_step(display_num_sequence_, clk_cnt_) + (_octave_aux * 12 << 7);
@@ -1224,7 +1249,7 @@ public:
             // CV?
             if (get_pulsewidth_cv_source()) {
 
-              _pulsewidth += (OC::ADC::value(static_cast<ADC_CHANNEL>(get_pulsewidth_cv_source() - 1)) + 4) >> 3;
+              _pulsewidth += ioframe->cv.ScaledValue<512>(get_pulsewidth_cv_source() - 1);
               if (!_gates)
                 CONSTRAIN(_pulsewidth, 1, PULSEW_MAX);
               else // CV for 50% duty cycle:
@@ -1271,7 +1296,7 @@ public:
   } // end update
 
   /* details re: sequence processing happens (mostly) here: */
-  inline bool process_num_seq_channel(uint8_t playmode, uint8_t reset) {
+  inline bool process_num_seq_channel(const OC::IOFrame *ioframe, uint8_t playmode, uint8_t reset) {
 
       bool _out = true;
       bool _change = true;
@@ -1308,12 +1333,12 @@ public:
       }
 
       if (get_sequence_cv_source()) {
-        num_sequence_cv = _num_seq += (OC::ADC::value(static_cast<ADC_CHANNEL>(get_sequence_cv_source() - 1)) + 255) >> 9;
+        num_sequence_cv = _num_seq += ioframe->cv.ScaledValue<8>(get_sequence_cv_source() - 1);
         CONSTRAIN(_num_seq, 0, OC::Patterns::PATTERN_USER_LAST - 0x1);
       }
 
       if (get_sequence_length_cv_source())
-        sequence_length_cv = (OC::ADC::value(static_cast<ADC_CHANNEL>(get_sequence_length_cv_source() - 1)) + 64) >> 7;
+        sequence_length_cv = ioframe->cv.ScaledValue<32>(get_sequence_length_cv_source() - 1);
 
       switch (_playmode) {
 
@@ -1354,7 +1379,7 @@ public:
                 if (active_sequence_ >= OC::Patterns::PATTERN_USER_LAST)
                     active_sequence_ -= OC::Patterns::PATTERN_USER_LAST;
                 // reset
-                _clock(get_sequence_length(active_sequence_), 0x0, sequence_max, true);
+                _clock(ioframe, get_sequence_length(active_sequence_), 0x0, sequence_max, true);
                 _reset = true;
               }
               else if (num_sequence_cv)  {
@@ -1416,8 +1441,9 @@ public:
 
            // process input:
            if (!input_range)
-              clk_cnt_ = input_map_.Process(OC::ADC::value(static_cast<ADC_CHANNEL>(_playmode - PM_SH1)));
+              clk_cnt_ = input_map_.Process(ioframe->cv.values[_playmode - PM_SH1]);
            else
+              // TODO[PLD] ???
               clk_cnt_ = input_map_.Process(0xFFF - OC::ADC::smoothed_raw_value(static_cast<ADC_CHANNEL>(_playmode - PM_SH1)));
         }
         break;
@@ -1441,8 +1467,9 @@ public:
 
            // process input:
            if (!input_range)
-              clk_cnt_ = input_map_.Process(OC::ADC::value(static_cast<ADC_CHANNEL>(_playmode - PM_CV1))); // = 5V
+              clk_cnt_ = input_map_.Process(ioframe->cv.values[_playmode - PM_CV1]); // = 5V
            else
+              // TODO[PLD] ???
               clk_cnt_ = input_map_.Process(0xFFF - OC::ADC::smoothed_raw_value(static_cast<ADC_CHANNEL>(_playmode - PM_CV1))); // = 10V
 
            // update output, if slot # changed:
@@ -1468,7 +1495,7 @@ public:
             CONSTRAIN(sequence_length, OC::Patterns::kMin, OC::Patterns::kMax);
 
         CONSTRAIN(clk_cnt_, 0x0, sequence_length);
-        sequence_EoS_ = _clock(sequence_length - 0x1, sequence_cnt, sequence_max, _reset);
+        sequence_EoS_ = _clock(ioframe, sequence_length - 0x1, sequence_cnt, sequence_max, _reset);
       }
 
       // this is the current sequence # (USER1-USER4):
@@ -1494,7 +1521,7 @@ public:
 
   // update sequencer clock, return -1, 0, 1 when EoS is reached:
 
-  int8_t _clock(uint8_t sequence_length, uint8_t sequence_count, uint8_t sequence_max, bool _reset) {
+  int8_t _clock(const OC::IOFrame *ioframe, uint8_t sequence_length, uint8_t sequence_count, uint8_t sequence_max, bool _reset) {
 
     int8_t EoS = 0x0, _clk_cnt, _direction;
     bool reset = _reset;
@@ -1503,7 +1530,7 @@ public:
     _direction = get_direction();
 
     if (get_direction_cv()) {
-       _direction += (OC::ADC::value(static_cast<ADC_CHANNEL>(get_direction_cv() - 1)) + 255) >> 9;
+       _direction += ioframe->cv.ScaledValue<8>(get_direction_cv() - 1);
        CONSTRAIN(_direction, 0, SEQ_DIRECTIONS_LAST - 0x1);
     }
 
@@ -1541,7 +1568,7 @@ public:
         int16_t brown_prb = get_brownian_probability();
 
         if (get_brownian_probability_cv()) {
-          brown_prb += (OC::ADC::value(static_cast<ADC_CHANNEL>(get_brownian_probability_cv() - 1)) + 8) >> 3;
+          brown_prb += ioframe->cv.ScaledValue<256>(get_brownian_probability_cv() - 1);
           CONSTRAIN(brown_prb, 0, 256);
         }
         if (random(0,256) < brown_prb)
@@ -1644,7 +1671,7 @@ public:
     return enabled_settings_[index];
   }
 
-  void update_enabled_settings(uint8_t channel_id) {
+  void update_enabled_settings() {
 
     SEQ_ChannelSetting *settings = enabled_settings_;
 
@@ -1836,51 +1863,40 @@ public:
    num_enabled_settings_ = settings - enabled_settings_;
   }
 
-  template <DAC_CHANNEL dacChannel>
-  void update_main_channel() {
-    int32_t _output = OC::DAC::pitch_to_scaled_voltage_dac(dacChannel, get_step_pitch(), 0, OC::DAC::get_voltage_scaling(dacChannel));
-    OC::DAC::set<dacChannel>(_output);
-
+  template <DAC_CHANNEL dac_channel>
+  void update_main_channel(OC::IOFrame *ioframe)
+  {
+    ioframe->outputs.set_pitch_value(dac_channel, get_step_pitch());
   }
 
-  template <DAC_CHANNEL dacChannel>
-  void update_aux_channel()
+  template <DAC_CHANNEL dac_channel>
+  void update_aux_channel(OC::IOFrame *ioframe)
   {
-
-      int8_t _mode = get_aux_mode();
-      uint32_t _output = 0;
-
-      switch (_mode) {
-
-        case GATE_OUT: // gate
-          #ifdef NORTHERNLIGHT
-          _output = (get_step_gate() == ON) ? OC::DAC::get_octave_offset(dacChannel, OCTAVES - OC::DAC::kOctaveZero - 0x2) : OC::DAC::get_zero_offset(dacChannel);
-          #else
-          _output = (get_step_gate() == ON) ? OC::DAC::get_octave_offset(dacChannel, OCTAVES - OC::DAC::kOctaveZero - 0x1) : OC::DAC::get_zero_offset(dacChannel);
-          #endif
+      switch (get_aux_mode()) {
+      case GATE_OUT: // gate
+        ioframe->outputs.set_gate_value(dac_channel, get_step_gate() == ON);
         break;
-        case COPY: // copy
-          _output = OC::DAC::pitch_to_scaled_voltage_dac(dacChannel, get_step_pitch_aux(), 0, OC::DAC::get_voltage_scaling(dacChannel));
+      case COPY: // copy
+        ioframe->outputs.set_pitch_value(dac_channel, get_step_pitch_aux());
         break;
-        // code to process envelopes here
-        case  ENV_AD:
-        case ENV_ADR:
-        case ENV_ADSR:
-          env_gate_state_ = 0;
-          env_gate_raised_ = (get_step_gate() == ON);
-          if (env_gate_raised_ && !prev_gate_raised_)
-             env_gate_state_ |= peaks::CONTROL_GATE_RISING;
-          if (env_gate_raised_)
-             env_gate_state_ |= peaks::CONTROL_GATE;
-          else if (prev_gate_raised_)
-            env_gate_state_ |= peaks::CONTROL_GATE_FALLING;
-          prev_gate_raised_ = env_gate_raised_;
-          _output = OC::DAC::get_zero_offset(dacChannel) + env_.ProcessSingleSample(env_gate_state_);
+      // code to process envelopes here
+      case ENV_AD:
+      case ENV_ADR:
+      case ENV_ADSR:
+        env_gate_state_ = 0;
+        env_gate_raised_ = (get_step_gate() == ON);
+        if (env_gate_raised_ && !prev_gate_raised_)
+          env_gate_state_ |= peaks::CONTROL_GATE_RISING;
+        if (env_gate_raised_)
+          env_gate_state_ |= peaks::CONTROL_GATE;
+        else if (prev_gate_raised_)
+          env_gate_state_ |= peaks::CONTROL_GATE_FALLING;
+        prev_gate_raised_ = env_gate_raised_;
+        ioframe->outputs.set_unipolar_value(dac_channel, env_.ProcessSingleSample(env_gate_state_));
         break;
-        default:
+      default:
         break;
-      }
-      OC::DAC::set<dacChannel>(_output);
+    }
   }
 
   void RenderScreensaver() const;
@@ -1941,295 +1957,293 @@ private:
   OC::DigitalInputDisplay clock_display_;
   peaks::MultistageEnvelope env_;
 
+  // TOTAL EEPROM SIZE: 2 * 54 bytes
+  SETTINGS_ARRAY_DECLARE() {{
+    { 0, 0, 4, "aux. mode", modes, settings::STORAGE_TYPE_U4 },
+    { SEQ_CHANNEL_TRIGGER_TR1, 0, SEQ_CHANNEL_TRIGGER_NONE, "clock src", SEQ_CHANNEL_TRIGGER_sources, settings::STORAGE_TYPE_U4 },
+    { 0, 0, OC::kNumDelayTimes - 1, "trigger delay", OC::Strings::trigger_delay_times, settings::STORAGE_TYPE_U8 },
+    { 2, 0, SEQ_CHANNEL_TRIGGER_LAST - 1, "reset/mute", reset_trigger_sources, settings::STORAGE_TYPE_U8 },
+    { MULT_BY_ONE, 0, MULT_MAX, "mult/div", display_multipliers, settings::STORAGE_TYPE_U8 },
+    { 25, 0, PULSEW_MAX, "--> pw", NULL, settings::STORAGE_TYPE_U8 },
+    //
+    { OC::Scales::SCALE_SEMI, 0, OC::Scales::NUM_SCALES - 1, "scale", OC::scale_names_short, settings::STORAGE_TYPE_U8 },
+    { 0, -5, 5, "octave", NULL, settings::STORAGE_TYPE_I8 }, // octave
+    { 0, 0, 11, "root", OC::Strings::note_names_unpadded, settings::STORAGE_TYPE_U8 },
+    { 0, -5, 5, "--> aux +/-", NULL, settings::STORAGE_TYPE_I8 }, // aux octave
+    { 65535, 1, 65535, "--> edit", NULL, settings::STORAGE_TYPE_U16 }, // mask
+    // seq
+    { 65535, 0, 65535, "--> edit", NULL, settings::STORAGE_TYPE_U16 }, // seq 1
+    { 65535, 0, 65535, "--> edit", NULL, settings::STORAGE_TYPE_U16 }, // seq 2
+    { 65535, 0, 65535, "--> edit", NULL, settings::STORAGE_TYPE_U16 }, // seq 3
+    { 65535, 0, 65535, "--> edit", NULL, settings::STORAGE_TYPE_U16 }, // seq 4
+    { OC::Patterns::PATTERN_USER_0_1, 0, OC::Patterns::PATTERN_USER_LAST-1, "sequence #", OC::pattern_names_short, settings::STORAGE_TYPE_U8 },
+    { OC::Patterns::kMax, OC::Patterns::kMin, OC::Patterns::kMax, "sequence length", NULL, settings::STORAGE_TYPE_U8 }, // seq 1
+    { OC::Patterns::kMax, OC::Patterns::kMin, OC::Patterns::kMax, "sequence length", NULL, settings::STORAGE_TYPE_U8 }, // seq 2
+    { OC::Patterns::kMax, OC::Patterns::kMin, OC::Patterns::kMax, "sequence length", NULL, settings::STORAGE_TYPE_U8 }, // seq 3
+    { OC::Patterns::kMax, OC::Patterns::kMin, OC::Patterns::kMax, "sequence length", NULL, settings::STORAGE_TYPE_U8 }, // seq 4
+    { 0, 0, PM_LAST - 1, "playmode", OC::Strings::seq_playmodes, settings::STORAGE_TYPE_U8 },
+    { 0, 0, SEQ_DIRECTIONS_LAST - 1, "direction", OC::Strings::seq_directions, settings::STORAGE_TYPE_U8 },
+    { 0, 0, 1, "CV adr. range", cv_ranges, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 3, "direction", arp_directions, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 3, "arp.range", arp_range, settings::STORAGE_TYPE_U8 },
+    { 64, 0, 255, "-->brown prob", NULL, settings::STORAGE_TYPE_U8 },
+    // cv sources
+    { 0, 0, 4, "mult/div CV ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 4, "transpose   ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 4, "--> pw      ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 4, "octave  +/- ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 4, "root    +/- ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 4, "--> aux +/- ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 4, "sequence #  ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 4, "mask rotate ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 4, "direction   ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 4, "arp.range   ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 4, "direction   ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 4, "-->brwn.prb ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 4, "seq.length  ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 4, "att dur  ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 4, "dec dur  ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 4, "sus lvl  ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 4, "rel dur  ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 4, "env loops ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U8 },
+    { 0, 0, 1, "-", NULL, settings::STORAGE_TYPE_U4 }, // DUMMY, use to store update behaviour
+    // envelope parameters
+    { 128, 0, 255, "--> att dur", NULL, settings::STORAGE_TYPE_U8 },
+    { peaks::ENV_SHAPE_QUARTIC, peaks::ENV_SHAPE_LINEAR, peaks::ENV_SHAPE_LAST - 1, "--> att shape", OC::Strings::envelope_shapes, settings::STORAGE_TYPE_U16 },
+    { 128, 0, 255, "--> dec dur", NULL, settings::STORAGE_TYPE_U8 },
+    { peaks::ENV_SHAPE_EXPONENTIAL, peaks::ENV_SHAPE_LINEAR, peaks::ENV_SHAPE_LAST - 1, "--> dec shape", OC::Strings::envelope_shapes, settings::STORAGE_TYPE_U16 },
+    { 128, 0, 255, "--> sus lvl", NULL, settings::STORAGE_TYPE_U16 },
+    { 128, 0, 255, "--> rel dur", NULL, settings::STORAGE_TYPE_U8 },
+    { peaks::ENV_SHAPE_EXPONENTIAL, peaks::ENV_SHAPE_LINEAR, peaks::ENV_SHAPE_LAST - 1, "--> rel shape", OC::Strings::envelope_shapes, settings::STORAGE_TYPE_U16 },
+    {1, 1, 127, "--> loops", NULL, settings::STORAGE_TYPE_U8 },
+    { peaks::RESET_BEHAVIOUR_NULL, peaks::RESET_BEHAVIOUR_NULL, peaks::RESET_BEHAVIOUR_LAST - 1, "att reset", OC::Strings::reset_behaviours, settings::STORAGE_TYPE_U8 },
+    { peaks::FALLING_GATE_BEHAVIOUR_IGNORE, peaks::FALLING_GATE_BEHAVIOUR_IGNORE, peaks::FALLING_GATE_BEHAVIOUR_LAST - 1, "att fall gt", OC::Strings::falling_gate_behaviours, settings::STORAGE_TYPE_U8 },
+    { peaks::RESET_BEHAVIOUR_SEGMENT_PHASE, peaks::RESET_BEHAVIOUR_NULL, peaks::RESET_BEHAVIOUR_LAST - 1, "dec/rel reset", OC::Strings::reset_behaviours, settings::STORAGE_TYPE_U8 },
+  }};
 };
 
-const char* const SEQ_CHANNEL_TRIGGER_sources[] = {
-  "TR1", "TR3", " - "
-};
+SETTINGS_ARRAY_DEFINE(SEQ_Channel);
 
-const char* const reset_trigger_sources[] = {
-  "RST2", "RST4", " - ", "=HI2", "=LO2", "=HI4", "=LO4"
-};
+namespace OC {
 
-const char* const display_multipliers[] = {
-  "/64", "/63", "/62", "/49", "/48", "/47", "/33", "/32", "/31", "/17", "/16", "/15", "/8", "/7", "/6", "/5", "/4", "/3", "/2", "-", "x2", "x3", "x4", "x5", "x6", "x7", "x8"
-};
-
-const char* const modes[] = {
-  "gate", "copy", "AD", "ADR", "ADSR",
-};
-
-const char* const cv_ranges[] = {
-  " 5V", "10V"
-};
-
-const char* const arp_directions[] = {
-  "up", "down", "u/d", "rnd"
-};
-
-const char* const arp_range[] = {
-  "1", "2", "3", "4"
-};
-
-// TOTAL EEPROM SIZE: 2 * 54 bytes
-SETTINGS_DECLARE(SEQ_Channel, SEQ_CHANNEL_SETTING_LAST) {
-
-  { 0, 0, 4, "aux. mode", modes, settings::STORAGE_TYPE_U4 },
-  { SEQ_CHANNEL_TRIGGER_TR1, 0, SEQ_CHANNEL_TRIGGER_NONE, "clock src", SEQ_CHANNEL_TRIGGER_sources, settings::STORAGE_TYPE_U4 },
-  { 0, 0, OC::kNumDelayTimes - 1, "trigger delay", OC::Strings::trigger_delay_times, settings::STORAGE_TYPE_U8 },
-  { 2, 0, SEQ_CHANNEL_TRIGGER_LAST - 1, "reset/mute", reset_trigger_sources, settings::STORAGE_TYPE_U8 },
-  { MULT_BY_ONE, 0, MULT_MAX, "mult/div", display_multipliers, settings::STORAGE_TYPE_U8 },
-  { 25, 0, PULSEW_MAX, "--> pw", NULL, settings::STORAGE_TYPE_U8 },
-  //
-  { OC::Scales::SCALE_SEMI, 0, OC::Scales::NUM_SCALES - 1, "scale", OC::scale_names_short, settings::STORAGE_TYPE_U8 },
-  { 0, -5, 5, "octave", NULL, settings::STORAGE_TYPE_I8 }, // octave
-  { 0, 0, 11, "root", OC::Strings::note_names_unpadded, settings::STORAGE_TYPE_U8 },
-  { 0, -5, 5, "--> aux +/-", NULL, settings::STORAGE_TYPE_I8 }, // aux octave
-  { 65535, 1, 65535, "--> edit", NULL, settings::STORAGE_TYPE_U16 }, // mask
-  // seq
-  { 65535, 0, 65535, "--> edit", NULL, settings::STORAGE_TYPE_U16 }, // seq 1
-  { 65535, 0, 65535, "--> edit", NULL, settings::STORAGE_TYPE_U16 }, // seq 2
-  { 65535, 0, 65535, "--> edit", NULL, settings::STORAGE_TYPE_U16 }, // seq 3
-  { 65535, 0, 65535, "--> edit", NULL, settings::STORAGE_TYPE_U16 }, // seq 4
-  { OC::Patterns::PATTERN_USER_0_1, 0, OC::Patterns::PATTERN_USER_LAST-1, "sequence #", OC::pattern_names_short, settings::STORAGE_TYPE_U8 },
-  { OC::Patterns::kMax, OC::Patterns::kMin, OC::Patterns::kMax, "sequence length", NULL, settings::STORAGE_TYPE_U8 }, // seq 1
-  { OC::Patterns::kMax, OC::Patterns::kMin, OC::Patterns::kMax, "sequence length", NULL, settings::STORAGE_TYPE_U8 }, // seq 2
-  { OC::Patterns::kMax, OC::Patterns::kMin, OC::Patterns::kMax, "sequence length", NULL, settings::STORAGE_TYPE_U8 }, // seq 3
-  { OC::Patterns::kMax, OC::Patterns::kMin, OC::Patterns::kMax, "sequence length", NULL, settings::STORAGE_TYPE_U8 }, // seq 4
-  { 0, 0, PM_LAST - 1, "playmode", OC::Strings::seq_playmodes, settings::STORAGE_TYPE_U8 },
-  { 0, 0, SEQ_DIRECTIONS_LAST - 1, "direction", OC::Strings::seq_directions, settings::STORAGE_TYPE_U8 },
-  { 0, 0, 1, "CV adr. range", cv_ranges, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 3, "direction", arp_directions, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 3, "arp.range", arp_range, settings::STORAGE_TYPE_U8 },
-  { 64, 0, 255, "-->brown prob", NULL, settings::STORAGE_TYPE_U8 },
-  // cv sources
-  { 0, 0, 4, "mult/div CV ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "transpose   ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "--> pw      ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "octave  +/- ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "root    +/- ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "--> aux +/- ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "sequence #  ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "mask rotate ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "direction   ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "arp.range   ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "direction   ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "-->brwn.prb ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "seq.length  ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "att dur  ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "dec dur  ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "sus lvl  ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "rel dur  ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "env loops ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U8 },
-  { 0, 0, 1, "-", NULL, settings::STORAGE_TYPE_U4 }, // DUMMY, use to store update behaviour
-  // envelope parameters
-  { 128, 0, 255, "--> att dur", NULL, settings::STORAGE_TYPE_U8 },
-  { peaks::ENV_SHAPE_QUARTIC, peaks::ENV_SHAPE_LINEAR, peaks::ENV_SHAPE_LAST - 1, "--> att shape", OC::Strings::envelope_shapes, settings::STORAGE_TYPE_U16 },
-  { 128, 0, 255, "--> dec dur", NULL, settings::STORAGE_TYPE_U8 },
-  { peaks::ENV_SHAPE_EXPONENTIAL, peaks::ENV_SHAPE_LINEAR, peaks::ENV_SHAPE_LAST - 1, "--> dec shape", OC::Strings::envelope_shapes, settings::STORAGE_TYPE_U16 },
-  { 128, 0, 255, "--> sus lvl", NULL, settings::STORAGE_TYPE_U16 },
-  { 128, 0, 255, "--> rel dur", NULL, settings::STORAGE_TYPE_U8 },
-  { peaks::ENV_SHAPE_EXPONENTIAL, peaks::ENV_SHAPE_LINEAR, peaks::ENV_SHAPE_LAST - 1, "--> rel shape", OC::Strings::envelope_shapes, settings::STORAGE_TYPE_U16 },
-  {1, 1, 127, "--> loops", NULL, settings::STORAGE_TYPE_U8 },
-  { peaks::RESET_BEHAVIOUR_NULL, peaks::RESET_BEHAVIOUR_NULL, peaks::RESET_BEHAVIOUR_LAST - 1, "att reset", OC::Strings::reset_behaviours, settings::STORAGE_TYPE_U8 },
-  { peaks::FALLING_GATE_BEHAVIOUR_IGNORE, peaks::FALLING_GATE_BEHAVIOUR_IGNORE, peaks::FALLING_GATE_BEHAVIOUR_LAST - 1, "att fall gt", OC::Strings::falling_gate_behaviours, settings::STORAGE_TYPE_U8 },
-  { peaks::RESET_BEHAVIOUR_SEGMENT_PHASE, peaks::RESET_BEHAVIOUR_NULL, peaks::RESET_BEHAVIOUR_LAST - 1, "dec/rel reset", OC::Strings::reset_behaviours, settings::STORAGE_TYPE_U8 },
-};
-
-class SEQ_State {
+OC_APP_TRAITS(AppDualSequencer, TWOCCS("SQ"), "Sequins", "2x Sequencer");
+class OC_APP_CLASS(AppDualSequencer) {
 public:
-  void Init() {
-    selected_channel = 0;
-    cursor.Init(SEQ_CHANNEL_SETTING_MODE, SEQ_CHANNEL_SETTING_LAST - 1);
-    pattern_editor.Init();
-    scale_editor.Init(false);
-  }
+  OC_APP_INTERFACE_DECLARE(AppDualSequencer);
+  OC_APP_STORAGE_SIZE(NUM_CHANNELS * SEQ_Channel::storageSize());
+
+private:
+  int selected_channel_;
+  menu::ScreenCursor<menu::kScreenLines> cursor_;
+  PatternEditor<SEQ_Channel> pattern_editor_;
+  ScaleEditor scale_editor_;
+
+  SEQ_Channel seq_channel_[NUM_CHANNELS];
 
   inline bool editing() const {
-    return cursor.editing();
+    return cursor_.editing();
   }
 
   inline int cursor_pos() const {
-    return cursor.cursor_pos();
+    return cursor_.cursor_pos();
   }
 
-  int selected_channel;
-  menu::ScreenCursor<menu::kScreenLines> cursor;
-  menu::ScreenCursor<menu::kScreenLines> cursor_state;
-  OC::PatternEditor<SEQ_Channel> pattern_editor;
-  OC::ScaleEditor<SEQ_Channel> scale_editor;
+  void HandleUpButtonLong();
+  void HandleDownButtonLong();
+  void HandleLeftButtonLong();
+  void HandleUpButton();
+  void HandleDownButton();
+  void HandleLeftButton();
+  void HandleRightButton();
 };
 
-SEQ_State seq_state;
-SEQ_Channel seq_channel[NUM_CHANNELS];
+void AppDualSequencer::Init() {
 
-void SEQ_init() {
+  selected_channel_ = 0;
+  cursor_.Init(SEQ_CHANNEL_SETTING_MODE, SEQ_CHANNEL_SETTING_LAST - 1);
+  pattern_editor_.Init();
+  scale_editor_.Init(false);
 
   ext_frequency[SEQ_CHANNEL_TRIGGER_TR1]  = 0xFFFFFFFF;
   ext_frequency[SEQ_CHANNEL_TRIGGER_TR2]  = 0xFFFFFFFF;
   ext_frequency[SEQ_CHANNEL_TRIGGER_NONE] = 0xFFFFFFFF;
 
-  seq_state.Init();
   for (size_t i = 0; i < NUM_CHANNELS; ++i)
-    seq_channel[i].Init(static_cast<SEQ_ChannelTriggerSource>(SEQ_CHANNEL_TRIGGER_TR1), i);
-  seq_state.cursor.AdjustEnd(seq_channel[0].num_enabled_settings() - 1);
+    seq_channel_[i].Init(static_cast<SEQ_ChannelTriggerSource>(SEQ_CHANNEL_TRIGGER_TR1), i);
+  cursor_.AdjustEnd(seq_channel_[0].num_enabled_settings() - 1);
 }
 
-static constexpr size_t SEQ_storageSize() {
-  return NUM_CHANNELS * SEQ_Channel::storageSize();
+size_t AppDualSequencer::SaveAppData(util::StreamBufferWriter &stream_buffer) const {
+
+  for (auto &channel : seq_channel_)
+    channel.Save(stream_buffer);
+  return stream_buffer.written();
 }
 
-static size_t SEQ_save(void *storage) {
+size_t AppDualSequencer::RestoreAppData(util::StreamBufferReader &stream_buffer) {
 
-  size_t used = 0;
-  for (size_t i = 0; i < NUM_CHANNELS; ++i) {
-    used += seq_channel[i].Save(static_cast<char*>(storage) + used);
-  }
-  return used;
-}
-
-static size_t SEQ_restore(const void *storage) {
-
-  size_t used = 0;
-
-  for (size_t i = 0; i < NUM_CHANNELS; ++i) {
-    used += seq_channel[i].Restore(static_cast<const char*>(storage) + used);
+  for (auto &channel : seq_channel_) {
+    channel.Restore(stream_buffer);
     // update display
-    seq_channel[i].pattern_changed(seq_channel[i].get_mask(seq_channel[i].get_sequence()), true);
-    seq_channel[i].set_display_num_sequence(seq_channel[i].get_sequence());
-    seq_channel[i].update_enabled_settings(i);
-    seq_channel[i].set_EoS_update();
+    channel.pattern_changed(channel.get_mask(channel.get_sequence()), true);
+    channel.set_display_num_sequence(channel.get_sequence());
+    channel.update_enabled_settings();
+    channel.set_EoS_update();
   }
-  seq_state.cursor.AdjustEnd(seq_channel[0].num_enabled_settings() - 1);
-  return used;
+  cursor_.AdjustEnd(seq_channel_[0].num_enabled_settings() - 1);
+
+  return stream_buffer.read();
 }
 
-void SEQ_handleAppEvent(OC::AppEvent event) {
+void AppDualSequencer::HandleAppEvent(AppEvent event) {
   switch (event) {
-    case OC::APP_EVENT_RESUME:
-        seq_state.cursor.set_editing(false);
-        seq_state.pattern_editor.Close();
-        seq_state.scale_editor.Close();
+    case APP_EVENT_RESUME:
+        cursor_.set_editing(false);
+        pattern_editor_.Close();
+        scale_editor_.Close();
     break;
-    case OC::APP_EVENT_SUSPEND:
-    case OC::APP_EVENT_SCREENSAVER_ON:
-    case OC::APP_EVENT_SCREENSAVER_OFF:
+    case APP_EVENT_SUSPEND:
+    case APP_EVENT_SCREENSAVER_ON:
+    case APP_EVENT_SCREENSAVER_OFF:
     {
-       SEQ_Channel &selected = seq_channel[seq_state.selected_channel];
+       SEQ_Channel &selected = seq_channel_[selected_channel_];
        selected.set_menu_page(PARAMETERS);
-       selected.update_enabled_settings(seq_state.selected_channel);
+       selected.update_enabled_settings();
     }
     break;
   }
 }
 
-void SEQ_loop() {
+void AppDualSequencer::Loop() {
 }
 
-void SEQ_isr() {
+void AppDualSequencer::Process(IOFrame *ioframe) {
 
   ticks_src1++; // src #1 ticks
   ticks_src2++; // src #2 ticks
   copy_timeout++;
 
-  uint32_t triggers = OC::DigitalInputs::clocked();
+  uint32_t triggers = ioframe->digital_inputs.triggered();
 
-  if (triggers & (1 << OC::DIGITAL_INPUT_1)) {
+  if (triggers & (1 << DIGITAL_INPUT_1)) {
     ext_frequency[SEQ_CHANNEL_TRIGGER_TR1] = ticks_src1;
     ticks_src1 = 0x0;
   }
-  if (triggers & (1 << OC::DIGITAL_INPUT_3)) {
+  if (triggers & (1 << DIGITAL_INPUT_3)) {
     ext_frequency[SEQ_CHANNEL_TRIGGER_TR2] = ticks_src2;
     ticks_src2 = 0x0;
   }
 
   // update sequencer channels 1, 2:
-  seq_channel[0].Update(triggers, DAC_CHANNEL_A);
-  seq_channel[1].Update(triggers, DAC_CHANNEL_B);
+  seq_channel_[0].Update(ioframe);
+  seq_channel_[1].Update(ioframe);
   // update DAC channels A, B:
-  seq_channel[0].update_main_channel<DAC_CHANNEL_A>();
-  seq_channel[1].update_main_channel<DAC_CHANNEL_B>();
+  seq_channel_[0].update_main_channel<DAC_CHANNEL_A>(ioframe);
+  seq_channel_[1].update_main_channel<DAC_CHANNEL_B>(ioframe);
   // update DAC channels C, D:
-  seq_channel[0].update_aux_channel<DAC_CHANNEL_C>();
-  seq_channel[1].update_aux_channel<DAC_CHANNEL_D>();
+  seq_channel_[0].update_aux_channel<DAC_CHANNEL_C>(ioframe);
+  seq_channel_[1].update_aux_channel<DAC_CHANNEL_D>(ioframe);
 }
 
-void SEQ_handleButtonEvent(const UI::Event &event) {
+void AppDualSequencer::GetIOConfig(IOConfig &ioconfig) const
+{
+  ioconfig.outputs[DAC_CHANNEL_A].set("CH1", OUTPUT_MODE_PITCH);
+  switch(seq_channel_[0].get_aux_mode()) {
+  case GATE: ioconfig.outputs[DAC_CHANNEL_C].set("CH1 gate", OUTPUT_MODE_GATE); break;
+  case COPY: ioconfig.outputs[DAC_CHANNEL_C].set("CH1 copy", OUTPUT_MODE_PITCH); break;
+  case ENV_AD: ioconfig.outputs[DAC_CHANNEL_C].set("CH1 AD", OUTPUT_MODE_UNI); break;
+  case ENV_ADR: ioconfig.outputs[DAC_CHANNEL_C].set("CH1 ADR", OUTPUT_MODE_UNI); break;
+  case ENV_ADSR: ioconfig.outputs[DAC_CHANNEL_C].set("CH1 ADSR", OUTPUT_MODE_UNI); break;
+  default: break;
+  }
+
+  ioconfig.outputs[DAC_CHANNEL_B].set("CH2", OUTPUT_MODE_PITCH);
+  switch(seq_channel_[1].get_aux_mode()) {
+  case GATE: ioconfig.outputs[DAC_CHANNEL_D].set("CH2 gate", OUTPUT_MODE_GATE); break;
+  case COPY: ioconfig.outputs[DAC_CHANNEL_D].set("CH2 copy", OUTPUT_MODE_PITCH); break;
+  case ENV_AD: ioconfig.outputs[DAC_CHANNEL_D].set("CH2 AD", OUTPUT_MODE_UNI); break;
+  case ENV_ADR: ioconfig.outputs[DAC_CHANNEL_D].set("CH2 ADR", OUTPUT_MODE_UNI); break;
+  case ENV_ADSR: ioconfig.outputs[DAC_CHANNEL_D].set("CH2 ADSR", OUTPUT_MODE_UNI); break;
+  default: break;
+  }
+}
+
+void AppDualSequencer::HandleButtonEvent(const UI::Event &event) {
 
   if (UI::EVENT_BUTTON_LONG_PRESS == event.type) {
      switch (event.control) {
-      case OC::CONTROL_BUTTON_UP:
-         SEQ_upButtonLong();
+      case CONTROL_BUTTON_UP:
+         HandleUpButtonLong();
         break;
-      case OC::CONTROL_BUTTON_DOWN:
-        SEQ_downButtonLong();
+      case CONTROL_BUTTON_DOWN:
+        HandleDownButtonLong();
         break;
-       case OC::CONTROL_BUTTON_L:
-        if (!(seq_state.pattern_editor.active()))
-          SEQ_leftButtonLong();
+       case CONTROL_BUTTON_L:
+        if (!(pattern_editor_.active()))
+          HandleLeftButtonLong();
         break;
       default:
         break;
      }
   }
 
-  if (seq_state.pattern_editor.active()) {
-    seq_state.pattern_editor.HandleButtonEvent(event);
+  if (pattern_editor_.active()) {
+    pattern_editor_.HandleButtonEvent(event);
     return;
   }
-  else if (seq_state.scale_editor.active()) {
-    seq_state.scale_editor.HandleButtonEvent(event);
+  else if (scale_editor_.active()) {
+    scale_editor_.HandleButtonEvent(event);
     return;
   }
 
   if (UI::EVENT_BUTTON_PRESS == event.type) {
     switch (event.control) {
       case OC::CONTROL_BUTTON_UP:
-        SEQ_upButton();
+        HandleUpButton();
         break;
       case OC::CONTROL_BUTTON_DOWN:
-        SEQ_downButton();
+        HandleDownButton();
         break;
       case OC::CONTROL_BUTTON_L:
-        SEQ_leftButton();
+        HandleLeftButton();
         break;
       case OC::CONTROL_BUTTON_R:
-        SEQ_rightButton();
+        HandleRightButton();
         break;
     }
   }
 }
 
-void SEQ_handleEncoderEvent(const UI::Event &event) {
+void AppDualSequencer::HandleEncoderEvent(const UI::Event &event) {
 
-  if (seq_state.pattern_editor.active()) {
-    seq_state.pattern_editor.HandleEncoderEvent(event);
+  if (pattern_editor_.active()) {
+    pattern_editor_.HandleEncoderEvent(event);
     return;
   }
-  else if (seq_state.scale_editor.active()) {
-    seq_state.scale_editor.HandleEncoderEvent(event);
+  else if (scale_editor_.active()) {
+    scale_editor_.HandleEncoderEvent(event);
     return;
   }
 
-  if (OC::CONTROL_ENCODER_L == event.control) {
+  if (CONTROL_ENCODER_L == event.control) {
 
-    int selected_channel = seq_state.selected_channel + event.value;
+    int selected_channel = selected_channel_ + event.value;
     CONSTRAIN(selected_channel, 0, NUM_CHANNELS-1);
-    seq_state.selected_channel = selected_channel;
+    selected_channel_ = selected_channel;
 
-    SEQ_Channel &selected = seq_channel[seq_state.selected_channel];
+    SEQ_Channel &selected = seq_channel_[selected_channel];
 
-    selected.update_enabled_settings(seq_state.selected_channel);
-    seq_state.cursor.Init(SEQ_CHANNEL_SETTING_MODE, 0);
-    seq_state.cursor.AdjustEnd(selected.num_enabled_settings() - 1);
+    selected.update_enabled_settings();
+    cursor_.Init(SEQ_CHANNEL_SETTING_MODE, 0);
+    cursor_.AdjustEnd(selected.num_enabled_settings() - 1);
 
-  } else if (OC::CONTROL_ENCODER_R == event.control) {
+  } else if (CONTROL_ENCODER_R == event.control) {
 
-       SEQ_Channel &selected = seq_channel[seq_state.selected_channel];
+       SEQ_Channel &selected = seq_channel_[selected_channel_];
 
-       if (seq_state.editing()) {
+       if (editing()) {
 
-          SEQ_ChannelSetting setting = selected.enabled_setting_at(seq_state.cursor_pos());
+          SEQ_ChannelSetting setting = selected.enabled_setting_at(cursor_pos());
 
           if (SEQ_CHANNEL_SETTING_SCALE_MASK != setting || SEQ_CHANNEL_SETTING_MASK1 != setting || SEQ_CHANNEL_SETTING_MASK2 != setting || SEQ_CHANNEL_SETTING_MASK3 != setting || SEQ_CHANNEL_SETTING_MASK4 != setting) {
 
@@ -2252,22 +2266,22 @@ void SEQ_handleEncoderEvent(const UI::Event &event) {
               case SEQ_CHANNEL_SETTING_MODE:
               case SEQ_CHANNEL_SETTING_SEQUENCE_PLAYMODE:
               case SEQ_CHANNEL_SETTING_SEQUENCE_DIRECTION:
-                 selected.update_enabled_settings(seq_state.selected_channel);
-                 seq_state.cursor.AdjustEnd(selected.num_enabled_settings() - 1);
+                 selected.update_enabled_settings();
+                 cursor_.AdjustEnd(selected.num_enabled_settings() - 1);
               break;
              default:
               break;
             }
         }
       } else {
-      seq_state.cursor.Scroll(event.value);
+      cursor_.Scroll(event.value);
     }
   }
 }
 
-void SEQ_upButton() {
+void AppDualSequencer::HandleUpButton() {
 
-  SEQ_Channel &selected = seq_channel[seq_state.selected_channel];
+  SEQ_Channel &selected = seq_channel_[selected_channel_];
 
   if (selected.get_menu_page() == PARAMETERS) {
 
@@ -2278,16 +2292,16 @@ void SEQ_upButton() {
   }
   else  {
     selected.set_menu_page(PARAMETERS);
-    selected.update_enabled_settings(seq_state.selected_channel);
-    seq_state.cursor.set_editing(false);
+    selected.update_enabled_settings();
+    cursor_.set_editing(false);
   }
 }
 
-void SEQ_downButton() {
+void AppDualSequencer::HandleDownButton() {
 
-  SEQ_Channel &selected = seq_channel[seq_state.selected_channel];
+  SEQ_Channel &selected = seq_channel_[selected_channel_];
 
-  if (!seq_state.pattern_editor.active() && !seq_state.scale_editor.active()) {
+  if (!pattern_editor_.active() && !scale_editor_.active()) {
 
       uint8_t _menu_page = selected.get_menu_page();
 
@@ -2303,36 +2317,36 @@ void SEQ_downButton() {
       }
 
       selected.set_menu_page(_menu_page);
-      selected.update_enabled_settings(seq_state.selected_channel);
-      seq_state.cursor.set_editing(false);
+      selected.update_enabled_settings();
+      cursor_.set_editing(false);
   }
   /*
-  SEQ_Channel &selected = seq_channel[seq_state.selected_channel];
+  SEQ_Channel &selected = seq_channel_[selected_channel_];
   if (selected.get_menu_page() == PARAMETERS)
     selected.change_value(SEQ_CHANNEL_SETTING_OCTAVE, -1);
   else {
     selected.set_menu_page(PARAMETERS);
-    selected.update_enabled_settings(seq_state.selected_channel);
-    seq_state.cursor.set_editing(false);
+    selected.update_enabled_settings(selected_channel_);
+    cursor_.set_editing(false);
   }
   */
 }
 
-void SEQ_rightButton() {
+void AppDualSequencer::HandleRightButton() {
 
-  SEQ_Channel &selected = seq_channel[seq_state.selected_channel];
+  SEQ_Channel &selected = seq_channel_[selected_channel_];
 
-  switch (selected.enabled_setting_at(seq_state.cursor_pos())) {
+  switch (selected.enabled_setting_at(cursor_pos())) {
 
     case SEQ_CHANNEL_SETTING_SCALE:
-      seq_state.cursor.toggle_editing();
+      cursor_.toggle_editing();
       selected.update_scale(true);
     break;
     case SEQ_CHANNEL_SETTING_SCALE_MASK:
     {
-     int scale = selected.get_scale(DUMMY);
-     if (OC::Scales::SCALE_NONE != scale) {
-          seq_state.scale_editor.Edit(&selected, scale);
+     int scale = selected.get_scale();
+     if (Scales::SCALE_NONE != scale) {
+          scale_editor_.Edit(&selected, scale);
         }
     }
     break;
@@ -2342,70 +2356,70 @@ void SEQ_rightButton() {
     case SEQ_CHANNEL_SETTING_MASK4:
     {
       int pattern = selected.get_sequence();
-      if (OC::Patterns::PATTERN_NONE != pattern) {
-        seq_state.pattern_editor.Edit(&selected, pattern);
+      if (Patterns::PATTERN_NONE != pattern) {
+        pattern_editor_.Edit(&selected, pattern);
       }
     }
     break;
     case SEQ_CHANNEL_SETTING_DUMMY:
       selected.set_menu_page(PARAMETERS);
-      selected.update_enabled_settings(seq_state.selected_channel);
+      selected.update_enabled_settings();
     break;
     default:
-     seq_state.cursor.toggle_editing();
+     cursor_.toggle_editing();
     break;
   }
 }
 
-void SEQ_leftButton() {
+void AppDualSequencer::HandleLeftButton() {
   // sync:
   for (int i = 0; i < NUM_CHANNELS; ++i)
-        seq_channel[i].sync();
+        seq_channel_[i].sync();
 }
 
-void SEQ_leftButtonLong() {
+void AppDualSequencer::HandleLeftButtonLong() {
   // copy scale
-  if (!seq_state.pattern_editor.active() && !seq_state.scale_editor.active()) {
+  if (!pattern_editor_.active() && !scale_editor_.active()) {
 
       uint8_t this_channel, the_other_channel, scale;
       uint16_t mask;
 
-      this_channel = seq_state.selected_channel;
-      scale = seq_channel[this_channel].get_scale(DUMMY);
-      mask = seq_channel[this_channel].get_rotated_scale_mask();
+      this_channel = selected_channel_;
+      scale = seq_channel_[this_channel].get_scale();
+      mask = seq_channel_[this_channel].get_rotated_scale_mask();
 
       the_other_channel = (~this_channel) & 1u;
-      seq_channel[the_other_channel].set_scale(scale);
-      seq_channel[the_other_channel].update_scale_mask(mask, DUMMY);
-      seq_channel[the_other_channel].update_scale(true);
+      seq_channel_[the_other_channel].set_scale(scale);
+      seq_channel_[the_other_channel].update_scale_mask(mask, 0);
+      seq_channel_[the_other_channel].update_scale(true);
   }
 }
 
-void SEQ_upButtonLong() {
+void AppDualSequencer::HandleUpButtonLong() {
   // screensaver short cut (happens elsewhere)
 }
 
-void SEQ_downButtonLong() {
+void AppDualSequencer::HandleDownButtonLong() {
   // clear CV mappings:
-  SEQ_Channel &selected = seq_channel[seq_state.selected_channel];
+  SEQ_Channel &selected = seq_channel_[selected_channel_];
 
   if (selected.get_menu_page() == CV_MAPPING) {
     selected.clear_CV_mapping();
-    seq_state.cursor.set_editing(false);
+    cursor_.set_editing(false);
   }
   else { // toggle update behaviour:
-    seq_channel[0x0].toggle_EoS();
-    seq_channel[0x1].toggle_EoS();
+    seq_channel_[0x0].toggle_EoS();
+    seq_channel_[0x1].toggle_EoS();
   }
 }
 
-void SEQ_menu() {
+void AppDualSequencer::DrawMenu() const {
 
   menu::DualTitleBar::Draw();
 
   for (int i = 0, x = 0; i < NUM_CHANNELS; ++i, x += 21) {
 
-    const SEQ_Channel &channel = seq_channel[i];
+    const SEQ_Channel &channel = seq_channel_[i];
     menu::DualTitleBar::SetColumn(i);
 
     // draw gate/step indicator
@@ -2429,11 +2443,11 @@ void SEQ_menu() {
       graphics.print("+");
   }
 
-  const SEQ_Channel &channel = seq_channel[seq_state.selected_channel];
+  const SEQ_Channel &channel = seq_channel_[selected_channel_];
 
-  menu::DualTitleBar::Selected(seq_state.selected_channel);
+  menu::DualTitleBar::Selected(selected_channel_);
 
-  menu::SettingsList<menu::kScreenLines, 0, menu::kDefaultValueX> settings_list(seq_state.cursor);
+  menu::SettingsList<menu::kScreenLines, 0, menu::kDefaultValueX> settings_list(cursor_);
 
   menu::SettingsListItem list_item;
 
@@ -2441,7 +2455,7 @@ void SEQ_menu() {
     const int setting =
         channel.enabled_setting_at(settings_list.Next(list_item));
     const int value = channel.get_value(setting);
-    const settings::value_attr &attr = SEQ_Channel::value_attr(setting);
+    const auto &attr = SEQ_Channel::value_attributes(setting);
 
     switch (setting) {
 
@@ -2451,11 +2465,11 @@ void SEQ_menu() {
           menu::DrawEditIcon(6, list_item.y, value, attr);
           graphics.movePrintPos(6, 0);
         }
-        graphics.print(OC::scale_names[value]);
+        graphics.print(scale_names[value]);
         list_item.DrawCustom();
         break;
       case SEQ_CHANNEL_SETTING_SCALE_MASK:
-       menu::DrawMask<false, 16, 8, 1>(menu::kDisplayWidth, list_item.y, channel.get_rotated_scale_mask(), OC::Scales::GetScale(channel.get_scale(DUMMY)).num_notes);
+       menu::DrawMask<false, 16, 8, 1>(menu::kDisplayWidth, list_item.y, channel.get_rotated_scale_mask(), Scales::GetScale(channel.get_scale()).num_notes);
        list_item.DrawNoValue<false>(value, attr);
       break;
       case SEQ_CHANNEL_SETTING_MASK1:
@@ -2486,28 +2500,37 @@ void SEQ_menu() {
     }
   }
 
-  if (seq_state.pattern_editor.active())
-    seq_state.pattern_editor.Draw();
-  else if (seq_state.scale_editor.active())
-    seq_state.scale_editor.Draw();
+  if (pattern_editor_.active())
+    pattern_editor_.Draw();
+  else if (scale_editor_.active())
+    scale_editor_.Draw();
+}
+void AppDualSequencer::DrawScreensaver() const {
+
+  seq_channel_[0].RenderScreensaver();
+  seq_channel_[1].RenderScreensaver();
 }
 
+void AppDualSequencer::DrawDebugInfo() const {
+}
+
+} // namespace OC
 
 void SEQ_Channel::RenderScreensaver() const {
 
       uint8_t seq_id = channel_id_;
-      uint8_t clock_x_pos = seq_channel[seq_id].get_clock_cnt();
-      int32_t _dac_value = seq_channel[seq_id].get_step_pitch();
+      uint8_t clock_x_pos = get_clock_cnt();
+      int32_t _dac_value = get_step_pitch();
       int32_t _dac_overflow = 0, _dac_overflow2 = 0;
 
       // reposition ARP:
-      if (seq_channel[seq_id].get_playmode() == PM_ARP)
+      if (get_playmode() == PM_ARP)
         clock_x_pos = 0x6 + (seq_id << 2);
 
       clock_x_pos = (seq_id << 6) + (clock_x_pos << 2);
 
       // clock/step indicator:
-      if(seq_channel[seq_id].step_state_ == OFF) {
+      if(step_state_ == OFF) {
         graphics.drawRect(clock_x_pos, 63, 5, 2);
         _dac_value = 0;
       }
@@ -2624,12 +2647,3 @@ void SEQ_Channel::RenderScreensaver() const {
         }
     }
 }
-
-void SEQ_screensaver() {
-
-  seq_channel[0].RenderScreensaver();
-  seq_channel[1].RenderScreensaver();
-}
-
-
-#endif // ENABLE_APP_SEQUINS

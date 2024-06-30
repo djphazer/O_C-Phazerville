@@ -74,11 +74,11 @@ void Ui::set_screensaver_timeout(uint32_t seconds) {
   event_queue_.Poke();
 }
 
-void FASTRUN Ui::_Poke() {
+void FASTRUN Ui::Poke() {
   event_queue_.Poke();
 }
 
-void Ui::_preemptScreensaver(bool v) {
+void Ui::preempt_screensaver(bool v) {
   preempt_screensaver_ = v;
 }
 
@@ -129,13 +129,14 @@ void FASTRUN Ui::Poll() {
   button_state_ = button_state;
 }
 
-UiMode Ui::DispatchEvents(const App *app) {
+UiMode Ui::DispatchEvents(AppBase *app) {
 
   while (event_queue_.available()) {
     const UI::Event event = event_queue_.PullEvent();
     if (IgnoreEvent(event))
       continue;
 
+    /*
     switch (event.type) {
       case UI::EVENT_BUTTON_PRESS:
 #ifdef VOR
@@ -178,17 +179,35 @@ UiMode Ui::DispatchEvents(const App *app) {
       default:
         break;
     }
+    */
     MENU_REDRAW = 1;
+
+    // Handle global hotkeys
+    if (UI::EVENT_BUTTON_LONG_PRESS == event.type) {
+      if (CONTROL_BUTTON_R == event.control) {
+        return UI_MODE_APP_SETTINGS;
+      } else if (CONTROL_BUTTON_UP == event.control) {
+        app->EditIOSettings();
+        continue;
+      }
+    }
+
+    if (UI_MODE_SCREENSAVER == app->DispatchEvent(event)) {
+      screensaver_ = true;
+      // Break to handle screensaver; queued events will be handled next call
+      return UI_MODE_SCREENSAVER;
+    }
   }
 
   // Turning screensaver seconds into screen-blanking minutes with the * 60 (chysn 9/2/2018)
-  if (idle_time() > (screensaver_timeout() * 60))
+  if (idle_time() > (screensaver_timeout() * 60) && !preempt_screensaver_)
     screensaver_ = true;
 
-  if (screensaver_)
+  if (screensaver_) {
     return UI_MODE_SCREENSAVER;
-  else
+  } else {
     return UI_MODE_MENU;
+  }
 }
 
 UiMode Ui::Splashscreen(bool &reset_settings) {

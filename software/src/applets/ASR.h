@@ -25,7 +25,7 @@
 
 #include "../HSRingBufferManager.h" // Singleton Ring Buffer manager
 
-class ASR : public HemisphereApplet {
+class MiniASR : public HemisphereApplet {
 public:
 
     const char* applet_name() {

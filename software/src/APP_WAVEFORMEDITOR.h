@@ -22,7 +22,6 @@
 #include "OC_apps.h"
 #include "OC_strings.h"
 #include "OC_ui.h"
-#include "UI/ui_events.h"
 
 #include "HSApplication.h"
 #include "HSMIDI.h"
@@ -381,7 +380,7 @@ static constexpr size_t WaveformEditor_storageSize() {return 0;}
 static size_t WaveformEditor_save(void *storage) {return 0;}
 static size_t WaveformEditor_restore(const void *storage) {return 0;}
 
-void WaveformEditor_isr() {
+void WaveformEditor_process(OC::IOFrame *) {
     return WaveformEditor_instance.BaseController();
 }
 

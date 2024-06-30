@@ -20,8 +20,6 @@
 //
 // CV-controllable Pong game
 
-#ifdef ENABLE_APP_PONG
-
 #include <Arduino.h>
 #include "OC_config.h"
 #include "OC_apps.h"
@@ -308,7 +306,7 @@ static size_t PONGGAME_restore(const void *storage) {
 	return 0;
 }
 
-void PONGGAME_isr() {
+void PONGGAME_process(OC::IOFrame *) {
 	pong_instance.ISR();
 }
 
@@ -373,5 +371,3 @@ void PONGGAME_handleEncoderEvent(const UI::Event &event) {
 	if (event.value > 0) pong_instance.MovePaddleDown();
 	pong_instance.ResetPaddle();
 }
-
-#endif

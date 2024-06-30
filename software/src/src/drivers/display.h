@@ -59,6 +59,7 @@ extern weegfx::Graphics graphics;
 
 #define GRAPHICS_BEGIN_FRAME(wait) \
 do { \
+  do { DEBUG_PIN_SCOPE(OC_GPIO_DEBUG_PIN1); } while(false); \
   uint8_t *frame = NULL; \
   do { \
     if (display::frame_buffer.writeable()) \

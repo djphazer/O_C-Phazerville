@@ -44,6 +44,11 @@ extern const uint8_t bitmap_loop_markers_8[];
 extern const uint8_t circle_disk_bitmap_8x8[];
 extern const uint8_t circle_bitmap_8x8[];
 
+extern const uint8_t bitmap_output_mode_8[];
+
+extern const uint8_t bitmap_io_settings_8[];
+
+extern const uint8_t bitmap_ellipsis_8[];
 };
 
 #endif // OC_BITMAPS_H_

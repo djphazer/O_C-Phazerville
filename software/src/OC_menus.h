@@ -91,7 +91,7 @@ public:
     cursor_pos_ = pos;
 
     int screen_line = screen_line_ + amount;
-    if (fancy) {
+    if (fancy && (end_ - start_ >= screen_lines)) {
       if (amount < 0) {
         if (screen_line < 2) {
           if (pos >= start_ + 1)
@@ -108,7 +108,10 @@ public:
         }
       }
     } else {
-      CONSTRAIN(screen_line, 0, screen_lines - 1);
+      if (end_ - start_ < screen_lines)
+        CONSTRAIN(screen_line, 0, (end_ - start_));
+      else
+        CONSTRAIN(screen_line, 0, screen_lines - 1);
     }
     screen_line_ = screen_line;
   }
@@ -122,7 +125,10 @@ public:
   }
 
   inline int last_visible() const {
-    return cursor_pos_ - screen_line_ + screen_lines - 1;
+    if (end_ - start_ < screen_lines)
+      return end_ - start_;
+    else
+      return cursor_pos_ - screen_line_ + screen_lines - 1;
   }
 
   inline bool editing() const {
@@ -146,7 +152,7 @@ private:
 };
 
 void DrawEditIcon(weegfx::coord_t x, weegfx::coord_t y, int value, int min_value, int max_value);
-void DrawEditIcon(weegfx::coord_t x, weegfx::coord_t y, int value, const settings::value_attr &attr);
+void DrawEditIcon(weegfx::coord_t x, weegfx::coord_t y, int value, const settings::ValueAttributes &attr);
 
 inline void DrawChord(weegfx::coord_t x, weegfx::coord_t y, int width, int value, int mem_offset) {
   
@@ -235,6 +241,8 @@ inline static void DrawGateIndicator(weegfx::coord_t x, weegfx::coord_t y, uint8
     graphics.drawBitmap8(x, y, 4, OC::bitmap_gate_indicators_8 + (state << 2));
 }
 
+void DrawIOStatusBar(uint32_t status_mask);
+
 // Templated title bar that can have multiple columns
 template <weegfx::coord_t start_x, int columns, weegfx::coord_t text_dx>
 class TitleBar {
@@ -248,12 +256,13 @@ public:
   }
 
   inline static void Draw() {
-    
-    if (OC::DAC::get_voltage_scaling(DAC_CHANNEL_A) || OC::DAC::get_voltage_scaling(DAC_CHANNEL_B) || OC::DAC::get_voltage_scaling(DAC_CHANNEL_C) || OC::DAC::get_voltage_scaling(DAC_CHANNEL_D))
-      graphics.drawHLinePattern(start_x, kMenuLineH, kDisplayWidth - start_x, 2);
-    else
-      graphics.drawHLine(start_x, kMenuLineH, kDisplayWidth - start_x);
+    graphics.drawHLine(start_x, kMenuLineH, kDisplayWidth - start_x);
     SetColumn(0);
+  }
+
+  inline static void Draw(uint32_t status_mask) {
+    Draw();
+    DrawIOStatusBar(status_mask);
   }
 
   inline static void Selected(int column) {
@@ -288,9 +297,8 @@ struct SettingsListItem {
   SettingsListItem() { }
   ~SettingsListItem() { }
 
-  inline void DrawName(const settings::value_attr &attr) const {
-    graphics.setPrintPos(x + kIndentDx, y + kTextDy);
-    graphics.print(attr.name);
+  inline void DrawName(const settings::ValueAttributes &attr) const {
+    DrawCharName(attr.name);
   }
 
   inline void DrawCharName(const char* name_string) const {
@@ -298,7 +306,18 @@ struct SettingsListItem {
     graphics.print(name_string);
   }
 
-  inline void DrawDefault(int value, const settings::value_attr &attr) const {
+  template <size_t max_chars = 0>
+  inline void DrawCharName(const char* name_string, weegfx::coord_t x_offset) const {
+    auto tx = x + kIndentDx + x_offset;
+    auto ty = y + kTextDy;
+    graphics.setPrintPos(tx, ty);
+    if (max_chars)
+      graphics.drawStrClipX(tx, ty, name_string, tx, max_chars * weegfx::Graphics::kFixedFontW);
+    else
+      graphics.print(name_string);
+  }
+
+  inline void DrawDefault(int value, const settings::ValueAttributes &attr) const {
     DrawName(attr);
 
     graphics.setPrintPos(endx, y + kTextDy);
@@ -313,7 +332,23 @@ struct SettingsListItem {
       graphics.invertRect(x, y, kDisplayWidth - x, kMenuLineH - 1);
   }
 
-  inline void Draw_PW_Value_Char(int value, const settings::value_attr &attr, const char* name_string) const {
+  template <bool draw_selection = true, size_t max_chars = 0>
+  inline void DrawCustomName(const char *name, int value, const settings::ValueAttributes &attr, weegfx::coord_t x_offset = 0) const {
+    DrawCharName<max_chars>(name, x_offset);
+
+    graphics.setPrintPos(endx, y + kTextDy);
+    if(attr.value_names)
+      graphics.print_right(attr.value_names[value]);
+    else
+      graphics.pretty_print_right(value);
+
+    if (editing)
+      menu::DrawEditIcon(valuex, y, value, attr);
+    if (selected && draw_selection)
+      graphics.invertRect(x, y, kDisplayWidth - x, kMenuLineH - 1);
+  }
+
+  inline void Draw_PW_Value_Char(int value, const settings::ValueAttributes &attr, const char* name_string) const {
     DrawCharName(name_string);
 
     graphics.setPrintPos(endx, y + kTextDy);
@@ -335,7 +370,7 @@ struct SettingsListItem {
       graphics.invertRect(x, y, kDisplayWidth - x, kMenuLineH - 1);
   }
   
-  inline void Draw_PW_Value(int value, const settings::value_attr &attr) const {
+  inline void Draw_PW_Value(int value, const settings::ValueAttributes &attr) const {
     DrawName(attr);
 
     graphics.setPrintPos(endx, y + kTextDy);
@@ -357,7 +392,7 @@ struct SettingsListItem {
       graphics.invertRect(x, y, kDisplayWidth - x, kMenuLineH - 1);
   }
 
-  inline void DrawValueMax(int value, const settings::value_attr &attr, int16_t _max) const {
+  inline void DrawValueMax(int value, const settings::ValueAttributes &attr, int16_t _max) const {
     DrawName(attr);
 
     graphics.setPrintPos(endx, y + kTextDy);
@@ -372,7 +407,7 @@ struct SettingsListItem {
       graphics.invertRect(x, y, kDisplayWidth - x, kMenuLineH - 1);
   }
 
-  inline void DrawDefault(const char *str, int value, const settings::value_attr &attr) const {
+  inline void DrawDefault(const char *str, int value, const settings::ValueAttributes &attr) const {
     DrawName(attr);
 
     graphics.setPrintPos(endx, y + kTextDy);
@@ -385,13 +420,20 @@ struct SettingsListItem {
   }
 
   template <bool editable>
-  inline void DrawNoValue(int value, const settings::value_attr &attr) const {
+  inline void DrawNoValue(int value, const settings::ValueAttributes &attr) const {
     DrawName(attr);
 
     if (editable && editing)
       menu::DrawEditIcon(valuex, y, value, attr);
     if (selected)
       graphics.invertRect(x, y, kDisplayWidth - x, kMenuLineH - 1);
+  }
+
+  inline void DrawCustomValue(const settings::ValueAttributes &attr, const char *value) {
+    DrawName(attr);
+    graphics.setPrintPos(endx, y + kTextDy);
+    graphics.print_right(value);
+    DrawCustom();
   }
 
   inline void DrawCustom() const {

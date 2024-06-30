@@ -2,6 +2,8 @@
 #include "OC_core.h"
 #include "HemisphereApplet.h"
 #include "HSUtils.h"
+#include "enigma/TuringMachine.h"
+#include "vector_osc/HSVectorOscillator.h"
 
 #ifdef ARDUINO_TEENSY41
 #include "AudioSetup.h"
@@ -15,6 +17,10 @@ namespace HS {
   int q_edit = 0; // edit cursor for quantizer popup, 0 = not editing
 
   OC::SemitoneQuantizer input_quant[ADC_CHANNEL_LAST];
+
+  // All of the HS:: globals should be instantiated here
+  TuringMachine user_turing_machines[TURING_MACHINE_COUNT];
+  VOSegment user_waveforms[VO_SEGMENT_COUNT];
 
   braids::Quantizer quantizer[QUANT_CHANNEL_COUNT]; // global shared quantizers
   int quant_scale[QUANT_CHANNEL_COUNT];

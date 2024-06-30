@@ -22,8 +22,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifdef ENABLE_APP_DARKEST_TIMELINE
-
 #include <Arduino.h>
 #include <EEPROM.h>
 #include <stdint.h>
@@ -39,8 +37,6 @@
 #include "HemisphereApplet.h"
 #include "util/util_settings.h"
 #include "OC_DAC.h"
-#include "braids_quantizer.h"
-#include "braids_quantizer_scales.h"
 #include "OC_scales.h"
 #include "HSApplication.h"
 #include "HSMIDI.h"
@@ -556,7 +552,7 @@ static size_t TheDarkestTimeline_restore(const void *storage) {
     return TheDarkestTimeline_instance.Restore(storage);
 }
 
-void TheDarkestTimeline_isr() {
+void TheDarkestTimeline_process(OC::IOFrame *) {
 	return TheDarkestTimeline_instance.BaseController();
 }
 
@@ -604,5 +600,3 @@ void TheDarkestTimeline_handleEncoderEvent(const UI::Event &event) {
     // Right encoder turned
     if (event.control == OC::CONTROL_ENCODER_R) TheDarkestTimeline_instance.OnRightEncoderMove(event.value);
 }
-
-#endif

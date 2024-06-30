@@ -5,15 +5,14 @@
 #include "OC_config.h"
 #include "OC_options.h"
 #include "OC_debug.h"
-#include "UI/ui_button.h"
-#include "UI/ui_encoder.h"
-#include "UI/ui_event_queue.h"
-#include "UI/ui_events.h"
+#include "src/UI/ui_button.h"
+#include "src/UI/ui_encoder.h"
+#include "src/UI/ui_event_queue.h"
 
 namespace OC {
 
 enum EncoderConfig : uint32_t;
-struct App;
+class AppBase;
 
 // UI::Event::control is uint16_t, but we only have 6 controls anyway.
 // So we can helpfully make things into bitmasks, which seems useful.
@@ -80,11 +79,11 @@ public:
   bool ConfirmReset();
   void DebugStats();
   void AppSettings();
-  UiMode DispatchEvents(const OC::App *app);
+  UiMode DispatchEvents(AppBase *app);
 
   void Poll();
-  void _Poke();
-  void _preemptScreensaver(bool v);
+  void Poke();
+  void preempt_screensaver(bool v);
 
   inline bool read_immediate(UiControl control) {
     return button_state_ & control;
@@ -157,7 +156,7 @@ private:
   UI::EventQueue<kEventQueueDepth> event_queue_;
 
   inline void PushEvent(UI::EventType t, uint16_t c, int16_t v, uint16_t m) {
-#ifdef OC_UI_DEBUG
+#ifdef OC_DEBUG_UI
     if (!event_queue_.writable())
       ++DEBUG::UI_queue_overflow;
     ++DEBUG::UI_event_count;
@@ -179,6 +178,7 @@ private:
     return ignore;
   }
 
+  DISALLOW_COPY_AND_ASSIGN(Ui);
 };
 
 extern Ui ui;

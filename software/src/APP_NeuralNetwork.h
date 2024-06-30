@@ -18,8 +18,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifdef ENABLE_APP_NEURAL_NETWORK
-
 #include <Arduino.h>
 #include <EEPROM.h>
 #include <stdint.h>
@@ -611,7 +609,7 @@ static constexpr size_t NeuralNetwork_storageSize() {return NeuralNetwork::stora
 static size_t NeuralNetwork_save(void *storage) {return NeuralNetwork_instance.Save(storage);}
 static size_t NeuralNetwork_restore(const void *storage) {return NeuralNetwork_instance.Restore(storage);}
 
-void NeuralNetwork_isr() {
+void NeuralNetwork_process(OC::IOFrame *) {
     return NeuralNetwork_instance.BaseController();
 }
 
@@ -660,5 +658,3 @@ void NeuralNetwork_handleEncoderEvent(const UI::Event &event) {
     // Right encoder turned
     if (event.control == OC::CONTROL_ENCODER_R) NeuralNetwork_instance.OnRightEncoderMove(event.value);
 }
-
-#endif

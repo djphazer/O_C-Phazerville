@@ -27,10 +27,12 @@
 #include <EEPROM.h>
 
 #include "OC_core.h"
+#include "OC_app_switcher.h"
 #include "OC_apps.h"
 #include "OC_DAC.h"
 #include "OC_debug.h"
 #include "OC_gpio.h"
+#include "OC_global_settings.h"
 #include "OC_ADC.h"
 #include "OC_calibration.h"
 #include "OC_digital_inputs.h"
@@ -56,10 +58,9 @@ MIDI_CREATE_INSTANCE(HardwareSerial, Serial8, MIDI1);
 
 #endif // __IMXRT1062__
 
-unsigned long LAST_REDRAW_TIME = 0;
 uint_fast8_t MENU_REDRAW = true;
-OC::UiMode ui_mode = OC::UI_MODE_MENU;
-const bool DUMMY = false;
+static OC::UiMode ui_mode = OC::UI_MODE_MENU;
+static OC::IOFrame io_frame;
 
 /*  ------------------------ UI timer ISR ---------------------------   */
 
@@ -80,29 +81,27 @@ void FASTRUN CORE_timer_ISR() {
   DEBUG_PIN_SCOPE(OC_GPIO_DEBUG_PIN2);
   OC_DEBUG_PROFILE_SCOPE(OC::DEBUG::ISR_cycles);
 
+  using namespace OC;
+
   // DAC and display share SPI. By first updating the DAC values, then starting
   // a DMA transfer to the display things are fairly nicely interleaved. In the
   // next ISR, the display transfer is finalized (CS update).
 
   display::Flush();
-  OC::DAC::Update();
+  DAC::Update();
   display::Update();
 
   // see OC_ADC.h for details; empirically (with current parameters), Scan_DMA() picks up new samples @ 5.55kHz
   OC::ADC::Scan_DMA();
 
   // Pin changes are tracked in separate ISRs, so depending on prio it might
-  // need extra precautions.
-  OC::DigitalInputs::Scan();
+  // need extra precautions. Note: This call is required to clear flags
+  DigitalInputs::Scan();
 
-#ifndef OC_UI_SEPARATE_ISR
-  TODO needs a counter
-  UI_timer_ISR();
-#endif
-
-  ++OC::CORE::ticks;
-  if (OC::CORE::app_isr_enabled)
-    OC::apps::ISR();
+  ++CORE::ticks;
+  if (CORE::app_isr_enabled) {
+    OC::app_switcher.Process(&io_frame);
+  }
 
   OC_DEBUG_RESET_CYCLES(OC::CORE::ticks, 16384, OC::DEBUG::ISR_cycles);
 }
@@ -164,7 +163,7 @@ void setup() {
   #endif
   OC::ADC::Init(&OC::calibration_data.adc); // Yes, it's using the calibration_data before it's loaded...
   OC::ADC::Init_DMA();
-  OC::DAC::Init(&OC::calibration_data.dac);
+  OC::DAC::Init(&OC::calibration_data.dac, &OC::global_settings.autotune_calibration_data);
 
   display::Init();
 
@@ -180,14 +179,20 @@ void setup() {
   OC::ui.configure_encoders(OC::calibration_data.encoder_config());
 
   SERIAL_PRINTLN("* CORE ISR @%luus", OC_CORE_TIMER_RATE);
+  io_frame.Reset();
   CORE_timer.begin(CORE_timer_ISR, OC_CORE_TIMER_RATE);
   CORE_timer.priority(OC_CORE_TIMER_PRIO);
 
-#ifdef OC_UI_SEPARATE_ISR
+  // Wait until there's at least some ADC values read
+  delay(4);
+  uint32_t random_seed =
+      OC::ADC::raw_value(ADC_CHANNEL_1) * OC::ADC::raw_value(ADC_CHANNEL_2) +
+      OC::ADC::raw_value(ADC_CHANNEL_3) + OC::ADC::raw_value(ADC_CHANNEL_4);
+  randomSeed(random_seed);
+
   SERIAL_PRINTLN("* UI ISR @%luus", OC_UI_TIMER_RATE);
   UI_timer.begin(UI_timer_ISR, OC_UI_TIMER_RATE);
   UI_timer.priority(OC_UI_TIMER_PRIO);
-#endif
 
   // Display splash screen and optional calibration
   bool reset_settings = false;
@@ -206,7 +211,7 @@ void setup() {
 #endif
 
   // initialize apps
-  OC::apps::Init(reset_settings);
+  OC::app_switcher.Init(reset_settings);
 
   if (start_cal)
     OC::start_calibration();
@@ -215,56 +220,53 @@ void setup() {
 /*  ---------    main loop  --------  */
 
 void FASTRUN loop() {
+  using namespace OC;
+  CORE::app_isr_enabled = true;
+  uint32_t menu_draw_count = 0;
+  uint32_t last_redraw_time = 0;
 
-  OC::CORE::app_isr_enabled = true;
-  uint32_t menu_redraws = 0;
   while (true) {
 
     // don't change current_app while it's running
-    if (OC::UI_MODE_APP_SETTINGS == ui_mode) {
-      OC::ui.AppSettings();
-      ui_mode = OC::UI_MODE_MENU;
+    if (UI_MODE_APP_SETTINGS == ui_mode) {
+      ui.AppSettings();
+      ui_mode = UI_MODE_MENU;
     }
 
     // Refresh display
     if (MENU_REDRAW) {
       GRAPHICS_BEGIN_FRAME(false); // Don't busy wait
-        if (OC::UI_MODE_MENU == ui_mode) {
-          OC_DEBUG_RESET_CYCLES(menu_redraws, 512, OC::DEBUG::MENU_draw_cycles);
-          OC_DEBUG_PROFILE_SCOPE(OC::DEBUG::MENU_draw_cycles);
-          OC::apps::current_app->DrawMenu();
-          ++menu_redraws;
-
-          #ifdef VOR
-          // JEJ:On app screens, show the bias popup, if necessary
-          VBiasManager *vbias_m = vbias_m->get();
-          vbias_m->DrawPopupPerhaps();
-          #endif
-
-        } else {
-          OC::apps::current_app->DrawScreensaver();
-        }
-        MENU_REDRAW = 0;
-        LAST_REDRAW_TIME = millis();
+      OC_DEBUG_RESET_CYCLES(menu_draw_count, 512, DEBUG::MENU_draw_cycles);
+      OC_DEBUG_PROFILE_SCOPE(DEBUG::MENU_draw_cycles);
+      app_switcher.current_app()->Draw(ui_mode);
+      ++menu_draw_count;
+#ifdef VOR
+      // TODO: move this into AppBase
+      // only if not screensaver
+      VBiasManager *vbias_m = vbias_m->get();
+      vbias_m->DrawPopupPerhaps();
+#endif
+      MENU_REDRAW = 0;
+      last_redraw_time = ui.ticks();
       GRAPHICS_END_FRAME();
     }
 
     // Run current app
-    OC::apps::current_app->loop();
+    app_switcher.current_app()->DispatchLoop();
 
     // UI events
-    OC::UiMode mode = OC::ui.DispatchEvents(OC::apps::current_app);
+    UiMode mode = ui.DispatchEvents(app_switcher.current_app());
 
     // State transition for app
     if (mode != ui_mode) {
-      if (OC::UI_MODE_SCREENSAVER == mode)
-        OC::apps::current_app->HandleAppEvent(OC::APP_EVENT_SCREENSAVER_ON);
-      else if (OC::UI_MODE_SCREENSAVER == ui_mode)
-        OC::apps::current_app->HandleAppEvent(OC::APP_EVENT_SCREENSAVER_OFF);
+      if (UI_MODE_SCREENSAVER == mode)
+        app_switcher.current_app()->DispatchAppEvent(APP_EVENT_SCREENSAVER_ON);
+      else if (UI_MODE_SCREENSAVER == ui_mode)
+        app_switcher.current_app()->DispatchAppEvent(APP_EVENT_SCREENSAVER_OFF);
       ui_mode = mode;
     }
 
-    if (millis() - LAST_REDRAW_TIME > REDRAW_TIMEOUT_MS)
+    if (ui.ticks() - last_redraw_time > REDRAW_TIMEOUT_MS)
       MENU_REDRAW = 1;
 
     static size_t cap_idx = 0;

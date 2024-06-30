@@ -23,35 +23,31 @@
 #ifndef OC_EUCLIDEAN_MASK_DRAW_H_
 #define OC_EUCLIDEAN_MASK_DRAW_H_
 
-#include "bjorklund.h"
+#include "src/extern/bjorklund.h"
 #include "OC_menus.h"
 
 namespace OC {
 
 class EuclideanMaskDraw {
 public:
-  EuclideanMaskDraw() { }
+  EuclideanMaskDraw() : last_length_(0), last_fill_(0), last_offset_(0) { }
   ~EuclideanMaskDraw() { }
 
-  void Init()
-  {
-    last_length_ = last_fill_ = last_offset_ = 0;
-    mask_ = 0;
-  }
-
-  void Render(weegfx::coord_t x, weegfx::coord_t y, uint8_t length, uint8_t fill, uint8_t offset, uint8_t active_step)
+  void Render(weegfx::coord_t x, weegfx::coord_t y, uint8_t length, uint8_t fill, uint8_t offset, uint8_t active_step) const
   {
     (void)x;
-    UpdateMask(length, fill, offset);
+    CacheMask(length, fill, offset);
     menu::DrawMask<false, 32, 7, 1>(64 + 2 + (length + 1) * 3 / 2, y, mask_, length + 1, active_step % (length + 1));
   }
 
 private:
 
-  uint32_t mask_;
-  uint8_t last_length_, last_fill_, last_offset_;
+  mutable uint32_t mask_;
+  mutable uint8_t last_length_;
+  mutable uint8_t last_fill_;
+  mutable uint8_t last_offset_;
 
-  void UpdateMask(uint8_t length, uint8_t fill, uint8_t offset)
+  void CacheMask(uint8_t length, uint8_t fill, uint8_t offset) const
   {
     if (length != last_length_ || fill != last_fill_ || offset != last_offset_) {
       mask_ = EuclideanPattern(length, fill, offset);

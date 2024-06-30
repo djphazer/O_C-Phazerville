@@ -45,6 +45,7 @@ namespace OC {
     extern const char* const TM_aux_cv_destinations[];
     extern const char* const reset_behaviours[];
     extern const char* const falling_gate_behaviours[];
+    extern const char *const output_mode_strings[];
     // Not strings but are constant integer sequences
     extern const uint8_t pi_digits[kIntSeqLen];
     // extern const uint8_t phi_digits[kIntSeqLen];
@@ -58,6 +59,7 @@ namespace OC {
     extern const uint8_t digsum_of_n_base5[kIntSeqLen];
     extern const uint8_t count_down_by_2[kIntSeqLen];
     extern const uint8_t interspersion_of_A163253[kIntSeqLen];
+
  };
 
   // Not a string, but needs to be closer to trigger_delay_times

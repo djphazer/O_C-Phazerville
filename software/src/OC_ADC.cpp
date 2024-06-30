@@ -1,5 +1,6 @@
 #include "OC_ADC.h"
 #include "OC_gpio.h"
+#include "OC_io.h"
 #include "DMAChannel.h"
 #include <algorithm>
 
@@ -11,9 +12,16 @@ namespace OC {
 /*static*/ ADC::CalibrationData *ADC::calibration_data_;
 /*static*/ uint32_t ADC::raw_[ADC_CHANNEL_LAST];
 /*static*/ uint32_t ADC::smoothed_[ADC_CHANNEL_LAST];
+
 #ifdef OC_ADC_ENABLE_DMA_INTERRUPT
 /*static*/ volatile bool ADC::ready_;
 #endif
+
+#ifdef OC_ADC_DEBUG_STATS
+/*static*/ ADC::ChannelStats ADC::channel_stats_[ADC_CHANNEL_LAST];
+/*static*/ uint32_t ADC::stats_ticks_ = 0;
+#endif
+
 
 #if defined(__MK20DX256__)
 constexpr uint16_t ADC::SCA_CHANNEL_ID[DMA_NUM_CH]; // ADCx_SCA register channel numbers
@@ -97,9 +105,22 @@ static PROGMEM const uint8_t adc2_pin_to_channel[] = {
   std::fill(raw_, raw_ + ADC_CHANNEL_LAST, 0);
   std::fill(smoothed_, smoothed_ + ADC_CHANNEL_LAST, 0);
   std::fill(adcbuffer_0, adcbuffer_0 + DMA_BUF_SIZE, 0);
-  
   adc_.enableDMA();
+
+#ifdef OC_ADC_DEBUG_STATS
+  for (auto &stats: channel_stats_)
+    stats.Reset();
+#endif  
 }
+
+#ifdef OC_ADC_ENABLE_DMA_INTERRUPT
+/*static*/ void FASTRUN ADC::DMA_ISR() {
+
+  ADC::ready_ = true;
+  dma0->clearInterrupt();
+  /* restart DMA in ADC::Scan_DMA() */
+}
+#endif
 
 #elif defined(__IMXRT1062__)
 /*static*/ void ADC::Init(CalibrationData *calibration_data) {
@@ -111,15 +132,17 @@ static PROGMEM const uint8_t adc2_pin_to_channel[] = {
   std::fill(smoothed_, smoothed_ + ADC_CHANNEL_LAST, _ADC_OFFSET << kAdcSmoothBits);
 }
 
-#endif // __IMXRT1062__
-
 #ifdef OC_ADC_ENABLE_DMA_INTERRUPT
 /*static*/ void ADC::DMA_ISR() {
+
   ADC::ready_ = true;
+  dma0->TCD->DADDR = &adcbuffer_0[0];
   dma0->clearInterrupt();
   /* restart DMA in ADC::Scan_DMA() */
 }
 #endif
+
+#endif // __IMXRT1062__
 
 /*
  * 
@@ -167,7 +190,7 @@ void ADC::Init_DMA() {
 
   dma0->enable();
   dma1->enable();
-} 
+}
 
 #elif defined(__IMXRT1062__)
 
@@ -446,18 +469,44 @@ static void Init_Teensy41_ADC33131D_chip() {
 
 
 #if defined(__MK20DX256__)
-/*static*/void FASTRUN ADC::Scan_DMA() {
+/*static*/
+void ADC::Read(IOFrame *ioframe)
+{
+  if (dma0->complete()) {
+    // On Teensy 3.2, this runs every 180us (every 3rd call from 60us timer)
+    dma0->clearComplete();
+    dma0->TCD->DADDR = &adcbuffer_0[0];
+  }
 
+  for (int channel = ADC_CHANNEL_1; channel < ADC_CHANNEL_LAST; ++channel) {
+    ioframe->cv.values[channel] = value(static_cast<ADC_CHANNEL>(channel));
+    ioframe->cv.pitch_values[channel] = value_to_pitch( ioframe->cv.values[channel] );
+  }
+} 
+
+/*static*/void FASTRUN ADC::Scan_DMA() {
 #ifdef OC_ADC_ENABLE_DMA_INTERRUPT
   if (ADC::ready_)  {
     ADC::ready_ = false;
 #else
   if (dma0->complete()) {
-    // On Teensy 3.2, this runs every 180us (every 3rd call from 60us timer)
     dma0->clearComplete();
 #endif
     dma0->TCD->DADDR = &adcbuffer_0[0];
 
+    // uhadd16 = Unsigned Halving Add 16
+    // The 4 (3?) LSB should all be zeroes anyway so this shouldn't affect the
+    // result, but this is half as many adds and word transfers by default.
+    const uint32_t *src = (uint32_t *)adcbuffer_0;
+    uint32_t sum01 = uhadd16(uhadd16(src[0], src[2]), uhadd16(src[4], src[6]));
+    uint32_t sum23 = uhadd16(uhadd16(src[1], src[3]), uhadd16(src[5], src[7]));
+
+    update<ADC_CHANNEL_1>(sum01 & 0xffff);
+    update<ADC_CHANNEL_2>(sum01 >> 16);
+    update<ADC_CHANNEL_3>(sum23 & 0xffff);
+    update<ADC_CHANNEL_4>(sum23 >> 16);
+
+#if 0
     /* 
      *  collect  results from adcbuffer_0; as things are, there's DMA_BUF_SIZE = 16 samples in the buffer. 
     */
@@ -474,9 +523,14 @@ static void Init_Teensy41_ADC33131D_chip() {
 
     value = (adcbuffer_0[3] + adcbuffer_0[7] + adcbuffer_0[11] + adcbuffer_0[15]) >> 2;
     update<ADC_CHANNEL_4>(value); 
+#endif
 
     /* restart */
     dma0->enable();
+
+#ifdef OC_ADC_DEBUG_STATS
+    ++stats_ticks_;
+#endif
   }
 }
 
@@ -565,6 +619,15 @@ static void Init_Teensy41_ADC33131D_chip() {
 #endif
 
     old_idx = idx;
+  }
+}
+
+/*static*/
+void ADC::Read(IOFrame *ioframe)
+{
+  for (int channel = ADC_CHANNEL_1; channel < ADC_CHANNEL_LAST; ++channel) {
+    ioframe->cv.values[channel] = value(static_cast<ADC_CHANNEL>(channel));
+    ioframe->cv.pitch_values[channel] = value_to_pitch( ioframe->cv.values[channel] );
   }
 }
 

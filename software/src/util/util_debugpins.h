@@ -1,6 +1,8 @@
 #ifndef UTIL_DEBUGPINS_H_
 #define UTIL_DEBUGPINS_H_
 
+#include "../OC_config.h"
+
 namespace util {
 
 template <int pin>
@@ -16,9 +18,7 @@ struct scoped_debug_pin {
 
 }; // namespace util
 
-//#define ENABLE_DEBUG_PINS
-
-#ifdef ENABLE_DEBUG_PINS
+#ifdef OC_DEBUG_ENABLE_PINS
 #define DEBUG_PIN_SCOPE(pin) \
   util::scoped_debug_pin<pin> debug_pin
 #else

@@ -25,7 +25,7 @@
 
 #include <Arduino.h>
 #include "ui_events.h"
-#include "../util/util_ringbuffer.h"
+#include "../../util/util_ringbuffer.h"
 
 namespace UI {
 
@@ -52,19 +52,14 @@ public:
     return events_.readable();
   }
 
-  inline void PushEvent(EventType t, uint16_t c, int16_t v) {
-    // TODO EmplaceWrite?
-    events_.Write(Event(t, c, v, 0));
-    Poke();
-  }
-
-  inline void PushEvent(EventType t, uint16_t c, int16_t v, uint16_t m) {
-    events_.Write(Event(t, c, v, m));
+  template <typename... Args>
+  inline void PushEvent(Args&&... args) {
+    events_.EmplaceWrite(std::forward<Args>(args)...);
     Poke();
   }
 
   inline Event PullEvent() {
-    return events_.Read();
+    return std::move(events_.Read());
   }
 
   inline void Poke() {

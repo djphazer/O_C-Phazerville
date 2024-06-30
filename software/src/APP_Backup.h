@@ -144,7 +144,7 @@ Backup Backup_instance;
 
 void Backup_init() {}
 void Backup_menu() {Backup_instance.View();}
-void Backup_isr() {Backup_instance.Controller();}
+void Backup_process(OC::IOFrame *) {Backup_instance.Controller();}
 
 // Storage not used for this app
 static constexpr size_t Backup_storageSize() {return 0;}

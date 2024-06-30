@@ -13,7 +13,6 @@ namespace OC {
 struct coords {
   weegfx::coord_t x, y;
 };
-
 static constexpr float note_circle_r = 28.f;
 static constexpr float pi = 3.14159265358979323846f;
 static constexpr float semitone_radians = (2.f * pi / 12.f);
@@ -36,7 +35,7 @@ static constexpr std::array<coords, 12> circle_pos_lut = generate_circle_pos_lut
 namespace menu {
 void Init()
 {
-};
+}
 
 void DrawEditIcon(weegfx::coord_t x, weegfx::coord_t y, int value, int min_value, int max_value) {
   const uint8_t *src = OC::bitmap_edit_indicators_8;
@@ -48,7 +47,7 @@ void DrawEditIcon(weegfx::coord_t x, weegfx::coord_t y, int value, int min_value
   graphics.drawBitmap8(x - 5, y + 1, OC::kBitmapEditIndicatorW, src);
 }
 
-void DrawEditIcon(weegfx::coord_t x, weegfx::coord_t y, int value, const settings::value_attr &attr) {
+void DrawEditIcon(weegfx::coord_t x, weegfx::coord_t y, int value, const settings::ValueAttributes &attr) {
   const uint8_t *src = OC::bitmap_edit_indicators_8;
   if (value == attr.max_)
     src += OC::kBitmapEditIndicatorW * 2;
@@ -58,8 +57,17 @@ void DrawEditIcon(weegfx::coord_t x, weegfx::coord_t y, int value, const setting
   graphics.drawBitmap8(x - 5, y + 1, OC::kBitmapEditIndicatorW, src);
 }
 
-}; // namespace menu
+void DrawIOStatusBar(uint32_t status_mask) {
+  weegfx::coord_t x = 32 - 14;
+  for (int i = 0; i < 4; ++i, x += 32, status_mask >>= 8) {
+    if (status_mask & 0x1) graphics.drawBitmap8(x, 9, 2, bitmap_io_settings_8);
+    if (status_mask & 0x2) graphics.drawBitmap8(x + 4, 9, 2, bitmap_io_settings_8);
+    if (status_mask & 0x4) graphics.drawBitmap8(x + 8, 9, 2, bitmap_io_settings_8);
+    if (status_mask & 0x8) graphics.drawBitmap8(x + 12, 9, 2, bitmap_io_settings_8);
+  }
+}
 
+} // namespace menu
 
 void visualize_pitch_classes(uint8_t *normalized, weegfx::coord_t centerx, weegfx::coord_t centery) {
   graphics.drawCircle(centerx, centery, note_circle_r);

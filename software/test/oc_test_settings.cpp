@@ -1,10 +1,13 @@
 #include "gtest/gtest.h"
 #include "util/util_settings.h"
 
-class TestU8Settings : public settings::SettingsBase<TestU8Settings, 1> { };
-SETTINGS_DECLARE(TestU8Settings, 1) {
-  { 0, 0, 8, "U8", nullptr, settings::STORAGE_TYPE_U8 },
+class TestU8Settings : public settings::SettingsBase<TestU8Settings, 1> { 
+
+  SETTINGS_ARRAY_DECLARE() {{
+    { 0, 0, 8, "U8", nullptr, settings::STORAGE_TYPE_U8 },
+  }};
 };
+SETTINGS_ARRAY_DEFINE(TestU8Settings);
 
 TEST(TestSettings,TestU8)
 {
@@ -15,12 +18,14 @@ TEST(TestSettings,TestU8)
   EXPECT_EQ(0, settings.get_value(0));
 }
 
-class TestPackU4EvenSettings : public settings::SettingsBase<TestPackU4EvenSettings, 3> { };
-SETTINGS_DECLARE(TestPackU4EvenSettings, 3) {
-  { 0, 0, 15, "U4", nullptr, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 15, "U4", nullptr, settings::STORAGE_TYPE_U4 },
-  { 0, -1, 8, "I32", nullptr, settings::STORAGE_TYPE_I32 },
+class TestPackU4EvenSettings : public settings::SettingsBase<TestPackU4EvenSettings, 3> {
+  SETTINGS_ARRAY_DECLARE() {{
+    { 0, 0, 15, "U4", nullptr, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 15, "U4", nullptr, settings::STORAGE_TYPE_U4 },
+    { 0, -1, 8, "I32", nullptr, settings::STORAGE_TYPE_I32 },
+  }};
 };
+SETTINGS_ARRAY_DEFINE(TestPackU4EvenSettings);
 
 TEST(TestSettings,TestPackU4Even)
 {
@@ -35,12 +40,14 @@ TEST(TestSettings,TestPackU4Even)
   std::vector<uint8_t> data;
   data.resize(TestPackU4EvenSettings::storageSize() + 1, 0xff);
 
-  size_t saved_size = settings.Save(&data.front());
+  auto writer = util::StreamBufferWriter{data};
+  size_t saved_size = settings.Save(writer);
   EXPECT_EQ(TestPackU4EvenSettings::storageSize(), saved_size);
   EXPECT_EQ(0xff, data[TestPackU4EvenSettings::storageSize()]);
 
   settings.InitDefaults();
-  size_t restored_size = settings.Restore(&data.front());
+  auto reader = util::StreamBufferReader{data};
+  size_t restored_size = settings.Restore(reader);
   EXPECT_EQ(saved_size, restored_size);
 
   EXPECT_EQ(0x09, settings.get_value(0));
@@ -48,11 +55,13 @@ TEST(TestSettings,TestPackU4Even)
   EXPECT_EQ(-1, settings.get_value(2));
 }
 
-class TestPackU4OddSettings : public settings::SettingsBase<TestPackU4OddSettings, 2> { };
-SETTINGS_DECLARE(TestPackU4OddSettings, 2) {
-  { 0, 0, 15, "U4", nullptr, settings::STORAGE_TYPE_U4 },
-  { 0, -1, 8, "I32", nullptr, settings::STORAGE_TYPE_I32 },
+class TestPackU4OddSettings : public settings::SettingsBase<TestPackU4OddSettings, 2> {
+  SETTINGS_ARRAY_DECLARE() {{
+    { 0, 0, 15, "U4", nullptr, settings::STORAGE_TYPE_U4 },
+    { 0, -1, 8, "I32", nullptr, settings::STORAGE_TYPE_I32 },
+  }};
 };
+SETTINGS_ARRAY_DEFINE(TestPackU4OddSettings);
 
 TEST(TestSettings,TestPackU4Odd)
 {
@@ -66,23 +75,27 @@ TEST(TestSettings,TestPackU4Odd)
   std::vector<uint8_t> data;
   data.resize(TestPackU4OddSettings::storageSize() + 1, 0xff);
 
-  size_t saved_size = settings.Save(&data.front());
+  auto writer = util::StreamBufferWriter{data};
+  size_t saved_size = settings.Save(writer);
   EXPECT_EQ(TestPackU4OddSettings::storageSize(), saved_size);
   EXPECT_EQ(0xff, data[TestPackU4OddSettings::storageSize()]);
 
   settings.InitDefaults();
-  size_t restored_size = settings.Restore(&data.front());
+  auto reader = util::StreamBufferReader{data};
+  size_t restored_size = settings.Restore(reader);
   EXPECT_EQ(saved_size, restored_size);
 
   EXPECT_EQ(0x09, settings.get_value(0));
   EXPECT_EQ(-1, settings.get_value(1));
 }
 
-class TestPackU4OddEndSettings : public settings::SettingsBase<TestPackU4OddEndSettings, 2> { };
-SETTINGS_DECLARE(TestPackU4OddEndSettings, 2) {
-  { 0, -1, 8, "I32", nullptr, settings::STORAGE_TYPE_I32 },
-  { 0, 0, 15, "U4", nullptr, settings::STORAGE_TYPE_U4 },
+class TestPackU4OddEndSettings : public settings::SettingsBase<TestPackU4OddEndSettings, 2> {
+  SETTINGS_ARRAY_DECLARE() {{
+    { 0, -1, 8, "I32", nullptr, settings::STORAGE_TYPE_I32 },
+    { 0, 0, 15, "U4", nullptr, settings::STORAGE_TYPE_U4 },
+  }};
 };
+SETTINGS_ARRAY_DEFINE(TestPackU4OddEndSettings);
 
 TEST(TestSettings,TestPackU4OddEnd)
 {
@@ -96,12 +109,14 @@ TEST(TestSettings,TestPackU4OddEnd)
   std::vector<uint8_t> data;
   data.resize(TestPackU4OddEndSettings::storageSize() + 1, 0xff);
 
-  size_t saved_size = settings.Save(&data.front());
+  auto writer = util::StreamBufferWriter{data};
+  size_t saved_size = settings.Save(writer);
   EXPECT_EQ(TestPackU4OddEndSettings::storageSize(), saved_size);
   EXPECT_EQ(0xff, data[TestPackU4OddEndSettings::storageSize()]);
 
   settings.InitDefaults();
-  size_t restored_size = settings.Restore(&data.front());
+  auto reader = util::StreamBufferReader{data};
+  size_t restored_size = settings.Restore(reader);
   EXPECT_EQ(saved_size, restored_size);
 
   EXPECT_EQ(-1, settings.get_value(0));

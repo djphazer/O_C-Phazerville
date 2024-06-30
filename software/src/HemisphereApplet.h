@@ -37,7 +37,7 @@
 #include "OC_ADC.h"
 #include "src/drivers/FreqMeasure/OC_FreqMeasure.h"
 #include "util/util_math.h"
-#include "bjorklund.h"
+#include "src/extern/bjorklund.h"
 #include "HSicons.h"
 #include "HSClockManager.h"
 

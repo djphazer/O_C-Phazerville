@@ -34,7 +34,7 @@
 #ifndef BRAIDS_QUANTIZER_H_
 #define BRAIDS_QUANTIZER_H_
 
-#include "util/util_macros.h"
+#include "../../util/util_macros.h"
 
 namespace braids {
 

@@ -22,6 +22,7 @@
 #define UTIL_RINGBUFFER_H_
 
 #include <stdint.h>
+#include <utility>
 #include "util_macros.h"
 
 namespace util {
@@ -62,6 +63,13 @@ public:
     size_t write_ptr = write_ptr_;
     buffer_[write_ptr & (size - 1)] = value;
     poke_ptr_ = write_ptr_ = write_ptr + 1;
+  }
+
+  template <typename... Args>
+  inline void EmplaceWrite(Args&&... args) {
+    size_t write_ptr = write_ptr_;
+    buffer_[write_ptr_ & (size -1)] = T{std::forward<Args>(args)...};
+    write_ptr_ = write_ptr + 1;
   }
 
   inline void Flush() {

@@ -7,31 +7,33 @@
 #if defined(__MK20DX256__) // Teensy 3.2
 
 /*static*/
-uint32_t OC::DigitalInputs::clocked_mask_;
+uint32_t OC::DigitalInputs::rising_edges_;
+/*static*/
+uint32_t OC::DigitalInputs::raised_mask_;
 
 /*static*/
-volatile uint32_t OC::DigitalInputs::clocked_[DIGITAL_INPUT_LAST];
+volatile uint32_t OC::DigitalInputs::captures_[DIGITAL_INPUT_LAST];
 
 void FASTRUN OC::tr1_ISR() {
-  OC::DigitalInputs::clock<OC::DIGITAL_INPUT_1>();
+  OC::DigitalInputs::capture<OC::DIGITAL_INPUT_1>();
 }  // main clock
 
 void FASTRUN OC::tr2_ISR() {
-  OC::DigitalInputs::clock<OC::DIGITAL_INPUT_2>();
+  OC::DigitalInputs::capture<OC::DIGITAL_INPUT_2>();
 }
 
 void FASTRUN OC::tr3_ISR() {
-  OC::DigitalInputs::clock<OC::DIGITAL_INPUT_3>();
+  OC::DigitalInputs::capture<OC::DIGITAL_INPUT_3>();
 }
 
 void FASTRUN OC::tr4_ISR() {
-  OC::DigitalInputs::clock<OC::DIGITAL_INPUT_4>();
+  OC::DigitalInputs::capture<OC::DIGITAL_INPUT_4>();
 }
 
 /*static*/
 void OC::DigitalInputs::Init() {
 
-  static const struct {
+  static constexpr struct {
     uint8_t pin;
     void (*isr_fn)();
   } pins[DIGITAL_INPUT_LAST] =  {
@@ -46,8 +48,9 @@ void OC::DigitalInputs::Init() {
     attachInterrupt(pin.pin, pin.isr_fn, FALLING);
   }
 
-  clocked_mask_ = 0;
-  std::fill(clocked_, clocked_ + DIGITAL_INPUT_LAST, 0);
+  rising_edges_ = 0;
+  raised_mask_ = 0;
+  std::fill(captures_, captures_ + DIGITAL_INPUT_LAST, 0);
 
   // Assume the priority of pin change interrupts is lower or equal to the
   // thread where ::Scan function is called. Otherwise a safer mechanism is
@@ -79,19 +82,27 @@ void OC::DigitalInputs::reInit() {
 }
 
 /*static*/
-void OC::DigitalInputs::Scan() {
-  clocked_mask_ =
+void OC::DigitalInputs::Scan()
+{
+  uint32_t rising_edges =
     ScanInput<DIGITAL_INPUT_1>() |
     ScanInput<DIGITAL_INPUT_2>() |
     ScanInput<DIGITAL_INPUT_3>() |
     ScanInput<DIGITAL_INPUT_4>();
+
+  rising_edges_ = rising_edges;
+
+  uint32_t raised_mask = 0;
+  if (read_immediate<DIGITAL_INPUT_1>()) raised_mask |= DIGITAL_INPUT_1_MASK;
+  if (read_immediate<DIGITAL_INPUT_2>()) raised_mask |= DIGITAL_INPUT_2_MASK;
+  if (read_immediate<DIGITAL_INPUT_3>()) raised_mask |= DIGITAL_INPUT_3_MASK;
+  if (read_immediate<DIGITAL_INPUT_4>()) raised_mask |= DIGITAL_INPUT_4_MASK;
+  raised_mask_ = raised_mask;
 }
 
 #endif // Teensy 3.2
 
-
 #if defined(__IMXRT1062__) // Teensy 4.0 or 4.1
-
 uint8_t OC::DigitalInputs::clocked_mask_;
 IMXRT_GPIO_t * OC::DigitalInputs::port[DIGITAL_INPUT_LAST];
 uint32_t  OC::DigitalInputs::bitmask[DIGITAL_INPUT_LAST];
@@ -148,7 +159,15 @@ void OC::DigitalInputs::Scan() {
   if (mask[1]) new_clocked_mask |= 0x02;
   if (mask[2]) new_clocked_mask |= 0x04;
   if (mask[3]) new_clocked_mask |= 0x08;
-  clocked_mask_ = new_clocked_mask;
+  rising_edges_ = new_clocked_mask;
+
+  uint32_t raised_mask = 0;
+  if (read_immediate<DIGITAL_INPUT_1>()) raised_mask |= DIGITAL_INPUT_1_MASK;
+  if (read_immediate<DIGITAL_INPUT_2>()) raised_mask |= DIGITAL_INPUT_2_MASK;
+  if (read_immediate<DIGITAL_INPUT_3>()) raised_mask |= DIGITAL_INPUT_3_MASK;
+  if (read_immediate<DIGITAL_INPUT_4>()) raised_mask |= DIGITAL_INPUT_4_MASK;
+  raised_mask_ = raised_mask;
+
   #if 0
   if (clocked_mask_) {
     static elapsedMicros usec;

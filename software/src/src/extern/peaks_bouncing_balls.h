@@ -35,9 +35,9 @@
 // #include <algorithm>
 
 #include <stdint.h>
-#include "util/util_macros.h"
+#include "../../util/util_macros.h"
 
-#include "extern/stmlib_utils_dsp.h"
+#include "stmlib_utils_dsp.h"
 #include "peaks_resources.h"
 #include "peaks_gate_processor.h"
 
@@ -121,7 +121,7 @@ class BouncingBall {
   }
 
 #ifdef BBGEN_DEBUG
-  inline uint16_t get_retrigger_bounces() {
+  inline uint16_t get_retrigger_bounces() const {
     return(static_cast<uint16_t>(retrigger_bounces_));
   }
 #endif // BBGEN_DEBUG

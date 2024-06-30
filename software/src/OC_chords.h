@@ -47,6 +47,10 @@ public:
     CHORDS_USER_LAST
   };
 
+  static constexpr int NUM_CHORD_PROGRESSIONS = 4;
+  static constexpr int NUM_CHORDS_TOTAL = CHORDS_USER_LAST;
+  static constexpr int NUM_CHORDS = NUM_CHORDS_TOTAL / NUM_CHORD_PROGRESSIONS;
+
   enum QUALITY 
   {
     CHORDS_FIFTH,
@@ -92,11 +96,6 @@ public:
   static void Init();
   static void Validate();
   static const Chord &GetChord(int index, int progression);
-
-  static constexpr int NUM_CHORD_PROGRESSIONS = 0x4;
-  static constexpr int NUM_CHORDS_TOTAL = CHORDS_USER_LAST; // = 8
-  static constexpr int NUM_CHORDS_PROPERTIES = sizeof(Chord);
-  static constexpr int NUM_CHORDS = NUM_CHORDS_TOTAL / NUM_CHORD_PROGRESSIONS;
 
 };
 

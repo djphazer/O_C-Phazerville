@@ -35,9 +35,9 @@
 // #include "peaks/drums/svf.h"
 
 #include <stdint.h>
-#include "util/util_macros.h"
+#include "../../util/util_macros.h"
 
-#include "extern/stmlib_utils_dsp.h"
+#include "stmlib_utils_dsp.h"
 
 #include "peaks_gate_processor.h"
 

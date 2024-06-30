@@ -18,8 +18,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifdef ENABLE_APP_ASR
-
 #include "util/util_settings.h"
 #include "util/util_trigger_delay.h"
 #include "util/util_turing.h"
@@ -27,31 +25,19 @@
 #include "util/util_integer_sequences.h"
 #include "OC_DAC.h"
 #include "OC_menus.h"
+#include "OC_pitch_utils.h"
+#include "OC_cv_utils.h"
 #include "OC_scales.h"
 #include "OC_scale_edit.h"
 #include "OC_strings.h"
 #include "OC_visualfx.h"
-#include "peaks_bytebeat.h"
-#include "extern/dspinst.h"
+#include "src/extern/peaks_bytebeat.h"
 
 extern uint_fast8_t MENU_REDRAW;
-using OC::DUMMY;
 
 #define NUM_ASR_CHANNELS 0x4
 #define ASR_MAX_ITEMS 256 // = ASR ring buffer size.
 #define ASR_HOLD_BUF_SIZE ASR_MAX_ITEMS / NUM_ASR_CHANNELS // max. delay size
-#define NUM_INPUT_SCALING 40 // # steps for input sample scaling (sb)
-
-// CV input gain multipliers
-const int32_t multipliers[NUM_INPUT_SCALING] = {
-  // 0.0 / 2.0 in 0.05 steps
-  3277, 6554, 9830, 13107, 16384, 19661, 22938, 26214, 29491, 32768,
-  36045, 39322, 42598, 45875, 49152, 52429, 55706, 58982, 62259, 65536,
-  68813, 72090, 75366, 78643, 81920, 85197, 88474, 91750, 95027, 98304,
-  101581, 104858, 108134, 111411, 114688, 117964, 121242, 124518, 127795, 131072
-};
-
-const uint8_t MULT_ONE = 19; // == 65536, see above
 
 enum ASRSettings {
   ASR_SETTING_SCALE,
@@ -99,9 +85,27 @@ enum ASR_CV4_DEST {
   ASR_DEST_LAST
 };
 
+const char* const asr_input_sources[] = {
+  "CV1", "TM", "ByteB", "IntSq"
+};
+
+const char* const asr_cv4_destinations[] = {
+  "oct", "root", "trns", "buf.l", "igain"
+};
+
+const char* const bb_CV_destinations[] = {
+  "igain", "eqn", "P0", "P1", "P2"
+};
+
+const char* const int_seq_CV_destinations[] = {
+  "igain", "seq", "strt", "len", "strd", "mod"
+};
+
 typedef int16_t ASR_pitch;
 
-class ASRApp : public settings::SettingsBase<ASRApp, ASR_SETTING_LAST> {
+class ASR
+: public settings::SettingsBase<ASR, ASR_SETTING_LAST>
+, public OC::ScaleEditorEventHandler {
 public:
   static constexpr size_t kHistoryDepth = 5;
 
@@ -117,50 +121,49 @@ public:
   static constexpr ADC_CHANNEL CVInput4 = ADC_CHANNEL_4;
 #endif
 
-  int get_scale(uint8_t dummy) const {
-    return values_[ASR_SETTING_SCALE];
+  // ScaleEditorEventHandler
+  int get_scale(int /*slot_index*/) const final {
+    return get_scale();
   }
 
-  uint8_t get_buffer_length() const {
-    return values_[ASR_SETTING_BUFFER_LENGTH];
+  uint16_t get_scale_mask(int /*slot_index*/) const final {
+    return get_scale_mask();
+  }
+
+  void update_scale_mask(uint16_t mask, int /*slot_index*/) final {
+    apply_value(ASR_SETTING_MASK, mask); // Should automatically be updated
+  }
+
+  void scale_changed() final {
+    force_update_ = true;
   }
 
   void set_scale(int scale) {
-    if (scale != get_scale(DUMMY)) {
+    if (scale != get_scale()) {
       const OC::Scale &scale_def = OC::Scales::GetScale(scale);
-      uint16_t mask = get_mask();
+      uint16_t mask = get_scale_mask();
       if (0 == (mask & ~(0xffff << scale_def.num_notes)))
         mask |= 0x1;
       apply_value(ASR_SETTING_MASK, mask);
       apply_value(ASR_SETTING_SCALE, scale);
     }
   }
+  // End ScaleEditorEventHandler
 
-  // dummy
-  int get_scale_select() const {
-    return 0;
+  int get_scale() const {
+    return values_[ASR_SETTING_SCALE];
   }
 
-  // dummy
-  void set_scale_at_slot(int scale, uint16_t mask, int root, int transpose, uint8_t scale_slot) {
-
-  }
-
-  // dummy
-  int get_transpose(uint8_t DUMMY) const {
-    return 0;
-  }
-
-  uint16_t get_mask() const {
+  uint16_t get_scale_mask() const {
     return values_[ASR_SETTING_MASK];
+  }
+
+  uint8_t get_buffer_length() const {
+    return values_[ASR_SETTING_BUFFER_LENGTH];
   }
 
   int get_root() const {
     return values_[ASR_SETTING_ROOT];
-  }
-
-  int get_root(uint8_t DUMMY) const {
-    return 0x0; // dummy
   }
 
   int get_index() const {
@@ -196,7 +199,7 @@ public:
     return values_[ASR_SETTING_TURING_LENGTH];
   }
 
-  uint8_t get_turing_display_length() {
+  uint8_t get_turing_display_length() const {
     return turing_display_length_;
   }
 
@@ -291,17 +294,17 @@ public:
   bool get_delay_type() const {
     return delay_type_;
   }
-
-  void manual_freeze() {
-    freeze_switch_ = !freeze_switch_;
+  
+  void toggle_manual_freeze() {
+    manual_freeze_ = !manual_freeze_;
   }
 
   void clear_freeze() {
-    freeze_switch_ = false;
+    manual_freeze_ = false;
   }
 
-  bool freeze_state() {
-    return freeze_switch_;
+  bool freeze_state() const {
+    return manual_freeze_ || freeze_;
   }
 
   ASRSettings enabled_setting_at(int index) const {
@@ -318,8 +321,8 @@ public:
     last_scale_ = -0x1;
     delay_type_ = false;
     octave_toggle_ = false;
-    freeze_switch_ = false;
-    TR2_state_ = 0x1;
+    manual_freeze_ = false;
+    freeze_ = false;
     set_scale(OC::Scales::SCALE_SEMI);
     last_mask_ = 0x0;
     quantizer_.Init();
@@ -339,11 +342,11 @@ public:
  }
 
   bool update_scale(bool force, int32_t mask_rotate) {
-
-    const int scale = get_scale(DUMMY);
-    uint16_t mask = get_mask();
+    
+    const int scale = get_scale();
+    uint16_t mask = get_scale_mask();
     if (mask_rotate)
-      mask = OC::ScaleEditor<ASRApp>::RotateMask(mask, OC::Scales::GetScale(scale).num_notes, mask_rotate);
+      mask = OC::ScaleEditor::RotateMask(mask, OC::Scales::GetScale(scale).num_notes, mask_rotate);
 
     if (force || (last_scale_ != scale || last_mask_ != mask)) {
 
@@ -359,20 +362,6 @@ public:
   void force_update() {
     force_update_ = true;
   }
-
-  // Wrappers for ScaleEdit
-  void scale_changed() {
-    force_update_ = true;
-  }
-
-  uint16_t get_scale_mask(uint8_t scale_select) const {
-    return get_mask();
-  }
-
-  void update_scale_mask(uint16_t mask, uint16_t dummy) {
-    apply_value(ASR_SETTING_MASK, mask); // Should automatically be updated
-  }
-  //
 
   uint16_t get_rotated_mask() const {
     return last_mask_;
@@ -426,15 +415,13 @@ public:
     num_enabled_settings_ = settings - enabled_settings_;
   }
 
-  void updateASR_indexed(int32_t *_asr_buf, int32_t _sample, int16_t _index, bool _freeze) {
-
+  void updateASR_indexed(int32_t *_asr_buf, int32_t _sample, int16_t _index, bool _freeze, OC::IOFrame *ioframe) {
       int16_t _delay = _index, _offset;
 
       if (_freeze) {
-
-        int8_t _buflen = get_buffer_length();
+        int32_t _buflen = get_buffer_length();
         if (get_cv4_destination() == ASR_DEST_BUFLEN) {
-          _buflen += ((OC::ADC::value<CVInput4>() + 31) >> 6);
+          _buflen += ioframe->cv.ScaledValue<64>(CVInput4);
           CONSTRAIN(_buflen, NUM_ASR_CHANNELS, ASR_HOLD_BUF_SIZE - 0x1);
         }
         _ASR.Freeze(_buflen);
@@ -456,69 +443,58 @@ public:
       *(_asr_buf + DAC_CHANNEL_D) = _ASR.Poke(_offset++);
   }
 
-  inline void update() {
+  inline void update(OC::IOFrame *ioframe) {
 
-     bool update = OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_1>();
+     bool update = ioframe->digital_inputs.triggered<OC::DIGITAL_INPUT_1>();
      clock_display_.Update(1, update);
 
      trigger_delay_.Update();
-
      if (update)
-      trigger_delay_.Push(OC::trigger_delay_ticks[get_trigger_delay()]);
-
+      trigger_delay_.Push(OC::trigger_delay_ticks[get_trigger_delay()]);     
      update = trigger_delay_.triggered();
 
      if (update) {
-
-         bool _freeze_switch, _freeze = digitalReadFast(TR2);
+         bool freeze = ioframe->digital_inputs.raised(OC::DIGITAL_INPUT_2);
          int8_t _root  = get_root();
-         int8_t _index = get_index() + ((OC::ADC::value<CVInput2>() + 31) >> 6);
+         int32_t _index = get_index() + ioframe->cv.ScaledValue<64>(CVInput2);
          int8_t _octave = get_octave();
          int8_t _transpose = 0;
          int8_t _mult = get_mult();
-         int32_t _pitch = OC::ADC::raw_pitch_value(CVInput1);
+         int32_t _pitch = ioframe->cv.pitch_values[CVInput1];
          int32_t _asr_buffer[NUM_ASR_CHANNELS];
 
          bool forced_update = force_update_;
          force_update_ = false;
-         update_scale(forced_update, (OC::ADC::value<CVInput3>() + 127) >> 8);
+         update_scale(forced_update, ioframe->cv.ScaledValue<16>(CVInput3));
 
          // cv4 destination, defaults to octave:
          switch(get_cv4_destination()) {
-
             case ASR_DEST_OCTAVE:
-              _octave += (OC::ADC::value<CVInput4>() + 255) >> 9;
+              _octave += ioframe->cv.ScaledValue<8>(CVInput4);
             break;
             case ASR_DEST_ROOT:
-              _root += (OC::ADC::value<CVInput4>() + 127) >> 8;
+              _root += ioframe->cv.ScaledValue<16>(CVInput4);
               CONSTRAIN(_root, 0, 11);
             break;
             case ASR_DEST_TRANSPOSE:
-              _transpose += (OC::ADC::value<CVInput4>() + 63) >> 7;
-              CONSTRAIN(_transpose, -12, 12);
+              _transpose += ioframe->cv.ScaledValue<32>(CVInput4);
+              CONSTRAIN(_transpose, -12, 12); 
             break;
             case ASR_DEST_INPUT_SCALING:
-              _mult += (OC::ADC::value<CVInput4>() + 63) >> 7;
-              CONSTRAIN(_mult, 0, NUM_INPUT_SCALING - 1);
+              _mult += ioframe->cv.ScaledValue<64>(CVInput4);
+              CONSTRAIN(_mult, 0, OC::CVUtils::kMultSteps - 1);
             break;
             // CV for buffer length happens in updateASR_indexed
             default:
             break;
          }
+         
+         // freeze?
+         freeze |= manual_freeze_;
+         freeze_ = freeze;
 
-         // freeze ?
-         if (_freeze < TR2_state_)
-            freeze_switch_ = true;
-         else if (_freeze > TR2_state_) {
-            freeze_switch_ = false;
-         }
-         TR2_state_ = _freeze;
-         //
-         _freeze_switch = freeze_switch_;
-
-         // use built in CV sources?
-         if (!_freeze_switch) {
-
+         // use built in CV sources? 
+         if (!freeze) {
            switch (get_cv_source()) {
 
             case ASR_CHANNEL_SOURCE_TURING:
@@ -671,39 +647,30 @@ public:
            }
          }
          // limit gain factor.
-         CONSTRAIN(_mult, 0, NUM_INPUT_SCALING - 0x1);
+         CONSTRAIN(_mult, 0, OC::CVUtils::kMultSteps - 1);
          // .. and index
          CONSTRAIN(_index, 0, ASR_HOLD_BUF_SIZE - 0x1);
-         // push sample into ring-buffer and/or freeze buffer:
-         updateASR_indexed(_asr_buffer, _pitch, _index, _freeze_switch);
+         // push sample into ring-buffer and/or freeze buffer: 
+         updateASR_indexed(_asr_buffer, _pitch, _index, freeze, ioframe);
 
          // get octave offset :
-         if (!digitalReadFast(TR3))
+         if (ioframe->digital_inputs.raised<OC::DIGITAL_INPUT_3>())
             _octave++;
-         else if (!digitalReadFast(TR4))
+         else if (ioframe->digital_inputs.raised<OC::DIGITAL_INPUT_4>())
             _octave--;
 
          // quantize buffer outputs:
          for (int i = 0; i < NUM_ASR_CHANNELS; ++i) {
-
              int32_t _sample = _asr_buffer[i];
-
-            // scale sample
-             if (_mult != MULT_ONE) {
-               _sample = signed_multiply_32x16b(multipliers[_mult], _sample);
-               _sample = signed_saturate_rshift(_sample, 16, 0);
-             }
-
+             _sample = OC::CVUtils::Attenuate(_sample, _mult);
              _sample = quantizer_.Process(_sample, _root << 7, _transpose);
-             _sample = OC::DAC::pitch_to_scaled_voltage_dac(static_cast<DAC_CHANNEL>(i), _sample, _octave, OC::DAC::get_voltage_scaling(i));
+             _sample = OC::PitchUtils::PitchAddOctaves(_sample, _octave);
              scrolling_history_[i].Push(_sample);
              _asr_buffer[i] = _sample;
          }
 
         // ... and write to DAC
-        for (int i = 0; i < NUM_ASR_CHANNELS; ++i)
-          OC::DAC::set(static_cast<DAC_CHANNEL>(i), _asr_buffer[i]);
-
+        ioframe->outputs.set_pitch_values(_asr_buffer);       
         MENU_REDRAW = 0x1;
       }
       for (auto &sh : scrolling_history_)
@@ -714,7 +681,7 @@ public:
     return clock_display_.getState();
   }
 
-  const OC::vfx::ScrollingHistory<uint16_t, kHistoryDepth> &history(int i) const {
+  const OC::vfx::ScrollingHistory<int32_t, kHistoryDepth> &history(int i) const {
     return scrolling_history_[i];
   }
 
@@ -722,8 +689,8 @@ private:
   bool force_update_;
   bool delay_type_;
   bool octave_toggle_;
-  bool freeze_switch_;
-  int8_t TR2_state_;
+  bool manual_freeze_;
+  bool freeze_;
   int last_scale_;
   uint16_t last_mask_;
   braids::Quantizer quantizer_;
@@ -734,301 +701,333 @@ private:
   int8_t turing_display_length_;
   peaks::ByteBeat bytebeat_ ;
   util::IntegerSequence int_seq_ ;
-  OC::vfx::ScrollingHistory<uint16_t, kHistoryDepth> scrolling_history_[NUM_ASR_CHANNELS];
+  OC::vfx::ScrollingHistory<int32_t, kHistoryDepth> scrolling_history_[NUM_ASR_CHANNELS];
   int num_enabled_settings_;
   ASRSettings enabled_settings_[ASR_SETTING_LAST];
-};
 
-const char* const asr_input_sources[] = {
-  "CV1", "TM", "ByteB", "IntSq"
+  // TOTAL EEPROM SIZE: 23 bytes
+  SETTINGS_ARRAY_DECLARE() {{
+    { OC::Scales::SCALE_SEMI, 0, OC::Scales::NUM_SCALES - 1, "Scale", OC::scale_names_short, settings::STORAGE_TYPE_U8 },
+    { 0, -5, 5, "octave", NULL, settings::STORAGE_TYPE_I8 }, // octave
+    { 0, 0, 11, "root", OC::Strings::note_names_unpadded, settings::STORAGE_TYPE_U8 },
+    { 65535, 1, 65535, "mask", NULL, settings::STORAGE_TYPE_U16 }, // mask
+    { 0, 0, ASR_HOLD_BUF_SIZE - 1, "buf.index", NULL, settings::STORAGE_TYPE_U8 },
+    { OC::CVUtils::kMultOne, 0, OC::CVUtils::kMultSteps - 1, "input gain", OC::Strings::mult, settings::STORAGE_TYPE_U8 },
+    { 0, 0, OC::kNumDelayTimes - 1, "trigger delay", OC::Strings::trigger_delay_times, settings::STORAGE_TYPE_U8 },
+    { 4, 4, ASR_HOLD_BUF_SIZE - 1, "hold (buflen)", NULL, settings::STORAGE_TYPE_U8 },
+    { 0, 0, ASR_CHANNEL_SOURCE_LAST -1, "CV source", asr_input_sources, settings::STORAGE_TYPE_U4 },
+    { 0, 0, ASR_DEST_LAST - 1, "CV4 dest. ->", asr_cv4_destinations, settings::STORAGE_TYPE_U4 },
+    { 16, 1, 32, "> LFSR length", NULL, settings::STORAGE_TYPE_U8 },
+    { 128, 0, 255, "> LFSR p", NULL, settings::STORAGE_TYPE_U8 },
+    { 0, 0, 3, "> LFSR CV1", OC::Strings::TM_aux_cv_destinations, settings::STORAGE_TYPE_U8 }, // ??
+    { 0, 0, 15, "> BB eqn", OC::Strings::bytebeat_equation_names, settings::STORAGE_TYPE_U8 },
+    { 8, 1, 255, "> BB P0", NULL, settings::STORAGE_TYPE_U8 },
+    { 12, 1, 255, "> BB P1", NULL, settings::STORAGE_TYPE_U8 },
+    { 14, 1, 255, "> BB P2", NULL, settings::STORAGE_TYPE_U8 },
+    { 0, 0, 4, "> BB CV1", bb_CV_destinations, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 9, "> IntSeq", OC::Strings::integer_sequence_names, settings::STORAGE_TYPE_U4 },
+    { 24, 2, 121, "> IntSeq modul", NULL, settings::STORAGE_TYPE_U8 },
+    { 0, 0, kIntSeqLen - 2, "> IntSeq start", NULL, settings::STORAGE_TYPE_U8 },
+    { 8, 2, kIntSeqLen, "> IntSeq len", NULL, settings::STORAGE_TYPE_U8 },
+    { 1, 0, 1, "> IntSeq dir", OC::Strings::integer_sequence_dirs, settings::STORAGE_TYPE_U4 },
+    { 1, 1, kIntSeqLen - 1, "> Fract stride", NULL, settings::STORAGE_TYPE_U8 },
+    { 0, 0, 5, "> IntSeq CV1", int_seq_CV_destinations, settings::STORAGE_TYPE_U4 }
+  }};
 };
-
-const char* const asr_cv4_destinations[] = {
-  "oct", "root", "trns", "buf.l", "igain"
-};
-
-const char* const bb_CV_destinations[] = {
-  "igain", "eqn", "P0", "P1", "P2"
-};
-
-const char* const int_seq_CV_destinations[] = {
-  "igain", "seq", "strt", "len", "strd", "mod"
-};
-
-// TOTAL EEPROM SIZE: 23 bytes
-SETTINGS_DECLARE(ASRApp, ASR_SETTING_LAST) {
-  { OC::Scales::SCALE_SEMI, 0, OC::Scales::NUM_SCALES - 1, "Scale", OC::scale_names_short, settings::STORAGE_TYPE_U8 },
-  { 0, -5, 5, "octave", NULL, settings::STORAGE_TYPE_I8 }, // octave
-  { 0, 0, 11, "root", OC::Strings::note_names_unpadded, settings::STORAGE_TYPE_U8 },
-  { 65535, 1, 65535, "mask", NULL, settings::STORAGE_TYPE_U16 }, // mask
-  { 0, 0, ASR_HOLD_BUF_SIZE - 1, "buf.index", NULL, settings::STORAGE_TYPE_U8 },
-  { MULT_ONE, 0, NUM_INPUT_SCALING - 1, "input gain", OC::Strings::mult, settings::STORAGE_TYPE_U8 },
-  { 0, 0, OC::kNumDelayTimes - 1, "trigger delay", OC::Strings::trigger_delay_times, settings::STORAGE_TYPE_U8 },
-  { 4, 4, ASR_HOLD_BUF_SIZE - 1, "hold (buflen)", NULL, settings::STORAGE_TYPE_U8 },
-  { 0, 0, ASR_CHANNEL_SOURCE_LAST -1, "CV source", asr_input_sources, settings::STORAGE_TYPE_U4 },
-  { 0, 0, ASR_DEST_LAST - 1, "CV4 dest. ->", asr_cv4_destinations, settings::STORAGE_TYPE_U4 },
-  { 16, 1, 32, "> LFSR length", NULL, settings::STORAGE_TYPE_U8 },
-  { 128, 0, 255, "> LFSR p", NULL, settings::STORAGE_TYPE_U8 },
-  { 0, 0, 3, "> LFSR CV1", OC::Strings::TM_aux_cv_destinations, settings::STORAGE_TYPE_U8 }, // ??
-  { 0, 0, 15, "> BB eqn", OC::Strings::bytebeat_equation_names, settings::STORAGE_TYPE_U8 },
-  { 8, 1, 255, "> BB P0", NULL, settings::STORAGE_TYPE_U8 },
-  { 12, 1, 255, "> BB P1", NULL, settings::STORAGE_TYPE_U8 },
-  { 14, 1, 255, "> BB P2", NULL, settings::STORAGE_TYPE_U8 },
-  { 0, 0, 4, "> BB CV1", bb_CV_destinations, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 9, "> IntSeq", OC::Strings::integer_sequence_names, settings::STORAGE_TYPE_U4 },
-  { 24, 2, 121, "> IntSeq modul", NULL, settings::STORAGE_TYPE_U8 },
-  { 0, 0, kIntSeqLen - 2, "> IntSeq start", NULL, settings::STORAGE_TYPE_U8 },
-  { 8, 2, kIntSeqLen, "> IntSeq len", NULL, settings::STORAGE_TYPE_U8 },
-  { 1, 0, 1, "> IntSeq dir", OC::Strings::integer_sequence_dirs, settings::STORAGE_TYPE_U4 },
-  { 1, 1, kIntSeqLen - 1, "> Fract stride", NULL, settings::STORAGE_TYPE_U8 },
-  { 0, 0, 5, "> IntSeq CV1", int_seq_CV_destinations, settings::STORAGE_TYPE_U4 }
-};
+SETTINGS_ARRAY_DEFINE(ASR);
 
 /* -------------------------------------------------------------------*/
 
-class ASRState {
-public:
+namespace OC {
 
-  void Init() {
-    cursor.Init(ASR_SETTING_SCALE, ASR_SETTING_LAST - 1);
-    scale_editor.Init(false);
-    left_encoder_value = OC::Scales::SCALE_SEMI;
-  }
+OC_APP_TRAITS(AppASR, TWOCCS("AS"), "CopierMaschine", "ASR");
+class OC_APP_CLASS(AppASR) {
+public:
+  OC_APP_INTERFACE_DECLARE(AppASR);
+  OC_APP_STORAGE_SIZE(ASR::storageSize());
+
+private:
+
+  ASR asr_;
+  int left_encoder_value_;
+  menu::ScreenCursor<menu::kScreenLines> cursor_;
+  ScaleEditor scale_editor_;
 
   inline bool editing() const {
-    return cursor.editing();
+    return cursor_.editing();
   }
 
   inline int cursor_pos() const {
-    return cursor.cursor_pos();
+    return cursor_.cursor_pos();
   }
 
-  int left_encoder_value;
-  menu::ScreenCursor<menu::kScreenLines> cursor;
-  menu::ScreenCursor<menu::kScreenLines> cursor_state;
-  OC::ScaleEditor<ASRApp> scale_editor;
+  void HandleTopButton();
+  void HandleLowerButton();
+  void HandleRightButton();
+  void HandleLeftButton();
+  void HandleLeftButtonLong();
+  void HandleDownButtonLong();
 };
 
-ASRState asr_state;
-ASRApp asr;
+void AppASR::Init() {
+  asr_.InitDefaults();
+  asr_.init();
 
-void ASR_init() {
+  left_encoder_value_ = Scales::SCALE_SEMI;
+  cursor_.Init(ASR_SETTING_SCALE, ASR_SETTING_LAST - 1);
+  scale_editor_.Init(false);
 
-  asr.InitDefaults();
-  asr.init();
-  asr_state.Init();
-  asr.update_enabled_settings();
-  asr_state.cursor.AdjustEnd(asr.num_enabled_settings() - 1);
+  asr_.update_enabled_settings();
+  cursor_.AdjustEnd(asr_.num_enabled_settings() - 1);
 }
 
-static constexpr size_t ASR_storageSize() {
-  return ASRApp::storageSize();
+size_t AppASR::SaveAppData(util::StreamBufferWriter &stream_buffer) const {
+  asr_.Save(stream_buffer);
+
+  return stream_buffer.written();
 }
 
-static size_t ASR_restore(const void *storage) {
+size_t AppASR::RestoreAppData(util::StreamBufferReader &stream_buffer) {
+  asr_.Restore(stream_buffer);
+
   // init nicely
-  size_t storage_size = asr.Restore(storage);
-  asr_state.left_encoder_value = asr.get_scale(DUMMY);
-  asr.set_scale(asr_state.left_encoder_value);
-  asr.clear_freeze();
-  asr.set_display_mask(asr.get_mask());
-  asr.update_enabled_settings();
-  asr_state.cursor.AdjustEnd(asr.num_enabled_settings() - 1);
-  return storage_size;
+  left_encoder_value_ = asr_.get_scale(); 
+  asr_.set_scale(left_encoder_value_);
+  asr_.clear_freeze();
+  asr_.set_display_mask(asr_.get_scale_mask());
+  asr_.update_enabled_settings();
+  cursor_.AdjustEnd(asr_.num_enabled_settings() - 1);
+
+  return stream_buffer.read();
 }
 
-void ASR_handleAppEvent(OC::AppEvent event) {
+void AppASR::HandleAppEvent(AppEvent event) {
   switch (event) {
-    case OC::APP_EVENT_RESUME:
-      asr_state.cursor.set_editing(false);
-      asr_state.scale_editor.Close();
+    case APP_EVENT_RESUME:
+      cursor_.set_editing(false);
+      scale_editor_.Close();
       break;
-    case OC::APP_EVENT_SUSPEND:
-    case OC::APP_EVENT_SCREENSAVER_ON:
-    case OC::APP_EVENT_SCREENSAVER_OFF:
-      asr.update_enabled_settings();
-      asr_state.cursor.AdjustEnd(asr.num_enabled_settings() - 1);
+    case APP_EVENT_SUSPEND:
+    case APP_EVENT_SCREENSAVER_ON:
+    case APP_EVENT_SCREENSAVER_OFF:
+      asr_.update_enabled_settings();
+      cursor_.AdjustEnd(asr_.num_enabled_settings() - 1);
       break;
   }
 }
 
-void ASR_loop() {
+void AppASR::Loop() {
 }
 
-void ASR_isr() {
-  asr.update();
+void AppASR::Process(IOFrame *ioframe) {
+  asr_.update(ioframe);
 }
 
-void ASR_topButton() {
-  if (asr.octave_toggle())
-    asr.change_value(ASR_SETTING_OCTAVE, 1);
+void AppASR::GetIOConfig(IOConfig &ioconfig) const
+{
+  ioconfig.digital_inputs[DIGITAL_INPUT_1].set("Clock");
+  ioconfig.digital_inputs[DIGITAL_INPUT_2].set("Freeze");
+  ioconfig.digital_inputs[DIGITAL_INPUT_3].set("Oct+");
+  ioconfig.digital_inputs[DIGITAL_INPUT_4].set("Oct-");
+
+  const char *src = asr_input_sources[asr_.get_cv_source()];
+  const char *mod = nullptr;
+  switch (asr_.get_cv_source()) {
+    case ASR_CHANNEL_SOURCE_TURING:
+      mod = Strings::TM_aux_cv_destinations[asr_.get_turing_CV()];
+      break;
+    case ASR_CHANNEL_SOURCE_BYTEBEAT:
+      mod = bb_CV_destinations[asr_.get_bytebeat_CV()];
+      break;
+    case ASR_CHANNEL_SOURCE_INTEGER_SEQUENCES:
+      mod = int_seq_CV_destinations[asr_.get_int_seq_CV()];
+      break;
+    default:
+      break;
+  }
+  auto &cv_ch1 = ioconfig.cv[CVInput1];
+  if (mod)
+    cv_ch1.set_printf("*%s:%s", src, mod);
   else
-    asr.change_value(ASR_SETTING_OCTAVE, -1);
+    cv_ch1.set_printf("S&H");
+  ioconfig.cv[CVInput2].set("*index");
+  ioconfig.cv[CVInput3].set("*scale");
+  ioconfig.cv[CVInput4].set_printf("*%s", asr_cv4_destinations[asr_.get_cv4_destination()]);
+
+  ioconfig.outputs[DAC_CHANNEL_A].set("ASR Tap1", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[DAC_CHANNEL_B].set("ASR Tap2", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[DAC_CHANNEL_C].set("ASR Tap3", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[DAC_CHANNEL_D].set("ASR Tap4", OUTPUT_MODE_PITCH);
 }
 
-void ASR_lowerButton() {
-   asr.manual_freeze();
-}
-
-void ASR_rightButton() {
-
-  switch (asr.enabled_setting_at(asr_state.cursor_pos())) {
-
-      case ASR_SETTING_MASK: {
-        int scale = asr.get_scale(DUMMY);
-        if (OC::Scales::SCALE_NONE != scale)
-          asr_state.scale_editor.Edit(&asr, scale);
-        }
-      break;
-      default:
-        asr_state.cursor.toggle_editing();
-      break;
-  }
-}
-
-void ASR_leftButton() {
-
-  if (asr_state.left_encoder_value != asr.get_scale(DUMMY))
-    asr.set_scale(asr_state.left_encoder_value);
-}
-
-void ASR_leftButtonLong() {
-
-  int scale = asr_state.left_encoder_value;
-  asr.set_scale(asr_state.left_encoder_value);
-  if (scale != OC::Scales::SCALE_NONE)
-      asr_state.scale_editor.Edit(&asr, scale);
-}
-
-void ASR_downButtonLong() {
-   asr.toggle_delay_mechanics();
-}
-
-void ASR_handleButtonEvent(const UI::Event &event) {
-  if (asr_state.scale_editor.active()) {
-    asr_state.scale_editor.HandleButtonEvent(event);
+void AppASR::HandleButtonEvent(const UI::Event &event) {
+  if (scale_editor_.active()) {
+    scale_editor_.HandleButtonEvent(event);
     return;
   }
 
   if (UI::EVENT_BUTTON_PRESS == event.type) {
     switch (event.control) {
-      case OC::CONTROL_BUTTON_UP:
-        ASR_topButton();
+      case CONTROL_BUTTON_UP:
+        HandleTopButton();
         break;
-      case OC::CONTROL_BUTTON_DOWN:
-        ASR_lowerButton();
+      case CONTROL_BUTTON_DOWN:
+        HandleLowerButton();
         break;
-      case OC::CONTROL_BUTTON_L:
-        ASR_leftButton();
+      case CONTROL_BUTTON_L:
+        HandleLeftButton();
         break;
-      case OC::CONTROL_BUTTON_R:
-        ASR_rightButton();
+      case CONTROL_BUTTON_R:
+        HandleRightButton();
         break;
     }
   } else if (UI::EVENT_BUTTON_LONG_PRESS == event.type) {
-    if (OC::CONTROL_BUTTON_L == event.control)
-      ASR_leftButtonLong();
-    else if (OC::CONTROL_BUTTON_DOWN == event.control)
-      ASR_downButtonLong();
+    if (CONTROL_BUTTON_L == event.control)
+      HandleLeftButtonLong();
+    else if (CONTROL_BUTTON_DOWN == event.control)
+      HandleDownButtonLong();  
   }
 }
 
-void ASR_handleEncoderEvent(const UI::Event &event) {
+void AppASR::HandleEncoderEvent(const UI::Event &event) {
 
-  if (asr_state.scale_editor.active()) {
-    asr_state.scale_editor.HandleEncoderEvent(event);
+  if (scale_editor_.active()) {
+    scale_editor_.HandleEncoderEvent(event);
     return;
   }
 
-  if (OC::CONTROL_ENCODER_L == event.control) {
+  if (CONTROL_ENCODER_L == event.control) {
+    
+    int value = left_encoder_value_ + event.value;
+    CONSTRAIN(value, 0, Scales::NUM_SCALES - 1);
+    left_encoder_value_ = value;
+    
+  } else if (CONTROL_ENCODER_R == event.control) {
 
-    int value = asr_state.left_encoder_value + event.value;
-    CONSTRAIN(value, 0, OC::Scales::NUM_SCALES - 1);
-    asr_state.left_encoder_value = value;
+    if (editing()) {  
 
-  } else if (OC::CONTROL_ENCODER_R == event.control) {
-
-    if (asr_state.editing()) {
-
-    ASRSettings setting = asr.enabled_setting_at(asr_state.cursor_pos());
+    ASRSettings setting = asr_.enabled_setting_at(cursor_pos());
 
     if (ASR_SETTING_MASK != setting) {
 
-          if (asr.change_value(setting, event.value))
-             asr.force_update();
-
+          if (asr_.change_value(setting, event.value))
+             asr_.force_update();
+             
           switch(setting) {
 
             case ASR_SETTING_CV_SOURCE:
-              asr.update_enabled_settings();
-              asr_state.cursor.AdjustEnd(asr.num_enabled_settings() - 1);
+              asr_.update_enabled_settings();
+              cursor_.AdjustEnd(asr_.num_enabled_settings() - 1);
               // hack/hide extra options when default CV source is selected
-              if (!asr.get_cv_source())
-                asr_state.cursor.Scroll(asr_state.cursor_pos());
+              if (!asr_.get_cv_source()) 
+                cursor_.Scroll(cursor_pos());
             break;
             default:
             break;
           }
         }
     } else {
-      asr_state.cursor.Scroll(event.value);
+      cursor_.Scroll(event.value);
     }
   }
 }
 
-static size_t ASR_save(void *storage) {
-  return asr.Save(storage);
+
+void AppASR::HandleTopButton() {
+  if (asr_.octave_toggle())
+    asr_.change_value(ASR_SETTING_OCTAVE, 1);
+  else 
+    asr_.change_value(ASR_SETTING_OCTAVE, -1);
 }
 
-void ASR_menu() {
+void AppASR::HandleLowerButton() {
+   asr_.toggle_manual_freeze();
+}
 
-  menu::TitleBar<0, 4, 0>::Draw();
+void AppASR::HandleRightButton() {
 
-  int scale = asr_state.left_encoder_value;
-  graphics.movePrintPos(weegfx::kFixedFontW, 0);
-  graphics.print(OC::scale_names[scale]);
+  switch (asr_.enabled_setting_at(cursor_pos())) {
 
-  if (asr.freeze_state())
-    graphics.drawBitmap8(1, menu::QuadTitleBar::kTextY, 4, OC::bitmap_hold_indicator_4x8);
-  else if (asr.get_scale(DUMMY) == scale)
-    graphics.drawBitmap8(1, menu::QuadTitleBar::kTextY, 4, OC::bitmap_indicator_4x8);
+      case ASR_SETTING_MASK: {
+        int scale = asr_.get_scale();
+        if (Scales::SCALE_NONE != scale)
+          scale_editor_.Edit(&asr_, scale);
+        }
+      break;
+      default:
+        cursor_.toggle_editing();
+      break;  
+  }
+}
 
-  if (asr.poke_octave_toggle()) {
+void AppASR::HandleLeftButton() {
+
+  if (left_encoder_value_ != asr_.get_scale())
+    asr_.set_scale(left_encoder_value_);
+}
+
+void AppASR::HandleLeftButtonLong() {
+
+  int scale = left_encoder_value_;
+  asr_.set_scale(left_encoder_value_);
+  if (scale != Scales::SCALE_NONE) 
+      scale_editor_.Edit(&asr_, scale);
+}
+
+void AppASR::HandleDownButtonLong() {
+   asr_.toggle_delay_mechanics();
+}
+
+void AppASR::DrawMenu() const {
+
+  menu::TitleBar<0, 4, 0>::Draw(io_settings_status_mask());
+
+  int scale = left_encoder_value_;
+  graphics.movePrintPos(weegfx::Graphics::kFixedFontW, 0);
+  graphics.print(scale_names[scale]);
+
+  if (asr_.get_scale() == scale)
+    graphics.drawBitmap8(1, menu::QuadTitleBar::kTextY, 4, bitmap_indicator_4x8);
+
+  if (asr_.freeze_state())
+    graphics.drawBitmap8(102, menu::QuadTitleBar::kTextY, 4, bitmap_hold_indicator_4x8);  
+
+  if (asr_.poke_octave_toggle()) {
     graphics.setPrintPos(110, 2);
     graphics.print("+");
   }
 
-  if (asr.get_delay_type())
-    graphics.drawBitmap8(118, menu::QuadTitleBar::kTextY, 4, OC::bitmap_hold_indicator_4x8);
-  else
-    graphics.drawBitmap8(118, menu::QuadTitleBar::kTextY, 4, OC::bitmap_indicator_4x8);
+  if (asr_.get_delay_type())
+    graphics.drawBitmap8(118, menu::QuadTitleBar::kTextY, 4, bitmap_hold_indicator_4x8);
+  else 
+    graphics.drawBitmap8(118, menu::QuadTitleBar::kTextY, 4, bitmap_indicator_4x8);
 
-  uint8_t clock_state = (asr.clockState() + 3) >> 2;
+  uint8_t clock_state = (asr_.clockState() + 3) >> 2;
   if (clock_state)
-    graphics.drawBitmap8(124, 2, 4, OC::bitmap_gate_indicators_8 + (clock_state << 2));
+    graphics.drawBitmap8(124, 2, 4, bitmap_gate_indicators_8 + (clock_state << 2));
 
-  menu::SettingsList<menu::kScreenLines, 0, menu::kDefaultValueX> settings_list(asr_state.cursor);
+  menu::SettingsList<menu::kScreenLines, 0, menu::kDefaultValueX> settings_list(cursor_);
   menu::SettingsListItem list_item;
 
   while (settings_list.available()) {
 
-    const int setting = asr.enabled_setting_at(settings_list.Next(list_item));
-    const int value = asr.get_value(setting);
-    const settings::value_attr &attr = ASRApp::value_attr(setting);
+    const int setting = asr_.enabled_setting_at(settings_list.Next(list_item));
+    const int value = asr_.get_value(setting);
+    const auto &attr = ASR::value_attributes(setting); 
 
     switch (setting) {
 
       case ASR_SETTING_MASK:
-      menu::DrawMask<false, 16, 8, 1>(menu::kDisplayWidth, list_item.y, asr.get_rotated_mask(), OC::Scales::GetScale(asr.get_scale(DUMMY)).num_notes);
+      menu::DrawMask<false, 16, 8, 1>(menu::kDisplayWidth, list_item.y, asr_.get_rotated_mask(), Scales::GetScale(asr_.get_scale()).num_notes);
       list_item.DrawNoValue<false>(value, attr);
       break;
       case ASR_SETTING_CV_SOURCE:
-      if (asr.get_cv_source() == ASR_CHANNEL_SOURCE_TURING) {
-
-          int turing_length = asr.get_turing_display_length();
+      if (asr_.get_cv_source() == ASR_CHANNEL_SOURCE_TURING) {
+       
+          int turing_length = asr_.get_turing_display_length();
           int w = turing_length >= 16 ? 16 * 3 : turing_length * 3;
 
-          menu::DrawMask<true, 16, 8, 1>(menu::kDisplayWidth, list_item.y, asr.get_shift_register(), turing_length);
+          menu::DrawMask<true, 16, 8, 1>(menu::kDisplayWidth, list_item.y, asr_.get_shift_register(), turing_length);
           list_item.valuex = menu::kDisplayWidth - w - 1;
           list_item.DrawNoValue<true>(value, attr);
        } else
@@ -1039,13 +1038,11 @@ void ASR_menu() {
       break;
     }
   }
-  if (asr_state.scale_editor.active())
-    asr_state.scale_editor.Draw();
+  if (scale_editor_.active())
+    scale_editor_.Draw(); 
 }
 
-uint16_t channel_history[ASRApp::kHistoryDepth];
-
-void ASR_screensaver() {
+void AppASR::DrawScreensaver() const {
 
 // Possible variants (w x h)
 // 4 x 32x64 px
@@ -1054,21 +1051,31 @@ void ASR_screensaver() {
 // Normalize history to within one octave? That would make steps more visisble for small ranges
 // "Zoomed view" to fit range of history...
 
+  int32_t channel_history[ASR::kHistoryDepth];
   for (int i = 0; i < NUM_ASR_CHANNELS; ++i) {
-    asr.history(i).Read(channel_history);
-    uint32_t scroll_pos = asr.history(i).get_scroll_pos() >> 5;
+    asr_.history(i).Read(channel_history);
+
+    std::transform(
+        std::begin(channel_history), std::end(channel_history),
+        std::begin(channel_history),
+        [](int32_t pitch) { return IO::pitch_rel_to_abs(pitch); } );
+
+    uint32_t scroll_pos = asr_.history(i).get_scroll_pos() >> 5;
 
     int pos = 0;
     weegfx::coord_t x = i * 32, y;
 
-    y = 63 - ((channel_history[pos++] >> 10) & 0x3f);
+    // Was: 10oct => 65536 / 1024 = 64px
+    // Now: 10oct => 1536 x 10 / 256 = 60px
+
+    y = 64 - ((channel_history[pos++] >> 8) & 0x3f);
     graphics.drawHLine(x, y, scroll_pos);
     x += scroll_pos;
     graphics.drawVLine(x, y, 3);
 
     weegfx::coord_t last_y = y;
     for (int c = 0; c < 3; ++c) {
-      y = 63 - ((channel_history[pos++] >> 10) & 0x3f);
+      y = 64 - ((channel_history[pos++] >> 8) & 0x3f);
       graphics.drawHLine(x, y, 8);
       if (y == last_y)
         graphics.drawVLine(x, y, 2);
@@ -1079,9 +1086,10 @@ void ASR_screensaver() {
       x += 8;
       last_y = y;
 //      graphics.drawVLine(x, y, 3);
+
     }
 
-    y = 63 - ((channel_history[pos++] >> 10) & 0x3f);
+    y = 64 - ((channel_history[pos++] >> 8) & 0x3f);
 //    graphics.drawHLine(x, y, 8 - scroll_pos);
     graphics.drawRect(x, y, 8 - scroll_pos, 2);
     if (y == last_y)
@@ -1095,22 +1103,22 @@ void ASR_screensaver() {
   }
 }
 
+void AppASR::DrawDebugInfo() const {
 #ifdef ASR_DEBUG
-void ASR_debug() {
-  for (int i = 0; i < 1; ++i) {
-    uint8_t ypos = 10*(i + 1) + 2 ;
+  for (int i = 0; i < 1; ++i) { 
+    uint8_t ypos = 10*(i + 1) + 2 ; 
     graphics.setPrintPos(2, ypos);
-    graphics.print(asr.get_int_seq_i());
+    graphics.print(asr_.get_int_seq_i());
     graphics.setPrintPos(32, ypos);
-    graphics.print(asr.get_int_seq_l());
+    graphics.print(asr_.get_int_seq_l());
     graphics.setPrintPos(62, ypos);
-    graphics.print(asr.get_int_seq_j());
+    graphics.print(asr_.get_int_seq_j());
     graphics.setPrintPos(92, ypos);
-    graphics.print(asr.get_int_seq_k());
+    graphics.print(asr_.get_int_seq_k());
     graphics.setPrintPos(122, ypos);
-    graphics.print(asr.get_int_seq_n());
+    graphics.print(asr_.get_int_seq_n());
  }
-}
 #endif // ASR_DEBUG
+}
 
-#endif // ENABLE_APP_ASR
+} // namespace OC

@@ -38,8 +38,6 @@
 #include "OC_gpio.h"
 #include "OC_options.h"
 #include "OC_calibration.h"
-#include "OC_autotune_presets.h"
-#include "OC_autotune.h"
 #if defined(__IMXRT1062__)
 #include <SPI.h>
 #endif
@@ -53,14 +51,13 @@ int DAC::kOctaveZero = 0;
 #endif
 
 /*static*/
-void DAC::Init(CalibrationData *calibration_data) {
+void DAC::Init(const CalibrationData *calibration_data, const AutotuneCalibrationData *autotune_calibration_data) {
 
   calibration_data_ = calibration_data;
-  
-  restore_scaling(0x0);
+  autotune_calibration_data_ = autotune_calibration_data;
 
   // set up DAC pins 
-  OC::pinMode(DAC_CS, OUTPUT);
+  pinMode(DAC_CS, OUTPUT);
 
   // set Vbias, using onboard DAC - does nothing on non-VOR hardware
   init_Vbias();
@@ -69,7 +66,7 @@ void DAC::Init(CalibrationData *calibration_data) {
   
 #ifndef VOR
   // VOR button uses the same pin as DAC_RST
-  OC::pinMode(DAC_RST,OUTPUT);
+  pinMode(DAC_RST,OUTPUT);
   #ifdef DAC8564 // A0 = 0, A1 = 0
     digitalWrite(DAC_RST, LOW); 
   #else  // default to DAC8565 - pull RST high 
@@ -110,128 +107,6 @@ void DAC::Init(CalibrationData *calibration_data) {
   Update();
 }
 
-/*static*/
-uint8_t DAC::calibration_data_used(uint8_t channel_id) {
-  const OC::Autotune_data &autotune_data = OC::AUTOTUNE::GetAutotune_data(channel_id);
-  return autotune_data.use_auto_calibration_;
-}
-/*static*/
-void DAC::set_auto_channel_calibration_data(uint8_t channel_id) {
-  
-  SERIAL_PRINTLN("use auto calibration data ... (channel: %d)", channel_id + 1);
-  
-  if (channel_id < DAC_CHANNEL_LAST) {
-  
-    OC::Autotune_data *_autotune_data = &OC::auto_calibration_data[channel_id];
-    if (_autotune_data->use_auto_calibration_ == 0xFF)  { // = data available ?
-      
-        _autotune_data->use_auto_calibration_ = 0x01; // = use auto data 
-        // update data:
-        const OC::Autotune_data &autotune_data = OC::AUTOTUNE::GetAutotune_data(channel_id);
-        for (int i = 0; i < OCTAVES + 1; i++)
-          calibration_data_->calibrated_octaves[channel_id][i] = autotune_data.auto_calibrated_octaves[i];
-    } 
-  }
-}
-/*static*/
-void DAC::set_default_channel_calibration_data(uint8_t channel_id) {
-  
-  SERIAL_PRINTLN("reset to core/default calibration data ... (channel: %d)", channel_id + 1);
-  
-  if (channel_id < DAC_CHANNEL_LAST) {
-
-    // reset data
-    for (int i = 0; i < OCTAVES + 1; i++) 
-      calibration_data_->calibrated_octaves[channel_id][i] = OC::calibration_data.dac.calibrated_octaves[channel_id][i];
-    // + update info
-    OC::Autotune_data *autotune_data = &OC::auto_calibration_data[channel_id];
-    if (autotune_data->use_auto_calibration_ == 0xFF || autotune_data->use_auto_calibration_ == 0x01)
-      autotune_data->use_auto_calibration_ = 0xFF; // = data available, but not used
-    else 
-      autotune_data->use_auto_calibration_ = 0x00;
-  }
-}
-/*static*/
-void DAC::update_auto_channel_calibration_data(uint8_t channel_id, int8_t octave, uint32_t pitch_data) {
-  
-  SERIAL_PRINTLN("update: ch.#%d -> %d (%d)", (int)(channel_id + 1), (int)pitch_data, (int)octave);
-  
-  if (channel_id < DAC_CHANNEL_LAST) {
-
-      // write data
-      OC::Autotune_data *autotune_data = &OC::auto_calibration_data[channel_id];
-      autotune_data->auto_calibrated_octaves[octave] = pitch_data;
-      // + update info
-      if (octave == OCTAVES) {
-        autotune_data->use_auto_calibration_ = 0xFF; // = data available, but not used
-        SERIAL_PRINTLN("set auto-calibration data, %d", autotune_data->use_auto_calibration_);
-      }
-   }
-}
-/*static*/
-void DAC::reset_auto_channel_calibration_data(uint8_t channel_id) {
-  
-  // reset data
-  if (channel_id < DAC_CHANNEL_LAST) {
-    SERIAL_PRINTLN("reset channel# %d calibration data", (int)(channel_id + 1));
-    OC::Autotune_data *autotune_data = &OC::auto_calibration_data[channel_id];
-    autotune_data->use_auto_calibration_ = 0x0;
-    for (int i = 0; i < OCTAVES + 1; i++)
-      autotune_data->auto_calibrated_octaves[i] = OC::calibration_data.dac.calibrated_octaves[channel_id][i];
-  }
-}
-/*static*/
-void DAC::reset_all_auto_channel_calibration_data(){
-   for (int i = 0; i < DAC_CHANNEL_LAST; i++)
-      reset_auto_channel_calibration_data(i);
-}
-/*static*/
-void DAC::choose_calibration_data() {
-  
-  // at this point, global settings are restored
-  for (int i = 0; i < DAC_CHANNEL_LAST; i++) {
-    
-    const OC::Autotune_data &autotune_data = OC::AUTOTUNE::GetAutotune_data(i);
-
-    if (autotune_data.use_auto_calibration_ == 0x0) { 
-    // no autotune_data yet, so we use defaults:
-      reset_auto_channel_calibration_data(i);
-    }
-    else if (autotune_data.use_auto_calibration_ == 0xFF) {
-    // use autotune_data
-      set_auto_channel_calibration_data(i);
-    }
-    // ... else use default calibration
-  }
-}
-/*static*/
-uint8_t DAC::get_voltage_scaling(uint8_t channel_id) {
-  return DAC_scaling[channel_id];
-}
-/*static*/
-void DAC::set_scaling(uint8_t scaling, uint8_t channel_id) {
-
-  if (channel_id < DAC_CHANNEL_LAST)
-    DAC_scaling[channel_id] = scaling;
-}
-/*static*/
-void DAC::restore_scaling(uint32_t scaling) {
-  
-  // restore scaling from global settings
-  for (int i = 0; i < DAC_CHANNEL_LAST; i++) {
-    uint8_t _scaling = (scaling >> (i * 8)) & 0xFF;
-    set_scaling(_scaling, i);
-  }
-}
-uint32_t DAC::store_scaling() {
-
-  uint32_t _scaling = 0;
-  // merge values into uint32_t : 
-  for (int i = 0; i < DAC_CHANNEL_LAST; i++)
-    _scaling |= (DAC_scaling[i] << (i * 8)); 
-  return _scaling;
-}
-
 #if defined(__MK20DX256__)
 /*static*/ 
 void DAC::init_Vbias() {
@@ -256,141 +131,39 @@ void DAC::set_Vbias(uint32_t data) {
 #endif
 
 /*static*/
-DAC::CalibrationData *DAC::calibration_data_ = nullptr;
+const DAC::CalibrationData *DAC::calibration_data_ = nullptr;
+
+/*static*/
+const DAC::AutotuneCalibrationData *DAC::autotune_calibration_data_ = nullptr;
+
 /*static*/
 uint32_t DAC::values_[DAC_CHANNEL_LAST];
+
 /*static*/
 uint16_t DAC::history_[DAC_CHANNEL_LAST][DAC::kHistoryDepth];
+
 /*static*/ 
 volatile size_t DAC::history_tail_;
-/*static*/ 
-uint8_t DAC::DAC_scaling[DAC_CHANNEL_LAST];
-}; // namespace OC
+
+} // namespace OC
+
+void DAC8565::Write(uint32_t cmd, uint32_t data) {
+#ifdef BUCHLA_cOC
+#else
+  data = kMaxValue - data;
+#endif
 
 #if defined(__MK20DX256__)
-void set8565_CHA(uint32_t data) {
-  #if defined(NORTHERNLIGHT) && !defined(NLM_DIY)
-  uint32_t _data = data;
-  #else
-  uint32_t _data = OC::DAC::MAX_VALUE - data;
-  #endif
-  #ifdef FLIP_180
-  SPIFIFO.write(0b00010110, SPI_CONTINUE);
-  #else
-  SPIFIFO.write(0b00010000, SPI_CONTINUE);
-  #endif
-  SPIFIFO.write16(_data);
+  SPIFIFO.write(cmd, SPI_CONTINUE);
+  SPIFIFO.write16(data);
   SPIFIFO.read();
   SPIFIFO.read();
-}
-
-void set8565_CHB(uint32_t data) {
-  #if defined(NORTHERNLIGHT) && !defined(NLM_DIY)
-  uint32_t _data = data;
-  #else
-  uint32_t _data = OC::DAC::MAX_VALUE - data;
-  #endif
-  #ifdef FLIP_180
-  SPIFIFO.write(0b00010100, SPI_CONTINUE);
-  #else
-  SPIFIFO.write(0b00010010, SPI_CONTINUE);
-  #endif
-  SPIFIFO.write16(_data);
-  SPIFIFO.read();
-  SPIFIFO.read();
-}
-
-void set8565_CHC(uint32_t data) {
-  #if defined(NORTHERNLIGHT) && !defined(NLM_DIY)
-  uint32_t _data = data;
-  #else
-  uint32_t _data = OC::DAC::MAX_VALUE - data;
-  #endif
-  #ifdef FLIP_180
-  SPIFIFO.write(0b00010010, SPI_CONTINUE);
-  #else
-  SPIFIFO.write(0b00010100, SPI_CONTINUE);
-  #endif
-  SPIFIFO.write16(_data);
-  SPIFIFO.read();
-  SPIFIFO.read(); 
-}
-
-void set8565_CHD(uint32_t data) {
-  #if defined(NORTHERNLIGHT) && !defined(NLM_DIY)
-  uint32_t _data = data;
-  #else
-  uint32_t _data = OC::DAC::MAX_VALUE - data;
-  #endif
-  #ifdef FLIP_180
-  SPIFIFO.write(0b00010000, SPI_CONTINUE);
-  #else
-  SPIFIFO.write(0b00010110, SPI_CONTINUE);
-  #endif
-  SPIFIFO.write16(_data);
-  SPIFIFO.read();
-  SPIFIFO.read();
-}
-
-#elif defined(__IMXRT1062__) // Teensy 4.1
-void set8565_CHA(uint32_t data) {
-  LPSPI4_TCR = (LPSPI4_TCR & 0xF8000000) | LPSPI_TCR_FRAMESZ(23)
-    | LPSPI_TCR_PCS(0) | LPSPI_TCR_RXMSK;
-  #if defined(NORTHERNLIGHT) && !defined(NLM_DIY)
-  uint32_t _data = data;
-  #else
-  uint32_t _data = OC::DAC::MAX_VALUE - data;
-  #endif
-  #ifdef FLIP_180
-  _data = (0b00010110 << 16) | (_data & 0xFFFF);
-  #else
-  _data = (0b00010000 << 16) | (_data & 0xFFFF);
-  #endif
-  LPSPI4_TDR = _data;
-}
-
-void set8565_CHB(uint32_t data) {
-  #if defined(NORTHERNLIGHT) && !defined(NLM_DIY)
-  uint32_t _data = data;
-  #else
-  uint32_t _data = OC::DAC::MAX_VALUE - data;
-  #endif
-  #ifdef FLIP_180
-  _data = (0b00010100 << 16) | (_data & 0xFFFF);
-  #else
-  _data = (0b00010010 << 16) | (_data & 0xFFFF);
-  #endif
-  LPSPI4_TDR = _data;
-}
-void set8565_CHC(uint32_t data) {
-  #if defined(NORTHERNLIGHT) && !defined(NLM_DIY)
-  uint32_t _data = data;
-  #else
-  uint32_t _data = OC::DAC::MAX_VALUE - data;
-  #endif
-  #ifdef FLIP_180
-  _data = (0b00010010 << 16) | (_data & 0xFFFF);
-  #else
-  _data = (0b00010100 << 16) | (_data & 0xFFFF);
-  #endif
-  LPSPI4_TDR = _data;
-}
-void set8565_CHD(uint32_t data) {
-  #if defined(NORTHERNLIGHT) && !defined(NLM_DIY)
-  uint32_t _data = data;
-  #else
-  uint32_t _data = OC::DAC::MAX_VALUE - data;
-  #endif
-  #ifdef FLIP_180
-  _data = (0b00010000 << 16) | (_data & 0xFFFF);
-  #else
-  _data = (0b00010110 << 16) | (_data & 0xFFFF);
-  #endif
-  LPSPI4_SR = LPSPI_SR_TCF; //  clear transmit complete flag before last write to FIFO
-  LPSPI4_TDR = _data;
-}
-
+#elif defined(__IMXRT1062__) // Teensy 4.x
+  data = (cmd << 16) | (data & 0xFFFF);
+  LPSPI4_TDR = data;
 #endif // __IMXRT1062__
+
+}
 
 // adapted from https://github.com/xxxajk/spi4teensy3 (MISO disabled) : 
 

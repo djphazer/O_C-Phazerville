@@ -30,7 +30,7 @@ const Scale &Scales::GetScale(int index) {
     return braids::scales[index - SCALE_USER_LAST];
 }
 
-const char* const scale_names_short[] = {
+const char* const scale_names_short[Scales::NUM_SCALES] = {
     "USR1",
     "USR2",
     "USR3",
@@ -188,7 +188,7 @@ const char* const scale_names_short[] = {
     
     };
 
-const char* const scale_names[] = {
+const char* const scale_names[Scales::NUM_SCALES] = {
     "User-defined 1",
     "User-defined 2",
     "User-defined 3",

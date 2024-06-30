@@ -81,6 +81,8 @@ protected:
 
 public:
 
+  PageStorage() { }
+
   static const size_t LENGTH = END_ADDR - BASE_ADDR;
   static const size_t PAGESIZE = sizeof(page_data);
   static const size_t PAGES = LENGTH / PAGESIZE;

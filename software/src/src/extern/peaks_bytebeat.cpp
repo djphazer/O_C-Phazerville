@@ -32,7 +32,7 @@
 
 #include "peaks_bytebeat.h"
 
-#include "extern/stmlib_utils_dsp.h"
+#include "stmlib_utils_dsp.h"
 // #include "util/stmlib_random.h"
 
 namespace peaks {

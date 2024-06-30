@@ -1,10 +1,13 @@
 #ifndef OC_AUTOTUNER_H
 #define OC_AUTOTUNER_H
 
-#include "OC_calibration.h"
-#include "OC_autotune.h"
 #include "OC_options.h"
 #include "OC_visualfx.h"
+#include "OC_DAC.h"
+#include "OC_global_settings.h"
+#include "OC_menus.h"
+#include "OC_strings.h"
+#include "OC_ui.h"
 
 // autotune constants:
 #ifdef VOR
@@ -101,99 +104,109 @@ enum AUTO_CALIBRATION_STEP {
   AUTO_CALIBRATION_STEP_LAST
 };
 
+extern const char* const AT_steps[];
+extern const char *const reset_action_strings[];
+extern const char *const status_action_strings[];
+
+enum AUTOTUNER_SETTINGS {
+  AT_SETTING_RESET,
+  AT_SETTING_START,
+  AT_SETTING_END,
+  AT_SETTING_ACTION,
+  AUTOTUNER_SETTINGS_LAST
+};
+
+enum AUTOTUNER_RESET_ACTION {
+  AUTOTUNER_RESET, AUTOTUNER_USE, AUTOTUNER_RESET_ACTION_LAST
+};
+
+enum AUTOTUNER_STATUS_ACTION {
+  AUTOTUNER_ARM, AUTOTUNER_RUN, AUTOTUNER_STOP, AUTOTUNER_OK, AUTOTUNER_STATUS_ACTION_LAST
+};
+
+class AutotunerSettings : public settings::SettingsBase<AutotunerSettings, AUTOTUNER_SETTINGS_LAST> {
+public:
+  int start_offset() const { return get_value(AT_SETTING_START); }
+  int end_offset() const { return get_value(AT_SETTING_END); }
+
+  AUTOTUNER_STATUS_ACTION get_status_action() const {
+    return static_cast<AUTOTUNER_STATUS_ACTION>(get_value(AT_SETTING_ACTION));
+  }
+
+  AUTOTUNER_RESET_ACTION get_reset_action() const {
+    return static_cast<AUTOTUNER_RESET_ACTION>(get_value(AT_SETTING_RESET));
+  }
+
+  SETTINGS_ARRAY_DECLARE() {{
+    { OC::AUTOTUNER_RESET, OC::AUTOTUNER_RESET, OC::AUTOTUNER_RESET_ACTION_LAST - 1, "Autotune", OC::reset_action_strings, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 3, "Start voltage", OC::AT_steps, settings::STORAGE_TYPE_U4 },
+    { 0, -3, 0, "End voltage", /*trust me, I know what I'm doing*/OC::AT_steps + OCTAVES - 1, settings::STORAGE_TYPE_U4 },
+    { OC::AUTOTUNER_ARM, OC::AUTOTUNER_ARM, OC::AUTOTUNER_STATUS_ACTION_LAST - 1, "", OC::status_action_strings, settings::STORAGE_TYPE_U4 }
+  }};
+};
+
+// This is a slight refactoring of the original implementation.
+// It tries to treat the Owner as the model, and implements both the view and
+// controller parts, i.e. doesn't actually have many smarts.
+//
+// Ideally (for some value of ideal) the autotuning state might be extracted
+// from the channel, and this would interface with that without the templatery.
+//
 template <typename Owner>
 class Autotuner {
-
 public:
+
+  static constexpr uint32_t kAnimationTicks = OC_CORE_ISR_FREQ / 2; 
 
   void Init() {
     owner_ = nullptr;
-    cursor_pos_ = 0;
-    data_select_ = 0;
-    channel_ = DAC_CHANNEL_A;
-    calibration_data_ = 0;
-    run_status_ = AT_OFF;
+    channel_ = DAC_CHANNEL_D;
+    calibration_data_ = nullptr;
 
-    // moved from REFS
-    armed_ = false;
-    step_ = OC::DAC_VOLT_0_ARM;
-    auto_DAC_offset_error_ = 0;
-    auto_frequency_ = 0;
-    auto_last_frequency_ = 0;
-    auto_freq_sum_ = 0;
-    auto_freq_count_ = 0;
-    ready_ = 0;
-    ticks_since_last_freq_ = 0;
-    completed_ = false;
-    F_correction_factor_ = 0xFF;
-    correction_direction_ = false;
-    correction_cnt_positive_ = 0x0;
-    correction_cnt_negative_ = 0x0;
-    reset_calibration_data();
+    settings_.InitDefaults();
+    cursor_.Init(AT_SETTING_RESET, AT_SETTING_ACTION);
 
-    history_.Init(0x0);
+    memset(status_action_label_, 0, sizeof(status_action_label_));
+    ticks_ = 0;
+    animation_counter_ = 0;
   }
 
-  bool active() const {
+  inline bool active() const {
     return nullptr != owner_;
   }
 
-  void Open(Owner *owner) {
-    owner_ = owner;
-    channel_ = owner_->get_channel();
-    Begin();
-  }
-
-  void Reset() {
-      reset_autotuner();
-  }
-
-  void ISR();
+  void Open(Owner *owner);
   void Close();
-  void Draw();
+  void Update();
+  void Tick();
+  void Draw() const;
   void HandleButtonEvent(const UI::Event &event);
   void HandleEncoderEvent(const UI::Event &event);
-  
+
 private:
 
   Owner *owner_;
-  size_t cursor_pos_;
-  size_t data_select_;
+
   DAC_CHANNEL channel_;
-  uint8_t calibration_data_;
-  AT_STATUS run_status_;
+  const DAC::AutotuneChannelCalibrationData *calibration_data_;
 
-  // moved from References
-  OC::vfx::ScrollingHistory<uint32_t, kHistoryDepth> history_;
+  AutotunerSettings settings_;
+  menu::ScreenCursor<menu::kScreenLines> cursor_;
 
-  bool armed_;
-  uint8_t step_;
-  int32_t auto_DAC_offset_error_;
-  uint32_t auto_frequency_;
-  uint32_t auto_target_frequencies_[OCTAVES + 1];
-  int16_t auto_calibration_data_[OCTAVES + 1];
-  uint32_t auto_last_frequency_;
-  bool error_;
-  bool ready_;
-  bool completed_;
-  uint32_t auto_freq_sum_;
-  uint32_t auto_freq_count_;
-  uint32_t ticks_since_last_freq_;
-  uint32_t auto_num_passes_;
-  uint16_t F_correction_factor_;
-  bool correction_direction_;
-  int16_t correction_cnt_positive_;
-  int16_t correction_cnt_negative_;
-  int16_t octaves_cnt_;
-  // -----
+  char status_action_label_[16];
+  uint32_t ticks_;
+  uint_fast8_t animation_counter_;
 
-  void Begin();
-  void move_cursor(int offset);
-  void change_value(int offset);
+  void DoReset(AUTOTUNER_RESET_ACTION reset_action);
+  void DoAction(AUTOTUNER_STATUS_ACTION status_action);
+
   void handleButtonLeft(const UI::Event &event);
+  void handleButtonRight(const UI::Event &event);
   void handleButtonUp(const UI::Event &event);
   void handleButtonDown(const UI::Event &event);
 
+#if 0
+  // TODO: ported from old REFS, might need rewrites
 
   void autotuner_arm(uint8_t _status) {
     reset_autotuner();
@@ -493,131 +506,141 @@ private:
       break;
     }
   }
+#endif
 };
-
+  
   template <typename Owner>
-  void Autotuner<Owner>::ISR() {
-      if (armed_) {
-          updateDAC();
-          measure_frequency_and_calc_error();
-          ticks_since_last_freq_++;
-      }
+  void Autotuner<Owner>::Open(Owner *owner) {
+    owner_ = owner;
+    channel_ = owner_->get_channel();
+    calibration_data_ = &global_settings.autotune_calibration_data.channels[channel_];
+    cursor_.Init(AT_SETTING_RESET, AT_SETTING_ACTION);
+    settings_.InitDefaults();
+    memset(status_action_label_, 0, sizeof(status_action_label_));
 
-    if (error_) {
-      run_status_ = AT_ERROR;
-      reset_autotuner();
-    }
-    else if (completed_) {
-      run_status_ = AT_DONE;
-      completed_ = false;
-    }
-    
+    Update();
   }
 
   template <typename Owner>
-  void Autotuner<Owner>::Draw() {
-    
-    weegfx::coord_t w = 128;
-    weegfx::coord_t x = 0;
-    weegfx::coord_t y = 0;
-    weegfx::coord_t h = 64;
+  void Autotuner<Owner>::Close() {
+    ui.SetButtonIgnoreMask();
+    if (owner_) {
+      owner_->autotuner_reset();
+      owner_ = nullptr;
+    }
+  }
 
-    //graphics.clearRect(x, y, w, h);
-    graphics.drawFrame(x, y, w, h);
-    graphics.setPrintPos(x + 2, y + 3);
-    graphics.print(OC::Strings::channel_id[channel_]);
+  template <typename Owner>
+  void Autotuner<Owner>::DoReset(AUTOTUNER_RESET_ACTION reset_action) {
+  }
 
-    x = 16; y = 15;
+  template <typename Owner>
+  void Autotuner<Owner>::DoAction(AUTOTUNER_STATUS_ACTION status_action) {
+    switch(status_action) {
+    case AUTOTUNER_ARM: owner_->autotuner_arm(); break;
+    case AUTOTUNER_RUN: owner_->autotuner_run(); break;
+    case AUTOTUNER_STOP:
+    case AUTOTUNER_OK: owner_->autotuner_reset(); break;
+    default: break;
+    }
+  }
 
-    for (size_t i = 0; i < (AUTO_MENU_ITEMS_LAST - 0x1); ++i, y += 20) {
-        //
-      graphics.setPrintPos(x + 2, y + 4);
-      
-      if (i == DATA_SELECT) {
-        graphics.print("use --> ");
-        
-        switch(calibration_data_) {
-          case 0x0:
-          graphics.print("(dflt.)");
+  template <typename Owner>
+  void Autotuner<Owner>::Update() {
+    static constexpr const char *ellipses[4] = { "   ", ".  ", ".. ", "..." };
+    if (owner_->autotuner_active()) {
+      auto error = owner_->autotuner_error();
+      if (error) {
+        if (animation_counter_ > 4)
+          snprintf(status_action_label_, sizeof(status_action_label_), "Autotune fail");
+        else
+          snprintf(status_action_label_, sizeof(status_action_label_), "%s %d", error, owner_->get_octave_cnt());
+        settings_.apply_value(AT_SETTING_ACTION, AUTOTUNER_OK);
+      } else if (owner_->autotuner_completed()){
+        snprintf(status_action_label_, sizeof(status_action_label_), "Autotune done");
+        settings_.apply_value(AT_SETTING_ACTION, AUTOTUNER_OK);
+      } else {
+        auto step = owner_->autotuner_step();
+        switch(step) {
+        case DAC_VOLT_0_ARM:
+          snprintf(status_action_label_, sizeof(status_action_label_), "Arming%s", ellipses[animation_counter_>>1]);
+          settings_.apply_value(AT_SETTING_ACTION, AUTOTUNER_RUN);
           break;
-          case 0x01:
-          graphics.print("auto.");
+        case DAC_VOLT_0_BASELINE:
+          snprintf(status_action_label_, sizeof(status_action_label_), "0V baseline%s", ellipses[animation_counter_>>1]);
+          settings_.apply_value(AT_SETTING_ACTION, AUTOTUNER_STOP);
           break;
-          default:
-          graphics.print("dflt.");
-          break;
+        case DAC_VOLT_TARGET_FREQUENCIES: 
+        case AUTO_CALIBRATION_STEP_LAST: {
+          auto octaves = owner_->get_octave_cnt();
+          auto ptr = status_action_label_;
+          while (octaves--) *ptr++ = '.';
+          *ptr = '\0';
+          //snprintf(status_action_label_, sizeof(status_action_label_), "Setup%s", ellipses[animation_counter_>>1]);
+          settings_.apply_value(AT_SETTING_ACTION, AUTOTUNER_STOP);
         }
-      }
-      else if (i == AUTOTUNE) {
-        
-        switch (run_status_) {
-        //to display progress, if running
-        case AT_OFF:
-        graphics.print("run --> ");
-        graphics.print(" ... ");
-        break;
-        case AT_READY: {
-        graphics.print("arm > ");
-        const uint32_t _freq = auto_frequency_;
-        if (_freq == 0)
-          graphics.print("wait ...");
-        else 
-        {
-          const uint32_t value = _freq / 1000;
-          const uint32_t cents = _freq % 1000;
-          graphics.printf("%4lu.%03lu", value, cents);
-        }
-        }
-        break;
-        case AT_WAIT:
-        graphics.print("Patch V/Oct");
-        graphics.print(" now!");
-        break;
-        case AT_RUN:
-        {
-          int _octave = octaves_cnt_ + 0x1;
-          if (_octave > 1 && _octave < OCTAVES) {
-            for (int i = 0; i <= _octave; i++, x += 6)
-              graphics.drawBitmap8(x + 18, y + 4, 4, OC::bitmap_indicator_4x8);
-          }
-          else if (step_ == DAC_VOLT_0_BASELINE || step_ == DAC_VOLT_TARGET_FREQUENCIES) // this goes too quick, so ... 
-            graphics.print(" 0.0V baseline");
-          else {
-            graphics.print(AT_steps[step_ - DAC_VOLT_3m + ZERO_OFFSET]);
-            if (!ready_)
-              graphics.print(" ");
-            else 
-            {
-              const uint32_t f = auto_frequency_;
-              const uint32_t value = f / 1000;
-              const uint32_t cents = f % 1000;
-              graphics.printf(" > %4lu.%03lu", value, cents);
-            }
-          }
-        }
-        break;
-        case AT_ERROR:
-        graphics.print("run --> ");
-        graphics.print("error!");
-        break;
-        case AT_DONE: 
-        graphics.print(OC::Strings::channel_id[channel_]);
-        graphics.print("  --> a-ok!");
-        calibration_data_ = data_available();
         break;
         default:
+          snprintf(status_action_label_, sizeof(status_action_label_), "Running%s", ellipses[animation_counter_>>1]);
+          settings_.apply_value(AT_SETTING_ACTION, AUTOTUNER_STOP);
         break;
         }
       }
+    } else {
+      snprintf(status_action_label_, sizeof(status_action_label_), "Ready");
+      settings_.apply_value(AT_SETTING_ACTION, AUTOTUNER_ARM);
     }
- 
-    x = 16; y = 15;
-    for (size_t i = 0; i < (AUTO_MENU_ITEMS_LAST - 0x1); ++i, y += 20) {
-      
-      graphics.drawFrame(x, y, 95, 16);
-      // cursor:
-      if (i == cursor_pos_) 
-        graphics.invertRect(x - 2, y - 2, 99, 20);
+
+    settings_.apply_value(AT_SETTING_RESET, calibration_data_->is_valid() ? AUTOTUNER_USE : AUTOTUNER_RESET);
+  }
+
+  template <typename Owner>
+  void Autotuner<Owner>::Tick() {
+    ++ticks_;
+    if (ticks_ > kAnimationTicks) {
+      animation_counter_ = (animation_counter_ + 1) & 0x7;
+      ticks_ = 0;
+    }
+  }
+
+  template <typename Owner>
+  void Autotuner<Owner>::Draw() const {
+
+    menu::DefaultTitleBar::Draw();
+    graphics.printf("%s ", Strings::channel_id[channel_]);
+
+    auto step = owner_->autotuner_step();
+    if (step >= DAC_VOLT_3m && step <= DAC_VOLT_6) {
+      graphics.print(AT_steps[step - DAC_VOLT_3m]);
+      graphics.print(' ');
+    }
+
+    if (owner_->autotuner_ready()) {
+      char freqstr[12];
+      snprintf(freqstr, sizeof(freqstr), "%7.3f", owner_->get_auto_frequency());
+      graphics.setPrintPos(128, 2);
+      graphics.print_right(freqstr);
+    }
+
+    menu::SettingsList<menu::kScreenLines, 0, menu::kDefaultValueX> settings_list(cursor_);
+    menu::SettingsListItem list_item;
+    while (settings_list.available()) {
+      const int setting = settings_list.Next(list_item);
+      const int value = settings_.get_value(setting);
+      const auto &attr = AutotunerSettings::value_attributes(setting);
+
+      if (AT_SETTING_ACTION == setting) {
+        list_item.DrawCustomName(status_action_label_, value, attr);
+      } else if (AT_SETTING_RESET == setting) {
+        if (calibration_data_->is_valid()) {
+          list_item.DrawCharName("Slot empty");
+          list_item.DrawCustom();
+        } else {
+          list_item.DrawDefault(value, attr);
+        }
+      } else {
+        list_item.DrawDefault(value, attr);
+      }
     }
   }
   
@@ -626,18 +649,10 @@ private:
     
      if (UI::EVENT_BUTTON_PRESS == event.type) {
       switch (event.control) {
-        case OC::CONTROL_BUTTON_UP:
-          handleButtonUp(event);
-          break;
-        case OC::CONTROL_BUTTON_DOWN:
-          handleButtonDown(event);
-          break;
-        case OC::CONTROL_BUTTON_L:
-          handleButtonLeft(event);
-          break;    
-        case OC::CONTROL_BUTTON_R:
-          reset_autotuner();
-          Close();
+        case CONTROL_BUTTON_UP: handleButtonUp(event); break;
+        case CONTROL_BUTTON_DOWN: handleButtonDown(event); break;
+        case CONTROL_BUTTON_L: handleButtonLeft(event); break;    
+        case CONTROL_BUTTON_R: handleButtonRight(event); break;
           break;
         default:
           break;
@@ -645,16 +660,15 @@ private:
     }
     else if (UI::EVENT_BUTTON_LONG_PRESS == event.type) {
        switch (event.control) {
-        case OC::CONTROL_BUTTON_UP:
+        case CONTROL_BUTTON_UP:
           // screensaver 
         break;
-        case OC::CONTROL_BUTTON_DOWN:
-          OC::DAC::reset_all_auto_channel_calibration_data();
-          calibration_data_ = 0x0;
+        case CONTROL_BUTTON_DOWN:
+          global_settings.autotune_calibration_data.Reset();
         break;
-        case OC::CONTROL_BUTTON_L: 
+        case CONTROL_BUTTON_L: 
         break;
-        case OC::CONTROL_BUTTON_R:
+        case CONTROL_BUTTON_R:
          // app menu
         break;  
         default:
@@ -666,130 +680,50 @@ private:
   template <typename Owner>
   void Autotuner<Owner>::HandleEncoderEvent(const UI::Event &event) {
    
-    if (OC::CONTROL_ENCODER_R == event.control) {
-      move_cursor(event.value);
-    }
-    else if (OC::CONTROL_ENCODER_L == event.control) {
-      change_value(event.value); 
-    }
-  }
-  
-  template <typename Owner>
-  void Autotuner<Owner>::move_cursor(int offset) {
-
-    if (run_status_ < AT_RUN) {
-      int cursor_pos = cursor_pos_ + offset;
-      CONSTRAIN(cursor_pos, 0, AUTO_MENU_ITEMS_LAST - 0x2);  
-      cursor_pos_ = cursor_pos;
-      //
-      if (cursor_pos_ == DATA_SELECT)
-          run_status_ = AT_OFF;
-    }
-    else if (run_status_ == AT_ERROR || run_status_ == AT_DONE)
-      run_status_ = AT_OFF;
-  }
-
-  template <typename Owner>
-  void Autotuner<Owner>::change_value(int offset) {
-
-    switch (cursor_pos_) {
-      case DATA_SELECT:
-      {
-        uint8_t data = data_available();
-        if (!data) { // no data -- 
-          calibration_data_ = 0x0;
-          data_select_ = 0x0;
-        }
-        else {
-          int _data_sel = data_select_ + offset;
-          CONSTRAIN(_data_sel, 0, 0x1);  
-          data_select_ = _data_sel;
-          if (_data_sel == 0x0) {
-            calibration_data_ = 0xFF;
-            use_default();
-          }
-          else {
-            calibration_data_ = 0x01;
-            use_auto_calibration();
-          }
-        }
-      }
-      break;
-      case AUTOTUNE: 
-      {
-        if (run_status_ < AT_RUN) {
-          int _status = run_status_ + offset;
-          CONSTRAIN(_status, 0, AT_READY);
-          run_status_ = AT_STATUS(_status);
-          autotuner_arm(_status);
-        }
-        else if (run_status_ == AT_ERROR || run_status_ == AT_DONE)
-          run_status_ = AT_OFF;
-      }
-      break;
-      default:
-      break;
+    if (CONTROL_ENCODER_R == event.control) {
+      if (cursor_.editing())
+        settings_.change_value(cursor_.cursor_pos(), event.value);
+      else if (settings_.get_status_action() == AUTOTUNER_ARM)
+        cursor_.Scroll(event.value);
+      else
+        DoAction(AUTOTUNER_STOP);
+    } else if (CONTROL_ENCODER_L == event.control) {
+      DoAction(AUTOTUNER_STOP);
     }
   }
-  
+
   template <typename Owner>
   void Autotuner<Owner>::handleButtonUp(const UI::Event &event) {
-
-    if (cursor_pos_ == AUTOTUNE && run_status_ == AT_OFF) {
-      // arm the tuner
-      run_status_ = AT_READY;
-      autotuner_arm(run_status_);
-    }
-    else {
-      reset_autotuner();
-      run_status_ = AT_OFF;
-    }
+    if (settings_.get_status_action() == AUTOTUNER_ARM)
+      DoAction(AUTOTUNER_STOP);
+    else
+      Close();
   }
   
   template <typename Owner>
   void Autotuner<Owner>::handleButtonDown(const UI::Event &event) {
-    if (run_status_ == AT_ERROR) {
-      reset_autotuner();
-      run_status_ = AT_OFF;
-      return;
-    }  
-    
-    if (cursor_pos_ == AUTOTUNE) {
-        if (run_status_ == AT_READY) {
-          autotuner_run();
-          run_status_ = AT_RUN;
-        }
-        else if (run_status_ == AT_WAIT) {
-          auto_next_step();
-          run_status_ = AT_RUN;
-        }
-    }
+    if (settings_.get_status_action() == AUTOTUNER_ARM)
+      DoAction(AUTOTUNER_STOP);
+    else
+      Close();
   }
   
   template <typename Owner>
   void Autotuner<Owner>::handleButtonLeft(const UI::Event &) {
+    Close();
   }
-  
+
   template <typename Owner>
-  void Autotuner<Owner>::Begin() {
-    
-    const OC::Autotune_data &autotune_data = OC::AUTOTUNE::GetAutotune_data(channel_);
-    calibration_data_ = autotune_data.use_auto_calibration_;
-    
-    if (calibration_data_ == 0x01) // auto cal. data is in use
-      data_select_ = 0x1;
-    else
-      data_select_ = 0x00;
-    cursor_pos_ = 0x0;
-    run_status_ = AT_OFF;
+  void Autotuner<Owner>::handleButtonRight(const UI::Event &event) {
+    switch(cursor_.cursor_pos()) {
+    case AT_SETTING_RESET: DoReset(settings_.get_reset_action()); break;
+    case AT_SETTING_ACTION: DoAction(settings_.get_status_action()); break;
+    default:
+      cursor_.toggle_editing();
+    break;
+    }
   }
-  
-  template <typename Owner>
-  void Autotuner<Owner>::Close() {
-    ui.SetButtonIgnoreMask();
-    owner_->ExitAutotune();
-    owner_ = nullptr;
-  }
-}; // namespace OC
+
+} // namespace OC
 
 #endif // OC_AUTOTUNER_H

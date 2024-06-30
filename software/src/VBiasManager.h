@@ -111,10 +111,10 @@ public:
 
     // Vbias auto-config helper
     // Cross-reference OC_apps.ino for app IDs
-    void SetStateForApp(const OC::App *app) {
+    void SetStateForApp(const OC::AppBase *app) {
         VState new_state = VBiasManager::ASYM; // default case
         
-        switch (app->id)
+        switch (app->id())
         {
         /* Default cases can be omitted
         case TWOCC<'C','8'>::value: // Calibr8or
@@ -129,18 +129,18 @@ public:
             break;
         */
         // Bi-polar +/-5V
-        case TWOCC<'L','R'>::value: // Low-rents (or) Lorenz
+        case TWOCCS("LR"): // Low-rents (or) Lorenz
             new_state = VBiasManager::BI;
             break;
         // Uni-polar 0-10V
-        case TWOCC<'E','G'>::value: // Piqued (or) 4x EG
-        case TWOCC<'B','B'>::value: // Dialectic Ping Pong (or) Balls
-        case TWOCC<'B','Y'>::value: // Viznutcracker sweet (or) Bytebeats
-        case TWOCC<'R','F'>::value: // References
+        case TWOCCS("EG"): // Piqued (or) 4x EG
+        case TWOCCS("BB"): // Dialectic Ping Pong (or) Balls
+        case TWOCCS("BY"): // Viznutcracker sweet (or) Bytebeats
+        case TWOCCS("RF"): // References
             new_state = VBiasManager::UNI;
             break;
-        case TWOCC<'P','L'>::value: // Quadraturia (or) Quadrature LFO
-        case TWOCC<'H','S'>::value: // Hemisphere
+        case TWOCCS("PL"): // Quadraturia (or) Quadrature LFO
+        case TWOCCS("HS"): // Hemisphere
             return; // cancel, it has its own VBias setting
         }
         instance->SetState(new_state);

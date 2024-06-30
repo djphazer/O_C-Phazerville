@@ -25,10 +25,14 @@ namespace OC {
     }
 
     uint32_t Update() {
-      uint32_t now = OC::CORE::ticks;
+      uint32_t now = CORE::ticks;
       uint32_t ticks = now - last_ticks;
       last_ticks = now;
       return ticks;
+    }
+
+    void Reset() {
+      last_ticks = CORE::ticks;
     }
 
     uint32_t last_ticks;

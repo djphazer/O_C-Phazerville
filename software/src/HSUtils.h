@@ -170,6 +170,7 @@ static constexpr uint8_t pad(int range, int number) {
 
 namespace HS {
   enum PopupType {
+    POPUP_NONE,
     MENU_POPUP,
     CLOCK_POPUP, PRESET_POPUP,
     QUANTIZER_POPUP,

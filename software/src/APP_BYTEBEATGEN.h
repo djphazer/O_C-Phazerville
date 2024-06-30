@@ -24,8 +24,6 @@
 
 // Byte beats app
 
-#ifdef ENABLE_APP_BYTEBEATGEN
-
 #include "OC_apps.h"
 #include "OC_bitmaps.h"
 #include "OC_digital_inputs.h"
@@ -34,7 +32,7 @@
 #include "util/util_math.h"
 #include "util/util_settings.h"
 #include "OC_menus.h"
-#include "peaks_bytebeat.h"
+#include "src/extern/peaks_bytebeat.h"
 
 enum ByteBeatSettings {
   BYTEBEAT_SETTING_EQUATION,
@@ -76,7 +74,10 @@ enum ByteBeatCVMapping {
   BYTEBEAT_CV_MAPPING_PITCH,
   BYTEBEAT_CV_MAPPING_LAST,
   BYTEBEAT_CV_MAPPING_FIRST=BYTEBEAT_CV_MAPPING_EQUATION
+};
 
+const char* const bytebeat_cv_mapping_names[BYTEBEAT_CV_MAPPING_LAST] = {
+  "off", "equ", "spd", "p0", "p1", "p2", "beg++", "beg+", "beg", "end++", "end+", "end","pitch"
 };
 
 class ByteBeat : public settings::SettingsBase<ByteBeat, BYTEBEAT_SETTING_LAST> {
@@ -272,7 +273,7 @@ public:
      segments[mapping - BYTEBEAT_CV_MAPPING_FIRST] += (cvs[cv_setting - BYTEBEAT_SETTING_CV1] * 65536) >> bytebeat_cv_rshift;
   }
 
-  void Update(uint32_t triggers, const int32_t cvs[ADC_CHANNEL_LAST], DAC_CHANNEL dac_channel) {
+  void Update(OC::IOFrame *ioframe, uint32_t triggers, const int32_t cvs[ADC_CHANNEL_LAST], DAC_CHANNEL dac_channel) {
 
     int32_t s[kMaxByteBeatParameters];
     s[0] = SCALE8_16(static_cast<int32_t>(get_equation() << 4));
@@ -305,22 +306,23 @@ public:
     if (triggers & DIGITAL_INPUT_MASK(trigger_input))
       gate_state |= peaks::CONTROL_GATE_RISING;
 
-    bool gate_raised = OC::DigitalInputs::read_immediate(trigger_input);
+    bool gate_raised = ioframe->digital_inputs.raised(trigger_input);
     if (gate_raised)
       gate_state |= peaks::CONTROL_GATE;
     else if (gate_raised_)
       gate_state |= peaks::CONTROL_GATE_FALLING;
     gate_raised_ = gate_raised;
 
-    // TODO Scale range or offset?
+    // TODO[PLD] Scale range or offset?
     uint16_t b = bytebeat_.ProcessSingleSample(gate_state);
+/*
     #ifdef NORTHERNLIGHT
       uint32_t value = OC::DAC::get_zero_offset(dac_channel) + b;
     #else
       uint32_t value = OC::DAC::get_zero_offset(dac_channel) + (int16_t)b;
     #endif
-    OC::DAC::set(dac_channel, value);
-
+*/
+    ioframe->outputs.set_raw_value(dac_channel, b);
 
     b >>= 8;
     if (b != history_.last()) // This make the effect a bit different
@@ -340,7 +342,31 @@ private:
   ByteBeatSettings enabled_settings_[BYTEBEAT_SETTING_LAST];
 
   util::History<uint8_t, kHistoryDepth> history_;
+
+  // TOTAL EEPROM SIZE: 4 * 16 bytes
+  SETTINGS_ARRAY_DECLARE() {{
+    { 0, 0, 15, "Equation", OC::Strings::bytebeat_equation_names, settings::STORAGE_TYPE_U8 },
+    { 255, 0, 255, "Speed", NULL, settings::STORAGE_TYPE_U8 },
+    { 1, 1, 255, "Pitch", NULL, settings::STORAGE_TYPE_U8 },
+    { 126, 0, 255, "Parameter 0", NULL, settings::STORAGE_TYPE_U8 },
+    { 126, 0, 255, "Parameter 1", NULL, settings::STORAGE_TYPE_U8 },
+    { 127, 0, 255, "Parameter 2", NULL, settings::STORAGE_TYPE_U8 },
+    { 0, 0, 1, "Loop mode", OC::Strings::no_yes, settings::STORAGE_TYPE_U8 },
+    { 0, 0, 255, "Loop begin ++", NULL, settings::STORAGE_TYPE_U8 },
+    { 0, 0, 255, "Loop begin +", NULL, settings::STORAGE_TYPE_U8 },
+    { 0, 0, 255, "Loop begin", NULL, settings::STORAGE_TYPE_U8 },
+    { 0, 0, 255, "Loop end ++", NULL, settings::STORAGE_TYPE_U8 },
+    { 1, 0, 255, "Loop end +", NULL, settings::STORAGE_TYPE_U8 },
+    { 255, 0, 255, "Loop end", NULL, settings::STORAGE_TYPE_U8 },
+    { OC::DIGITAL_INPUT_1, OC::DIGITAL_INPUT_1, OC::DIGITAL_INPUT_4, "Trigger input", OC::Strings::trigger_input_names, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 1, "Step mode", OC::Strings::no_yes, settings::STORAGE_TYPE_U4 },
+    { BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_LAST - 1, "CV1 -> ", bytebeat_cv_mapping_names, settings::STORAGE_TYPE_U4 },
+    { BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_LAST - 1, "CV2 -> ", bytebeat_cv_mapping_names, settings::STORAGE_TYPE_U4 },
+    { BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_LAST - 1, "CV3 -> ", bytebeat_cv_mapping_names, settings::STORAGE_TYPE_U4 },
+    { BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_LAST - 1, "CV4 -> ", bytebeat_cv_mapping_names, settings::STORAGE_TYPE_U4 },
+  }};
 };
+SETTINGS_ARRAY_DEFINE(ByteBeat);
 
 void ByteBeat::Init(OC::DigitalInput default_trigger) {
   InitDefaults();
@@ -351,77 +377,16 @@ void ByteBeat::Init(OC::DigitalInput default_trigger) {
   history_.Init(0);
 }
 
-const char* const bytebeat_cv_mapping_names[BYTEBEAT_CV_MAPPING_LAST] = {
-  "off", "equ", "spd", "p0", "p1", "p2", "beg++", "beg+", "beg", "end++", "end+", "end","pitch"
-};
+namespace OC {
 
-// TOTAL EEPROM SIZE: 4 * 16 bytes
-SETTINGS_DECLARE(ByteBeat, BYTEBEAT_SETTING_LAST) {
-  { 0, 0, 15, "Equation", OC::Strings::bytebeat_equation_names, settings::STORAGE_TYPE_U8 },
-  { 255, 0, 255, "Speed", NULL, settings::STORAGE_TYPE_U8 },
-  { 1, 1, 255, "Pitch", NULL, settings::STORAGE_TYPE_U8 },
-  { 126, 0, 255, "Parameter 0", NULL, settings::STORAGE_TYPE_U8 },
-  { 126, 0, 255, "Parameter 1", NULL, settings::STORAGE_TYPE_U8 },
-  { 127, 0, 255, "Parameter 2", NULL, settings::STORAGE_TYPE_U8 },
-  { 0, 0, 1, "Loop mode", OC::Strings::no_yes, settings::STORAGE_TYPE_U8 },
-  { 0, 0, 255, "Loop begin ++", NULL, settings::STORAGE_TYPE_U8 },
-  { 0, 0, 255, "Loop begin +", NULL, settings::STORAGE_TYPE_U8 },
-  { 0, 0, 255, "Loop begin", NULL, settings::STORAGE_TYPE_U8 },
-  { 0, 0, 255, "Loop end ++", NULL, settings::STORAGE_TYPE_U8 },
-  { 1, 0, 255, "Loop end +", NULL, settings::STORAGE_TYPE_U8 },
-  { 255, 0, 255, "Loop end", NULL, settings::STORAGE_TYPE_U8 },
-  { OC::DIGITAL_INPUT_1, OC::DIGITAL_INPUT_1, OC::DIGITAL_INPUT_4, "Trigger input", OC::Strings::trigger_input_names, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 1, "Step mode", OC::Strings::no_yes, settings::STORAGE_TYPE_U4 },
-  { BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_LAST - 1, "CV1 -> ", bytebeat_cv_mapping_names, settings::STORAGE_TYPE_U4 },
-  { BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_LAST - 1, "CV2 -> ", bytebeat_cv_mapping_names, settings::STORAGE_TYPE_U4 },
-  { BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_LAST - 1, "CV3 -> ", bytebeat_cv_mapping_names, settings::STORAGE_TYPE_U4 },
-  { BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_LAST - 1, "CV4 -> ", bytebeat_cv_mapping_names, settings::STORAGE_TYPE_U4 },
-};
-
-class QuadByteBeats {
+OC_APP_TRAITS(AppQuadByteBeats, TWOCCS("BY"), "Viznutcracker sweet", "Bytebeats");
+class OC_APP_CLASS(AppQuadByteBeats) {
 public:
+  OC_APP_INTERFACE_DECLARE(AppQuadByteBeats);
+  OC_APP_STORAGE_SIZE(4 * ByteBeat::storageSize());
+
+private:
   static constexpr int32_t kCvSmoothing = 16;
-
-  // bb = bytebeat, balls_ = bytebeats_, BouncingBall = Bytebeat
-  // QuadBouncingBalls = QuadByteBeats, bbgen = bytebeatgen, BBGEN = BYTEBEATGEN
-
-  void Init() {
-    int input = OC::DIGITAL_INPUT_1;
-    for (auto &bytebeat : bytebeats_) {
-      bytebeat.Init(static_cast<OC::DigitalInput>(input));
-      ++input;
-    }
-
-    ui.left_encoder_value = 0;
-    ui.left_edit_mode = MODE_EDIT_SETTINGS;
-
-    ui.selected_channel = 0;
-    ui.selected_segment = 0;
-    ui.cursor.Init(BYTEBEAT_SETTING_EQUATION, BYTEBEAT_SETTING_LAST - 1);
-    ui.cursor.AdjustEnd(bytebeats_[0].num_enabled_settings() - 1);
-  }
-
-  void ISR() {
-#ifdef ARDUINO_TEENSY41
-    cv1.push(OC::ADC::value<ADC_CHANNEL_5>());
-    cv2.push(OC::ADC::value<ADC_CHANNEL_6>());
-    cv3.push(OC::ADC::value<ADC_CHANNEL_7>());
-    cv4.push(OC::ADC::value<ADC_CHANNEL_8>());
-#else
-    cv1.push(OC::ADC::value<ADC_CHANNEL_1>());
-    cv2.push(OC::ADC::value<ADC_CHANNEL_2>());
-    cv3.push(OC::ADC::value<ADC_CHANNEL_3>());
-    cv4.push(OC::ADC::value<ADC_CHANNEL_4>());
-#endif
-
-    const int32_t cvs[ADC_CHANNEL_LAST] = { cv1.value(), cv2.value(), cv3.value(), cv4.value() };
-    uint32_t triggers = OC::DigitalInputs::clocked();
-
-    bytebeats_[0].Update(triggers, cvs, DAC_CHANNEL_A);
-    bytebeats_[1].Update(triggers, cvs, DAC_CHANNEL_B);
-    bytebeats_[2].Update(triggers, cvs, DAC_CHANNEL_C);
-    bytebeats_[3].Update(triggers, cvs, DAC_CHANNEL_D);
-  }
 
   enum LeftEditMode {
     MODE_SELECT_CHANNEL,
@@ -442,135 +407,170 @@ public:
     return bytebeats_[ui.selected_channel];
   }
 
+  const ByteBeat &selected() const {
+    return bytebeats_[ui.selected_channel];
+  }
+
   ByteBeat bytebeats_[4];
 
   SmoothedValue<int32_t, kCvSmoothing> cv1;
   SmoothedValue<int32_t, kCvSmoothing> cv2;
   SmoothedValue<int32_t, kCvSmoothing> cv3;
   SmoothedValue<int32_t, kCvSmoothing> cv4;
+
+  void HandleTopButton();
+  void HandleLowerButton();
 };
 
-QuadByteBeats bytebeatgen;
+void AppQuadByteBeats::Init() {
+  int input = OC::DIGITAL_INPUT_1;
+  for (auto &bytebeat : bytebeats_) {
+    bytebeat.Init(static_cast<OC::DigitalInput>(input));
+    ++input;
+  }
 
-void BYTEBEATGEN_init() {
-  bytebeatgen.Init();
+  ui.left_encoder_value = 0;
+  ui.left_edit_mode = MODE_EDIT_SETTINGS;
+
+  ui.selected_channel = 0;
+  ui.selected_segment = 0;
+  ui.cursor.Init(BYTEBEAT_SETTING_EQUATION, BYTEBEAT_SETTING_LAST - 1);
+  ui.cursor.AdjustEnd(bytebeats_[0].num_enabled_settings() - 1);
 }
 
-static constexpr size_t BYTEBEATGEN_storageSize() {
-  return 4 * ByteBeat::storageSize();
+void FASTRUN AppQuadByteBeats::Process(OC::IOFrame *ioframe) {
+  // TODO[PLD] Do we need the excessive smoothing?
+#ifdef ARDUINO_TEENSY41
+  cv1.push(ioframe->cv.values[ADC_CHANNEL_5]);
+  cv2.push(ioframe->cv.values[ADC_CHANNEL_6]);
+  cv3.push(ioframe->cv.values[ADC_CHANNEL_7]);
+  cv4.push(ioframe->cv.values[ADC_CHANNEL_8]);
+#else
+  cv1.push(ioframe->cv.values[ADC_CHANNEL_1]);
+  cv2.push(ioframe->cv.values[ADC_CHANNEL_2]);
+  cv3.push(ioframe->cv.values[ADC_CHANNEL_3]);
+  cv4.push(ioframe->cv.values[ADC_CHANNEL_4]);
+#endif
+
+  const int32_t cvs[ADC_CHANNEL_LAST] = { cv1.value(), cv2.value(), cv3.value(), cv4.value() };
+  uint32_t triggers = ioframe->digital_inputs.triggered();
+
+  bytebeats_[0].Update(ioframe, triggers, cvs, DAC_CHANNEL_A);
+  bytebeats_[1].Update(ioframe, triggers, cvs, DAC_CHANNEL_B);
+  bytebeats_[2].Update(ioframe, triggers, cvs, DAC_CHANNEL_C);
+  bytebeats_[3].Update(ioframe, triggers, cvs, DAC_CHANNEL_D);
 }
 
-static size_t BYTEBEATGEN_save(void *storage) {
-  size_t s = 0;
-  for (auto &bytebeat : bytebeatgen.bytebeats_)
-    s += bytebeat.Save(static_cast<byte *>(storage) + s);
-  return s;
+size_t AppQuadByteBeats::SaveAppData(util::StreamBufferWriter &stream_buffer) const {
+  for (auto &bytebeat : bytebeats_)
+    bytebeat.Save(stream_buffer);
+
+  return stream_buffer.written();
 }
 
-static size_t BYTEBEATGEN_restore(const void *storage) {
-  size_t s = 0;
-  for (auto &bytebeat : bytebeatgen.bytebeats_) {
-    s += bytebeat.Restore(static_cast<const byte *>(storage) + s);
+size_t AppQuadByteBeats::RestoreAppData(util::StreamBufferReader &stream_buffer) {
+  for (auto &bytebeat : bytebeats_) {
+    bytebeat.Restore(stream_buffer);
     bytebeat.update_enabled_settings();
   }
-  bytebeatgen.ui.cursor.AdjustEnd(bytebeatgen.bytebeats_[0].num_enabled_settings() - 1);
-  return s;
+  ui.cursor.AdjustEnd(bytebeats_[0].num_enabled_settings() - 1);
+
+  return stream_buffer.read();
 }
 
-
-void BYTEBEATGEN_handleAppEvent(OC::AppEvent event) {
+void AppQuadByteBeats::HandleAppEvent(AppEvent event) {
   switch (event) {
-    case OC::APP_EVENT_RESUME:
-      bytebeatgen.ui.cursor.set_editing(false);
+    case APP_EVENT_RESUME:
+      ui.cursor.set_editing(false);
       break;
-    case OC::APP_EVENT_SUSPEND:
-    case OC::APP_EVENT_SCREENSAVER_ON:
-    case OC::APP_EVENT_SCREENSAVER_OFF:
+    case APP_EVENT_SUSPEND:
+    case APP_EVENT_SCREENSAVER_ON:
+    case APP_EVENT_SCREENSAVER_OFF:
       break;
   }
 }
 
-void BYTEBEATGEN_loop() {
+void AppQuadByteBeats::Loop() {
 }
 
-void BYTEBEATGEN_menu() {
+void AppQuadByteBeats::DrawMenu() const {
 
   menu::QuadTitleBar::Draw();
   for (uint_fast8_t i = 0; i < 4; ++i) {
     menu::QuadTitleBar::SetColumn(i);
     graphics.print((char)('A' + i));
   }
-  menu::QuadTitleBar::Selected(bytebeatgen.ui.selected_channel);
+  menu::QuadTitleBar::Selected(ui.selected_channel);
 
-  auto const &bytebeat = bytebeatgen.selected();
-  menu::SettingsList<menu::kScreenLines, 0, menu::kDefaultValueX> settings_list(bytebeatgen.ui.cursor);
+  auto const &bytebeat = selected();
+  menu::SettingsList<menu::kScreenLines, 0, menu::kDefaultValueX> settings_list(ui.cursor);
   menu::SettingsListItem list_item;
   while (settings_list.available()) {
     const int setting = bytebeat.enabled_setting_at(settings_list.Next(list_item));
     const int value = bytebeat.get_value(setting);
-    const settings::value_attr &attr = ByteBeat::value_attr(setting);
+    const auto &attr = ByteBeat::value_attributes(setting);
     if (ByteBeat::indentSetting(static_cast<ByteBeatSettings>(setting)))
       list_item.x += menu::kIndentDx;
     list_item.DrawDefault(value, attr);
   }
 }
 
-void BYTEBEATGEN_topButton() {
-  auto &selected_bytebeat = bytebeatgen.selected();
-  selected_bytebeat.change_value(BYTEBEAT_SETTING_EQUATION + bytebeatgen.ui.selected_segment, 1);
+void AppQuadByteBeats::HandleTopButton() {
+  auto &selected_bytebeat = selected();
+  selected_bytebeat.change_value(BYTEBEAT_SETTING_EQUATION + ui.selected_segment, 1);
 }
 
-void BYTEBEATGEN_lowerButton() {
-  auto &selected_bytebeat = bytebeatgen.selected();
-  selected_bytebeat.change_value(BYTEBEAT_SETTING_EQUATION + bytebeatgen.ui.selected_segment, -1);
+void AppQuadByteBeats::HandleLowerButton() {
+  auto &selected_bytebeat = selected();
+  selected_bytebeat.change_value(BYTEBEAT_SETTING_EQUATION + ui.selected_segment, -1);
 }
 
-void BYTEBEATGEN_handleButtonEvent(const UI::Event &event) {
+void AppQuadByteBeats::HandleButtonEvent(const UI::Event &event) {
   if (UI::EVENT_BUTTON_PRESS == event.type) {
     switch (event.control) {
-      case OC::CONTROL_BUTTON_UP:
-        BYTEBEATGEN_topButton();
+      case CONTROL_BUTTON_UP:
+        HandleTopButton();
         break;
-      case OC::CONTROL_BUTTON_DOWN:
-        BYTEBEATGEN_lowerButton();
+      case CONTROL_BUTTON_DOWN:
+        HandleLowerButton();
         break;
-      case OC::CONTROL_BUTTON_L:
+      case CONTROL_BUTTON_L:
         break;
-      case OC::CONTROL_BUTTON_R:
-        bytebeatgen.ui.cursor.toggle_editing();
+      case CONTROL_BUTTON_R:
+        ui.cursor.toggle_editing();
         break;
     }
   }
 }
 
-void BYTEBEATGEN_handleEncoderEvent(const UI::Event &event) {
+void AppQuadByteBeats::HandleEncoderEvent(const UI::Event &event) {
 
-  if (OC::CONTROL_ENCODER_L == event.control) {
-    int left_value = bytebeatgen.ui.selected_channel + event.value;
+  if (CONTROL_ENCODER_L == event.control) {
+    int left_value = ui.selected_channel + event.value;
     CONSTRAIN(left_value, 0, 3);
-    bytebeatgen.ui.selected_channel = left_value;
-    auto &selected = bytebeatgen.selected();
-    bytebeatgen.ui.cursor.AdjustEnd(selected.num_enabled_settings() - 1);
-  } else if (OC::CONTROL_ENCODER_R == event.control) {
-    if (bytebeatgen.ui.cursor.editing()) {
-      auto &selected = bytebeatgen.selected();
-      ByteBeatSettings setting = selected.enabled_setting_at(bytebeatgen.ui.cursor.cursor_pos());
-      selected.change_value(setting, event.value);
+    ui.selected_channel = left_value;
+    auto &selected_bb = selected();
+    ui.cursor.AdjustEnd(selected_bb.num_enabled_settings() - 1);
+  } else if (CONTROL_ENCODER_R == event.control) {
+    if (ui.cursor.editing()) {
+      auto &selected_bb = selected();
+      ByteBeatSettings setting = selected_bb.enabled_setting_at(ui.cursor.cursor_pos());
+      selected_bb.change_value(setting, event.value);
       switch (setting) {
         case BYTEBEAT_SETTING_LOOP_MODE:
-          selected.update_enabled_settings();
-          bytebeatgen.ui.cursor.AdjustEnd(selected.num_enabled_settings() - 1);
+          selected_bb.update_enabled_settings();
+          ui.cursor.AdjustEnd(selected_bb.num_enabled_settings() - 1);
           break;
         default: break;
       }
     } else {
-      bytebeatgen.ui.cursor.Scroll(event.value);
+      ui.cursor.Scroll(event.value);
     }
   }
 }
 
+void AppQuadByteBeats::DrawDebugInfo() const {
 #ifdef BYTEBEAT_DEBUG
-void BYTEBEATGEN_debug() {
   for (int i = 0; i < 4; ++i) {
     uint8_t ypos = 10*(i + 1) + 2 ;
     graphics.setPrintPos(2, ypos);
@@ -578,20 +578,18 @@ void BYTEBEATGEN_debug() {
     graphics.setPrintPos(12, ypos);
     graphics.print("t=") ;
     graphics.setPrintPos(40, ypos);
-    graphics.print(bytebeatgen.bytebeats_[i].get_eqn_num(), 12);
+    graphics.print(bytebeats_[i].get_eqn_num(), 12);
   }
-}
 #endif // BYTEBEATGEN_DEBUG
+}
 
-uint8_t bb_history[ByteBeat::kHistoryDepth];
+static uint8_t bb_history[ByteBeat::kHistoryDepth];
 
-void BYTEBEATGEN_screensaver() {
-
+void AppQuadByteBeats::DrawScreensaver() const {
   // Display raw history values "radiating" from center point by mirroring
   // on x and y. Oldest value is at start of buffer after reading history.
-
   weegfx::coord_t y = 0;
-  for (const auto & bb : bytebeatgen.bytebeats_) {
+  for (const auto & bb : bytebeats_) {
     bb.ReadHistory(bb_history);
     const uint8_t *history = bb_history + ByteBeat::kHistoryDepth - 1;
     for (int i = 0; i < 64; ++i) {
@@ -606,8 +604,46 @@ void BYTEBEATGEN_screensaver() {
   }
 }
 
-void FASTRUN BYTEBEATGEN_isr() {
-  bytebeatgen.ISR();
+void AppQuadByteBeats::GetIOConfig(IOConfig &ioconfig) const
+{
+  char label[kMaxIOLabelLength + 1] = {0}; // oversized, truncate later...
+
+  for (int di = DIGITAL_INPUT_1; di <= DIGITAL_INPUT_4; ++di ) {
+    char *l = label;
+    int channel = 0;
+    for (const auto &bb : bytebeats_) {
+      ++channel;
+      if (di == bb.get_trigger_input()) {
+        if (label == l)
+          l += sprintf(l, "CH%d", channel);
+        else
+          l += sprintf(l, ",CH%d", channel);
+      }
+    }
+    *l = 0;
+    ioconfig.digital_inputs[di].set(label);
+  }
+
+  for (int cv = ADC_CHANNEL_1; cv <= ADC_CHANNEL_4; ++cv) {
+    char *l = label;
+    int channel = 0;
+    for (const auto &bb : bytebeats_) {
+      ++channel;
+      auto mapping = bb.get_value(BYTEBEAT_SETTING_CV1 + cv);
+      if (mapping) {
+        if (l != label)
+          l += sprintf(l, ",%d:%s", channel, bytebeat_cv_mapping_names[mapping]);
+        else
+          l += sprintf(l, "%d:%s", channel, bytebeat_cv_mapping_names[mapping]);
+      }
+    }
+    *l = 0;
+    ioconfig.cv[cv].set(label);
+  }
+
+  for (int i = DAC_CHANNEL_A; i <= DAC_CHANNEL_D; ++i)
+    ioconfig.outputs[i].set_printf(OUTPUT_MODE_RAW, "CH%d %s", i + 1,
+                                   Strings::bytebeat_equation_names[bytebeats_[i].get_equation()]);
 }
 
-#endif // ENABLE_APP_BYTEBEATGEN
+} // namespace OC

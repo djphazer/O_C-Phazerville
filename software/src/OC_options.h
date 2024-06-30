@@ -18,6 +18,8 @@
 /* ------------ uncomment for use with Northernlight 2OC on the left side: --------------------------  */
 //#define NORTHERNLIGHT_2OC_LEFTSIDE
 
+/* ------------ uncomment for boring app names ------------------------------------------------------  */
+//#define BORING_APP_NAMES
 /* ------------ print debug messages to USB serial --------------------------------------------------  */
 //#define PRINT_DEBUG
 /* ------------ flip screen / IO mapping ------------------------------------------------------------  */
@@ -26,6 +28,12 @@
 //#define INVERT_DISPLAY
 /* ------------ use DAC8564 -------------------------------------------------------------------------  */
 //#define DAC8564
+/* ------------ 0 / 10V range -----------------------------------------------------------------------  */
+//#define IO_10V
+/* ------------ Debug for autotune ------------------------------------------------------------------  */
+//#define AUTOTUNE_DEBUG
+/* ------------ Debug for app load/save -------------------------------------------------------------  */
+//#define APPS_DEBUG
 
 
 /* ------------ uncomment for use with Plum Audio VOR enabled versions (OCP, 1uO_c v2, 4Robots) -----  */

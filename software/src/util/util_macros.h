@@ -18,4 +18,7 @@
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
 
+#define MACRO_CONCAT_(x, y) x ## y
+#define MACRO_CONCAT(x, y) MACRO_CONCAT_(x, y)
+
 #endif // UTIL_MACROS_H_
