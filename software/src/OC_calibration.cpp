@@ -220,10 +220,16 @@ struct CalibrationStep {
 };
 
 DAC_CHANNEL step_to_channel(int step) {
+#ifdef ARDUINO_TEENSY41
+  if (step >= DAC_H_VOLT_3m) return DAC_CHANNEL_H;
+  if (step >= DAC_G_VOLT_3m) return DAC_CHANNEL_G;
+  if (step >= DAC_F_VOLT_3m) return DAC_CHANNEL_F;
+  if (step >= DAC_E_VOLT_3m) return DAC_CHANNEL_E;
+#endif
   if (step >= DAC_D_VOLT_3m) return DAC_CHANNEL_D;
   if (step >= DAC_C_VOLT_3m) return DAC_CHANNEL_C;
   if (step >= DAC_B_VOLT_3m) return DAC_CHANNEL_B;
-  /*if (step >= DAC_B_VOLT_3m)*/ 
+  /*if (step >= DAC_A_VOLT_3m)*/ 
   return DAC_CHANNEL_A;
 }
 
