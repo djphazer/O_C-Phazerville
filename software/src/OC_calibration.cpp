@@ -155,6 +155,16 @@ void calibration_save() {
 #ifdef FLIP_180
   calibration_flip();
 #endif
+
+  uint32_t start = millis();
+  while(millis() < start + SETTINGS_SAVE_TIMEOUT_MS) {
+    GRAPHICS_BEGIN_FRAME(true);
+    graphics.setPrintPos(13, 18);
+    graphics.print("Calibration saved");
+    graphics.setPrintPos(31, 27);
+    graphics.print("to EEPROM!");
+    GRAPHICS_END_FRAME();
+  }
 }
 
 enum CALIBRATION_STEP {  
@@ -569,6 +579,11 @@ void calibration_draw(const CalibrationState &state) {
       y += menu::kMenuLineH;
       graphics.setPrintPos(menu::kIndentDx, y + 2);
       graphics.print((int)OC::ADC::value(ADC_CHANNEL_1), 2);
+      if ( (state.adc_1v && step->calibration_type == CALIBRATE_ADC_1V) ||
+           (state.adc_3v && step->calibration_type == CALIBRATE_ADC_3V) )
+      {
+        graphics.print("  (set)");
+      }
       break;
 
     case CALIBRATE_NONE:
@@ -580,18 +595,15 @@ void calibration_draw(const CalibrationState &state) {
           graphics.print(step->value_str[state.encoder_value]);
       } else {
         graphics.setPrintPos(menu::kIndentDx, y + 2);
+
         if (calibration_data_loaded && state.used_defaults)
-            graphics.print("Overwrite? ");
+          graphics.print("Overwrite? ");
         else
           graphics.print("Save? ");
+
         if (step->value_str)
           graphics.print(step->value_str[state.encoder_value]);
 
-        if (state.used_defaults && calibration_data_loaded) {
-          y += menu::kMenuLineH;
-          graphics.setPrintPos(menu::kIndentDx, y + 2);
-          graphics.print("NB replaces existing!");
-        }
       }
       break;
   }
