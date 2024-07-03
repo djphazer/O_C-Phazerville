@@ -194,7 +194,7 @@ void setup() {
   ui_mode = OC::ui.Splashscreen(reset_settings);
 
   if (ui_mode == OC::UI_MODE_CALIBRATE) {
-    OC::ui.Calibrate();
+    OC::start_calibration();
     ui_mode = OC::UI_MODE_MENU;
   }
   OC::ui.set_screensaver_timeout(OC::calibration_data.screensaver_timeout);

@@ -16,6 +16,18 @@
 
 namespace OC {
 
+#if defined(BUCHLA_cOC) || defined(VOR)
+static constexpr uint16_t DAC_OFFSET = 0;  // DAC offset, initial approx., ish (Easel card)
+#else
+static constexpr uint16_t DAC_OFFSET = 4890; // DAC offset, initial approx., ish --> -3.5V to 6V
+#endif
+
+#ifdef BUCHLA_4U
+  static constexpr uint16_t _ADC_OFFSET = (uint16_t)((float)pow(2,OC::ADC::kAdcResolution)*1.0f);       // ADC offset @3.3V
+#else
+  static constexpr uint16_t _ADC_OFFSET = (uint16_t)((float)pow(2,OC::ADC::kAdcResolution)*0.6666667f); // ADC offset @2.2V
+#endif
+
 static constexpr unsigned kCalibrationAdcSmoothing = 4;
 
 enum CALIBRATION_STEP {  
@@ -165,12 +177,16 @@ static_assert(sizeof(CalibrationData) == 212, "Calibration data size changed!");
 
 typedef PageStorage<EEPROMStorage, EEPROM_CALIBRATIONDATA_START, EEPROM_CALIBRATIONDATA_END, CalibrationData> CalibrationStorage;
 
+extern const CalibrationStep calibration_steps[CALIBRATION_STEP_LAST];
 extern CalibrationData calibration_data;
+extern bool calibration_data_loaded;
 
 void calibration_load();
 void calibration_save();
 void calibration_update(CalibrationState &state);
 void calibration_reset();
+void calibration_draw(const CalibrationState &state);
+
 
 }; // namespace OC
 

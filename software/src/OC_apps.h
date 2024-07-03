@@ -81,11 +81,13 @@ namespace apps {
 
   const App *find(uint16_t id);
   int index_of(uint16_t id);
+  void set_current_app(int index);
 
 }; // namespace apps
 
 void draw_save_message(uint8_t c);
 void save_app_data();
+void start_calibration();
 
 }; // namespace OC
 

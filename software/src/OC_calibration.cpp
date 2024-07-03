@@ -27,25 +27,14 @@ namespace menu = OC::menu;
 
 using OC::DAC;
 
-#if defined(BUCHLA_cOC) || defined(VOR)
-static constexpr uint16_t DAC_OFFSET = 0;  // DAC offset, initial approx., ish (Easel card)
-#else
-static constexpr uint16_t DAC_OFFSET = 4890; // DAC offset, initial approx., ish --> -3.5V to 6V
-#endif
-
-#ifdef BUCHLA_4U
-  static constexpr uint16_t _ADC_OFFSET = (uint16_t)((float)pow(2,OC::ADC::kAdcResolution)*1.0f);       // ADC offset @3.3V
-#else
-  static constexpr uint16_t _ADC_OFFSET = (uint16_t)((float)pow(2,OC::ADC::kAdcResolution)*0.6666667f); // ADC offset @2.2V
-#endif
-
 namespace OC {
 
 CalibrationStorage calibration_storage;
 CalibrationData calibration_data;
+
 bool calibration_data_loaded = false;
 
-const OC::CalibrationData kCalibrationDefaults = {
+const CalibrationData kCalibrationDefaults = {
   // DAC
   { {
     #ifdef BUCHLA_cOC 
@@ -174,7 +163,7 @@ const char * const default_footer = "[PREV]         [NEXT]";
 const char * const default_help_r = "[R] => Adjust";
 const char * const select_help    = "[R] => Select";
 
-constexpr CalibrationStep calibration_steps[CALIBRATION_STEP_LAST] = {
+const CalibrationStep calibration_steps[CALIBRATION_STEP_LAST] = {
   { HELLO, "Setup: Calibrate", "Use defaults? ", select_help, start_footer, CALIBRATE_NONE, 0, OC::Strings::no_yes, 0, 1 },
   { CENTER_DISPLAY, "Center Display", "Pixel offset ", default_help_r, default_footer, CALIBRATE_DISPLAY, 0, nullptr, 0, 2 },
 
@@ -436,8 +425,8 @@ constexpr CalibrationStep calibration_steps[CALIBRATION_STEP_LAST] = {
   { CALIBRATION_EXIT, "Calibration complete", "Save values? ", select_help, end_footer, CALIBRATE_NONE, 0, OC::Strings::no_yes, 0, 1 }
 };
 
+
 void calibration_draw(const CalibrationState &state) {
-  GRAPHICS_BEGIN_FRAME(true);
   const CalibrationStep *step = state.current_step;
 
   /*
@@ -543,8 +532,6 @@ void calibration_draw(const CalibrationState &state) {
 
   static constexpr uint16_t step_width = (menu::kDisplayWidth << 8 ) / (CALIBRATION_STEP_LAST - 1);
   graphics.drawRect(0, menu::kDisplayHeight - 2, (state.step * step_width) >> 8, 2);
-
-  GRAPHICS_END_FRAME();
 }
 
 /* DAC output etc */ 
@@ -602,6 +589,7 @@ void calibration_update(CalibrationState &state) {
 
 /*     loop calibration menu until done       */
 void OC::Ui::Calibrate() {
+// unused; this has been integrated into APP_SETTINGS.h
 
   // Calibration data should be loaded (or defaults) by now
   SERIAL_PRINTLN("Start calibration...");
@@ -784,7 +772,9 @@ void OC::Ui::Calibrate() {
     }
 
     calibration_update(calibration_state);
+  GRAPHICS_BEGIN_FRAME(true);
     calibration_draw(calibration_state);
+  GRAPHICS_END_FRAME();
     delay(2); // VOR calibration hack
   }
 

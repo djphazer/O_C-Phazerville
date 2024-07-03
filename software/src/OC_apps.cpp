@@ -84,6 +84,7 @@ namespace menu = OC::menu;
 }
 
 static constexpr OC::App available_apps[] = {
+  DECLARE_APP('S','E', "Setup / About", Settings),
 
   #ifdef ENABLE_APP_CALIBR8OR
   DECLARE_APP('C','8', "Calibr8or", Calibr8or),
@@ -163,7 +164,6 @@ static constexpr OC::App available_apps[] = {
   DECLARE_APP('R','F', "References", REFS),
   #endif
   DECLARE_APP('B','R', "Backup / Restore", Backup),
-  DECLARE_APP('S','E', "Setup / About", Settings),
 };
 
 static constexpr int NUM_AVAILABLE_APPS = ARRAY_SIZE(available_apps);
@@ -220,7 +220,7 @@ DMAMEM GlobalSettingsStorage global_settings_storage;
 DMAMEM AppData app_settings;
 DMAMEM AppDataStorage app_data_storage;
 
-static constexpr int DEFAULT_APP_INDEX = 0;
+static constexpr int DEFAULT_APP_INDEX = 1;
 static const uint16_t DEFAULT_APP_ID = available_apps[DEFAULT_APP_INDEX].id;
 
 void save_global_settings() {
@@ -617,6 +617,11 @@ bool Ui::ConfirmReset() {
   } while (!done);
 
   return confirm;
+}
+
+void start_calibration() {
+  OC::apps::set_current_app(0); // switch to Settings app
+  Settings_instance.Calibration(); // Set up calibration mode in Settings app
 }
 
 }; // namespace OC
