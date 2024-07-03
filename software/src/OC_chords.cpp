@@ -3,7 +3,7 @@
 
 namespace OC {
 
-    Chord user_chords[Chords::CHORDS_USER_LAST];
+    DMAMEM Chord user_chords[Chords::CHORDS_USER_LAST];
 
     /*static*/
     void Chords::Init() {

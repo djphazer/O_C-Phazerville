@@ -214,11 +214,11 @@ struct AppData {
 typedef PageStorage<EEPROMStorage, EEPROM_GLOBALSETTINGS_START, EEPROM_GLOBALSETTINGS_END, GlobalSettings> GlobalSettingsStorage;
 typedef PageStorage<EEPROMStorage, EEPROM_APPDATA_START, EEPROM_APPDATA_END, AppData> AppDataStorage;
 
-GlobalSettings global_settings;
-GlobalSettingsStorage global_settings_storage;
+DMAMEM GlobalSettings global_settings;
+DMAMEM GlobalSettingsStorage global_settings_storage;
 
-AppData app_settings;
-AppDataStorage app_data_storage;
+DMAMEM AppData app_settings;
+DMAMEM AppDataStorage app_data_storage;
 
 static constexpr int DEFAULT_APP_INDEX = 0;
 static const uint16_t DEFAULT_APP_ID = available_apps[DEFAULT_APP_INDEX].id;

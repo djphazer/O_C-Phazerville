@@ -48,7 +48,7 @@ struct VOSegment {
 
 };
 
-VOSegment user_waveforms[VO_SEGMENT_COUNT];
+DMAMEM VOSegment user_waveforms[VO_SEGMENT_COUNT];
 
 }; // namespace HS
 

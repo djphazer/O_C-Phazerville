@@ -39,7 +39,7 @@ enum {
     Morph7,
 };
 
-VOSegment library_waveforms[] = {
+DMAMEM VOSegment library_waveforms[] = {
     // Triangle
     VOSegment {2, VO_TOC}, // 255=TOC marker, and 2=Number of segments in this waveform
     VOSegment {255, 1},
