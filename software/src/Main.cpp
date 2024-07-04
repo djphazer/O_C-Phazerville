@@ -193,8 +193,9 @@ void setup() {
   bool reset_settings = false;
   ui_mode = OC::ui.Splashscreen(reset_settings);
 
+  bool start_cal = false;
   if (ui_mode == OC::UI_MODE_CALIBRATE) {
-    OC::start_calibration();
+    start_cal = true;
     ui_mode = OC::UI_MODE_MENU;
   }
   OC::ui.set_screensaver_timeout(OC::calibration_data.screensaver_timeout);
@@ -206,6 +207,9 @@ void setup() {
 
   // initialize apps
   OC::apps::Init(reset_settings);
+
+  if (start_cal)
+    OC::start_calibration();
 }
 
 /*  ---------    main loop  --------  */
