@@ -57,6 +57,8 @@ public:
         PITCH2,
         MOD1,
         MOD2,
+        TRIGPITCH1,
+        TRIGPITCH2,
         TRIG1,
         TRIG2,
         GATE1,
@@ -170,8 +172,10 @@ public:
         }
  
         // Send 8-bit scaled and quantized CV
-        int32_t note = Proportion(reg[0] & 0xff, 0xff, range_mod) + 64;
-        int32_t note2 = Proportion(reg[1] & 0xff, 0xff, range_mod) + 64;
+        const int32_t note[2] = {
+          Proportion(reg[0] & 0xff, 0xff, range_mod) + 64,
+          Proportion(reg[1] & 0xff, 0xff, range_mod) + 64
+        };
 
         ForEachChannel(ch) {
             switch (outmode[ch]) {
@@ -179,15 +183,15 @@ public:
               // this is the unique case where input CV crossfades between the two melodies
               int x = constrain(note_trans[2], -range_mod, range_mod);
               int y = range_mod;
-              int n = (note * (y + x) + note2 * (y - x)) / (2*y);
+              int n = (note[0] * (y + x) + note[1] * (y - x)) / (2*y);
               slew(Output[ch], HS::QuantizerLookup(qselect_mod[ch], n));
               break;
-              }
+            }
             case PITCH1:
-              slew(Output[ch], HS::QuantizerLookup(qselect_mod[ch], note + note_trans[0]));
+              slew(Output[ch], HS::QuantizerLookup(qselect_mod[ch], note[0] + note_trans[0]));
               break;
             case PITCH2:
-              slew(Output[ch], HS::QuantizerLookup(qselect_mod[ch], note2 + note_trans[1]));
+              slew(Output[ch], HS::QuantizerLookup(qselect_mod[ch], note[1] + note_trans[1]));
               break;
             case MOD1: // 8-bit bi-polar proportioned CV
               slew(Output[ch], Proportion( int(reg[0] & 0xff)-0x7f, 0x80, HEMISPHERE_MAX_CV) );
@@ -195,6 +199,22 @@ public:
             case MOD2:
               slew(Output[ch], Proportion( int(reg[1] & 0xff)-0x7f, 0x80, HEMISPHERE_MAX_CV) );
               break;
+            case TRIGPITCH1:
+            case TRIGPITCH2: {
+              const int rnum = outmode[ch] - TRIGPITCH1;
+              if (clk && (reg[outmode[ch]-TRIGPITCH1] & 0x01) == 1) // trigger if 1st bit is high
+              {
+                Output[ch] = HEMISPHERE_MAX_CV;
+                trigpulse[ch] = HEMISPHERE_CLOCK_TICKS * trig_length;
+              }
+              else // decay to pitch
+              {
+                // hold until it's time to pull it down
+                if (--trigpulse[ch] < 0)
+                  slew(Output[ch], HS::QuantizerLookup(qselect_mod[ch], note[rnum] + note_trans[rnum]));
+              }
+              break;
+            }
             case TRIG1:
             case TRIG2:
               if (clk && (reg[outmode[ch]-TRIG1] & 0x01) == 1) // trigger if 1st bit is high
@@ -206,7 +226,7 @@ public:
               {
                 // hold until it's time to pull it down
                 if (--trigpulse[ch] < 0)
-                  slew(Output[ch]);
+                  slew(Output[ch], 0);
               }
               break;
             case GATE1:
@@ -385,6 +405,10 @@ private:
         case MOD1:
         case MOD2:
             gfxBitmap(15 + x, y, 8, WAVEFORM_ICON);
+            break;
+        case TRIGPITCH1:
+        case TRIGPITCH2:
+            gfxBitmap(15 + x, y, 8, SINGING_PIGEON_ICON);
             break;
         case TRIG1:
         case TRIG2:
