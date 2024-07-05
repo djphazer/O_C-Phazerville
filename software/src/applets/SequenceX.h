@@ -80,7 +80,7 @@ public:
         if (cursor >= SEQX_STEPS && !EditMode()) // toggle mute
             muted ^= (0x01 << (cursor - SEQX_STEPS));
         else
-            CursorAction(cursor, SEQX_STEPS*2-1);
+            CursorToggle();
     }
     void AuxButton() {
       const int s = cursor % SEQX_STEPS;

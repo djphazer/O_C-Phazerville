@@ -86,9 +86,7 @@ public:
         else DrawSelector();
     }
 
-    void OnButtonPress() {
-        CursorAction(cursor, MIDI_CURSOR_LAST);
-    }
+    //void OnButtonPress() { }
 
     void OnEncoderMove(int direction) {
         if (!EditMode()) {

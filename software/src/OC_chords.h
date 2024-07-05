@@ -90,6 +90,7 @@ public:
   };
   
   static void Init();
+  static void Validate();
   static const Chord &GetChord(int index, int progression);
 
   static constexpr int NUM_CHORD_PROGRESSIONS = 0x4;

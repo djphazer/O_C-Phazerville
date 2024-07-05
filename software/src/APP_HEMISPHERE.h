@@ -125,11 +125,11 @@ public:
       for (size_t i = 0; i < 4; ++i) {
         int val = (uint16_t(values_[HEMISPHERE_TRIGMAP]) >> (i*4)) & 0x0F;
         if (val != 0)
-          HS::trigger_mapping[i] = constrain(val - 1, 0, ADC_CHANNEL_LAST);
+          HS::trigger_mapping[i] = constrain(val - 1, 0, ADC_CHANNEL_LAST + DAC_CHANNEL_LAST);
 
         val = (uint16_t(values_[HEMISPHERE_CVMAP]) >> (i*4)) & 0x0F;
         if (val != 0)
-          HS::cvmapping[i] = constrain(val - 1, 0, ADC_CHANNEL_LAST + 4);
+          HS::cvmapping[i] = constrain(val - 1, 0, ADC_CHANNEL_LAST + DAC_CHANNEL_LAST);
       }
     }
 
@@ -732,6 +732,9 @@ public:
         }
 
         if (clock_setup) {
+          if (h == LEFT_HEMISPHERE)
+            ClockSetup_instance.OnLeftEncoderMove(event.value);
+          else
             ClockSetup_instance.OnEncoderMove(event.value);
         } else if (select_mode == h) {
             ChangeApplet(HEM_SIDE(h), event.value);
@@ -920,13 +923,13 @@ private:
         case TRIGMAP4:
             HS::trigger_mapping[config_cursor-TRIGMAP1] = constrain(
                 HS::trigger_mapping[config_cursor-TRIGMAP1] + dir,
-                0, ADC_CHANNEL_LAST);
+                0, ADC_CHANNEL_LAST + DAC_CHANNEL_LAST);
             break;
         case CVMAP1:
         case CVMAP2:
         case CVMAP3:
         case CVMAP4:
-            HS::cvmapping[config_cursor-CVMAP1] = constrain( HS::cvmapping[config_cursor-CVMAP1] + dir, 0, ADC_CHANNEL_LAST + 4);
+            HS::cvmapping[config_cursor-CVMAP1] = constrain( HS::cvmapping[config_cursor-CVMAP1] + dir, 0, ADC_CHANNEL_LAST + DAC_CHANNEL_LAST);
             break;
         case TRIG_LENGTH:
             HS::trig_length = (uint32_t) constrain( int(HS::trig_length + dir), 1, 127);

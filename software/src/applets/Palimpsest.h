@@ -84,9 +84,7 @@ public:
         DrawSequence();
     }
 
-    void OnButtonPress() {
-        CursorAction(cursor, 2);
-    }
+    // void OnButtonPress() { }
 
     void OnEncoderMove(int direction) {
         if (!EditMode()) {

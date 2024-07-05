@@ -81,7 +81,7 @@ public:
     }
     void OnButtonPress() {
         if (cursor == 0) { // scale page selection mode
-            CursorAction(cursor, 12);
+            CursorToggle();
         } else { // scale note edit mode
             const uint8_t bit = cursor - 1;
             ToggleBit(bit);

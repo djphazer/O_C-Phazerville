@@ -132,10 +132,7 @@ public:
         DrawInterface();
     }
 
-    void OnButtonPress() {
-        CursorAction(cursor, 7);
-        if (mode[1] > 2 && cursor == 3) ++cursor;
-    }
+    //void OnButtonPress() { }
 
     void OnEncoderMove(int direction) {
         if (!EditMode()) {

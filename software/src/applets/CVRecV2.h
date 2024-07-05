@@ -99,7 +99,7 @@ public:
             punch_out = (mode > 0) ? end - start + 1 : 0;
         }
 
-        CursorAction(cursor, 3);
+        CursorToggle();
     }
 
     void OnEncoderMove(int direction) {

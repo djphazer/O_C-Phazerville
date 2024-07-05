@@ -34,6 +34,7 @@ typedef struct IOFrame {
     int output_diff[DAC_CHANNEL_LAST];
     int outputs_smooth[DAC_CHANNEL_LAST];
     int clock_countdown[DAC_CHANNEL_LAST];
+    bool clockout_q[DAC_CHANNEL_LAST]; // for loopback
     int adc_lag_countdown[ADC_CHANNEL_LAST]; // Time between a clock event and an ADC read event
     uint32_t last_clock[ADC_CHANNEL_LAST]; // Tick number of the last clock observed by the child class
     uint32_t cycle_ticks[ADC_CHANNEL_LAST]; // Number of ticks between last two clocks
@@ -322,6 +323,7 @@ typedef struct IOFrame {
     void ClockOut(DAC_CHANNEL ch, const int pulselength = HEMISPHERE_CLOCK_TICKS * HS::trig_length) {
         clock_countdown[ch] = pulselength;
         outputs[ch] = PULSE_VOLTAGE * (12 << 7);
+        clockout_q[ch] = true;
     }
 
     // TODO: Hardware IO should be extracted

@@ -66,9 +66,7 @@ public:
         DrawOutput();
     }
 
-    void OnButtonPress() {
-        CursorAction(cursor, 1);
-    }
+    // void OnButtonPress() { }
 
     void OnEncoderMove(int direction) {
         if (!EditMode()) {

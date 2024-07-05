@@ -124,9 +124,7 @@ public:
         DrawEditor();
     }
 
-    void OnButtonPress() {
-        CursorAction(cursor, LAST_SETTING);
-    }
+    // void OnButtonPress() { }
 
     void OnEncoderMove(int direction) {
         if (!EditMode()) {

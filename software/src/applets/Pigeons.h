@@ -72,9 +72,7 @@ public:
         DrawInterface();
     }
 
-    void OnButtonPress() {
-        CursorAction(cursor, CURSOR_LAST);
-    }
+    // void OnButtonPress() { }
 
     void OnEncoderMove(int direction) {
         if (!EditMode()) {

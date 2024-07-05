@@ -106,9 +106,9 @@ public:
                 clock_m.Boop(cursor-BOOP1);
                 button_ticker = HEMISPHERE_PULSE_ANIMATION_TIME_LONG;
             }
-            else CursorAction(cursor, LAST_SETTING);
+            else CursorToggle();
         }
-        else CursorAction(cursor, LAST_SETTING);
+        else CursorToggle();
 
         if (cursor == TEMPO) {
             // Tap Tempo detection
@@ -145,7 +145,7 @@ public:
         case TRIG2:
         case TRIG3:
         case TRIG4:
-            HS::trigger_mapping[cursor-TRIG1] = constrain( HS::trigger_mapping[cursor-TRIG1] + direction, 0, 4);
+            HS::trigger_mapping[cursor-TRIG1] = constrain( HS::trigger_mapping[cursor-TRIG1] + direction, 0, ADC_CHANNEL_LAST + DAC_CHANNEL_LAST);
             break;
 
         case BOOP1:
@@ -175,6 +175,18 @@ public:
 
         default: break;
         }
+    }
+    void OnLeftEncoderMove(const int direction) {
+      if (EditMode() && cursor >= MULT1 && cursor <= MULT4) {
+        int mult = clock_m.GetMultiply(cursor - MULT1);
+
+        if (0 == mult) mult += direction;
+        else if (mult > 0) mult = (direction > 0) ? mult * 2 : mult / 2;
+        else mult = ((direction > 0) ? (mult - 1) / 2 : (mult - 1) * 2) + 1;
+
+        clock_m.SetMultiply(mult, cursor - MULT1);
+      }
+      else OnEncoderMove(direction);
     }
 
     uint64_t OnDataRequest() {

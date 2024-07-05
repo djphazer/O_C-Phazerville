@@ -97,7 +97,7 @@ public:
       if (cursor == 3)
         HS::QuantizerEdit(io_offset);
       else
-        CursorAction(cursor, 3);
+        CursorToggle();
     }
 
     void OnEncoderMove(int direction) {

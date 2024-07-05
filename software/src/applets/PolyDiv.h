@@ -126,7 +126,7 @@ public:
         if (cursor >= TOGGLE_A1 && !EditMode())
             ToggleDiv(cursor - TOGGLE_A1);
         else
-            CursorAction(cursor, LAST_SETTING);
+            CursorToggle();
     }
 
     void OnEncoderMove(int direction) {

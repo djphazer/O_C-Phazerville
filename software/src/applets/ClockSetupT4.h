@@ -110,9 +110,9 @@ public:
     void OnButtonPress() {
         if (!EditMode()) { // special cases for toggle buttons
             if (cursor == PLAY_STOP) PlayStop();
-            else CursorAction(cursor, LAST_SETTING);
+            else CursorToggle();
         }
-        else CursorAction(cursor, LAST_SETTING);
+        else CursorToggle();
 
         if (cursor == TEMPO) {
             // Tap Tempo detection
@@ -153,7 +153,7 @@ public:
         case TRIG6:
         case TRIG7:
         case TRIG8:
-            HS::trigger_mapping[cursor-TRIG1] = constrain( HS::trigger_mapping[cursor-TRIG1] + direction, 0, 8);
+            HS::trigger_mapping[cursor-TRIG1] = constrain( HS::trigger_mapping[cursor-TRIG1] + direction, 0, ADC_CHANNEL_LAST + DAC_CHANNEL_LAST);
             break;
 
         /* the boops shall return in a hidden form
@@ -189,6 +189,18 @@ public:
 
         default: break;
         }
+    }
+    void OnLeftEncoderMove(const int direction) {
+      if (EditMode() && cursor >= MULT1 && cursor <= MULT8) {
+        int mult = clock_m.GetMultiply(cursor - MULT1);
+
+        if (0 == mult) mult += direction;
+        else if (mult > 0) mult = (direction > 0) ? mult * 2 : mult / 2;
+        else mult = ((direction > 0) ? (mult - 1) / 2 : (mult - 1) * 2) + 1;
+
+        clock_m.SetMultiply(mult, cursor - MULT1);
+      }
+      else OnEncoderMove(direction);
     }
 
     // Same data blobs as T3 version, but different layout

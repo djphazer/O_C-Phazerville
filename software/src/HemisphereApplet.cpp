@@ -43,11 +43,19 @@ bool HemisphereApplet::Clock(int ch, bool physical) {
     const size_t virt_chan = (ch + io_offset) % 4;
 #endif
 
+    const int trmap = trigger_mapping[ch + io_offset];
+
     // clock triggers
     if (useTock && HS::clock_m.GetMultiply(virt_chan) != 0)
         clocked = HS::clock_m.Tock(virt_chan);
-    else if (trigger_mapping[ch + io_offset] > 0 && trigger_mapping[ch + io_offset] <= ADC_CHANNEL_LAST)
-        clocked = frame.clocked[ trigger_mapping[ch + io_offset] - 1 ];
+    else if (trmap > 0) {
+      if (trmap <= ADC_CHANNEL_LAST)
+        clocked = frame.clocked[ trmap - 1 ];
+      else {
+        clocked = frame.clockout_q[ trmap - 1 - ADC_CHANNEL_LAST ];
+        frame.clockout_q[ trmap - 1 - ADC_CHANNEL_LAST ] = false;
+      }
+    }
 
     // Try to eat a boop
     clocked = clocked || clock_m.Beep(virt_chan);

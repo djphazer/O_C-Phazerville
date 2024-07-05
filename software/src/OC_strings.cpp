@@ -47,7 +47,15 @@ namespace OC {
 
   const char * const trigger_input_names[4] = { "TR1", "TR2", "TR3", "TR4" };
 
-  const char * const trigger_input_names_none[9] = { " - ", "TR1", "TR2", "TR3", "TR4", "TR5", "TR6", "TR7", "TR8" };
+  const char * const trigger_input_names_none[] = { " - ", "TR1", "TR2", "TR3", "TR4",
+#ifdef ARDUINO_TEENSY41
+    "TR5", "TR6", "TR7", "TR8",
+#endif
+    "A", "B", "C", "D",
+#ifdef ARDUINO_TEENSY41
+    "E", "F", "G", "H",
+#endif
+  };
 
   const char * const cv_input_names[4] = { "CV1", "CV2", "CV3", "CV4" };
 
@@ -55,7 +63,11 @@ namespace OC {
 #ifdef ARDUINO_TEENSY41
     "CV5", "CV6", "CV7", "CV8",
 #endif
-    "A", "B", "C", "D" };
+    "A", "B", "C", "D",
+#ifdef ARDUINO_TEENSY41
+    "E", "F", "G", "H",
+#endif
+  };
 
   const char * const channel_id[4] = { "#A", "#B", "#C", "#D" };
 

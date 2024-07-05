@@ -75,9 +75,7 @@ public:
         DrawIndicator();
     }
 
-    void OnButtonPress() {
-        CursorAction(selected, 1);
-    }
+    // void OnButtonPress() { }
 
     void OnEncoderMove(int direction) {
         if (!EditMode()) {

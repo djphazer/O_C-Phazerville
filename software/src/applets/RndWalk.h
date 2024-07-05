@@ -94,9 +94,7 @@ public:
         DrawDisplay();
     }
 
-    void OnButtonPress() {
-        CursorAction(cursor, 5);
-    }
+    // void OnButtonPress() { }
 
     void OnEncoderMove(int direction) {
         if (!EditMode()) {

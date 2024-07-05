@@ -129,8 +129,8 @@ public:
       for (size_t i = 0; i < 4; ++i) {
         int val1 = (uint32_t(values_[QUADRANTS_TRIGMAP1]) >> (i*4)) & 0x0F;
         int val2 = (uint32_t(values_[QUADRANTS_TRIGMAP2]) >> (i*4)) & 0x0F;
-        if (val1 != 0) HS::trigger_mapping[i] = constrain(val1 - 1, 0, 8);
-        if (val2 != 0) HS::trigger_mapping[i+4] = constrain(val2 - 1, 0, 8);
+        if (val1 != 0) HS::trigger_mapping[i] = constrain(val1 - 1, 0, ADC_CHANNEL_LAST + DAC_CHANNEL_LAST);
+        if (val2 != 0) HS::trigger_mapping[i+4] = constrain(val2 - 1, 0, ADC_CHANNEL_LAST + DAC_CHANNEL_LAST);
       }
     }
 
@@ -681,6 +681,9 @@ public:
         }
 
         if (clock_setup) {
+          if (h == LEFT_HEMISPHERE)
+            ClockSetup_instance.OnLeftEncoderMove(event.value);
+          else
             ClockSetup_instance.OnEncoderMove(event.value);
         } else if (select_mode == slot) {
             ChangeApplet(slot, event.value);

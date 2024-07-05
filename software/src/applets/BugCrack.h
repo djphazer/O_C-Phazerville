@@ -215,7 +215,7 @@ public:
         Out(0, bd_signal);
 
         // Snare Drum Output
-        Out(1, sd_signal);
+        Out(1, sd_signal + (mix_outs ? bd_signal : 0));
     }
 
     void View() {
@@ -223,12 +223,14 @@ public:
     }
 
     void OnButtonPress() {
-        CursorAction(cursor, 9);
+      if (cursor == 10) mix_outs = !mix_outs;
+      else
+        CursorToggle();
     }
 
     void OnEncoderMove(int direction) {
         if (!EditMode()) {
-            MoveCursor(cursor, direction, 9);
+            MoveCursor(cursor, direction, 10);
             return;
         }
 
@@ -285,6 +287,8 @@ public:
 
         Pack(data, PackLocation {48,4}, cv_mode_kick);
         Pack(data, PackLocation {52,4}, cv_mode_snare);
+
+        Pack(data, PackLocation {56, 1}, mix_outs);
         return data;
     }
 
@@ -301,6 +305,8 @@ public:
 
         cv_mode_kick = Unpack(data, PackLocation {48,4});
         cv_mode_snare = Unpack(data, PackLocation {52,4});
+
+        mix_outs = Unpack(data, PackLocation {56,1});
     }
 
 protected:
@@ -353,6 +359,8 @@ private:
     int blend_snare;
     int _blend_snare;
 
+    bool mix_outs = true;
+
     const char *CV_MODE_NAMES_BD[5] = {"atn", "ton", "dec", "FM", "dro"};
     const char *CV_MODE_NAMES_SN[5] = {"atn", "ton", "dec", "FM", "bln"};
 
@@ -394,6 +402,11 @@ private:
             case 9: // CV modes
                 gfxIcon(32, 57, CV_ICON);
                 gfxPrint(41, 55, CV_MODE_NAMES_SN[cv_mode_snare]);
+                break;
+
+            case 10: // mix outs @ B/D
+                gfxPrint(1, 55, "MixOut:");
+                gfxIcon(50, 55, mix_outs ? CHECK_ON_ICON : CHECK_OFF_ICON);
                 break;
         }
         if (EditMode()) gfxInvert(1 + (cursor<5?0:31), 54, 31, 9);

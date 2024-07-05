@@ -134,7 +134,7 @@ public:
       if (cursor == QUANT_SCALE || cursor == QUANT_ROOT)
         HS::QuantizerEdit(io_offset);
       else
-        CursorAction(cursor, MAX_CURSOR);
+        CursorToggle();
 
       if (cursor == WRITE_MODE) // toggle
         write_mode = EditMode();
@@ -173,6 +173,8 @@ public:
       switch (cursor) {
         default: // (cursor >= NOTES)
           seq.SetNote(seq.GetNote(cursor-NOTES) + direction, cursor-NOTES);
+          if ((cursor-NOTES) == seq.step)
+            current_note = seq.GetNote();
           break;
         case PATTERN:
           // TODO: queued pattern changes

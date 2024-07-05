@@ -124,9 +124,7 @@ public:
         DrawIndicator();
     }
 
-    void OnButtonPress() {
-        CursorAction(cursor, clocked ? 4 : 3);
-    }
+    //void OnButtonPress() { CursorToggle(); }
 
     void OnEncoderMove(int direction) {
         if (!EditMode()) {

@@ -230,9 +230,8 @@ public:
         DrawIndicator();
     }
 
-    void OnButtonPress() {
-      CursorAction(cursor, LAST_SETTING);
-    }
+    // void OnButtonPress() { }
+
     void AuxButton() {
       if (cursor == QUANT_A || cursor == QUANT_B) {
         HS::QuantizerEdit(qselect[cursor - QUANT_A]);

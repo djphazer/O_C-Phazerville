@@ -57,9 +57,7 @@ public:
         DrawInterface();
     }
 
-    void OnButtonPress() {
-        CursorAction(cursor, 3);
-    }
+    //void OnButtonPress() { }
 
     void OnEncoderMove(int direction) {
         if (!EditMode()) {

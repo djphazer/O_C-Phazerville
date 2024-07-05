@@ -143,7 +143,7 @@ public:
             const int s = (cursor - MUTE1A) % NUM_STEPS;
             div_seq[ch].ToggleStep(s);
         } else
-            CursorAction(cursor, LAST_SETTING);
+            CursorToggle();
     }
     void AuxButton() {
       const int ch = (cursor) / NUM_STEPS;

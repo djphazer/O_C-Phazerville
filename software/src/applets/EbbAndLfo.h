@@ -40,9 +40,9 @@ public:
 
     // handle CV inputs
     pitch_mod = pitch;
-    slope_mod = slope;
-    shape_mod = shape;
-    fold_mod = fold;
+    slope_mod = slope * (65535 / 127);
+    shape_mod = shape * (65535 / 127);
+    fold_mod = fold * (32767 / 127);
     level_mod = level * 10;
 
     ForEachChannel(ch) {
@@ -55,15 +55,15 @@ public:
           }
           break;
         case SLOPE:
-            Modulate(slope_mod, ch, 0, 127);
+            Modulate(slope_mod, ch, 0, 65535);
             break;
         case SHAPE:
-            shape_mod += Proportion(DetentedIn(ch), HEMISPHERE_MAX_INPUT_CV, 127);
-            while (shape_mod < 0) shape_mod += 128;
-            while (shape_mod > 127) shape_mod -= 128;
+            shape_mod += Proportion(DetentedIn(ch), HEMISPHERE_MAX_INPUT_CV, 65535);
+            while (shape_mod < 0) shape_mod += 65535;
+            while (shape_mod > 65535) shape_mod -= 65535;
             break;
         case FOLD:
-            Modulate(fold_mod, ch, 0, 127);
+            Modulate(fold_mod, ch, 0, 32767);
             break;
         }
     }
@@ -82,8 +82,8 @@ public:
     }
 
     // COMPUTE
-    int s = constrain(slope_mod * 65535 / 127, 0, 65535);
-    ProcessSample(s, shape_mod * 65535 / 127, fold_mod * 32767 / 127, phase, sample);
+    int s = constrain(slope_mod, 0, 65535);
+    ProcessSample(s, shape_mod, fold_mod, phase, sample);
 
     ForEachChannel(ch) {
       switch (output(ch)) {
@@ -116,8 +116,8 @@ public:
       int bottom = 32 + (h + 1) * ch;
       int last = bottom;
       for (int i = 0; i < 64; i++) {
-        ProcessSample(slope_mod * 65535 / 127, shape_mod * 65535 / 127,
-                      fold_mod * 32767 / 127, 0xffffffff / 64 * i, disp_sample);
+        ProcessSample(slope_mod, shape_mod,
+                      fold_mod, 0xffffffff / 64 * i, disp_sample);
         int next = 0;
         switch (output(ch)) {
         case UNIPOLAR:
@@ -188,7 +188,7 @@ public:
     if (cursor == ONESHOT_MODE)
       oneshot_mode = !oneshot_mode;
     else
-      CursorAction(cursor, MAX_CURSOR);
+      CursorToggle();
   }
 
   void OnEncoderMove(int direction) {

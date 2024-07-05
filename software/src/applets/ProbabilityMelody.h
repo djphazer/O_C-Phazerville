@@ -103,9 +103,7 @@ public:
         DrawKeyboard();
     }
 
-    void OnButtonPress() {
-        CursorAction(cursor, LAST_NOTE);
-    }
+    // void OnButtonPress() { }
 
     void OnEncoderMove(int direction) {
         if (!EditMode()) {

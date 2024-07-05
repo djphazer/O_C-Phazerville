@@ -207,7 +207,7 @@ public:
             last_note[0] = quantized;
         }
 
-        // on channel 2, for each clock pulse, move the cursor to the next setting, or if the cursor is !Edit mode, do CursorAction to set it into Edit mode. Let's make this only cycle through cursor 2-5
+        // on channel 2, for each clock pulse, move the cursor to the next setting, or if the cursor is !Edit mode, do CursorToggle to set it into Edit mode. Let's make this only cycle through cursor 2-5
         if (Clock(1)) {
             if (EditMode()) {
                 if (cursor < 2) {
@@ -218,7 +218,7 @@ public:
                     cursor = 2;
                 }
             } else {
-                CursorAction(cursor, 3);
+                CursorToggle();
                 cursor = 2;
             }
         }
@@ -244,9 +244,7 @@ public:
         DrawSelector();
     }
 
-    void OnButtonPress() {
-        CursorAction(cursor, 3);
-    }
+    // void OnButtonPress() { }
 
     void OnEncoderMove(int direction) {
         if (!EditMode()) {

@@ -99,7 +99,7 @@ public:
         if (cursor == SHUFFLE && !EditMode()) // special case toggle
             shuffle ? ImprintChord(sel_chord) : ShuffleChord();
         else // Advance or toggle cursor
-            CursorAction(cursor, LAST_SETTING);
+            CursorToggle();
 
         // Set a chord imprint if a new chord is picked
         if (chord != sel_chord) {

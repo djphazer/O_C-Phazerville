@@ -198,23 +198,32 @@ public:
   OC::Autotuner<Cal8ChannelConfig> autotuner;
 
 
-	void Start() {
+    void Start() {
         segment.Init(SegmentSize::BIG_SEGMENTS);
 
         // make sure to turn this off, just in case
         FreqMeasure.end();
         OC::DigitalInputs::reInit();
 
+        // This initializes the global HS Quantizers
         ClearPreset();
 
         autotuner.Init();
-	}
+    }
 	
     void ClearPreset() {
-        for (int ch = 0; ch < DAC_CHANNEL_LAST; ++ch) {
+        for (int ch = 0; ch < QUANT_CHANNEL_COUNT; ++ch) {
             HS::quantizer[ch].Init();
+#ifdef ARDUINO_TEENSY41
             HS::QuantizerConfigure(ch, OC::Scales::SCALE_SEMI, 0xffff);
+#else
+            // Q1..Q4 default to Semitones
+            // Q5..Q8 get initialized as USR1..USR4
+            HS::QuantizerConfigure(ch, (ch<4) ? OC::Scales::SCALE_SEMI : ch - 4, 0xffff);
+#endif
+        }
 
+        for (int ch = 0; ch < DAC_CHANNEL_LAST; ++ch) {
             channel[ch].scale_factor = 0;
             channel[ch].offset = 0;
             channel[ch].transpose = 0;
@@ -255,6 +264,7 @@ public:
     void ProcessMIDI() {
         HS::IOFrame &f = HS::frame;
         bool dothething = false;
+
         while (usbMIDI.read()) {
             const int message = usbMIDI.getType();
             const int data1 = usbMIDI.getData1();
@@ -271,6 +281,42 @@ public:
               dothething = true;
             }
         }
+
+#if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
+        thisUSB.Task();
+        while (usbHostMIDI.read()) {
+            const int message = usbHostMIDI.getType();
+            const int data1 = usbHostMIDI.getData1();
+            const int data2 = usbHostMIDI.getData2();
+
+            if (message == usbMIDI.SystemExclusive) {
+                // TODO: consider implementing SysEx import/export for Calibr8or
+                continue;
+            }
+
+            f.MIDIState.ProcessMIDIMsg(usbHostMIDI.getChannel(), message, data1, data2);
+
+            if (message == usbMIDI.NoteOn || message == usbMIDI.NoteOff) {
+              dothething = true;
+            }
+        }
+        while (MIDI1.read()) {
+            const int message = MIDI1.getType();
+            const int data1 = MIDI1.getData1();
+            const int data2 = MIDI1.getData2();
+
+            if (message == usbMIDI.SystemExclusive) {
+                // TODO: consider implementing SysEx import/export for Calibr8or
+                continue;
+            }
+
+            f.MIDIState.ProcessMIDIMsg(MIDI1.getChannel(), message, data1, data2);
+
+            if (message == usbMIDI.NoteOn || message == usbMIDI.NoteOff) {
+              dothething = true;
+            }
+        }
+#endif
 
         if (dothething) {
           // reconfigure with MIDI-derived masks

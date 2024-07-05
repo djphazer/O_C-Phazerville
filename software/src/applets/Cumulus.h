@@ -97,9 +97,7 @@ public:
         DrawSelector();
     }
 
-    void OnButtonPress() {
-        CursorAction(cursor, LAST_CURSOR);
-    }
+    //void OnButtonPress() { }
 
     void OnEncoderMove(int direction) {
         if (!EditMode()) {

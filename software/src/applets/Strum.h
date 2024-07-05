@@ -18,9 +18,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "HSicons.h"
-#include "HemisphereApplet.h"
-
 class Strum : public HemisphereApplet {
 public:
   const char *applet_name() { return "Strum"; }

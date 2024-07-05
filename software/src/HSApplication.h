@@ -44,7 +44,7 @@ typedef int32_t simfloat;
 #define HSAPPLICATION_CHANGE_THRESHOLD 32
 
 #if defined(BUCHLA_4U) || defined(VOR)
-#define HSAPP_PULSE_VOLTAGE 8
+#define HSAPP_PULSE_VOLTAGE 9
 #else
 #define HSAPP_PULSE_VOLTAGE 5
 #endif

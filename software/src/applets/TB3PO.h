@@ -172,9 +172,7 @@ class TB_3PO: public HemisphereApplet {
     DrawGraphics();
   }
 
-  void OnButtonPress() {
-    CursorAction(cursor, 8);
-  }
+  // void OnButtonPress() { }
 
   void AuxButton() {
     if (cursor == DENSITY) {
