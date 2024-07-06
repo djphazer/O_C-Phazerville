@@ -103,6 +103,11 @@ public:
         cv_data[0] = DetentedIn(0);
         cv_data[1] = DetentedIn(1);
 
+        // Reset
+        if (reset_active && Clock(1)) {
+          ForEachChannel(ch) reg[ch] = reg_snap[ch];
+        }
+
         // default to no mod
         p_mod = p;
         qselect_mod[0] = qselect[0];
@@ -156,19 +161,13 @@ public:
 
         // Advance the register on clock, flipping bits as necessary
         if (clk) {
-            // If the cursor is not on the p value, and Digital 2 is not gated, the sequence remains the same
-            int prob = (cursor == PROB || Gate(1)) ? p_mod : 0;
+          // If the cursor is not on the p value, and Digital 2 is not gated, the sequence remains the same
+          int prob = (cursor == PROB || (!reset_active && Gate(1))) ? p_mod : 0;
 
-            for (int i = 0; i < 2; ++i) {
-                // Grab the bit that's about to be shifted away
-                int last = (reg[i] >> (len_mod - 1)) & 0x01;
-
-                // Does it change?
-                if (random(0, 99) < prob) last = 1 - last;
-
-                // Shift left, then potentially add the bit from the other side
-                reg[i] = (reg[i] << 1) + last;
-            }
+          if (rotate_right)
+            ShiftRight(prob);
+          else
+            ShiftLeft(prob);
         }
  
         // Send 8-bit scaled and quantized CV
@@ -256,6 +255,16 @@ public:
       if (cursor == QUANT_A || cursor == QUANT_B) {
         HS::QuantizerEdit(qselect[cursor - QUANT_A]);
       }
+      if (cursor == PROB) {
+        reset_active = !reset_active;
+        if (reset_active) {
+          // grab snapshots of the registers
+          ForEachChannel(ch) reg_snap[ch] = reg[ch];
+        }
+      }
+      if (cursor == LENGTH) {
+        rotate_right = !rotate_right;
+      }
       isEditing = false;
     }
 
@@ -316,6 +325,8 @@ public:
         Pack(data, PackLocation {48,4}, qselect[0]);
         Pack(data, PackLocation {52,4}, qselect[1]);
 
+        Pack(data, PackLocation {56,1}, rotate_right);
+
         // TODO: utilize enigma's global turing machine storage for the registers
 
         return data;
@@ -338,6 +349,7 @@ public:
         CONSTRAIN(qselect[0], 0, DAC_CHANNEL_LAST - 1);
         CONSTRAIN(qselect[1], 0, DAC_CHANNEL_LAST - 1);
 
+        rotate_right = Unpack(data, PackLocation {56,1});
     }
 
 protected:
@@ -357,6 +369,9 @@ private:
 
     // TODO: consider using the TuringMachine class or whatev
     uint32_t reg[2]; // 32-bit sequence registers
+    uint32_t reg_snap[2]; // for resetting
+    bool reset_active = false;
+    bool rotate_right = false;
 
     // most recent output values
     int Output[2] = {0, 0};
@@ -387,6 +402,32 @@ private:
         if (OC::CORE::ticks % s) return;
 
         old_val = (old_val * (s - 1) + new_val) / s;
+    }
+
+    void ShiftLeft(int prob) {
+      ForEachChannel(i) {
+        // Grab the bit that's about to be shifted away
+        uint32_t last = (reg[i] >> (len_mod - 1)) & 0x01;
+
+        // Does it change?
+        if (random(0, 99) < prob) last = 1 - last;
+
+        // Shift left, then potentially add the bit from the other side
+        reg[i] = (reg[i] << 1) + last;
+      }
+    }
+    void ShiftRight(int prob) {
+      ForEachChannel(i) {
+        // Grab the bit that's about to be shifted away
+        uint32_t last = reg[i] & 0x01;
+
+        // Does it change?
+        if (random(0, 99) < prob) last = 1 - last;
+        last = last << (len_mod - 1);
+
+        // Shift right, then potentially add the bit from the other side
+        reg[i] = ((reg[i] >> 1) & ~(1 << (len_mod - 1))) | last ;
+      }
     }
 
     void DrawOutputMode(int ch) {
@@ -469,12 +510,15 @@ private:
     void DrawSelector() {
         gfxBitmap(1, 14, 8, LOOP_ICON);
         gfxPrint(12 + pad(10, len_mod), 15, len_mod);
+        gfxIcon(25, 15, rotate_right ? ROTATE_R_ICON : ROTATE_L_ICON);
+
         gfxPrint(35 + pad(100, p_mod), 15, p_mod);
-        if (cursor == PROB || Gate(1)) { // p unlocked
+        if (cursor == PROB || (!reset_active && Gate(1))) { // p unlocked
             gfxBitmap(55, 15, 8, TOSS_ICON);
         } else { // p is disabled
             gfxBitmap(55, 15, 8, LOCK_ICON);
         }
+        if (reset_active) gfxInvert(54, 14, 9, 9);
 
         // two separate pages of params
         switch ((TM2Cursor)cursor){
@@ -527,12 +571,12 @@ private:
     void DrawIndicator() {
         gfxLine(0, 45, 63, 45);
         gfxLine(0, 62, 63, 62);
-        for (int b = 0; b < 16; b++)
+        for (int b = 0; b < 32; ++b)
         {
             int v = (reg[0] >> b) & 0x01;
             int v2 = (reg[1] >> b) & 0x01;
-            if (v) gfxRect(60 - (4 * b), 47, 3, 7);
-            if (v2) gfxRect(60 - (4 * b), 54, 3, 7);
+            if (v) gfxRect(60 - (2 * b), 47, 1, 7);
+            if (v2) gfxRect(60 - (2 * b), 54, 1, 7);
         }
     }
 
