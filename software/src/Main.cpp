@@ -130,7 +130,7 @@ void setup() {
   }
 
   if (I2S2_Audio_ADC && I2S2_Audio_DAC) {
-    OC::AudioInit();
+    OC::AudioDSP::Init();
   }
   #endif
 
