@@ -27,7 +27,7 @@
 #define PCM_TO_CV(S) Proportion((int)S - 127, 127, CLIPLIMIT)
 #define CV_TO_PCM(S) Proportion(constrain(S, -CLIPLIMIT, CLIPLIMIT), CLIPLIMIT, 127) + 127
 
-uint8_t lofi_pcm_buffer[HEM_LOFI_PCM_BUFFER_SIZE];
+DMAMEM uint8_t lofi_pcm_buffer[HEM_LOFI_PCM_BUFFER_SIZE];
 
 class DrLoFi : public HemisphereApplet {
 public:

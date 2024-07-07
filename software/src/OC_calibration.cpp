@@ -29,7 +29,7 @@ using OC::DAC;
 
 namespace OC {
 
-CalibrationStorage calibration_storage;
+DMAMEM CalibrationStorage calibration_storage;
 CalibrationData calibration_data;
 
 bool calibration_data_loaded = false;
@@ -83,7 +83,7 @@ const CalibrationData kCalibrationDefaults = {
   #endif
 };
 
-void calibration_reset() {
+FLASHMEM void calibration_reset() {
   memcpy(&OC::calibration_data, &kCalibrationDefaults, sizeof(OC::calibration_data));
   for (int ch = 0; ch < DAC_CHANNEL_LAST; ++ch) {
     for (int i = 0; i < OCTAVES; ++i) {
@@ -93,7 +93,7 @@ void calibration_reset() {
 }
 
 #ifdef FLIP_180
-void calibration_flip() {
+FLASHMEM void calibration_flip() {
     uint16_t flip_dac[OCTAVES + 1];
     uint16_t flip_adc;
     for (int i = 0; i < 2; ++i) {
@@ -108,7 +108,7 @@ void calibration_flip() {
 }
 #endif
 
-void calibration_load() {
+FLASHMEM void calibration_load() {
   SERIAL_PRINTLN("Cal.Storage: PAGESIZE=%u, PAGES=%u, LENGTH=%u",
                  OC::CalibrationStorage::PAGESIZE, OC::CalibrationStorage::PAGES, OC::CalibrationStorage::LENGTH);
 
@@ -133,7 +133,7 @@ void calibration_load() {
     OC::calibration_data.screensaver_timeout = SCREENSAVER_TIMEOUT_S;
 }
 
-void calibration_save() {
+FLASHMEM void calibration_save() {
   SERIAL_PRINTLN("Saving calibration data");
 #ifdef FLIP_180
   calibration_flip();
@@ -426,7 +426,7 @@ const CalibrationStep calibration_steps[CALIBRATION_STEP_LAST] = {
 };
 
 
-void calibration_draw(const CalibrationState &state) {
+FLASHMEM void calibration_draw(const CalibrationState &state) {
   const CalibrationStep *step = state.current_step;
 
   /*
@@ -536,7 +536,7 @@ void calibration_draw(const CalibrationState &state) {
 
 /* DAC output etc */ 
 
-void calibration_update(CalibrationState &state) {
+FLASHMEM void calibration_update(CalibrationState &state) {
 
   CONSTRAIN(state.encoder_value, state.current_step->min, state.current_step->max);
   const CalibrationStep *step = state.current_step;
@@ -588,7 +588,7 @@ void calibration_update(CalibrationState &state) {
 } // namespace OC
 
 /*     loop calibration menu until done       */
-void OC::Ui::Calibrate() {
+FLASHMEM void OC::Ui::Calibrate() {
 // unused; this has been integrated into APP_SETTINGS.h
 
   // Calibration data should be loaded (or defaults) by now

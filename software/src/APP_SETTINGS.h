@@ -309,7 +309,7 @@ public:
 
 };
 
-Settings Settings_instance;
+DMAMEM Settings Settings_instance;
 
 // App stubs
 void Settings_init() {

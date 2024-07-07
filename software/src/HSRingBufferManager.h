@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-struct RingBufferManager {
+DMAMEM struct RingBufferManager {
     int buffer[256];
     uint8_t position = 0;
     uint8_t index = 0;
