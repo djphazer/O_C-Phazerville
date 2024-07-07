@@ -84,8 +84,8 @@ public:
     }
 
     void Start() {
-        reg[0] = random(0, 65535);
-        reg[1] = ~reg[0];
+        reg[0] = random(0xFFFFFFFF);
+        reg[1] = random(0xFFFFFFFF);
         qselect[0] = io_offset;
         qselect[1] = io_offset + 1;
 
