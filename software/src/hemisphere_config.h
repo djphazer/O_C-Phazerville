@@ -16,7 +16,7 @@
 #ifdef ARDUINO_TEENSY41
 // Teensy 4.1 can run four applets in Quadrasphere
 #define CREATE_APPLET(class_name) \
-DMAMEM class_name class_name ## _instance[4]
+class_name class_name ## _instance[4]
 
 #define DECLARE_APPLET(id, categories, class_name) \
 { id, categories, { \
