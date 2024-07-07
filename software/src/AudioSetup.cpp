@@ -74,6 +74,11 @@ namespace OC {
     uint8_t mods_enabled = 0xff; // DAC outputs bitmask
     int bias[TARGET_COUNT]; // UI settings
 
+    float amplevel_left = 1.0;
+    float amplevel_right = 1.0;
+    float foldamt_left = 0.0;
+    float foldamt_right = 0.0;
+
     bool enabled(int ch) { return (mods_enabled >> ch) & 0x1; }
     void toggle(int ch) { mods_enabled ^= (0x1 << ch); }
 
@@ -136,17 +141,27 @@ namespace OC {
     }
 
     void WavefoldL(int cv) {
-      dc1.amplitude((float)cv / MAX_CV);
+      foldamt_left = (float)cv / MAX_CV;
+      dc1.amplitude(foldamt_left);
+      mixer3.gain(0, amplevel_left * (1.0 - abs(foldamt_left)));
+      mixer3.gain(3, foldamt_left);
     }
     void WavefoldR(int cv) {
-      dc2.amplitude((float)cv / MAX_CV);
+      foldamt_right = (float)cv / MAX_CV;
+      dc2.amplitude(foldamt_right);
+      mixer4.gain(0, amplevel_right * (1.0 - abs(foldamt_right)));
+      mixer4.gain(3, foldamt_right);
     }
 
     void AmpL(int cv) {
-      mixer3.gain(0, (float)cv / MAX_CV);
+      amplevel_left = (float)cv / MAX_CV;
+      //mixer3.gain(0, amplevel_left);
+      mixer3.gain(0, amplevel_left * (1.0 - abs(foldamt_left)));
     }
     void AmpR(int cv) {
-      mixer4.gain(0, (float)cv / MAX_CV);
+      amplevel_right = (float)cv / MAX_CV;
+      //mixer4.gain(0, amplevel_right);
+      mixer4.gain(0, amplevel_right * (1.0 - abs(foldamt_right)));
     }
 
     // Designated Integration Functions
@@ -154,34 +169,35 @@ namespace OC {
     void Init() {
       AudioMemory(128);
 
-      // Reverb
-      freeverb1.roomsize(0.7);
-      freeverb1.damping(0.5);
-      mixer3.gain(1, 0.10); // verb1
-      mixer3.gain(2, 0.10); // verb2
-
-      freeverb2.roomsize(0.8);
-      freeverb2.damping(0.6);
-      mixer4.gain(1, 0.10); // verb2
-      mixer4.gain(2, 0.10); // verb1
-      
       amp1.gain(0.85); // attenuate before filter
       amp2.gain(0.85); // attenuate before filter
 
-      // wavefolders should pass thru clean at 6%
-      dc1.amplitude(0.00);
-      dc2.amplitude(0.00);
-      mixer3.gain(3, 1.0);
-      mixer4.gain(3, 1.0);
-
+      // --Filters
       //BypassFilterL();
-      EnableFilterL();
-
       //BypassFilterR();
-      SelectBPF();
+      EnableFilterL();
+      SelectLPF();
 
       svfilter1.resonance(1.05);
       ladder1.resonance(0.6);
+
+      // --Wavefolders
+      dc1.amplitude(0.00);
+      dc2.amplitude(0.00);
+      mixer3.gain(3, 0.9);
+      mixer4.gain(3, 0.9);
+
+      // --Reverbs
+      freeverb1.roomsize(0.7);
+      freeverb1.damping(0.5);
+      mixer3.gain(1, 0.08); // verb1
+      mixer3.gain(2, 0.05); // verb2
+
+      freeverb2.roomsize(0.8);
+      freeverb2.damping(0.6);
+      mixer4.gain(1, 0.08); // verb2
+      mixer4.gain(2, 0.05); // verb1
+      
     }
 
     // ----- called from Controller thread
