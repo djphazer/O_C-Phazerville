@@ -1,3 +1,5 @@
+#if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
+
 #include "AudioSetup.h"
 
 // Use the web GUI tool as a guide: https://www.pjrc.com/teensy/gui/
@@ -234,3 +236,5 @@ namespace OC {
     }
   } // AudioDSP namespace
 } // OC namespace
+
+#endif
