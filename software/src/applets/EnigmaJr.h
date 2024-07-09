@@ -136,12 +136,12 @@ private:
             // status instead of the probability
             byte length = tm_state.GetLength();
             if (length > 0) {
-                gfxIcon(42, 15, LOOP_ICON);
-                gfxPrint(52 + pad(10, length), 15, length);
+                gfxIcon(41, 15, LOOP_ICON);
+                gfxPrint(51 + pad(10, length), 15, length);
             }
             else gfxPrint("--");
         } else {
-            gfxPrint(34, 15, "p=");
+            gfxPrint(33, 15, "p=");
             gfxPrint(pad(100, p), p);
         }
 

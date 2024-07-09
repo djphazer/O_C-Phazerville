@@ -509,7 +509,7 @@ private:
 
     void DrawSelector() {
         gfxBitmap(1, 14, 8, LOOP_ICON);
-        gfxPrint(12 + pad(10, len_mod), 15, len_mod);
+        gfxPrint(11 + pad(10, len_mod), 15, len_mod);
         gfxIcon(25, 15, rotate_right ? ROTATE_R_ICON : ROTATE_L_ICON);
 
         gfxPrint(35 + pad(100, p_mod), 15, p_mod);
@@ -549,7 +549,7 @@ private:
 
         // TODO: generalize this as a cursor LUT for all applets
         switch ((TM2Cursor)cursor) {
-            case LENGTH: gfxCursor(12, 23, 13); break;
+            case LENGTH: gfxCursor(11, 23, 13); break;
             case PROB:   gfxCursor(35, 23, 19); break;
             case QUANT_A:  gfxCursor(12, 33, 13); break;
             case QUANT_B:  gfxCursor(39, 33, 13); break;
