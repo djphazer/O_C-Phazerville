@@ -432,7 +432,7 @@ public:
           }
           else if (help_hemisphere > -1) {
             int index = my_applet[help_hemisphere];
-            HS::available_applets[index].instance[help_hemisphere]->BaseView();
+            HS::available_applets[index].instance[help_hemisphere]->BaseView(true);
             draw_applets = false;
           }
         }
@@ -673,17 +673,7 @@ public:
         preset_cursor = preset_id + 1;
     }
 
-    void SetHelpScreen(int hemisphere) {
-        if (help_hemisphere > -1) { // Turn off the previous help screen
-            int index = my_applet[help_hemisphere];
-            HS::available_applets[index].instance[help_hemisphere]->ToggleHelpScreen();
-        }
-
-        if (hemisphere > -1) { // Turn on the next hemisphere's screen
-            int index = my_applet[hemisphere];
-            HS::available_applets[index].instance[hemisphere]->ToggleHelpScreen();
-        }
-
+    inline void SetHelpScreen(int hemisphere) {
         help_hemisphere = hemisphere;
     }
 

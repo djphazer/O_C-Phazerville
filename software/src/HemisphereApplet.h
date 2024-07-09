@@ -133,13 +133,12 @@ public:
 
     //void BaseStart(const HEM_SIDE hemisphere_);
     void BaseController();
-    void BaseView();
+    void BaseView(bool full_screen = false);
 
     constexpr void BaseStart(const HEM_SIDE hemisphere_) {
         hemisphere = hemisphere_;
 
         // Initialize some things for startup
-        full_screen = 0;
         cursor_countdown[hemisphere] = HEMISPHERE_CURSOR_TICKS;
 
         // Shutdown FTM capture on Digital 4, used by Tuner
@@ -168,7 +167,6 @@ public:
     void BaseScreensaverView() {}
 
     /* Help Screen Toggle */
-    void ToggleHelpScreen() { full_screen = 1 - full_screen; }
     virtual void DrawFullScreen() {
         SetHelp();
 
@@ -467,7 +465,6 @@ protected:
 
 private:
     bool applet_started; // Allow the app to maintain state during switching
-    bool full_screen;
 };
 
 #endif // _HEM_APPLET_H_
