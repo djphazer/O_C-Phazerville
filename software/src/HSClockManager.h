@@ -72,6 +72,8 @@ class ClockManager {
 
     bool boop[8] = {0,0,0,0,0,0,0,0}; // Manual triggers
 
+    void (*sync_func)(); // callback function
+
 public:
     ClockManager() {
         SetTempoBPM(120);
@@ -123,6 +125,18 @@ public:
      */
     uint16_t GetTempo() {return tempo;}
 
+    void QueuePresetLoad(auto func) {
+      sync_func = func;
+    }
+    void ProcessBeatSync() {
+      // TODO: things that should only happen on the downbeat
+      // such as: preset load, multiplier change, etc...
+      if (sync_func != nullptr) {
+        sync_func();
+        sync_func = nullptr;
+      }
+    }
+
     // Reset - Resync multipliers, optionally skipping the first tock
     void Reset(bool count_skip = 0) {
         beat_tick = OC::CORE::ticks;
@@ -133,6 +147,7 @@ public:
         for (int ch = 0; ch < NR_OF_CLOCKS; ch++) {
             if (tocks_per_beat[ch] > 0 || 0 == count_skip) count[ch] = count_skip;
         }
+
         cycle = 1 - cycle;
     }
 
@@ -153,6 +168,8 @@ public:
 
         // Reset only when all multipliers have been met
         bool reset = 1;
+        // Process beat sync actions when any multiplier is met
+        bool beatsync = 0;
 
         // count and calculate Tocks
         for (int ch = 0; ch < NR_OF_CLOCKS; ch++) {
@@ -168,7 +185,8 @@ public:
                 tock[ch] = now >= next_tock_tick;
                 if (tock[ch]) ++count[ch]; // increment multiplier counter
 
-                reset = reset && (count[ch] > tocks_per_beat[ch]); // multiplier has been exceeded
+                beatsync = beatsync || (count[ch] > tocks_per_beat[ch]); // multiplier has been exceeded
+                reset = reset && (count[ch] > tocks_per_beat[ch]);
             } else { // division: -1 becomes /2, -2 becomes /3, etc.
                 int div = 1 - tocks_per_beat[ch];
                 uint32_t next_beat = beat_tick + (count[ch] ? ticks_per_beat : 0);
@@ -181,12 +199,14 @@ public:
                     tock[ch] = 0;
 
                 // resync on every beat
+                beatsync = beatsync || beat_exceeded;
                 reset = reset && beat_exceeded;
                 if (tock[ch]) count[ch] = 1;
             }
 
         }
         if (reset) Reset(1); // skip the one we're already on
+        if (beatsync) ProcessBeatSync();
 
         // handle syncing to physical clocks
         if (clocked && clock_tick[tickno] && clock_ppqn) {
