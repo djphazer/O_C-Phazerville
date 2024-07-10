@@ -7,23 +7,39 @@
 namespace OC {
   namespace AudioDSP {
 
-    enum ParamTargets {
-      FILTER1_CUTOFF, FILTER1_RESONANCE,
-      FILTER2_CUTOFF, FILTER2_RESONANCE,
-      WAVEFOLD1_MOD, WAVEFOLD2_MOD,
-      REVERB1_WET, REVERB1_SIZE, REVERB1_DAMP,
-      REVERB2_WET, REVERB2_SIZE, REVERB2_DAMP,
+    enum ParamTarget {
+      AMP_LEVEL,
+      FILTER_CUTOFF,
+      FILTER_RESONANCE,
+      WAVEFOLD_MOD,
+      REVERB_LEVEL,
+      REVERB_SIZE,
+      REVERB_DAMP,
 
       TARGET_COUNT
     };
 
+    enum ChannelMode {
+      PASSTHRU,
+      VCA_MODE,
+      LPG_MODE,
+      VCF_MODE,
+      WAVEFOLDER,
+
+      MODE_COUNT
+    };
+    extern const char * const mode_names[];
+
     const int MAX_CV = 9216; // 6V
 
     extern uint8_t mods_enabled; // DAC outputs bitmask
-    extern int bias[TARGET_COUNT]; // UI settings
+    extern ChannelMode mode[2]; // mode for each channel
+    extern int mod_map[2][TARGET_COUNT]; // CV modulation sources (as channel indexes for [inputs..outputs])
+    extern float bias[2][TARGET_COUNT]; // baseline settings
 
     void Init();
     void Process(const int *values);
+    void SwitchMode(int ch, ChannelMode newmode);
 
   } // AudioDSP namespace
 } // OC namespace

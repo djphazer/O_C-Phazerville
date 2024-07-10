@@ -73,38 +73,28 @@ AudioConnection          patchCord26(freeverb1, 0, mixer4, 2);
 namespace OC {
   namespace AudioDSP {
 
-    uint8_t mods_enabled = 0xff; // DAC outputs bitmask
-    int bias[TARGET_COUNT]; // UI settings
+    const char * const mode_names[] = {
+      "Off", "VCA", "LPG", "VCF", "FOLD",
+    };
 
-    float amplevel_left = 1.0;
-    float amplevel_right = 1.0;
-    float foldamt_left = 0.0;
-    float foldamt_right = 0.0;
+    /* Mod Targets:
+      AMP_LEVEL
+      FILTER_CUTOFF,
+      FILTER_RESONANCE,
+      WAVEFOLD_MOD,
+      REVERB_LEVEL,
+      REVERB_SIZE,
+      REVERB_DAMP,
+     */
+    ChannelMode mode[2] = { PASSTHRU, PASSTHRU };
+    int mod_map[2][TARGET_COUNT] = {
+      { 8, 8, -1, 8, -1, -1, -1 },
+      { 10, 10, -1, 10, -1, -1, -1 },
+    };
+    float bias[2][TARGET_COUNT];
 
-    bool enabled(int ch) { return (mods_enabled >> ch) & 0x1; }
-    void toggle(int ch) { mods_enabled ^= (0x1 << ch); }
-
-    // Left side ladder filter functions
-    void EnableFilterL() {
-      mixer1.gain(0, 1.0); // LPF
-      mixer1.gain(3, 0.0); // Dry
-    }
-    void BypassFilterL() {
-      mixer1.gain(0, 0.0); // LPF
-      mixer1.gain(1, 0.0); // unused
-      mixer1.gain(2, 0.0); // unused
-      mixer1.gain(3, 1.0); // Dry
-    }
-    void ModFilterL(int cv) {
-      // quartertones squared
-      // 1 Volt is 576 Hz
-      // 2V = 2304 Hz
-      // 3V = 5184 Hz
-      // 4V = 9216 Hz
-      float freq = abs(cv) / 64;
-      freq *= freq;
-      ladder1.frequency(freq);
-    }
+    float amplevel[2] = { 1.0, 1.0 };
+    float foldamt[2] = { 0.0, 0.0 };
 
     // Right side state variable filter functions
     void SelectHPF() {
@@ -125,45 +115,67 @@ namespace OC {
       mixer2.gain(2, 0.0); // HPF
       mixer2.gain(3, 0.0); // Dry
     }
-    void BypassFilterR() {
-      mixer2.gain(0, 0.0); // LPF
-      mixer2.gain(1, 0.0); // BPF
-      mixer2.gain(2, 0.0); // HPF
-      mixer2.gain(3, 1.0); // Dry
+
+    void BypassFilter(int ch) {
+      if (ch == 0) {
+        mixer1.gain(0, 0.0); // LPF
+        mixer1.gain(1, 0.0); // unused
+        mixer1.gain(2, 0.0); // unused
+        mixer1.gain(3, 1.0); // Dry
+      } else {
+        mixer2.gain(0, 0.0); // LPF
+        mixer2.gain(1, 0.0); // BPF
+        mixer2.gain(2, 0.0); // HPF
+        mixer2.gain(3, 1.0); // Dry
+      }
     }
-    void ModFilterR(int cv) {
+
+    void EnableFilter(int ch) {
+      if (ch == 0) {
+        mixer1.gain(0, 1.0); // LPF
+        mixer1.gain(1, 0.0); // unused
+        mixer1.gain(2, 0.0); // unused
+        mixer1.gain(3, 0.0); // Dry
+      } else {
+        SelectLPF();
+      }
+    }
+
+    void ModFilter(int ch, int cv) {
       // quartertones squared
       // 1 Volt is 576 Hz
       // 2V = 2304 Hz
       // 3V = 5184 Hz
       // 4V = 9216 Hz
-      float freq = abs(cv) / 64;
+      float freq = abs(cv) / 64 + bias[ch][FILTER_CUTOFF];
       freq *= freq;
-      svfilter1.frequency(freq);
+
+      if (ch == 0)
+        ladder1.frequency(freq);
+      else
+        svfilter1.frequency(freq);
     }
 
-    void WavefoldL(int cv) {
-      foldamt_left = (float)cv / MAX_CV;
-      dc1.amplitude(foldamt_left);
-      mixer3.gain(0, amplevel_left * (1.0 - abs(foldamt_left)));
-      mixer3.gain(3, foldamt_left);
-    }
-    void WavefoldR(int cv) {
-      foldamt_right = (float)cv / MAX_CV;
-      dc2.amplitude(foldamt_right);
-      mixer4.gain(0, amplevel_right * (1.0 - abs(foldamt_right)));
-      mixer4.gain(3, foldamt_right);
+
+    void Wavefold(int ch, int cv) {
+      foldamt[ch] = (float)cv / MAX_CV + bias[ch][WAVEFOLD_MOD];
+      if (ch == 0) {
+        dc1.amplitude(foldamt[ch]);
+        mixer3.gain(0, amplevel[ch] * (1.0 - abs(foldamt[ch])));
+        mixer3.gain(3, foldamt[ch]);
+      } else {
+        dc2.amplitude(foldamt[ch]);
+        mixer4.gain(0, amplevel[ch] * (1.0 - abs(foldamt[ch])));
+        mixer4.gain(3, foldamt[ch]);
+      }
     }
 
-    void AmpL(int cv) {
-      amplevel_left = (float)cv / MAX_CV;
-      //mixer3.gain(0, amplevel_left);
-      mixer3.gain(0, amplevel_left * (1.0 - abs(foldamt_left)));
-    }
-    void AmpR(int cv) {
-      amplevel_right = (float)cv / MAX_CV;
-      //mixer4.gain(0, amplevel_right);
-      mixer4.gain(0, amplevel_right * (1.0 - abs(foldamt_right)));
+    void AmpLevel(int ch, int cv) {
+      amplevel[ch] = (float)cv / MAX_CV + bias[ch][AMP_LEVEL];
+      if (ch == 0)
+        mixer3.gain(0, amplevel[ch] * (1.0 - abs(foldamt[ch])));
+      else
+        mixer4.gain(0, amplevel[ch] * (1.0 - abs(foldamt[ch])));
     }
 
     // Designated Integration Functions
@@ -175,10 +187,8 @@ namespace OC {
       amp2.gain(0.85); // attenuate before filter
 
       // --Filters
-      //BypassFilterL();
-      //BypassFilterR();
-      EnableFilterL();
-      SelectLPF();
+      BypassFilter(0);
+      BypassFilter(1);
 
       svfilter1.resonance(1.05);
       ladder1.resonance(0.6);
@@ -204,36 +214,62 @@ namespace OC {
 
     // ----- called from Controller thread
     void Process(const int *values) {
-      // Output A - VCA L
-      if (enabled(0)) {
-        AmpL(values[0]);
-      }
+      for (int i = 0; i < 2; ++i) {
 
-      // Output B - VCF L
-      if (enabled(1)) {
-        ModFilterL(values[1]);
-      }
+        // some things depend on mode
+        switch(mode[i]) {
+          case PASSTHRU:
+            break;
 
-      // Output C - VCA R
-      if (enabled(2)) {
-        AmpR(values[2]);
-      }
+          case LPG_MODE:
+            if (mod_map[i][AMP_LEVEL] < 0) continue;
+            ModFilter(i, values[mod_map[i][AMP_LEVEL]]);
+          case VCA_MODE:
+            if (mod_map[i][AMP_LEVEL] < 0) continue;
+            AmpLevel(i, values[mod_map[i][AMP_LEVEL]]);
+            break;
 
-      // Output D - VCF R
-      if (enabled(3)) {
-        ModFilterR(values[3]);
-      }
+          case VCF_MODE:
+            if (mod_map[i][FILTER_CUTOFF] < 0) continue;
+            ModFilter(i, values[mod_map[i][FILTER_CUTOFF]]);
+            break;
 
-      // Output E - Wavefolder L
-      if (enabled(4)) {
-        WavefoldL(values[4]);
-      }
+          case WAVEFOLDER:
+            if (mod_map[i][WAVEFOLD_MOD] < 0) continue;
+            Wavefold(i, values[mod_map[i][WAVEFOLD_MOD]]);
+            break;
+        }
 
-      // Output G - Wavefolder R
-      if (enabled(6)) {
-        WavefoldR(values[6]);
+        // other modulation happens regardless of mode
+
       }
     }
+
+    void SwitchMode(int ch, ChannelMode newmode) {
+      mode[ch] = newmode;
+      switch(newmode) {
+          case PASSTHRU:
+          case VCA_MODE:
+            Wavefold(ch, 0);
+            AmpLevel(ch, MAX_CV);
+            BypassFilter(ch);
+            break;
+
+          case VCF_MODE:
+          case LPG_MODE:
+            Wavefold(ch, 0);
+            AmpLevel(ch, MAX_CV);
+            EnableFilter(ch);
+            break;
+
+          case WAVEFOLDER:
+            AmpLevel(ch, 0);
+            BypassFilter(ch);
+            break;
+      }
+    }
+
+
   } // AudioDSP namespace
 } // OC namespace
 

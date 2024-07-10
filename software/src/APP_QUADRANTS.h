@@ -575,6 +575,12 @@ public:
                 OC::ui.SetButtonIgnoreMask(); // ignore button release
                 return;
             }
+            // dual press for Audio Setup
+            if (event.mask == (OC::CONTROL_BUTTON_UP2 | OC::CONTROL_BUTTON_DOWN2) && hemisphere != first_click) {
+                // TODO: Audio Setup mode and UI
+                OC::ui.SetButtonIgnoreMask(); // ignore button release
+                return;
+            }
 
             if (OC::CORE::ticks - click_tick < HEMISPHERE_DOUBLE_CLICK_TIME && hemisphere == first_click) {
                 // This is a double-click on one button. Activate corresponding help screen and deactivate select mode.

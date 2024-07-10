@@ -370,7 +370,8 @@ typedef struct IOFrame {
       if (autoMIDIOut) MIDIState.Send(outputs);
 
 #ifdef ARDUINO_TEENSY41
-      OC::AudioDSP::Process(outputs);
+      // this relies on the inputs and outputs arrays being contiguous...
+      OC::AudioDSP::Process(inputs);
 #endif
     }
 
