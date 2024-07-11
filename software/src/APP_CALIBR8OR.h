@@ -402,6 +402,11 @@ public:
 
             DrawInterface();
         }
+
+        // Overlay popup window last
+        if (OC::CORE::ticks - HS::popup_tick < HEMISPHERE_CURSOR_TICKS) {
+          HS::DrawPopup();
+        }
     }
 
     /////////////////////////////////////////////////////////////////
@@ -817,12 +822,14 @@ void Calibr8or_handleButtonEvent(const UI::Event &event) {
     // For down button, handle press and long press
     switch (event.type) {
     case UI::EVENT_BUTTON_DOWN:
-#ifdef VOR
-        if (event.control != OC::CONTROL_BUTTON_M)
-#endif
+        if (event.control == OC::CONTROL_BUTTON_M) {
+            HS::ToggleClockRun();
+            OC::ui.SetButtonIgnoreMask(); // ignore release and long-press
+            break;
+        }
         Calibr8or_instance.OnButtonDown(event);
-
         break;
+
     case UI::EVENT_BUTTON_PRESS: {
         switch (event.control) {
         case OC::CONTROL_BUTTON_L:

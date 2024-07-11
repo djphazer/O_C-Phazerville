@@ -656,20 +656,6 @@ public:
         }
     }
 
-    void ToggleClockRun() {
-        if (HS::clock_m.IsRunning()) {
-            HS::clock_m.Stop();
-        } else {
-            bool p = HS::clock_m.IsPaused();
-            HS::clock_m.Start( !p );
-        }
-        PokePopup(CLOCK_POPUP);
-    }
-
-    void ToggleClockSetup() {
-        clock_setup = 1 - clock_setup;
-    }
-
     void ToggleConfigMenu() {
         config_menu = !config_menu;
         if (config_menu) SetHelpScreen(-1);

@@ -150,6 +150,16 @@ namespace HS {
     }
   }
 
+  void ToggleClockRun() {
+    if (HS::clock_m.IsRunning()) {
+      HS::clock_m.Stop();
+    } else {
+      bool p = HS::clock_m.IsPaused();
+      HS::clock_m.Start( !p );
+    }
+    PokePopup(CLOCK_POPUP);
+  }
+
 } // namespace HS
 
 //////////////// Hemisphere-like graphics methods for easy porting
