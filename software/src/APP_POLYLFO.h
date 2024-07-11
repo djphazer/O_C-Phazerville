@@ -273,10 +273,17 @@ void FASTRUN POLYLFO_isr() {
   bool freeze = OC::DigitalInputs::read_immediate<OC::DIGITAL_INPUT_2>();
   bool tempo_sync = OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_3>();
  
+#ifdef ARDUINO_TEENSY41
+  poly_lfo.cv_freq.push(OC::ADC::value<ADC_CHANNEL_5>());
+  poly_lfo.cv_shape.push(OC::ADC::value<ADC_CHANNEL_6>());
+  poly_lfo.cv_spread.push(OC::ADC::value<ADC_CHANNEL_7>());
+  poly_lfo.cv_mappable.push(OC::ADC::value<ADC_CHANNEL_8>());
+#else
   poly_lfo.cv_freq.push(OC::ADC::value<ADC_CHANNEL_1>());
   poly_lfo.cv_shape.push(OC::ADC::value<ADC_CHANNEL_2>());
   poly_lfo.cv_spread.push(OC::ADC::value<ADC_CHANNEL_3>());
   poly_lfo.cv_mappable.push(OC::ADC::value<ADC_CHANNEL_4>());
+#endif
 
   // Range in settings is (0-256] so this gets scaled to (0,65535]
   // CV value is 12 bit so also needs scaling

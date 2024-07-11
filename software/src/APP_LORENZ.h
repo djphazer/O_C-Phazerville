@@ -182,10 +182,17 @@ void FASTRUN LORENZ_isr() {
   bool reset_both_phase = OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_3>();
   bool freeze = OC::DigitalInputs::read_immediate<OC::DIGITAL_INPUT_4>();
 
+#ifdef ARDUINO_TEENSY41
+  lorenz_generator.cv_freq1.push(OC::ADC::value<ADC_CHANNEL_5>());
+  lorenz_generator.cv_rho1.push(OC::ADC::value<ADC_CHANNEL_6>());
+  lorenz_generator.cv_freq2.push(OC::ADC::value<ADC_CHANNEL_7>());
+  lorenz_generator.cv_rho2.push(OC::ADC::value<ADC_CHANNEL_8>());
+#else
   lorenz_generator.cv_freq1.push(OC::ADC::value<ADC_CHANNEL_1>());
   lorenz_generator.cv_rho1.push(OC::ADC::value<ADC_CHANNEL_2>());
   lorenz_generator.cv_freq2.push(OC::ADC::value<ADC_CHANNEL_3>());
   lorenz_generator.cv_rho2.push(OC::ADC::value<ADC_CHANNEL_4>());
+#endif
 
   // Range in settings is (0-256] so this gets scaled to (0,65535]
   // CV value is 12 bit so also needs scaling

@@ -241,10 +241,17 @@ public:
   }
 
   void ISR() {
+#ifdef ARDUINO_TEENSY41
+    cv1.push(OC::ADC::value<ADC_CHANNEL_5>());
+    cv2.push(OC::ADC::value<ADC_CHANNEL_6>());
+    cv3.push(OC::ADC::value<ADC_CHANNEL_7>());
+    cv4.push(OC::ADC::value<ADC_CHANNEL_8>());
+#else
     cv1.push(OC::ADC::value<ADC_CHANNEL_1>());
     cv2.push(OC::ADC::value<ADC_CHANNEL_2>());
     cv3.push(OC::ADC::value<ADC_CHANNEL_3>());
     cv4.push(OC::ADC::value<ADC_CHANNEL_4>());
+#endif
 
     const int32_t cvs[ADC_CHANNEL_LAST] = { cv1.value(), cv2.value(), cv3.value(), cv4.value() };
     uint32_t triggers = OC::DigitalInputs::clocked();

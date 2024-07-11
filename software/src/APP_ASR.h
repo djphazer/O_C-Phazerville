@@ -105,6 +105,18 @@ class ASRApp : public settings::SettingsBase<ASRApp, ASR_SETTING_LAST> {
 public:
   static constexpr size_t kHistoryDepth = 5;
 
+#ifdef ARDUINO_TEENSY41
+  static constexpr ADC_CHANNEL CVInput1 = ADC_CHANNEL_5;
+  static constexpr ADC_CHANNEL CVInput2 = ADC_CHANNEL_6;
+  static constexpr ADC_CHANNEL CVInput3 = ADC_CHANNEL_7;
+  static constexpr ADC_CHANNEL CVInput4 = ADC_CHANNEL_8;
+#else
+  static constexpr ADC_CHANNEL CVInput1 = ADC_CHANNEL_1;
+  static constexpr ADC_CHANNEL CVInput2 = ADC_CHANNEL_2;
+  static constexpr ADC_CHANNEL CVInput3 = ADC_CHANNEL_3;
+  static constexpr ADC_CHANNEL CVInput4 = ADC_CHANNEL_4;
+#endif
+
   int get_scale(uint8_t dummy) const {
     return values_[ASR_SETTING_SCALE];
   }
@@ -422,7 +434,7 @@ public:
 
         int8_t _buflen = get_buffer_length();
         if (get_cv4_destination() == ASR_DEST_BUFLEN) {
-          _buflen += ((OC::ADC::value<ADC_CHANNEL_4>() + 31) >> 6);
+          _buflen += ((OC::ADC::value<CVInput4>() + 31) >> 6);
           CONSTRAIN(_buflen, NUM_ASR_CHANNELS, ASR_HOLD_BUF_SIZE - 0x1);
         }
         _ASR.Freeze(_buflen);
@@ -460,33 +472,33 @@ public:
 
          bool _freeze_switch, _freeze = digitalReadFast(TR2);
          int8_t _root  = get_root();
-         int8_t _index = get_index() + ((OC::ADC::value<ADC_CHANNEL_2>() + 31) >> 6);
+         int8_t _index = get_index() + ((OC::ADC::value<CVInput2>() + 31) >> 6);
          int8_t _octave = get_octave();
          int8_t _transpose = 0;
          int8_t _mult = get_mult();
-         int32_t _pitch = OC::ADC::raw_pitch_value(ADC_CHANNEL_1);
+         int32_t _pitch = OC::ADC::raw_pitch_value(CVInput1);
          int32_t _asr_buffer[NUM_ASR_CHANNELS];
 
          bool forced_update = force_update_;
          force_update_ = false;
-         update_scale(forced_update, (OC::ADC::value<ADC_CHANNEL_3>() + 127) >> 8);
+         update_scale(forced_update, (OC::ADC::value<CVInput3>() + 127) >> 8);
 
          // cv4 destination, defaults to octave:
          switch(get_cv4_destination()) {
 
             case ASR_DEST_OCTAVE:
-              _octave += (OC::ADC::value<ADC_CHANNEL_4>() + 255) >> 9;
+              _octave += (OC::ADC::value<CVInput4>() + 255) >> 9;
             break;
             case ASR_DEST_ROOT:
-              _root += (OC::ADC::value<ADC_CHANNEL_4>() + 127) >> 8;
+              _root += (OC::ADC::value<CVInput4>() + 127) >> 8;
               CONSTRAIN(_root, 0, 11);
             break;
             case ASR_DEST_TRANSPOSE:
-              _transpose += (OC::ADC::value<ADC_CHANNEL_4>() + 63) >> 7;
+              _transpose += (OC::ADC::value<CVInput4>() + 63) >> 7;
               CONSTRAIN(_transpose, -12, 12);
             break;
             case ASR_DEST_INPUT_SCALING:
-              _mult += (OC::ADC::value<ADC_CHANNEL_4>() + 63) >> 7;
+              _mult += (OC::ADC::value<CVInput4>() + 63) >> 7;
               CONSTRAIN(_mult, 0, NUM_INPUT_SCALING - 1);
             break;
             // CV for buffer length happens in updateASR_indexed

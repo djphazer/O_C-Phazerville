@@ -83,6 +83,12 @@ enum CHORDS_CV_SOURCES {
   CHORDS_CV_SOURCE_CV2,
   CHORDS_CV_SOURCE_CV3,
   CHORDS_CV_SOURCE_CV4,
+#ifdef ARDUINO_TEENSY41
+  CHORDS_CV_SOURCE_CV5,
+  CHORDS_CV_SOURCE_CV6,
+  CHORDS_CV_SOURCE_CV7,
+  CHORDS_CV_SOURCE_CV8,
+#endif
   CHORDS_CV_SOURCE_LAST
 };
 
@@ -1016,17 +1022,17 @@ SETTINGS_DECLARE(Chords, CHORDS_SETTING_LAST) {
   { 0, 0, OC::Chords::CHORDS_USER_LAST - 1, "num.chords", NULL, settings::STORAGE_TYPE_U8 }, // progression 4
   { 0, 0, 0, "chords -->", NULL, settings::STORAGE_TYPE_U4 }, // = chord editor
   // CV
-  { 0, 0, 4, "root CV      >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "mask CV      >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "transpose CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "octave CV    >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "quality CV   >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "voicing CV   >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "inversion CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "prg.slot# CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "direction CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "-->br.prb CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "num.chrds CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_LAST, "root CV      >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_LAST, "mask CV      >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_LAST, "transpose CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_LAST, "octave CV    >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_LAST, "quality CV   >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_LAST, "voicing CV   >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_LAST, "inversion CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_LAST, "prg.slot# CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_LAST, "direction CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_LAST, "-->br.prb CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_LAST, "num.chrds CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
   { 0, 0, 0, "-", NULL, settings::STORAGE_TYPE_U4 }, // DUMMY
   { 0, 0, 0, " ", NULL, settings::STORAGE_TYPE_U4 }  // MORE DUMMY
 };
