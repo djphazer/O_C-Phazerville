@@ -121,7 +121,7 @@ typedef struct IOFrame {
             case usbMIDI.Clock:
                 if (++clock_count == 1) {
                     clock_q = 1;
-                    ForAllChannels(ch) 
+                    for(int ch = 0; ch < ADC_CHANNEL_LAST; ++ch)
                     {
                         if (function[ch] == HEM_MIDI_CLOCK_OUT) {
                             trigout_q[ch] = 1;
@@ -137,7 +137,7 @@ typedef struct IOFrame {
                 start_q = 1;
                 clock_count = 0;
                 clock_run = true;
-                ForAllChannels(ch) 
+                for(int ch = 0; ch < ADC_CHANNEL_LAST; ++ch)
                 {
                     if (function[ch] == HEM_MIDI_START_OUT) {
                         trigout_q[ch] = 1;
@@ -166,7 +166,8 @@ typedef struct IOFrame {
 
             }
 
-            ForAllChannels(ch) {
+            for(int ch = 0; ch < ADC_CHANNEL_LAST; ++ch)
+            {
                 if (function[ch] == HEM_MIDI_NOOP) continue;
 
                 // skip unwanted MIDI Channels
