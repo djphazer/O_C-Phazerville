@@ -22,13 +22,13 @@ namespace HS {
   bool auto_save_enabled = false;
 #ifdef ARDUINO_TEENSY41
   int trigger_mapping[] = { 1, 2, 3, 4, 1, 2, 3, 4 };
-  int cvmapping[] = { 5, 6, 7, 8, 0, 0, 0, 0 };
+  int cvmapping[] = { 5, 6, 7, 8, 5, 6, 7, 8 };
 #else
   int trigger_mapping[] = { 1, 2, 3, 4 };
   int cvmapping[] = { 1, 2, 3, 4 };
 #endif
   uint8_t trig_length = 10; // in ms, multiplier for HEMISPHERE_CLOCK_TICKS
-  uint8_t screensaver_mode = 2; // 0 = blank, 1 = Meters, 2 = Zaps
+  uint8_t screensaver_mode = 3; // 0 = blank, 1 = Meters, 2 = Scope/Zaps, 3 = Zips/Stars
 
   // --- Quantizer helpers
   int GetLatestNoteNumber(int ch) {
