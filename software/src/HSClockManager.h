@@ -125,7 +125,7 @@ public:
      */
     uint16_t GetTempo() {return tempo;}
 
-    void QueuePresetLoad(auto func) {
+    void BeatSync(void (*func)()) {
       sync_func = func;
     }
     void ProcessBeatSync() {

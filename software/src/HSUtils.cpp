@@ -14,6 +14,9 @@ namespace HS {
   int quant_scale[QUANT_CHANNEL_COUNT];
   int8_t root_note[QUANT_CHANNEL_COUNT];
   int8_t q_octave[QUANT_CHANNEL_COUNT];
+  // for Beat Sync'd octave or key switching
+  int next_ch = -1;
+  int8_t next_octave, next_root_note;
 
   int octave_max = 5;
 
@@ -29,6 +32,20 @@ namespace HS {
 #endif
   uint8_t trig_length = 10; // in ms, multiplier for HEMISPHERE_CLOCK_TICKS
   uint8_t screensaver_mode = 3; // 0 = blank, 1 = Meters, 2 = Scope/Zaps, 3 = Zips/Stars
+
+  void ProcessBeatSync() {
+    if (next_ch > -1) {
+      q_octave[next_ch] = next_octave;
+      root_note[next_ch] = next_root_note;
+      next_ch = -1;
+    }
+  }
+  void QueueBeatSync() {
+    if (clock_m.IsRunning())
+      clock_m.BeatSync( &ProcessBeatSync );
+    else
+      ProcessBeatSync();
+  }
 
   // --- Quantizer helpers
   int GetLatestNoteNumber(int ch) {
@@ -57,17 +74,35 @@ namespace HS {
     return (root_note[ch] = root);
   }
   void NudgeRootNote(int ch, int dir) {
-    int8_t &r = root_note[ch];
-    r += dir;
-    if (r > 11 && q_octave[ch] < 5) {
-      ++q_octave[ch];
-      r -= 12;
+    if (next_ch < 0) {
+      next_ch = ch;
+      next_root_note = root_note[ch];
+      next_octave = q_octave[ch];
     }
-    if (r < 0 && q_octave[ch] > -5) {
-      --q_octave[ch];
-      r += 12;
+    next_root_note += dir;
+
+    if (next_root_note > 11 && next_octave < 5) {
+      ++next_octave;
+      next_root_note -= 12;
     }
-    CONSTRAIN(r, 0, 11);
+    if (next_root_note < 0 && next_octave > -5) {
+      --next_octave;
+      next_root_note += 12;
+    }
+    CONSTRAIN(next_root_note, 0, 11);
+
+    QueueBeatSync();
+  }
+  void NudgeOctave(int ch, int dir) {
+    if (next_ch < 0) {
+      next_ch = ch;
+      next_root_note = root_note[ch];
+      next_octave = q_octave[ch];
+    }
+    next_octave += dir;
+    CONSTRAIN(next_octave, -5, 5);
+
+    QueueBeatSync();
   }
   void NudgeScale(int ch, int dir) {
     const int max = OC::Scales::NUM_SCALES;
@@ -91,7 +126,7 @@ namespace HS {
         CONFIG_DUMMY, // past this point goes full screen
     };
 
-    if (HS::popup_type == MENU_POPUP) {
+    if (popup_type == MENU_POPUP) {
       graphics.clearRect(73, 25, 54, 38);
       graphics.drawFrame(74, 26, 52, 36);
     } else {
@@ -100,7 +135,7 @@ namespace HS {
       graphics.setPrintPos(28, 28);
     }
 
-    switch (HS::popup_type) {
+    switch (popup_type) {
       case MENU_POPUP:
         gfxPrint(78, 30, "Load");
         gfxPrint(78, 40, config_cursor == AUTO_SAVE ? "(auto)" : "Save");
@@ -113,7 +148,7 @@ namespace HS {
             break;
           case AUTO_SAVE:
             if (blink)
-              gfxIcon(114, 40, HS::auto_save_enabled ? CHECK_ON_ICON : CHECK_OFF_ICON );
+              gfxIcon(114, 40, auto_save_enabled ? CHECK_ON_ICON : CHECK_OFF_ICON );
             break;
           case CONFIG_DUMMY:
             gfxIcon(115, 50, RIGHT_ICON);
@@ -124,10 +159,10 @@ namespace HS {
         break;
       case CLOCK_POPUP:
         graphics.print("Clock ");
-        if (HS::clock_m.IsRunning())
+        if (clock_m.IsRunning())
           graphics.print("Start");
         else
-          graphics.print(HS::clock_m.IsPaused() ? "Armed" : "Stop");
+          graphics.print(clock_m.IsPaused() ? "Armed" : "Stop");
         break;
 
       case PRESET_POPUP:
@@ -135,27 +170,31 @@ namespace HS {
         graphics.print(OC::Strings::capital_letters[preset_id]);
         break;
       case QUANTIZER_POPUP:
+      {
+        const int root = (next_ch > -1) ? next_root_note : root_note[qview];
+        const int octave = (next_ch > -1) ? next_octave : q_octave[qview];
         graphics.print("Q");
-        graphics.print(HS::qview + 1);
+        graphics.print(qview + 1);
         graphics.print(":");
-        graphics.print(OC::scale_names_short[ HS::quant_scale[HS::qview] ]);
+        graphics.print(OC::scale_names_short[ quant_scale[qview] ]);
         graphics.print(" ");
-        graphics.print(OC::Strings::note_names[ HS::root_note[HS::qview] ]);
-        if (HS::q_octave[HS::qview] >= 0) graphics.print("+");
-        graphics.print(HS::q_octave[HS::qview]);
-        if (HS::q_edit) {
+        graphics.print(OC::Strings::note_names[ root ]);
+        if (octave >= 0) graphics.print("+");
+        graphics.print(octave);
+        if (q_edit) {
           gfxInvert(23, 23, 82, 18);
         }
         break;
+      }
     }
   }
 
   void ToggleClockRun() {
-    if (HS::clock_m.IsRunning()) {
-      HS::clock_m.Stop();
+    if (clock_m.IsRunning()) {
+      clock_m.Stop();
     } else {
-      bool p = HS::clock_m.IsPaused();
-      HS::clock_m.Start( !p );
+      bool p = clock_m.IsPaused();
+      clock_m.Start( !p );
     }
     PokePopup(CLOCK_POPUP);
   }

@@ -374,7 +374,7 @@ public:
                 if (slot < HEM_NR_OF_PRESETS) {
                   if (HS::clock_m.IsRunning()) {
                     queued_preset = slot;
-                    HS::clock_m.QueuePresetLoad( &BeatSyncProcess );
+                    HS::clock_m.BeatSync( &BeatSyncProcess );
                   }
                   else
                     LoadFromPreset(slot);
@@ -761,13 +761,12 @@ public:
             }
             if (HS::q_edit) {
               if (event.control == OC::CONTROL_BUTTON_UP)
-                ++HS::q_octave[HS::qview];
+                HS::NudgeOctave(HS::qview, 1);
               else if (event.control == OC::CONTROL_BUTTON_DOWN)
-                --HS::q_octave[HS::qview];
+                HS::NudgeOctave(HS::qview, -1);
               else
                 HS::q_edit = false;
 
-              CONSTRAIN(HS::q_octave[HS::qview], -5, 5);
               OC::ui.SetButtonIgnoreMask();
               break;
             }
@@ -925,7 +924,7 @@ private:
             else {
               if (HS::clock_m.IsRunning()) {
                 queued_preset = preset_cursor - 1;
-                HS::clock_m.QueuePresetLoad( &BeatSyncProcess );
+                HS::clock_m.BeatSync( &BeatSyncProcess );
               }
               else
                 LoadFromPreset(preset_cursor-1);
