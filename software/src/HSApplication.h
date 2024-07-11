@@ -130,7 +130,9 @@ public:
     }
 
     int In(int ch) {
-        return frame.inputs[ch];
+        const int c = cvmapping[ch];
+        if (!c) return 0;
+        return (c <= ADC_CHANNEL_LAST) ? frame.inputs[c - 1] : frame.outputs[c - 1 - ADC_CHANNEL_LAST];
     }
 
     // Apply small center detent to input, so it reads zero before a threshold
@@ -150,7 +152,10 @@ public:
     }
 
     bool Gate(int ch) {
-        return frame.gate_high[ch];
+        const int t = trigger_mapping[ch];
+        if (!t) return false;
+        return (t <= ADC_CHANNEL_LAST) ? frame.gate_high[t - 1] : frame.outputs[t - 1 - ADC_CHANNEL_LAST] > HEMISPHERE_3V_CV;
+        //return frame.gate_high[ch];
     }
 
     void GateOut(int ch, bool high) {
@@ -159,10 +164,17 @@ public:
 
     bool Clock(int ch) {
         bool clocked = 0;
+        const int trmap = trigger_mapping[ch];
+
         if (HS::clock_m.IsRunning() && HS::clock_m.GetMultiply(ch) != 0)
             clocked = HS::clock_m.Tock(ch);
-        else {
-            clocked = frame.clocked[ch];
+        else if (trmap > 0) {
+          if (trmap <= ADC_CHANNEL_LAST)
+            clocked = frame.clocked[ trmap - 1 ];
+          else {
+            clocked = frame.clockout_q[ trmap - 1 - ADC_CHANNEL_LAST ];
+            frame.clockout_q[ trmap - 1 - ADC_CHANNEL_LAST ] = false;
+          }
         }
 
         // manual triggers
