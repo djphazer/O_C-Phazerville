@@ -2,7 +2,10 @@
 #include "OC_core.h"
 #include "HemisphereApplet.h"
 #include "HSUtils.h"
+
+#ifdef ARDUINO_TEENSY41
 #include "AudioSetup.h"
+#endif
 
 namespace HS {
 
@@ -206,6 +209,7 @@ namespace HS {
 
 } // namespace HS
 
+#ifdef ARDUINO_TEENSY41
 void OC::AudioDSP::DrawAudioSetup() {
   for (int ch = 0; ch < 2; ++ch)
   {
@@ -226,11 +230,11 @@ void OC::AudioDSP::DrawAudioSetup() {
 
     // Channel mode
     gfxPrint(8 + 82*ch, 15, "Mode");
-    gfxPrint(8 + 82*ch, 25, OC::AudioDSP::mode_names[OC::AudioDSP::mode[ch]]);
+    gfxPrint(8 + 82*ch, 25, mode_names[ mode[ch] ]);
 
     // Modulation assignment
     gfxPrint(8 + 82*ch, 35, "Map");
-    gfxPrint(8 + 82*ch, 45, OC::Strings::cv_input_names_none[ OC::AudioDSP::mod_map[ch][mod_target] + 1 ] );
+    gfxPrint(8 + 82*ch, 45, OC::Strings::cv_input_names_none[ mod_map[ch][mod_target] + 1 ] );
 
     // cursor
     gfxIcon(120*ch, 25 + audio_cursor[ch]*20, ch ? LEFT_ICON : RIGHT_ICON);
@@ -239,6 +243,7 @@ void OC::AudioDSP::DrawAudioSetup() {
   // Reverb params (size, damping, level?)
   // careful, because level is also feedback...
 }
+#endif
 
 
 //////////////// Hemisphere-like graphics methods for easy porting
