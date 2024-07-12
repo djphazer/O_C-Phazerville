@@ -220,6 +220,7 @@ QuadrantsPreset *quad_active_preset = 0;
 using namespace HS;
 
 void QuadrantSysExHandler();
+void QuadrantBeatSync();
 
 class QuadAppletManager : public HSApplication {
 public:
@@ -317,6 +318,9 @@ public:
         preset_id = id;
         PokePopup(PRESET_POPUP);
     }
+    void ProcessQueue() {
+      LoadFromPreset(queued_preset);
+    }
 
     // does not modify the preset, only the quad_manager
     void SetApplet(HEM_SIDE hemisphere, int index) {
@@ -346,7 +350,14 @@ public:
 
             if (message == usbMIDI.ProgramChange) {
                 int slot = device.getData1();
-                if (slot < QUAD_PRESET_COUNT) LoadFromPreset(slot);
+                if (slot < QUAD_PRESET_COUNT) {
+                  if (HS::clock_m.IsRunning()) {
+                    queued_preset = slot;
+                    HS::clock_m.BeatSync( &QuadrantBeatSync );
+                  }
+                  else
+                    LoadFromPreset(slot);
+                }
                 continue;
             }
 
@@ -708,6 +719,7 @@ public:
 
 private:
     int preset_id = 0;
+    int queued_preset = 0;
     int preset_cursor = 0;
     int my_applet[4]; // Indexes to available_applets
                       // Left side: 0,2
@@ -821,8 +833,14 @@ private:
             // Save or Load on button push
             if (config_cursor == SAVE_PRESET)
                 StoreToPreset(preset_cursor-1);
-            else
+            else {
+              if (HS::clock_m.IsRunning()) {
+                queued_preset = preset_cursor - 1;
+                HS::clock_m.BeatSync( &QuadrantBeatSync );
+              }
+              else
                 LoadFromPreset(preset_cursor-1);
+            }
 
             preset_cursor = 0; // deactivate preset selection
             config_page = HIDE_CONFIG;
@@ -1056,6 +1074,9 @@ QuadAppletManager quad_manager;
 void QuadrantSysExHandler() {
     if (quad_active_preset)
         quad_active_preset->OnReceiveSysEx();
+}
+void QuadrantBeatSync() {
+  quad_manager.ProcessQueue();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
