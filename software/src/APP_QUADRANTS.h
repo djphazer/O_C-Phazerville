@@ -539,13 +539,9 @@ public:
         bool down = (event.type == UI::EVENT_BUTTON_DOWN);
         HEM_SIDE hemisphere = ButtonToSlot(event);
 
-        if (preset_cursor && !down) {
-            // cancel preset select
+        if ((config_page || preset_cursor) && !down) {
+            // cancel preset select or config screens
             preset_cursor = 0;
-            return;
-        }
-        if (config_page && !down) {
-            // cancel config screens
             config_page = HIDE_CONFIG;
             HS::popup_tick = 0;
             return;
@@ -683,13 +679,12 @@ public:
             }
             if (HS::q_edit) {
               if (event.control == OC::CONTROL_BUTTON_UP)
-                ++HS::q_octave[HS::qview];
+                HS::NudgeOctave(HS::qview, 1);
               else if (event.control == OC::CONTROL_BUTTON_DOWN)
-                --HS::q_octave[HS::qview];
+                HS::NudgeOctave(HS::qview, -1);
               else
                 HS::q_edit = false;
 
-              CONSTRAIN(HS::q_octave[HS::qview], -5, 5);
               OC::ui.SetButtonIgnoreMask();
               break;
             }
