@@ -153,8 +153,11 @@ public:
 
     bool Gate(int ch) {
         const int t = trigger_mapping[ch];
+        const int offset = OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_LAST;
         if (!t) return false;
-        return (t <= ADC_CHANNEL_LAST) ? frame.gate_high[t - 1] : frame.outputs[t - 1 - ADC_CHANNEL_LAST] > HEMISPHERE_3V_CV;
+        return (t <= offset)
+          ? frame.gate_high[t - 1]
+          : frame.outputs[t - 1 - offset] > GATE_THRESHOLD;
         //return frame.gate_high[ch];
     }
 
@@ -169,11 +172,12 @@ public:
         if (HS::clock_m.IsRunning() && HS::clock_m.GetMultiply(ch) != 0)
             clocked = HS::clock_m.Tock(ch);
         else if (trmap > 0) {
-          if (trmap <= ADC_CHANNEL_LAST)
+          const int offset = OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_LAST;
+          if (trmap <= offset)
             clocked = frame.clocked[ trmap - 1 ];
           else {
-            clocked = frame.clockout_q[ trmap - 1 - ADC_CHANNEL_LAST ];
-            frame.clockout_q[ trmap - 1 - ADC_CHANNEL_LAST ] = false;
+            clocked = frame.clockout_q[ trmap - 1 - offset ];
+            frame.clockout_q[ trmap - 1 - offset ] = false;
           }
         }
 

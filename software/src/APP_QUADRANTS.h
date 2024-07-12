@@ -130,8 +130,8 @@ public:
       for (size_t i = 0; i < 4; ++i) {
         int val1 = (uint32_t(values_[QUADRANTS_TRIGMAP1]) >> (i*4)) & 0x0F;
         int val2 = (uint32_t(values_[QUADRANTS_TRIGMAP2]) >> (i*4)) & 0x0F;
-        if (val1 != 0) HS::trigger_mapping[i] = constrain(val1 - 1, 0, ADC_CHANNEL_LAST + DAC_CHANNEL_LAST);
-        if (val2 != 0) HS::trigger_mapping[i+4] = constrain(val2 - 1, 0, ADC_CHANNEL_LAST + DAC_CHANNEL_LAST);
+        if (val1 != 0) HS::trigger_mapping[i] = constrain(val1 - 1, 0, TRIGMAP_MAX);
+        if (val2 != 0) HS::trigger_mapping[i+4] = constrain(val2 - 1, 0, TRIGMAP_MAX);
       }
     }
 
@@ -813,7 +813,7 @@ private:
         case CVMAP7:
         case CVMAP8:
             HS::cvmapping[config_cursor-CVMAP1] =
-              constrain( HS::cvmapping[config_cursor-CVMAP1] + dir, 0, ADC_CHANNEL_LAST + DAC_CHANNEL_LAST);
+              constrain( HS::cvmapping[config_cursor-CVMAP1] + dir, 0, CVMAP_MAX);
             break;
         case TRIG_LENGTH:
             HS::trig_length = (uint32_t) constrain( int(HS::trig_length + dir), 1, 127);

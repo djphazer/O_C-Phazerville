@@ -44,16 +44,17 @@ bool HemisphereApplet::Clock(int ch, bool physical) {
 #endif
 
     const int trmap = trigger_mapping[ch + io_offset];
+    const int offset = OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_LAST;
 
     // clock triggers
     if (useTock && HS::clock_m.GetMultiply(virt_chan) != 0)
         clocked = HS::clock_m.Tock(virt_chan);
     else if (trmap > 0) {
-      if (trmap <= ADC_CHANNEL_LAST)
+      if (trmap <= offset)
         clocked = frame.clocked[ trmap - 1 ];
       else {
-        clocked = frame.clockout_q[ trmap - 1 - ADC_CHANNEL_LAST ];
-        frame.clockout_q[ trmap - 1 - ADC_CHANNEL_LAST ] = false;
+        clocked = frame.clockout_q[ trmap - 1 - offset ];
+        frame.clockout_q[ trmap - 1 - offset ] = false;
       }
     }
 

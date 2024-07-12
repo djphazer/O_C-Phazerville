@@ -145,7 +145,7 @@ public:
         case TRIG2:
         case TRIG3:
         case TRIG4:
-            HS::trigger_mapping[cursor-TRIG1] = constrain( HS::trigger_mapping[cursor-TRIG1] + direction, 0, ADC_CHANNEL_LAST + DAC_CHANNEL_LAST);
+            HS::trigger_mapping[cursor-TRIG1] = constrain( HS::trigger_mapping[cursor-TRIG1] + direction, 0, TRIGMAP_MAX);
             break;
 
         case BOOP1:
