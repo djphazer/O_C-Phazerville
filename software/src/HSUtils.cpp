@@ -2,6 +2,7 @@
 #include "OC_core.h"
 #include "HemisphereApplet.h"
 #include "HSUtils.h"
+#include "AudioSetup.h"
 
 namespace HS {
 
@@ -20,7 +21,6 @@ namespace HS {
 
   int octave_max = 5;
 
-  int select_mode = -1;
   bool cursor_wrap = 0;
   bool auto_save_enabled = false;
 #ifdef ARDUINO_TEENSY41
@@ -32,6 +32,11 @@ namespace HS {
 #endif
   uint8_t trig_length = 10; // in ms, multiplier for HEMISPHERE_CLOCK_TICKS
   uint8_t screensaver_mode = 3; // 0 = blank, 1 = Meters, 2 = Scope/Zaps, 3 = Zips/Stars
+
+  void PokePopup(PopupType pop) {
+    popup_type = pop;
+    popup_tick = OC::CORE::ticks;
+  }
 
   void ProcessBeatSync() {
     if (next_ch > -1) {
@@ -201,6 +206,41 @@ namespace HS {
 
 } // namespace HS
 
+void OC::AudioDSP::DrawAudioSetup() {
+  for (int ch = 0; ch < 2; ++ch)
+  {
+    int mod_target = AMP_LEVEL;
+    switch (mode[ch]) {
+      default:
+      case PASSTHRU:
+      case VCA_MODE:
+      case LPG_MODE:
+        break;
+      case VCF_MODE:
+        mod_target = FILTER_CUTOFF;
+        break;
+      case WAVEFOLDER:
+        mod_target = WAVEFOLD_MOD;
+        break;
+    }
+
+    // Channel mode
+    gfxPrint(8 + 82*ch, 15, "Mode");
+    gfxPrint(8 + 82*ch, 25, OC::AudioDSP::mode_names[OC::AudioDSP::mode[ch]]);
+
+    // Modulation assignment
+    gfxPrint(8 + 82*ch, 35, "Map");
+    gfxPrint(8 + 82*ch, 45, OC::Strings::cv_input_names_none[ OC::AudioDSP::mod_map[ch][mod_target] + 1 ] );
+
+    // cursor
+    gfxIcon(120*ch, 25 + audio_cursor[ch]*20, ch ? LEFT_ICON : RIGHT_ICON);
+  }
+
+  // Reverb params (size, damping, level?)
+  // careful, because level is also feedback...
+}
+
+
 //////////////// Hemisphere-like graphics methods for easy porting
 ////////////////////////////////////////////////////////////////////////////////
 void gfxPos(int x, int y) {
@@ -286,3 +326,8 @@ void gfxIcon(int x, int y, const uint8_t *data) {
     gfxBitmap(x, y, 8, data);
 }
 
+void gfxHeader(const char *str) {
+  gfxPrint(1, 1, str);
+  gfxLine(0, 10, 127, 10);
+  gfxLine(0, 11, 127, 11);
+}

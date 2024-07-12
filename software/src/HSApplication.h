@@ -213,11 +213,6 @@ public:
     void gfxCursor(int x, int y, int w) {
         if (CursorBlink()) gfxLine(x, y, x + w - 1, y);
     }
-    void gfxHeader(const char *str) {
-         gfxPrint(1, 1, str);
-         gfxLine(0, 10, 127, 10);
-         gfxLine(0, 11, 127, 11);
-    }
 
 protected:
     // Check cursor blink cycle

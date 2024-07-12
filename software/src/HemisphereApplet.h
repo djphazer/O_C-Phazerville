@@ -41,63 +41,6 @@
 #include "HSicons.h"
 #include "HSClockManager.h"
 
-#ifdef BUCHLA_4U
-#define PULSE_VOLTAGE 9
-#define HEMISPHERE_MAX_CV 15360
-#define HEMISPHERE_CENTER_CV 7680 // 5V
-#define HEMISPHERE_MIN_CV 0
-#elif defined(VOR)
-#define PULSE_VOLTAGE 8
-#define HEMISPHERE_MAX_CV (HS::octave_max * 12 << 7)
-#define HEMISPHERE_CENTER_CV 0
-#define HEMISPHERE_MIN_CV (HEMISPHERE_MAX_CV - 15360)
-#else
-#define PULSE_VOLTAGE 5
-#define HEMISPHERE_MAX_CV 9216 // 6V
-#define HEMISPHERE_CENTER_CV 0
-#define HEMISPHERE_MIN_CV -4608 // -3V
-#endif
-#define HEMISPHERE_3V_CV 4608
-#define HEMISPHERE_MAX_INPUT_CV 9216 // 6V
-#define HEMISPHERE_CENTER_DETENT 80
-#define HEMISPHERE_CLOCK_TICKS 17 // one millisecond
-#define HEMISPHERE_CURSOR_TICKS 12000
-#define HEMISPHERE_ADC_LAG 33
-#define HEMISPHERE_CHANGE_THRESHOLD 32
-
-enum HEM_SIDE {
-LEFT_HEMISPHERE = 0,
-RIGHT_HEMISPHERE = 1,
-#ifdef ARDUINO_TEENSY41
-LEFT2_HEMISPHERE = 2,
-RIGHT2_HEMISPHERE = 3,
-#endif
-
-APPLET_SLOTS
-};
-
-// Codes for help system sections
-enum HEM_HELP_SECTIONS {
-HEMISPHERE_HELP_DIGITALS = 0,
-HEMISPHERE_HELP_CVS = 1,
-HEMISPHERE_HELP_OUTS = 2,
-HEMISPHERE_HELP_ENCODER = 3
-};
-static const char * HEM_HELP_SECTION_NAMES[4] = {"Dig", "CV", "Out", "Enc"};
-
-// Hemisphere-specific macros
-#define BottomAlign(h) (62 - h)
-#define ForEachChannel(ch) for(int_fast8_t ch = 0; ch < 2; ++ch)
-#define ForAllChannels(ch) for(int_fast8_t ch = 0; ch < 4; ++ch)
-#define gfx_offset ((hemisphere % 2) * 64) // Graphics offset, based on the side
-#define io_offset (hemisphere * 2) // Input/Output offset, based on the side
-
-static constexpr uint32_t HEMISPHERE_SIM_CLICK_TIME = 1000;
-static constexpr uint32_t HEMISPHERE_DOUBLE_CLICK_TIME = 8000;
-static constexpr uint32_t HEMISPHERE_PULSE_ANIMATION_TIME = 500;
-static constexpr uint32_t HEMISPHERE_PULSE_ANIMATION_TIME_LONG = 1200;
-
-#include "OC_scales.h"
 #include "HSUtils.h"
 #include "HSIOFrame.h"
 

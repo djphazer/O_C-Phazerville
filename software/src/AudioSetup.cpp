@@ -1,6 +1,11 @@
 #if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
 
 #include "AudioSetup.h"
+#include "OC_ADC.h"
+#include "OC_DAC.h"
+#include "HSUtils.h"
+#include "HSicons.h"
+#include "OC_strings.h"
 
 // Use the web GUI tool as a guide: https://www.pjrc.com/teensy/gui/
 
@@ -92,9 +97,11 @@ namespace OC {
       { 10, 10, -1, 10, -1, -1, -1 },
     };
     float bias[2][TARGET_COUNT];
+    uint8_t audio_cursor[2] = { 0, 0 };
 
     float amplevel[2] = { 1.0, 1.0 };
     float foldamt[2] = { 0.0, 0.0 };
+
 
     // Right side state variable filter functions
     void SelectHPF() {
@@ -218,6 +225,7 @@ namespace OC {
 
         // some things depend on mode
         switch(mode[i]) {
+          default:
           case PASSTHRU:
             break;
 
@@ -266,9 +274,31 @@ namespace OC {
             AmpLevel(ch, 0);
             BypassFilter(ch);
             break;
+          default: break;
       }
     }
 
+    void AudioMenuAdjust(int ch, int direction) {
+      if (audio_cursor[ch]) {
+        int mod_target = AMP_LEVEL;
+        switch (mode[ch]) {
+          case VCF_MODE:
+            mod_target = FILTER_CUTOFF;
+            break;
+          case WAVEFOLDER:
+            mod_target = WAVEFOLD_MOD;
+            break;
+          default: break;
+        }
+
+        int &targ = mod_map[ch][mod_target];
+        targ = constrain(targ + direction + 1, 0, ADC_CHANNEL_LAST + DAC_CHANNEL_LAST) - 1;
+      } else {
+        int newmode = mode[ch] + direction;
+        CONSTRAIN(newmode, 0, MODE_COUNT - 1);
+        SwitchMode(ch, ChannelMode(newmode));
+      }
+    }
 
   } // AudioDSP namespace
 } // OC namespace

@@ -1,8 +1,65 @@
 #pragma once
 
+#include "OC_scales.h"
+
 // misc. utility functions extracted from Hemisphere
 // -NJM
 
+#ifdef BUCHLA_4U
+#define PULSE_VOLTAGE 9
+#define HEMISPHERE_MAX_CV 15360
+#define HEMISPHERE_CENTER_CV 7680 // 5V
+#define HEMISPHERE_MIN_CV 0
+#elif defined(VOR)
+#define PULSE_VOLTAGE 8
+#define HEMISPHERE_MAX_CV (HS::octave_max * 12 << 7)
+#define HEMISPHERE_CENTER_CV 0
+#define HEMISPHERE_MIN_CV (HEMISPHERE_MAX_CV - 15360)
+#else
+#define PULSE_VOLTAGE 5
+#define HEMISPHERE_MAX_CV 9216 // 6V
+#define HEMISPHERE_CENTER_CV 0
+#define HEMISPHERE_MIN_CV -4608 // -3V
+#endif
+#define HEMISPHERE_3V_CV 4608
+#define HEMISPHERE_MAX_INPUT_CV 9216 // 6V
+#define HEMISPHERE_CENTER_DETENT 80
+#define HEMISPHERE_CLOCK_TICKS 17 // one millisecond
+#define HEMISPHERE_CURSOR_TICKS 12000
+#define HEMISPHERE_ADC_LAG 33
+#define HEMISPHERE_CHANGE_THRESHOLD 32
+
+enum HEM_SIDE {
+LEFT_HEMISPHERE = 0,
+RIGHT_HEMISPHERE = 1,
+#ifdef ARDUINO_TEENSY41
+LEFT2_HEMISPHERE = 2,
+RIGHT2_HEMISPHERE = 3,
+#endif
+
+APPLET_SLOTS
+};
+
+// Codes for help system sections
+enum HEM_HELP_SECTIONS {
+HEMISPHERE_HELP_DIGITALS = 0,
+HEMISPHERE_HELP_CVS = 1,
+HEMISPHERE_HELP_OUTS = 2,
+HEMISPHERE_HELP_ENCODER = 3
+};
+static const char * const HEM_HELP_SECTION_NAMES[4] = {"Dig", "CV", "Out", "Enc"};
+
+// Hemisphere-specific macros
+#define BottomAlign(h) (62 - h)
+#define ForEachChannel(ch) for(int_fast8_t ch = 0; ch < 2; ++ch)
+#define ForAllChannels(ch) for(int_fast8_t ch = 0; ch < 4; ++ch)
+#define gfx_offset ((hemisphere % 2) * 64) // Graphics offset, based on the side
+#define io_offset (hemisphere * 2) // Input/Output offset, based on the side
+
+static constexpr uint32_t HEMISPHERE_SIM_CLICK_TIME = 1000;
+static constexpr uint32_t HEMISPHERE_DOUBLE_CLICK_TIME = 8000;
+static constexpr uint32_t HEMISPHERE_PULSE_ANIMATION_TIME = 500;
+static constexpr uint32_t HEMISPHERE_PULSE_ANIMATION_TIME_LONG = 1200;
 // Simulated fixed floats by multiplying and dividing by powers of 2
 #ifndef int2simfloat
 #define int2simfloat(x) (x << 14)
@@ -80,6 +137,7 @@ void gfxDottedLine(int x, int y, int x2, int y2, uint8_t p = 2);
 void gfxCircle(int x, int y, int r);
 void gfxBitmap(int x, int y, int w, const uint8_t *data);
 void gfxIcon(int x, int y, const uint8_t *data);
+void gfxHeader(const char *str);
 
 static constexpr uint8_t pad(int range, int number) {
     uint8_t padding = 0;
@@ -118,11 +176,6 @@ namespace HS {
   extern uint8_t qview; // which quantizer's setting is shown in popup
   extern bool q_edit;
 
-  static inline void PokePopup(PopupType pop) {
-    popup_type = pop;
-    popup_tick = OC::CORE::ticks;
-  }
-
   extern braids::Quantizer quantizer[QUANT_CHANNEL_COUNT]; // global shared quantizers
   extern int quant_scale[QUANT_CHANNEL_COUNT];
   extern int8_t root_note[QUANT_CHANNEL_COUNT];
@@ -153,5 +206,6 @@ namespace HS {
   void QuantizerEdit(int ch);
   void DrawPopup(const int config_cursor = 0, const int preset_id = 0, const bool blink = 0);
   void ToggleClockRun();
+  void PokePopup(PopupType pop);
 
 }

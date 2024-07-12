@@ -36,10 +36,17 @@ namespace OC {
     extern ChannelMode mode[2]; // mode for each channel
     extern int mod_map[2][TARGET_COUNT]; // CV modulation sources (as channel indexes for [inputs..outputs])
     extern float bias[2][TARGET_COUNT]; // baseline settings
+    extern uint8_t audio_cursor[2];
+    static constexpr int CURSOR_MAX = 2;
 
     void Init();
     void Process(const int *values);
     void SwitchMode(int ch, ChannelMode newmode);
+    void AudioMenuAdjust(int ch, int direction);
+    void DrawAudioSetup();
 
+    static inline void AudioSetupButtonAction(int ch) {
+      ++audio_cursor[ch] %= CURSOR_MAX;
+    }
   } // AudioDSP namespace
 } // OC namespace
