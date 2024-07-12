@@ -599,12 +599,9 @@ public:
         }
 
         // --- Button Release
-        if (preset_cursor) {
-            preset_cursor = 0;
-            return;
-        }
-        if (view_state != APPLETS) {
+        if (preset_cursor || view_state != APPLETS) {
             // cancel config screen, etc. on select button release
+            preset_cursor = 0;
             view_state = APPLETS;
             HS::popup_tick = 0;
             return;
@@ -628,12 +625,9 @@ public:
         bool down = (event.type == UI::EVENT_BUTTON_DOWN);
         const int hemisphere = (event.control == OC::CONTROL_BUTTON_UP) ? LEFT_HEMISPHERE : RIGHT_HEMISPHERE;
 
-        if (preset_cursor && !down) {
-            preset_cursor = 0;
-            return;
-        }
-        if (view_state != APPLETS && !down) {
+        if (!down && (preset_cursor || view_state != APPLETS)) {
             // cancel preset select, or config screen on select button release
+            preset_cursor = 0;
             view_state = APPLETS;
             HS::popup_tick = 0;
             return;

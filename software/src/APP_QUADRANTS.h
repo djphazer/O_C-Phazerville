@@ -586,6 +586,8 @@ public:
 
                 // reset double-click timer either way
                 click_tick = 0;
+
+                OC::ui.SetButtonIgnoreMask(); // ignore release
                 return;
             }
 
@@ -678,6 +680,7 @@ public:
     inline void SetFullScreen(HEM_SIDE hemisphere) {
       zoom_slot = hemisphere;
       view_state = APPLET_FULLSCREEN;
+      select_mode = -1;
     }
 
     void HandleButtonEvent(const UI::Event &event) {
