@@ -351,8 +351,8 @@ typedef struct IOFrame {
             inputs[i] = OC::ADC::raw_pitch_value(ADC_CHANNEL(i));
 
             // calculate gates/clocks for all ADC inputs as well
-            gate_high[4 + i] = inputs[i] > GATE_THRESHOLD;
-            clocked[4 + i] = (gate_high[4 + i] && last_cv[i] < GATE_THRESHOLD);
+            gate_high[OC::DIGITAL_INPUT_LAST + i] = inputs[i] > GATE_THRESHOLD;
+            clocked[OC::DIGITAL_INPUT_LAST + i] = (gate_high[OC::DIGITAL_INPUT_LAST + i] && last_cv[i] < GATE_THRESHOLD);
 
             if (abs(inputs[i] - last_cv[i]) > HEMISPHERE_CHANGE_THRESHOLD) {
                 changed_cv[i] = 1;
