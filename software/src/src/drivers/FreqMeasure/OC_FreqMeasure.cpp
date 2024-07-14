@@ -122,33 +122,312 @@ void FTM_ISR_NAME (void)
 }
 
 #elif defined(__IMXRT1062__)
-void FreqMeasureClass::begin(void)
+
+FreqMeasureClass *FreqMeasureClass::pin_inst[4];
+extern "C" void xbar_connect(unsigned int input, unsigned int output); // in pwm.c
+
+FLASHMEM
+void FreqMeasureClass::begin(uint8_t pin /*= 0 TR1*/)
 {
-	// TODO Teensy 4.1
+	switch (pin) {
+	  case 0: // TR1  AD_B0_03  XBAR1_INOUT17 -> XBAR1 -> QTIMER1_TIMER3
+		type = 1;
+		timer.quad = &IMXRT_TMR1;
+		ch = 3;
+		pin_inst[0] = this;
+		IOMUXC_GPR_GPR6 &= ~IOMUXC_GPR_GPR6_IOMUXC_XBAR_DIR_SEL_17;
+		muxreg = &IOMUXC_SW_MUX_CTL_PAD_GPIO_AD_B0_03; // page 473
+		*muxreg = 1 | 0x10;
+		IOMUXC_XBAR1_IN17_SELECT_INPUT = 1; // page 904
+		CCM_CCGR2 |= CCM_CCGR2_XBAR1(CCM_CCGR_ON);
+		xbar_connect(XBARA1_IN_IOMUX_XBAR_INOUT17, XBARA1_OUT_QTIMER1_TIMER3);
+		IOMUXC_GPR_GPR6 |= IOMUXC_GPR_GPR6_QTIMER1_TRM3_INPUT_SEL;
+		irq = IRQ_QTIMER1;
+		attachInterruptVector(irq, &pin0_isr);
+		Serial.println("pin 0");
+		break;
+	  case 1: // TR2  AD_B0_02  XBAR1_INOUT16 -> XBAR1 -> QTIMER2_TIMER3
+		type = 1;
+		timer.quad = &IMXRT_TMR2;
+		ch = 3;
+		pin_inst[1] = this;
+		IOMUXC_GPR_GPR6 &= ~IOMUXC_GPR_GPR6_IOMUXC_XBAR_DIR_SEL_16;
+		muxreg = &IOMUXC_SW_MUX_CTL_PAD_GPIO_AD_B0_02; // page 472
+		*muxreg = 1 | 0x10;
+		IOMUXC_XBAR1_IN16_SELECT_INPUT = 0; // page 911
+		CCM_CCGR2 |= CCM_CCGR2_XBAR1(CCM_CCGR_ON);
+		xbar_connect(XBARA1_IN_IOMUX_XBAR_INOUT16, XBARA1_OUT_QTIMER2_TIMER3);
+		IOMUXC_GPR_GPR6 |= IOMUXC_GPR_GPR6_QTIMER2_TRM3_INPUT_SEL;
+		irq = IRQ_QTIMER2;
+		attachInterruptVector(irq, &pin1_isr);
+		Serial.println("pin 1");
+		break;
+	  case 23: // TR3  AD_B1_09  FlexPWM4_1_A
+		type = 0;
+		timer.flex = &IMXRT_FLEXPWM4;
+		ch = 1;
+		pin_inst[2] = this;
+		muxreg = &IOMUXC_SW_MUX_CTL_PAD_GPIO_AD_B1_09; // page 497
+		*muxreg = 1 | 0x10;
+		IOMUXC_FLEXPWM4_PWMA1_SELECT_INPUT = 1; // page 812
+		irq = IRQ_FLEXPWM4_1;
+		attachInterruptVector(irq, &pin23_isr);
+		Serial.println("pin 23");
+		break;
+	  case 22: // TR4  AD_B1_08  FlexPWM4_0_A
+		type = 0;
+		timer.flex = &IMXRT_FLEXPWM4;
+		ch = 0;
+		pin_inst[3] = this;
+		muxreg = &IOMUXC_SW_MUX_CTL_PAD_GPIO_AD_B1_08; // page 496
+		*muxreg = 1 | 0x10;
+		IOMUXC_FLEXPWM4_PWMA0_SELECT_INPUT = 1; // page 811
+		irq = IRQ_FLEXPWM4_0;
+		attachInterruptVector(irq, &pin22_isr);
+		Serial.println("pin 22");
+		break;
+	  default:
+		return;
+	}
+	if (type == 0) {
+		timer.flex->FCTRL0 |= FLEXPWM_FCTRL0_FLVL(1 << ch);
+		timer.flex->FSTS0 |= FLEXPWM_FSTS0_FFLAG(1 << ch);
+		timer.flex->MCTRL |= FLEXPWM_MCTRL_CLDOK(1 << ch);
+		// Counter Synchronization, page 3109
+		// CTRL2 register, page 3144
+		//timer.flex->SM[ch].CTRL2 = FLEXPWM_SMCTRL2_INDEP;
+		//if (in == 'X') timer.flex->SM[ch].CTRL2 |= FLEXPWM_SMCTRL2_INIT_SEL(3);
+		timer.flex->SM[ch].CTRL2 = FLEXPWM_SMCTRL2_INIT_SEL(0) | FLEXPWM_SMCTRL2_INDEP;
+		timer.flex->SM[ch].CTRL = FLEXPWM_SMCTRL_FULL;
+		timer.flex->SM[ch].INIT = 0;
+		timer.flex->SM[ch].VAL0 = 0;
+		timer.flex->SM[ch].VAL1 = 65535;
+		timer.flex->SM[ch].VAL2 = 0;
+		timer.flex->SM[ch].VAL3 = 0;
+		timer.flex->SM[ch].VAL4 = 0;
+		timer.flex->SM[ch].VAL5 = 0;
+		timer.flex->MCTRL |= FLEXPWM_MCTRL_LDOK(1 << ch) | FLEXPWM_MCTRL_RUN(1 << ch);
+		NVIC_SET_PRIORITY(irq, 48);
+		timer.flex->SM[ch].INTEN = FLEXPWM_SMINTEN_CA0IE | FLEXPWM_SMINTEN_RIE;
+		capture_msw = 0;
+		capture_previous = 0;
+		buffer_head = 0;
+		buffer_tail = 0;
+		timer.flex->SM[ch].CAPTCTRLA = FLEXPWM_SMCAPTCTRLA_EDGA0(2)
+			| FLEXPWM_SMCAPTCTRLA_ARMA;
+		timer.flex->SM[ch].STS = FLEXPWM_SMSTS_CFA0 | FLEXPWM_SMSTS_RF;
+		//Serial.println("input A");
+		//*muxreg = muxval | 0x10;
+		NVIC_ENABLE_IRQ(irq);
+	} else /*if (type == 1)*/ {
+		// testing only: pin 10  B0_00  QuadTimer1_0
+		//IOMUXC_SW_MUX_CTL_PAD_GPIO_B0_00 = 1 | 0x10;
+		//IOMUXC_GPR_GPR6 |= IOMUXC_GPR_GPR6_QTIMER1_TRM0_INPUT_SEL;
+		timer.quad->ENBL &= ~(1 << ch);
+		timer.quad->CH[ch].CTRL = 0;
+		timer.quad->CH[ch].CNTR = 0;
+		timer.quad->CH[ch].COMP1 = 65535;
+		timer.quad->CH[ch].COMP2 = 40000;
+		timer.quad->CH[ch].LOAD = 0;
+		timer.quad->CH[ch].CSCTRL = 0;
+		timer.quad->CH[ch].FILT = 0;
+		timer.quad->CH[ch].DMA = 0;
+		timer.quad->CH[ch].CTRL = TMR_CTRL_CM(1) | TMR_CTRL_PCS(8) // page 3079
+			| TMR_CTRL_SCS(ch) /* | TMR_CTRL_ONCE */ /*| TMR_CTRL_LENGTH */;
+		timer.quad->CH[ch].SCTRL = TMR_SCTRL_TCFIE | TMR_SCTRL_IEFIE
+			| TMR_SCTRL_CAPTURE_MODE(1);
+		capture_msw = 0;
+		capture_previous = 0;
+		buffer_head = 0;
+		buffer_tail = 0;
+		timer.quad->ENBL |= (1 << ch);
+		//Serial.println(timer.quad->ENBL);
+		NVIC_SET_PRIORITY(irq, 48);
+		NVIC_ENABLE_IRQ(irq);
+/*
+		Serial.println("quadtimer");
+		uint32_t prior = 0;
+		for (int i=0; i < 150; i++) {
+			uint32_t s = timer.quad->CH[ch].SCTRL;
+			if (s & TMR_SCTRL_TOF) {
+				// never happens, errata ERR050194
+				timer.quad->CH[ch].SCTRL = s & ~TMR_SCTRL_TOF;
+				Serial.print(" TOF ");
+			}
+			if (s & TMR_SCTRL_TCF) {
+				timer.quad->CH[ch].SCTRL = s & ~TMR_SCTRL_TCF;
+				Serial.print(" TCF ");
+			}
+			if (s & TMR_SCTRL_IEF) {
+				timer.quad->CH[ch].SCTRL = s & ~TMR_SCTRL_IEF;
+				Serial.print(" IEF ");
+			}
+			if (s & TMR_SCTRL_INPUT) {
+				Serial.print(" () ");
+			}
+			uint32_t count = timer.quad->CH[ch].CNTR;
+			if (count >= prior) {
+				Serial.print(" ");
+			} else {
+				Serial.println();
+			}
+			Serial.print(count);
+			prior = count;
+			delayMicroseconds(100);
+		}
+*/
+	}
+	running = true;
 }
 
 uint8_t FreqMeasureClass::available(void)
 {
-	// TODO Teensy 4.1
-	return 0;
+	if (!running) return 0;
+	uint8_t head, tail;
+	head = buffer_head;
+	tail = buffer_tail;
+	if (head >= tail) return head - tail;
+	return FREQMEASURE_BUFFER_LEN + head - tail;
 }
 
 uint32_t FreqMeasureClass::read(void)
 {
-	// TODO Teensy 4.1
-	return 0;
+	uint8_t head, tail;
+	uint32_t value;
+
+	if (!running) return 0;
+	head = buffer_head;
+	tail = buffer_tail;
+	if (head == tail) return 0xFFFFFFFF;
+	tail = tail + 1;
+	if (tail >= FREQMEASURE_BUFFER_LEN) tail = 0;
+	value = buffer_value[tail];
+	buffer_tail = tail;
+	return value;
 }
 
-float FreqMeasureClass::countToFrequency(uint32_t count)
-{
-	// TODO Teensy 4.1
-	return 0.0f;
-}
-
+FLASHMEM
 void FreqMeasureClass::end(void)
 {
-	// TODO Teensy 4.1
+	if (!running) return;
+	if (type == 0) {
+		timer.flex->SM[ch].INTEN = 0;
+		timer.flex->SM[ch].CAPTCTRLA = 0;
+	} else if (type == 1) {
+		timer.quad->ENBL &= ~(1 << ch);
+		timer.quad->CH[ch].CTRL = 0;
+		timer.quad->CH[ch].SCTRL = 0;
+	}
+	NVIC_DISABLE_IRQ(irq);
+	*muxreg = 5 | 0x10;
 }
+
+void FreqMeasureClass::isr(void)
+{
+	bool inc = false;
+	uint32_t capture;
+
+	if (type == 0) {
+		uint32_t sts = timer.flex->SM[ch].STS;
+		if (sts & FLEXPWM_SMSTS_RF) { // counter 16 bit overflow
+			timer.flex->SM[ch].STS = FLEXPWM_SMSTS_RF;
+			capture_msw++;
+			inc = true;
+			//Serial.write('.');
+		}
+		if (sts & FLEXPWM_SMSTS_CFA0) {
+			capture = timer.flex->SM[ch].CVAL2;
+			timer.flex->SM[ch].STS = FLEXPWM_SMSTS_CFA0;
+		} else {
+			return;
+		}
+	} else /* type == 1 */ {
+		uint32_t sctrl = timer.quad->CH[ch].SCTRL;
+		if (sctrl & TMR_SCTRL_TCF) {
+			timer.quad->CH[ch].SCTRL = sctrl & ~TMR_SCTRL_TCF;
+			capture_msw++;
+			inc = true;
+			//Serial.write('.');
+		}
+		if (sctrl & TMR_SCTRL_IEF) {
+			capture = timer.quad->CH[ch].CAPT;
+			timer.quad->CH[ch].SCTRL = sctrl & ~TMR_SCTRL_IEF;
+		} else {
+			return;
+		}
+	}
+
+	uint32_t hw_capture = capture;
+	if (capture <= 0xE000 || !inc) {
+		capture |= (capture_msw << 16);
+	} else {
+		capture |= ((capture_msw - 1) << 16);
+	}
+	//Serial.write('*');
+	//Serial.print(hw_capture);
+	//Serial.write('*');
+
+	// compute the waveform period
+	uint32_t period = capture - capture_previous;
+	capture_previous = capture;
+	// store it into the buffer
+	uint32_t i = buffer_head + 1;
+	if (i >= FREQMEASURE_BUFFER_LEN) i = 0;
+	if (i != buffer_tail) {
+		buffer_value[i] = period;
+		buffer_head = i;
+	}
+}
+
+/*
+// Arduino sketch for simple testing
+
+FreqMeasureClass freq1;
+FreqMeasureClass freq2;
+FreqMeasureClass freq3;
+FreqMeasureClass freq4;
+
+const int mypin = 22;
+FreqMeasureClass &freq = freq4;  // try reading just 1 for now
+
+void setup() {
+	Serial.begin(9600);
+	Serial.println("OC_FreqMeasure");
+	//freq1.begin(0);  // TR1
+	//freq2.begin(1);  // TR2
+	//freq3.begin(23); // TR3
+	//freq4.begin(22); // TR4
+
+	// create frequencies for testing with breadboard wires between pins
+	analogWriteFrequency(3, 681.7);
+	analogWrite(3, 120);
+	analogWriteFrequency(4, 155.3);
+	analogWrite(4, 120);
+	analogWriteFrequency(5, 2239.1);
+	analogWrite(5, 120);
+	analogWriteFrequency(8, 57.4);
+	analogWrite(8, 120);
+	analogWriteFrequency(9, 8234.5);
+	analogWrite(9, 120);
+
+	freq.begin(mypin);
+}
+
+void loop() {
+	static elapsedMillis msec;
+
+	if (freq.available()) {
+		Serial.println(freq.countToFrequency(freq.read()));
+		msec = 0;
+	}
+	if (msec >= 5000) {
+		msec = 0;
+		Serial.println("timeout");
+	}
+
+}
+*/
+
 
 #endif // __IMXRT1062__
 
