@@ -144,7 +144,6 @@ void FreqMeasureClass::begin(uint8_t pin /*= 0 TR1*/)
 		IOMUXC_GPR_GPR6 |= IOMUXC_GPR_GPR6_QTIMER1_TRM3_INPUT_SEL;
 		irq = IRQ_QTIMER1;
 		attachInterruptVector(irq, &pin0_isr);
-		Serial.println("pin 0");
 		break;
 	  case 1: // TR2  AD_B0_02  XBAR1_INOUT16 -> XBAR1 -> QTIMER2_TIMER3
 		type = 1;
@@ -160,7 +159,6 @@ void FreqMeasureClass::begin(uint8_t pin /*= 0 TR1*/)
 		IOMUXC_GPR_GPR6 |= IOMUXC_GPR_GPR6_QTIMER2_TRM3_INPUT_SEL;
 		irq = IRQ_QTIMER2;
 		attachInterruptVector(irq, &pin1_isr);
-		Serial.println("pin 1");
 		break;
 	  case 23: // TR3  AD_B1_09  FlexPWM4_1_A
 		type = 0;
@@ -172,7 +170,6 @@ void FreqMeasureClass::begin(uint8_t pin /*= 0 TR1*/)
 		IOMUXC_FLEXPWM4_PWMA1_SELECT_INPUT = 1; // page 812
 		irq = IRQ_FLEXPWM4_1;
 		attachInterruptVector(irq, &pin23_isr);
-		Serial.println("pin 23");
 		break;
 	  case 22: // TR4  AD_B1_08  FlexPWM4_0_A
 		type = 0;
@@ -184,7 +181,6 @@ void FreqMeasureClass::begin(uint8_t pin /*= 0 TR1*/)
 		IOMUXC_FLEXPWM4_PWMA0_SELECT_INPUT = 1; // page 811
 		irq = IRQ_FLEXPWM4_0;
 		attachInterruptVector(irq, &pin22_isr);
-		Serial.println("pin 22");
 		break;
 	  default:
 		return;
@@ -195,8 +191,6 @@ void FreqMeasureClass::begin(uint8_t pin /*= 0 TR1*/)
 		timer.flex->MCTRL |= FLEXPWM_MCTRL_CLDOK(1 << ch);
 		// Counter Synchronization, page 3109
 		// CTRL2 register, page 3144
-		//timer.flex->SM[ch].CTRL2 = FLEXPWM_SMCTRL2_INDEP;
-		//if (in == 'X') timer.flex->SM[ch].CTRL2 |= FLEXPWM_SMCTRL2_INIT_SEL(3);
 		timer.flex->SM[ch].CTRL2 = FLEXPWM_SMCTRL2_INIT_SEL(0) | FLEXPWM_SMCTRL2_INDEP;
 		timer.flex->SM[ch].CTRL = FLEXPWM_SMCTRL_FULL;
 		timer.flex->SM[ch].INIT = 0;
@@ -216,13 +210,8 @@ void FreqMeasureClass::begin(uint8_t pin /*= 0 TR1*/)
 		timer.flex->SM[ch].CAPTCTRLA = FLEXPWM_SMCAPTCTRLA_EDGA0(2)
 			| FLEXPWM_SMCAPTCTRLA_ARMA;
 		timer.flex->SM[ch].STS = FLEXPWM_SMSTS_CFA0 | FLEXPWM_SMSTS_RF;
-		//Serial.println("input A");
-		//*muxreg = muxval | 0x10;
 		NVIC_ENABLE_IRQ(irq);
 	} else /*if (type == 1)*/ {
-		// testing only: pin 10  B0_00  QuadTimer1_0
-		//IOMUXC_SW_MUX_CTL_PAD_GPIO_B0_00 = 1 | 0x10;
-		//IOMUXC_GPR_GPR6 |= IOMUXC_GPR_GPR6_QTIMER1_TRM0_INPUT_SEL;
 		timer.quad->ENBL &= ~(1 << ch);
 		timer.quad->CH[ch].CTRL = 0;
 		timer.quad->CH[ch].CNTR = 0;
@@ -241,41 +230,8 @@ void FreqMeasureClass::begin(uint8_t pin /*= 0 TR1*/)
 		buffer_head = 0;
 		buffer_tail = 0;
 		timer.quad->ENBL |= (1 << ch);
-		//Serial.println(timer.quad->ENBL);
 		NVIC_SET_PRIORITY(irq, 48);
 		NVIC_ENABLE_IRQ(irq);
-/*
-		Serial.println("quadtimer");
-		uint32_t prior = 0;
-		for (int i=0; i < 150; i++) {
-			uint32_t s = timer.quad->CH[ch].SCTRL;
-			if (s & TMR_SCTRL_TOF) {
-				// never happens, errata ERR050194
-				timer.quad->CH[ch].SCTRL = s & ~TMR_SCTRL_TOF;
-				Serial.print(" TOF ");
-			}
-			if (s & TMR_SCTRL_TCF) {
-				timer.quad->CH[ch].SCTRL = s & ~TMR_SCTRL_TCF;
-				Serial.print(" TCF ");
-			}
-			if (s & TMR_SCTRL_IEF) {
-				timer.quad->CH[ch].SCTRL = s & ~TMR_SCTRL_IEF;
-				Serial.print(" IEF ");
-			}
-			if (s & TMR_SCTRL_INPUT) {
-				Serial.print(" () ");
-			}
-			uint32_t count = timer.quad->CH[ch].CNTR;
-			if (count >= prior) {
-				Serial.print(" ");
-			} else {
-				Serial.println();
-			}
-			Serial.print(count);
-			prior = count;
-			delayMicroseconds(100);
-		}
-*/
 	}
 	running = true;
 }
@@ -333,7 +289,6 @@ void FreqMeasureClass::isr(void)
 			timer.flex->SM[ch].STS = FLEXPWM_SMSTS_RF;
 			capture_msw++;
 			inc = true;
-			//Serial.write('.');
 		}
 		if (sts & FLEXPWM_SMSTS_CFA0) {
 			capture = timer.flex->SM[ch].CVAL2;
@@ -347,7 +302,6 @@ void FreqMeasureClass::isr(void)
 			timer.quad->CH[ch].SCTRL = sctrl & ~TMR_SCTRL_TCF;
 			capture_msw++;
 			inc = true;
-			//Serial.write('.');
 		}
 		if (sctrl & TMR_SCTRL_IEF) {
 			capture = timer.quad->CH[ch].CAPT;
@@ -357,15 +311,11 @@ void FreqMeasureClass::isr(void)
 		}
 	}
 
-	uint32_t hw_capture = capture;
 	if (capture <= 0xE000 || !inc) {
 		capture |= (capture_msw << 16);
 	} else {
 		capture |= ((capture_msw - 1) << 16);
 	}
-	//Serial.write('*');
-	//Serial.print(hw_capture);
-	//Serial.write('*');
 
 	// compute the waveform period
 	uint32_t period = capture - capture_previous;
@@ -378,56 +328,6 @@ void FreqMeasureClass::isr(void)
 		buffer_head = i;
 	}
 }
-
-/*
-// Arduino sketch for simple testing
-
-FreqMeasureClass freq1;
-FreqMeasureClass freq2;
-FreqMeasureClass freq3;
-FreqMeasureClass freq4;
-
-const int mypin = 22;
-FreqMeasureClass &freq = freq4;  // try reading just 1 for now
-
-void setup() {
-	Serial.begin(9600);
-	Serial.println("OC_FreqMeasure");
-	//freq1.begin(0);  // TR1
-	//freq2.begin(1);  // TR2
-	//freq3.begin(23); // TR3
-	//freq4.begin(22); // TR4
-
-	// create frequencies for testing with breadboard wires between pins
-	analogWriteFrequency(3, 681.7);
-	analogWrite(3, 120);
-	analogWriteFrequency(4, 155.3);
-	analogWrite(4, 120);
-	analogWriteFrequency(5, 2239.1);
-	analogWrite(5, 120);
-	analogWriteFrequency(8, 57.4);
-	analogWrite(8, 120);
-	analogWriteFrequency(9, 8234.5);
-	analogWrite(9, 120);
-
-	freq.begin(mypin);
-}
-
-void loop() {
-	static elapsedMillis msec;
-
-	if (freq.available()) {
-		Serial.println(freq.countToFrequency(freq.read()));
-		msec = 0;
-	}
-	if (msec >= 5000) {
-		msec = 0;
-		Serial.println("timeout");
-	}
-
-}
-*/
-
 
 #endif // __IMXRT1062__
 
