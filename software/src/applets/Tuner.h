@@ -51,23 +51,27 @@ public:
         A4_Hz = 440;
         if (TUNER_ENABLED) {
 #if defined(__IMXRT1062__)
-            FreqMeasure.begin(TUNER_PIN);
+            freq_measure.begin(TUNER_PIN);
 #else
-            FreqMeasure.begin();
+            freq_measure.begin();
 #endif
         }
         AllowRestart();
     }
+    void Unload() {
+        freq_measure.end();
+        OC::DigitalInputs::reInit();
+    }
 
     void Controller() {
-        if (TUNER_ENABLED && FreqMeasure.available())
+        if (TUNER_ENABLED && freq_measure.available())
         {
             // average several readings together
-            freq_sum_ = freq_sum_ + FreqMeasure.read();
+            freq_sum_ = freq_sum_ + freq_measure.read();
             freq_count_ = freq_count_ + 1;
 
             if (milliseconds_since_last_freq_ > 750) {
-                frequency_ = FreqMeasure.countToFrequency(freq_sum_ / freq_count_);
+                frequency_ = freq_measure.countToFrequency(freq_sum_ / freq_count_);
                 freq_sum_ = 0;
                 freq_count_ = 0;
                 milliseconds_since_last_freq_ = 0;
@@ -130,6 +134,7 @@ private:
     float frequency_ ;
     elapsedMillis milliseconds_since_last_freq_;
     int A4_Hz; // Tuning reference
+    FreqMeasureClass freq_measure;
 
     void DrawTuner() {
         float frequency_ = get_frequency() ;

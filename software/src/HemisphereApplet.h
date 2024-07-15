@@ -78,22 +78,11 @@ public:
     void BaseController();
     void BaseView(bool full_screen = false);
 
-    constexpr void BaseStart(const HEM_SIDE hemisphere_) {
+    void BaseStart(const HEM_SIDE hemisphere_) {
         hemisphere = hemisphere_;
 
         // Initialize some things for startup
         cursor_countdown[hemisphere] = HEMISPHERE_CURSOR_TICKS;
-
-        // Shutdown FTM capture on Digital 4, used by Tuner
-#ifdef FLIP_180
-        if (hemisphere == 0)
-#else
-        if (hemisphere == 1)
-#endif
-        {
-            FreqMeasure.end();
-            OC::DigitalInputs::reInit();
-        }
 
         // Maintain previous app state by skipping Start
         if (!applet_started) {
@@ -104,6 +93,7 @@ public:
             }
         }
     }
+    virtual void Unload() { }
 
     // Screensavers are deprecated in favor of screen blanking, but the BaseScreensaverView() remains
     // to avoid breaking applets based on the old boilerplate

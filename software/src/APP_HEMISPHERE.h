@@ -333,6 +333,8 @@ public:
 
     // does not modify the preset, only the manager
     void SetApplet(HEM_SIDE hemisphere, int index) {
+        //if (my_applet[hemisphere]) // TODO: special case for first load?
+        HS::available_applets[my_applet[hemisphere]].instance[hemisphere]->Unload();
         next_applet[hemisphere] = my_applet[hemisphere] = index;
         HS::available_applets[index].instance[hemisphere]->BaseStart(hemisphere);
     }
