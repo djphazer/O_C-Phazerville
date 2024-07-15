@@ -276,10 +276,12 @@ void FreqMeasureClass::end(void)
 	}
 	NVIC_DISABLE_IRQ(irq);
 	*muxreg = 5 | 0x10;
+	running = false;
 }
 
 void FreqMeasureClass::isr(void)
 {
+	if (!running) return;
 	bool inc = false;
 	uint32_t capture;
 
