@@ -21,7 +21,7 @@ class FreqMeasureClass {
 public:
 	// supports up to 4 simultaneously running instances
 	FreqMeasureClass() { running = false; }
-	void begin(uint8_t pin = 23); // pin can be 0 (TR1), 1 (TR2), 23 (TR3), 22 (TR4)
+	void begin(uint8_t pin = 22); // pin can be 0 (TR1), 1 (TR2), 23 (TR3), 22 (TR4)
 	uint8_t available(void);
 	uint32_t read(void);
 	float countToFrequency(uint32_t count) { return (float)F_BUS_ACTUAL / (float)count; }

@@ -28,6 +28,16 @@
 
 #include "../src/drivers/FreqMeasure/OC_FreqMeasure.h"
 
+#if defined(__IMXRT1062__)
+#define TUNER_ENABLED 1
+// TR2 on left, TR4 on right
+#define TUNER_PIN (hemisphere == 0 ? 1 : 22)
+#elif defined(FLIP_180)
+#define TUNER_ENABLED (hemisphere == 0)
+#else
+#define TUNER_ENABLED (hemisphere == 1)
+#endif
+
 static constexpr double HEM_TUNER_AaboveMidCtoC0 = 0.03716272234383494188492;
 
 class Tuner : public HemisphereApplet {
@@ -39,22 +49,18 @@ public:
 
     void Start() {
         A4_Hz = 440;
-#ifdef FLIP_180
-        if (hemisphere == 0) {
+        if (TUNER_ENABLED) {
+#if defined(__IMXRT1062__)
+            FreqMeasure.begin(TUNER_PIN);
 #else
-        if (hemisphere == 1) {
-#endif
             FreqMeasure.begin();
+#endif
         }
         AllowRestart();
     }
 
     void Controller() {
-#ifdef FLIP_180
-        if (hemisphere == 0 && FreqMeasure.available())
-#else
-        if (hemisphere == 1 && FreqMeasure.available())
-#endif
+        if (TUNER_ENABLED && FreqMeasure.available())
         {
             // average several readings together
             freq_sum_ = freq_sum_ + FreqMeasure.read();
@@ -72,11 +78,7 @@ public:
     }
 
     void View() {
-#ifdef FLIP_180
-        if (hemisphere == 0) DrawTuner();
-#else
-        if (hemisphere == 1) DrawTuner();
-#endif
+        if (TUNER_ENABLED) DrawTuner();
         else DrawWarning();
     }
 
@@ -100,11 +102,10 @@ public:
 
 protected:
     void SetHelp() {
+        if (TUNER_ENABLED) {
 #ifdef FLIP_180
-        if (hemisphere == 0) {
             help[HEMISPHERE_HELP_DIGITALS] = "1=Input";
 #else
-        if (hemisphere == 1) {
             help[HEMISPHERE_HELP_DIGITALS] = "2=Input";
 #endif
             help[HEMISPHERE_HELP_CVS]      = "";
