@@ -109,7 +109,7 @@ private:
             DrawSchmittTriggerAtPositionWithState(x, y, state[ch]);
 
             // Input monitor
-            gfxLine(3, 22 + (38 * ch), ProportionCV(ViewIn(ch), 58) + 3, 22 + (38 * ch));
+            gfxLine(3, 22 + (38 * ch), ProportionCV(In(ch), 58) + 3, 22 + (38 * ch));
 
             // Line to input
             if (ch == 0) gfxDottedLine(3, 32, 3, 23, 2);

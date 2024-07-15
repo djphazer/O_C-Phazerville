@@ -91,8 +91,8 @@ private:
         gfxLine(x, 15, x, 20);
 
         // Draw comparison
-        if (in_greater) gfxRect(1, 35, ProportionCV(ViewIn(0), 62), 6);
-        else gfxFrame(1, 35, ProportionCV(ViewIn(0), 62), 6);
+        if (in_greater) gfxRect(1, 35, ProportionCV(In(0), 62), 6);
+        else gfxFrame(1, 35, ProportionCV(In(0), 62), 6);
 
         if (!in_greater) gfxRect(1, 45, ProportionCV(mod_cv, 62), 6);
         else gfxFrame(1, 45, ProportionCV(mod_cv, 62), 6);

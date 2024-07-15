@@ -351,7 +351,7 @@ public:
     void gfxSkyline() {
         ForEachChannel(ch)
         {
-            int height = ProportionCV(ViewIn(ch), 32);
+            int height = ProportionCV(In(ch), 32);
             gfxFrame(23 + (10 * ch), BottomAlign(height), 6, 63);
 
             height = ProportionCV(ViewOut(ch), 32);
