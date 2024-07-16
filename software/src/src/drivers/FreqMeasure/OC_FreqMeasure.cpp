@@ -130,7 +130,7 @@ FLASHMEM
 void FreqMeasureClass::begin(uint8_t pin /*= 0 TR1*/)
 {
 	switch (pin) {
-	  case 0: // TR1  AD_B0_03  XBAR1_INOUT17 -> XBAR1 -> QTIMER1_TIMER3
+	  case TR1: // TR1=0  AD_B0_03  XBAR1_INOUT17 -> XBAR1 -> QTIMER1_TIMER3
 		type = 1;
 		timer.quad = &IMXRT_TMR1;
 		ch = 3;
@@ -145,7 +145,7 @@ void FreqMeasureClass::begin(uint8_t pin /*= 0 TR1*/)
 		irq = IRQ_QTIMER1;
 		attachInterruptVector(irq, &pin0_isr);
 		break;
-	  case 1: // TR2  AD_B0_02  XBAR1_INOUT16 -> XBAR1 -> QTIMER2_TIMER3
+	  case TR2: // TR2=1  AD_B0_02  XBAR1_INOUT16 -> XBAR1 -> QTIMER2_TIMER3
 		type = 1;
 		timer.quad = &IMXRT_TMR2;
 		ch = 3;
@@ -160,7 +160,7 @@ void FreqMeasureClass::begin(uint8_t pin /*= 0 TR1*/)
 		irq = IRQ_QTIMER2;
 		attachInterruptVector(irq, &pin1_isr);
 		break;
-	  case 23: // TR3  AD_B1_09  FlexPWM4_1_A
+	  case TR3: // TR3=23  AD_B1_09  FlexPWM4_1_A
 		type = 0;
 		timer.flex = &IMXRT_FLEXPWM4;
 		ch = 1;
@@ -171,7 +171,7 @@ void FreqMeasureClass::begin(uint8_t pin /*= 0 TR1*/)
 		irq = IRQ_FLEXPWM4_1;
 		attachInterruptVector(irq, &pin23_isr);
 		break;
-	  case 22: // TR4  AD_B1_08  FlexPWM4_0_A
+	  case TR4: // TR4=22  AD_B1_08  FlexPWM4_0_A
 		type = 0;
 		timer.flex = &IMXRT_FLEXPWM4;
 		ch = 0;

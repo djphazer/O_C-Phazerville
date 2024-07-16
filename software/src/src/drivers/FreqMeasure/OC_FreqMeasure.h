@@ -2,6 +2,9 @@
 #define OC_FREQMEASURE_H
 
 #include <Arduino.h>
+#ifdef ARDUINO_TEENSY40
+#include "../../../OC_gpio.h"
+#endif
 
 #if defined(__MK20DX256__)
 
@@ -19,9 +22,19 @@ public:
 
 class FreqMeasureClass {
 public:
+#ifdef ARDUINO_TEENSY40
+  // T4.0 on old hardware
+  // pins already defined as macros in OC_gpio.h
+#else
+  // T4.1 on new hardware
+  // static local copies of expected pin numbers, dynamically assigned in OC_gpio.cpp
+  // TODO: this could be made dynamic if we care about supporting T4.1 on old hardware
+  static constexpr uint8_t TR1 = 0, TR2 = 1, TR3 = 23, TR4 = 22;
+#endif
+
 	// supports up to 4 simultaneously running instances
 	FreqMeasureClass() { running = false; }
-	void begin(uint8_t pin = 22); // pin can be 0 (TR1), 1 (TR2), 23 (TR3), 22 (TR4)
+	void begin(uint8_t pin = TR4); // pin can be 0 (TR1), 1 (TR2), 23 (TR3), 22 (TR4)
 	uint8_t available(void);
 	uint32_t read(void);
 	float countToFrequency(uint32_t count) { return (float)F_BUS_ACTUAL / (float)count; }
