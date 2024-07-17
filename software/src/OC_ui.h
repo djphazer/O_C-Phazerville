@@ -47,6 +47,13 @@ enum UiControl {
 #else
   CONTROL_BUTTON_LAST = 4,
 #endif
+
+  // Some aliases for new hardware
+  CONTROL_BUTTON_A = CONTROL_BUTTON_UP,
+  CONTROL_BUTTON_B = CONTROL_BUTTON_DOWN,
+  CONTROL_BUTTON_X = CONTROL_BUTTON_UP2,
+  CONTROL_BUTTON_Y = CONTROL_BUTTON_DOWN2,
+  CONTROL_BUTTON_Z = CONTROL_BUTTON_M,
 };
 
 static inline uint16_t control_mask(unsigned i) {
