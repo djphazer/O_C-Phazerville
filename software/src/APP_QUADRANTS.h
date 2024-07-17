@@ -509,34 +509,28 @@ public:
         }
     }
 
+    // only happens on button down
     void DelegateEncoderPush(const UI::Event &event) {
-        bool down = (event.type == UI::EVENT_BUTTON_DOWN);
         int h = (event.control == OC::CONTROL_BUTTON_L) ? LEFT_HEMISPHERE : RIGHT_HEMISPHERE;
         HEM_SIDE slot = HEM_SIDE(view_slot[h]*2 + h);
 
         if (config_page > HIDE_CONFIG || preset_cursor) {
-            // button release for config screen
-            if (!down) ConfigButtonPush(h);
-            return;
+          ConfigButtonPush(h);
+          return;
         }
         if (view_state == AUDIO_SETUP) {
-            if (!down) OC::AudioDSP::AudioSetupButtonAction(h);
-            return;
+          OC::AudioDSP::AudioSetupButtonAction(h);
+          return;
         }
 
-        // button down
-        if (down) {
-            // Clock Setup is more immediate for manual triggers
-            if (view_state == CLOCK_SETUP) ClockSetup_instance.OnButtonPress();
-            // TODO: consider a new OnButtonDown handler for applets
-            return;
+        if (view_state == CLOCK_SETUP) {
+          ClockSetup_instance.OnButtonPress();
+          return;
         }
 
-        // button release
         if (select_mode == slot) {
             select_mode = -1; // Pushing a button for the selected side turns off select mode
         } else if (view_state != CLOCK_SETUP) {
-            // regular applets get button release
             active_applet[slot]->OnButtonPress();
         }
     }
@@ -559,52 +553,46 @@ public:
         }
     }
 
+    // always act-on-press
     void DelegateSelectButtonPush(const UI::Event &event) {
-        bool down = (event.type == UI::EVENT_BUTTON_DOWN);
         HEM_SIDE hemisphere = ButtonToSlot(event);
 
-        // -- button down
-        if (down) {
-            // dual press A+B for Clock Setup... check first_click, so we only process the 2nd button event
-            if (event.mask == (OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_B) && hemisphere != first_click) {
-                view_state = CLOCK_SETUP;
-                select_mode = -1;
-                OC::ui.SetButtonIgnoreMask(); // ignore button release
-                return;
-            }
-            // dual press X+Y for Audio Setup
-            if (event.mask == (OC::CONTROL_BUTTON_X | OC::CONTROL_BUTTON_Y) && hemisphere != first_click) {
-                view_state = AUDIO_SETUP;
-                OC::ui.SetButtonIgnoreMask(); // ignore button release
-                return;
-            }
-            // dual press A+X for Load Preset
-            if (event.mask == (OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_X) && hemisphere != first_click) {
-                ShowPresetSelector();
-                OC::ui.SetButtonIgnoreMask(); // ignore button release
-                return;
-            }
-
-            // dual press B+Y for Input Mapping
-            if (event.mask == (OC::CONTROL_BUTTON_B | OC::CONTROL_BUTTON_Y) && hemisphere != first_click) {
-                config_page = INPUT_SETTINGS;
-                config_cursor = TRIGMAP1;
-                OC::ui.SetButtonIgnoreMask(); // ignore button release
-                return;
-            }
-
-            // -- any single click to exit fullscreen
-            if (view_state == APPLET_FULLSCREEN) {
-              view_state = APPLETS;
-              OC::ui.SetButtonIgnoreMask(); // ignore release
-            }
-
-            // mark this single click
-            first_click = hemisphere;
+        // dual press A+B for Clock Setup... check first_click, so we only process the 2nd button event
+        if (event.mask == (OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_B) && hemisphere != first_click) {
+            view_state = CLOCK_SETUP;
+            select_mode = -1;
+            OC::ui.SetButtonIgnoreMask(); // ignore button release
+            return;
+        }
+        // dual press X+Y for Audio Setup
+        if (event.mask == (OC::CONTROL_BUTTON_X | OC::CONTROL_BUTTON_Y) && hemisphere != first_click) {
+            view_state = AUDIO_SETUP;
+            OC::ui.SetButtonIgnoreMask(); // ignore button release
+            return;
+        }
+        // dual press A+X for Load Preset
+        if (event.mask == (OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_X) && hemisphere != first_click) {
+            ShowPresetSelector();
+            OC::ui.SetButtonIgnoreMask(); // ignore button release
             return;
         }
 
-        // -- button release
+        // dual press B+Y for Input Mapping
+        if (event.mask == (OC::CONTROL_BUTTON_B | OC::CONTROL_BUTTON_Y) && hemisphere != first_click) {
+            config_page = INPUT_SETTINGS;
+            config_cursor = TRIGMAP1;
+            OC::ui.SetButtonIgnoreMask(); // ignore button release
+            return;
+        }
+
+        // -- any single click to exit fullscreen
+        if (view_state == APPLET_FULLSCREEN) {
+          view_state = APPLETS;
+          OC::ui.SetButtonIgnoreMask(); // ignore release
+        }
+
+        // mark this single click
+        first_click = hemisphere;
 
         // cancel preset select or config screens
         if (config_page || preset_cursor) {
@@ -729,13 +717,6 @@ public:
             break;
           }
 
-          // most button-down events fall through here
-        case UI::EVENT_BUTTON_PRESS:
-          if (event.control == OC::CONTROL_BUTTON_Z) {
-            ToggleClockRun();
-            break;
-          }
-
           if (event.control == OC::CONTROL_BUTTON_L || event.control == OC::CONTROL_BUTTON_R) {
             DelegateEncoderPush(event);
           } else {
@@ -744,9 +725,27 @@ public:
 
           break;
 
+        case UI::EVENT_BUTTON_PRESS:
+          if (event.control == OC::CONTROL_BUTTON_Z) {
+            ToggleClockRun();
+          }
+          // ignore all other button release events
+          break;
+
         case UI::EVENT_BUTTON_LONG_PRESS:
           if (event.control == OC::CONTROL_BUTTON_B) ToggleConfigMenu();
-          if (event.control == OC::CONTROL_BUTTON_L) ToggleClockRun();
+
+          if (event.control == OC::CONTROL_BUTTON_X) {
+            // Fullscreen left side
+            HEM_SIDE slot = HEM_SIDE(view_slot[0]*2 + 0);
+            SetFullScreen(slot);
+          }
+          if (event.control == OC::CONTROL_BUTTON_Y) {
+            // Fullscreen right side
+            HEM_SIDE slot = HEM_SIDE(view_slot[1]*2 + 1);
+            SetFullScreen(slot);
+          }
+          //if (event.control == OC::CONTROL_BUTTON_L) ToggleClockRun();
           break;
 
         default: break;
