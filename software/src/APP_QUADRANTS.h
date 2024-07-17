@@ -284,10 +284,13 @@ public:
         // initiate actual EEPROM save - ONLY if necessary!
         if (doSave && !skip_eeprom) {
             OC::CORE::app_isr_enabled = false;
-            OC::draw_save_message(60);
+            OC::draw_save_message(16);
             delay(1);
+            OC::draw_save_message(32);
             OC::save_app_data();
+            OC::draw_save_message(64);
             delay(1);
+            OC::draw_save_message(96);
             OC::CORE::app_isr_enabled = true;
         }
 
@@ -320,6 +323,14 @@ public:
     }
     void ProcessQueue() {
       LoadFromPreset(queued_preset);
+    }
+    void QueuePresetLoad(int id) {
+      if (HS::clock_m.IsRunning()) {
+        queued_preset = id;
+        HS::clock_m.BeatSync( &QuadrantBeatSync );
+      }
+      else
+        LoadFromPreset(id);
     }
 
     // does not modify the preset, only the quad_manager
@@ -355,12 +366,7 @@ public:
             if (message == usbMIDI.ProgramChange) {
                 int slot = device.getData1();
                 if (slot < QUAD_PRESET_COUNT) {
-                  if (HS::clock_m.IsRunning()) {
-                    queued_preset = slot;
-                    HS::clock_m.BeatSync( &QuadrantBeatSync );
-                  }
-                  else
-                    LoadFromPreset(slot);
+                  QueuePresetLoad(slot);
                 }
                 continue;
             }
@@ -707,14 +713,16 @@ public:
           // Z-button held down?
           // shift functions for all buttons
           if (event.mask & OC::CONTROL_BUTTON_Z) {
-            if (event.control == OC::CONTROL_BUTTON_L || event.control == OC::CONTROL_BUTTON_R) {
-              // TODO: encoders
+            if (event.control == OC::CONTROL_BUTTON_L) {
               // Left - Reload last preset
+              QueuePresetLoad(preset_id);
+            } else if (event.control == OC::CONTROL_BUTTON_R) {
               // Right - Save to last preset
-              break;
+              StoreToPreset(preset_id);
+            } else {
+              HEM_SIDE hemisphere = ButtonToSlot(event);
+              SetFullScreen(hemisphere);
             }
-            HEM_SIDE hemisphere = ButtonToSlot(event);
-            SetFullScreen(hemisphere);
             OC::ui.SetButtonIgnoreMask();
             break;
           }
@@ -877,12 +885,7 @@ private:
             if (config_cursor == SAVE_PRESET)
                 StoreToPreset(preset_cursor-1);
             else {
-              if (HS::clock_m.IsRunning()) {
-                queued_preset = preset_cursor - 1;
-                HS::clock_m.BeatSync( &QuadrantBeatSync );
-              }
-              else
-                LoadFromPreset(preset_cursor-1);
+                QueuePresetLoad(preset_cursor - 1);
             }
 
             preset_cursor = 0; // deactivate preset selection
