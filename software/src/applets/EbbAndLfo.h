@@ -273,14 +273,18 @@ public:
   }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1=Clock / 2=Reset";
-        help[HEMISPHERE_HELP_CVS]      = "Assignable";
-        help[HEMISPHERE_HELP_OUTS]     = "Assignable";
-        help[HEMISPHERE_HELP_ENCODER]  = "Select/Edit params";
-        //                               "------------------" <-- Size Guide
-    }
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "Clock";
+    help[HELP_DIGITAL2] = "Reset";
+    help[HELP_CV1]      = cv_labels[cv_type(0)];
+    help[HELP_CV2]      = cv_labels[cv_type(1)];
+    help[HELP_OUT1]     = out_labels[output(0)];
+    help[HELP_OUT2]     = out_labels[output(1)];
+    help[HELP_EXTRA1]  = "Enc: Select/Edit";
+    help[HELP_EXTRA2]  = "     Parameters";
+    //                   "---------------------" <-- Extra text size guide
+  }
 
 private:
 
@@ -290,7 +294,7 @@ private:
     EOA,
     EOR,
   };
-  const char* out_labels[4] = {"Un", "Bi", "Hi", "Lo"};
+  const char* const out_labels[4] = {"Un", "Bi", "Hi", "Lo"};
 
   enum CV {
     FREQ,
@@ -298,7 +302,7 @@ private:
     SHAPE,
     FOLD,
   };
-  const char* cv_labels[4] = {"Hz", "Sl", "Sh", "Fo"};
+  const char* const cv_labels[4] = {"Hz", "Sl", "Sh", "Fo"};
 
   int cursor = 0;
   int16_t pitch = -3 * 12 * 128;
