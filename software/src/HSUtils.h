@@ -5,6 +5,14 @@
 // misc. utility functions extracted from Hemisphere
 // -NJM
 
+// Simulated fixed floats by multiplying and dividing by powers of 2
+#ifndef int2simfloat
+#define int2simfloat(x) (x << 14)
+#define simfloat2int(x) (x >> 14)
+typedef int32_t simfloat;
+#endif
+
+// Reference Constants
 #ifdef BUCHLA_4U
 #define PULSE_VOLTAGE 9
 #define HEMISPHERE_MAX_CV 15360
@@ -29,26 +37,6 @@
 #define HEMISPHERE_ADC_LAG 33
 #define HEMISPHERE_CHANGE_THRESHOLD 32
 
-enum HEM_SIDE {
-LEFT_HEMISPHERE = 0,
-RIGHT_HEMISPHERE = 1,
-#ifdef ARDUINO_TEENSY41
-LEFT2_HEMISPHERE = 2,
-RIGHT2_HEMISPHERE = 3,
-#endif
-
-APPLET_SLOTS
-};
-
-// Codes for help system sections
-enum HEM_HELP_SECTIONS {
-HEMISPHERE_HELP_DIGITALS = 0,
-HEMISPHERE_HELP_CVS = 1,
-HEMISPHERE_HELP_OUTS = 2,
-HEMISPHERE_HELP_ENCODER = 3
-};
-static const char * const HEM_HELP_SECTION_NAMES[4] = {"Dig", "CV", "Out", "Enc"};
-
 // Hemisphere-specific macros
 #define BottomAlign(h) (62 - h)
 #define ForEachChannel(ch) for(int_fast8_t ch = 0; ch < 2; ++ch)
@@ -56,16 +44,45 @@ static const char * const HEM_HELP_SECTION_NAMES[4] = {"Dig", "CV", "Out", "Enc"
 #define gfx_offset ((hemisphere % 2) * 64) // Graphics offset, based on the side
 #define io_offset (hemisphere * 2) // Input/Output offset, based on the side
 
+namespace HS {
+
+enum HEM_SIDE {
+  LEFT_HEMISPHERE = 0,
+  RIGHT_HEMISPHERE = 1,
+#ifdef ARDUINO_TEENSY41
+  LEFT2_HEMISPHERE = 2,
+  RIGHT2_HEMISPHERE = 3,
+#endif
+
+  APPLET_SLOTS
+};
+
+// Codes for help system labels
+enum HELP_SECTIONS {
+  HELP_DIGITAL1 = 0,
+  HELP_DIGITAL2,
+  HELP_CV1,
+  HELP_CV2,
+  HELP_OUT1,
+  HELP_OUT2,
+  HELP_EXTRA1,
+  HELP_EXTRA2,
+
+  HELP_LABEL_COUNT,
+
+  // aliases to ease refactoring
+  HEMISPHERE_HELP_DIGITALS = HELP_DIGITAL1,
+  HEMISPHERE_HELP_CVS      = HELP_CV1,
+  HEMISPHERE_HELP_OUTS     = HELP_OUT1,
+  HEMISPHERE_HELP_ENCODER  = HELP_EXTRA1,
+};
+
 static constexpr uint32_t HEMISPHERE_SIM_CLICK_TIME = 1000;
 static constexpr uint32_t HEMISPHERE_DOUBLE_CLICK_TIME = 8000;
 static constexpr uint32_t HEMISPHERE_PULSE_ANIMATION_TIME = 500;
 static constexpr uint32_t HEMISPHERE_PULSE_ANIMATION_TIME_LONG = 1200;
-// Simulated fixed floats by multiplying and dividing by powers of 2
-#ifndef int2simfloat
-#define int2simfloat(x) (x << 14)
-#define simfloat2int(x) (x >> 14)
-typedef int32_t simfloat;
-#endif
+
+} // namespace HS
 
 //////////////// Calculation methods
 ////////////////////////////////////////////////////////////////////////////////
@@ -208,4 +225,4 @@ namespace HS {
   void ToggleClockRun();
   void PokePopup(PopupType pop);
 
-}
+} // namespace HS

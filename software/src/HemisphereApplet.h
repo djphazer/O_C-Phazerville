@@ -102,20 +102,50 @@ public:
     // to avoid breaking applets based on the old boilerplate
     void BaseScreensaverView() {}
 
-    /* Help Screen Toggle */
+    /* Formerly Help Screen */
     virtual void DrawFullScreen() {
         SetHelp();
+        const bool clockrun = HS::clock_m.IsRunning();
 
-        for (int section = 0; section < 4; section++)
-        {
-            int y = section * 12 + 16;
-            graphics.setPrintPos(0, y);
-            graphics.print( HEM_HELP_SECTION_NAMES[section] );
-            graphics.invertRect(0, y - 1, 19, 9);
+        for (int ch = 0; ch < 2; ++ch) {
+          int y = 14;
+          const int mult = clockrun ? HS::clock_m.GetMultiply(ch + io_offset) : 0;
 
-            graphics.setPrintPos(20, y);
-            graphics.print(help[section]);
+          graphics.setPrintPos(ch*64, y);
+          if (mult != 0) { // Multipliers
+            graphics.print( (mult > 0) ? "x" : "/" );
+            graphics.print( (mult > 0) ? mult : 1 - mult );
+          } else { // Trigger mapping
+            graphics.print( OC::Strings::trigger_input_names_none[ HS::trigger_mapping[ch + io_offset] ] );
+          }
+          graphics.invertRect(ch*64, y - 1, 19, 9);
+
+          graphics.setPrintPos(ch*64 + 20, y);
+          graphics.print( help[HELP_DIGITAL1 + ch] );
+
+          y += 10;
+
+          graphics.setPrintPos(ch*64, y);
+          graphics.print( OC::Strings::cv_input_names_none[ HS::cvmapping[ch + io_offset] ] );
+          graphics.invertRect(ch*64, y - 1, 19, 9);
+
+          graphics.setPrintPos(ch*64 + 20, y);
+          graphics.print( help[HELP_CV1 + ch] );
+
+          y += 10;
+
+          graphics.setPrintPos(6 + ch*64, y);
+          graphics.print( OC::Strings::capital_letters[ ch + io_offset ] );
+          graphics.invertRect(ch*64, y - 1, 19, 9);
+
+          graphics.setPrintPos(ch*64 + 20, y);
+          graphics.print( help[HELP_OUT1 + ch] );
         }
+
+        graphics.setPrintPos(0, 45);
+        graphics.print( help[HELP_EXTRA1] );
+        graphics.setPrintPos(0, 55);
+        graphics.print( help[HELP_EXTRA2] );
     }
     virtual void AuxButton() {
       isEditing = false;
@@ -369,7 +399,10 @@ public:
 protected:
     HEM_SIDE hemisphere; // Which hemisphere (0, 1, ...) this applet uses
     bool isEditing = false; // modal editing toggle
-    const char* help[4];
+    const char* help[HELP_LABEL_COUNT] = {
+      "Clock", "Reset", "Param1", "Param2", "Pitch", "Trig",
+      "(extratext1)", "(extratext2)"
+    };
     virtual void SetHelp() = 0;
 
     /* Forces applet's Start() method to run the next time the applet is selected. This
