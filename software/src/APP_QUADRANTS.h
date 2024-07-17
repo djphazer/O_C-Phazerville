@@ -650,14 +650,18 @@ public:
         }
     }
 
+    void SetConfigPageFromCursor() {
+      if (config_cursor < CONFIG_DUMMY) config_page = LOADSAVE_POPUP;
+      else if (config_cursor < TRIGMAP1) config_page = CONFIG_SETTINGS;
+      else if (config_cursor < QUANT1) config_page = INPUT_SETTINGS;
+      else if (config_cursor < SHOWHIDELIST) config_page = QUANTIZER_SETTINGS;
+    }
     void ToggleConfigMenu() {
-        if (config_page) {
-          config_page = HIDE_CONFIG;
-        } else {
-          if (config_cursor < CONFIG_DUMMY) config_page = LOADSAVE_POPUP;
-          else if (config_cursor < QUANT1) config_page = CONFIG_SETTINGS;
-          else config_page = QUANTIZER_SETTINGS;
-        }
+      if (config_page) {
+        config_page = HIDE_CONFIG;
+      } else {
+        SetConfigPageFromCursor();
+      }
     }
     void ShowPresetSelector() {
         config_cursor = LOAD_PRESET;
@@ -805,11 +809,7 @@ private:
             config_cursor += dir;
             config_cursor = constrain(config_cursor, 0, MAX_CURSOR);
 
-            if (config_cursor < CONFIG_DUMMY) config_page = LOADSAVE_POPUP;
-            else if (config_cursor < TRIGMAP1) config_page = CONFIG_SETTINGS;
-            else if (config_cursor < QUANT1) config_page = INPUT_SETTINGS;
-            else if (config_cursor < SHOWHIDELIST) config_page = QUANTIZER_SETTINGS;
-
+            SetConfigPageFromCursor();
           }
           ResetCursor();
           return;
@@ -939,7 +939,7 @@ private:
         gfxIcon(25, 13, TR_ICON); gfxIcon(89, 13, TR_ICON);
         gfxIcon(25, 26, CV_ICON); gfxIcon(89, 26, CV_ICON);
         gfxIcon(25, 39, TR_ICON); gfxIcon(89, 39, TR_ICON);
-        gfxIcon(25, 50, CV_ICON); gfxIcon(89, 50, CV_ICON);
+        gfxIcon(25, 52, CV_ICON); gfxIcon(89, 52, CV_ICON);
 
         for (int ch=0; ch<4; ++ch) {
           // Physical trigger input mappings
@@ -967,7 +967,7 @@ private:
 
     }
     void DrawQuantizerConfig() {
-        gfxHeader("< Quantizer Setup >");
+        gfxHeader("<  Quantizer Setup");
 
         for (int ch=0; ch<4; ++ch) {
           const int x = 8 + ch*32;
@@ -1018,7 +1018,7 @@ private:
 
     void DrawConfigMenu() {
         // --- Config Selection
-        gfxHeader("< Presets / Config");
+        gfxHeader("< General Settings  >");
 
         gfxPrint(1, 15, "Trig Length: ");
         gfxPrint(HS::trig_length);
