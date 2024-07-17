@@ -567,6 +567,7 @@ public:
         // dual press X+Y for Audio Setup
         if (event.mask == (OC::CONTROL_BUTTON_X | OC::CONTROL_BUTTON_Y) && hemisphere != first_click) {
             view_state = AUDIO_SETUP;
+            select_mode = -1;
             OC::ui.SetButtonIgnoreMask(); // ignore button release
             return;
         }
@@ -588,6 +589,7 @@ public:
         // -- any single click to exit fullscreen
         if (view_state == APPLET_FULLSCREEN) {
           view_state = APPLETS;
+          select_mode = -1;
           OC::ui.SetButtonIgnoreMask(); // ignore release
         }
 
@@ -604,6 +606,7 @@ public:
         if (view_state != APPLETS) {
             // cancel anything else
             view_state = APPLETS;
+            select_mode = -1;
             return;
         }
 
@@ -667,13 +670,15 @@ public:
       } else {
         SetConfigPageFromCursor();
       }
+      select_mode = -1;
     }
     void ShowPresetSelector() {
-        config_cursor = LOAD_PRESET;
-        preset_cursor = preset_id + 1;
+      config_cursor = LOAD_PRESET;
+      preset_cursor = preset_id + 1;
+      select_mode = -1;
     }
 
-    inline void SetFullScreen(HEM_SIDE hemisphere) {
+    void SetFullScreen(HEM_SIDE hemisphere) {
       zoom_slot = hemisphere;
       view_state = APPLET_FULLSCREEN;
       select_mode = -1;
@@ -892,6 +897,7 @@ private:
             preset_cursor = 0; // deactivate preset selection
             config_page = HIDE_CONFIG;
             view_state = APPLETS;
+            select_mode = -1;
             isEditing = false;
             return;
         }
