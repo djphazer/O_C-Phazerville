@@ -72,7 +72,7 @@ namespace OC {
 
   const char * const channel_id[4] = { "#A", "#B", "#C", "#D" };
 
-  const char * const capital_letters[26] = { "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z" };
+  const char * const capital_letters[] = { "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "z", "Z", "z", "Z", "z", "Z" };
 
   const char * const no_yes[] = { "No", "Yes" };
 

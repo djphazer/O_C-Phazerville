@@ -27,6 +27,8 @@ static constexpr int GATE_THRESHOLD = 15 << 7; // 1.25 volts
 static constexpr int TRIGMAP_MAX = OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_LAST + DAC_CHANNEL_LAST;
 static constexpr int CVMAP_MAX = ADC_CHANNEL_LAST + DAC_CHANNEL_LAST;
 
+static constexpr int MAX_CHANNELS = 32;
+
 typedef struct MIDILogEntry {
     int message;
     int data1;
@@ -37,31 +39,31 @@ typedef struct MIDILogEntry {
 // this will allow chaining applets together, multiple stages of processing
 typedef struct IOFrame {
     bool autoMIDIOut = false;
-    bool clocked[OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_LAST];
-    bool gate_high[OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_LAST];
-    int inputs[ADC_CHANNEL_LAST];
-    int outputs[DAC_CHANNEL_LAST];
-    int output_diff[DAC_CHANNEL_LAST];
-    int outputs_smooth[DAC_CHANNEL_LAST];
-    int clock_countdown[DAC_CHANNEL_LAST];
-    bool clockout_q[DAC_CHANNEL_LAST]; // for loopback
-    int adc_lag_countdown[ADC_CHANNEL_LAST]; // Time between a clock event and an ADC read event
-    uint32_t last_clock[ADC_CHANNEL_LAST]; // Tick number of the last clock observed by the child class
-    uint32_t cycle_ticks[ADC_CHANNEL_LAST]; // Number of ticks between last two clocks
-    bool changed_cv[ADC_CHANNEL_LAST]; // Has the input changed by more than 1/8 semitone since the last read?
-    int last_cv[ADC_CHANNEL_LAST]; // For change detection
+    bool clocked[MAX_CHANNELS];
+    bool gate_high[MAX_CHANNELS];
+    int inputs[MAX_CHANNELS];
+    int outputs[MAX_CHANNELS];
+    int output_diff[MAX_CHANNELS];
+    int outputs_smooth[MAX_CHANNELS];
+    int clock_countdown[MAX_CHANNELS];
+    bool clockout_q[MAX_CHANNELS]; // for loopback
+    int adc_lag_countdown[MAX_CHANNELS]; // Time between a clock event and an ADC read event
+    uint32_t last_clock[MAX_CHANNELS]; // Tick number of the last clock observed by the child class
+    uint32_t cycle_ticks[MAX_CHANNELS]; // Number of ticks between last two clocks
+    bool changed_cv[MAX_CHANNELS]; // Has the input changed by more than 1/8 semitone since the last read?
+    int last_cv[MAX_CHANNELS]; // For change detection
 
     /* MIDI message queue/cache */
     struct {
-        int channel[ADC_CHANNEL_LAST]; // MIDI channel number
-        int function[ADC_CHANNEL_LAST]; // Function for each channel
-        int function_cc[ADC_CHANNEL_LAST]; // CC# for each channel
-        uint16_t semitone_mask[ADC_CHANNEL_LAST]; // which notes are currently on
+        int channel[MAX_CHANNELS]; // MIDI channel number
+        int function[MAX_CHANNELS]; // Function for each channel
+        int function_cc[MAX_CHANNELS]; // CC# for each channel
+        uint16_t semitone_mask[MAX_CHANNELS]; // which notes are currently on
 
         // MIDI input stuff handled by MIDIIn applet
         int8_t notes_on[16]; // attempts to track how many notes are on, per MIDI channel
-        int outputs[DAC_CHANNEL_LAST]; // translated CV values
-        bool trigout_q[DAC_CHANNEL_LAST];
+        int outputs[MAX_CHANNELS]; // translated CV values
+        bool trigout_q[MAX_CHANNELS];
 
         // Clock/Start/Stop are handled by ClockSetup applet
         bool clock_run = 0;
@@ -99,13 +101,13 @@ typedef struct IOFrame {
 #endif
         };
         uint8_t current_note[16]; // note number, per MIDI channel
-        uint8_t current_ccval[DAC_CHANNEL_LAST]; // level 0 - 127, per DAC channel
-        int note_countdown[DAC_CHANNEL_LAST];
-        int inputs[DAC_CHANNEL_LAST]; // CV to be translated
-        int last_cv[DAC_CHANNEL_LAST];
-        bool clocked[DAC_CHANNEL_LAST];
-        bool gate_high[DAC_CHANNEL_LAST];
-        bool changed_cv[DAC_CHANNEL_LAST];
+        uint8_t current_ccval[MAX_CHANNELS]; // level 0 - 127, per DAC channel
+        int note_countdown[MAX_CHANNELS];
+        int inputs[MAX_CHANNELS]; // CV to be translated
+        int last_cv[MAX_CHANNELS];
+        bool clocked[MAX_CHANNELS];
+        bool gate_high[MAX_CHANNELS];
+        bool changed_cv[MAX_CHANNELS];
 
         // Logging
         MIDILogEntry log[7];
