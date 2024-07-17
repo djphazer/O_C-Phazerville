@@ -470,20 +470,14 @@ public:
             ClockSetup_instance.View();
             draw_applets = false;
           }
-          else if (view_state == APPLET_FULLSCREEN) {
-            active_applet[zoom_slot]->BaseView(true);
-            draw_applets = false;
-          }
         }
 
         if (draw_applets) {
-            if (HS::clock_m.IsRunning()) {
-                // Metronome icon
-                gfxIcon(56, 1, HS::clock_m.Cycle() ? METRO_L_ICON : METRO_R_ICON);
-            } else if (HS::clock_m.IsPaused()) {
-                gfxIcon(56, 1, PAUSE_ICON);
-            }
-
+          if (view_state == APPLET_FULLSCREEN) {
+            active_applet[zoom_slot]->BaseView(true);
+            // Applets 3 and 4 get inverted titles
+            if (zoom_slot > 1) gfxInvert(1 + (zoom_slot%2)*64, 1, 54, 10);
+          } else {
             // only two applets visible at a time
             for (int h = 0; h < 2; h++)
             {
@@ -499,6 +493,14 @@ public:
 
             // vertical separator
             graphics.drawLine(63, 0, 63, 63, 2);
+          }
+
+          // Clock indicator icons in header
+          if (HS::clock_m.IsRunning()) {
+              gfxIcon(56, 1, HS::clock_m.Cycle() ? METRO_L_ICON : METRO_R_ICON);
+          } else if (HS::clock_m.IsPaused()) {
+              gfxIcon(56, 1, PAUSE_ICON);
+          }
         }
 
         // Overlay popup window last
