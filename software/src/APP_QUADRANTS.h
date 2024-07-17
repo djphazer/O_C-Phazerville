@@ -324,8 +324,8 @@ public:
 
     // does not modify the preset, only the quad_manager
     void SetApplet(HEM_SIDE hemisphere, int index) {
-      if (active_applet[hemisphere])
-        active_applet[hemisphere]->Unload();
+        if (active_applet[hemisphere])
+          active_applet[hemisphere]->Unload();
 
         next_applet_index[hemisphere] = active_applet_index[hemisphere] = index;
         active_applet[hemisphere] = HS::available_applets[index].instance[hemisphere];
@@ -566,15 +566,24 @@ public:
             }
             // dual press X+Y for Audio Setup
             if (event.mask == (OC::CONTROL_BUTTON_X | OC::CONTROL_BUTTON_Y) && hemisphere != first_click) {
-                // TODO: Audio Setup mode and UI
                 view_state = AUDIO_SETUP;
                 OC::ui.SetButtonIgnoreMask(); // ignore button release
                 return;
             }
-            // dual press A+X for ???
-            //if (event.mask == (OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_X) && hemisphere != first_click) { }
-            // dual press B+Y for ???
-            //if (event.mask == (OC::CONTROL_BUTTON_B | OC::CONTROL_BUTTON_Y) && hemisphere != first_click) { }
+            // dual press A+X for Load Preset
+            if (event.mask == (OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_X) && hemisphere != first_click) {
+                ShowPresetSelector();
+                OC::ui.SetButtonIgnoreMask(); // ignore button release
+                return;
+            }
+
+            // dual press B+Y for Input Mapping
+            if (event.mask == (OC::CONTROL_BUTTON_B | OC::CONTROL_BUTTON_Y) && hemisphere != first_click) {
+                config_page = INPUT_SETTINGS;
+                config_cursor = TRIGMAP1;
+                OC::ui.SetButtonIgnoreMask(); // ignore button release
+                return;
+            }
 
             // -- any single click to exit fullscreen
             if (view_state == APPLET_FULLSCREEN) {
@@ -679,7 +688,6 @@ public:
         case UI::EVENT_BUTTON_DOWN:
           // Middle button is a modifier while held
           if (event.control == OC::CONTROL_BUTTON_Z) {
-            zap_mod = true;
             break;
           }
 
@@ -696,11 +704,17 @@ public:
             break;
           }
 
-          if (zap_mod) {
-            // TODO: shift functions for all buttons
+          // Z-button held down?
+          // shift functions for all buttons
+          if (event.mask & OC::CONTROL_BUTTON_Z) {
+            if (event.control == OC::CONTROL_BUTTON_L || event.control == OC::CONTROL_BUTTON_R) {
+              // TODO: encoders
+              // Left - Reload last preset
+              // Right - Save to last preset
+              break;
+            }
             HEM_SIDE hemisphere = ButtonToSlot(event);
             SetFullScreen(hemisphere);
-            zap_mod = false;
             OC::ui.SetButtonIgnoreMask();
             break;
           }
@@ -708,7 +722,6 @@ public:
           // most button-down events fall through here
         case UI::EVENT_BUTTON_PRESS:
           if (event.control == OC::CONTROL_BUTTON_Z) {
-            zap_mod = false;
             ToggleClockRun();
             break;
           }
@@ -722,7 +735,6 @@ public:
           break;
 
         case UI::EVENT_BUTTON_LONG_PRESS:
-          if (event.control == OC::CONTROL_BUTTON_Z) zap_mod = false;
           if (event.control == OC::CONTROL_BUTTON_B) ToggleConfigMenu();
           if (event.control == OC::CONTROL_BUTTON_L) ToggleClockRun();
           break;
@@ -743,7 +755,6 @@ private:
     uint64_t clock_data, global_data, applet_data[4]; // cache of applet data
     bool view_slot[2] = {0, 0}; // Two applets on each side, only one visible at a time
     bool isEditing = false;
-    bool zap_mod = false;
     int config_cursor = 0;
 
     int select_mode = -1;
