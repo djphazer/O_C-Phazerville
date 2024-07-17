@@ -43,6 +43,10 @@ public:
         CV_DEST2,
         LAST_SETTING = CV_DEST2
     };
+    static constexpr const char* const cv_labels[] = {
+      "Length1", "Fill 1", "Rotate1", "Pad 1",
+      "Length2", "Fill 2", "Rotate2", "Pad 2",
+    };
 
     const char* applet_name() {
         return "EuclidX";
@@ -191,14 +195,18 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1=Clock 2=Reset";
-        help[HEMISPHERE_HELP_CVS]      = "Assignable";
-        help[HEMISPHERE_HELP_OUTS]     = "Clock A=Ch1 B=Ch2";
-        help[HEMISPHERE_HELP_ENCODER]  = "Len/Hits/Rot/CV";
-        //                               "------------------" <-- Size Guide
-    }
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "Clock";
+    help[HELP_DIGITAL2] = "Reset";
+    help[HELP_CV1]      = cv_labels[cv_dest[0]];
+    help[HELP_CV2]      = cv_labels[cv_dest[1]];
+    help[HELP_OUT1]     = "Chan1";
+    help[HELP_OUT2]     = "Chan2";
+    help[HELP_EXTRA1]  = "Adjust global trigger";
+    help[HELP_EXTRA2]  = "pulsewidth in Config";
+    //                   "---------------------" <-- Extra text size guide
+  }
 
 private:
     int step;
