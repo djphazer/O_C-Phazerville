@@ -197,7 +197,8 @@ private:
         gfxPrint(12, 25, OC::scale_names_short[scale]);
         gfxBitmap(41, 24, 8, NOTE4_ICON);
         gfxPrint(49, 25, quant_range); // APD
-        gfxPrint(1, 35, hemisphere ? "B:":"D:");
+        gfxPrint(1, 35, OutputLabel(1));
+        gfxPrint(":");
         switch (out_b) {
         case 0: // modulation output
             gfxBitmap(28, 35, 8, WAVEFORM_ICON);

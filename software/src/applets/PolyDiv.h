@@ -181,7 +181,8 @@ private:
     ProbLoopLinker *loop_linker = loop_linker->get();
 
     void DrawInterface() {
-      gfxPrint(32, 14, "A B");
+      char outlabel[] = { (char)('A' + io_offset), ' ',  (char)('B' + io_offset), '\0' };
+      gfxPrint(32, 14, outlabel);
       ForAllChannels(ch) {
         const int y = 24 + ch*10;
         gfxPrint(1, y, "/");

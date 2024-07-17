@@ -152,19 +152,24 @@ private:
 
     void DrawSelector() {
         // MIDI Channels
-        gfxPrint(1, 15, hemisphere == 0 ? "ChA:" : "ChC:");
+        
+        char out_label[] = { 'C', 'h', (char)('A' + io_offset), ':', '\0'  };
+        gfxPrint(1, 15, out_label);
         gfxPrint(24, 15, frame.MIDIState.channel[io_offset + 0] + 1);
-        gfxPrint(1, 25, hemisphere == 0 ? "ChB:" : "ChD:");
+        ++out_label[2];
+        gfxPrint(1, 25, out_label);
         gfxPrint(24, 25, frame.MIDIState.channel[io_offset + 1] + 1);
 
         // Output 1 function
-        gfxPrint(1, 35, hemisphere == 0 ? "A :" : "C :");
+        char out_label_fn[] = { (char)('A' + io_offset), ' ', ':', '\0'  };
+        gfxPrint(1, 35, out_label_fn);
         gfxPrint(24, 35, midi_fn_name[frame.MIDIState.function[io_offset + 0]]);
         if (frame.MIDIState.function[io_offset + 0] == HEM_MIDI_CC_OUT)
             gfxPrint(frame.MIDIState.function_cc[io_offset + 0]);
 
         // Output 2 function
-        gfxPrint(1, 45, hemisphere == 0 ? "B :" : "D :");
+        ++out_label_fn[0];
+        gfxPrint(1, 45, out_label_fn);
         gfxPrint(24, 45, midi_fn_name[frame.MIDIState.function[io_offset + 1]]);
         if (frame.MIDIState.function[io_offset + 1] == HEM_MIDI_CC_OUT)
             gfxPrint(frame.MIDIState.function_cc[io_offset + 1]);

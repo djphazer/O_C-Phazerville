@@ -121,8 +121,9 @@ private:
     void DrawInterface() {
         ForEachChannel(ch)
         {
-            gfxPrint(0, 15 + (ch * 20), (hemisphere ? (ch ? "D " : "C ") : (ch ? "B " : "A ")));
+            gfxPrint(0, 15 + (ch * 20), OutputLabel(ch));
             int cv = offset[ch] * ATTENOFF_INCREMENTS;
+            gfxPrint(" ");
             gfxPrintVoltage(cv);
             gfxPrint(16, 25 + (ch * 20), Proportion(level[ch], 63, 100));
             gfxPrint("%");

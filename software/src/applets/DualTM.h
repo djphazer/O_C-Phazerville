@@ -434,7 +434,7 @@ private:
         const int y = 35;
         const int x = 34*ch;
 
-        gfxPrint(x+1, y+1, ch ? (hemisphere ? "D" : "B") : (hemisphere ? "C" : "A") );
+        gfxPrint(x+1, y+1, OutputLabel(ch));
         gfxPrint(":");
 
         switch (outmode[ch]) {

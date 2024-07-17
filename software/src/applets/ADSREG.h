@@ -234,10 +234,10 @@ private:
 
         //-ghostils:Indicate which ADSR envelope we are selected on:
         if(curEG == 0) {
-          gfxPrint(0,22,"A");
+          gfxPrint(0,22, OutputLabel(0) );
           gfxInvert(0,21,7,9);
         }else{
-          gfxPrint(0,22,"B");
+          gfxPrint(0,22, OutputLabel(1) );
           gfxInvert(0,21,7,9);
         }
     }

@@ -94,7 +94,7 @@ protected:
         //                               "------------------" <-- Size Guide
         help[HEMISPHERE_HELP_DIGITALS] = "Gate 1,2";
         help[HEMISPHERE_HELP_CVS]      = "";
-        help[HEMISPHERE_HELP_OUTS]     = "Voltage A,B";
+        help[HEMISPHERE_HELP_OUTS]     = "Constant Voltage";
         help[HEMISPHERE_HELP_ENCODER]  = "Voltage/Gating";
         //                               "------------------" <-- Size Guide
     }
@@ -110,7 +110,8 @@ private:
     void DrawInterface() {
         ForEachChannel(ch)
         {
-            gfxPrint(0, 15 + (ch * 20), (hemisphere ? (ch ? "D " : "C ") : (ch ? "B " : "A ")));
+            gfxPrint(0, 15 + (ch * 20), OutputLabel(ch));
+            gfxPrint(" ");
             int cv = voltage[ch] * VOLTAGE_INCREMENTS;
             gfxPrintVoltage(cv);
             gfxPrint(0, 25 + (ch * 20), gate[ch] ? "  G-On" : "  G-Off");

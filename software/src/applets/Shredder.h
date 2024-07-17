@@ -188,7 +188,8 @@ private:
 
     void DrawParams() {
         // Channel 1 voltage
-        gfxPrint(1, 15, "1:+");
+        char outlabel[] = { (char)('A' + io_offset), ':', '+', '\0' };
+        gfxPrint(1, 15, outlabel);
         gfxPrint(19, 15, (char) (range[0]));
         if (bipolar[0]) {
           gfxPrint(13, 18, "-");
@@ -196,7 +197,8 @@ private:
         if (cursor == 0) gfxCursor(13, 23, 12);
 
         // Channel 2 voltage
-        gfxPrint(32, 15, "2:+");
+        ++outlabel[0];
+        gfxPrint(32, 15, outlabel);
         gfxPrint(50, 15, (char) (range[1]));
         if (bipolar[1]) {
           gfxPrint(44, 18, "-");
@@ -206,9 +208,12 @@ private:
         // quantize channel selection
         gfxIcon(32, 25, SCALE_ICON);
         if (quant_channels == 0) {
-          gfxPrint(42, 25, "1+2");
+          outlabel[0] = 'A'+io_offset;
+          outlabel[1] = '+';
+          outlabel[2] = 'B'+io_offset;
+          gfxPrint(42, 25, outlabel);
         } else {
-          gfxPrint(48, 25, (char) quant_channels);
+          gfxPrint(48, 25, 'A' + quant_channels - 1 + io_offset);
         }
         if (cursor == 2) gfxCursor(42, 33, 20);
 

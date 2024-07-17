@@ -106,7 +106,7 @@ protected:
         //                               "------------------" <-- Size Guide
         help[HEMISPHERE_HELP_DIGITALS] = "1,2=Gate";
         help[HEMISPHERE_HELP_CVS]      = "";
-        help[HEMISPHERE_HELP_OUTS]     = "A,B=Out";
+        help[HEMISPHERE_HELP_OUTS]     = "Outputs";
         help[HEMISPHERE_HELP_ENCODER]  = "Freq./Waveform";
         //                               "------------------" <-- Size Guide
     }
@@ -127,8 +127,7 @@ private:
 
         // Show channel output
         gfxPos(1, 15);
-        if (hemisphere == 0) gfxPrint(ch ? "B" : "A");
-        else gfxPrint(ch ? "D" : "C");
+        gfxPrint(OutputLabel(ch));
         gfxInvert(1, 14, 7, 9);
 
         gfxPrint(10, 15, ones(freq[ch]));

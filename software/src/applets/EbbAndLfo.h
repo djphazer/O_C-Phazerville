@@ -164,9 +164,12 @@ public:
       gfxPrint(fold);
       break;
     case OUTPUT_MODES:
-      gfxPrint(0, 56, hemisphere == 0 ? "A:" : "C:");
+      gfxPrint(0, 56, OutputLabel(0));
+      gfxPrint(":");
       gfxPrint(out_labels[output(0)]);
-      gfxPrint(hemisphere == 0 ? " B:" : " D:");
+      gfxPrint(" ");
+      gfxPrint(OutputLabel(1));
+      gfxPrint(":");
       gfxPrint(out_labels[output(1)]);
       break;
     case INPUT_MODES:
@@ -272,9 +275,9 @@ public:
 protected:
     void SetHelp() {
         //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1=Clock 2=Reset";
-        help[HEMISPHERE_HELP_CVS]      = "1,2=Assignable";
-        help[HEMISPHERE_HELP_OUTS]     = "A=OutA  B=OutB";
+        help[HEMISPHERE_HELP_DIGITALS] = "1=Clock / 2=Reset";
+        help[HEMISPHERE_HELP_CVS]      = "Assignable";
+        help[HEMISPHERE_HELP_OUTS]     = "Assignable";
         help[HEMISPHERE_HELP_ENCODER]  = "Select/Edit params";
         //                               "------------------" <-- Size Guide
     }

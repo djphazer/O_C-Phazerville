@@ -123,8 +123,8 @@ protected:
     void SetHelp() {
         //                               "------------------" <-- Size Guide
         help[HEMISPHERE_HELP_DIGITALS] = "";
-        help[HEMISPHERE_HELP_CVS]      = "1,2=Signal";
-        help[HEMISPHERE_HELP_OUTS]     = "A,B=Assignable";
+        help[HEMISPHERE_HELP_CVS]      = "Signal 1 / 2";
+        help[HEMISPHERE_HELP_OUTS]     = "Assignable";
         help[HEMISPHERE_HELP_ENCODER]  = "Assign/Sensitivity";
         //                               "------------------" <-- Size Guide
     }
@@ -144,9 +144,11 @@ private:
     int sensitivity;
 
     void DrawSelector() {
-        gfxPrint(1, 15, hemisphere ? "C:" : "A:");
+        gfxPrint(1, 15, OutputLabel(0));
+        gfxPrint(":");
         gfxPrint(Trending_assignments[assign[0]]);
-        gfxPrint(1, 25, hemisphere ? "D:" : "B:");
+        gfxPrint(1, 25, OutputLabel(1));
+        gfxPrint(":");
         gfxPrint(Trending_assignments[assign[1]]);
         gfxFrame(1, 35, 62, 6);
         int px = Proportion(sensitivity, TRENDING_MAX_SENS, 62);

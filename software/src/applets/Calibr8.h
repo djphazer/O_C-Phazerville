@@ -137,7 +137,7 @@ private:
     void DrawInterface() {
         ForEachChannel(ch) {
             int y = 14 + ch*21;
-            gfxPrint(0, y, ch?"B:":"A:");
+            gfxPrint(0, y, OutputLabel(ch));
 
             int whole = (scale_factor[ch] + CAL8_PRECISION) / 100;
             int decimal = (scale_factor[ch] + CAL8_PRECISION) % 100;

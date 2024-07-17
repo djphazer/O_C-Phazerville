@@ -122,8 +122,7 @@ private:
 
         // Show channel output
         gfxPos(1, 15);
-        if (hemisphere == 0) gfxPrint(ch ? "B" : "A");
-        else gfxPrint(ch ? "D" : "C");
+        gfxPrint(OutputLabel(ch));
         gfxInvert(1, 14, 7, 9);
 
         gfxPrint(10, 15, phase[ch]);

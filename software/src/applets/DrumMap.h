@@ -276,10 +276,12 @@ private:
     
     void DrawInterface() {
         // output selection
-        gfxPrint(1,15,"A:");
+        char outlabel[] = { (char)('A' + io_offset), ':', '\0' };
+        gfxPrint(1,15, outlabel);
         gfxIcon(15,15, (pulse_animation[0] > 0)? MODE_PULSE_ICON[mode[0]] : MODE_ICONS[mode[0]] );
 
-        gfxPrint(32,15,"B:");
+        ++outlabel[0];
+        gfxPrint(32,15, outlabel);
         if (mode[1] == 3) {
             // accent
             gfxIcon(46,15,MODE_ICONS[mode[0]]);

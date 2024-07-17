@@ -148,9 +148,7 @@ private:
         // Second and third lines: Outputs
         ForEachChannel(ch)
         {
-            byte o = 'A' + static_cast<char>(ch);
-            if (hemisphere) o += 2;
-            char out_name[3] = {o, ':', '\0'};
+            char out_name[3] = {OutputLabel(ch)[0], ':', '\0'};
             gfxPrint(1, 25 + (ch * 10), out_name);
             gfxPrint(enigma_type_short_names[output[ch].type()]);
         }

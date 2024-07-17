@@ -65,6 +65,9 @@ public:
     static int cursor_countdown[APPLET_SLOTS];
 
     virtual const char* applet_name() = 0; // Maximum of 9 characters
+    const char* const OutputLabel(int ch) {
+      return OC::Strings::capital_letters[ch + io_offset];
+    }
 
     virtual void Start() = 0;
     virtual void Controller() = 0;

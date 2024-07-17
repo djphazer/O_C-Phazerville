@@ -79,9 +79,9 @@ public:
 
 protected:
     void SetHelp() {
-        help[HEMISPHERE_HELP_DIGITALS] = "1=Clock/Gate";
+        help[HEMISPHERE_HELP_DIGITALS] = "Clock / Gate";
         help[HEMISPHERE_HELP_CVS] = "1=p Mod";
-        help[HEMISPHERE_HELP_OUTS] = "A,B=Clock/Gate";
+        help[HEMISPHERE_HELP_OUTS] = "Clock / Gate";
         help[HEMISPHERE_HELP_ENCODER] = "Set p";
     }
 
@@ -94,12 +94,13 @@ private:
         // Show the probability in the middle
         gfxPrint(1, 15, "p=");
         gfxPrint(15 + pad(100, p_mod), 15, p_mod);
-        gfxPrint(33, 15, hemisphere ? "%  C" : "%  A");
+        gfxPrint(33, 15, "%  ");
+        gfxPrint(OutputLabel(0));
         gfxCursor(15, 23, 18);
         if (p != p_mod) gfxIcon(39, 12, CV_ICON);
 
-        gfxPrint(12, 45, hemisphere ? "C" : "A");
-        gfxPrint(44, 45, hemisphere ? "D" : "B");
+        gfxPrint(12, 45, OutputLabel(0));
+        gfxPrint(44, 45, OutputLabel(1));
         gfxFrame(9 + (32 * choice), 42, 13, 13);
 	}
 };
