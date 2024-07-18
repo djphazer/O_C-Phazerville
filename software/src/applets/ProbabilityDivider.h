@@ -191,15 +191,19 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1=Clock  2=Reset";
-        help[HEMISPHERE_HELP_CVS]      = "1=Length 2=Reseed";
-        help[HEMISPHERE_HELP_OUTS]     = "A=Div    B=Skips";
-        help[HEMISPHERE_HELP_ENCODER]  = "Weights/Loop";
-        //                               "------------------" <-- Size Guide
-    }
-    
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "Clock";
+    help[HELP_DIGITAL2] = "Reset";
+    help[HELP_CV1]      = "Length";
+    help[HELP_CV2]      = "Reseed";
+    help[HELP_OUT1]     = "Div";
+    help[HELP_OUT2]     = "Skips";
+    help[HELP_EXTRA1] = "Set: Weights / Loop";
+    help[HELP_EXTRA2] = "";
+    //                  "---------------------" <-- Extra text size guide
+  }
+
 private:
     int cursor; // ProbDivCursor 
     int weight_1;

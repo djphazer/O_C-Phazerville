@@ -151,15 +151,19 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1=Clock 2=Reset";
-        help[HEMISPHERE_HELP_CVS]      = "1=X 2=Y";
-        help[HEMISPHERE_HELP_OUTS]     = "A=Quant B=(XY)/5V";
-        help[HEMISPHERE_HELP_ENCODER]  = "Note/Chord/Trnspos";
-        //                               "------------------" <-- Size Guide
-    }
-    
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "Clock";
+    help[HELP_DIGITAL2] = "Reset";
+    help[HELP_CV1]      = "X";
+    help[HELP_CV2]      = "Y";
+    help[HELP_OUT1]     = "Pitch";
+    help[HELP_OUT2]     = "X*Y/5V";
+    help[HELP_EXTRA1] = "";
+    help[HELP_EXTRA2] = "";
+    //                  "---------------------" <-- Extra text size guide
+  }
+
 private:
     int cursor; // CarpeggioCursor
 

@@ -146,15 +146,19 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1=Clock 2=Reset";
-        help[HEMISPHERE_HELP_CVS]      = "Rec: 1=Tr1 2=Tr2";
-        help[HEMISPHERE_HELP_OUTS]     = "Play: A=Tr1 B=Tr2";
-        help[HEMISPHERE_HELP_ENCODER]  = "Range/Smooth/Rec";
-        //                               "------------------" <-- Size Guide
-    }
-    
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "Clock";
+    help[HELP_DIGITAL2] = "Reset";
+    help[HELP_CV1]      = "Rec 1";
+    help[HELP_CV2]      = "Rec 2";
+    help[HELP_OUT1]     = "Play 1";
+    help[HELP_OUT2]     = "Play 2";
+    help[HELP_EXTRA1] = "";
+    help[HELP_EXTRA2] = "";
+    //                  "---------------------" <-- Extra text size guide
+  }
+
 private:
     int cursor; // 0=Start 1=End 2=Smooth 3=Record Mode
     SegmentDisplay segment;

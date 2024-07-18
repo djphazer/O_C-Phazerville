@@ -103,15 +103,19 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1=Clock 2=ScaleSel";
-        help[HEMISPHERE_HELP_CVS]      = "1=CV    2=Unclock";
-        help[HEMISPHERE_HELP_OUTS]     = "A=Pitch B=Trig";
-        help[HEMISPHERE_HELP_ENCODER]  = "T=Note P=Toggle";
-        //                               "------------------" <-- Size Guide
-    }
-    
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "S&H Clk";
+    help[HELP_DIGITAL2] = "Scale2";
+    help[HELP_CV1]      = "CV";
+    help[HELP_CV2]      = "Unclock";
+    help[HELP_OUT1]     = "Pitch";
+    help[HELP_OUT2]     = "Trig";
+    help[HELP_EXTRA1] = "Trig fires when";
+    help[HELP_EXTRA2] = "pitch changes";
+    //                  "---------------------" <-- Extra text size guide
+  }
+
 private:
     uint16_t mask[2];
     uint8_t cursor; // 0-11=Scale 1; 12-23=Scale 2

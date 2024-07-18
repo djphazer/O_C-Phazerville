@@ -72,15 +72,19 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1=Bit 3 2=Bit 2";
-        help[HEMISPHERE_HELP_CVS]      = "1=Bit 1 2=Bit 0";
-        help[HEMISPHERE_HELP_OUTS]     = "A=Binary B=Count";
-        help[HEMISPHERE_HELP_ENCODER]  = "";
-        //                               "------------------" <-- Size Guide
-    }
-    
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "Bit 3";
+    help[HELP_DIGITAL2] = "Bit 2";
+    help[HELP_CV1]      = "Bit 1";
+    help[HELP_CV2]      = "Bit 0";
+    help[HELP_OUT1]     = "Binary";
+    help[HELP_OUT2]     = "Count";
+    help[HELP_EXTRA1] = "";
+    help[HELP_EXTRA2] = "";
+    //                  "---------------------" <-- Extra text size guide
+  }
+
 private:
     bool bit[4];
     const int CVal = HEMISPHERE_MAX_CV / 4; // One-fourth of the count

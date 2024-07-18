@@ -219,19 +219,24 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1=Clock   2=Reset";
-        help[HEMISPHERE_HELP_CVS]      = "Assignable";
-        help[HEMISPHERE_HELP_OUTS]     = "A=Part A  B=Part B";
-        help[HEMISPHERE_HELP_ENCODER]  = "Params/Config";
-        //                               "------------------" <-- Size Guide
-    }
-    
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "Clock";
+    help[HELP_DIGITAL2] = "Reset";
+    help[HELP_CV1]      = cv_mode & 0x01 ? "X" : "Fill 1";
+    help[HELP_CV2]      = (cv_mode == 0 ? "Fill 2" : (cv_mode == 1 ? "Y" : "Chaos"));
+    help[HELP_OUT1]     = OUT_MODE_NAMES[mode[0]];
+    help[HELP_OUT2]     = OUT_MODE_NAMES[mode[1]];
+    help[HELP_EXTRA1] = "";
+    help[HELP_EXTRA2] = "";
+    //                  "---------------------" <-- Extra text size guide
+  }
+
 private:
     const uint8_t *MODE_ICONS[3] = {BD_ICON,SN_ICON,HH_ICON};
     const uint8_t *MODE_PULSE_ICON[3] = {BD_HIT_ICON,SN_HIT_ICON,HH_HIT_ICON};
-    const char *CV_MODE_NAMES[3] = {"FILL A/B", "X/Y", "FA/CHAOS"};
+    const char * const CV_MODE_NAMES[3] = {"FILL 1/2", "X/Y", "FA/CHAOS"};
+    const char * const OUT_MODE_NAMES[4] = {"Kick", "Snare", "HiHat", "Accent"};
     const int *VALUE_MAP[5] = {&fill[0], &fill[1], &x, &y, &chaos};
     int cursor = 0;
     uint8_t step;

@@ -125,15 +125,19 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1=Pause 2= Fb=100";
-        help[HEMISPHERE_HELP_CVS]      = "1=Audio 2=RateMod";
-        help[HEMISPHERE_HELP_OUTS]     = "A=Audio B=Reverse";
-        help[HEMISPHERE_HELP_ENCODER]  = "Time/Fbk/Rate/Bits";
-        //                               "------------------" <-- Size Guide
-    }
-    
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "Pause";
+    help[HELP_DIGITAL2] = "FB=100";
+    help[HELP_CV1]      = "Signal";
+    help[HELP_CV2]      = "RateMod";
+    help[HELP_OUT1]     = "Signal";
+    help[HELP_OUT2]     = "Reverse";
+    help[HELP_EXTRA1] = "Set: Time / Feedback";
+    help[HELP_EXTRA2] = "SamplRate / Bitcrush";
+    //                  "---------------------" <-- Extra text size guide
+  }
+
 private:
     bool play = 0; //play always on unless gated on Digital 1
     uint16_t head = 0; // Location of read/play head

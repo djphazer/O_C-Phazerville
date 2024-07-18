@@ -68,15 +68,19 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "";
-        help[HEMISPHERE_HELP_CVS]      = "1,2 Signals";
-        help[HEMISPHERE_HELP_OUTS]     = "A=Mix Out B=Comp";
-        help[HEMISPHERE_HELP_ENCODER]  = "Balance";
-        //                               "------------------" <-- Size Guide
-    }
-    
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "";
+    help[HELP_DIGITAL2] = "";
+    help[HELP_CV1]      = "Sig 1";
+    help[HELP_CV2]      = "Sig 2";
+    help[HELP_OUT1]     = "Mix 1+2";
+    help[HELP_OUT2]     = "Mix 2+1";
+    help[HELP_EXTRA1] = "Set: Balance";
+    help[HELP_EXTRA2] = "";
+    //                  "---------------------" <-- Extra text size guide
+  }
+
 private:
     int cursor;
     int balance;

@@ -77,13 +77,19 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        help[HEMISPHERE_HELP_DIGITALS] = "Clock Ch1, Ch2";
-        help[HEMISPHERE_HELP_CVS]      = "p Mod Ch1, Ch2";
-        help[HEMISPHERE_HELP_OUTS]     = "Clock Ch1, Ch2";
-        help[HEMISPHERE_HELP_ENCODER]  = "Set p";
-    }
-    
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "Clock1";
+    help[HELP_DIGITAL2] = "Clock2";
+    help[HELP_CV1]      = "p Ch1";
+    help[HELP_CV2]      = "p Ch2";
+    help[HELP_OUT1]     = "Clock1";
+    help[HELP_OUT2]     = "Clock2";
+    help[HELP_EXTRA1] = "";
+    help[HELP_EXTRA2] = "";
+    //                  "---------------------" <-- Extra text size guide
+  }
+
 private:
     int16_t p[2];
     int16_t p_mod[2];

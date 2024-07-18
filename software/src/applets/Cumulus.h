@@ -139,14 +139,18 @@ public:
     }
 
 protected:
-    void SetHelp() {
-    //                                    "------------------" <-- Size Guide      
-        help[HEMISPHERE_HELP_DIGITALS] =  "1=Clock 2=Rand Z";
-        help[HEMISPHERE_HELP_CVS] =       "1=a mod 2=k mod";
-        help[HEMISPHERE_HELP_OUTS] =      "Assignable";
-        help[HEMISPHERE_HELP_ENCODER] =   "Select/Push 2 Edit";
-    //                                    "------------------" <-- Size Guide       
-    }
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "Clock";
+    help[HELP_DIGITAL2] = "Rand Z";
+    help[HELP_CV1]      = "a mod";
+    help[HELP_CV2]      = "k mod";
+    help[HELP_OUT1]     = "Assign";
+    help[HELP_OUT2]     = "Assign";
+    help[HELP_EXTRA1] = "";
+    help[HELP_EXTRA2] = "";
+    //                  "---------------------" <-- Extra text size guide
+  }
 
 private:
     int cursor;

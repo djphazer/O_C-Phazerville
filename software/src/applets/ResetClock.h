@@ -116,15 +116,19 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "Clock, Reset";
-        help[HEMISPHERE_HELP_CVS]      = "1=Offset";
-        help[HEMISPHERE_HELP_OUTS]     = "Clock, Reset";
-        help[HEMISPHERE_HELP_ENCODER]  = "Len/Offst/Spac/Pos";
-        //                               "------------------" <-- Size Guide
-    }
-    
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "Clock";
+    help[HELP_DIGITAL2] = "Reset";
+    help[HELP_CV1]      = "Offset";
+    help[HELP_CV2]      = "";
+    help[HELP_OUT1]     = "Advance";
+    help[HELP_OUT2]     = "Trigger";
+    help[HELP_EXTRA1] = " 2nd trigger fires";
+    help[HELP_EXTRA2] = "when seq step settles";
+    //                  "---------------------" <-- Extra text size guide
+  }
+
 private:
     int cursor;
     int ticks_since_clock;

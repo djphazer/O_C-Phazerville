@@ -117,15 +117,19 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1=Clock";
-        help[HEMISPHERE_HELP_CVS]      = "1,2=Pitch inputs";
-        help[HEMISPHERE_HELP_OUTS]     = "A,B=Pitch outputs";
-        help[HEMISPHERE_HELP_ENCODER]  = "Scale/Offset/Trans";
-        //                               "------------------" <-- Size Guide
-    }
-    
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "Clock";
+    help[HELP_DIGITAL2] = "";
+    help[HELP_CV1]      = "Input1";
+    help[HELP_CV2]      = "Input2";
+    help[HELP_OUT1]     = "Pitch1";
+    help[HELP_OUT2]     = "Pitch2";
+    help[HELP_EXTRA1] = "";
+    help[HELP_EXTRA2] = "";
+    //                  "---------------------" <-- Extra text size guide
+  }
+
 private:
     int cursor;
     bool clocked_mode = false;

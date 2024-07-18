@@ -102,14 +102,18 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "2=Mix A&B";
-        help[HEMISPHERE_HELP_CVS]      = "CV Inputs 1,2";
-        help[HEMISPHERE_HELP_OUTS]     = "Outputs A,B";
-        help[HEMISPHERE_HELP_ENCODER]  = "Offset V / Level %";
-        //                               "------------------" <-- Size Guide
-    }
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "";
+    help[HELP_DIGITAL2] = "Mix 1+2";
+    help[HELP_CV1]      = "CV Ch1";
+    help[HELP_CV2]      = "CV Ch2";
+    help[HELP_OUT1]     = "Out1";
+    help[HELP_OUT2]     = "Out2";
+    help[HELP_EXTRA1] = "V Offset in semitones";
+    help[HELP_EXTRA2] = "  +/-200% attenuvert";
+    //                  "---------------------" <-- Extra text size guide
+  }
     
 private:
     int cursor;

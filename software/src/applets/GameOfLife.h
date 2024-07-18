@@ -67,14 +67,18 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1=Clock 2=Draw";
-        help[HEMISPHERE_HELP_CVS]      = "1=X pos 2=Y pos";
-        help[HEMISPHERE_HELP_OUTS]     = "A=Global B=Local";
-        help[HEMISPHERE_HELP_ENCODER]  = "T=Weight P=Clear";
-        //                               "------------------" <-- Size Guide
-    }
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "Clock";
+    help[HELP_DIGITAL2] = "Draw";
+    help[HELP_CV1]      = "X pos";
+    help[HELP_CV2]      = "Y pos";
+    help[HELP_OUT1]     = "Global";
+    help[HELP_OUT2]     = "Local";
+    help[HELP_EXTRA1] = "Set: Weight";
+    help[HELP_EXTRA2] = "Push to Clear";
+    //                  "---------------------" <-- Extra text size guide
+  }
 
 private:
     uint64_t board[80]; // 64x40 board

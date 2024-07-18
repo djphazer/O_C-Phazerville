@@ -121,15 +121,19 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1=Clock 2=Brush";
-        help[HEMISPHERE_HELP_CVS]      = "Mod 1=Compose 2=De";
-        help[HEMISPHERE_HELP_OUTS]     = "A=Output B=Trigger";
-        help[HEMISPHERE_HELP_ENCODER]  = "Comp/Decomp/Length";
-        //                               "------------------" <-- Size Guide
-    }
-    
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "Clock";
+    help[HELP_DIGITAL2] = "Brush";
+    help[HELP_CV1]      = "Compose";
+    help[HELP_CV2]      = "Decomp";
+    help[HELP_OUT1]     = "Output";
+    help[HELP_OUT2]     = "Trigger";
+    help[HELP_EXTRA1] = "Set: Compose / Decomp";
+    help[HELP_EXTRA2] = "     Length";
+    //                  "---------------------" <-- Extra text size guide
+  }
+
 private:
     int accent[16]; // Accent data
     int step;

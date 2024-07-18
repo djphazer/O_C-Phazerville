@@ -114,14 +114,18 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1=Clock 2=Freeze";
-        help[HEMISPHERE_HELP_CVS]      = "1=CV 2=Mod index";
-        help[HEMISPHERE_HELP_OUTS]     = "Outputs";
-        help[HEMISPHERE_HELP_ENCODER]  = "Index/Scale";
-        //                               "------------------" <-- Size Guide
-    }
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "Clock";
+    help[HELP_DIGITAL2] = "Freeze";
+    help[HELP_CV1]      = "CV";
+    help[HELP_CV2]      = "Index";
+    help[HELP_OUT1]     = "Out";
+    help[HELP_OUT2]     = "Out";
+    help[HELP_EXTRA1] = "Can be linked with a";
+    help[HELP_EXTRA2] = "shared buffer.";
+    //                  "---------------------" <-- Extra text size guide
+  }
     
 private:
     int cursor;

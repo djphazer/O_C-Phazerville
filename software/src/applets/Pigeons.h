@@ -132,15 +132,19 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "Clock  1,2";
-        help[HEMISPHERE_HELP_CVS]      = "Modulo 1,2";
-        help[HEMISPHERE_HELP_OUTS]     = "Pitch  1,2";
-        help[HEMISPHERE_HELP_ENCODER]  = "Params";
-        //                               "------------------" <-- Size Guide
-    }
-    
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "Clock 1";
+    help[HELP_DIGITAL2] = "Clock 2";
+    help[HELP_CV1]      = "Modulo1";
+    help[HELP_CV2]      = "Modulo2";
+    help[HELP_OUT1]     = "Pitch 1";
+    help[HELP_OUT2]     = "Pitch 2";
+    help[HELP_EXTRA1] = "Set: Notes / Modulus";
+    help[HELP_EXTRA2] = " Quantizer (Aux=Edit)";
+    //                  "---------------------" <-- Extra text size guide
+  }
+
 private:
     int cursor;
     struct Pigeon {

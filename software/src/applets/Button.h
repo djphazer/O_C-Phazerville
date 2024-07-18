@@ -90,16 +90,19 @@ public:
     }
 
 protected:
-    /* Set help text. Each help section can have up to 18 characters. Be concise! */
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1,2=Press Button";
-        help[HEMISPHERE_HELP_CVS]      = "";
-        help[HEMISPHERE_HELP_OUTS]     = "A,B=Trig/Gate Out";
-        help[HEMISPHERE_HELP_ENCODER]  = "T=Config P=Button";
-        //                               "------------------" <-- Size Guide
-    }
-    
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = gate_mode[0] ? "Toggle" : "Trig";
+    help[HELP_DIGITAL2] = gate_mode[1] ? "Toggle" : "Trig";
+    help[HELP_CV1]      = "";
+    help[HELP_CV2]      = "";
+    help[HELP_OUT1]     = gate_mode[0] ? "Gate" : "Trig";
+    help[HELP_OUT2]     = gate_mode[1] ? "Gate" : "Trig";
+    help[HELP_EXTRA1] = "";
+    help[HELP_EXTRA2] = "";
+    //                  "---------------------" <-- Extra text size guide
+  }
+
 private:
     bool trigger_out[2] = {0,0}; // Trigger output queue (output A/C)
     bool toggle_st[2] = {0,0}; // Toggle state (output B/D)

@@ -132,10 +132,16 @@ public:
 
 protected:
   void SetHelp() {
-    help[HEMISPHERE_HELP_DIGITALS] = "S&H Sig, S&H Wgt";
-    help[HEMISPHERE_HELP_CVS] = "Signal, Weight";
-    help[HEMISPHERE_HELP_OUTS] = "Sig Thru, Scl Deg";
-    help[HEMISPHERE_HELP_ENCODER] = "Scale, Root, Mask";
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "S&H Sig";
+    help[HELP_DIGITAL2] = "S&H Wgt";
+    help[HELP_CV1]      = "Signal";
+    help[HELP_CV2]      = "Weight";
+    help[HELP_OUT1]     = "SigThru";
+    help[HELP_OUT2]     = "Scl Deg";
+    help[HELP_EXTRA1] = "";
+    help[HELP_EXTRA2] = "";
+    //                  "---------------------" <-- Extra text size guide
   }
 
 private:

@@ -70,15 +70,19 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "";
-        help[HEMISPHERE_HELP_CVS]      = "1=CV1 2=Mod Level";
-        help[HEMISPHERE_HELP_OUTS]     = "A=CV1>Lv B=Lv>=CV1";
-        help[HEMISPHERE_HELP_ENCODER]  = "Set Level";
-        //                               "------------------" <-- Size Guide
-    }
-    
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "";
+    help[HELP_DIGITAL2] = "";
+    help[HELP_CV1]      = "CV";
+    help[HELP_CV2]      = "Mod";
+    help[HELP_OUT1]     = "CV>Mod";
+    help[HELP_OUT2]     = "MOD>=CV";
+    help[HELP_EXTRA1] = "";
+    help[HELP_EXTRA2] = "";
+    //                  "---------------------" <-- Extra text size guide
+  }
+
 private:
     int level;
     int mod_cv; // Modified CV used in comparison

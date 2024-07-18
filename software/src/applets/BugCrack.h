@@ -310,14 +310,18 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "trigger 1=ki 2=sn";
-        help[HEMISPHERE_HELP_CVS]      = "cv in   1=ki 2=sn";
-        help[HEMISPHERE_HELP_OUTS]     = "output  1=ki 2=sn";
-        help[HEMISPHERE_HELP_ENCODER]  = "preset/pan";
-        //                               "------------------" <-- Size Guide
-    }
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "Kick";
+    help[HELP_DIGITAL2] = "Snare";
+    help[HELP_CV1]      = CV_MODE_NAMES_BD[cv_mode_kick];
+    help[HELP_CV2]      = CV_MODE_NAMES_SN[cv_mode_snare];
+    help[HELP_OUT1]     = "Kick";
+    help[HELP_OUT2]     = mix_outs ? "Kik+Snr" : "Snare";
+    help[HELP_EXTRA1] = "";
+    help[HELP_EXTRA2] = "";
+    //                  "---------------------" <-- Extra text size guide
+  }
 
 private:
     int cursor = 0;

@@ -162,15 +162,19 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1=X Clock 2=Y Clk";
-        help[HEMISPHERE_HELP_CVS]      = "1=Range 2=step";
-        help[HEMISPHERE_HELP_OUTS]     = "RndWalk A=X B=Y";
-        help[HEMISPHERE_HELP_ENCODER]  = "T=Set P=Select";
-        //                               "------------------" <-- Size Guide
-    }
-    
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "X Clock";
+    help[HELP_DIGITAL2] = "Y Clock";
+    help[HELP_CV1]      = "Range";
+    help[HELP_CV2]      = "Step";
+    help[HELP_OUT1]     = "X";
+    help[HELP_OUT2]     = "Y";
+    help[HELP_EXTRA1] = "";
+    help[HELP_EXTRA2] = "";
+    //                  "---------------------" <-- Extra text size guide
+  }
+
 private:
     // Parameters (saved in EEPROM)
     bool yClkSrc = 0; // 0=TR1, 1=TR2

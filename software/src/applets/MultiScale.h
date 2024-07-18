@@ -118,15 +118,19 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1=Clock  2=Unclock";
-        help[HEMISPHERE_HELP_CVS]      = "1=CV     2=Scale";
-        help[HEMISPHERE_HELP_OUTS]     = "A=Pitch  B=Gate";
-        help[HEMISPHERE_HELP_ENCODER]  = "Edit Scales";
-        //                               "------------------" <-- Size Guide
-    }
-    
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "Clock";
+    help[HELP_DIGITAL2] = "UnClock";
+    help[HELP_CV1]      = "CV";
+    help[HELP_CV2]      = "Scale";
+    help[HELP_OUT1]     = "Pitch";
+    help[HELP_OUT2]     = "Trig";
+    help[HELP_EXTRA1] = "Trig fires when";
+    help[HELP_EXTRA2] = "  scale changes";
+    //                  "---------------------" <-- Extra text size guide
+  }
+
 private:
     int cursor = 0;
     bool continuous = true;

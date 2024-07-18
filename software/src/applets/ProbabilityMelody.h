@@ -163,15 +163,19 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1=ClockA 2=ClockB";
-        help[HEMISPHERE_HELP_CVS]      = "1=LowRng 2=HighRng";
-        help[HEMISPHERE_HELP_OUTS]     = "A,B=Pitch out";
-        help[HEMISPHERE_HELP_ENCODER]  = "Push to edit value";
-        //                               "------------------" <-- Size Guide
-    }
-    
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "Clock 1";
+    help[HELP_DIGITAL2] = "Clock 2";
+    help[HELP_CV1]      = "Lower";
+    help[HELP_CV2]      = "Upper";
+    help[HELP_OUT1]     = "Pitch 1";
+    help[HELP_OUT2]     = "Pitch 2";
+    help[HELP_EXTRA1] = "Set: Range bounds /";
+    help[HELP_EXTRA2] = "     Note weights";
+    //                  "---------------------" <-- Extra text size guide
+  }
+
 private:
     int cursor; // ProbMeloCursor 
     int weights[12] = {10,0,0,2,0,0,0,2,0,0,4,0};

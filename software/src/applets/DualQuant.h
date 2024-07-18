@@ -93,14 +93,19 @@ public:
     }
 
 protected:
-    /* Set help text. Each help section can have up to 18 characters. Be concise! */
-    void SetHelp() {
-        help[HEMISPHERE_HELP_DIGITALS] = "Clock 1=Ch1 2=Ch2";
-        help[HEMISPHERE_HELP_CVS] = "CV 1=Ch1 2=Ch2";
-        help[HEMISPHERE_HELP_OUTS] = "Pitch A=Ch1 B=Ch2";
-        help[HEMISPHERE_HELP_ENCODER] = "Scale/Root";
-    }
-    
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "Clock 1";
+    help[HELP_DIGITAL2] = "Clock 2";
+    help[HELP_CV1]      = "CV Ch1";
+    help[HELP_CV2]      = "CV Ch2";
+    help[HELP_OUT1]     = "Pitch 1";
+    help[HELP_OUT2]     = "Pitch 2";
+    help[HELP_EXTRA1] = "Set: Scale / Root";
+    help[HELP_EXTRA2] = "     per channel";
+    //                  "---------------------" <-- Extra text size guide
+  }
+
 private:
     int last_note[2]; // Last quantized note
     bool continuous[2]; // Each channel starts as continuous and becomes clocked when a clock is received

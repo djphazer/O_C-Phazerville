@@ -140,15 +140,19 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "Clk 1=BPM 2=Cycle1";
-        help[HEMISPHERE_HELP_CVS]      = "1=CV1 2=CV2";
-        help[HEMISPHERE_HELP_OUTS]     = "A=CV1 B=CV2";
-        help[HEMISPHERE_HELP_ENCODER]  = "T=Value P=Setting";
-        //                               "------------------" <-- Size Guide
-    }
-    
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "BPM";
+    help[HELP_DIGITAL2] = "Cycle";
+    help[HELP_CV1]      = "CV 1";
+    help[HELP_CV2]      = "CV 2";
+    help[HELP_OUT1]     = "CV 1";
+    help[HELP_OUT2]     = "CV 2";
+    help[HELP_EXTRA1] = "";
+    help[HELP_EXTRA2] = "";
+    //                  "---------------------" <-- Extra text size guide
+  }
+
 private:
     // BPM Calcultion
     int last_bpm_tick;

@@ -176,15 +176,19 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1=Clock 2=Burst";
-        help[HEMISPHERE_HELP_CVS]      = "1=Number 2=Spacing";
-        help[HEMISPHERE_HELP_OUTS]     = "A=Burst B=Gate";
-        help[HEMISPHERE_HELP_ENCODER]  = "Number/Spacing/Div";
-        //                               "------------------" <-- Size Guide
-    }
-    
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "Clock";
+    help[HELP_DIGITAL2] = "Burst";
+    help[HELP_CV1]      = "Number";
+    help[HELP_CV2]      = "Spacing";
+    help[HELP_OUT1]     = "Burst";
+    help[HELP_OUT2]     = "Gate";
+    help[HELP_EXTRA1] = "";
+    help[HELP_EXTRA2] = "";
+    //                  "---------------------" <-- Extra text size guide
+  }
+
 private:
     int cursor; // Number and Spacing
     int burst_countdown; // Number of ticks to the next expected burst

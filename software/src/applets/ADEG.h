@@ -123,14 +123,18 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1=Trg 2=Trg Revers";
-        help[HEMISPHERE_HELP_CVS]      = "1=A mod 2=D mod";
-        help[HEMISPHERE_HELP_OUTS]     = "A=Output B=EOC";
-        help[HEMISPHERE_HELP_ENCODER]  = "Attack/Decay";
-        //                               "------------------" <-- Size Guide
-    }
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "Trigger";
+    help[HELP_DIGITAL2] = "Reverse";
+    help[HELP_CV1]      = "Attack";
+    help[HELP_CV2]      = "Decay";
+    help[HELP_OUT1]     = "Output";
+    help[HELP_OUT2]     = "EOC";
+    help[HELP_EXTRA1] = "";
+    help[HELP_EXTRA2] = "";
+    //                  "---------------------" <-- Extra text size guide
+  }
     
 private:
     simfloat signal; // Current signal level for each channel

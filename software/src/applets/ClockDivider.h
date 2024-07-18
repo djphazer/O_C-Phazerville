@@ -147,12 +147,18 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        help[HEMISPHERE_HELP_DIGITALS] = "1=Clock 2=Reset";
-        help[HEMISPHERE_HELP_CVS] = "Div/Mult Ch1,Ch2";
-        help[HEMISPHERE_HELP_OUTS] = "Clk A=Ch1 B=Ch2";
-        help[HEMISPHERE_HELP_ENCODER] = "Div,Mult";
-    }
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "Clock";
+    help[HELP_DIGITAL2] = "Reset";
+    help[HELP_CV1]      = "Ch1";
+    help[HELP_CV2]      = "Ch2";
+    help[HELP_OUT1]     = "Clock";
+    help[HELP_OUT2]     = "Clock";
+    help[HELP_EXTRA1] = "CV inputs modulate";
+    help[HELP_EXTRA2] = "1st multiplier per Ch";
+    //                  "---------------------" <-- Extra text size guide
+  }
 
 private:
     int div[2] = {1, 2}; // Division setting before modulation.
@@ -165,7 +171,7 @@ private:
         {
             const int y = 15 + (ch * 24);
 
-            gfxPrint(1, y, OC::Strings::capital_letters[ch+hemisphere*2]);
+            gfxPrint(1, y, OutputLabel(ch));
             ForEachChannel(d) {
               const int s = divmult[ch*2 + d].steps;
 

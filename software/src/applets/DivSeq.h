@@ -194,15 +194,19 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1=Clock  2=Reset";
-        help[HEMISPHERE_HELP_CVS]      = "1=XOR    2=XOR";
-        help[HEMISPHERE_HELP_OUTS]     = "A=Trig   B=Trig";
-        help[HEMISPHERE_HELP_ENCODER]  = "Division per step";
-        //                               "------------------" <-- Size Guide
-    }
-    
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "Clock";
+    help[HELP_DIGITAL2] = "Reset";
+    help[HELP_CV1]      = "XOR 1";
+    help[HELP_CV2]      = "XOR 2";
+    help[HELP_OUT1]     = "Trig 1";
+    help[HELP_OUT2]     = "Trig 2";
+    help[HELP_EXTRA1] = "Negative CV engages";
+    help[HELP_EXTRA2] = "cross-channel XOR";
+    //                  "---------------------" <-- Extra text size guide
+  }
+
 private:
     int cursor; // DivSeqCursor 
 

@@ -79,16 +79,19 @@ public:
     }
 
 protected:
-    /* Set help text. Each help section can have up to 18 characters. Be concise! */
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "";
-        help[HEMISPHERE_HELP_CVS]      = "CV Inputs 1,2";
-        help[HEMISPHERE_HELP_OUTS]     = "Gate Ouputs A,B";
-        help[HEMISPHERE_HELP_ENCODER]  = "High/Low Thresh";
-        //                               "------------------" <-- Size Guide
-    }
-    
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "";
+    help[HELP_DIGITAL2] = "";
+    help[HELP_CV1]      = "CV 1";
+    help[HELP_CV2]      = "CV 2";
+    help[HELP_OUT1]     = "Gate 1";
+    help[HELP_OUT2]     = "Gate 2";
+    help[HELP_EXTRA1] = "Set: High/Low Thresh";
+    help[HELP_EXTRA2] = "";
+    //                  "---------------------" <-- Extra text size guide
+  }
+
 private:
     int cursor; // 0 = locked 1 = high threshold, 2 = low threshold
 

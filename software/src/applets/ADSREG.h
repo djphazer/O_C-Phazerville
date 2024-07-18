@@ -180,21 +180,18 @@ public:
     }
 
 protected:
-    /* Set help text. Each help section can have up to 18 characters. Be concise! */
-    void SetHelp() {
-        /*
-        help[HEMISPHERE_HELP_DIGITALS] = "Gate 1=Ch1 2=Ch2";
-        help[HEMISPHERE_HELP_CVS] = "Mod 1=Att 2=Rel";
-        help[HEMISPHERE_HELP_OUTS] = "Amp A=Ch1 B=Ch2";
-        help[HEMISPHERE_HELP_ENCODER] = "A/D/S/R";
-        */
-
-        //-ghostils:Update onboard help:
-        help[HEMISPHERE_HELP_DIGITALS] = "Gate 1=Ch1 2=Ch2";
-        help[HEMISPHERE_HELP_CVS] = "Mod 1=Rel 2=Rel";
-        help[HEMISPHERE_HELP_OUTS] = "Amp A=Ch1 B=Ch2";
-        help[HEMISPHERE_HELP_ENCODER] = "A/D/S/R";
-    }
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "GateCh1";
+    help[HELP_DIGITAL2] = "GateCh2";
+    help[HELP_CV1]      = "Releas1";
+    help[HELP_CV2]      = "Releas2";
+    help[HELP_OUT1]     = "AmpCh1";
+    help[HELP_OUT2]     = "AmpCh2";
+    help[HELP_EXTRA1] = "";
+    help[HELP_EXTRA2] = "";
+    //                  "---------------------" <-- Extra text size guide
+  }
 
 private:
     int edit_stage;

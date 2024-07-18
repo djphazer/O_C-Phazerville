@@ -146,15 +146,19 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1,2 Play";
-        help[HEMISPHERE_HELP_CVS]      = "Atten. 1=BD 2=SD";
-        help[HEMISPHERE_HELP_OUTS]     = "A=Left B=Right";
-        help[HEMISPHERE_HELP_ENCODER]  = "Preset/Pan";
-        //                               "------------------" <-- Size Guide
-    }
-    
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "Trig BD";
+    help[HELP_DIGITAL2] = "Trig SD";
+    help[HELP_CV1]      = "AttenBD";
+    help[HELP_CV2]      = "AttenSD";
+    help[HELP_OUT1]     = "BD";
+    help[HELP_OUT2]     = "SD";
+    help[HELP_EXTRA1] = "";
+    help[HELP_EXTRA2] = "Encoder: Preset/Pan";
+    //                  "---------------------" <-- Extra text size guide
+  }
+
 private:
     int cursor = 0;
     VectorOscillator bass;

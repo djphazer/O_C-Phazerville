@@ -107,15 +107,19 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1=Clock";
-        help[HEMISPHERE_HELP_CVS]      = "1=Shift 2=Organize";
-        help[HEMISPHERE_HELP_OUTS]     = "Assignable";
-        help[HEMISPHERE_HELP_ENCODER]  = "Reg/Prob/Assign";
-        //                               "------------------" <-- Size Guide
-    }
-    
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "Clock";
+    help[HELP_DIGITAL2] = "Reset";
+    help[HELP_CV1]      = "Shift";
+    help[HELP_CV2]      = "Organiz";
+    help[HELP_OUT1]     = enigma_type_short_names[output[0].type()];
+    help[HELP_OUT2]     = enigma_type_short_names[output[1].type()];
+    help[HELP_EXTRA1] = "Set: Register / Prob";
+    help[HELP_EXTRA2] = "     Output Modes";
+    //                  "---------------------" <-- Extra text size guide
+  }
+
 private:
     int cursor; // 0=Reg Select, 1=p, 2=Output A/C, 3=Output B/D
     byte length;

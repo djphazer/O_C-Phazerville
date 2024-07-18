@@ -124,15 +124,19 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "";
-        help[HEMISPHERE_HELP_CVS]      = "Inputs 1,2";
-        help[HEMISPHERE_HELP_OUTS]     = "Follow/Duck";
-        help[HEMISPHERE_HELP_ENCODER]  = "Gain/Assign/Speed";
-        //                               "------------------" <-- Size Guide
-    }
-    
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "";
+    help[HELP_DIGITAL2] = "";
+    help[HELP_CV1]      = "Input 1";
+    help[HELP_CV2]      = "Input 2";
+    help[HELP_OUT1]     = duck[0] ? "Duck 1" : "Follow1";
+    help[HELP_OUT2]     = duck[1] ? "Duck 2" : "Follow2";
+    help[HELP_EXTRA1] = "Set: Gain / Mode";
+    help[HELP_EXTRA2] = "     Speed";
+    //                  "---------------------" <-- Extra text size guide
+  }
+
 private:
     int cursor;
     int max[2];

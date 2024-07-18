@@ -78,12 +78,18 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        help[HEMISPHERE_HELP_DIGITALS] = "Clock / Gate";
-        help[HEMISPHERE_HELP_CVS] = "1=p Mod";
-        help[HEMISPHERE_HELP_OUTS] = "Clock / Gate";
-        help[HEMISPHERE_HELP_ENCODER] = "Set p";
-    }
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "Clk/Gte";
+    help[HELP_DIGITAL2] = "";
+    help[HELP_CV1]      = "p Mod";
+    help[HELP_CV2]      = "";
+    help[HELP_OUT1]     = "Left";
+    help[HELP_OUT2]     = "Right";
+    help[HELP_EXTRA1] = "";
+    help[HELP_EXTRA2] = "Encoder: Set p";
+    //                  "---------------------" <-- Extra text size guide
+  }
 
 private:
 	int p, p_mod;

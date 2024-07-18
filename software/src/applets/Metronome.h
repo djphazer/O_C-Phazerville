@@ -59,15 +59,19 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "";
-        help[HEMISPHERE_HELP_CVS]      = "";
-        help[HEMISPHERE_HELP_OUTS]     = "A=Multiply B=Beat";
-        help[HEMISPHERE_HELP_ENCODER]  = "Tempo";
-        //                               "------------------" <-- Size Guide
-    }
-    
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "";
+    help[HELP_DIGITAL2] = "";
+    help[HELP_CV1]      = "";
+    help[HELP_CV2]      = "";
+    help[HELP_OUT1]     = "Mult";
+    help[HELP_OUT2]     = "Beat";
+    help[HELP_EXTRA1] = "Set: Tempo";
+    help[HELP_EXTRA2] = "";
+    //                  "---------------------" <-- Extra text size guide
+  }
+
 private:
     void DrawInterface() {
         gfxIcon(1, 15, NOTE4_ICON);

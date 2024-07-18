@@ -86,15 +86,19 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "Gate Ch1,2";
-        help[HEMISPHERE_HELP_CVS]      = "Time Mod Ch1,Ch2";
-        help[HEMISPHERE_HELP_OUTS]     = "Delay Ch1,2";
-        help[HEMISPHERE_HELP_ENCODER]  = "Set time";
-        //                               "------------------" <-- Size Guide
-    }
-    
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "Gate 1";
+    help[HELP_DIGITAL2] = "Gate 2";
+    help[HELP_CV1]      = "Time 1";
+    help[HELP_CV2]      = "Time 2";
+    help[HELP_OUT1]     = "Delay 1";
+    help[HELP_OUT2]     = "Delay 2";
+    help[HELP_EXTRA1] = "Set: Time,";
+    help[HELP_EXTRA2] = "     per channel";
+    //                  "---------------------" <-- Extra text size guide
+  }
+
 private:
     uint32_t tape[2][64]; // 63 x 32 = 2016 bits per channel, or 2s at 1ms resolution
     int time[2]; // Length of each channel (in ms)

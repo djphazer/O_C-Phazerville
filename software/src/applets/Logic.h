@@ -101,13 +101,18 @@ public:
     }
 
 protected:
-    /* Set help text. Each help section can have up to 18 characters. Be concise! */
-    void SetHelp() {
-        help[HEMISPHERE_HELP_DIGITALS] = "1=In1, 2=In2";
-        help[HEMISPHERE_HELP_CVS] = "-CV-:1=Op1, 2=Op2";
-        help[HEMISPHERE_HELP_OUTS] = "A=Result1 B=Res2";
-        help[HEMISPHERE_HELP_ENCODER] = "Operation";
-    }
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "In 1";
+    help[HELP_DIGITAL2] = "In 2";
+    help[HELP_CV1]      = operation[0] == HEMISPHERE_NUMBER_OF_LOGIC - 1 ? "Op 1" : " - ";
+    help[HELP_CV2]      = operation[1] == HEMISPHERE_NUMBER_OF_LOGIC - 1 ? "Op 2" : " - ";
+    help[HELP_OUT1]     = op_name[operation[0]];
+    help[HELP_OUT2]     = op_name[operation[1]];
+    help[HELP_EXTRA1] = "Set: Operator";
+    help[HELP_EXTRA2] = "";
+    //                  "---------------------" <-- Extra text size guide
+  }
     
 private:
     const char* op_name[HEMISPHERE_NUMBER_OF_LOGIC] = {"AND", "OR", "XOR", "NAND", "NOR", "XNOR", "-CV-"};

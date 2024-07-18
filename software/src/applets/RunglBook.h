@@ -72,15 +72,19 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1=Clock 2=Freeze";
-        help[HEMISPHERE_HELP_CVS]      = "1=Signal";
-        help[HEMISPHERE_HELP_OUTS]     = "A=Rungle B=Alt";
-        help[HEMISPHERE_HELP_ENCODER]  = "Threshold";
-        //                               "------------------" <-- Size Guide
-    }
-    
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "Clock";
+    help[HELP_DIGITAL2] = "Freeze";
+    help[HELP_CV1]      = "Signal";
+    help[HELP_CV2]      = "";
+    help[HELP_OUT1]     = "Rungle";
+    help[HELP_OUT2]     = "Alt";
+    help[HELP_EXTRA1] = "Set: Threshold";
+    help[HELP_EXTRA2] = "";
+    //                  "---------------------" <-- Extra text size guide
+  }
+
 private:
     byte reg;
     uint16_t threshold;

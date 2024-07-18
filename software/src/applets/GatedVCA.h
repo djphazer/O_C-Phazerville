@@ -64,13 +64,19 @@ public:
     }
 
 protected:
-    void SetHelp() {
-        help[HEMISPHERE_HELP_DIGITALS] = "1=A Gate 2=B Revrs";
-        help[HEMISPHERE_HELP_CVS] = "1=CV signal 2=Amp";
-        help[HEMISPHERE_HELP_OUTS] = "A=Norm off B=N. on";
-        help[HEMISPHERE_HELP_ENCODER] = "T=Amp CV Offset";
-    }
-    
+  void SetHelp() {
+    //                    "-------" <-- Label size guide
+    help[HELP_DIGITAL1] = "Gate 1";
+    help[HELP_DIGITAL2] = "Mute 2";
+    help[HELP_CV1]      = "Signal";
+    help[HELP_CV2]      = "Amp";
+    help[HELP_OUT1]     = "Closed";
+    help[HELP_OUT2]     = "Open";
+    help[HELP_EXTRA1] = "Set: Amp offset";
+    help[HELP_EXTRA2] = "";
+    //                  "---------------------" <-- Extra text size guide
+  }
+
 private:
     int amp_offset_pct; // Offset as percentage of max cv
     int amp_offset_cv; // Raw CV offset; calculated on encoder move
