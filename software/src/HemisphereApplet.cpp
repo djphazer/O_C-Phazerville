@@ -4,6 +4,7 @@ HS::IOFrame HS::frame;
 HS::ClockManager HS::clock_m;
 
 int HemisphereApplet::cursor_countdown[APPLET_SLOTS];
+const char* HemisphereApplet::help[HELP_LABEL_COUNT];
 
 void HemisphereApplet::BaseController() {
     // I moved the IO-related stuff to the parent HemisphereManager app.

@@ -63,6 +63,13 @@ using namespace HS;
 class HemisphereApplet {
 public:
     static int cursor_countdown[APPLET_SLOTS];
+    static const char* help[HELP_LABEL_COUNT];
+    static constexpr const char* const default_help[HELP_LABEL_COUNT] = {
+      "Clock", "Reset",
+      "CV1", "CV2",
+      "Out1", "Out2",
+      "", "",
+    };
 
     virtual const char* applet_name() = 0; // Maximum of 9 characters
     const char* const OutputLabel(int ch) {
@@ -104,6 +111,7 @@ public:
 
     /* Formerly Help Screen */
     virtual void DrawFullScreen() {
+        for (int i=0; i<HELP_LABEL_COUNT; ++i) help[i] = default_help[i];
         SetHelp();
         const bool clockrun = HS::clock_m.IsRunning();
 
@@ -399,10 +407,6 @@ public:
 protected:
     HEM_SIDE hemisphere; // Which hemisphere (0, 1, ...) this applet uses
     bool isEditing = false; // modal editing toggle
-    const char* help[HELP_LABEL_COUNT] = {
-      "Clock", "Reset", "Param1", "Param2", "Pitch", "Trig",
-      "(extratext1)", "(extratext2)"
-    };
     virtual void SetHelp() = 0;
 
     /* Forces applet's Start() method to run the next time the applet is selected. This
