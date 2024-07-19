@@ -240,8 +240,10 @@ public:
         case CONTROL_BUTTON_UP:
         case CONTROL_BUTTON_DOWN:
           if (UI::EVENT_BUTTON_LONG_PRESS == event.type) {
+            const CalibrationStep *step = calibration_state.current_step;
+
             // long-press DOWN to measure ADC points
-            switch (calibration_state.current_step->step) {
+            switch (step->step) {
               case ADC_PITCH_C2:
                 calibration_state.adc_1v = OC::ADC::value(ADC_CHANNEL_1);
                 break;
@@ -249,6 +251,20 @@ public:
                 calibration_state.adc_3v = OC::ADC::value(ADC_CHANNEL_1);
                 break;
               default: break;
+            }
+
+            // long-press DOWN to auto-scale DAC values on current channel
+            int volts = step->index + DAC::kOctaveZero;
+            if (step->calibration_type == CALIBRATE_OCTAVE && volts > 0) {
+              int ch = step_to_channel(step->step);
+              uint16_t first = OC::calibration_data.dac.calibrated_octaves[ch][0];
+              uint16_t second = OC::calibration_data.dac.calibrated_octaves[ch][volts];
+              int interval = (second - first) / volts;
+
+              for (int i = 1; i < OCTAVES; ++i) {
+                first += interval;
+                OC::calibration_data.dac.calibrated_octaves[ch][i] = first;
+              }
             }
             break;
           }
