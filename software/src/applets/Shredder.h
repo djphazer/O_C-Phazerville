@@ -213,7 +213,7 @@ private:
           outlabel[2] = 'B'+io_offset;
           gfxPrint(42, 25, outlabel);
         } else {
-          gfxPrint(48, 25, 'A' + quant_channels - 1 + io_offset);
+          gfxPrint(48, 25, OutputLabel(quant_channels - 1));
         }
         if (cursor == 2) gfxCursor(42, 33, 20);
 
