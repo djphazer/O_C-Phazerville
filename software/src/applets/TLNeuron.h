@@ -103,12 +103,16 @@ public:
 
 protected:
     void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1,2=Dendrites 1,2";
-        help[HEMISPHERE_HELP_CVS]      = "2=Dendrite3";
-        help[HEMISPHERE_HELP_OUTS]     = "A,B=Axon Output";
-        help[HEMISPHERE_HELP_ENCODER]  = "T=Set P=Select";
-        //                               "------------------" <-- Size Guide
+        //                    "-------" <-- Label size guide
+        help[HELP_DIGITAL1] = "Dendrt1";
+        help[HELP_DIGITAL2] = "Dendrt2";
+        help[HELP_CV1]      = "Dendrt3";
+        help[HELP_CV2]      = "";
+        help[HELP_OUT1]     = "AxonOut";
+        help[HELP_OUT2]     = "AxonOut";
+        help[HELP_EXTRA1] = "";
+        help[HELP_EXTRA2] = "Gate if wght > thresh";
+       //                   "---------------------" <-- Extra text size guide
     }
     
 private:

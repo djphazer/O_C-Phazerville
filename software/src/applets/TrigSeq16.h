@@ -103,14 +103,18 @@ public:
 
 protected:
     void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1=Clock 2=Reset";
-        help[HEMISPHERE_HELP_CVS]      = "1=Swap A&B @ 3V";
-        help[HEMISPHERE_HELP_OUTS]     = "Trg A=Trg B=Cmp";
-        help[HEMISPHERE_HELP_ENCODER]  = "T=Set P=Select";
-        //                               "------------------" <-- Size Guide
+        //                    "-------" <-- Label size guide
+        help[HELP_DIGITAL1] = "Clock";
+        help[HELP_DIGITAL2] = "Reset";
+        help[HELP_CV1]      = "Swap Ch";
+        help[HELP_CV2]      = "Offset";
+        help[HELP_OUT1]     = "Trg";
+        help[HELP_OUT2]     = "Inverse";
+        help[HELP_EXTRA1] = "";
+        help[HELP_EXTRA2] = "";
+       //                   "---------------------" <-- Extra text size guide
     }
-    
+
 private:
     int step; // Current step
     int active_step;

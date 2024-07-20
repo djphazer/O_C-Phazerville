@@ -103,14 +103,18 @@ public:
 
 protected:
     void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1,2=Gate";
-        help[HEMISPHERE_HELP_CVS]      = "";
-        help[HEMISPHERE_HELP_OUTS]     = "Outputs";
-        help[HEMISPHERE_HELP_ENCODER]  = "Freq./Waveform";
-        //                               "------------------" <-- Size Guide
+        //                    "-------" <-- Label size guide
+        help[HELP_DIGITAL1] = "Gate 1";
+        help[HELP_DIGITAL2] = "Gate 2";
+        help[HELP_CV1]      = "";
+        help[HELP_CV2]      = "";
+        help[HELP_OUT1]     = "Ch1 Env";
+        help[HELP_OUT2]     = "Ch2 Env";
+        help[HELP_EXTRA1] = "";
+        help[HELP_EXTRA2] = "Enc: Freq, Waveform";
+       //                   "---------------------" <-- Extra text size guide
     }
-    
+
 private:
     int cursor; // 0=Freq A; 1=Waveform A; 2=Freq B; 3=Waveform B
     VectorOscillator osc[2];

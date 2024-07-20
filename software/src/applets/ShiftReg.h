@@ -160,6 +160,17 @@ static constexpr int MAX_LENGTH = 16;
 
 protected:
     void SetHelp() {
+        //                    "-------" <-- Label size guide
+        help[HELP_DIGITAL1] = "Clock";
+        help[HELP_DIGITAL2] = "p Gate";
+        help[HELP_CV1]      = "Length";
+        help[HELP_CV2]      = "p Mod";
+        help[HELP_OUT1]     = "5bits Q";
+        help[HELP_OUT2]     = "8bits V";
+        help[HELP_EXTRA1] = "";
+        help[HELP_EXTRA2] = "";
+       //                  "---------------------" <-- Extra text size guide
+    }
         //                               "------------------" <-- Size Guide
         help[HEMISPHERE_HELP_DIGITALS] = "1=Clock  2=p Gate";
         help[HEMISPHERE_HELP_CVS]      = "1=Length 2=p Mod";

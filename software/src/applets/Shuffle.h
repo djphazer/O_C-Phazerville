@@ -122,12 +122,16 @@ public:
 
 protected:
     void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1=Clock 2=Reset";
-        help[HEMISPHERE_HELP_CVS]      = "1=Odd Mod 2=Even";
-        help[HEMISPHERE_HELP_OUTS]     = "A=Clock B=Triplets";
-        help[HEMISPHERE_HELP_ENCODER]  = "Odd/Even Delay";
-        //                               "------------------" <-- Size Guide
+        //                    "-------" <-- Label size guide
+        help[HELP_DIGITAL1] = "Clock";
+        help[HELP_DIGITAL2] = "Reset";
+        help[HELP_CV1]      = "Odd Mod";
+        help[HELP_CV2]      = "Even";
+        help[HELP_OUT1]     = "Shuffle";
+        help[HELP_OUT2]     = "Triplets";
+        help[HELP_EXTRA1] = "";
+        help[HELP_EXTRA2] = "";
+       //                  "---------------------" <-- Extra text size guide
     }
     
 private:

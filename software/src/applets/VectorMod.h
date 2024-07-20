@@ -92,12 +92,16 @@ public:
 
 protected:
     void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1,2=Trigger";
-        help[HEMISPHERE_HELP_CVS]      = "1,2=Cycle";
-        help[HEMISPHERE_HELP_OUTS]     = "A,B=Out";
-        help[HEMISPHERE_HELP_ENCODER]  = "Freq./Waveform";
-        //                               "------------------" <-- Size Guide
+        //                    "-------" <-- Label size guide
+        help[HELP_DIGITAL1] = "Trig 1";
+        help[HELP_DIGITAL2] = "Trig 2";
+        help[HELP_CV1]      = "Cycle 1";
+        help[HELP_CV2]      = "Cycle 2";
+        help[HELP_OUT1]     = "Ch1 Mod";
+        help[HELP_OUT2]     = "Ch2 Mod";
+        help[HELP_EXTRA1] = "";
+        help[HELP_EXTRA2] = "Enc: Freq, Waveform";
+       //                   "---------------------" <-- Extra text size guide
     }
     
 private:

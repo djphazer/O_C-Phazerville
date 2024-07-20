@@ -133,13 +133,16 @@ public:
 
 protected:
     void SetHelp()
-    {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1=Clock,2=Reset";
-        help[HEMISPHERE_HELP_CVS]      = "CV Ch1,Ch2";
-        help[HEMISPHERE_HELP_OUTS]     = "A=Out1,B=Out1";
-        help[HEMISPHERE_HELP_ENCODER]  = "Change Mode,Seq";
-        //                               "------------------" <-- Size Guide
+        //                    "-------" <-- Label size guide
+        help[HELP_DIGITAL1] = "Clock";
+        help[HELP_DIGITAL2] = "Reset";
+        help[HELP_CV1]      = "CV Ch 1";
+        help[HELP_CV2]      = "CV Ch 2";
+        help[HELP_OUT1]     = "Ch 1";
+        help[HELP_OUT2]     = "Ch 2";
+        help[HELP_EXTRA1] = "";
+        help[HELP_EXTRA2] = "Enc: Change Mode, Seq";
+       //                   "---------------------" <-- Extra text size guide
     }
 
 private:

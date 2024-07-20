@@ -121,12 +121,16 @@ public:
 
 protected:
     void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "";
-        help[HEMISPHERE_HELP_CVS]      = "Signal 1 / 2";
-        help[HEMISPHERE_HELP_OUTS]     = "Assignable";
-        help[HEMISPHERE_HELP_ENCODER]  = "Assign/Sensitivity";
-        //                               "------------------" <-- Size Guide
+        //                    "-------" <-- Label size guide
+        help[HELP_DIGITAL1] = "";
+        help[HELP_DIGITAL2] = "";
+        help[HELP_CV1]      = "Sig 1";
+        help[HELP_CV2]      = "Sig 2";
+        help[HELP_OUT1]     = Trending_assignments[assign[0];
+        help[HELP_OUT2]     = Trending_assignments[assign[1];
+        help[HELP_EXTRA1] = "";
+        help[HELP_EXTRA2] = "Enc:Mode, Sensitivity";
+       //                   "---------------------" <-- Extra text size guide
     }
     
 private:

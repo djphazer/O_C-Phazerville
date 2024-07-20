@@ -115,12 +115,16 @@ public:
 
 protected:
     void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1=Clock 2=+1 Oct A";
-        help[HEMISPHERE_HELP_CVS]      = "1=Signal 2=Shift B";
-        help[HEMISPHERE_HELP_OUTS]     = "A,B=Quantized";
-        help[HEMISPHERE_HELP_ENCODER]  = "Shift/Scale";
-        //                               "------------------" <-- Size Guide
+        //                    "-------" <-- Label size guide
+        help[HELP_DIGITAL1] = "Clock";
+        help[HELP_DIGITAL2] = "+OctCh1";
+        help[HELP_CV1]      = "Signal";
+        help[HELP_CV2]      = "Trn Ch2";
+        help[HELP_OUT1]     = "Qnt Ch1";
+        help[HELP_OUT2]     = "Qnt Ch2";
+        help[HELP_EXTRA1] = "";
+        help[HELP_EXTRA2] = "";
+       //                  "---------------------" <-- Extra text size guide
     }
     
 private:

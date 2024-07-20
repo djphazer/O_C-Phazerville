@@ -98,14 +98,18 @@ public:
 
 protected:
     void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "Defeat 1=Ch1 2=Ch2";
-        help[HEMISPHERE_HELP_CVS]      = "Input 1=Ch1 2=Ch2";
-        help[HEMISPHERE_HELP_OUTS]     = "A=Linear B=Exp";
-        help[HEMISPHERE_HELP_ENCODER]  = "Rise/Fall";
-        //                               "------------------" <-- Size Guide
+        //                    "-------" <-- Label size guide
+        help[HELP_DIGITAL1] = "Defeat1";
+        help[HELP_DIGITAL2] = "Defeat2";
+        help[HELP_CV1]      = "Input 1";
+        help[HELP_CV2]      = "Input 2";
+        help[HELP_OUT1]     = "(1) Lin";
+        help[HELP_OUT2]     = "(2) Exp";
+        help[HELP_EXTRA1] = "";
+        help[HELP_EXTRA2] = "";
+       //                  "---------------------" <-- Extra text size guide
     }
-    
+
 private:
     int rise; // Time to reach signal level if signal < 5V
     int fall; // Time to reach signal level if signal > 0V

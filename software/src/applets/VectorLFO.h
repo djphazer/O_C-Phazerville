@@ -151,14 +151,18 @@ public:
 
 protected:
     void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1,2=Sync";
-        help[HEMISPHERE_HELP_CVS]      = "1=Freq1  2=Mix 1@B";
-        help[HEMISPHERE_HELP_OUTS]     = "Out A=1, B=2+1";
-        help[HEMISPHERE_HELP_ENCODER]  = "Freq./Waveform";
-        //                               "------------------" <-- Size Guide
+        //                    "-------" <-- Label size guide
+        help[HELP_DIGITAL1] = "Sync 1";
+        help[HELP_DIGITAL2] = "Sync 2";
+        help[HELP_CV1]      = "FM 1";
+        help[HELP_CV2]      = "1->2Mix";
+        help[HELP_OUT1]     = "Ch1 LFO";
+        help[HELP_OUT2]     = "Ch2 LFO";
+        help[HELP_EXTRA1] = "";
+        help[HELP_EXTRA2] = "Enc: Freq, Waveform";
+       //                   "---------------------" <-- Extra text size guide
     }
-    
+
 private:
     int cursor; // 0=Freq A; 1=Waveform A; 2=Freq B; 3=Waveform B
     VectorOscillator osc[2];

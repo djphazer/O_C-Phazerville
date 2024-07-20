@@ -292,13 +292,17 @@ class TB_3PO: public HemisphereApplet {
 
 protected:
   void SetHelp() {
-    //                               "------------------" <-- Size Guide
-    help[HEMISPHERE_HELP_DIGITALS] = "1=Clock 2=Regen";
-    help[HEMISPHERE_HELP_CVS]      = "1=Transp 2=Density";
-    help[HEMISPHERE_HELP_OUTS]     = "A=CV+glide B=Gate";
-    help[HEMISPHERE_HELP_ENCODER]  = "seed/dens/qnt/len";
-    //                               "------------------" <-- Size Guide
-  }
+        //                    "-------" <-- Label size guide
+        help[HELP_DIGITAL1] = "Clock";
+        help[HELP_DIGITAL2] = "Regen";
+        help[HELP_CV1]      = "Transp";
+        help[HELP_CV2]      = "Density";
+        help[HELP_OUT1]     = "Pitch";
+        help[HELP_OUT2]     = "Gate";
+        help[HELP_EXTRA1] = "";
+        help[HELP_EXTRA2] = "Glide on the side!";
+       //                   "---------------------" <-- Extra text size guide
+    }
 
 private:
   int cursor = 0;

@@ -252,12 +252,16 @@ public:
 
 protected:
     void SetHelp() {
-    //                                    "------------------" <-- Size Guide      
-        help[HEMISPHERE_HELP_DIGITALS] =  "1=Clock 2=Reset";
-        help[HEMISPHERE_HELP_CVS] =       "1=Steps 2=Position";
-        help[HEMISPHERE_HELP_OUTS] =      "A=CV B=BOC Trg";
-        help[HEMISPHERE_HELP_ENCODER] =   "Steps/Dir/Rand";
-    //                                    "------------------" <-- Size Guide       
+        //                    "-------" <-- Label size guide
+        help[HELP_DIGITAL1] = "Clock";
+        help[HELP_DIGITAL2] = "Reset";
+        help[HELP_CV1]      = "Steps";
+        help[HELP_CV2]      = "Pos";
+        help[HELP_OUT1]     = "Step CV";
+        help[HELP_OUT2]     = "BoC Trg";
+        help[HELP_EXTRA1] = "";
+        help[HELP_EXTRA2] = "";
+       //                   "---------------------" <-- Extra text size guide
     }
 
 private:

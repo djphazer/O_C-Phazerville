@@ -125,14 +125,18 @@ public:
 
 protected:
     void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1=Clock 2=Reset";
-        help[HEMISPHERE_HELP_CVS]      = "1=Trans 2=RndSeq";
-        help[HEMISPHERE_HELP_OUTS]     = "A=CV B=Clk Step 1";
-        help[HEMISPHERE_HELP_ENCODER]  = "Edit Step / Mutes";
-        //                               "------------------" <-- Size Guide
+        //                    "-------" <-- Label size guide
+        help[HELP_DIGITAL1] = "Clock";
+        help[HELP_DIGITAL2] = "Reset";
+        help[HELP_CV1]      = "Transp";
+        help[HELP_CV2]      = "Rndmize";
+        help[HELP_OUT1]     = "CV";
+        help[HELP_OUT2]     = "Step 1";
+        help[HELP_EXTRA1] = "";
+        help[HELP_EXTRA2] = "AuxButton: Mute step";
+       //                   "---------------------" <-- Extra text size guide
     }
-    
+
 private:
     int cursor = 0;
     uint8_t muted = 0xF0; // Bitfield for muted steps; ((muted >> step) & 1) means muted

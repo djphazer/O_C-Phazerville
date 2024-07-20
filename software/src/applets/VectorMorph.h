@@ -97,12 +97,16 @@ public:
 
 protected:
     void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "";
-        help[HEMISPHERE_HELP_CVS]      = "1,2=Phase";
-        help[HEMISPHERE_HELP_OUTS]     = "A,B=Out";
-        help[HEMISPHERE_HELP_ENCODER]  = "Phase/Waveform";
-        //                               "------------------" <-- Size Guide
+        //                    "-------" <-- Label size guide
+        help[HELP_DIGITAL1] = "";
+        help[HELP_DIGITAL2] = "";
+        help[HELP_CV1]      = "Phase 1";
+        help[HELP_CV2]      = "Phase 2";
+        help[HELP_OUT1]     = "Ch1 Mod";
+        help[HELP_OUT2]     = "Ch2 Mod";
+        help[HELP_EXTRA1] = "";
+        help[HELP_EXTRA2] = "Enc: Phase, Waveform";
+       //                   "---------------------" <-- Extra text size guide
     }
     
 private:

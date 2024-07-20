@@ -79,6 +79,17 @@ public:
 
 protected:
     void SetHelp() {
+        //                    "-------" <-- Label size guide
+        help[HELP_DIGITAL1] = "Clock";
+        help[HELP_DIGITAL2] = "Freeze";
+        help[HELP_CV1]      = "Flip0 1";
+        help[HELP_CV2]      = "Flip0 2";
+        help[HELP_OUT1]     = trigger[0] ? "Trigger" : "Gate";
+        help[HELP_OUT2]     = trigger[1] ? "Trigger" : "Gate";
+        help[HELP_EXTRA1] = "";
+        help[HELP_EXTRA2] = "";
+       //                   "---------------------" <-- Extra text size guide
+    }
         //                               "------------------" <-- Size Guide
         help[HEMISPHERE_HELP_DIGITALS] = "1=Clock 2=Freeze";
         help[HEMISPHERE_HELP_CVS]      = "1,2 Gate=Flip Bit0";

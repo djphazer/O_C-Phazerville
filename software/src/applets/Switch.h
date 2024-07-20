@@ -70,11 +70,16 @@ public:
 
 protected:
     void SetHelp() {
-        // Each help section can have up to 18 characters. Be concise!
-        help[HEMISPHERE_HELP_DIGITALS] = "1=Clock 2=Gate";
-        help[HEMISPHERE_HELP_CVS] = "1,2=CV";
-        help[HEMISPHERE_HELP_OUTS] = "A=Seq B=Gated Out";
-        help[HEMISPHERE_HELP_ENCODER] = "";
+        //                    "-------" <-- Label size guide
+        help[HELP_DIGITAL1] = "Flip";
+        help[HELP_DIGITAL2] = "Gate";
+        help[HELP_CV1]      = "Input 1";
+        help[HELP_CV2]      = "Input 2";
+        help[HELP_OUT1]     = "Toggled";
+        help[HELP_OUT2]     = "Gated";
+        help[HELP_EXTRA1] = "";
+        help[HELP_EXTRA2] = "";
+       //                   "---------------------" <-- Extra text size guide
     }
 
 private:

@@ -201,12 +201,16 @@ public:
 
 protected:
     void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1=Clock  2=Reset";
-        help[HEMISPHERE_HELP_CVS]      = "";
-        help[HEMISPHERE_HELP_OUTS]     = "A=Pitch  B=Gate";
-        help[HEMISPHERE_HELP_ENCODER]  = "Edit Slot";
-        //                               "------------------" <-- Size Guide
+        //                    "-------" <-- Label size guide
+        help[HELP_DIGITAL1] = "Clock";
+        help[HELP_DIGITAL2] = "Reset";
+        help[HELP_CV1]      = "";
+        help[HELP_CV2]      = "";
+        help[HELP_OUT1]     = "Pitch";
+        help[HELP_OUT2]     = "Gate";
+        help[HELP_EXTRA1] = "";
+        help[HELP_EXTRA2] = "AuxButton: Edit Step";
+       //                   "---------------------" <-- Extra text size guide
     }
     
 private:

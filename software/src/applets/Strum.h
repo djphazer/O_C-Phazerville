@@ -212,12 +212,17 @@ public:
 
 protected:
   void SetHelp() {
-    //                               "------------------" <-- Size Guide
-    help[HEMISPHERE_HELP_DIGITALS] = "Strum Up,  Down";
-    help[HEMISPHERE_HELP_CVS]      = "Root    ,  Spacing";
-    help[HEMISPHERE_HELP_OUTS]     = "Pitch   ,  Trig";
-    help[HEMISPHERE_HELP_ENCODER]  = "";
-  }
+        //                    "-------" <-- Label size guide
+        help[HELP_DIGITAL1] = "Strm Up";
+        help[HELP_DIGITAL2] = "Strm Dn";
+        help[HELP_CV1]      = "Root";
+        help[HELP_CV2]      = "Spacing";
+        help[HELP_OUT1]     = "Pitch";
+        help[HELP_OUT2]     = "Trig";
+        help[HELP_EXTRA1] = "";
+        help[HELP_EXTRA2] = "";
+       //                   "---------------------" <-- Extra text size guide
+    }
 
 private:
   static const int MAX_CHORD_LENGTH = 6;

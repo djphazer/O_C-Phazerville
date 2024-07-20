@@ -91,12 +91,16 @@ public:
 
 protected:
     void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "Gate 1,2";
-        help[HEMISPHERE_HELP_CVS]      = "";
-        help[HEMISPHERE_HELP_OUTS]     = "Constant Voltage";
-        help[HEMISPHERE_HELP_ENCODER]  = "Voltage/Gating";
-        //                               "------------------" <-- Size Guide
+        //                    "-------" <-- Label size guide
+        help[HELP_DIGITAL1] = "Gate 1";
+        help[HELP_DIGITAL2] = "Gate 2";
+        help[HELP_CV1]      = "";
+        help[HELP_CV2]      = "";
+        help[HELP_OUT1]     = "Volt 1";
+        help[HELP_OUT2]     = "Volt 2";
+        help[HELP_EXTRA1] = "";
+        help[HELP_EXTRA2] = "";
+       //                   "---------------------" <-- Extra text size guide
     }
     
 private:
