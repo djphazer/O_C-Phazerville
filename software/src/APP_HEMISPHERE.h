@@ -41,6 +41,11 @@
 #endif
 
 #include "hemisphere_config.h"
+#include <optional>
+#ifdef ARDUINO_TEENSY41
+#include "AudioSetup.h"
+#include "AudioPassthrough.h"
+#endif
 
 // The settings specify the selected applets, and 64 bits of data for each applet,
 // plus 64 bits of data for the ClockSetup applet (which includes some misc config).
@@ -85,9 +90,9 @@ public:
         return (h == LEFT_HEMISPHERE) ? values_[HEMISPHERE_SELECTED_LEFT_ID]
                                       : values_[HEMISPHERE_SELECTED_RIGHT_ID];
     }
-    HemisphereApplet* GetApplet(int h) {
+    HemisphereApplet& GetApplet(int h) {
       int idx = HS::get_applet_index_by_id( GetAppletId(h) );
-      return HS::available_applets[idx].instance[h];
+      return HS::available_applets[idx]->GetInstance(h);
     }
     void SetAppletId(int h, int id) {
         apply_value(h, id);
@@ -242,6 +247,9 @@ public:
 
         SetApplet(LEFT_HEMISPHERE, HS::get_applet_index_by_id(18)); // DualTM
         SetApplet(RIGHT_HEMISPHERE, HS::get_applet_index_by_id(15)); // EuclidX
+        #ifdef ARDUINO_TEENSY41
+        UpdateAudioPipeline();
+        #endif
     }
 
     void Resume() {
@@ -267,11 +275,11 @@ public:
         for (int h = 0; h < 2; h++)
         {
             int index = my_applet[h];
-            if (hem_active_preset->GetAppletId(HEM_SIDE(h)) != HS::available_applets[index].id)
+            if (hem_active_preset->GetAppletId(HEM_SIDE(h)) != HS::available_applets[index]->id)
                 doSave = 1;
-            hem_active_preset->SetAppletId(HEM_SIDE(h), HS::available_applets[index].id);
+            hem_active_preset->SetAppletId(HEM_SIDE(h), HS::available_applets[index]->id);
 
-            uint64_t data = HS::available_applets[index].instance[h]->OnDataRequest();
+            uint64_t data = HS::available_applets[index]->GetInstance(h).OnDataRequest();
             if (data != applet_data[h]) doSave = 1;
             applet_data[h] = data;
             hem_active_preset->SetData(HEM_SIDE(h), data);
@@ -319,7 +327,7 @@ public:
                 int index = HS::get_applet_index_by_id( hem_active_preset->GetAppletId(h) );
                 applet_data[h] = hem_active_preset->GetData(HEM_SIDE(h));
                 SetApplet(HEM_SIDE(h), index);
-                HS::available_applets[index].instance[h]->OnDataReceive(applet_data[h]);
+                HS::available_applets[index]->GetInstance(h).OnDataReceive(applet_data[h]);
             }
 
 
@@ -331,13 +339,88 @@ public:
       LoadFromPreset(queued_preset);
     }
 
+    HemisphereApplet& GetApplet(HEM_SIDE hemisphere) {
+        return HS::available_applets[my_applet[hemisphere]]->GetInstance(hemisphere);
+    }
+
+    #ifdef ARDUINO_TEENSY41
+    void UpdateAudioPipeline() {
+        AudioNoInterrupts();
+        HemisphereApplet& left_applet = GetApplet(HEM_SIDE::LEFT_HEMISPHERE);
+        HemisphereApplet& right_applet = GetApplet(HEM_SIDE::RIGHT_HEMISPHERE);
+
+        for (int i=0; i < 3; i++) for (int j=0; j < 2; j++) conns[i][j].disconnect();
+
+        AudioStream& in = OC::AudioDSP::input_stream();
+        AudioStream& out = OC::AudioDSP::output_stream();
+
+        auto lin = left_applet.InputStream();
+        auto lout = left_applet.OutputStream();
+
+        auto rin = right_applet.InputStream();
+        auto rout = right_applet.OutputStream();
+
+        // Rules:
+        // - If both sides are mono, left applet controls left pipeline, right controls right
+        // - If one side is mono and the other stereo, the stereo effectively becomes mono
+        // - If one side is stereo and the other none, the stereo applet controls both channels
+        // - If both are stereo, left pipeline feeds into right
+
+        // Wire up left channel
+        if (left_applet.NumAudioChannels() > 0) {
+            conns[0][0].connect(in, 0, lin.value(), 0);
+            if (right_applet.NumAudioChannels() == 2 && left_applet.NumAudioChannels() == 2) {
+                conns[1][0].connect(lout.value(), 0, rin.value(), 0);
+                conns[2][0].connect(rout.value(), 0, out, 0);
+            } else {
+                conns[1][0].connect(lout.value(), 0, out, 0);
+            }
+        } else if (right_applet.NumAudioChannels() == 2) {
+            conns[0][0].connect(in, 0, rin.value(), 0);
+            conns[1][0].connect(rout.value(), 0, out, 0);
+        } else {
+            conns[0][0]. connect(in, 0, out, 0);
+        }
+
+        // Wire up right channel
+        if (right_applet.NumAudioChannels() == 1) {
+            conns[0][1].connect(in, 1, rin.value(), 0);
+            conns[1][1].connect(rout.value(), 0, out, 1);
+        } else if (left_applet.NumAudioChannels() == 2) {
+            conns[0][1].connect(in, 1, lin.value(), 1);
+            if (right_applet.NumAudioChannels() == 2) {
+                conns[1][1].connect(lout.value(), 1, rin.value(), 1);
+                conns[2][1].connect(rout.value(), 1, out, 1);
+            } else {
+                conns[1][1].connect(lout.value(), 1, out, 1);
+            }
+        } else if (right_applet.NumAudioChannels() == 2) {
+            conns[0][1].connect(in, 1, rin.value(), 1);
+            conns[1][1].connect(rout.value(), 1, out, 1);
+        } else {
+            conns[0][1].connect(in, 1, out, 1);
+        }
+        AudioInterrupts();
+    }
+    #endif
+
     // does not modify the preset, only the manager
     void SetApplet(HEM_SIDE hemisphere, int index) {
         //if (my_applet[hemisphere]) // TODO: special case for first load?
-        HS::available_applets[my_applet[hemisphere]].instance[hemisphere]->Unload();
+        GetApplet(hemisphere).Unload();
+        #ifdef ARDUINO_TEENSY41
+        const uint8_t last_channels = GetApplet(hemisphere).NumAudioChannels();
+        #endif
         next_applet[hemisphere] = my_applet[hemisphere] = index;
-        HS::available_applets[index].instance[hemisphere]->BaseStart(hemisphere);
+        HemisphereApplet& selected_applet = HS::available_applets[index]->GetInstance(hemisphere);
+        selected_applet.BaseStart(hemisphere);
+
+        #ifdef ARDUINO_TEENSY41
+        if (selected_applet.NumAudioChannels() > 0 || selected_applet.NumAudioChannels() != last_channels)
+            UpdateAudioPipeline();
+        #endif
     }
+
     void ChangeApplet(HEM_SIDE h, int dir) {
         int index = HS::get_next_applet_index(next_applet[h], dir);
         next_applet[h] = index;
@@ -423,7 +506,7 @@ public:
             int index = my_applet[h];
 
             // MIDI signals mixed with inputs to applets
-            if (HS::available_applets[index].id != 150) // not MIDI In
+            if (HS::available_applets[index]->id != 150) // not MIDI In
             {
                 ForEachChannel(ch) {
                     int chan = h*2 + ch;
@@ -448,7 +531,7 @@ public:
                     }
                 }
             }
-            HS::available_applets[index].instance[h]->BaseController();
+            HS::available_applets[index]->GetInstance(h).BaseController();
         }
 
 #ifdef ARDUINO_TEENSY41
@@ -500,7 +583,7 @@ public:
 #ifdef ARDUINO_TEENSY41
         if (view_state == AUDIO_SETUP) {
           gfxHeader("Audio DSP Setup");
-          OC::AudioDSP::DrawAudioSetup();
+          // OC::AudioDSP::DrawAudioSetup();
           draw_applets = false;
         }
 #endif
@@ -514,15 +597,15 @@ public:
         }
 
         if (draw_applets) {
+          // either zoomed or split view
+
           if (help_hemisphere > -1) {
-            int index = my_applet[help_hemisphere];
-            HS::available_applets[index].instance[help_hemisphere]->BaseView(true);
-            draw_applets = false;
+            GetApplet(static_cast<HEM_SIDE>(help_hemisphere)).BaseView(true);
           } else {
             for (int h = 0; h < 2; h++)
             {
                 int index = my_applet[h];
-                HS::available_applets[index].instance[h]->BaseView();
+                HS::available_applets[index]->GetInstance(h).BaseView();
             }
 
             if (select_mode == LEFT_HEMISPHERE) graphics.drawFrame(0, 0, 64, 64);
@@ -557,7 +640,7 @@ public:
         }
 #ifdef ARDUINO_TEENSY41
         if (view_state == AUDIO_SETUP) {
-          if (!down) OC::AudioDSP::AudioSetupButtonAction(h);
+          // if (!down) OC::AudioDSP::AudioSetupButtonAction(h);
           return;
         }
 #endif
@@ -576,7 +659,7 @@ public:
         } else if (!clock_setup) {
             // regular applets get button release
             int index = my_applet[h];
-            HS::available_applets[index].instance[h]->OnButtonPress();
+            HS::available_applets[index]->GetInstance(h).OnButtonPress();
         }
     }
 
@@ -678,11 +761,11 @@ public:
         // -- button release
         if (!clock_setup) {
           const int index = my_applet[hemisphere];
-          HemisphereApplet* applet = HS::available_applets[index].instance[hemisphere];
+          HemisphereApplet& applet = HS::available_applets[index]->GetInstance(hemisphere);
 
-          if (applet->EditMode()) {
+          if (applet.EditMode()) {
             // select button becomes aux button while editing a param
-            applet->AuxButton();
+            applet.AuxButton();
           } else {
             // Select Mode
             if (hemisphere == select_mode) select_mode = -1; // Exit Select Mode if same button is pressed
@@ -706,7 +789,7 @@ public:
         }
 #ifdef ARDUINO_TEENSY41
         if (view_state == AUDIO_SETUP) {
-          OC::AudioDSP::AudioMenuAdjust(h, event.value);
+          // OC::AudioDSP::AudioMenuAdjust(h, event.value);
           return;
         }
 #endif
@@ -720,7 +803,7 @@ public:
             ChangeApplet(HEM_SIDE(h), event.value);
         } else {
             int index = my_applet[h];
-            HS::available_applets[index].instance[h]->OnEncoderMove(event.value);
+            HS::available_applets[index]->GetInstance(h).OnEncoderMove(event.value);
         }
     }
 
@@ -796,6 +879,13 @@ private:
     int config_cursor = 0;
     int config_page = 0;
     int dummy_count = 0;
+
+    #ifdef ARDUINO_TEENSY41
+    // default audio streams for applets so non-audio applets don't need their
+    // own.
+    AudioPassthrough<2> passthroughs[2];
+    AudioConnection conns[3][2]; // input_to_left, left_to_right, right_to_output
+    #endif
 
     OC::menu::ScreenCursor<5> showhide_cursor;
 
@@ -965,7 +1055,7 @@ private:
             break;
 
         case SCREENSAVER_MODE:
-            ++HS::screensaver_mode %= 4;
+            ++HS::screensaver_mode %= 5;
             break;
 
         case CURSOR_MODE:
@@ -1083,7 +1173,7 @@ private:
            ++current, y += LineH) {
 
         gfxIcon(1, y + 1, HS::applet_is_hidden(current) ? CHECK_OFF_ICON : CHECK_ON_ICON);
-        gfxPrint( 11, y + 2, HS::available_applets[current].instance[0]->applet_name());
+        gfxPrint( 11, y + 2, HS::available_applets[current]->GetInstance(0).applet_name());
 
         if (current == showhide_cursor.cursor_pos())
           gfxInvert(0, y, 127, LineH - 1);
@@ -1097,12 +1187,18 @@ private:
         gfxPrint(HS::trig_length);
         gfxPrint("ms");
 
-        const char * const ssmodes[4] = { "[blank]", "Meters", "Scope",
+        const char * const ssmodes[5] = { "[blank]", "Meters", "Scope",
         #if defined(__IMXRT1062__)
         "Stars"
         #else
         "Zips"
         #endif
+        #ifdef ARDUINO_TEENSY41
+        , "AuDebug"
+        #else
+        , "[blank]"
+        #endif
+
         };
         gfxPrint(1, 25, "Screensaver:  ");
         gfxPrint( ssmodes[HS::screensaver_mode] );
@@ -1159,9 +1255,9 @@ private:
             if (!hem_presets[i].is_valid())
                 gfxPrint(18, y, "(empty)");
             else {
-                gfxPrint(18, y, hem_presets[i].GetApplet(0)->applet_name());
+                gfxPrint(18, y, hem_presets[i].GetApplet(0).applet_name());
                 gfxPrint(", ");
-                gfxPrint(hem_presets[i].GetApplet(1)->applet_name());
+                gfxPrint(hem_presets[i].GetApplet(1).applet_name());
             }
 
             y += 10;
@@ -1210,6 +1306,12 @@ void HEMISPHERE_init() {
     manager.BaseStart();
 }
 
+// #ifdef ARDUINO_TEENSY41
+// void HEMISPHERE_initAudio(AudioStream &input, AudioStream &output) {
+//     manager.SetIOStreams(input, output);
+// }
+// #endif
+
 static constexpr size_t HEMISPHERE_storageSize() {
     return HemispherePreset::storageSize() * HEM_NR_OF_PRESETS;
 }
@@ -1257,6 +1359,11 @@ void HEMISPHERE_menu() {
 
 void HEMISPHERE_screensaver() {
     switch (HS::screensaver_mode) {
+    case 0x4:
+        #ifdef ARDUINO_TEENSY41
+        AudioDebugScreensaver();
+        #endif
+        break;
     case 0x3: // Zips or Stars
         ZapScreensaver(true);
         break;

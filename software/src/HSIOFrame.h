@@ -371,11 +371,6 @@ typedef struct IOFrame {
         OC::DAC::set_pitch_scaled(DAC_CHANNEL(i), outputs[i], 0);
       }
       if (autoMIDIOut) MIDIState.Send(outputs);
-
-#ifdef ARDUINO_TEENSY41
-      // this relies on the inputs and outputs arrays being contiguous...
-      OC::AudioDSP::Process(inputs);
-#endif
     }
 
 } IOFrame;

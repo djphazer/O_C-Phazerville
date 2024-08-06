@@ -26,6 +26,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <optional>
 #ifndef _HEM_APPLET_H_
 #define _HEM_APPLET_H_
 
@@ -44,21 +45,44 @@
 #include "HSUtils.h"
 #include "HSIOFrame.h"
 
+#ifdef ARDUINO_TEENSY41
+#include <Audio.h>
+#endif
+
 class HemisphereApplet;
 
 namespace HS {
 
-typedef struct Applet {
-  const int id;
-  const uint8_t categories;
-  HemisphereApplet* instance[APPLET_SLOTS];
-} Applet;
+class BaseApplet {
+public:
+    BaseApplet(const int id, const uint8_t categories) : id(id), categories(categories) {}
+    const int id;
+    const uint8_t categories;
+    virtual HemisphereApplet & GetInstance(int slot) = 0;
+};
+
+template<class A, int Id, uint8_t Categories>
+class StaticApplet : public BaseApplet {
+public:
+    StaticApplet() : BaseApplet(Id, Categories) {}
+    A instance[APPLET_SLOTS];
+
+    HemisphereApplet & GetInstance(int slot) override {
+        return instance[slot];
+    }
+};
 
 extern IOFrame frame;
 
 }
 
 using namespace HS;
+
+enum AudioChannels {
+  None = 0,
+  Mono = 1,
+  Stereo = 2,
+};
 
 class HemisphereApplet {
 public:
@@ -77,6 +101,13 @@ public:
     virtual void OnDataReceive(uint64_t data) = 0;
     virtual void OnButtonPress() { CursorToggle(); };
     virtual void OnEncoderMove(int direction) = 0;
+
+    #ifdef ARDUINO_TEENSY41
+    template <typename T> using optional_ref = std::optional<std::reference_wrapper<T>>;
+    virtual optional_ref<AudioStream> InputStream() { return std::nullopt; }
+    virtual optional_ref<AudioStream> OutputStream() { return std::nullopt; }
+    virtual AudioChannels NumAudioChannels() { return None; }
+    #endif
 
     //void BaseStart(const HEM_SIDE hemisphere_);
     void BaseController();
@@ -189,6 +220,10 @@ public:
         const int c = cvmapping[ch + io_offset];
         if (!c) return 0;
         return (c <= ADC_CHANNEL_LAST) ? frame.inputs[c - 1] : frame.outputs[c - 1 - ADC_CHANNEL_LAST];
+    }
+
+    float InF(int ch) {
+        return static_cast<float>(In(ch)) / HEMISPHERE_MAX_INPUT_CV;
     }
 
     // Apply small center detent to input, so it reads zero before a threshold
@@ -335,6 +370,27 @@ public:
         gfxPrint(num);
     }
 
+    void gfxPrint(int x, int y, float num, int digits) {
+        graphics.setPrintPos(x + gfx_offset, y);
+        gfxPrint(num, digits);
+    }
+
+    void gfxPrint(float num, int digits) {
+        int i = static_cast<int>(num);
+        float dec = num - i;
+        gfxPrint(i);
+        if (digits > 0) {
+            gfxPrint(".");
+            while (digits--) {
+                dec *= 10;
+                i = static_cast<int>(dec);
+                gfxPrint(i);
+                dec -= i;
+            }
+        }
+    }
+
+
     template<typename... Args>
     void gfxPrintfn(int x, int y, int n, const char *format,  Args ...args) {
         graphics.setPrintPos(x + gfx_offset, y);
@@ -425,6 +481,10 @@ protected:
     HEM_SIDE hemisphere; // Which hemisphere (0, 1, ...) this applet uses
     bool isEditing = false; // modal editing toggle
     virtual void SetHelp() = 0;
+
+    #ifdef ARDUINO_TEENSY41
+    AudioConnection passThru{};
+    #endif
 
     /* Forces applet's Start() method to run the next time the applet is selected. This
      * allows an applet to start up the same way every time, regardless of previous state.

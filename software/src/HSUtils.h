@@ -125,6 +125,16 @@ typedef struct PackLocation {
     size_t size;
 } PackLocation;
 
+union FloatBitsPun {
+    float f;
+    uint32_t u;
+};
+
+// For easy reference: leading bit is sign, then 8 bits for exponent, then 23
+// bits for fraction
+constexpr uint32_t FloatToBits(float x) { return FloatBitsPun{.f = x}.u; }
+constexpr float BitsToFloat(uint32_t n) { return FloatBitsPun{.u = n}.f; }
+
 /* Add value to a 64-bit storage unit at the specified location */
 constexpr void Pack(uint64_t &data, const PackLocation p, const uint64_t value) {
     data |= (value << p.location);

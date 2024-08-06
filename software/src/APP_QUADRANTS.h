@@ -89,9 +89,9 @@ public:
     int GetAppletId(HEM_SIDE h) {
         return values_[QUADRANTS_SELECTED_LEFT_ID + h];
     }
-    HemisphereApplet* GetApplet(HEM_SIDE h) {
+    HemisphereApplet& GetApplet(HEM_SIDE h) {
       int idx = HS::get_applet_index_by_id( GetAppletId(h) );
-      return HS::available_applets[idx].instance[h];
+      return HS::available_applets[idx]->GetInstance(h);
     }
     void SetAppletId(HEM_SIDE h, int id) {
         apply_value(h, id);
@@ -273,11 +273,11 @@ public:
         for (int h = 0; h < APPLET_SLOTS; h++)
         {
             int index = active_applet_index[h];
-            if (quad_active_preset->GetAppletId(HEM_SIDE(h)) != HS::available_applets[index].id)
+            if (quad_active_preset->GetAppletId(HEM_SIDE(h)) != HS::available_applets[index]->id)
                 doSave = 1;
-            quad_active_preset->SetAppletId(HEM_SIDE(h), HS::available_applets[index].id);
+            quad_active_preset->SetAppletId(HEM_SIDE(h), HS::available_applets[index]->id);
 
-            uint64_t data = HS::available_applets[index].instance[h]->OnDataRequest();
+            uint64_t data = HS::available_applets[index]->GetInstance(h).OnDataRequest();
             if (data != applet_data[h]) doSave = 1;
             applet_data[h] = data;
             quad_active_preset->SetData(HEM_SIDE(h), data);
@@ -328,7 +328,7 @@ public:
                 int index = HS::get_applet_index_by_id( quad_active_preset->GetAppletId(HEM_SIDE(h)) );
                 applet_data[h] = quad_active_preset->GetData(HEM_SIDE(h));
                 SetApplet(HEM_SIDE(h), index);
-                HS::available_applets[index].instance[h]->OnDataReceive(applet_data[h]);
+                HS::available_applets[index]->GetInstance(h).OnDataReceive(applet_data[h]);
             }
         }
         preset_id = id;
@@ -352,7 +352,7 @@ public:
           active_applet[hemisphere]->Unload();
 
         next_applet_index[hemisphere] = active_applet_index[hemisphere] = index;
-        active_applet[hemisphere] = HS::available_applets[index].instance[hemisphere];
+        active_applet[hemisphere] = &HS::available_applets[index]->GetInstance(hemisphere);
         active_applet[hemisphere]->BaseStart(hemisphere);
     }
     void ChangeApplet(HEM_SIDE h, int dir) {
@@ -404,7 +404,7 @@ public:
             }
 
             // MIDI signals mixed with inputs to applets
-            if (HS::available_applets[ active_applet_index[h] ].id != 150) // not MIDI In
+            if (HS::available_applets[ active_applet_index[h] ]->id != 150) // not MIDI In
             {
                 ForEachChannel(ch) {
                     int chan = h*2 + ch;
@@ -472,7 +472,7 @@ public:
         if (draw_applets) {
           if (view_state == AUDIO_SETUP) {
             gfxHeader("Audio DSP Setup");
-            OC::AudioDSP::DrawAudioSetup();
+            // OC::AudioDSP::DrawAudioSetup();
             draw_applets = false;
           }
           else if (view_state == CLOCK_SETUP) {
@@ -530,7 +530,7 @@ public:
           return;
         }
         if (view_state == AUDIO_SETUP) {
-          OC::AudioDSP::AudioSetupButtonAction(h);
+          // OC::AudioDSP::AudioSetupButtonAction(h);
           return;
         }
 
@@ -623,7 +623,7 @@ public:
             return;
         }
         if (view_state == AUDIO_SETUP) {
-          OC::AudioDSP::AudioMenuAdjust(h, event.value);
+          // OC::AudioDSP::AudioMenuAdjust(h, event.value);
           return;
         }
 
@@ -1116,9 +1116,9 @@ private:
             if (!quad_presets[i].is_valid())
                 gfxPrint(18, y, "(empty)");
             else {
-                gfxPrint(18, y, quad_presets[i].GetApplet(LEFT_HEMISPHERE)->applet_name());
+                gfxPrint(18, y, quad_presets[i].GetApplet(LEFT_HEMISPHERE).applet_name());
                 gfxPrint(", ");
-                gfxPrint(quad_presets[i].GetApplet(RIGHT_HEMISPHERE)->applet_name());
+                gfxPrint(quad_presets[i].GetApplet(RIGHT_HEMISPHERE).applet_name());
             }
 
             y += 10;

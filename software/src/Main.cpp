@@ -50,8 +50,9 @@ USBHub hub1(thisUSB);
 MIDIDevice usbHostMIDI(thisUSB);
 
 #if defined(ARDUINO_TEENSY41)
-MIDI_CREATE_INSTANCE(HardwareSerial, Serial8, MIDI1);
 #include "AudioSetup.h"
+
+MIDI_CREATE_INSTANCE(HardwareSerial, Serial8, MIDI1);
 #endif
 
 #endif // __IMXRT1062__

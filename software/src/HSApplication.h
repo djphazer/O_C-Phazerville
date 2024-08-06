@@ -312,3 +312,17 @@ static void ZapScreensaver(const bool stars = false) {
   if (--frame_delay < 0) frame_delay = 100;
 }
 
+#ifdef ARDUINO_TEENSY41
+static void AudioDebugScreensaver() {
+    gfxPrint(0, 0, "CPU: ");
+    gfxPrint(AudioProcessorUsage());
+    gfxPrint("%");
+    gfxPrint(64, 0, "Max: ");
+    gfxPrint(AudioProcessorUsageMax());
+    gfxPrint("%");
+    gfxPrint(0, 10, "Mem: ");
+    gfxPrint(AudioMemoryUsage());
+    gfxPrint(64, 10, "Max: ");
+    gfxPrint(AudioMemoryUsageMax());
+}
+#endif

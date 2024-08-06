@@ -20,3 +20,6 @@ if "FLIP_180" in defines:
     extras += "_flipped"
 
 env.Replace(PROGNAME=f"o_C-phazerville-{version}{extras}-{git_rev}")
+
+# include toolchain paths in compiledb for clangd lsp
+env.Replace(COMPILATIONDB_INCLUDE_TOOLCHAIN=True)
