@@ -38,6 +38,7 @@
 #include "AudioSetup.h"
 
 #include "hemisphere_config.h"
+#include "hemisphere_audio_config.h"
 
 // We depend on Calibr8or now
 #include "APP_CALIBR8OR.h"
@@ -244,6 +245,7 @@ void QuadrantBeatSync();
 class QuadAppletManager : public HSApplication {
 public:
     void Start() {
+        audio_app.SetParentApp(this);
 
         for (int i = 0; i < 4; ++i) {
             quant_scale[i] = OC::Scales::SCALE_SEMI;
@@ -258,6 +260,7 @@ public:
     }
 
     void Resume() {
+        audio_app.SetParentApp(this);
         if (!quad_active_preset)
             LoadFromPreset(0);
         // TODO: restore quantizer settings...
@@ -483,8 +486,10 @@ public:
 
         if (draw_applets) {
           if (view_state == AUDIO_SETUP) {
-            gfxHeader("Audio DSP Setup");
-            OC::AudioDSP::DrawAudioSetup();
+            audio_app.View();
+
+            // gfxHeader("Audio DSP Setup");
+            // OC::AudioDSP::DrawAudioSetup();
             draw_applets = false;
           }
         }
@@ -557,7 +562,8 @@ public:
           return;
         }
         if (view_state == AUDIO_SETUP) {
-          OC::AudioDSP::AudioSetupButtonAction(h);
+          // OC::AudioDSP::AudioSetupButtonAction(h);
+          audio_app.HandleButtonEvent(event);
           return;
         }
         if (view_state == APPLET_FULLSCREEN) {
@@ -666,7 +672,8 @@ public:
             return;
         }
         if (view_state == AUDIO_SETUP) {
-          OC::AudioDSP::AudioMenuAdjust(h, event.value);
+          // OC::AudioDSP::AudioMenuAdjust(h, event.value);
+          audio_app.HandleEncoderEvent(event);
           return;
         }
 

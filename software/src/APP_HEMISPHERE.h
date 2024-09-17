@@ -43,6 +43,10 @@
 
 #include "hemisphere_config.h"
 
+#ifdef ARDUINO_TEENSY41
+#include "hemisphere_audio_config.h"
+#endif
+
 #ifdef ENABLE_APP_CALIBR8OR
 // We depend on Calibr8or to save quantizer settings
 #include "APP_CALIBR8OR.h"

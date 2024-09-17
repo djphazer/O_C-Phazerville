@@ -82,6 +82,7 @@ public:
     virtual void OnButtonPress() { CursorToggle(); };
     virtual void OnEncoderMove(int direction) = 0;
 
+    template <typename T> using optional_ref = std::optional<std::reference_wrapper<T>>;
     //void BaseStart(const HEM_SIDE hemisphere_);
     void BaseController();
     void BaseView(bool full_screen = false);
