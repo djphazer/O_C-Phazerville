@@ -1,5 +1,6 @@
 #pragma once
 
+#include <AudioStream.h>
 #include "HemisphereApplet.h"
 
 enum AudioChannels {

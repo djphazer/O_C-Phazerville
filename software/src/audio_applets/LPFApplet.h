@@ -10,13 +10,13 @@ public:
   void Controller() {}
 
   void View() {
-    gfxPrint(15, 0, "Level:  ");
+    gfxPrint(15, 0, "Freq:  ");
     gfxStartCursor();
     gfxPrint(level);
     gfxPrint("%");
     gfxEndCursor(cursor == 0);
 
-    gfxPrint(25, 0, "Offset: ");
+    gfxPrint(25, 0, "Res:  ");
     gfxStartCursor();
     gfxPrint(level);
     gfxPrint("%");

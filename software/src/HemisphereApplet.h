@@ -82,13 +82,13 @@ public:
     virtual void OnButtonPress() { CursorToggle(); };
     virtual void OnEncoderMove(int direction) = 0;
 
-    template <typename T> using optional_ref = std::optional<std::reference_wrapper<T>>;
     //void BaseStart(const HEM_SIDE hemisphere_);
     void BaseController();
     void BaseView(bool full_screen = false);
 
     void BaseStart(const HEM_SIDE hemisphere_) {
         hemisphere = hemisphere_;
+        SetDisplaySide(hemisphere);
 
         // Initialize some things for startup
         cursor_countdown[hemisphere] = HEMISPHERE_CURSOR_TICKS;
@@ -469,9 +469,14 @@ public:
         if (EditMode() && is_cursor) gfxInvert(x-1, y, len+3, 8);
     }
 
+    void SetDisplaySide(int side) {
+        gfx_offset = (side % 2) * 64;
+    }
+
 protected:
     HEM_SIDE hemisphere; // Which hemisphere (0, 1, ...) this applet uses
     bool isEditing = false; // modal editing toggle
+    int gfx_offset = 0;
     virtual void SetHelp() = 0;
 
     /* Forces applet's Start() method to run the next time the applet is selected. This
