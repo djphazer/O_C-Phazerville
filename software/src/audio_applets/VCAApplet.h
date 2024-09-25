@@ -10,19 +10,19 @@ public:
   void Controller() {}
 
   void View() {
-    gfxPrint(15, 0, "Level:  ");
+    gfxPrint(0, 15, "Level: ");
     gfxStartCursor();
     gfxPrint(level);
     gfxPrint("%");
     gfxEndCursor(cursor == 0);
 
-    gfxPrint(25, 0, "Offset: ");
+    gfxPrint(0, 25, "Bias: ");
     gfxStartCursor();
-    gfxPrint(level);
+    gfxPrint(offset);
     gfxPrint("%");
     gfxEndCursor(cursor == 1);
 
-    gfxPrint(35, 0, "Shape:  ");
+    gfxPrint(0, 35, "Shape: ");
     gfxStartCursor();
     gfxPrint(shape);
     gfxPrint("%");
@@ -39,7 +39,7 @@ public:
       level = constrain(level + direction, -200, 200);
       break;
     case 1:
-      offset = constrain(level + direction, -200, 200);
+      offset = constrain(offset + direction, -200, 200);
       break;
     case 2:
       shape = constrain(shape + direction, 0, 100);

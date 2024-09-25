@@ -469,7 +469,7 @@ public:
         if (EditMode() && is_cursor) gfxInvert(x-1, y, len+3, 8);
     }
 
-    void SetDisplaySide(int side) {
+    void SetDisplaySide(HEM_SIDE side) {
         gfx_offset = (side % 2) * 64;
     }
 

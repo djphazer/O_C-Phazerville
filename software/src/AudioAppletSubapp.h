@@ -50,33 +50,43 @@ public:
   }
 
   void View() {
-    gfxPrint("Audio Pipeline");
-    gfxDottedLine(0, 10, 123, 10);
     for (size_t i = 0; i < Slots; i++) {
       print_applet_line(i);
     }
     if (edit_state == EDIT_LEFT) {
-      HemisphereApplet* applet = IsStereo(left_cursor)
+      HemisphereAudioApplet& applet = IsStereo(left_cursor)
         ? get_stereo_applet(left_cursor)
-        : get_mono_applet(0, left_cursor);
-      gfxPrint(64, 15, applet->applet_name());
-      gfxPrint(64, 25, "appears");
-      gfxPrint(64, 35, "here");
-    } else if (edit_state == EDIT_RIGHT) {
-      HemisphereApplet* applet = IsStereo(right_cursor)
+        : get_mono_applet(LEFT_HEMISPHERE, left_cursor);
+      applet.BaseView();
+      gfxFrame(64, 0, 64, 64);
+    } else {
+      gfxPrint(65, 2, "R Channel");
+      gfxDottedLine(64, 10, 126, 10);
+    }
+    if (edit_state == EDIT_RIGHT) {
+      HemisphereAudioApplet& applet = IsStereo(right_cursor)
         ? get_stereo_applet(right_cursor)
-        : get_mono_applet(1, right_cursor);
-      gfxPrint(0, 15, applet->applet_name());
-      gfxPrint(0, 25, "appears");
-      gfxPrint(0, 35, "here");
+        : get_mono_applet(RIGHT_HEMISPHERE, right_cursor);
+      applet.BaseView();
+      gfxFrame(0, 0, 64, 64);
+    } else {
+      gfxPrint(1, 2, "L Channel");
+      gfxDottedLine(0, 10, 62, 10);
     }
   }
 
   void HandleButtonEvent(const UI::Event& event) {
-    parent_app->isEditing = !parent_app->isEditing;
-    edit_state = parent_app->isEditing
-      ? (event.control == OC::CONTROL_BUTTON_L ? EDIT_LEFT : EDIT_RIGHT)
-      : EDIT_NONE;
+    bool forwardPress
+      = (event.control == OC::CONTROL_BUTTON_R && edit_state == EDIT_LEFT)
+      || (event.control == OC::CONTROL_BUTTON_L && edit_state == EDIT_RIGHT);
+    if (forwardPress) {
+      get_selected_applet()->OnButtonPress();
+    } else {
+      parent_app->isEditing = !parent_app->isEditing;
+      edit_state = parent_app->isEditing
+        ? (event.control == OC::CONTROL_BUTTON_L ? EDIT_LEFT : EDIT_RIGHT)
+        : EDIT_NONE;
+    }
   }
 
   void HandleEncoderEvent(const UI::Event& event) {
@@ -88,14 +98,25 @@ public:
             int& sel = selected_stereo_applets[left_cursor];
             int n = left_cursor == 0 ? NumStereoSources : NumStereoProcessors;
             sel = constrain(sel + dir, 0, n - 1);
+            auto& app = get_stereo_applet(left_cursor);
+            app.BaseStart(LEFT_HEMISPHERE);
+            app.SetDisplaySide(RIGHT_HEMISPHERE);
           } else {
             int& sel = selected_mono_applets[0][left_cursor];
             int n = left_cursor == 0 ? NumMonoSources : NumMonoProcessors;
             sel = constrain(sel + dir, 0, n - 1);
+            auto& app = get_mono_applet(LEFT_HEMISPHERE, left_cursor);
+            app.BaseStart(LEFT_HEMISPHERE);
+            app.SetDisplaySide(RIGHT_HEMISPHERE);
           }
           break;
-        case EDIT_RIGHT:
+        case EDIT_RIGHT: {
+          auto& app = IsStereo(right_cursor)
+            ? get_stereo_applet(right_cursor)
+            : get_mono_applet(RIGHT_HEMISPHERE, right_cursor);
+          app.OnEncoderMove(dir);
           break;
+        }
         case EDIT_NONE:
           left_cursor = constrain(left_cursor + dir, 0, (int)Slots - 1);
           break;
@@ -107,22 +128,31 @@ public:
             int& sel = selected_stereo_applets[right_cursor];
             int n = right_cursor == 0 ? NumStereoSources : NumStereoProcessors;
             sel = constrain(sel + dir, 0, n - 1);
+            auto& app = get_stereo_applet(right_cursor);
+            app.BaseStart(RIGHT_HEMISPHERE);
+            app.SetDisplaySide(LEFT_HEMISPHERE);
           } else {
             int& sel = selected_mono_applets[1][right_cursor];
             int n = right_cursor == 0 ? NumMonoSources : NumMonoProcessors;
             sel = constrain(sel + dir, 0, n - 1);
+            auto& app = get_mono_applet(RIGHT_HEMISPHERE, right_cursor);
+            app.BaseStart(RIGHT_HEMISPHERE);
+            app.SetDisplaySide(LEFT_HEMISPHERE);
           }
           break;
-        case EDIT_LEFT:
+        case EDIT_LEFT: {
+          auto& app = IsStereo(left_cursor)
+            ? get_stereo_applet(left_cursor)
+            : get_mono_applet(LEFT_HEMISPHERE, left_cursor);
+          app.OnEncoderMove(dir);
           break;
+        }
         case EDIT_NONE:
           right_cursor = constrain(right_cursor + dir, 0, (int)Slots - 1);
           break;
       }
     }
   }
-
-  // void SwitchApplet(int cursor, )
 
   void SetParentApp(HSApplication* app) {
     parent_app = app;
@@ -155,37 +185,47 @@ private:
   EditState edit_state = EDIT_NONE;
   int left_cursor = 0;
   int right_cursor = 0;
-  HemisphereApplet* get_mono_applet(size_t side, size_t slot) {
+
+  HemisphereAudioApplet& get_mono_applet(HEM_SIDE side, size_t slot) {
     const size_t ix = selected_mono_applets[side][slot];
-    return slot == 0 ? mono_input_applets[side][ix]
-                     : mono_processor_applets[side][slot - 1][ix];
+    return slot == 0 ? *mono_input_applets[side][ix]
+                     : *mono_processor_applets[side][slot - 1][ix];
   }
 
-  HemisphereApplet* get_stereo_applet(size_t slot) {
+  HemisphereAudioApplet& get_stereo_applet(size_t slot) {
     const size_t ix = selected_stereo_applets[slot];
-    return slot == 0 ? stereo_input_applets[ix]
-                     : stereo_processor_applets[slot - 1][ix];
+    return slot == 0 ? *stereo_input_applets[ix]
+                     : *stereo_processor_applets[slot - 1][ix];
+  }
+
+  HemisphereAudioApplet* get_selected_applet() {
+    if (edit_state == EDIT_NONE) return nullptr;
+    int cursor = edit_state == EDIT_LEFT ? left_cursor : right_cursor;
+    if (IsStereo(cursor)) {
+      return &get_stereo_applet(cursor);
+    } else {
+      return &get_mono_applet(
+        edit_state == EDIT_LEFT ? LEFT_HEMISPHERE : RIGHT_HEMISPHERE, cursor
+      );
+    }
   }
 
   void print_applet_line(int slot) {
-    int y = 13 + 10 * slot;
+    int y = 15 + 10 * slot;
     if ((stereo >> slot) & 1) {
       int xs[] = {32, 0, 64};
-
-      // int x = edit_state == EDIT_LEFT ? 0 : edit_state == EDIT_RIGHT ? 64 :
-      // 32;
       int x = xs[edit_state];
-      gfxPrint(x, y, get_stereo_applet(slot)->applet_name());
+      gfxPrint(x, y, get_stereo_applet(slot).applet_name());
       if (left_cursor == slot || right_cursor == slot) {
         parent_app->gfxCursor(x, y + 8, 63);
       }
     } else {
       if (edit_state != EDIT_RIGHT) {
-        gfxPrint(0, y, get_mono_applet(0, slot)->applet_name());
+        gfxPrint(0, y, get_mono_applet(LEFT_HEMISPHERE, slot).applet_name());
         if (left_cursor == slot) parent_app->gfxCursor(0, y + 8, 63);
       }
       if (edit_state != EDIT_LEFT) {
-        gfxPrint(64, y, get_mono_applet(1, slot)->applet_name());
+        gfxPrint(64, y, get_mono_applet(RIGHT_HEMISPHERE, slot).applet_name());
         if (right_cursor == slot) parent_app->gfxCursor(64, y + 8, 63);
       }
     }

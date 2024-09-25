@@ -10,19 +10,19 @@ public:
   void Controller() {}
 
   void View() {
-    gfxPrint(15, 0, "Freq:  ");
+    gfxPrint(0, 15, "Freq:  ");
     gfxStartCursor();
     gfxPrint(level);
     gfxPrint("%");
     gfxEndCursor(cursor == 0);
 
-    gfxPrint(25, 0, "Res:  ");
+    gfxPrint(0, 25, "Res:   ");
     gfxStartCursor();
     gfxPrint(level);
     gfxPrint("%");
     gfxEndCursor(cursor == 1);
 
-    gfxPrint(35, 0, "Shape:  ");
+    gfxPrint(0, 35, "Shape: ");
     gfxStartCursor();
     gfxPrint(shape);
     gfxPrint("%");
