@@ -792,6 +792,13 @@ public:
 
     void HandleButtonEvent(const UI::Event &event) {
 
+        if ((event.control == OC::CONTROL_BUTTON_L || event.control== OC::CONTROL_BUTTON_R)
+            && view_state == AUDIO_SETUP) {
+          // OC::AudioDSP::AudioSetupButtonAction(h);
+          audio_app.HandleEncoderButtonEvent(event);
+          return;
+        }
+
         switch (event.type) {
         case UI::EVENT_BUTTON_DOWN:
 

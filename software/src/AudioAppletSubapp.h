@@ -4,6 +4,7 @@
 #include "HSUtils.h"
 #include "HemisphereAudioApplet.h"
 #include "OC_ui.h"
+#include "UI/ui_events.h"
 #include "util/util_tuples.h"
 
 using std::array, std::tuple;
@@ -75,17 +76,35 @@ public:
     }
   }
 
-  void HandleButtonEvent(const UI::Event& event) {
-    bool forwardPress
-      = (event.control == OC::CONTROL_BUTTON_R && edit_state == EDIT_LEFT)
-      || (event.control == OC::CONTROL_BUTTON_L && edit_state == EDIT_RIGHT);
-    if (forwardPress) {
-      get_selected_applet()->OnButtonPress();
-    } else {
-      parent_app->isEditing = !parent_app->isEditing;
-      edit_state = parent_app->isEditing
-        ? (event.control == OC::CONTROL_BUTTON_L ? EDIT_LEFT : EDIT_RIGHT)
-        : EDIT_NONE;
+  void HandleEncoderButtonEvent(const UI::Event& event) {
+    if ((event.mask & OC::CONTROL_BUTTON_L)
+        && (event.mask & OC::CONTROL_BUTTON_R)) {
+      // check ready_for_press to suppress double events on button combos
+      if (left_cursor == right_cursor && ready_for_press) {
+        stereo ^= 1 << left_cursor;
+      }
+      // Prevent press detection when doing a button combo
+      ready_for_press = false;
+    } else if (event.type == UI::EVENT_BUTTON_PRESS && ready_for_press) {
+      bool forwardPress
+        = (event.control == OC::CONTROL_BUTTON_R && edit_state == EDIT_LEFT)
+        || (event.control == OC::CONTROL_BUTTON_L && edit_state == EDIT_RIGHT);
+      if (forwardPress) {
+        get_selected_applet()->OnButtonPress();
+      } else {
+        parent_app->isEditing = !parent_app->isEditing;
+        edit_state = parent_app->isEditing
+          ? (event.control == OC::CONTROL_BUTTON_L ? EDIT_LEFT : EDIT_RIGHT)
+          : EDIT_NONE;
+        if (edit_state != EDIT_NONE) {
+          get_selected_applet()->SetDisplaySide(
+            event.control == OC::CONTROL_BUTTON_L ? RIGHT_HEMISPHERE
+                                                  : LEFT_HEMISPHERE
+          );
+        }
+      }
+    } else if (event.type == UI::EVENT_BUTTON_DOWN) {
+      ready_for_press = true;
     }
   }
 
@@ -175,6 +194,8 @@ private:
 
   array<array<int, Slots>, 2> selected_mono_applets;
   array<int, Slots> selected_stereo_applets;
+
+  bool ready_for_press = false;
 
   enum EditState {
     EDIT_NONE,
