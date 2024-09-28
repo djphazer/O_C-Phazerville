@@ -5,13 +5,15 @@
 #include "HSUtils.h"
 #include "HemisphereAudioApplet.h"
 #include "OC_ui.h"
+#include "smalloc.h"
 #include "UI/ui_events.h"
 #include "util/util_tuples.h"
 #include <Audio.h>
 
 using std::array, std::tuple;
 
-template <class T, size_t N> class Slot {};
+template <class T, size_t N>
+class Slot {};
 
 template <
   size_t Slots,
@@ -66,6 +68,20 @@ public:
         get_mono_applet(RIGHT_HEMISPHERE, slot).BaseStart(RIGHT_HEMISPHERE);
         ConnectMonoToNext(LEFT_HEMISPHERE, slot);
         ConnectMonoToNext(RIGHT_HEMISPHERE, slot);
+      }
+    }
+  }
+
+  void Controller() {
+    // Call Controller instead of BaseController so we don't trigger
+    // cursor_countdown multiple times. This is a stupid hack and we should do
+    // something smarter.
+    for (size_t i = 0; i < Slots; i++) {
+      if (IsStereo(i)) {
+        get_stereo_applet(i).Controller();
+      } else {
+        get_mono_applet(LEFT_HEMISPHERE, i).Controller();
+        get_mono_applet(RIGHT_HEMISPHERE, i).Controller();
       }
     }
   }
@@ -289,6 +305,7 @@ private:
   array<array<AudioConnection, Slots + 1>, 2> conns;
 
   bool ready_for_press = false;
+  size_t total, user, free;
 
   enum EditState {
     EDIT_NONE,
