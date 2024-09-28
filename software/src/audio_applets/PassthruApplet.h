@@ -1,20 +1,35 @@
 
 #include "HemisphereAudioApplet.h"
+#include "AudioPassthrough.h"
 
+template <AudioChannels Channels>
 class PassthruApplet : public HemisphereAudioApplet {
 public:
-  const char *applet_name() override { return " - ";}
+  const char* applet_name() override {
+    return " - ";
+  }
   void Start() override {}
   void Controller() override {}
   void View() override {}
-  uint64_t OnDataRequest() override { return 0; }
+  uint64_t OnDataRequest() override {
+    return 0;
+  }
   void OnDataReceive(uint64_t data) override {}
   void OnEncoderMove(int direction) override {}
 
-  AudioStream *InputStream() override { return nullptr; }
-  AudioStream *OutputStream() override { return nullptr; }
-  AudioChannels NumChannels() override { return MONO; }
+  AudioStream* InputStream() override {
+    return &passthru;
+  }
+  AudioStream* OutputStream() override {
+    return &passthru;
+  }
+  AudioChannels NumChannels() override {
+    return Channels;
+  }
 
 protected:
   void SetHelp() override {}
+
+private:
+  AudioPassthrough<Channels> passthru;
 };

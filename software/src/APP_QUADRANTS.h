@@ -35,7 +35,7 @@
 #include "HSicons.h"
 #include "HSMIDI.h"
 #include "HSClockManager.h"
-#include "AudioSetup.h"
+// #include "AudioSetup.h"
 
 #include "hemisphere_config.h"
 #include "hemisphere_audio_config.h"
@@ -246,6 +246,7 @@ class QuadAppletManager : public HSApplication {
 public:
     void Start() {
         audio_app.SetParentApp(this);
+        audio_app.Init();
 
         for (int i = 0; i < 4; ++i) {
             quant_scale[i] = OC::Scales::SCALE_SEMI;
@@ -563,7 +564,7 @@ public:
         }
         if (view_state == AUDIO_SETUP) {
           // OC::AudioDSP::AudioSetupButtonAction(h);
-          audio_app.HandleButtonEvent(event);
+          // audio_app.HandleButtonEvent(event);
           return;
         }
         if (view_state == APPLET_FULLSCREEN) {
@@ -791,6 +792,7 @@ public:
     }
 
     void HandleButtonEvent(const UI::Event &event) {
+        //serial_printf("mask=%d type=%d value=%d control=%d\n", event.mask, event.type, event.value, event.control);
 
         if ((event.control == OC::CONTROL_BUTTON_L || event.control== OC::CONTROL_BUTTON_R)
             && view_state == AUDIO_SETUP) {

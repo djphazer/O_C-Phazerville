@@ -1,11 +1,13 @@
 #pragma once
 
+#include "AudioIO.h"
 #include "HSApplication.h"
 #include "HSUtils.h"
 #include "HemisphereAudioApplet.h"
 #include "OC_ui.h"
 #include "UI/ui_events.h"
 #include "util/util_tuples.h"
+#include <Audio.h>
 
 using std::array, std::tuple;
 
@@ -48,6 +50,24 @@ public:
           stereo_processor_pool[slot]
         );
     }
+    selected_mono_applets[0].fill(0);
+    selected_mono_applets[1].fill(0);
+    selected_mono_applets[1][0] = 1;
+    selected_stereo_applets.fill(0);
+  }
+
+  void Init() {
+    for (size_t slot = 0; slot < Slots; slot++) {
+      if (IsStereo(slot)) {
+        get_stereo_applet(slot).BaseStart(LEFT_HEMISPHERE);
+        ConnectStereoToNext(slot);
+      } else {
+        get_mono_applet(LEFT_HEMISPHERE, slot).BaseStart(LEFT_HEMISPHERE);
+        get_mono_applet(RIGHT_HEMISPHERE, slot).BaseStart(RIGHT_HEMISPHERE);
+        ConnectMonoToNext(LEFT_HEMISPHERE, slot);
+        ConnectMonoToNext(RIGHT_HEMISPHERE, slot);
+      }
+    }
   }
 
   void View() {
@@ -82,6 +102,22 @@ public:
       // check ready_for_press to suppress double events on button combos
       if (left_cursor == right_cursor && ready_for_press) {
         stereo ^= 1 << left_cursor;
+        if (IsStereo(left_cursor)) {
+          get_mono_applet(LEFT_HEMISPHERE, left_cursor).Unload();
+          get_mono_applet(RIGHT_HEMISPHERE, left_cursor).Unload();
+          get_stereo_applet(left_cursor).BaseStart(LEFT_HEMISPHERE);
+          ConnectStereoToNext(left_cursor);
+          if (left_cursor > 0) ConnectSlotToNext(left_cursor - 1);
+        } else {
+          get_stereo_applet(left_cursor).Unload();
+          get_mono_applet(LEFT_HEMISPHERE, left_cursor)
+            .BaseStart(LEFT_HEMISPHERE);
+          get_mono_applet(RIGHT_HEMISPHERE, left_cursor)
+            .BaseStart(RIGHT_HEMISPHERE);
+          ConnectMonoToNext(LEFT_HEMISPHERE, left_cursor);
+          ConnectMonoToNext(RIGHT_HEMISPHERE, left_cursor);
+          if (left_cursor > 0) ConnectSlotToNext(left_cursor - 1);
+        }
       }
       // Prevent press detection when doing a button combo
       ready_for_press = false;
@@ -108,32 +144,53 @@ public:
     }
   }
 
+  void ChangeStereoApplet(HEM_SIDE side, size_t slot, int dir) {
+    int& sel = selected_stereo_applets[slot];
+    int n = slot == 0 ? NumStereoSources : NumStereoProcessors;
+    get_stereo_applet(slot).Unload();
+    sel = constrain(sel + dir, 0, n - 1);
+    auto& app = get_stereo_applet(slot);
+    app.BaseStart(side);
+    app.SetDisplaySide(
+      side == LEFT_HEMISPHERE ? RIGHT_HEMISPHERE : LEFT_HEMISPHERE
+    );
+    ConnectStereoToNext(slot);
+    if (slot > 0) ConnectSlotToNext(slot - 1);
+  }
+
+  void ChangeMonoApplet(HEM_SIDE side, size_t slot, int dir) {
+    int& sel = selected_mono_applets[side][slot];
+    int n = slot == 0 ? NumMonoSources : NumMonoProcessors;
+    get_mono_applet(side, slot).Unload();
+    sel = constrain(sel + dir, 0, n - 1);
+    auto& app = get_mono_applet(side, slot);
+    app.BaseStart(side);
+    app.SetDisplaySide(
+      side == LEFT_HEMISPHERE ? RIGHT_HEMISPHERE : LEFT_HEMISPHERE
+    );
+    ConnectMonoToNext(side, slot);
+    if (slot > 0) ConnectSlotToNext(slot - 1);
+  }
+
+  void ForwardEncoderMove(HEM_SIDE side, size_t slot, int dir) {
+    auto& app
+      = IsStereo(slot) ? get_stereo_applet(slot) : get_mono_applet(side, slot);
+    app.OnEncoderMove(dir);
+  }
+
   void HandleEncoderEvent(const UI::Event& event) {
     int dir = event.value;
     if (event.control == OC::CONTROL_ENCODER_L) {
       switch (edit_state) {
         case EDIT_LEFT:
           if (IsStereo(left_cursor)) {
-            int& sel = selected_stereo_applets[left_cursor];
-            int n = left_cursor == 0 ? NumStereoSources : NumStereoProcessors;
-            sel = constrain(sel + dir, 0, n - 1);
-            auto& app = get_stereo_applet(left_cursor);
-            app.BaseStart(LEFT_HEMISPHERE);
-            app.SetDisplaySide(RIGHT_HEMISPHERE);
+            ChangeStereoApplet(LEFT_HEMISPHERE, left_cursor, dir);
           } else {
-            int& sel = selected_mono_applets[0][left_cursor];
-            int n = left_cursor == 0 ? NumMonoSources : NumMonoProcessors;
-            sel = constrain(sel + dir, 0, n - 1);
-            auto& app = get_mono_applet(LEFT_HEMISPHERE, left_cursor);
-            app.BaseStart(LEFT_HEMISPHERE);
-            app.SetDisplaySide(RIGHT_HEMISPHERE);
+            ChangeMonoApplet(LEFT_HEMISPHERE, left_cursor, dir);
           }
           break;
         case EDIT_RIGHT: {
-          auto& app = IsStereo(right_cursor)
-            ? get_stereo_applet(right_cursor)
-            : get_mono_applet(RIGHT_HEMISPHERE, right_cursor);
-          app.OnEncoderMove(dir);
+          ForwardEncoderMove(RIGHT_HEMISPHERE, right_cursor, dir);
           break;
         }
         case EDIT_NONE:
@@ -144,26 +201,13 @@ public:
       switch (edit_state) {
         case EDIT_RIGHT:
           if (IsStereo(right_cursor)) {
-            int& sel = selected_stereo_applets[right_cursor];
-            int n = right_cursor == 0 ? NumStereoSources : NumStereoProcessors;
-            sel = constrain(sel + dir, 0, n - 1);
-            auto& app = get_stereo_applet(right_cursor);
-            app.BaseStart(RIGHT_HEMISPHERE);
-            app.SetDisplaySide(LEFT_HEMISPHERE);
+            ChangeStereoApplet(RIGHT_HEMISPHERE, right_cursor, dir);
           } else {
-            int& sel = selected_mono_applets[1][right_cursor];
-            int n = right_cursor == 0 ? NumMonoSources : NumMonoProcessors;
-            sel = constrain(sel + dir, 0, n - 1);
-            auto& app = get_mono_applet(RIGHT_HEMISPHERE, right_cursor);
-            app.BaseStart(RIGHT_HEMISPHERE);
-            app.SetDisplaySide(LEFT_HEMISPHERE);
+            ChangeMonoApplet(RIGHT_HEMISPHERE, right_cursor, dir);
           }
           break;
         case EDIT_LEFT: {
-          auto& app = IsStereo(left_cursor)
-            ? get_stereo_applet(left_cursor)
-            : get_mono_applet(LEFT_HEMISPHERE, left_cursor);
-          app.OnEncoderMove(dir);
+          ForwardEncoderMove(LEFT_HEMISPHERE, left_cursor, dir);
           break;
         }
         case EDIT_NONE:
@@ -175,6 +219,53 @@ public:
 
   void SetParentApp(HSApplication* app) {
     parent_app = app;
+  }
+
+  void ConnectSlotToNext(size_t slot) {
+    if (IsStereo(slot)) {
+      ConnectStereoToNext(slot);
+    } else {
+      ConnectMonoToNext(LEFT_HEMISPHERE, slot);
+      ConnectMonoToNext(RIGHT_HEMISPHERE, slot);
+    }
+  }
+
+  void ConnectMonoToNext(HEM_SIDE side, size_t slot) {
+    AudioStream* stream = get_mono_applet(side, slot).OutputStream();
+    AudioConnection& conn = conns[side][slot];
+    conn.disconnect();
+    if (slot + 1 < Slots && !IsStereo(slot + 1)) {
+      conn.connect(
+        *stream, 0, *get_mono_applet(side, slot + 1).InputStream(), 0
+      );
+    } else {
+      AudioStream* next_stream = slot + 1 < Slots
+        ? get_stereo_applet(slot + 1).InputStream()
+        : &OC::AudioIO::OutputStream();
+      conn.connect(*stream, 0, *next_stream, side);
+    }
+  }
+
+  void ConnectStereoToNext(size_t slot) {
+    AudioStream* stream = get_stereo_applet(slot).OutputStream();
+    AudioConnection& lconn = conns[LEFT_HEMISPHERE][slot];
+    AudioConnection& rconn = conns[RIGHT_HEMISPHERE][slot];
+    lconn.disconnect();
+    rconn.disconnect();
+    if (slot + 1 < Slots && !IsStereo(slot + 1)) {
+      AudioStream* lstream
+        = get_mono_applet(LEFT_HEMISPHERE, slot + 1).InputStream();
+      AudioStream* rstream
+        = get_mono_applet(RIGHT_HEMISPHERE, slot + 1).InputStream();
+      lconn.connect(*stream, 0, *lstream, 0);
+      rconn.connect(*stream, 1, *rstream, 0);
+    } else {
+      AudioStream* next_stream = slot + 1 < Slots
+        ? get_stereo_applet(slot + 1).InputStream()
+        : &OC::AudioIO::OutputStream();
+      lconn.connect(*stream, 0, *next_stream, 1);
+      rconn.connect(*stream, 1, *next_stream, 1);
+    }
   }
 
 protected:
@@ -194,6 +285,8 @@ private:
 
   array<array<int, Slots>, 2> selected_mono_applets;
   array<int, Slots> selected_stereo_applets;
+
+  array<array<AudioConnection, Slots + 1>, 2> conns;
 
   bool ready_for_press = false;
 
