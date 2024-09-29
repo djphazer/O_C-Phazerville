@@ -196,6 +196,12 @@ public:
         return (c <= ADC_CHANNEL_LAST) ? frame.inputs[c - 1] : frame.outputs[c - 1 - ADC_CHANNEL_LAST];
     }
 
+    #ifdef ARDUINO_TEENSY41
+    float InF(int ch) {
+        return static_cast<float>(In(ch)) / HEMISPHERE_MAX_INPUT_CV;
+    }
+    #endif
+
     // Apply small center detent to input, so it reads zero before a threshold
     int DetentedIn(int ch) {
         return (In(ch) > (HEMISPHERE_CENTER_CV + HEMISPHERE_CENTER_DETENT) || In(ch) < (HEMISPHERE_CENTER_CV - HEMISPHERE_CENTER_DETENT))
@@ -343,6 +349,27 @@ public:
     void gfxPrint(int num) {
         graphics.print(num);
     }
+
+    void gfxPrint(int x, int y, float num, int digits) {
+        graphics.setPrintPos(x + gfx_offset, y);
+        gfxPrint(num, digits);
+    }
+
+    void gfxPrint(float num, int digits) {
+        int i = static_cast<int>(num);
+        float dec = num - i;
+        gfxPrint(i);
+        if (digits > 0) {
+            gfxPrint(".");
+            while (digits--) {
+                dec *= 10;
+                i = static_cast<int>(dec);
+                gfxPrint(i);
+                dec -= i;
+            }
+        }
+    }
+
 
     void gfxStartCursor(int x, int y) {
         gfxPos(x, y);

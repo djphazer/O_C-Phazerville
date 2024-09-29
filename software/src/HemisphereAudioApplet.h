@@ -13,7 +13,6 @@ class HemisphereAudioApplet : public HemisphereApplet{
 public:
   virtual AudioStream *InputStream() = 0;
   virtual AudioStream *OutputStream() = 0;
-  virtual AudioChannels NumChannels() = 0;
 };
 
 // template <AudioChannels NumIn, AudioChannels NumOut>

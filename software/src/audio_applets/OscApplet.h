@@ -12,7 +12,7 @@ public:
 
   AudioStream *InputStream() override { return nullptr; }
   AudioStream *OutputStream() override { return nullptr; }
-  AudioChannels NumChannels() override { return MONO; }
+  // AudioChannels NumChannels() override { return MONO; }
 
 protected:
   void SetHelp() override {}

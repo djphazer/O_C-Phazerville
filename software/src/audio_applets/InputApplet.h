@@ -26,9 +26,6 @@ public:
   AudioStream* OutputStream() override {
     return &amp;
   }
-  AudioChannels NumChannels() override {
-    return MONO;
-  }
 
 protected:
   void SetHelp() override {}

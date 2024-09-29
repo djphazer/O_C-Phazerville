@@ -23,9 +23,6 @@ public:
   AudioStream* OutputStream() override {
     return &passthru;
   }
-  AudioChannels NumChannels() override {
-    return Channels;
-  }
 
 protected:
   void SetHelp() override {}
