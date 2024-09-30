@@ -1,5 +1,6 @@
 #include "HemisphereAudioApplet.h"
 #include "AudioPassthrough.h"
+#include "dsputils.h"
 #include <Audio.h>
 
 template <AudioChannels Channels>
@@ -19,7 +20,7 @@ public:
 
   void Controller() {
     for (int i=0; i<Channels; i++) {
-      filters[i].frequency(pitch);
+      filters[i].frequency(PitchToRatio(pitch) * C3);
       filters[i].resonance(0.01f * res);
     }
 
@@ -28,9 +29,12 @@ public:
   void View() {
     const int label_x = 1;
     const int param_x = 38;
-    gfxPrint(label_x, 15, "Freq:");
-    gfxStartCursor(param_x, 15);
-    graphics.printf("%4d", pitch);
+    // gfxPrint(label_x, 15, "Freq:");
+    gfxStartCursor(label_x, 15);
+    float freq = PitchToRatio(pitch) * C3;
+    int int_part = static_cast<int>(freq);
+    int dec_part = static_cast<int>(100 * (freq - int_part));
+    graphics.printf("%5d.%02dHz", int_part, dec_part);
     gfxEndCursor(cursor == 0);
 
     gfxPrint(label_x, 25, "Res:");
@@ -46,7 +50,7 @@ public:
     }
     switch (cursor) {
       case 0:
-        pitch = constrain(pitch + direction, 0, 0xffff);
+        pitch = constrain(pitch + direction * 64, 0, 0xffff);
         break;
       case 1:
         res = constrain(res + direction, 0, 180);

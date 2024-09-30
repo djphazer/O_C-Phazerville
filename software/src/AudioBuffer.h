@@ -119,7 +119,7 @@ public:
 
   void Acquire() {
     if (this->buffer == nullptr) {
-      this->buffer = extmem_calloc(NumSamples, sizeof(T));
+      this->buffer = static_cast<T*>(extmem_calloc(NumSamples, sizeof(T)));
     }
   }
 
