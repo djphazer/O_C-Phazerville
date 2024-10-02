@@ -41,10 +41,14 @@ public:
         SwitchTuringMachine(0);
     }
 
+    void Reset() {
+        tm_state.Reset();
+        length = tm_state.GetLength();
+    }
+
     void Controller() {
         if (Clock(1)) {
-            tm_state.Reset();
-            length = tm_state.GetLength();
+            Reset();
         }
 
         // If a clock is present, advance the TuringMachineState

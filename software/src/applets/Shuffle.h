@@ -39,14 +39,15 @@ public:
         triplet_time = 0;
     }
 
+    void Reset() {
+        which = 0; // Reset (next trigger will be even clock)
+        last_tick = OC::CORE::ticks;
+        triplet_which = 0;  // Triplets reset to down beat
+    }
+
     void Controller() {
-        uint32_t tick = OC::CORE::ticks;
-        if (Clock(1))
-        {
-            which = 0; // Reset (next trigger will be even clock)
-            last_tick = tick;
-            triplet_which = 0;  // Triplets reset to down beat
-        }
+        const uint32_t tick = OC::CORE::ticks;
+        if (Clock(1)) Reset();
 
         // continuously update CV modulated delay values, for display
         ForEachChannel(ch)

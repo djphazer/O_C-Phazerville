@@ -41,11 +41,15 @@ public:
         VoltageOut();
     }
 
+    void Reset() {
+        step = 0; // Reset
+        reset = true;
+        VoltageOut();
+    }
+
     void Controller() {
         if (Clock(1)) {
-            step = 0; // Reset
-            reset = true;
-            VoltageOut();
+            Reset();
         }
 
         if (Clock(0)) {

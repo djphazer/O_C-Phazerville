@@ -57,10 +57,14 @@ public:
     void Start() {
     }
 
+    void Reset() {
+      seq.Reset();
+    }
+
     void Controller()
     {
       if (Clock(1)) { // reset
-        seq.Reset();
+        Reset();
       }
       if (Clock(0)) { // clock
 

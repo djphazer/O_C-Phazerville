@@ -35,8 +35,12 @@ public:
         cursor = 0;
     }
 
+    void Reset() {
+        step = -1;
+    }
+
     void Controller() {
-        if (Clock(1)) step = -1; // reset regardless of clock
+        if (Clock(1)) Reset();
 
         if (Clock(0)) {
             bool swap = In(0) >= HEMISPHERE_3V_CV;

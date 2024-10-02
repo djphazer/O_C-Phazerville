@@ -37,6 +37,11 @@ public:
         Randomize();
     }
 
+    void Reset() {
+        step = 0;
+        reset = true;
+    }
+
     void Randomize() {
         for (int s = 0; s < SEQX_STEPS; s++) note[s] = random(SEQX_MIN_VALUE, SEQX_MAX_VALUE);
     }
@@ -149,11 +154,6 @@ private:
         if (++step == SEQX_STEPS) step = 0;
         // If all the steps have been muted, stay where we were
         if (step_is_muted(step) && step != starting_point) Advance(starting_point);
-    }
-
-    void Reset() {
-        step = 0;
-        reset = true;
     }
 
     void DrawPanel() {

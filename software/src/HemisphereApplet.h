@@ -70,6 +70,7 @@ public:
     }
 
     virtual void Start() = 0;
+    virtual void Reset() { };
     virtual void Controller() = 0;
     virtual void View() = 0;
     virtual uint64_t OnDataRequest() = 0;

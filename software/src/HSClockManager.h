@@ -40,6 +40,7 @@ constexpr int CLOCK_MAX_MULTIPLE = 24;
 constexpr int CLOCK_MIN_MULTIPLE = -31; // becomes /32
 
 class ClockManager {
+public:
     enum ClockOutput {
         LEFT_CLOCK1,
         LEFT_CLOCK2,
@@ -57,6 +58,7 @@ class ClockManager {
     uint32_t ticks_per_beat; // Based on the selected tempo in BPM
     bool running = 0; // Specifies whether the clock is running for interprocess communication
     bool paused = 0; // Specifies whethr the clock is paused
+    bool auto_reset = 0; // on clock start
     bool midi_out_enabled = 1;
 
     bool tickno = 0;
@@ -75,7 +77,6 @@ class ClockManager {
 
     void (*sync_func)(); // callback function
 
-public:
     ClockManager() {
         SetTempoBPM(120);
     }
@@ -259,6 +260,7 @@ public:
         Reset();
         running = 1;
         paused = p;
+        auto_reset = !p;
         if (!p && midi_out_enabled) {
             usbMIDI.sendRealTime(usbMIDI.Start);
 #if defined(__IMXRT1062__)

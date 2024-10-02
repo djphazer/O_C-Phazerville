@@ -43,6 +43,12 @@ public:
       divmult[2].steps = 4;
     }
 
+    void Reset() {
+      ForEachChannel(ch) {
+        ForEachChannel(d) divmult[ch*2 + d].Reset();
+      }
+    }
+
     void Controller() {
         // Modulate setting via CV
         ForEachChannel(ch)
@@ -52,11 +58,7 @@ public:
           divmult[ch*2].steps = div_m;
         }
 
-        if (Clock(1)) { // Reset
-          ForEachChannel(ch) {
-            ForEachChannel(d) divmult[ch*2 + d].Reset();
-          }
-        }
+        if (Clock(1)) Reset();
 
         bool clocked = Clock(0);
         ForEachChannel(ch)

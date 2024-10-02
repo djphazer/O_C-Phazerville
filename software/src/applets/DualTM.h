@@ -99,6 +99,12 @@ public:
         qselect[1] = io_offset + 1;
     }
 
+    void Reset() {
+      if (reset_active) {
+        ForEachChannel(ch) reg[ch] = reg_snap[ch];
+      }
+    }
+
     void Controller() {
         bool clk = Clock(0);
         if (clk) StartADCLag(0);
@@ -109,9 +115,7 @@ public:
         cv_data[1] = DetentedIn(1);
 
         // Reset
-        if (reset_active && Clock(1)) {
-          ForEachChannel(ch) reg[ch] = reg_snap[ch];
-        }
+        if (Clock(1)) { Reset(); }
 
         // default to no mod
         p_mod = p;

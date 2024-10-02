@@ -38,6 +38,10 @@ public:
         offset = 0;
     }
 
+    void Reset() {
+        pending_clocks += (length - position + offset_mod - 1) % length;
+    }
+
     void Controller() {
         // CV1 modulates offset
         int cv1_mod = offset;
@@ -47,7 +51,7 @@ public:
             UpdateOffset(offset_mod, cv1_mod);
 
         if (Clock(1)) {
-            pending_clocks += (length - position + offset_mod - 1) % length;
+            Reset();
         }
 
         if (Clock(0)) pending_clocks++;

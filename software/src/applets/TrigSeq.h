@@ -36,9 +36,13 @@ public:
         reset = true;
     }
 
+    void Reset() {
+        ForEachChannel(ch) step[ch] = -1;
+    }
+
     void Controller() {
-        if (Clock(1)) { // reset
-            ForEachChannel(ch) step[ch] = -1;
+        if (Clock(1)) {
+            Reset();
         }
 
         if (Clock(0)) { // clock advance

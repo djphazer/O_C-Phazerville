@@ -424,8 +424,12 @@ public:
                     }
                 }
             }
+            if (HS::clock_m.auto_reset)
+                active_applet[h]->Reset();
+
             active_applet[h]->BaseController();
         }
+        HS::clock_m.auto_reset = false;
     }
 
     void View() {

@@ -70,22 +70,22 @@ class TB_3PO: public HemisphereApplet {
 
     lock_seed = 0;
     reseed();
-    regenerate_all();
 
+  }
+
+  void Reset() {
+    manual_reset_flag = 0;
+    if (lock_seed == 0) {
+      reseed();
+    }
+    step = 0;
   }
 
   void Controller() {
     const int this_tick = OC::CORE::ticks;
 
     if (Clock(1) || manual_reset_flag) {
-      manual_reset_flag = 0;
-      if (lock_seed == 0) {
-        reseed();
-      }
-
-      regenerate_all();
-
-      step = 0;
+      Reset();
     }
 
     transpose_cv = 0;
@@ -388,6 +388,7 @@ private:
   void reseed() {
     randomSeed(micros());
     seed = random(0, 65535); // 16 bits
+    regenerate_all();
   }
 
   void regenerate_all() {

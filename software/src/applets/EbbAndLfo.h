@@ -24,14 +24,18 @@ public:
     phase_extractor.Init();
   }
 
+  void Reset() {
+    phase = 0;
+    oneshot_active = true;
+    reset = true;
+  }
+
   void Controller() {
     if (knob_accel > (1 << 8))
       knob_accel--;
 
-    bool reset = Clock(1);
-    if (reset) { // reset/retrigger
-      phase = 0;
-      oneshot_active = true;
+    if (Clock(1)) {
+      Reset();
     }
 
     int freq_div_mul = ratio;
@@ -80,6 +84,7 @@ public:
     uint32_t oldphase = phase;
     if (clocked) {
       phase = phase_extractor.Advance(got_clock, reset, freq_div_mul);
+      reset = false;
     } else {
       uint32_t phase_increment = ComputePhaseIncrement(pitch_mod);
       phase += phase_increment;
@@ -379,6 +384,7 @@ private:
   bool oneshot_mode = 0;
   bool oneshot_active = 0;
   bool clocked = 0;
+  bool reset = 0;
 
   PhaseExtractor<> phase_extractor;
 

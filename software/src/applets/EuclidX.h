@@ -64,8 +64,12 @@ public:
         step = 0;
     }
 
+    void Reset() {
+        step = 0;
+    }
+
     void Controller() {
-        if (Clock(1)) step = 0; // Reset
+        if (Clock(1)) Reset();
 
         // continuously recalculate pattern with CV offsets
         ForEachChannel(ch) {

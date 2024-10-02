@@ -477,8 +477,12 @@ public:
                     }
                 }
             }
+            if (HS::clock_m.auto_reset)
+                HS::available_applets[index].instance[h]->Reset();
+
             HS::available_applets[index].instance[h]->BaseController();
         }
+        HS::clock_m.auto_reset = false;
 
 #ifdef ARDUINO_TEENSY41
         // auto-trigger outputs E..H
