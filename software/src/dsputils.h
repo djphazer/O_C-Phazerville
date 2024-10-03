@@ -1,5 +1,4 @@
 #pragma once
-
 #include "extern/fastapprox/fastexp.h"
 #include "extern/fastapprox/fastlog.h"
 
@@ -15,6 +14,8 @@ inline float SemitonesToRatio(float semitones) {
   return fastpow2(semitones / 12.0f);
 }
 
+// TODO: This is less accurate the LUT used in tideslite so might want to just
+// use those instead when performance isn't critical
 inline float PitchToRatio(int16_t pitch) {
   return SemitonesToRatio(static_cast<float>(pitch) / 128.0f);
 }
