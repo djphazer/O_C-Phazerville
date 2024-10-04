@@ -343,11 +343,12 @@ private:
 
   void print_applet_line(int slot) {
     int y = 15 + 10 * slot;
-    if ((stereo >> slot) & 1) {
+    if (IsStereo(slot)) {
       int xs[] = {32, 0, 64};
       int x = xs[edit_state];
       gfxPrint(x, y, get_stereo_applet(slot).applet_name());
-      if (left_cursor == slot || right_cursor == slot) {
+      if ((left_cursor == slot && edit_state != EDIT_RIGHT)
+          || (right_cursor == slot && edit_state != EDIT_LEFT)) {
         parent_app->gfxCursor(x, y + 8, 63);
       }
     } else {
