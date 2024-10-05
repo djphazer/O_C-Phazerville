@@ -49,7 +49,7 @@ public:
     gfxEndCursor(cursor == 2);
 
     gfxPrint(label_x, 45, "PBG:");
-    gfxStartCursor(param_x, 45);
+    gfxStartCursor(param_x + 2 * 6, 45);
     graphics.printf("%2d", pb_gain);
     gfxEndCursor(cursor == 3);
   }
@@ -92,10 +92,10 @@ protected:
 
 private:
   int cursor = 0;
-  int pitch = 0;
+  int pitch = 1 * 12 * 128; // C4
   int16_t res = 0;
   int16_t gain = 100;
-  int16_t pb_gain = 0;
+  int16_t pb_gain = 50;
 
   AudioPassthrough<Channels> input;
   std::array<AudioFilterLadder, Channels> filters;
