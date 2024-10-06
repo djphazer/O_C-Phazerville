@@ -66,9 +66,8 @@ public:
       if (Clock(1)) {
         if (write_mode) {
           // insert rest
-          seq.Advance();
           seq.Mute(seq.step);
-          //StartADCLag(); // record note and accent anyway?
+          StartADCLag();
         } else
           Reset();
       }
@@ -82,10 +81,12 @@ public:
 
           trans_mod = transpose;
           Modulate(trans_mod, 1, -MAX_TRANS, MAX_TRANS);
-        }
 
-        seq.Advance();
-        if (write_mode) seq.Unmute(seq.step);
+          seq.Advance();
+        } else {
+          seq.Unmute(seq.step);
+          StartADCLag();
+        }
 
         if (seq.muted(seq.step)) {
           GateOut(1, false);
@@ -104,16 +105,15 @@ public:
             ClockOut(1);
           }
         }
-        StartADCLag();
       }
 
       if (EndOfADCLag() && write_mode) {
-        // sample and record note number from cv2
+        // sample and record note number from CV2, accent from CV1, and then advance
         Quantize(0, In(1));
         current_note = GetLatestNoteNumber(0) - 64;
         seq.SetNote(current_note, seq.step);
-
         seq.SetAccent(seq.step, In(0) > (24 << 7)); // cv1 > 2V qualifies as accent
+        seq.Advance();
       }
 
       // continuously compute CV with transpose
