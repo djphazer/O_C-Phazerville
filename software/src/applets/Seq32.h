@@ -63,8 +63,14 @@ public:
 
     void Controller()
     {
-      if (Clock(1)) { // reset
-        Reset();
+      if (Clock(1)) {
+        if (write_mode) {
+          // insert rest
+          seq.Advance();
+          seq.Mute(seq.step);
+          //StartADCLag(); // record note and accent anyway?
+        } else
+          Reset();
       }
       if (Clock(0)) { // clock
 
@@ -79,6 +85,7 @@ public:
         }
 
         seq.Advance();
+        if (write_mode) seq.Unmute(seq.step);
 
         if (seq.muted(seq.step)) {
           GateOut(1, false);
@@ -101,19 +108,14 @@ public:
       }
 
       if (EndOfADCLag() && write_mode) {
-        // sample and record note number from cv1
-        Quantize(0, In(0));
+        // sample and record note number from cv2
+        Quantize(0, In(1));
         current_note = GetLatestNoteNumber(0) - 64;
         seq.SetNote(current_note, seq.step);
 
-        if (In(1) > (6 << 7)) // cv2 > 0.5V determines mute state
-          seq.Unmute(seq.step);
-        else
-          seq.Mute(seq.step);
-
-        seq.SetAccent(seq.step, In(1) > (24 << 7)); // cv2 > 2V qualifies as accent
+        seq.SetAccent(seq.step, In(0) > (24 << 7)); // cv1 > 2V qualifies as accent
       }
-      
+
       // continuously compute CV with transpose
       int play_note = current_note + 64 + trans_mod;
       CONSTRAIN(play_note, 0, 127);
@@ -153,17 +155,23 @@ public:
       }
     }
     void AuxButton() {
-      if (cursor >= NOTES)
+      if (cursor == WRITE_MODE) {
+        seq.ToggleMute(seq.step);
+        return;
+      }
+      if (cursor >= NOTES) {
         seq.ToggleMute(cursor - NOTES);
-      else if (cursor == LENGTH)
+        return;
+      }
+
+      if (cursor == LENGTH)
         seq.Randomize(true);
       else if (cursor == TRANSPOSE)
         seq.SowPitches(abs(transpose));
       else if (cursor == PATTERN)
         seq.Clear();
-      
-      if (cursor < NOTES) flash_ticker = 1000;
 
+      flash_ticker = 1000;
       isEditing = false;
     }
 
@@ -191,18 +199,14 @@ public:
           seq.SetLength(constrain(seq.GetLength() + direction, 1, MiniSeq::MAX_STEPS));
           break;
 
-        /* handled in popup editor
-        case QUANT_SCALE:
-          NudgeScale(0, direction);
-          break;
-
-        case QUANT_ROOT:
-          SetRootNote(0, GetRootNote(0) + direction);
-          break;
-        */
-
         case TRANSPOSE:
           transpose = constrain(transpose + direction, -MAX_TRANS, MAX_TRANS);
+          break;
+
+        case WRITE_MODE:
+          seq.Advance(direction < 0);
+          if (!seq.muted())
+            current_note = seq.GetNote();
           break;
       }
     }

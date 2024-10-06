@@ -32,12 +32,16 @@ struct MiniSeq {
     }
     SetLength(length);
   }
-  void Advance() {
+  void Advance(bool reverse = false) {
       if (reset) {
         reset = false;
         return;
       }
-      if (++step >= GetLength()) step = 0;
+      if (reverse) {
+        if (--step < 0) step = GetLength() - 1;
+      } else {
+        if (++step >= GetLength()) step = 0;
+      }
   }
   int GetNote(const size_t s_) {
     // lower 6 bits is note value
@@ -64,6 +68,9 @@ struct MiniSeq {
   void SetAccent(const size_t s_, bool on = true) {
     note[s_] &= ~(1 << 6); // clear
     note[s_] |= (on << 6); // set
+  }
+  bool muted() {
+    return muted(step);
   }
   bool muted(const size_t s_) {
     // highest bit is mute
