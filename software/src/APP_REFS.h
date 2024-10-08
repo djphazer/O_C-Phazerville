@@ -32,63 +32,14 @@
 #include "OC_autotuner.h"
 #include "src/drivers/FreqMeasure/OC_FreqMeasure.h"
 
-// autotune constants:
-static constexpr uint32_t FREQ_MEASURE_TIMEOUT = 512;
-static constexpr uint32_t ERROR_TIMEOUT = (FREQ_MEASURE_TIMEOUT << 0x4);
-#define MAX_NUM_PASSES 1500
-#define CONVERGE_PASSES 5
-
 static constexpr int32_t kMaxOffsetError = (65536 / 5);
-
-// 
 static constexpr double kAaboveMidCtoC0 = 0.03716272234383494188492;
 
-#ifdef AUTOTUNE_DEBUG
-# define AUTOTUNE_PRINTLN(msg, ...) \
-  serial_printf(msg "\n", ##__VA_ARGS__)
-#else
-# define AUTOTUNE_PRINTLN(msg, ...)
-#endif
-
-//
 #ifdef FLIP_180
 static constexpr DAC_CHANNEL DAC_CHANNEL_FTM = DAC_CHANNEL_A;
 #else
 static constexpr DAC_CHANNEL DAC_CHANNEL_FTM = DAC_CHANNEL_D;
 #endif
-
-// 
-#ifdef NORTHERNLIGHT
-  const float target_multipliers[OCTAVES] = { 1.0f, 2.0f, 4.0f, 8.0f, 16.0f, 32.0f, 64.0f, 128.0f, 256.0f, 512.0f };
-#else
-  const float target_multipliers[OCTAVES] = { 0.125f, 0.25f, 0.5f, 1.0f, 2.0f, 4.0f, 8.0f, 16.0f, 32.0f, 64.0f };
-#endif
-
-  const float target_multipliers_1V2[OCTAVES] = {
-    0.1767766952966368931843f,
-    0.3149802624737182976666f,
-    0.5612310241546865086093f,
-    1.0f,
-    1.7817974362806785482150f,
-    3.1748021039363991668836f,
-    5.6568542494923805818985f,
-    10.0793683991589855253324f,
-    17.9593927729499718282113f,
-    32.0f
-  };
-
-  const float target_multipliers_2V0[OCTAVES] = {
-    0.3535533905932737863687f,
-    0.5f,
-    0.7071067811865475727373f,
-    1.0f,
-    1.4142135623730951454746f,
-    2.0f,
-    2.8284271247461902909492f,
-    4.0f,
-    5.6568542494923805818985f,
-    8.0f
-  };
 
 enum ReferenceSetting {
   REF_SETTING_OCTAVE,
@@ -347,6 +298,7 @@ public:
       case OC::DAC_VOLT_TARGET_FREQUENCIES: 
       // NOTE This step is "sticky" and repeats for all required octaves
       {
+          /* TODO: autotuner is just broken for now...
           switch(OC::DAC::get_voltage_scaling(dac_channel_)) {
 
             case VOLTAGE_SCALING_1_2V_PER_OCT: // 1.2V/octave
@@ -359,6 +311,8 @@ public:
             auto_target_frequencies_[octaves_cnt_]  =  auto_frequency_ * target_multipliers[octaves_cnt_]; 
             break;
           }
+          */
+        auto_target_frequencies_[octaves_cnt_]  =  auto_frequency_ * target_multipliers[octaves_cnt_];
         AUTOTUNE_PRINTLN("channel %d : auto_target_frequencies[%d] = %.3f", (int)dac_channel_, octaves_cnt_, auto_target_frequencies_[octaves_cnt_]);
         octaves_cnt_++;
         // go to next step, if done:

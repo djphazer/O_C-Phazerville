@@ -16,14 +16,22 @@ static constexpr int ACTIVE_OCTAVES = OCTAVES;
 static constexpr int ACTIVE_OCTAVES = OCTAVES - 1;
 #endif
 
-static constexpr size_t kHistoryDepth = 10;
-
 #define ZERO_OFFSET (5 - OC::DAC::kOctaveZero)
 
-#define FREQ_MEASURE_TIMEOUT 512
-#define ERROR_TIMEOUT (FREQ_MEASURE_TIMEOUT << 0x4)
+static constexpr size_t kHistoryDepth = 10;
+
+static constexpr uint32_t FREQ_MEASURE_TIMEOUT = 512;
+static constexpr uint32_t ERROR_TIMEOUT = (FREQ_MEASURE_TIMEOUT << 0x4);
 #define MAX_NUM_PASSES 1500
 #define CONVERGE_PASSES 5
+
+#ifdef AUTOTUNE_DEBUG
+# define AUTOTUNE_PRINTLN(msg, ...) \
+  serial_printf(msg "\n", ##__VA_ARGS__)
+#else
+# define AUTOTUNE_PRINTLN(msg, ...)
+#endif
+
 
 #if defined(NORTHERNLIGHT) && !defined(IO_10V)
 const char* const AT_steps[] = {

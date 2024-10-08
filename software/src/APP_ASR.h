@@ -103,12 +103,6 @@ const char* const int_seq_CV_destinations[] = {
 
 typedef int16_t ASR_pitch;
 
-class ASR
-: public settings::SettingsBase<ASR, ASR_SETTING_LAST>
-, public OC::ScaleEditorEventHandler {
-public:
-  static constexpr size_t kHistoryDepth = 5;
-
 #ifdef ARDUINO_TEENSY41
   static constexpr ADC_CHANNEL CVInput1 = ADC_CHANNEL_5;
   static constexpr ADC_CHANNEL CVInput2 = ADC_CHANNEL_6;
@@ -120,6 +114,12 @@ public:
   static constexpr ADC_CHANNEL CVInput3 = ADC_CHANNEL_3;
   static constexpr ADC_CHANNEL CVInput4 = ADC_CHANNEL_4;
 #endif
+
+class ASR
+: public settings::SettingsBase<ASR, ASR_SETTING_LAST>
+, public OC::ScaleEditorEventHandler {
+public:
+  static constexpr size_t kHistoryDepth = 5;
 
   // ScaleEditorEventHandler
   int get_scale(int /*slot_index*/) const final {

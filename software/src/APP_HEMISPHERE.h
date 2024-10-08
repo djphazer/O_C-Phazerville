@@ -326,7 +326,9 @@ public:
 #ifdef ENABLE_APP_CALIBR8OR
           // call Calibr8or so it remembers quantizer settings
           // this also takes care of the EEPROM save
-          Calibr8or_instance.SavePreset();
+
+          // TODO: how to do this now?!
+          //Calibr8or_instance.SavePreset();
 #else
         // initiate actual EEPROM save
         OC::CORE::app_isr_enabled = false;
@@ -1186,7 +1188,8 @@ void ReceiveManagerSysEx() {
         hem_active_preset->OnReceiveSysEx();
 }
 void BeatSyncProcess() {
-  manager.ProcessQueue();
+  // TODO:
+  //manager.ProcessQueue();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
