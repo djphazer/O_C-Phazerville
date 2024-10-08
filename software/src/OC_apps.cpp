@@ -881,8 +881,10 @@ bool Ui::ConfirmReset() {
 }
 
 void start_calibration() {
+/* TODO:
   OC::apps::set_current_app(0); // switch to Settings app
   Settings_instance.StartCalibration(); // Set up calibration mode in Settings app
+*/
 }
 
 }; // namespace OC
