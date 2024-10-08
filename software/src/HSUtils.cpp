@@ -31,7 +31,7 @@ namespace HS {
   int midi_edit = 0;
   uint8_t mview = 0;
 
-  OC::SemitoneQuantizer input_quant[ADC_CHANNEL_LAST];
+  util::SemitoneQuantizer input_quant[ADC_CHANNEL_LAST];
 
   // All of the HS:: globals should be instantiated here
   TuringMachine user_turing_machines[TURING_MACHINE_COUNT];

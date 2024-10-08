@@ -1,6 +1,6 @@
 #pragma once
 
-#include "util_pattern_predictor.h"
+#include "../src/extern/peaks_pattern_predictor.h"
 
 struct Ratio {
   int16_t num;
