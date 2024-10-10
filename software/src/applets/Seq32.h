@@ -28,24 +28,27 @@ public:
 
     // sets the function of the accent bit
     enum AccentMode {
-      VELOCITY,
-      TIE_NOTE,
-      OCTAVE_UP,
-      DOUBLE_OCTAVE_UP,
+      GATE_25,
+      GATE_50,
+      GATE_75,
+      GATE_100,
+
+      ACCENT_MODE_LAST = GATE_100
     };
 
     enum Seq32Cursor {
       // ---
       PATTERN,
       LENGTH,
-      WRITE_MODE,
-      // ---
-      QUANT_SCALE,
-      QUANT_ROOT,
       TRANSPOSE,
       // ---
+      QUANT_SCALE,
+      ACCENT_MODE,
+      // ---
+      WRITE_MODE,
       NOTES,
-      MAX_CURSOR = TRANSPOSE + MiniSeq::MAX_STEPS
+
+      MAX_CURSOR = WRITE_MODE + MiniSeq::MAX_STEPS
     };
 
    MiniSeq seq;
@@ -76,11 +79,11 @@ public:
         if (!write_mode) {
           // CV modulation of pattern and transposition
           pattern_mod = pattern_index;
-          Modulate(pattern_mod, 0, 0, 7);
+          Modulate(pattern_mod, 1, 0, 7);
           seq.SetPattern(pattern_mod);
 
           trans_mod = transpose;
-          Modulate(trans_mod, 1, -MAX_TRANS, MAX_TRANS);
+          Modulate(trans_mod, 0, -MAX_TRANS, MAX_TRANS);
 
           seq.Advance();
         } else {
@@ -94,11 +97,20 @@ public:
           current_note = seq.GetNote();
 
           if (seq.accent(seq.step)) {
-            // - tied note
-            //GateOut(1, true);
+            switch (seqmode) {
+              case GATE_25:
+              case GATE_50:
+              case GATE_75:
+                // - variable length gate
+                ClockOut(1, ClockCycleTicks(0) * (1 + seqmode - GATE_25)/4);
+                break;
 
-            // - 50% duty cycle gate
-            ClockOut(1, ClockCycleTicks(0)/2);
+              case GATE_100:
+              default:
+                // - tied note
+                GateOut(1, true);
+                break;
+            }
 
           } else {
             // regular trigger
@@ -108,11 +120,11 @@ public:
       }
 
       if (EndOfADCLag() && write_mode) {
-        // sample and record note number from CV2, accent from CV1, and then advance
-        Quantize(0, In(1));
+        // sample and record note number from CV1, accent from CV2, and then advance
+        Quantize(0, In(0));
         current_note = GetLatestNoteNumber(0) - 64;
         seq.SetNote(current_note, seq.step);
-        seq.SetAccent(seq.step, In(0) > (24 << 7)); // cv1 > 2V qualifies as accent
+        seq.SetAccent(seq.step, In(1) > (24 << 7)); // cv2 > 2V qualifies as accent
         seq.Advance();
       }
 
@@ -121,7 +133,7 @@ public:
       CONSTRAIN(play_note, 0, 127);
       // set CV output
       int play_cv = QuantizerLookup(0, play_note);
-      if (seq.accent(seq.step)) {
+      if (seq.accent(seq.step) && glide_on) {
         // glide
         SmoothedOut(0, play_cv, GLIDE_FACTOR);
       } else {
@@ -137,7 +149,7 @@ public:
     }
 
     void OnButtonPress() {
-      if (cursor == QUANT_SCALE || cursor == QUANT_ROOT)
+      if (cursor == QUANT_SCALE)
         HS::QuantizerEdit(io_offset);
       else
         CursorToggle();
@@ -161,6 +173,10 @@ public:
       }
       if (cursor >= NOTES) {
         seq.ToggleMute(cursor - NOTES);
+        return;
+      }
+      if (cursor == ACCENT_MODE) {
+        glide_on = !glide_on;
         return;
       }
 
@@ -203,6 +219,10 @@ public:
           transpose = constrain(transpose + direction, -MAX_TRANS, MAX_TRANS);
           break;
 
+        case ACCENT_MODE:
+          seqmode = (AccentMode)constrain(seqmode + direction, 0, ACCENT_MODE_LAST);
+          break;
+
         case WRITE_MODE:
           seq.Advance(direction < 0);
           if (!seq.muted())
@@ -216,11 +236,12 @@ public:
         // TODO: save Global Settings data to store modified sequences
         Pack(data, PackLocation {0, 4}, pattern_index);
         Pack(data, PackLocation {4, 4}, seqmode);
-        // there are 6 bits here now that length is global.
+        Pack(data, PackLocation {8, 1}, glide_on);
+        // 5 empty bits here
         Pack(data, PackLocation {14, 6}, transpose + MAX_TRANS);
 
-        Pack(data, PackLocation {20, 8}, (uint8_t)GetScale(0));
-        Pack(data, PackLocation {28, 4}, (uint8_t)GetRootNote(0));
+        //Pack(data, PackLocation {20, 8}, (uint8_t)GetScale(0));
+        //Pack(data, PackLocation {28, 4}, (uint8_t)GetRootNote(0));
 
         return data;
     }
@@ -228,31 +249,34 @@ public:
     void OnDataReceive(uint64_t data) {
       pattern_mod = pattern_index = Unpack(data, PackLocation {0, 4});
       seqmode = (AccentMode)Unpack(data, PackLocation {4, 4});
+      glide_on = Unpack(data, PackLocation {8, 1});
       trans_mod = transpose = Unpack(data, PackLocation {14, 6}) - MAX_TRANS;
 
+      /* let's leave global quantizer settings as it were
       const uint8_t scale = Unpack(data, PackLocation {20,8});
       const uint8_t root_note = Unpack(data, PackLocation {28, 4});
-
-      seq.SetPattern(pattern_index);
       SetScale(0, scale);
       SetRootNote(0, root_note);
+      */
+
+      seq.SetPattern(pattern_index);
       seq.Reset();
     }
 
 protected:
     void SetHelp() {
         //                    "-------" <-- Label size guide
-        help[HELP_DIGITAL1] = "Clock";
-        help[HELP_DIGITAL2] = "Reset";
-        help[HELP_CV1]      = "Seq Sel";
-        help[HELP_CV2]      = "Transp";
+        help[HELP_DIGITAL1] = write_mode? "Record":"Clock";
+        help[HELP_DIGITAL2] = write_mode? "Rest":"Reset";
+        help[HELP_CV1]      = write_mode? "Pitch" :"Transp";
+        help[HELP_CV2]      = write_mode? "Accent":"Seq Sel";
         help[HELP_OUT1]     = "Pitch";
         help[HELP_OUT2]     = "Gate";
         help[HELP_EXTRA1] = "";
         help[HELP_EXTRA2] = "";
        //                  "---------------------" <-- Extra text size guide
     }
-      
+
 private:
     int cursor = 0;
     int pattern_index;
@@ -261,6 +285,7 @@ private:
     int transpose = 0;
     int trans_mod, pattern_mod;
     bool write_mode = 0;
+    bool glide_on = true;
     uint32_t click_tick = 0;
 
     int flash_ticker = 0;
@@ -272,77 +297,87 @@ private:
         if (edit_ticker == 0 && pattern_mod != pattern_index) gfxIcon(11, 10, CV_ICON);
     }
     void DrawPanel() {
-      gfxDottedLine(0, 22, 63, 22, 3);
+      gfxDottedLine(0, 27, 63, 27, 3);
 
       switch (cursor) {
         case QUANT_SCALE:
-        case QUANT_ROOT:
-        case TRANSPOSE:
+        case ACCENT_MODE:
         {
           gfxPrint(1, 13, OC::scale_names_short[GetScale(0)]);
           gfxPrint(31, 13, OC::Strings::note_names_unpadded[GetRootNote(0)]);
+
+          int gatelen = (1 + seqmode - GATE_25)*4;
+          gfxIcon(47, 14, glide_on ? SLEW_ICON : GATE_ICON);
+          gfxIcon(55, 14, glide_on ? SLEW_ICON : GATE_ICON);
+          gfxFrame(47, 12, gatelen, 4);
+
+          if (QUANT_SCALE == cursor)
+            gfxCursor(1, 21, 25);
+          else
+            gfxSpicyCursor(46, 22, 18, 11);
+
+          break;
+        }
+
+        case WRITE_MODE:
+          gfxFrame(49, 12, 10, 10);
+        default: // cursor >= NOTES
+        {
+          DrawSequenceNumber();
+
+          gfxIcon(50, 13, RECORD_ICON);
+          if (write_mode)
+            gfxInvert(49, 12, 10, 10);
+
+          int notenum = seq.GetNote((WRITE_MODE==cursor)? seq.step : cursor - NOTES);
+          notenum = MIDIQuantizer::NoteNumber( QuantizerLookup(0, notenum + 64) );
+          gfxPrint(29, 13, midi_note_numbers[notenum]);
+          break;
+        }
+
+        case PATTERN:
+        case LENGTH:
+        case TRANSPOSE:
+        {
+          DrawSequenceNumber();
 
           const int t = edit_ticker? transpose : trans_mod;
           gfxPrint(45, 13, t >= 0 ? "+" : "-");
           gfxPrint(abs(t));
           if (edit_ticker == 0 && trans_mod != transpose) gfxIcon(44, 8, CV_ICON);
 
+          gfxIcon(22, 13, LOOP_ICON);
+          gfxPrint(31, 13, seq.GetLength());
+
           if (cursor == TRANSPOSE)
             gfxSpicyCursor(45, 21, 19);
           else
-            gfxCursor(1 + (cursor-QUANT_SCALE)*30, 21, (1-(cursor-QUANT_SCALE))*12 + 13);
+            gfxSpicyCursor(6 + (cursor-PATTERN)*25, 21, 13);
+
           break;
         }
-
-        default: // cursor >= NOTES
-        {
-          DrawSequenceNumber();
-
-          // XXX: probably not the most efficient approach...
-          int notenum = seq.GetNote(cursor - NOTES);
-          notenum = MIDIQuantizer::NoteNumber( QuantizerLookup(0, notenum + 64) );
-          gfxPrint(33, 13, midi_note_numbers[notenum]);
-          break;
-        }
-
-        case PATTERN:
-        case LENGTH:
-        case WRITE_MODE:
-          DrawSequenceNumber();
-
-          gfxIcon(24, 13, LOOP_ICON);
-          gfxPrint(33, 13, seq.GetLength());
-          gfxIcon(49, 13, RECORD_ICON);
-          if (cursor == WRITE_MODE)
-            gfxFrame(48, 12, 10, 10);
-          else
-            gfxSpicyCursor(6 + (cursor-PATTERN)*27, 21, 13);
-
-          if (write_mode)
-            gfxInvert(48, 12, 10, 10);
-          break;
       }
 
       // Draw steps
       for (int s = 0; s < seq.GetLength(); s++)
       {
         const int x = 2 + (s % 8)*8;
-        const int y = 26 + (s / 8)*10;
+        const int y = 34 + (s / 8)*8;
         if (!seq.muted(s))
         {
           if (seq.accent(s))
-            gfxRect(x-1, y-1, 5, 5);
+            gfxRect(x-1, y-1, 5, 4);
           else
-            gfxFrame(x-1, y-1, 5, 5);
+            gfxFrame(x-1, y-1, 5, 4);
         }
 
         if (seq.step == s)
-          gfxIcon(x-2, y-7, DOWN_BTN_ICON);
-        // TODO: visualize note value
+          gfxIcon(x-2, y-8, DOWN_BTN_ICON);
+        // TODO: visualize note value?
 
         if (cursor - NOTES == s) {
-          gfxFrame(x-2, y-2, 8, 10);
-          if (EditMode()) gfxInvert(x-1, y-1, 6, 8);
+          gfxFrame(x-2, y-2, 8, 7);
+          if (EditMode()) gfxInvert(x-1, y-1, 6, 5);
         }
       }
 
