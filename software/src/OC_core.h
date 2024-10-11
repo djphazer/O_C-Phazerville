@@ -14,6 +14,8 @@ namespace OC {
   namespace CORE {
   extern volatile uint32_t ticks;
   extern volatile bool app_isr_enabled;
+  extern volatile bool display_update_enabled;
+  extern volatile bool app_loop_enabled;
 
   }; // namespace CORE
 

@@ -74,6 +74,8 @@ void FASTRUN UI_timer_ISR() {
 /*  ------------------------ core timer ISR ---------------------------   */
 IntervalTimer CORE_timer;
 volatile bool OC::CORE::app_isr_enabled = false;
+volatile bool OC::CORE::display_update_enabled = false;
+volatile bool OC::CORE::app_loop_enabled = false;
 volatile uint32_t OC::CORE::ticks = 0;
 
 void FASTRUN CORE_timer_ISR() {
@@ -225,6 +227,8 @@ void setup() {
 void FASTRUN loop() {
 
   OC::CORE::app_isr_enabled = true;
+  OC::CORE::display_update_enabled = true;
+  OC::CORE::app_loop_enabled = true;
   uint32_t menu_redraws = 0;
   while (true) {
 
@@ -235,7 +239,7 @@ void FASTRUN loop() {
     }
 
     // Refresh display
-    if (MENU_REDRAW) {
+    if (MENU_REDRAW && OC::CORE::display_update_enabled) {
       GRAPHICS_BEGIN_FRAME(false); // Don't busy wait
         if (OC::UI_MODE_MENU == ui_mode) {
           OC_DEBUG_RESET_CYCLES(menu_redraws, 512, OC::DEBUG::MENU_draw_cycles);
@@ -258,7 +262,8 @@ void FASTRUN loop() {
     }
 
     // Run current app
-    OC::apps::current_app->loop();
+    if (OC::CORE::app_loop_enabled)
+      OC::apps::current_app->loop();
 
     // UI events
     OC::UiMode mode = OC::ui.DispatchEvents(OC::apps::current_app);
@@ -279,9 +284,58 @@ void FASTRUN loop() {
     static elapsedMicros cap_send_time = 0;
     // check for request from PC to capture the screen
     if (Serial && Serial.available() > 0) {
-      do { Serial.read(); } while (Serial.available() > 0);
-      display::frame_buffer.capture_request();
-      cap_idx = 0;
+      bool capreq = false;
+      do {
+        int cmd = Serial.read();
+        switch (cmd) {
+          case 'z':
+            Serial.println("-=[ PEW PEW NERDS! ]=-");
+            Serial.println("Secret Menu Options:");
+            Serial.printf("'i' = Toggle App ISR [%s]\n", OC::CORE::app_isr_enabled ? "ON" : "OFF");
+            Serial.printf("'d' = Toggle Display Redraw [%s]\n", OC::CORE::display_update_enabled ? "ON" : "OFF");
+            Serial.printf("'l' = Toggle App Loop [%s]\n", OC::CORE::app_loop_enabled ? "ON" : "OFF");
+            break;
+
+          case 'i':
+            OC::CORE::app_isr_enabled = !OC::CORE::app_isr_enabled;
+            Serial.printf("App ISR = %s\n", OC::CORE::app_isr_enabled ? "ON" : "OFF");
+            break;
+          case 'd':
+            OC::CORE::display_update_enabled = !OC::CORE::display_update_enabled;
+            Serial.printf("Display Redraw = %s\n", OC::CORE::display_update_enabled ? "ON" : "OFF");
+            break;
+          case 'l':
+            OC::CORE::app_loop_enabled = !OC::CORE::app_loop_enabled;
+            Serial.printf("App Loop = %s\n", OC::CORE::app_loop_enabled ? "ON" : "OFF");
+            break;
+
+            // TODO:
+          case '+':
+          case '-':
+            // simulate UP and DOWN buttons
+            break;
+          case '[':
+          case ']':
+            // simulate Encoder button press
+            break;
+          case ',':
+          case '.':
+            // simulate Left Encoder turn
+            break;
+          case '<':
+          case '>':
+            // simulate Right Encoder turn
+            break;
+
+          default:
+            capreq = true;
+            break;
+        }
+      } while (Serial.available() > 0);
+      if (capreq) {
+        display::frame_buffer.capture_request();
+        cap_idx = 0;
+      }
     }
 
     // check for frame buffer to have capture data ready
