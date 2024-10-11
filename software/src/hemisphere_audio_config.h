@@ -10,6 +10,8 @@
 
 const size_t NUM_SLOTS = 5;
 
+VcaApplet<MONO> vca;
+
 std::tuple<InputApplet<0>, InputApplet<1>, OscApplet> mono_input_pool[2];
 std::tuple<InputApplet<0>, InputApplet<1>> stereo_input_pool;
 std::tuple<PassthruApplet<MONO>, DelayApplet, LadderApplet<MONO>, VcaApplet<MONO>>

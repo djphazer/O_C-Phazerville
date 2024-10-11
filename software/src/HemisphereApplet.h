@@ -457,7 +457,7 @@ public:
     }
 
     void gfxPrintIcon(const uint8_t *data, int16_t w = 8) {
-        gfxIcon(gfxGetPrintPosY(), gfxGetPrintPosX(), data);
+        gfxIcon(gfxGetPrintPosX(), gfxGetPrintPosY(), data);
         gfxPos(gfxGetPrintPosX() + w, gfxGetPrintPosY());
     }
 
