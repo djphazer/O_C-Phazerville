@@ -20,56 +20,84 @@ public:
 
   void Controller() {
     for (int i = 0; i < Channels; i++) {
-      filters[i].frequency(PitchToRatio(pitch) * C3);
-      filters[i].resonance(0.01f * res);
-      filters[i].inputDrive(0.01f * gain);
+      filters[i].frequency(PitchToRatio(pitch + pitch_cv.In()) * C3);
+      filters[i].resonance(0.01f * (res + res_cv.InRescaled(100)));
+      filters[i].inputDrive(0.01f * (gain + gain_cv.InRescaled(100)));
       filters[i].passbandGain(0.01f * pb_gain);
     }
   }
 
   void View() {
     const int label_x = 1;
-    const int param_x = 38;
-    // gfxPrint(label_x, 15, "Freq:");
     gfxStartCursor(label_x, 15);
     float freq = PitchToRatio(pitch) * C3;
     int int_part = static_cast<int>(freq);
-    int dec_part = static_cast<int>(100 * (freq - int_part));
-    graphics.printf("%5d.%02dHz", int_part, dec_part);
+    float dec = freq - int_part;
+    if (int_part < 100) {
+      int dec_part = static_cast<int>(1000 * dec);
+      graphics.printf("%2d.%03d", int_part, dec_part);
+    } else if (int_part < 1000) {
+      int dec_part = static_cast<int>(100 * dec);
+      graphics.printf("%3d.%02d", int_part, dec_part);
+    } else if (int_part < 10000) {
+      int dec_part = static_cast<int>(10 * dec);
+      graphics.printf("%4d.%01d", int_part, dec_part);
+    } else {
+      graphics.printf("%6d", int_part);
+    }
+    gfxPrint("Hz");
     gfxEndCursor(cursor == 0);
-
-    gfxPrint(label_x, 25, "Res:");
-    gfxStartCursor(param_x, 25);
-    graphics.printf("%3d%%", res);
+    gfxStartCursor();
+    gfxPrintIcon(pitch_cv.Icon());
     gfxEndCursor(cursor == 1);
 
-    gfxPrint(label_x, 35, "Drive:");
-    gfxStartCursor(param_x, 35);
-    graphics.printf("%3d%%", gain);
+    gfxPrint(label_x, 25, "Res: ");
+    gfxStartCursor();
+    graphics.printf("%3d%%", res);
     gfxEndCursor(cursor == 2);
-
-    gfxPrint(label_x, 45, "PBG:");
-    gfxStartCursor(param_x + 2 * 6, 45);
-    graphics.printf("%2d", pb_gain);
+    gfxStartCursor();
+    gfxPrintIcon(res_cv.Icon());
     gfxEndCursor(cursor == 3);
+
+    gfxPrint(label_x, 35, "Drv: ");
+    gfxStartCursor();
+    graphics.printf("%3d%%", gain);
+    gfxEndCursor(cursor == 4);
+    gfxStartCursor();
+    gfxPrintIcon(gain_cv.Icon());
+    gfxEndCursor(cursor == 5);
+
+    gfxPrint(label_x, 45, "PBG: ");
+    gfxStartCursor();
+    graphics.printf("%3d", pb_gain);
+    gfxEndCursor(cursor == 6);
   }
 
   void OnEncoderMove(int direction) {
     if (!EditMode()) {
-      MoveCursor(cursor, direction, 3);
+      MoveCursor(cursor, direction, 6);
       return;
     }
     switch (cursor) {
       case 0:
-        pitch = constrain(pitch + direction * 16, 0, 0xffff);
+        pitch = constrain(pitch + direction * 16, -8 * 12 * 128, 8 * 12 * 128);
         break;
       case 1:
-        res = constrain(res + direction, 0, 180);
+        pitch_cv.ChangeSource(direction);
         break;
       case 2:
-        gain = constrain(gain + direction, 0, 400);
+        res = constrain(res + direction, 0, 180);
         break;
       case 3:
+        res_cv.ChangeSource(direction);
+        break;
+      case 4:
+        gain = constrain(gain + direction, 0, 400);
+        break;
+      case 5:
+        gain_cv.ChangeSource(direction);
+        break;
+      case 6:
         pb_gain = constrain(pb_gain + direction, 0, 50);
         break;
     }
@@ -93,8 +121,11 @@ protected:
 private:
   int cursor = 0;
   int pitch = 1 * 12 * 128; // C4
+  CVInput pitch_cv;
   int16_t res = 0;
+  CVInput res_cv;
   int16_t gain = 100;
+  CVInput gain_cv;
   int16_t pb_gain = 50;
 
   AudioPassthrough<Channels> input;

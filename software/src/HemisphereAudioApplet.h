@@ -13,6 +13,10 @@ struct CVInput{
       : frame.outputs[source - 1 - ADC_CHANNEL_LAST];
   }
 
+  int InRescaled(int max_value) {
+    return Proportion(In(), HEMISPHERE_MAX_INPUT_CV, max_value);
+  }
+
   void ChangeSource(int dir) {
     source = constrain(source + dir, 0, NumInputs() - 1);
   }
