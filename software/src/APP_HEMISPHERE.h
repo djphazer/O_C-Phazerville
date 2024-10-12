@@ -1565,6 +1565,7 @@ size_t AppHemisphere::RestoreAppData(util::StreamBufferReader &stream_buffer) {
     hem_presets[i].Restore(stream_buffer);
   }
 
+  // using secret hidden preset for extra data
   HS::hidden_applets[0] = hem_presets[HEM_NR_OF_PRESETS].GetData(HEM_SIDE(0));
   HS::hidden_applets[1] = hem_presets[HEM_NR_OF_PRESETS].GetData(HEM_SIDE(1));
   HS::frame.MIDIState.pc_channel =

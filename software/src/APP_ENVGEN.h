@@ -1209,10 +1209,11 @@ void AppQuadEnvelopeGenerator::HandleEncoderEvent(const UI::Event &event) {
         else {
            selected_env.change_value(setting, event.value);
         }
-        
+
         if (ENV_SETTING_TRIGGER_DELAY_MODE == setting || ENV_SETTING_EUCLIDEAN_LENGTH == setting)
           selected_env.update_enabled_settings();
-          ui.cursor.AdjustEnd(selected_env.num_enabled_settings() - 1);
+
+        ui.cursor.AdjustEnd(selected_env.num_enabled_settings() - 1);
       } else {
         ui.cursor.Scroll(event.value);
       }

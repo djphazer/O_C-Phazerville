@@ -98,27 +98,23 @@ static void debug_menu_version()
   graphics.print(Strings::VERSION);
   graphics.setPrintPos(2, 32);
   graphics.print(Strings::BUILD_TAG);
+
 #ifdef OC_DEV
   graphics.print(" DEV");
 #else
   graphics.print(" PROD");
 #endif
 
+  int y = 42;
 #ifdef IO_10V
   graphics.drawStr(2, y, "IO_1OV"); y += 10;
 #endif
-#ifdef BUCHLA_SUPPORT
-  graphics.drawStr(2, y, "BUCHLA_SUPPORT"); y += 10;
-#endif
-#ifdef BUCHLA_cOC
-  graphics.drawStr(2, y, "BUCHLA_cOC"); y += 10;
-#endif
-#ifdef BUCHLA_4U
-  graphics.drawStr(2, y, "BUCHLA_4U"); y += 10;
+#ifdef NORTHERNLIGHT
+  graphics.drawStr(2, y, "NorthernLight"); y += 10;
 #endif
 
 #ifdef USB_SERIAL
-  graphics.setPrintPos(2, 42);
+  graphics.setPrintPos(2, y);
   graphics.print("USB_SERIAL");
 #endif
 }
