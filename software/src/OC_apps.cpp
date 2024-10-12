@@ -86,7 +86,7 @@ namespace menu = OC::menu;
 #endif
 // #include "APP_PONGGAME.h"
 // #include "APP_Backup.h"
-// #include "APP_SETTINGS.h"
+#include "APP_SETTINGS.h"
 
 /*
 // The order here is not inconsequential.
@@ -216,6 +216,7 @@ enum GlobalSettingsDataKeys : uint16_t {
 // triage all code (minus any dangling static parts). (Yeah, this still relies
 // on the fugly .ino compilation method, don't @ me).
 static AppContainer<void // this space intentionally left blank
+  , AppSettings
 #ifndef NO_HEMISPHERE
   #ifdef ARDUINO_TEENSY41
   , AppQuadrants
