@@ -61,19 +61,24 @@
  */
 #define CENTER_DETENT 640
 
-class Pong : public HSApplication {
+OC_APP_TRAITS(AppPong, TWOCCS("PO"), "Pong", "Pong");
+class OC_APP_CLASS(AppPong), public HSApplication {
 public:
+  OC_APP_INTERFACE_DECLARE(AppPong);
+  OC_APP_STORAGE_SIZE(0);
+
     /* There are two types of game state properties: Those that should be initialized only once (like high score), and
      * those that need to be initialized after each game. Init() sets the first kind, and then calls StartNewGame()
      * to start a new game.
      */
     void Start() {
-        return_countdown = 0;
-        bounce_countdown = 0;
-        hi_score = 0;
+      return_countdown = 0;
+      bounce_countdown = 0;
+      hi_score = 0;
 
-        StartNewGame();
+      StartNewGame();
     }
+
     void Resume() { }
 
     void StartNewGame() {
@@ -316,80 +321,75 @@ private:
     bool twoplayermode = false;
 };
 
-Pong pong_instance;
-
-// App stubs
-void PONGGAME_init() {
-    pong_instance.BaseStart();
+void AppPong::Init() {
+  BaseStart();
 }
 
-static constexpr size_t PONGGAME_storageSize() {
-    return 0;
+size_t AppPong::SaveAppData(util::StreamBufferWriter &) const { return 0; }
+size_t AppPong::RestoreAppData(util::StreamBufferReader &) { return 0; }
+
+void AppPong::Process(OC::IOFrame *ioframe) {
+  BaseController(ioframe);
 }
 
-static size_t PONGGAME_save(void *storage) {
-    return 0;
+void AppPong::HandleAppEvent(OC::AppEvent event) {
 }
 
-static size_t PONGGAME_restore(const void *storage) {
-    return 0;
+void AppPong::Loop() {
 }
 
-void PONGGAME_process(OC::IOFrame *) {
-    pong_instance.BaseController();
+void AppPong::GetIOConfig(OC::IOConfig &ioconfig) const
+{
+  ioconfig.outputs[DAC_CHANNEL_A].set("CH1", OC::OUTPUT_MODE_UNI);
+  ioconfig.outputs[DAC_CHANNEL_B].set("CH2", OC::OUTPUT_MODE_UNI);
+  ioconfig.outputs[DAC_CHANNEL_C].set("CH3", OC::OUTPUT_MODE_UNI);
+  ioconfig.outputs[DAC_CHANNEL_D].set("CH4", OC::OUTPUT_MODE_UNI);
+}
+void AppPong::DrawDebugInfo() const { }
+
+void AppPong::DrawMenu() const {
+  BaseView();
 }
 
-void PONGGAME_handleAppEvent(OC::AppEvent event) {
-}
-
-void PONGGAME_loop() {
-}
-
-void PONGGAME_menu() {
-    pong_instance.BaseView();
-}
-
-void PONGGAME_screensaver() {
-    // Game pieces only
-    pong_instance.DrawBall();
-    pong_instance.DrawPlayerPaddle();
-    pong_instance.DrawOCPaddle();
+void AppPong::DrawScreensaver() const {
+  // Game pieces only
+  DrawGame();
 }
 
 /* Controlling the game with the buttons is the worst experience ever, so this is really just here
  * to demonstrate how the buttons work.
  */
-void PONGGAME_handleButtonEvent(const UI::Event &event) {
+void AppPong::HandleButtonEvent(const UI::Event &event) {
     if (UI::EVENT_BUTTON_DOWN == event.type && OC::CONTROL_BUTTON_L == event.control) {
-        pong_instance.SnapToBall();
+        SnapToBall();
     }
     if (UI::EVENT_BUTTON_PRESS == event.type) {
         switch (event.control) {
           case OC::CONTROL_BUTTON_UP:
-                pong_instance.MovePaddleUp();
-                pong_instance.ResetPaddle();
+            MovePaddleUp();
+            ResetPaddle();
             break;
 
           case OC::CONTROL_BUTTON_DOWN:
-                pong_instance.MovePaddleDown();
-                pong_instance.ResetPaddle();
+            MovePaddleDown();
+            ResetPaddle();
             break;
 
           case OC::CONTROL_BUTTON_R:
-                pong_instance.ToggleTwoPlayer();
+            ToggleTwoPlayer();
             break;
         }
     }
     if (UI::EVENT_BUTTON_LONG_PRESS == event.type && OC::CONTROL_BUTTON_L == event.control) {
-      pong_instance.LevelUp();
+      LevelUp();
     }
 }
 
 /* The UI::Event has a value property, which is positive when the encoder is turned clockwise and
  * negative when it's turned widdershins. I just wanted to say "widdershins."
  */
-void PONGGAME_handleEncoderEvent(const UI::Event &event) {
-    if (event.value < 0) pong_instance.MovePaddleUp();
-    if (event.value > 0) pong_instance.MovePaddleDown();
-    pong_instance.ResetPaddle();
+void AppPong::HandleEncoderEvent(const UI::Event &event) {
+    if (event.value < 0) MovePaddleUp();
+    if (event.value > 0) MovePaddleDown();
+    ResetPaddle();
 }
