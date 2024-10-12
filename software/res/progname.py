@@ -2,9 +2,22 @@ Import("env")
 
 import subprocess
 
-version = subprocess.check_output("tail -n1 'src/OC_version.h'|tr -d '\"'", shell=True).decode().strip()
-# git_rev = subprocess.check_output("git rev-parse --short HEAD", shell=True).decode().strip()
-git_rev = subprocess.check_output("sh res/oc_build_tag.sh", shell=True).decode().strip()
+def get_git_rev():
+    git_rev = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).decode().strip()
+    git_status = subprocess.check_output(["git", "status", "-s", "--untracked-files=no"]).decode
+    suffix = "dirty" if git_status else ""
+
+    return git_rev + suffix
+
+def get_version():
+    with open("src/OC_version.h") as file:
+        last_line = file.readlines()[-1].strip().replace('"', '')
+
+    return last_line 
+
+
+version = get_version()
+git_rev = get_git_rev()
 extras = ""
 env.Append(BUILD_FLAGS=[ f'-DOC_BUILD_TAG=\\"{git_rev}\\"' ])
 
