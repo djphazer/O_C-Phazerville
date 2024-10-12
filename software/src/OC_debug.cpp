@@ -146,6 +146,7 @@ static void debug_menu_version()
   graphics.print(Strings::VERSION);
   graphics.setPrintPos(2, 32);
   graphics.print(Strings::BUILD_TAG);
+
 #ifdef OC_DEV
   graphics.print(" DEV");
 #else
