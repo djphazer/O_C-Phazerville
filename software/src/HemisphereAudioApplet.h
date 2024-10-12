@@ -1,9 +1,10 @@
 #pragma once
 
 #include "HemisphereApplet.h"
+#include "dsputils.h"
 #include <AudioStream.h>
 
-struct CVInput{
+struct CVInput {
   int8_t source = 0;
 
   int In(int default_value = 0) {
@@ -11,6 +12,11 @@ struct CVInput{
     return source <= ADC_CHANNEL_LAST
       ? frame.inputs[source - 1]
       : frame.outputs[source - 1 - ADC_CHANNEL_LAST];
+  }
+
+  float InF(float default_value = 0.0f) {
+    return In(static_cast<int>(default_value * HEMISPHERE_MAX_INPUT_CV))
+      / static_cast<float>(HEMISPHERE_MAX_INPUT_CV);
   }
 
   int InRescaled(int max_value) {
@@ -48,5 +54,23 @@ class HemisphereAudioApplet : public HemisphereApplet {
 public:
   virtual AudioStream* InputStream() = 0;
   virtual AudioStream* OutputStream() = 0;
-};
 
+  void gfxPrintPitchHz(int16_t pitch, float base_freq = C3) {
+    float freq = PitchToRatio(pitch) * base_freq;
+    int int_part = static_cast<int>(freq);
+    float dec = freq - int_part;
+    if (int_part < 100) {
+      int dec_part = static_cast<int>(1000 * dec);
+      graphics.printf("%2d.%03d", int_part, dec_part);
+    } else if (int_part < 1000) {
+      int dec_part = static_cast<int>(100 * dec);
+      graphics.printf("%3d.%02d", int_part, dec_part);
+    } else if (int_part < 10000) {
+      int dec_part = static_cast<int>(10 * dec);
+      graphics.printf("%4d.%01d", int_part, dec_part);
+    } else {
+      graphics.printf("%6d", int_part);
+    }
+    gfxPrint("Hz");
+  }
+};
