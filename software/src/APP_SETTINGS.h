@@ -24,6 +24,7 @@
 #include "OC_apps.h"
 #include "OC_calibration.h"
 #include "OC_core.h"
+#include "OC_io.h"
 #include "OC_ui.h"
 #include "HSApplication.h"
 #include "OC_strings.h"
@@ -35,8 +36,30 @@
 extern "C" void _reboot_Teensyduino_();
 using namespace OC;
 
-class Settings : public HSApplication {
+OC_APP_TRAITS(AppSettings, TWOCCS("SE"), "Setup/About", "Settings");
+
+class OC_APP_CLASS(AppSettings), public HSApplication {
 public:
+  OC_APP_INTERFACE_DECLARE(AppSettings);
+  OC_APP_STORAGE_SIZE(0);
+
+  /*
+  clazz() : OC::AppBaseImpl<clazz, MACRO_CONCAT(clazz, Traits)>() { } \
+  virtual void Init() final; \
+  virtual size_t appdata_storage_size() const final { return kAppDataStorageSize; } \
+  virtual size_t SaveAppData(util::StreamBufferWriter &) const final; \
+  virtual size_t RestoreAppData(util::StreamBufferReader &) final; \
+  virtual void HandleAppEvent(OC::AppEvent) final; \
+  virtual void Loop() final; \
+  virtual void DrawMenu() const final; \
+  virtual void DrawScreensaver() const final; \
+  virtual void HandleButtonEvent(const UI::Event &) final; \
+  virtual void HandleEncoderEvent(const UI::Event &) final; \
+  virtual void Process(OC::IOFrame *ioframe) final; \
+  virtual void GetIOConfig(OC::IOConfig &) const final; \
+  virtual void DrawDebugInfo() const final
+  */
+
   bool reflash = false;
   bool calibration_mode = false;
   bool calibration_complete = true;
@@ -51,7 +74,9 @@ public:
     0, // "use defaults: no"
   };
 
-  void Start() { }
+  void Start() {
+  }
+
   void Resume() {
     if (calibration_mode && !calibration_complete) {
       // restart calibration if you exit and come back
@@ -207,6 +232,7 @@ public:
 
   void Controller()
   {
+    using namespace OC;
     if (calibration_mode && !calibration_complete)
     {
       uint32_t ticks = tick_count.Update();
@@ -279,7 +305,7 @@ public:
   };
   int pick_left = 0, pick_right = 0;
 
-  void View() {
+    void View() const {
       if (calibration_mode) {
         DrawCalibration();
         return;
@@ -588,47 +614,51 @@ public:
     }
 
     void FactoryReset() {
-        OC::apps::Init(1);
+      // TODO:
+        //OC::apps::Init(1);
     }
 
 };
 
-DMAMEM Settings Settings_instance;
-
-// App stubs
-void Settings_init() {
-    Settings_instance.BaseStart();
+void AppSettings::Init() {
+    BaseStart();
 }
 
 // Not using O_C Storage
-static constexpr size_t Settings_storageSize() {return 0;}
-static size_t Settings_save(void *storage) {return 0;}
-static size_t Settings_restore(const void *storage) {return 0;}
+size_t AppSettings::SaveAppData(util::StreamBufferWriter &) const { return 0; }
+size_t AppSettings::RestoreAppData(util::StreamBufferReader &) { return 0; }
 
-void Settings_process(OC::IOFrame *) {
+void AppSettings::Process(OC::IOFrame *ioframe) {
   // Usually you would call BaseController, but Calibration is a special case.
-  // We don't want the automatic frame Load() and Send() calls from this App.
-  Settings_instance.Controller();
-  return;
+  // We don't want the automatic frame Load() and Send() calls from this App. - or do we?!
+  BaseController(ioframe);
 }
 
-void Settings_handleAppEvent(OC::AppEvent event) {
+void AppSettings::HandleAppEvent(OC::AppEvent event) {
   if (event == OC::APP_EVENT_RESUME) {
-    Settings_instance.Resume();
+    Resume();
   }
   if (event == OC::APP_EVENT_SUSPEND) {
-    Settings_instance.Suspend();
+    Suspend();
   }
 }
 
-void Settings_loop() {
-} // Deprecated
+void AppSettings::Loop() {} // Deprecated
 
-void Settings_menu() {
-    Settings_instance.BaseView();
+void AppSettings::GetIOConfig(OC::IOConfig &ioconfig) const
+{
+  ioconfig.outputs[DAC_CHANNEL_A].set("CH1", OC::OUTPUT_MODE_UNI);
+  ioconfig.outputs[DAC_CHANNEL_B].set("CH2", OC::OUTPUT_MODE_UNI);
+  ioconfig.outputs[DAC_CHANNEL_C].set("CH3", OC::OUTPUT_MODE_UNI);
+  ioconfig.outputs[DAC_CHANNEL_D].set("CH4", OC::OUTPUT_MODE_UNI);
+}
+void AppSettings::DrawDebugInfo() const { }
+
+void AppSettings::DrawMenu() const {
+    BaseView();
 }
 
-void Settings_screensaver() {
+void AppSettings::DrawScreensaver() const {
 #ifdef PEWPEWPEW
     for (int i = 0; i < (pewpew_width * pewpew_height / 64); ++i) {
       // TODO: the problem here is that one byte in XBM is a row of 8 pixels,
@@ -638,10 +668,10 @@ void Settings_screensaver() {
 #endif
 }
 
-void Settings_handleButtonEvent(const UI::Event &event) {
-  Settings_instance.HandleUiEvent(event);
+void AppSettings::HandleButtonEvent(const UI::Event &event) {
+  HandleUiEvent(event);
 }
 
-void Settings_handleEncoderEvent(const UI::Event &event) {
-  Settings_instance.HandleUiEvent(event);
+void AppSettings::HandleEncoderEvent(const UI::Event &event) {
+  HandleUiEvent(event);
 }
