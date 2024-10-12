@@ -261,7 +261,7 @@ void ScaleEditor::HandleEncoderEvent(const UI::Event &event) {
                   mask |= ~(0xffff << (num_notes_ - cursor_pos_)) << cursor_pos_;
                 } else {
                   // scale might be shortened to where no notes are active in mask
-                  if (0 == (mask & ~(0xffff < num_notes_)))
+                  if (0 == (mask & ~(0xffff << num_notes_)))
                     mask |= 0x1;
                 }
       
