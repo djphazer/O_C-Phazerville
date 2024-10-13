@@ -4,7 +4,7 @@ import subprocess
 
 def get_git_rev():
     git_rev = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).decode().strip()
-    git_status = subprocess.check_output(["git", "status", "-s", "--untracked-files=no"]).decode
+    git_status = subprocess.check_output(["git", "status", "-s", "--untracked-files=no"]).decode()
     suffix = "dirty" if git_status else ""
 
     return git_rev + suffix
