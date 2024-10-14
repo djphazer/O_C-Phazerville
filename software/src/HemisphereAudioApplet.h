@@ -58,19 +58,8 @@ public:
   void gfxPrintPitchHz(int16_t pitch, float base_freq = C3) {
     float freq = PitchToRatio(pitch) * base_freq;
     int int_part = static_cast<int>(freq);
-    float dec = freq - int_part;
-    if (int_part < 100) {
-      int dec_part = static_cast<int>(1000 * dec);
-      graphics.printf("%2d.%03d", int_part, dec_part);
-    } else if (int_part < 1000) {
-      int dec_part = static_cast<int>(100 * dec);
-      graphics.printf("%3d.%02d", int_part, dec_part);
-    } else if (int_part < 10000) {
-      int dec_part = static_cast<int>(10 * dec);
-      graphics.printf("%4d.%01d", int_part, dec_part);
-    } else {
-      graphics.printf("%6d", int_part);
-    }
+    int dec = static_cast<int>(10 * (freq - int_part));
+    graphics.printf("%5d.%01d", int_part, dec);
     gfxPrint("Hz");
   }
 };

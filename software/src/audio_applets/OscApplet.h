@@ -22,7 +22,6 @@ public:
     gfxPrintPitchHz(pitch);
     gfxEndCursor(cursor == 1);
 
-    gfxPrint(" ");
     gfxStartCursor();
     gfxPrintIcon(pitch_cv.Icon());
     gfxEndCursor(cursor == 2);
@@ -51,11 +50,7 @@ public:
         waveform = constrain(waveform + direction, 0, 2);
         break;
       case 1:
-        pitch = constrain(
-          pitch + direction * 16,
-          -HEMISPHERE_MAX_INPUT_CV,
-          HEMISPHERE_MAX_INPUT_CV
-        );
+        pitch = constrain(pitch + direction * 16, -3 * 12 * 128, 7 * 12 * 128);
         break;
       case 2:
         pitch_cv.ChangeSource(direction);
