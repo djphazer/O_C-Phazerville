@@ -1,3 +1,5 @@
+#ifdef ARDUINO_TEENSY41
+
 #include "AudioIO.h"
 // #include <Audio.h>
 
@@ -21,3 +23,4 @@ namespace OC {
     }
   }
 }
+#endif
