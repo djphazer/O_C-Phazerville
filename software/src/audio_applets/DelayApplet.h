@@ -50,6 +50,7 @@ public:
       }
     }
 
+    float tap_gain = 1.0f / taps;
     if (frozen) {
       input_amp.gain(0.0f);
       delay.feedback(8, 1.0f);
@@ -58,16 +59,16 @@ public:
       }
     } else {
       input_amp.gain(1.0f);
-      float f = 0.01f * feedback / taps;
+      float f = 0.01f * feedback * tap_gain;
       for (int tap = 0; tap < 9; tap++) {
         delay.feedback(tap, tap < taps ? f : 0.0f);
       }
     }
 
     for (int i = 0; i < 4; i++) {
-      taps_mixer1.gain(i, i < taps ? 1.0f : 0.0f);
+      taps_mixer1.gain(i, i < taps ? tap_gain : 0.0f);
       int j = i + 4;
-      taps_mixer2.gain(i, j < taps ? 1.0f : 0.0f);
+      taps_mixer2.gain(i, j < taps ? tap_gain : 0.0f);
     }
 
     float w = 0.01f * wet + InF(1);

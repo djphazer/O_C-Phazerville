@@ -10,8 +10,7 @@ template <
   size_t Taps = 1>
 class AudioDelayExt : public AudioStream {
 public:
-  AudioDelayExt()
-    : AudioStream(1, input_queue_array) {
+  AudioDelayExt() : AudioStream(1, input_queue_array) {
     delay_secs.fill(OnePole(Interpolated(0.0f, AUDIO_BLOCK_SAMPLES), 0.0002f));
     fb.fill(Interpolated(0.0f, AUDIO_BLOCK_SAMPLES));
   }
@@ -42,7 +41,7 @@ public:
   }
 
   void update(void) {
-    auto in_block = receiveReadOnly();
+    audio_block_t* in_block = receiveReadOnly();
     if (in_block == NULL) return;
 
     audio_block_t* outs[Taps];
@@ -51,12 +50,12 @@ public:
     }
 
     for (size_t i = 0; i < AUDIO_BLOCK_SAMPLES; i++) {
-      int32_t in = in_block->data[i];
+      float in = in_block->data[i];
       for (size_t tap = 0; tap < Taps; tap++) {
-        outs[tap]->data[i] = ReadNext(tap);
+        outs[tap]->data[i] = Clip16(static_cast<int32_t>(ReadNext(tap)));
         in += fb[tap].ReadNext() * outs[tap]->data[i];
       }
-      buffer.WriteSample(Clip16(in));
+      buffer.WriteSample(Clip16(static_cast<int32_t>(in)));
     }
     release(in_block);
     for (size_t tap = 0; tap < Taps; tap++) {
@@ -65,19 +64,20 @@ public:
     }
   }
 
-  int16_t ReadNext(size_t tap) {
+  float ReadNext(size_t tap) {
     float d = delay_secs[tap].ReadNext();
     auto& target = target_delay[tap];
     if (target.phase > 0.0f) {
-      int16_t target_val = buffer.ReadSample(target.target * AUDIO_SAMPLE_RATE);
-      int16_t source_val = buffer.ReadSample(d * AUDIO_SAMPLE_RATE);
+      float target_val = buffer.ReadSample(target.target * AUDIO_SAMPLE_RATE);
+      float source_val = buffer.ReadSample(d * AUDIO_SAMPLE_RATE);
       float t = target.phase;
-      int16_t val = t * target_val + (1.0f - t) * source_val;
+      float val = t * target_val + (1.0f - t) * source_val;
       // crossfade length being longer than delay time screws up, e.g.,
       // karplus-strong. Also, delay times that short will produce higher
       // harmonics that crossfades of that length (that's kinda the point).
       // Just maxing here seems to work pretty well for KS.
-      target.phase += max(crossfade_dt, 1.0f / (target.target * AUDIO_SAMPLE_RATE));
+      target.phase
+        += max(crossfade_dt, 1.0f / target.target / AUDIO_SAMPLE_RATE);
       if (target.phase >= 1.0f) {
         target.phase = 0.0f;
         delay_secs[tap] = target.target;
@@ -103,5 +103,5 @@ private:
   std::array<CrossfadeTarget, Taps> target_delay;
   std::array<OnePole<Interpolated>, Taps> delay_secs;
   std::array<Interpolated, Taps> fb;
-  ExtAudioBuffer<BufferLength> buffer;
+  ExtAudioBuffer<BufferLength, int16_t> buffer;
 };

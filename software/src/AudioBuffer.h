@@ -3,8 +3,9 @@
 #include <Audio.h>
 #include <smalloc.h>
 
-template <typename T>
-constexpr inline T InterpHermite(T xm1, T x0, T x1, T x2, float t) {
+constexpr inline float InterpHermite(
+  float xm1, float x0, float x1, float x2, float t
+) {
   // https://github.com/pichenettes/stmlib/blob/d18def816c51d1da0c108236928b2bbd25c17481/dsp/dsp.h#L52
   const float c = (x1 - xm1) * 0.5f;
   const float v = x0 - x1;
@@ -88,7 +89,7 @@ public:
 
   // TODO:: This is prett innefficient for reading sequences. We should read
   // based on an array of ts instead, reducing dup reads and calcs
-  int16_t ReadInterp(float seconds_ago) {
+  float ReadInterp(float seconds_ago) {
     float samples_back = seconds_ago * AUDIO_SAMPLE_RATE;
     size_t samples_back_int = static_cast<size_t>(samples_back);
     // Need point from before target point and we're between samples_back_int
@@ -110,9 +111,9 @@ protected:
 };
 
 template <size_t NumSamples, typename T = int16_t>
-class ExtAudioBuffer : public AudioBuffer<NumSamples> {
+class ExtAudioBuffer : public AudioBuffer<NumSamples, T> {
 public:
-  ExtAudioBuffer() : AudioBuffer<NumSamples>(nullptr) {}
+  ExtAudioBuffer() : AudioBuffer<NumSamples, T>(nullptr) {}
   ~ExtAudioBuffer() {
     Release();
   }
