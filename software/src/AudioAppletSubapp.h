@@ -101,6 +101,7 @@ public:
     for (size_t i = 0; i < Slots; i++) {
       print_applet_line(i);
     }
+
     if (edit_state == EDIT_LEFT) {
       HemisphereAudioApplet& applet = IsStereo(left_cursor)
         ? get_stereo_applet(left_cursor)
@@ -108,7 +109,9 @@ public:
       applet.BaseView();
       gfxFrame(64, 0, 64, 64);
     } else {
-      gfxPrint(65, 2, "R Channel");
+      // gfxPrint(65, 2, "R Channel");
+      gfxPos(65, 2);
+      graphics.printf("MEM%3d%%) R", mem_percent);
       gfxDottedLine(64, 10, 126, 10);
     }
     if (edit_state == EDIT_RIGHT) {
@@ -118,8 +121,22 @@ public:
       applet.BaseView();
       gfxFrame(0, 0, 64, 64);
     } else {
-      gfxPrint(1, 2, "L Channel");
+      // gfxPrint(1, 2, "L Channel");
+      gfxPos(1, 2);
+      graphics.printf("L (CPU%3d%%", cpu_percent);
       gfxDottedLine(0, 10, 62, 10);
+    }
+
+    // Recall that unsigned substraction rolls over correclty, so when millis()
+    // rolls over, this will still work.
+    if (millis() - last_stats_update > 250) {
+      last_stats_update = millis();
+      mem_percent = static_cast<int16_t>(
+        100 * static_cast<float>(AudioMemoryUsageMax()) / OC::AudioIO::AUDIO_MEMORY
+      );
+      cpu_percent = static_cast<int16_t>(AudioProcessorUsageMax());
+      AudioProcessorUsageMaxReset();
+      AudioMemoryUsageMaxReset();
     }
   }
 
@@ -319,6 +336,10 @@ private:
   size_t total, user, free;
 
   uint32_t last_update = 0;
+
+  int16_t mem_percent = 0;
+  int16_t cpu_percent = 0;
+  uint32_t last_stats_update = 0;
 
   enum EditState {
     EDIT_NONE,

@@ -19,7 +19,7 @@ namespace OC {
     }
 
     void Init() {
-      AudioMemory(128);
+      AudioMemory(AUDIO_MEMORY);
     }
   }
 }
