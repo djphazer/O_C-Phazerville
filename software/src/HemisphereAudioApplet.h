@@ -41,7 +41,7 @@ struct CVInput {
 };
 
 struct TrigInput {
-  uint8_t source = 0;
+  int8_t source = 0;
 };
 
 enum AudioChannels {

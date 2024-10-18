@@ -36,7 +36,7 @@ public:
 
     if (Clock(1)) frozen = !frozen;
 
-    float d = DelaySecs(delay_time + delay_cv.Process(In(0)));
+    float d = DelaySecs(delay_time + delay_cv.Process(delay_time_cv.In()));
     for (int tap = 0; tap < taps; tap++) {
       float t = d * (tap + 1.0f) / taps;
       CONSTRAIN(d, 0.0f, MAX_DELAY_SECS);
@@ -59,9 +59,11 @@ public:
       }
     } else {
       input_amp.gain(1.0f);
-      float f = 0.01f * feedback * tap_gain;
+      float fb = constrain(
+        (0.01f * feedback + feedback_cv.InF()) * tap_gain, 0.0, 2.0f
+      );
       for (int tap = 0; tap < 9; tap++) {
-        delay.feedback(tap, tap < taps ? f : 0.0f);
+        delay.feedback(tap, tap < taps ? fb : 0.0f);
       }
     }
 
@@ -71,7 +73,7 @@ public:
       taps_mixer2.gain(i, j < taps ? tap_gain : 0.0f);
     }
 
-    float w = 0.01f * wet + InF(1);
+    float w = constrain(0.01f * wet + wet_cv.InF(), 0.0f, 1.0f);
     CONSTRAIN(w, 0.0f, 1.0f);
     wet_dry_mixer.gain(WD_WET_CH_1, w);
     wet_dry_mixer.gain(WD_WET_CH_2, w);
@@ -80,14 +82,20 @@ public:
 
   void View() {
     // gfxPrint(0, 15, delaySecs * 1000.0f, 0);
-    int unit_x = 6 * 8;
+    int unit_x = 6 * 7 + 1;
+    gfxPos(1, 15);
+
     switch (time_units) {
       case SECS:
-        gfxPrint(0, 15, DelaySecs(delay_time) * 1000.0f, 0);
+        graphics.printf(
+          "  %5d", static_cast<int>(roundf(1000.0f * DelaySecs(delay_time)))
+        );
         gfxPrint(unit_x, 15, "ms");
         break;
       case HZ:
-        gfxPrint(0, 15, 1.0f / DelaySecs(delay_time), 2);
+        graphics.printf(
+          "%5d.%01d", SPLIT_INT_DEC(1.0f / DelaySecs(delay_time), 10)
+        );
         gfxPrint(unit_x, 15, "Hz");
         break;
       case CLOCK:
@@ -102,44 +110,52 @@ public:
         gfxIcon(unit_x, 15, CLOCK_ICON);
         break;
     }
-    if (cursor == TIME) gfxCursor(0, 23, 6 * 6);
+    if (cursor == TIME) gfxCursor(1, 23, 6 * 7);
     if (cursor == TIME_UNITS) gfxCursor(unit_x, 23, 2 * 6);
 
-    gfxPrint(0, 25, "FB: ");
-    gfxPos(60 - 5 * 6, 25);
+    gfxStartCursor(unit_x + 2 * 6, 15);
+    gfxPrintIcon(delay_time_cv.Icon());
+    gfxEndCursor(cursor == TIME_CV);
+
+    int param_right_x = 63 - 8;
+    gfxPrint(1, 25, "FB:");
+    gfxStartCursor(param_right_x - 4 * 6, 25);
     graphics.printf("%3d%%", feedback);
-    if (cursor == FEEDBACK) gfxCursor(60 - 4 * 6, 32, 4 * 6);
+    gfxEndCursor(cursor == FEEDBACK);
 
-    gfxIcon(54, 25, LOOP_ICON);
-    if (frozen) gfxInvert(54, 25, 8, 8);
-    if (cursor == FREEZE) gfxCursor(54, 32, 8);
+    gfxStartCursor();
+    gfxPrintIcon(feedback_cv.Icon());
+    gfxEndCursor(cursor == FEEDBACK_CV);
 
-    gfxPrint(0, 35, "Wet: ");
-    gfxPos(60 - 5 * 6, 35);
+    // gfxIcon(54, 25, LOOP_ICON);
+    // if (frozen) gfxInvert(54, 25, 8, 8);
+    // if (cursor == FREEZE) gfxCursor(54, 32, 8);
+
+    gfxPrint(1, 35, "Wet:");
+    gfxStartCursor(param_right_x - 4 * 6, 35);
     graphics.printf("%3d%%", wet);
-    if (cursor == WET) gfxCursor(60 - 4 * 6, 42, 4 * 6);
+    gfxEndCursor(cursor == WET);
 
-    gfxPrint(0, 45, "Taps: ");
-    gfxPrint(54, 45, taps);
-    if (cursor == TAPS) gfxCursor(54, 52, 6);
+    gfxStartCursor();
+    gfxPrintIcon(wet_cv.Icon());
+    gfxEndCursor(cursor == WET_CV);
 
-    switch (delay_mod_type) {
-      case CROSSFADE:
-        gfxPrint(0, 55, "Crossfade");
-        break;
-      case STRETCH:
-        gfxPrint(0, 55, "Stretch");
-        break;
-    }
-    if (cursor == TIME_MOD) gfxCursor(0, 62, 9 * 6);
+    gfxPrint(1, 45, "Taps:");
+    gfxStartCursor(param_right_x - 2 * 6, 45);
+    gfxPrint(taps);
+    gfxEndCursor(cursor == TAPS);
+
+    gfxStartCursor(1, 55);
+    gfxPrint(delay_mod_type == CROSSFADE ? "Crossfade" : "Stretch  ");
+    gfxEndCursor(cursor == TIME_MOD);
   }
 
   void OnButtonPress() {
-    if (cursor == FREEZE) {
-      frozen = !frozen;
-    } else {
-      CursorToggle();
-    }
+    // if (cursor == FREEZE) {
+    //   frozen = !frozen;
+    // } else {
+    CursorToggle();
+    // }
   }
 
   void OnEncoderMove(int direction) {
@@ -167,6 +183,9 @@ public:
         time_units += direction;
         CONSTRAIN(time_units, 0, TIME_REP_LENGTH - 1);
         break;
+      case TIME_CV:
+        delay_time_cv.ChangeSource(direction);
+        break;
       case TIME_MOD:
         delay_mod_type += direction;
         CONSTRAIN(delay_mod_type, 0, 1);
@@ -175,9 +194,15 @@ public:
         feedback += direction;
         CONSTRAIN(feedback, 0, 100);
         break;
+      case FEEDBACK_CV:
+        feedback_cv.ChangeSource(direction);
+        break;
       case WET:
         wet += direction;
         CONSTRAIN(wet, 0, 100);
+        break;
+      case WET_CV:
+        wet_cv.ChangeSource(direction);
         break;
       case TAPS:
         taps += direction;
@@ -216,7 +241,7 @@ public:
     return &wet_dry_mixer;
   }
 
-  float DelaySecs(int16_t raw) {
+  float DelaySecs(int raw) {
     // we need duration, not frequency: negating pitch gets that faster than
     // `1.0f /`
     float s;
@@ -229,7 +254,7 @@ public:
         break;
       default:
       case SECS:
-        s = 0.500f + raw / 1000.0f; // default to 500ms
+        s = raw / 1000.0f; // default to 500ms
         break;
     }
     CONSTRAIN(s, 0.0f, MAX_DELAY_SECS);
@@ -260,9 +285,12 @@ private:
   enum Cursor {
     TIME,
     TIME_UNITS,
+    TIME_CV,
     FEEDBACK,
-    FREEZE,
+    FEEDBACK_CV,
+    // FREEZE,
     WET,
+    WET_CV,
     TAPS,
     TIME_MOD,
     CURSOR_LENGTH,
@@ -283,19 +311,29 @@ private:
   int cursor = TIME;
 
   // only uses 16 bits, but do 32 to make CONSTRAIN easier
-  int32_t delay_time = 0;
+  int32_t delay_time = 500;
+  CVInput delay_time_cv;
+  int16_t ratio = 0;
+  TrigInput clock_source;
   uint8_t time_units = 0;
   // Only need 7 bits on these but the sign makes CONSTRAIN work
-  int8_t wet = 50;
   int8_t feedback = 0;
+  CVInput feedback_cv;
+  int8_t wet = 50;
+  CVInput wet_cv;
   int8_t taps = 1;
   int8_t delay_mod_type = CROSSFADE;
 
   static constexpr PackLocation delay_loc{0, 16};
-  static constexpr PackLocation time_rep_loc{16, 4};
+  static constexpr PackLocation time_rep_loc{16, 3};
+  static constexpr PackLocation ratio_loc{19, 8};
+  static constexpr PackLocation delay_time_cv_loc{27, 5};
   static constexpr PackLocation wet_loc{32, 7};
   static constexpr PackLocation fb_loc{39, 7};
   static constexpr PackLocation taps_loc{46, 3};
+  static constexpr PackLocation clock_source_loc{49, 5};
+  static constexpr PackLocation feedback_cv_loc{54, 5};
+  static constexpr PackLocation wet_cv_loc{59, 5};
 
   NoiseSuppressor delay_cv{
     0.0f,
