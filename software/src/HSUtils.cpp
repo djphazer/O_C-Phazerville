@@ -286,43 +286,6 @@ namespace HS {
 
 } // namespace HS
 
-#ifdef ARDUINO_TEENSY41
-void OC::AudioDSP::DrawAudioSetup() {
-  for (int ch = 0; ch < 2; ++ch)
-  {
-    int mod_target = AMP_LEVEL;
-    switch (mode[ch]) {
-      default:
-      case PASSTHRU:
-      case VCA_MODE:
-      case LPG_MODE:
-        break;
-      case VCF_MODE:
-        mod_target = FILTER_CUTOFF;
-        break;
-      case WAVEFOLDER:
-        mod_target = WAVEFOLD_MOD;
-        break;
-    }
-
-    // Channel mode
-    gfxPrint(8 + 82*ch, 15, "Mode");
-    gfxPrint(8 + 82*ch, 25, mode_names[ mode[ch] ]);
-
-    // Modulation assignment
-    gfxPrint(8 + 82*ch, 35, "Map");
-    gfxPrint(8 + 82*ch, 45, OC::Strings::cv_input_names_none[ mod_map[ch][mod_target] + 1 ] );
-
-    // cursor
-    gfxIcon(120*ch, 25 + audio_cursor[ch]*20, ch ? LEFT_ICON : RIGHT_ICON);
-  }
-
-  // Reverb params (size, damping, level?)
-  // careful, because level is also feedback...
-}
-#endif
-
-
 //////////////// Hemisphere-like graphics methods for easy porting
 ////////////////////////////////////////////////////////////////////////////////
 void gfxPos(int x, int y) {
