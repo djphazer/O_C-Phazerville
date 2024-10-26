@@ -1,4 +1,4 @@
-#include "AudioPassthrough.h"
+#include "audio/AudioPassthrough.h"
 #include "HemisphereAudioApplet.h"
 #include "dsputils.h"
 #include <Audio.h>

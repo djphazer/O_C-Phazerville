@@ -1,6 +1,6 @@
 
 #include "HemisphereAudioApplet.h"
-#include "AudioPassthrough.h"
+#include "audio/AudioPassthrough.h"
 
 template <AudioChannels Channels>
 class PassthruApplet : public HemisphereAudioApplet {

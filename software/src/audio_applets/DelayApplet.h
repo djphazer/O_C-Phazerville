@@ -1,7 +1,7 @@
 #pragma once
 
-#include "AudioDelayExt.h"
-#include "AudioPassthrough.h"
+#include "audio/AudioDelayExt.h"
+#include "audio/AudioPassthrough.h"
 #include "HSicons.h"
 #include "HemisphereAudioApplet.h"
 #include "dsputils.h"
