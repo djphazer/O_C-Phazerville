@@ -170,14 +170,28 @@ public:
 
     switch (cursor) {
       case TIME:
-        if (time_units == CLOCK) {
-          delay_time += static_cast<float>(direction) / RATIO_SCALAR;
-        } else {
-          float cur_delay = DelaySecs(delay_time);
-          while (DelaySecs(delay_time) == cur_delay)
+        switch (time_units) {
+          case CLOCK:
+            delay_time += static_cast<float>(direction) / RATIO_SCALAR;
+            CONSTRAIN(delay_time, -128, 128);
+            break;
+          case HZ:
+            // Adjust by 1/8 semitone, and ensure we hit semitones.
+            delay_time /= 16;
             delay_time += knob_accel;
+            delay_time *= 16;
+
+            // -8 * 12 * 128 -> ~1 Hz
+            // 6 * 12 * 128 -> ~17kHz
+            CONSTRAIN(delay_time, -8 * 12 * 128, 6 * 12 * 128);
+            break;
+          case TIME:
+            delay_time += knob_accel;
+            CONSTRAIN(
+              delay_time, 1, static_cast<int>(MAX_DELAY_SECS * 1000) - 1
+            );
+            break;
         }
-        CONSTRAIN(delay_time, INT16_MIN, INT16_MAX);
         break;
       case TIME_UNITS:
         time_units += direction;
@@ -247,7 +261,7 @@ public:
     float s;
     switch (time_units) {
       case HZ:
-        s = (PitchToRatio(-raw)) / 220.0f;
+        s = (PitchToRatio(-raw)) / (C3 * 2);
         break;
       case CLOCK:
         s = clock_base_secs / (DelayRatio(raw));
