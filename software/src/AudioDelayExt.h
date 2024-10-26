@@ -40,9 +40,16 @@ public:
     this->fb[tap] = fb;
   }
 
-  void update(void) {
+  void update(void) override {
+    if (!buffer.IsReady()) return;
     audio_block_t* in_block = receiveReadOnly();
-    if (in_block == NULL) return;
+
+    if (in_block == NULL) {
+      // Even if we're not getting anything we need to process feedback.
+      // e.g. a VCA will actually not output blocks when closed.
+      in_block = allocate();
+      std::fill(in_block->data, in_block->data + AUDIO_BLOCK_SAMPLES, 0);
+    }
 
     audio_block_t* outs[Taps];
     for (size_t tap = 0; tap < Taps; tap++) {

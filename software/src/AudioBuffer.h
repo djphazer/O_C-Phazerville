@@ -135,4 +135,8 @@ public:
       this->buffer = nullptr;
     }
   }
+
+  inline bool IsReady() {
+    return this->buffer != nullptr;
+  }
 };
