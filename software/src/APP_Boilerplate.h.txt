@@ -1,0 +1,170 @@
+// Copyright (c) 2024, __________
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+#include "HSApplication.h"
+#include "HSMIDI.h"
+
+class ClassName : public HSApplication, public SystemExclusiveHandler {
+public:
+    void Start() {
+      // initialize state here
+    }
+
+    void Resume() {
+    }
+
+    void Suspend() {
+      // maybe save some state here
+    }
+
+    void Controller() {
+      // MAIN I/O LOGIC
+    }
+
+    void View() {
+      gfxHeader("ClassName");
+      //DrawInterface();
+    }
+
+    void OnSendSysEx() {
+    }
+
+    void OnReceiveSysEx() {
+    }
+
+    /////////////////////////////////////////////////////////////////
+    // Control handlers
+    /////////////////////////////////////////////////////////////////
+    void OnLeftButtonPress() {
+    }
+
+    void OnLeftButtonLongPress() {
+    }
+
+    void OnRightButtonPress() {
+    }
+
+    void OnUpButtonPress() {
+    }
+
+    void OnDownButtonPress() {
+    }
+
+    void OnDownButtonLongPress() {
+    }
+
+    void OnLeftEncoderMove(int direction) {
+    }
+
+    void OnRightEncoderMove(int direction) {
+    }
+
+private:
+    int8_t cursor;
+
+    /* Example private screen-drawing method
+    void DrawInterface() {
+    }
+    */
+};
+
+ClassName ClassName_instance;
+
+// App stubs
+void ClassName_init() {
+    ClassName_instance.BaseStart();
+}
+
+// Not using O_C Storage
+size_t ClassName_storageSize() {return 0;}
+size_t ClassName_save(void *storage) {return 0;}
+size_t ClassName_restore(const void *storage) {return 0;}
+
+void ClassName_isr() {
+    ClassName_instance.BaseController();
+}
+
+void ClassName_handleAppEvent(OC::AppEvent event) {
+    if (event ==  OC::APP_EVENT_RESUME) {
+        ClassName_instance.Resume();
+    }
+    if (event == OC::APP_EVENT_SUSPEND) {
+        ClassName_instance.OnSendSysEx();
+    }
+}
+
+void ClassName_loop() {} // Deprecated
+
+void ClassName_menu() {
+    ClassName_instance.BaseView();
+}
+
+void ClassName_screensaver() {
+    ClassName_instance.BaseScreensaver(true);
+}
+
+void ClassName_handleButtonEvent(const UI::Event &event) {
+    // For left encoder, handle press and long press
+    // For right encoder, only handle press (long press is reserved)
+    // For up button, handle only press (long press is reserved)
+    // For down button, handle press and long press
+    switch (event.type) {
+    case UI::EVENT_BUTTON_DOWN: // when button is first pressed
+        //ClassName_instance.OnButtonDown(event);
+        break;
+
+    case UI::EVENT_BUTTON_PRESS: { // when button is released
+        switch (event.control) {
+        case OC::CONTROL_BUTTON_L:
+          ClassName_instance.OnLeftButtonPress();
+          break;
+        case OC::CONTROL_BUTTON_R:
+          ClassName_instance.OnRightButtonPress();
+          break;
+        case OC::CONTROL_BUTTON_DOWN:
+          ClassName_instance.OnDownButtonPress();
+          break;
+        case OC::CONTROL_BUTTON_UP:
+          ClassName_instance.OnUpButtonPress();
+          break;
+        default: break;
+        }
+    } break;
+
+    case UI::EVENT_BUTTON_LONG_PRESS:
+        if (event.control == OC::CONTROL_BUTTON_L) {
+            ClassName_instance.OnLeftButtonLongPress();
+        }
+        if (event.control == OC::CONTROL_BUTTON_DOWN) {
+            ClassName_instance.OnDownButtonLongPress();
+        }
+        break;
+
+    default: break;
+    }
+}
+
+void ClassName_handleEncoderEvent(const UI::Event &event) {
+    // Left encoder turned
+    if (event.control == OC::CONTROL_ENCODER_L) ClassName_instance.OnLeftEncoderMove(event.value);
+
+    // Right encoder turned
+    if (event.control == OC::CONTROL_ENCODER_R) ClassName_instance.OnRightEncoderMove(event.value);
+}

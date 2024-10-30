@@ -3,27 +3,27 @@ name: PlatformIO CI
 on:
   push:
     paths:
-      - 'software/o_c_REV/**'
+      - 'software/**'
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Setup env
       run: |
-        echo "OC_ARTIFACT_TAG=${GITHUB_REF_NAME}-$(software/o_c_REV/resources/oc_build_tag.sh)" | tr '/' '_' >> $GITHUB_ENV
+        echo "OC_ARTIFACT_TAG=${GITHUB_REF_NAME}-$(git rev-parse --short HEAD)" | tr '/' '_' >> $GITHUB_ENV
 
     - name: Cache PlatformIO
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.platformio
         key: ${{ runner.os }}-${{ hashFiles('**/lockfiles') }}
 
     - name: Set up Python
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v5
       with:
         python-version: '3.x'
         cache: 'pip'
@@ -34,12 +34,12 @@ jobs:
         pip3 install -r .github/workflows/requirements.txt
 
     - name: Build firmware
-      working-directory: software/o_c_REV/
+      working-directory: software/
       run: |
         pio run
 
     - name: Copy artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: o_C-${{env.OC_ARTIFACT_TAG}}
-        path: software/o_c_REV/.pio/build/*/*.hex
+        path: software/.pio/build/*/*.hex
