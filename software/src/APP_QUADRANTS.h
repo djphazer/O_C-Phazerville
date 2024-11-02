@@ -35,7 +35,6 @@
 #include "HSicons.h"
 #include "HSMIDI.h"
 #include "HSClockManager.h"
-// #include "AudioSetup.h"
 
 #include "hemisphere_config.h"
 #include "hemisphere_audio_config.h"

@@ -37,10 +37,6 @@
 #include "HSMIDI.h"
 #include "HSClockManager.h"
 
-#ifdef ARDUINO_TEENSY41
-// #include "AudioSetup.h"
-#endif
-
 #include "hemisphere_config.h"
 
 #ifdef ARDUINO_TEENSY41

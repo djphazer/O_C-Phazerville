@@ -3,10 +3,6 @@
 #include "HemisphereApplet.h"
 #include "HSUtils.h"
 
-#ifdef ARDUINO_TEENSY41
-#include "AudioSetup.h"
-#endif
-
 namespace HS {
 
   uint32_t popup_tick; // for button feedback

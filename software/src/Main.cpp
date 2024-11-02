@@ -51,7 +51,6 @@ MIDIDevice usbHostMIDI(thisUSB);
 
 #if defined(ARDUINO_TEENSY41)
 MIDI_CREATE_INSTANCE(HardwareSerial, Serial8, MIDI1);
-// #include "AudioSetup.h"
 #include "AudioIO.h"
 #endif
 
@@ -132,7 +131,6 @@ void setup() {
 
   if (I2S2_Audio_ADC && I2S2_Audio_DAC) {
     OC::AudioIO::Init();
-    // OC::AudioDSP::Init();
   }
   #endif
 
