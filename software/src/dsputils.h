@@ -34,3 +34,13 @@ inline int32_t Clip16(int32_t x) {
     return x;
   }
 }
+
+inline int16_t Clip16(float x) {
+  if (x < -32768.0f) {
+    return -32768;
+  } else if (x > 32767.0f) {
+    return 32767;
+  } else {
+    return static_cast<int16_t>(x);
+  }
+}

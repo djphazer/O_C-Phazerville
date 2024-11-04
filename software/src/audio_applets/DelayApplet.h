@@ -1,10 +1,11 @@
 #pragma once
 
-#include "audio/AudioDelayExt.h"
-#include "audio/AudioPassthrough.h"
 #include "HSicons.h"
 #include "HemisphereAudioApplet.h"
 #include "dsputils.h"
+#include "audio/AudioDelayExt.h"
+#include "audio/AudioMixer.h"
+#include "audio/AudioPassthrough.h"
 #include <Audio.h>
 
 class DelayApplet : public HemisphereAudioApplet {
@@ -15,11 +16,10 @@ public:
   void Start() {
     delay.Acquire();
 
-    for (int i = 0; i < 4; i++) {
-      taps_conns[i].connect(delay, i, taps_mixer1, i);
-      int j = i + 4;
-      taps_conns[j].connect(delay, j, taps_mixer2, i);
+    for (int i = 0; i < 8; i++) {
+      taps_conns[i].connect(delay, i, taps_mixer, i);
     }
+    set_taps(taps);
   }
 
   void Unload() {
@@ -50,7 +50,6 @@ public:
       }
     }
 
-    float tap_gain = 1.0f / taps;
     if (frozen) {
       input_amp.gain(0.0f);
       delay.feedback(8, 1.0f);
@@ -59,24 +58,16 @@ public:
       }
     } else {
       input_amp.gain(1.0f);
-      float fb = constrain(
-        (0.01f * feedback + feedback_cv.InF()) * tap_gain, 0.0, 2.0f
-      );
+      float fb
+        = constrain((0.01f * feedback + feedback_cv.InF()) / taps, 0.0, 2.0f);
       for (int tap = 0; tap < 9; tap++) {
         delay.feedback(tap, tap < taps ? fb : 0.0f);
       }
     }
 
-    for (int i = 0; i < 4; i++) {
-      taps_mixer1.gain(i, i < taps ? tap_gain : 0.0f);
-      int j = i + 4;
-      taps_mixer2.gain(i, j < taps ? tap_gain : 0.0f);
-    }
-
     float w = constrain(0.01f * wet + wet_cv.InF(), 0.0f, 1.0f);
     CONSTRAIN(w, 0.0f, 1.0f);
-    wet_dry_mixer.gain(WD_WET_CH_1, w);
-    wet_dry_mixer.gain(WD_WET_CH_2, w);
+    wet_dry_mixer.gain(WD_WET_CH, w);
     wet_dry_mixer.gain(WD_DRY_CH, 1.0f - w);
   }
 
@@ -219,8 +210,8 @@ public:
         wet_cv.ChangeSource(direction);
         break;
       case TAPS:
-        taps += direction;
-        CONSTRAIN(taps, 1, 8);
+        set_taps(taps + direction);
+        break;
       case CURSOR_LENGTH:
         break;
     }
@@ -295,6 +286,16 @@ public:
 protected:
   void SetHelp() {}
 
+  void set_taps(size_t t) {
+    taps = t;
+    CONSTRAIN(taps, 1, 8);
+    float tap_gain = 1.0f / taps;
+    for (int i = 0; i < taps; i++)
+      taps_mixer.gain(i, tap_gain);
+    for (int i = taps; i < 8; i++)
+      taps_mixer.gain(i, 0.0f);
+  }
+
 private:
   enum Cursor {
     TIME,
@@ -367,8 +368,7 @@ private:
   elapsedMillis millis_since_turn;
 
   const uint8_t WD_DRY_CH = 0;
-  const uint8_t WD_WET_CH_1 = 1;
-  const uint8_t WD_WET_CH_2 = 2;
+  const uint8_t WD_WET_CH = 1;
 
   // Uses 1MB of psram and gives just under 12 secs of delay time.
   static const size_t DELAY_LENGTH = 1024 * 512;
@@ -381,11 +381,9 @@ private:
   AudioConnection input_to_amp{input_stream, input_amp};
   AudioConnection amp_to_delay{input_amp, delay};
   AudioConnection taps_conns[8];
-  AudioMixer4 taps_mixer1;
-  AudioMixer4 taps_mixer2;
+  AudioMixer<8> taps_mixer;
 
-  AudioMixer4 wet_dry_mixer;
-  AudioConnection wet_conn1{taps_mixer1, 0, wet_dry_mixer, WD_WET_CH_1};
-  AudioConnection wet_conn2{taps_mixer2, 0, wet_dry_mixer, WD_WET_CH_2};
+  AudioMixer<2> wet_dry_mixer;
+  AudioConnection wet_conn{taps_mixer, 0, wet_dry_mixer, WD_WET_CH};
   AudioConnection dry_conn{input_stream, 0, wet_dry_mixer, WD_DRY_CH};
 };
