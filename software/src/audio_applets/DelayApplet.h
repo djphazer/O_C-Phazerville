@@ -29,14 +29,30 @@ public:
 
   void Controller() {
     clock_count++;
-    if (Clock(0)) {
+    if (clock_source.Clock()) {
       clock_base_secs = clock_count / 16666.0f;
       clock_count = 0;
     }
 
-    if (Clock(1)) frozen = !frozen;
+    // if (Clock(1)) frozen = !frozen;
 
-    float d = DelaySecs(delay_time + delay_cv.Process(delay_time_cv.In()));
+    float d;
+    switch (time_units) {
+      case HZ:
+        d = DelaySecsFromPitch(
+          delay_time + delay_cv.Process(delay_time_cv.In())
+        );
+        break;
+      case CLOCK:
+        d = DelaySecsFromRatio(
+          ratio + semitones_to_div(delay_time_cv.SemitoneIn())
+        );
+        break;
+      default:
+      case SECS:
+        d = DelaySecsFromMs(delay_time + delay_cv.Process(delay_time_cv.In()));
+        break;
+    }
     for (int tap = 0; tap < taps; tap++) {
       float t = d * (tap + 1.0f) / taps;
       CONSTRAIN(d, 0.0f, MAX_DELAY_SECS);
@@ -78,31 +94,44 @@ public:
 
     switch (time_units) {
       case SECS:
-        graphics.printf(
-          "  %5d", static_cast<int>(roundf(1000.0f * DelaySecs(delay_time)))
-        );
-        gfxPrint(unit_x, 15, "ms");
+        gfxStartCursor();
+        graphics.printf("  %5d", delay_time);
+        gfxEndCursor(cursor == TIME);
+
+        gfxStartCursor(unit_x, 15);
+        gfxPrint("ms");
+        gfxEndCursor(cursor == TIME_UNITS);
         break;
       case HZ:
+        gfxStartCursor();
         graphics.printf(
-          "%5d.%01d", SPLIT_INT_DEC(1.0f / DelaySecs(delay_time), 10)
+          "%5d.%01d", SPLIT_INT_DEC(1.0f / DelaySecsFromPitch(delay_time), 10)
         );
+        gfxEndCursor(cursor == TIME);
+
+        gfxStartCursor(unit_x, 15);
         gfxPrint(unit_x, 15, "Hz");
+        gfxEndCursor(cursor == TIME_UNITS);
         break;
       case CLOCK:
-        float r = DelayRatio(delay_time);
-        if (r < 1.0f) {
-          gfxPrint(0, 15, "/ ");
-          gfxPrint(roundf(1.0f / r), 0);
+        gfxStartCursor();
+        gfxPrintIcon(clock_source.Icon());
+        gfxEndCursor(cursor == CLOCK_SOURCE);
+        gfxPrint(" ");
+
+        gfxStartCursor();
+        if (ratio < 0) {
+          graphics.printf("X %d", -ratio + 1);
         } else {
-          gfxPrint(0, 15, "X ");
-          gfxPrint(roundf(r), 0);
+          graphics.printf("/ %d", ratio + 1);
         }
-        gfxIcon(unit_x, 15, CLOCK_ICON);
+        gfxEndCursor(cursor == TIME);
+
+        gfxStartCursor(unit_x, 15);
+        gfxPrintIcon(CLOCK_ICON);
+        gfxEndCursor(cursor == TIME_UNITS);
         break;
     }
-    if (cursor == TIME) gfxCursor(1, 23, 6 * 7);
-    if (cursor == TIME_UNITS) gfxCursor(unit_x, 23, 2 * 6);
 
     gfxStartCursor(unit_x + 2 * 6, 15);
     gfxPrintIcon(delay_time_cv.Icon());
@@ -152,6 +181,8 @@ public:
   void OnEncoderMove(int direction) {
     if (!EditMode()) {
       MoveCursor(cursor, direction, CURSOR_LENGTH - 1);
+      if (cursor == CLOCK_SOURCE && time_units != CLOCK)
+        MoveCursor(cursor, direction, CURSOR_LENGTH - 1);
       return;
     }
 
@@ -163,8 +194,7 @@ public:
       case TIME:
         switch (time_units) {
           case CLOCK:
-            delay_time += static_cast<float>(direction) / RATIO_SCALAR;
-            CONSTRAIN(delay_time, -128, 128);
+            ratio = constrain(ratio + direction, -127, 127);
             break;
           case HZ:
             // Adjust by 1/8 semitone, and ensure we hit semitones.
@@ -176,13 +206,16 @@ public:
             // 6 * 12 * 128 -> ~17kHz
             CONSTRAIN(delay_time, -8 * 12 * 128, 6 * 12 * 128);
             break;
-          case TIME:
+          case SECS:
             delay_time += knob_accel;
             CONSTRAIN(
               delay_time, 1, static_cast<int>(MAX_DELAY_SECS * 1000) - 1
             );
             break;
         }
+        break;
+      case CLOCK_SOURCE:
+        clock_source.ChangeSource(direction);
         break;
       case TIME_UNITS:
         time_units += direction;
@@ -222,6 +255,7 @@ public:
     uint64_t data = 0;
     Pack(data, delay_loc, delay_time);
     Pack(data, time_rep_loc, time_units);
+    Pack(data, ratio_loc, ratio);
     Pack(data, wet_loc, wet);
     Pack(data, fb_loc, feedback);
     Pack(data, taps_loc, taps - 1);
@@ -232,6 +266,7 @@ public:
     if (data != 0) {
       delay_time = Unpack(data, delay_loc);
       time_units = Unpack(data, time_rep_loc);
+      ratio = Unpack(data, ratio_loc);
       wet = Unpack(data, wet_loc);
       feedback = Unpack(data, fb_loc);
       taps = Unpack(data, taps_loc) + 1;
@@ -246,41 +281,20 @@ public:
     return &wet_dry_mixer;
   }
 
-  float DelaySecs(int raw) {
-    // we need duration, not frequency: negating pitch gets that faster than
-    // `1.0f /`
-    float s;
-    switch (time_units) {
-      case HZ:
-        s = (PitchToRatio(-raw)) / (C3 * 2);
-        break;
-      case CLOCK:
-        s = clock_base_secs / (DelayRatio(raw));
-        break;
-      default:
-      case SECS:
-        s = raw / 1000.0f; // default to 500ms
-        break;
-    }
-    CONSTRAIN(s, 0.0f, MAX_DELAY_SECS);
-    return s;
+  float DelaySecsFromPitch(int pitch) {
+    return constrain(PitchToRatio(-pitch) / (C3 * 2), 0.0f, MAX_DELAY_SECS);
   }
 
-  // /4 per v
-  static constexpr float RATIO_SCALAR = 4.0f / (HEMISPHERE_3V_CV / 3.0f);
-  float DelayRatio(int16_t raw) {
-    float ratio = roundf(raw * RATIO_SCALAR);
-    if (ratio == 0.0f) return 1.0f;
-    else if (ratio > 0.0f) return 1.0f / (1.0f + ratio);
-    else return 1.0f - ratio;
+  float DelaySecsFromMs(int ms) {
+    return constrain(0.001f * ms, 0.0f, MAX_DELAY_SECS);
   }
 
-  int16_t RatioToDelay(float ratio) {
-    if (ratio < 1.0f) {
-      return static_cast<int16_t>((1.0f / ratio - 1.0f) / RATIO_SCALAR);
-    } else {
-      return static_cast<int16_t>((1.0f - ratio) / RATIO_SCALAR);
-    }
+  float DelaySecsFromRatio(int ratio) {
+    return constrain(clock_base_secs * DelayRatio(ratio), 0.0f, MAX_DELAY_SECS);
+  }
+
+  float DelayRatio(int16_t ratio) {
+    return ratio < 0 ? 1.0f / (-ratio + 1) : ratio + 1;
   }
 
 protected:
@@ -298,6 +312,7 @@ protected:
 
 private:
   enum Cursor {
+    CLOCK_SOURCE,
     TIME,
     TIME_UNITS,
     TIME_CV,
@@ -325,11 +340,10 @@ private:
 
   int cursor = TIME;
 
-  // only uses 16 bits, but do 32 to make CONSTRAIN easier
-  int32_t delay_time = 500;
+  int delay_time = 500;
   CVInput delay_time_cv;
   int16_t ratio = 0;
-  TrigInput clock_source;
+  DigitalInput clock_source;
   uint8_t time_units = 0;
   // Only need 7 bits on these but the sign makes CONSTRAIN work
   int8_t feedback = 0;
@@ -386,4 +400,9 @@ private:
   AudioMixer<2> wet_dry_mixer;
   AudioConnection wet_conn{taps_mixer, 0, wet_dry_mixer, WD_WET_CH};
   AudioConnection dry_conn{input_stream, 0, wet_dry_mixer, WD_DRY_CH};
+
+  // [-4,-2]=>-1, [-1,1]=>0, [2,4]=>1, etc
+  int16_t semitones_to_div(int16_t semis) {
+    return (semis + 32767) / 3 - 10922;
+  }
 };

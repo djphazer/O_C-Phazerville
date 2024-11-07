@@ -73,15 +73,6 @@ public:
   }
 
   void Controller() {
-    uint32_t t = millis();
-
-    // Prevent Controllers from running multiple times per block sample, wasting
-    // cpu.
-    // TODO: This is a really stupid way to do this: we should just check to see
-    // if a audio interrupt has occurred since last controller update
-    if (t - last_update <= 1000 * AUDIO_BLOCK_SAMPLES / AUDIO_SAMPLE_RATE)
-      return;
-    last_update = t;
     AudioNoInterrupts();
     // Call Controller instead of BaseController so we don't trigger
     // cursor_countdown multiple times. This is a stupid hack and we should do
