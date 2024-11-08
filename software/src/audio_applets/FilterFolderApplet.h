@@ -110,11 +110,11 @@ private:
   int cursor = 0;
   int pitch = 1 * 12 * 128; // C4
   CVInput pitch_cv;
-  int16_t res = 70;
+  int16_t res = 75;
   CVInput res_cv;
-  int16_t fold = 100;
+  int16_t fold = 0;
   CVInput fold_cv;
-  int16_t amplevel = 50;
+  int16_t amplevel = 100;
   CVInput amp_cv;
 
   struct FilterFolder {

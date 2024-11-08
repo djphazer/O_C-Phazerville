@@ -107,7 +107,7 @@ private:
   CVInput pitch_cv;
   int8_t pw = 50;
   CVInput pw_cv;
-  int level = 100;
+  int level = 75;
   CVInput level_cv;
 
   AudioSynthWaveform synth;
