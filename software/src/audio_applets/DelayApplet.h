@@ -3,9 +3,9 @@
 #include "HSicons.h"
 #include "HemisphereAudioApplet.h"
 #include "dsputils.h"
-#include "audio/AudioDelayExt.h"
-#include "audio/AudioMixer.h"
-#include "audio/AudioPassthrough.h"
+#include "Audio/AudioDelayExt.h"
+#include "Audio/AudioMixer.h"
+#include "Audio/AudioPassthrough.h"
 #include <Audio.h>
 
 class DelayApplet : public HemisphereAudioApplet {
