@@ -96,8 +96,7 @@ struct DigitalInput {
   uint8_t const* Icon() const {
     switch (source_type()) {
       case CLOCK:
-        // TODO tick tock animation?
-        return METRO_L_ICON;
+        return clock_m.cycle ? METRO_L_ICON : METRO_R_ICON;
       case DIGITAL_INPUT:
         return DIGITAL_INPUT_ICONS + digital_input_index() * 8;
       case CV_OUTPUT:
