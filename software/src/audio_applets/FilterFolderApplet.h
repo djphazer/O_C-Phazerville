@@ -83,7 +83,7 @@ public:
         fold_cv.ChangeSource(direction);
         break;
       case 6:
-        amplevel = constrain(amplevel + direction, 0, 50);
+        amplevel = constrain(amplevel + direction, 0, 100);
         break;
       case 7:
         amp_cv.ChangeSource(direction);
@@ -129,9 +129,10 @@ private:
     AudioConnection conn4{drive, 0, folder, 1};
 
     void AmpAndFold(int foldamt, int amplevel) {
-      drive.amplitude(foldamt);
-      mixer.gain(0, amplevel * (1.0 - abs(foldamt)));
-      mixer.gain(3, foldamt * 0.9);
+      float foldF = 0.01f * foldamt;
+      drive.amplitude(foldF);
+      mixer.gain(0, 0.01f * amplevel * (1.0 - abs(foldF)));
+      mixer.gain(3, foldF * 0.9);
     }
   };
 
