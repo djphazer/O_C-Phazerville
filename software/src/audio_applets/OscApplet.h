@@ -12,6 +12,12 @@ public:
     float freq = PitchToRatio(pitch + pitch_cv.In()) * C3;
     synth.begin(1.0f, freq, waveforms[waveform]);
     synth.pulseWidth(0.01f * pw + pw_cv.InF());
+
+    // built-in VCA
+    float gain = 0.01f
+      * (level * static_cast<float>(level_cv.In(HEMISPHERE_MAX_INPUT_CV))
+           / HEMISPHERE_MAX_INPUT_CV);
+    mixer.gain(1, gain);
   }
   void View() override {
     gfxStartCursor(1, 15);
@@ -34,6 +40,15 @@ public:
     gfxStartCursor();
     gfxPrintIcon(pw_cv.Icon());
     gfxEndCursor(cursor == 4);
+
+    gfxPrint(1, 45, "Level:");
+    gfxStartCursor();
+    graphics.printf("%3d", level);
+    gfxEndCursor(cursor == 5);
+
+    gfxStartCursor();
+    gfxPrintIcon(level_cv.Icon());
+    gfxEndCursor(cursor == 6);
   }
 
   uint64_t OnDataRequest() override {
@@ -42,7 +57,7 @@ public:
   void OnDataReceive(uint64_t data) override {}
   void OnEncoderMove(int direction) override {
     if (!EditMode()) {
-      MoveCursor(cursor, direction, 5);
+      MoveCursor(cursor, direction, 7);
       return;
     }
     switch (cursor) {
@@ -61,14 +76,20 @@ public:
       case 4:
         pw_cv.ChangeSource(direction);
         break;
+      case 5:
+        level = constrain(level + direction, 0, 100);
+        break;
+      case 6:
+        level_cv.ChangeSource(direction);
+        break;
     }
   }
 
   AudioStream* InputStream() override {
-    return nullptr;
+    return &mixer;
   }
   AudioStream* OutputStream() override {
-    return &synth;
+    return &mixer;
   }
   // AudioChannels NumChannels() override { return MONO; }
 
@@ -86,5 +107,10 @@ private:
   CVInput pitch_cv;
   int8_t pw = 50;
   CVInput pw_cv;
+  int level = 100;
+  CVInput level_cv;
+
   AudioSynthWaveform synth;
+  AudioMixer4 mixer;
+  AudioConnection synthConn{synth, 0, mixer, 1};
 };
