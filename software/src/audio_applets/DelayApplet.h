@@ -218,8 +218,7 @@ public:
         clock_source.ChangeSource(direction);
         break;
       case TIME_UNITS:
-        time_units += direction;
-        CONSTRAIN(time_units, 0, TIME_REP_LENGTH - 1);
+        time_units = constrain(time_units + direction, 0, TIME_REP_LENGTH - 1);
         break;
       case TIME_CV:
         delay_time_cv.ChangeSource(direction);
