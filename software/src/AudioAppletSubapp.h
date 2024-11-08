@@ -298,7 +298,7 @@ public:
       AudioStream* next_stream = slot + 1 < Slots
         ? get_stereo_applet(slot + 1).InputStream()
         : &OC::AudioIO::OutputStream();
-      lconn.connect(*stream, 0, *next_stream, 1);
+      lconn.connect(*stream, 0, *next_stream, 0);
       rconn.connect(*stream, 1, *next_stream, 1);
     }
   }
