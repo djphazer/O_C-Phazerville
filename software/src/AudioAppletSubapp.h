@@ -98,7 +98,8 @@ public:
         ? get_stereo_applet(left_cursor)
         : get_mono_applet(LEFT_HEMISPHERE, left_cursor);
       applet.BaseView();
-      gfxFrame(64, 0, 64, 64);
+      gfxLine(64, 0, 64, 64);
+      gfxLine(64, 0, 127, 0);
     } else {
       // gfxPrint(65, 2, "R Channel");
       gfxPos(65, 2);
@@ -110,7 +111,8 @@ public:
         ? get_stereo_applet(right_cursor)
         : get_mono_applet(RIGHT_HEMISPHERE, right_cursor);
       applet.BaseView();
-      gfxFrame(0, 0, 64, 64);
+      gfxLine(64, 0, 64, 64);
+      gfxLine(0, 0, 64, 0);
     } else {
       // gfxPrint(1, 2, "L Channel");
       gfxPos(1, 2);
