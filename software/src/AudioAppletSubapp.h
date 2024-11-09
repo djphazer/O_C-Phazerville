@@ -131,6 +131,18 @@ public:
     }
   }
 
+  void HandleAuxButtonEvent(const UI::Event& event) {
+    if (event.type == UI::EVENT_BUTTON_DOWN) {
+      bool forwardPress
+        = (event.control == OC::CONTROL_BUTTON_X && edit_state == EDIT_LEFT)
+        || (event.control == OC::CONTROL_BUTTON_Y && edit_state == EDIT_RIGHT);
+
+      if (forwardPress) {
+        get_selected_applet()->AuxButton();
+      }
+    }
+  }
+
   void HandleEncoderButtonEvent(const UI::Event& event) {
     if ((event.mask & OC::CONTROL_BUTTON_L)
         && (event.mask & OC::CONTROL_BUTTON_R)) {

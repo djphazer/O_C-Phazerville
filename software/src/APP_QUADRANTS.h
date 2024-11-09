@@ -794,11 +794,17 @@ public:
     void HandleButtonEvent(const UI::Event &event) {
         //serial_printf("mask=%d type=%d value=%d control=%d\n", event.mask, event.type, event.value, event.control);
 
-        if ((event.control == OC::CONTROL_BUTTON_L || event.control== OC::CONTROL_BUTTON_R)
-            && view_state == AUDIO_SETUP) {
-          // OC::AudioDSP::AudioSetupButtonAction(h);
-          audio_app.HandleEncoderButtonEvent(event);
-          return;
+        if (AUDIO_SETUP == view_state) {
+          if ((event.control == OC::CONTROL_BUTTON_L || event.control== OC::CONTROL_BUTTON_R))
+          {
+            audio_app.HandleEncoderButtonEvent(event);
+            return;
+          }
+          if ((event.control == OC::CONTROL_BUTTON_X || event.control== OC::CONTROL_BUTTON_Y))
+          {
+            audio_app.HandleAuxButtonEvent(event);
+            return;
+          }
         }
 
         switch (event.type) {
