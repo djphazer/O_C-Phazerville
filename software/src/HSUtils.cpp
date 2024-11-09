@@ -3,6 +3,10 @@
 #include "HemisphereApplet.h"
 #include "HSUtils.h"
 
+#ifdef ARDUINO_TEENSY41
+#include "SD.h"
+#endif
+
 namespace HS {
 
   uint32_t popup_tick; // for button feedback
@@ -35,6 +39,7 @@ namespace HS {
 #endif
   uint8_t trig_length = 10; // in ms, multiplier for HEMISPHERE_CLOCK_TICKS
   uint8_t screensaver_mode = 3; // 0 = blank, 1 = Meters, 2 = Scope/Zaps, 3 = Zips/Stars
+  bool wavplayer_available = false;
 
   OC::menu::ScreenCursor<5> showhide_cursor;
 
@@ -44,6 +49,10 @@ namespace HS {
 
     for (int i = 0; i < QUANT_CHANNEL_COUNT; ++i)
       quantizer[i].Init();
+
+#ifdef ARDUINO_TEENSY41
+    wavplayer_available = SD.begin(BUILTIN_SDCARD);
+#endif
 
     showhide_cursor.Init(0, HEMISPHERE_AVAILABLE_APPLETS - 1);
     showhide_cursor.Scroll(0);

@@ -26,6 +26,7 @@
 #ifndef CLOCK_MANAGER_H
 #define CLOCK_MANAGER_H
 
+#include "OC_core.h"
 #include "HSMIDI.h"
 
 namespace HS {

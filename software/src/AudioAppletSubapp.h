@@ -88,6 +88,17 @@ public:
     AudioInterrupts();
   }
 
+  void mainloop() {
+    for (size_t slot = 0; slot < Slots; slot++) {
+      if (IsStereo(slot)) {
+        get_stereo_applet(slot).mainloop();
+      } else {
+        get_mono_applet(LEFT_HEMISPHERE, slot).mainloop();
+        get_mono_applet(RIGHT_HEMISPHERE, slot).mainloop();
+      }
+    }
+  }
+
   void View() {
     for (size_t i = 0; i < Slots; i++) {
       print_applet_line(i);

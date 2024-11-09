@@ -1353,7 +1353,9 @@ void QUADRANTS_handleAppEvent(OC::AppEvent event) {
     }
 }
 
-void QUADRANTS_loop() {} // Essentially deprecated in favor of ISR
+void QUADRANTS_loop() {
+  audio_app.mainloop();
+} // Essentially deprecated in favor of ISR
 
 void QUADRANTS_menu() {
     quad_manager.View();

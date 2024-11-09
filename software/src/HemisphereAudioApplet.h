@@ -143,6 +143,7 @@ class HemisphereAudioApplet : public HemisphereApplet {
 public:
   virtual AudioStream* InputStream() = 0;
   virtual AudioStream* OutputStream() = 0;
+  virtual void mainloop() {}
 
   void gfxPrintPitchHz(int16_t pitch, float base_freq = C3) {
     float freq = PitchToRatio(pitch) * base_freq;
