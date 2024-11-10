@@ -2,6 +2,7 @@
 
 #include "AudioIO.h"
 #include "HSUtils.h"
+#include "PhzConfig.h"
 #include "HemisphereAudioApplet.h"
 #include "OC_ui.h"
 #include "UI/ui_events.h"
@@ -146,7 +147,6 @@ public:
     }
   }
 
-  // TODO: Rename this and change something else to aux button
   void HandleButtonEvent(const UI::Event& event) {
     if (event.type == UI::EVENT_BUTTON_PRESS) {
       switch (event.control) {
@@ -168,27 +168,32 @@ public:
     }
   }
 
+  void SetupMonoStereo(int c) {
+    if (IsStereo(c)) {
+      get_selected_stereo_applet(c).BaseStart(LEFT_HEMISPHERE);
+      ForEachSide(side) {
+        get_selected_mono_applet(side, c).Unload();
+        ConnectStereoToNext(side, c);
+        if (c > 0) ConnectSlotToNext(side, c - 1);
+      }
+    } else {
+      get_selected_stereo_applet(c).Unload();
+      ForEachSide(side) {
+        get_selected_mono_applet(side, c).BaseStart(side);
+        ConnectMonoToNext(side, c);
+        if (c > 0) ConnectSlotToNext(side, c - 1);
+      }
+    }
+  }
+
   void HandleEncoderButtonEvent(const UI::Event& event) {
     if (event.mask == (OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_R)) {
       // check ready_for_press to suppress double events on button combos
       if (cursor[0] == cursor[1] && ready_for_press) {
         int c = cursor[0];
         stereo ^= 1 << c;
-        if (IsStereo(c)) {
-          get_selected_stereo_applet(c).BaseStart(LEFT_HEMISPHERE);
-          ForEachSide(side) {
-            get_selected_mono_applet(side, c).Unload();
-            ConnectStereoToNext(side, c);
-            if (c > 0) ConnectSlotToNext(side, c - 1);
-          }
-        } else {
-          get_selected_stereo_applet(c).Unload();
-          ForEachSide(side) {
-            get_selected_mono_applet(side, c).BaseStart(side);
-            ConnectMonoToNext(side, c);
-            if (c > 0) ConnectSlotToNext(side, c - 1);
-          }
-        }
+
+        SetupMonoStereo(c);
       }
       // Prevent press detection when doing a button combo
       ready_for_press = false;
@@ -319,6 +324,85 @@ public:
     }
     peak_conns[side][slot + 1].disconnect();
     peak_conns[side][slot + 1].connect(*stream, side, peaks[side][slot + 1], 0);
+  }
+
+  enum AudioConfigKeys : uint16_t {
+    STEREO_MODE_FLAGS = 0,
+    MONO_APPLETS = 1,
+    STEREO_APPLETS = 1 << 8,
+    APPLET_CONFIGS = 1 << 9,
+  };
+  void LoadPreset(int id) {
+    char filename[] = "AUDIO00.CFG";
+    filename[5] += (id / 10);
+    filename[6] += id;
+    if ( !PhzConfig::load_config(filename) ) return;
+
+    int idx = 0;
+    uint64_t data = 0;
+    uint64_t oldstereo = stereo;
+    PhzConfig::getValue(STEREO_MODE_FLAGS, data);
+    stereo = data & 0xFFFFFFFF;
+
+    for ( size_t slot = 0; slot < Slots; ++slot ) {
+
+      if (IsStereo(slot)) {
+        if (0 == ((oldstereo >> slot) & 1)) {
+          SetupMonoStereo(slot);
+        }
+        data = 0;
+        //stereo applets
+        PhzConfig::getValue(STEREO_APPLETS + slot, data);
+        ChangeStereoApplet(LEFT_HEMISPHERE, slot, (int)data);
+
+        if (data) {
+          PhzConfig::getValue(STEREO_APPLETS + APPLET_CONFIGS + slot, data);
+          get_selected_stereo_applet(slot).OnDataReceive(data);
+        }
+      } else {
+        if ((oldstereo >> slot) & 1) {
+          SetupMonoStereo(slot);
+        }
+        //mono applets
+        ForEachSide(ch) {
+          data = 0;
+          PhzConfig::getValue(MONO_APPLETS + slot + ch * Slots, data);
+          ChangeMonoApplet(ch, slot, (int)data);
+
+          if (data) {
+            PhzConfig::getValue(APPLET_CONFIGS + slot + ch * Slots, data);
+            get_selected_mono_applet(ch, slot).OnDataReceive(data);
+          }
+        }
+      }
+    }
+
+  }
+  void SavePreset(int id) {
+    PhzConfig::clear_config();
+
+    PhzConfig::setValue(STEREO_MODE_FLAGS, (uint64_t)stereo); // bitset
+    int idx = 0;
+    ForEachSide(ch) {
+      for ( size_t slot = 0; slot < Slots; ++slot ) {
+          idx = selected_mono_applets[ch][slot];
+          PhzConfig::setValue(MONO_APPLETS + slot + ch * Slots, idx);
+          PhzConfig::setValue(APPLET_CONFIGS + slot + ch * Slots,
+              get_selected_mono_applet(ch, slot).OnDataRequest());
+
+          if (0 == ch) {
+            idx = selected_stereo_applets[slot];
+            PhzConfig::setValue(STEREO_APPLETS + slot, idx);
+            PhzConfig::setValue(STEREO_APPLETS + APPLET_CONFIGS + slot,
+                get_selected_stereo_applet(slot).OnDataRequest());
+          }
+      }
+    }
+
+    char filename[] = "AUDIO00.CFG";
+    filename[5] += (id / 10);
+    filename[6] += id;
+    PhzConfig::save_config(filename);
   }
 
 protected:

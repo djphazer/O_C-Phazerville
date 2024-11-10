@@ -307,6 +307,7 @@ public:
     }
     void StoreToPreset(int id, bool skip_eeprom = false) {
         StoreToPreset( (QuadrantsPreset*)(quad_presets + id), skip_eeprom );
+        audio_app.SavePreset(id);
         preset_id = id;
     }
     void LoadFromPreset(int id) {
@@ -328,6 +329,7 @@ public:
                 HS::available_applets[index].instance[h]->OnDataReceive(applet_data[h]);
             }
         }
+        audio_app.LoadPreset(id);
         preset_id = id;
         PokePopup(PRESET_POPUP);
     }

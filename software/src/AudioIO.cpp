@@ -1,6 +1,7 @@
 #ifdef ARDUINO_TEENSY41
 
-  #include "AudioIO.h"
+#include "AudioIO.h"
+#include "PhzConfig.h"
 
 namespace OC {
   namespace AudioIO {
@@ -26,6 +27,7 @@ namespace OC {
     void Init() {
       AudioMemory(AUDIO_MEMORY);
     }
+
   }
 }
 #endif

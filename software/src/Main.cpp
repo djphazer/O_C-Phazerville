@@ -45,6 +45,8 @@
 #include "HSMIDI.h"
 
 #if defined(__IMXRT1062__)
+#include "PhzConfig.h"
+
 USBHost thisUSB;
 USBHub hub1(thisUSB);
 MIDIDevice usbHostMIDI(thisUSB);
@@ -135,6 +137,9 @@ void setup() {
     OC::AudioIO::Init();
   }
   #endif
+
+  // LittleFS config files
+  PhzConfig::setup();
 
   // USB Host support for both 4.0 and 4.1
   usbHostMIDI.begin();
@@ -294,6 +299,10 @@ void FASTRUN loop() {
             Serial.printf("'i' = Toggle App ISR [%s]\n", OC::CORE::app_isr_enabled ? "ON" : "OFF");
             Serial.printf("'d' = Toggle Display Redraw [%s]\n", OC::CORE::display_update_enabled ? "ON" : "OFF");
             Serial.printf("'l' = Toggle App Loop [%s]\n", OC::CORE::app_loop_enabled ? "ON" : "OFF");
+#if defined(__IMXRT1062__)
+            Serial.println("'p' = Show Power Cycle Count");
+            Serial.println("'P' = clear/reset Config file");
+#endif
             break;
 
           case 'i':
@@ -308,6 +317,25 @@ void FASTRUN loop() {
             OC::CORE::app_loop_enabled = !OC::CORE::app_loop_enabled;
             Serial.printf("App Loop = %s\n", OC::CORE::app_loop_enabled ? "ON" : "OFF");
             break;
+
+#if defined(__IMXRT1062__)
+          case 'p':
+          {
+            uint64_t val = 0;
+            PhzConfig::getValue(PhzConfig::POWER_CYCLE_COUNT, val);
+            Serial.printf("Power Cycle Count: %u \n", val);
+            break;
+          }
+
+          case 'P':
+            Serial.println("CLEARING CONFIG FILE!!");
+            PhzConfig::clear_config();
+            PhzConfig::setValue(PhzConfig::POWER_CYCLE_COUNT, 0);
+            PhzConfig::save_config();
+            PhzConfig::listFiles();
+            PhzConfig::load_config();
+            break;
+#endif
 
             // TODO:
           case '+':
