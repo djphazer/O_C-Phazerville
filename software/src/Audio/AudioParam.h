@@ -1,8 +1,7 @@
 #pragma once
 
 #include <Audio.h>
-
-#define ONE_POLE(out, in, coefficient) out += (coefficient) * ((in) - out);
+#include "dsputils.h"
 
 template <typename T> class AudioParam {
 public:

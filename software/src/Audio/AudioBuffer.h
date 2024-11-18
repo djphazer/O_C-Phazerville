@@ -2,18 +2,7 @@
 
 #include <Audio.h>
 #include <smalloc.h>
-
-constexpr inline float InterpHermite(
-  float xm1, float x0, float x1, float x2, float t
-) {
-  // https://github.com/pichenettes/stmlib/blob/d18def816c51d1da0c108236928b2bbd25c17481/dsp/dsp.h#L52
-  const float c = (x1 - xm1) * 0.5f;
-  const float v = x0 - x1;
-  const float w = c + v;
-  const float a = w + v + (x2 - x0) * 0.5f;
-  const float b_neg = w + a;
-  return ((((a * t) - b_neg) * t + c) * t + x0);
-}
+#include "dsputils.h"
 
 // TODO: this should be backed by an ordinary ring buffer. I don't think the
 // std::copy helps performance much, so extracting and simplifying the ring
