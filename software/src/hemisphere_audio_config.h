@@ -10,6 +10,7 @@
 #include "audio_applets/VCAApplet.h"
 #include "audio_applets/WAVPlayerApplet.h"
 #include "audio_applets/UpsampledApplet.h"
+//#include "audio_applets/DynamicsApplet.h"
 
 const size_t NUM_SLOTS = 5;
 
