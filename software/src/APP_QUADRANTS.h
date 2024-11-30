@@ -81,7 +81,7 @@ enum QUADRANTS_SETTINGS {
     QUADRANTS_SETTING_LAST
 };
 
-static constexpr int QUAD_PRESET_COUNT = 4;
+static constexpr int QUAD_PRESET_COUNT = 8;
 
 /* Preset
  * - conveniently store/recall multiple applet configurations
