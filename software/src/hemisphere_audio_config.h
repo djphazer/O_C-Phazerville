@@ -16,9 +16,9 @@ const size_t NUM_SLOTS = 5;
 
 std::tuple<InputApplet<MONO>, UpsampledApplet> mono_input_pool[2];
 std::tuple<InputApplet<STEREO>, WavPlayerApplet<STEREO>> stereo_input_pool;
-std::tuple<PassthruApplet<MONO>, OscApplet, DelayApplet, LadderApplet<MONO>, FilterFolderApplet<MONO>, VcaApplet<MONO>>
+std::tuple<PassthruApplet<MONO>, VcaApplet<MONO>, DelayApplet, LadderApplet<MONO>, FilterFolderApplet<MONO>, OscApplet>
   mono_processors_pool[2][NUM_SLOTS - 1];
-std::tuple<PassthruApplet<STEREO>, LadderApplet<STEREO>, FilterFolderApplet<STEREO>, VcaApplet<STEREO>, WavPlayerApplet<STEREO>>
+std::tuple<PassthruApplet<STEREO>, VcaApplet<STEREO>, LadderApplet<STEREO>, FilterFolderApplet<STEREO>, WavPlayerApplet<STEREO>>
   stereo_processors_pool[NUM_SLOTS - 1];
 
 AudioAppletSubapp<NUM_SLOTS, 2, 2, 6, 5> audio_app(
