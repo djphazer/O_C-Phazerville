@@ -29,7 +29,7 @@ public:
     else {
       wavplayer[0].enableInterpolation(true);
       //wavplayer[1].enableInterpolation(true);
-      wavplayer[0].setBufferInPSRAM(true);
+      wavplayer[0].setBufferInPSRAM(false);
       //wavplayer[1].setBufferInPSRAM(true);
     }
   }
@@ -145,8 +145,6 @@ public:
     gfxIcon(52, y, loop_on[0] ? CHECK_ON_ICON : CHECK_OFF_ICON);
     if (cursor == LOOP_ENABLE)
       gfxFrame(51, y-1, 10, 10);
-
-    // TODO: HPF
   }
 
   void AuxButton() {
