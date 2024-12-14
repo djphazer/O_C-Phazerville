@@ -16,7 +16,7 @@ public:
     // built-in VCA
     float gain = 0.01f
       * (level * static_cast<float>(level_cv.In(HEMISPHERE_MAX_INPUT_CV))
-           / HEMISPHERE_MAX_INPUT_CV);
+         / HEMISPHERE_MAX_INPUT_CV);
     mixer.gain(1, gain);
   }
   void View() override {
@@ -24,7 +24,9 @@ public:
     gfxPrint(waveform_names[waveform]);
     gfxEndCursor(cursor == 0);
 
-    gfxStartCursor(1, 25);
+    gfxPos(1, 25);
+    gfxPrintTuningIndicator(pitch);
+    gfxStartCursor(11, 25);
     gfxPrintPitchHz(pitch);
     gfxEndCursor(cursor == 1);
 

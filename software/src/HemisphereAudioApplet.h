@@ -67,8 +67,10 @@ struct DigitalInput {
     switch (source_type()) {
       case CLOCK: {
         uint32_t ticks_since_beat = OC::CORE::ticks - clock_m.beat_tick;
-        uint32_t tick_phase = (ppqn * ticks_since_beat) % clock_m.ticks_per_beat;
-        bool gate = tick_phase < internal_clocked_gate_pw * clock_m.ticks_per_beat;
+        uint32_t tick_phase
+          = (ppqn * ticks_since_beat) % clock_m.ticks_per_beat;
+        bool gate
+          = tick_phase < internal_clocked_gate_pw * clock_m.ticks_per_beat;
         return gate;
       }
       case DIGITAL_INPUT:
@@ -145,11 +147,31 @@ public:
   virtual AudioStream* OutputStream() = 0;
   virtual void mainloop() {}
 
+  void gfxPrintTuningIndicator(int16_t pitch) {
+    // TODO this assumes pitch = C, which might not be true for some applets
+    int semitone = pitch / 128;
+    int offset = pitch - semitone * 128;
+    if (offset >= 64) {
+      offset = offset - 128;
+      semitone++;
+    }
+    semitone = ((semitone % 12) + 12) % 12;
+    int y = gfxGetPrintPosY();
+    int x = gfxGetPrintPosX();
+    gfxPrintIcon(NOTE_NAMES + semitone * 8);
+    int pxOffset = 7 - (offset / 16 + 4);
+    if (offset == 0) gfxInvert(x, y, 9, 8);
+    else gfxDottedLine(x - 1, y + pxOffset, x + 9, y + pxOffset);
+  }
+
   void gfxPrintPitchHz(int16_t pitch, float base_freq = C3) {
     float freq = PitchToRatio(pitch) * base_freq;
-    int int_part = static_cast<int>(freq);
-    int dec = static_cast<int>(10 * (freq - int_part));
-    graphics.printf("%5d.%01d", int_part, dec);
-    gfxPrint("Hz");
+    int shiftedFreq = static_cast<int>(roundf(freq * 10));
+    int int_part = shiftedFreq / 10;
+    int dec = shiftedFreq % 10;
+    if (int_part > 9999) graphics.printf("%6d", int_part);
+    else graphics.printf("%4d.%01d", int_part, dec);
+    gfxPrintIcon(HZ);
+    // gfxPrint("Hz");
   }
 };
