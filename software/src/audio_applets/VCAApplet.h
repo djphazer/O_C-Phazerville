@@ -1,5 +1,6 @@
-#include "Audio/AudioPassthrough.h"
 #include "HemisphereAudioApplet.h"
+#include "Audio/AudioPassthrough.h"
+#include "Audio/InterpolatingStream.h"
 #include <Audio.h>
 
 template <AudioChannels Channels>
@@ -10,19 +11,28 @@ public:
   }
 
   void Start() {
+    cv_stream.Acquire();
     for (int i = 0; i < Channels; i++) {
-      in_conns[i].connect(input, i, amps[i], 0);
-      out_conns[i].connect(amps[i], 0, output, i);
+      in_conns[i].connect(input, i, muls[i], 0);
+      cv_conns[i].connect(cv_stream, 0, muls[i], 1);
+      mul_to_mixer[i].connect(muls[i], 0, bias_mixer[i], 0);
+      bias_to_mixer[i].connect(input, i, bias_mixer[i], 1);
+      out_conns[i].connect(bias_mixer[i], 0, output, i);
     }
   }
 
+  void Unload() {
+    cv_stream.Release();
+    AllowRestart();
+  }
+
   void Controller() {
-    float gain = 0.01f
-      * (level * static_cast<float>(level_cv.In(HEMISPHERE_MAX_INPUT_CV))
-           / HEMISPHERE_MAX_INPUT_CV
-         + offset);
+    float cv = static_cast<float>(level_cv.In(HEMISPHERE_MAX_INPUT_CV))
+      / HEMISPHERE_MAX_INPUT_CV * 32768.0f;
     for (int i = 0; i < Channels; i++) {
-      amps[i].gain(gain);
+      cv_stream.Push(Clip16(cv));
+      bias_mixer[i].gain(0, level * 0.01f);
+      bias_mixer[i].gain(1, offset * 0.01f);
     }
   }
 
@@ -98,9 +108,14 @@ private:
   CVInput shape_cv;
 
   AudioPassthrough<Channels> input;
-  std::array<AudioAmplifier, Channels> amps;
+  InterpolatingStream<> cv_stream;
+  std::array<AudioEffectMultiply, Channels> muls;
+  std::array<AudioMixer<2>, Channels> bias_mixer;
   AudioPassthrough<Channels> output;
 
   std::array<AudioConnection, Channels> in_conns;
+  std::array<AudioConnection, Channels> cv_conns;
+  std::array<AudioConnection, Channels> mul_to_mixer;
+  std::array<AudioConnection, Channels> bias_to_mixer;
   std::array<AudioConnection, Channels> out_conns;
 };

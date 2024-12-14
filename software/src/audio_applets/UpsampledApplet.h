@@ -1,3 +1,5 @@
+#pragma once 
+
 #include "HSicons.h"
 #include "HemisphereAudioApplet.h"
 #include "Audio/InterpolatingStream.h"
