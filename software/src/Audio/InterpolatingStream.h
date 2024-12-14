@@ -32,6 +32,7 @@ public:
   }
 
   void Push(int16_t value) {
+    if (buffer == nullptr) return;
     buffer[write_ix++] = value;
     write_ix %= AUDIO_BLOCK_SAMPLES;
   }

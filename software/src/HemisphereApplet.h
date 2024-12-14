@@ -171,7 +171,9 @@ public:
       isEditing = !isEditing;
       ResetCursor();
     }
-    void MoveCursor(int &cursor, int direction, int max) {
+
+    template<typename T>
+    void MoveCursor(T &cursor, int direction, int max) {
         cursor += direction;
         if (cursor_wrap) {
             if (cursor < 0) cursor = max;

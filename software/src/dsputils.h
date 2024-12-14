@@ -62,3 +62,8 @@ constexpr inline float InterpHermite(
   const float b_neg = w + a;
   return ((((a * t) - b_neg) * t + c) * t + x0);
 }
+
+inline float dbToScalar(float db) {
+  // pow10(x) = exp(log(10) * x)
+  return fastexp(2.302585092994046f * 0.05f * db);
+}
