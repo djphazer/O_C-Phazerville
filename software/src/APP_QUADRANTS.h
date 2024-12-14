@@ -244,7 +244,6 @@ void QuadrantBeatSync();
 class QuadAppletManager : public HSApplication {
 public:
     void Start() {
-        audio_app.SetParentApp(this);
         audio_app.Init();
 
         for (int i = 0; i < 4; ++i) {
@@ -260,7 +259,6 @@ public:
     }
 
     void Resume() {
-        audio_app.SetParentApp(this);
         if (!quad_active_preset)
             LoadFromPreset(0);
         // TODO: restore quantizer settings...

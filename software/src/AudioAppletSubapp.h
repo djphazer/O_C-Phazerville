@@ -59,6 +59,7 @@ public:
   }
 
   void Init() {
+    cursor_countdown = HSAPPLICATION_CURSOR_TICKS;
     for (size_t slot = 0; slot < Slots; slot++) {
       if (IsStereo(slot)) {
         get_stereo_applet(slot).BaseStart(LEFT_HEMISPHERE);
@@ -73,6 +74,8 @@ public:
   }
 
   void Controller() {
+    if (--cursor_countdown < -HSAPPLICATION_CURSOR_TICKS)
+      cursor_countdown = HSAPPLICATION_CURSOR_TICKS;
     AudioNoInterrupts();
     // Call Controller instead of BaseController so we don't trigger
     // cursor_countdown multiple times. This is a stupid hack and we should do
@@ -136,7 +139,8 @@ public:
     if (millis() - last_stats_update > 250) {
       last_stats_update = millis();
       mem_percent = static_cast<int16_t>(
-        100 * static_cast<float>(AudioMemoryUsageMax()) / OC::AudioIO::AUDIO_MEMORY
+        100 * static_cast<float>(AudioMemoryUsageMax())
+        / OC::AudioIO::AUDIO_MEMORY
       );
       cpu_percent = static_cast<int16_t>(AudioProcessorUsageMax());
       AudioProcessorUsageMaxReset();
@@ -188,8 +192,7 @@ public:
       if (forwardPress) {
         get_selected_applet()->OnButtonPress();
       } else {
-        parent_app->isEditing = !parent_app->isEditing;
-        edit_state = parent_app->isEditing
+        edit_state = edit_state == EDIT_NONE
           ? (event.control == OC::CONTROL_BUTTON_L ? EDIT_LEFT : EDIT_RIGHT)
           : EDIT_NONE;
         if (edit_state != EDIT_NONE) {
@@ -277,10 +280,6 @@ public:
     }
   }
 
-  void SetParentApp(HSApplication* app) {
-    parent_app = app;
-  }
-
   void ConnectSlotToNext(size_t slot) {
     if (IsStereo(slot)) {
       ConnectStereoToNext(slot);
@@ -334,7 +333,6 @@ protected:
   }
 
 private:
-  HSApplication* parent_app = nullptr;
   array<array<HemisphereAudioApplet*, NumMonoSources>, 2> mono_input_applets;
   array<HemisphereAudioApplet*, NumStereoSources> stereo_input_applets;
   array<array<array<HemisphereAudioApplet*, NumMonoProcessors>, Slots - 1>, 2>
@@ -367,6 +365,8 @@ private:
   int left_cursor = 0;
   int right_cursor = 0;
 
+  int cursor_countdown;
+
   HemisphereAudioApplet& get_mono_applet(HEM_SIDE side, size_t slot) {
     const size_t ix = selected_mono_applets[side][slot];
     return slot == 0 ? *mono_input_applets[side][ix]
@@ -397,19 +397,39 @@ private:
       int xs[] = {32, 0, 64};
       int x = xs[edit_state];
       gfxPrint(x, y, get_stereo_applet(slot).applet_name());
-      if ((left_cursor == slot && edit_state != EDIT_RIGHT)
-          || (right_cursor == slot && edit_state != EDIT_LEFT)) {
-        parent_app->gfxCursor(x, y + 8, 63);
-      }
+      if (left_cursor == slot && edit_state != EDIT_RIGHT)
+        gfxCursor(edit_state == EDIT_LEFT, x, y + 8, 63);
+      if (right_cursor == slot && edit_state != EDIT_RIGHT)
+        gfxCursor(edit_state == EDIT_RIGHT, x, y + 8, 63);
     } else {
       if (edit_state != EDIT_RIGHT) {
         gfxPrint(0, y, get_mono_applet(LEFT_HEMISPHERE, slot).applet_name());
-        if (left_cursor == slot) parent_app->gfxCursor(0, y + 8, 63);
+        if (left_cursor == slot)
+          gfxCursor(edit_state == EDIT_LEFT, 0, y + 8, 63);
       }
       if (edit_state != EDIT_LEFT) {
         gfxPrint(64, y, get_mono_applet(RIGHT_HEMISPHERE, slot).applet_name());
-        if (right_cursor == slot) parent_app->gfxCursor(64, y + 8, 63);
+        if (right_cursor == slot)
+          gfxCursor(edit_state == EDIT_RIGHT, 64, y + 8, 63);
       }
     }
+  }
+
+  void gfxCursor(bool isEditing, int x, int y, int w, int h = 9) {
+    if (isEditing) {
+      gfxInvert(x, y - h, w, h);
+    } else if (CursorBlink()) {
+      gfxLine(x, y, x + w - 1, y);
+      gfxPixel(x, y - 1);
+      gfxPixel(x + w - 1, y - 1);
+    }
+  }
+
+  bool CursorBlink() {
+    return (cursor_countdown > 0);
+  }
+
+  void ResetCursor() {
+    cursor_countdown = HSAPPLICATION_CURSOR_TICKS;
   }
 };
