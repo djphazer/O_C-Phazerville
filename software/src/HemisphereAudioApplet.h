@@ -158,10 +158,11 @@ public:
     semitone = ((semitone % 12) + 12) % 12;
     int y = gfxGetPrintPosY();
     int x = gfxGetPrintPosX();
-    gfxPrintIcon(NOTE_NAMES + semitone * 8);
+    gfxPos(x + 1, y);
+    gfxPrintIcon(NOTE_NAMES + semitone * 8, 9);
     int pxOffset = 7 - (offset / 16 + 4);
-    if (offset == 0) gfxInvert(x, y, 9, 8);
-    else gfxDottedLine(x - 1, y + pxOffset, x + 9, y + pxOffset);
+    if (offset == 0) gfxInvert(x, y, 10, 8);
+    else gfxDottedLine(x, y + pxOffset, x + 10, y + pxOffset);
   }
 
   void gfxPrintPitchHz(int16_t pitch, float base_freq = C3) {

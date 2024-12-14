@@ -22,35 +22,36 @@ public:
   void View() override {
     gfxStartCursor(1, 15);
     gfxPrint(waveform_names[waveform]);
-    gfxEndCursor(cursor == 0);
+    gfxEndCursor(cursor == WAVEFORM);
 
-    gfxPos(1, 25);
+    gfxStartCursor(1, 25);
     gfxPrintTuningIndicator(pitch);
+    gfxEndCursor(cursor == OCTAVE);
     gfxStartCursor(11, 25);
     gfxPrintPitchHz(pitch);
-    gfxEndCursor(cursor == 1);
+    gfxEndCursor(cursor == PITCH);
 
     gfxStartCursor();
     gfxPrintIcon(pitch_cv.Icon());
-    gfxEndCursor(cursor == 2);
+    gfxEndCursor(cursor == PITCH_CV);
 
     gfxPrint(1, 35, "PW:  ");
     gfxStartCursor();
     graphics.printf("%3d%%", pw);
-    gfxEndCursor(cursor == 3);
+    gfxEndCursor(cursor == PW);
 
     gfxStartCursor();
     gfxPrintIcon(pw_cv.Icon());
-    gfxEndCursor(cursor == 4);
+    gfxEndCursor(cursor == PW_CV);
 
     gfxPrint(1, 45, "Level:");
     gfxStartCursor();
     graphics.printf("%3d", level);
-    gfxEndCursor(cursor == 5);
+    gfxEndCursor(cursor == LEVEL);
 
     gfxStartCursor();
     gfxPrintIcon(level_cv.Icon());
-    gfxEndCursor(cursor == 6);
+    gfxEndCursor(cursor == LEVEL_CV);
   }
 
   uint64_t OnDataRequest() override {
@@ -62,26 +63,31 @@ public:
       MoveCursor(cursor, direction, 7);
       return;
     }
+    const int max_pitch = 7 * 12 * 128;
+    const int min_pitch = -3 * 12 * 128;
     switch (cursor) {
-      case 0:
+      case WAVEFORM:
         waveform = constrain(waveform + direction, 0, 2);
         break;
-      case 1:
-        pitch = constrain(pitch + direction * 16, -3 * 12 * 128, 7 * 12 * 128);
+      case OCTAVE:
+        pitch = constrain(pitch + direction * 1 * 128, min_pitch, max_pitch);
         break;
-      case 2:
+      case PITCH:
+        pitch = constrain(pitch + direction * 4, min_pitch, max_pitch);
+        break;
+      case PITCH_CV:
         pitch_cv.ChangeSource(direction);
         break;
-      case 3:
+      case PW:
         pw = constrain(pw + direction, 0, 100);
         break;
-      case 4:
+      case PW_CV:
         pw_cv.ChangeSource(direction);
         break;
-      case 5:
+      case LEVEL:
         level = constrain(level + direction, 0, 100);
         break;
-      case 6:
+      case LEVEL_CV:
         level_cv.ChangeSource(direction);
         break;
     }
@@ -99,6 +105,8 @@ protected:
   void SetHelp() override {}
 
 private:
+  enum Cursor { WAVEFORM, OCTAVE, PITCH, PITCH_CV, PW, PW_CV, LEVEL, LEVEL_CV };
+
   int cursor = 0;
   const int8_t waveforms[3]
     = {WAVEFORM_SINE, WAVEFORM_TRIANGLE_VARIABLE, WAVEFORM_PULSE};
