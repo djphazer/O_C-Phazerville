@@ -12,6 +12,9 @@ public:
   }
 
   void Start() {
+    // Less CPU than hermite, but I couldn't hear the difference whereas I could
+    // with ZOH
+    cv_stream.Method(INTERPOLATION_LINEAR);
     cv_stream.Acquire();
     for (int i = 0; i < Channels; i++) {
       in_conns[i].connect(input, i, muls[i], 0);
@@ -29,15 +32,8 @@ public:
 
   void Controller() {
     float lin_cv = level_cv.InF(1.0f);
-    float exp_cv = fastpow2(lin_cv);
-    exp_cv *= exp_cv; // 4
-    exp_cv *= exp_cv; // 16
-    exp_cv *= exp_cv; // 256 - VCV Veils uses 200 FWIW
-    exp_cv = (exp_cv - 1.0f) / 255.0f;
-    float cross = shape * 0.01f;
-
-    float cv = InterpLinear(lin_cv, exp_cv, cross) * 32768.0f;
-    // float cv = cross * exp_cv + (1.0f - cross) * lin_cv * 32768.0f;
+    if (rectify && lin_cv < 0.0f) lin_cv = 0.0f;
+    float cv = 32768.0f * (shape > 0 ? varexp(0.3f * shape, lin_cv) : lin_cv);
     cv_stream.Push(Clip16(cv));
     float lvl_scalar = level < VCA_MIN_DB ? 0.0f : dbToScalar(level);
     float off_scalar = offset < VCA_MIN_DB ? 0.0f : dbToScalar(offset);
@@ -68,6 +64,11 @@ public:
     gfxStartCursor();
     gfxPrintIcon(PARAM_MAP_ICONS + 8 * shape_cv.source);
     gfxEndCursor(cursor == 4);
+
+    gfxPrint(1, 45, "Rectify: ");
+    gfxStartCursor();
+    gfxPrintIcon(rectify ? CHECK_ON_ICON : CHECK_OFF_ICON);
+    gfxEndCursor(cursor == 5);
   }
 
   void OnEncoderMove(int direction) {
@@ -91,6 +92,9 @@ public:
       case 4:
         shape_cv.ChangeSource(direction);
         break;
+      case 5:
+        rectify = !rectify;
+        break;
     }
   }
 
@@ -110,7 +114,7 @@ protected:
   void SetHelp() override {}
 
 private:
-  static const int NUM_PARAMS = 5;
+  static const int NUM_PARAMS = 6;
   // -90 = 15bits of depth so no point in going lower
   static const int VCA_MIN_DB = -90;
   static const int VCA_MAX_DB = 90;
@@ -121,6 +125,7 @@ private:
   int8_t shape = 0;
   CVInput level_cv;
   CVInput shape_cv;
+  bool rectify = true;
 
   AudioPassthrough<Channels> input;
   InterpolatingStream<> cv_stream;
@@ -137,5 +142,11 @@ private:
   void gfxPrintDb(int db) {
     if (db < VCA_MIN_DB) gfxPrint("    - ");
     else graphics.printf("%3ddB", db);
+  }
+
+  // Gives variable curve exponent by controlling the base normalized to go from
+  // 0 to 1 for powers 0 to 1.
+  float varexp(float log2base, float power) {
+    return (fastpow2(log2base * power) - 1.0f) / (fastpow2(log2base) - 1.0f);
   }
 };
