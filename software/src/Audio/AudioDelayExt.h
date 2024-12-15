@@ -78,7 +78,7 @@ public:
       float target_val = buffer.ReadSample(target.target * AUDIO_SAMPLE_RATE);
       float source_val = buffer.ReadSample(d * AUDIO_SAMPLE_RATE);
       float t = target.phase;
-      float val = t * target_val + (1.0f - t) * source_val;
+      float val = EqualPowerFadeBetween(source_val, target_val, t);
       // crossfade length being longer than delay time screws up, e.g.,
       // karplus-strong. Also, delay times that short will produce higher
       // harmonics that crossfades of that length (that's kinda the point).

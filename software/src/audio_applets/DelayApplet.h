@@ -81,10 +81,13 @@ public:
       }
     }
 
-    float w = constrain(0.01f * wet + wet_cv.InF(), 0.0f, 1.0f);
-    CONSTRAIN(w, 0.0f, 1.0f);
-    wet_dry_mixer.gain(WD_WET_CH, w);
-    wet_dry_mixer.gain(WD_DRY_CH, 1.0f - w);
+    float dry_gain, wet_gain;
+    EqualPowerFade(
+      dry_gain, wet_gain, constrain(0.01f * wet + wet_cv.InF(), 0.0f, 1.0f)
+    );
+
+    wet_dry_mixer.gain(WD_WET_CH, wet_gain);
+    wet_dry_mixer.gain(WD_DRY_CH, dry_gain);
   }
 
   void View() {
@@ -302,7 +305,7 @@ protected:
   void set_taps(size_t t) {
     taps = t;
     CONSTRAIN(taps, 1, 8);
-    float tap_gain = 1.0f / taps;
+    float tap_gain = EQUAL_POWER_EQUAL_MIX[taps];
     for (int i = 0; i < taps; i++)
       taps_mixer.gain(i, tap_gain);
     for (int i = taps; i < 8; i++)

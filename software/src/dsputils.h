@@ -67,3 +67,54 @@ inline float dbToScalar(float db) {
   // pow10(x) = exp(log(10) * x)
   return fastexp(2.302585092994046f * 0.05f * db);
 }
+
+// Coefficients to use when equally mixing n sources for equal power
+static const float EQUAL_POWER_EQUAL_MIX[]{
+  1.0f,
+  1.0f,
+  0.7071067811865475f,
+  0.5773502691896258,
+  0.5,
+  0.4472135954999579,
+  0.4082482904638631,
+  0.3779644730092272,
+  0.353553390593273731
+};
+
+// From https://signalsmith-audio.co.uk/writing/2021/cheap-energy-crossfade/
+// Could use a LUT, but meh
+inline void EqualPowerFade(float& fade_out, float& fade_in, float t) {
+  float mt = 1.0f - t;
+  float a = t * mt;
+  float b = a * (1.0f + 1.4186f * a);
+  float c = b + t;
+  float d = b + mt;
+  fade_out = d * d;
+  fade_in = c * c;
+}
+
+inline float EqualPowerFadeBetween(float from, float to, float t) {
+  float out;
+  float in;
+  EqualPowerFade(out, in, t);
+  return out * from + in * to;
+}
+
+// The curve Stages uses for its envelopes:
+// https://github.com/pichenettes/eurorack/blob/08460a69a7e1f7a81c5a2abcc7189c9a6b7208d4/stages/segment_generator.cc#L118
+// Gives a nice sublog -> log -> lin -> exp -> supexp approximation for
+// envelopes t *must* be between 0 and 1 curve: 0 -> supexp/accelerating, 0.5 ->
+// linear, 1.0 -> sublog/decelerating
+inline float WarpPhase(float t, float curve) {
+  curve -= 0.5f;
+  const bool flip = curve < 0.0f;
+  if (flip) {
+    t = 1.0f - t;
+  }
+  const float a = 128.0f * curve * curve;
+  t = (1.0f + a) * t / (1.0f + a * t);
+  if (flip) {
+    t = 1.0f - t;
+  }
+  return t;
+}
