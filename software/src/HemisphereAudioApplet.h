@@ -91,7 +91,6 @@ struct DigitalInput {
     bool gate = Gate();
     bool tock = !last_gate_state && gate;
     last_gate_state = gate;
-    if (tock) serial_printf("tock %d\n", OC::CORE::ticks);
     return tock;
   }
 

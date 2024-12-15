@@ -31,6 +31,13 @@ public:
   void cf_delay(size_t tap, float secs) {
     auto& t = target_delay[tap];
     if (t.phase == 0.0f && t.target != secs) {
+      // 0.0005f comes from variation
+      // I observed a <0.0005 noise in detecting internal clock signal. External
+      // I saw a bit larger with faster clocks. 0.001 seems reasonable, though
+      // it means, with full delay, <12ms changes will be ignored.
+      if (abs(t.target - secs) / t.target < 0.001f) {
+        return;
+      }
       t.phase = crossfade_dt;
       t.target = secs;
     }
