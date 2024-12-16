@@ -1,14 +1,15 @@
 #pragma once
 
+#include "AudioIO.h"
 #include "HemisphereAudioApplet.h"
 #include <Audio.h>
-#include "AudioIO.h"
 
 template <AudioChannels Channels>
 class InputApplet : public HemisphereAudioApplet {
 public:
   const char* applet_name() override {
-    return Channels == MONO ? "Input" : "Inputs";
+    return Channels == MONO ? (mono_mode == LEFT ? "Input L" : "Input R")
+                            : "Inputs";
   }
   void Start() override {
     if (MONO == Channels) {
@@ -24,8 +25,8 @@ public:
     } else {
       for (int i = 0; i < Channels; ++i) {
         in_conn[i].connect(OC::AudioIO::InputStream(), i, mixer[i], 0);
-        cross_conn[i].connect(OC::AudioIO::InputStream(), i, mixer[1-i], 1);
-        in_conn[i+2].connect(input, i, mixer[i], 3);
+        cross_conn[i].connect(OC::AudioIO::InputStream(), i, mixer[1 - i], 1);
+        in_conn[i + 2].connect(input, i, mixer[i], 3);
 
         out_conn[i].connect(mixer[i], 0, output, i);
         mixer[i].gain(1, 0.0);
@@ -36,15 +37,13 @@ public:
   }
   void Controller() override {}
   void View() override {
-    const char * const txt[] = {
-      "Left", "Right", "Mixed"
-    };
+    const char* const txt[] = {"Left", "Right", "Mixed"};
     gfxPrint(3, 15, txt[mono_mode]);
     if constexpr (Channels == STEREO) {
       gfxPrint("+Right");
 
       gfxPrint(10, 25, "Mix? ");
-      gfxPrint(10, 35, mixtomono ? "Mono" : "Stereo" );
+      gfxPrint(10, 35, mixtomono ? "Mono" : "Stereo");
       if (cursor == CHANNEL_MODE) gfxCursor(10, 43, 37);
 
       if (peakmeter[1].available()) {
@@ -55,7 +54,8 @@ public:
       if (cursor == CHANNEL_MODE) gfxCursor(3, 23, 31);
     }
     gfxPrint(2, 45, "Lvl:");
-    gfxPrint(level); gfxPrint("%");
+    gfxPrint(level);
+    gfxPrint("%");
     if (cursor == IN_LEVEL) gfxCursor(26, 53, 26);
 
     if (peakmeter[0].available()) {
@@ -73,18 +73,18 @@ public:
       return;
     }
     switch (cursor) {
-    case IN_LEVEL:
-      level = constrain(level + direction, 0, 200);
-      break;
-    case CHANNEL_MODE:
-      if (Channels == MONO) {
-        if (cursor == CHANNEL_MODE) {
-          mono_mode = constrain(mono_mode + direction, 0, MODE_COUNT-1);
+      case IN_LEVEL:
+        level = constrain(level + direction, 0, 200);
+        break;
+      case CHANNEL_MODE:
+        if (Channels == MONO) {
+          if (cursor == CHANNEL_MODE) {
+            mono_mode = constrain(mono_mode + direction, 0, MODE_COUNT - 1);
+          }
+        } else {
+          mixtomono = !mixtomono;
         }
-      } else {
-        mixtomono = !mixtomono;
-      }
-      break;
+        break;
     }
 
     // update mix levels on any param change
@@ -98,9 +98,9 @@ public:
       }
     } else {
       mixer[0].gain(0, level * 0.01f);
-      mixer[0].gain(1, mixtomono? level * 0.01f : 0.0);
+      mixer[0].gain(1, mixtomono ? level * 0.01f : 0.0);
       mixer[1].gain(0, level * 0.01f);
-      mixer[1].gain(1, mixtomono? level * 0.01f : 0.0);
+      mixer[1].gain(1, mixtomono ? level * 0.01f : 0.0);
     }
   }
 
@@ -116,7 +116,7 @@ protected:
 
 private:
   AudioPassthrough<Channels> input;
-  AudioConnection in_conn[Channels*2];
+  AudioConnection in_conn[Channels * 2];
   AudioConnection cross_conn[Channels];
   AudioMixer4 mixer[Channels];
   AudioConnection out_conn[Channels];
@@ -129,16 +129,7 @@ private:
   bool mixtomono = 0;
   int level = 90;
 
-  enum SideMode {
-    LEFT, RIGHT,
-    MIXED,
-    MODE_COUNT
-  };
-  enum {
-    CHANNEL_MODE,
-    IN_LEVEL,
-    MAX_CURSOR = IN_LEVEL
-  };
+  enum SideMode { LEFT, RIGHT, MIXED, MODE_COUNT };
+  enum { CHANNEL_MODE, IN_LEVEL, MAX_CURSOR = IN_LEVEL };
   int cursor;
-
 };
