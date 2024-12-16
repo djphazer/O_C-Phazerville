@@ -34,7 +34,15 @@ public:
     const uint8_t* applet_icon() { return PhzIcons::cvRec; }
 
     void Start() {
+        cv[0] = new int16_t[CVREC_MAX_STEP];
+        cv[1] = new int16_t[CVREC_MAX_STEP];
         segment.Init(SegmentSize::BIG_SEGMENTS);
+        AllowRestart();
+    }
+
+    void Unload() {
+        delete cv[0];
+        delete cv[1];
     }
 
     void Controller() {
@@ -164,7 +172,7 @@ private:
     int cursor; // 0=Start 1=End 2=Smooth 3=Record Mode
     SegmentDisplay segment;
 
-    int16_t cv[2][CVREC_MAX_STEP];
+    int16_t* cv[2];
     simfloat rise[2];
     simfloat signal[2];
     bool smooth;
