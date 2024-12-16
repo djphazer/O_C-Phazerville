@@ -1,10 +1,11 @@
-#pragma once 
+#pragma once
 
 #include "HSicons.h"
 #include "HemisphereAudioApplet.h"
 #include "Audio/InterpolatingStream.h"
 #include <Audio.h>
 
+template <AudioChannels Channels>
 class UpsampledApplet : public HemisphereAudioApplet {
 public:
   const char* applet_name() override {
@@ -14,6 +15,14 @@ public:
   void Start() override {
     interp_stream.Acquire();
     interp_stream.Method(static_cast<InterpolationMethod>(method));
+
+    for (int c = 0; c < Channels; c++) {
+      interp_conn[c].connect(interp_stream, 0, mixer[c], 0);
+      in_conn[c].connect(input_stream, c, mixer[c], 1);
+      out_conn[c].connect(mixer[c], 0, output_stream, c);
+      mixer[c].gain(0, 1.0f);
+      mixer[c].gain(1, 1.0f);
+    }
   }
 
   void Unload() override {
@@ -97,22 +106,30 @@ public:
   }
 
   AudioStream* InputStream() override {
-    return nullptr;
+    return &input_stream;
   }
   AudioStream* OutputStream() override {
-    return &interp_stream;
+    return &output_stream;
   };
 
 protected:
   void SetHelp() override {}
 
 private:
+  AudioPassthrough<Channels> input_stream;
   InterpolatingStream<> interp_stream;
+  AudioMixer<2> mixer[Channels];
+  AudioPassthrough<Channels> output_stream;
+
+  AudioConnection in_conn[Channels];
+  AudioConnection interp_conn[Channels];
+  AudioConnection out_conn[Channels];
+
   CVInput input;
   float lp = 0.0f;
   static constexpr float scalar = -31267.0f / HEMISPHERE_MAX_CV;
   int cursor = 0;
   int8_t method = INTERPOLATION_HERMITE;
-  int16_t gain = 100;
+  int16_t gain = 90;
   boolean ac_couple = 0;
 };
