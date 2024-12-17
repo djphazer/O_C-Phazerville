@@ -54,7 +54,6 @@ public:
     }
     selected_mono_applets[0].fill(0);
     selected_mono_applets[1].fill(0);
-    selected_mono_applets[1][0] = 1;
     selected_stereo_applets.fill(0);
   }
 

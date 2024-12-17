@@ -13,15 +13,14 @@ public:
   }
   void Start() override {
     if (MONO == Channels) {
+      mono_mode = hemisphere;
       in_conn[0].connect(OC::AudioIO::InputStream(), 0, mixer[0], 0);
       cross_conn[0].connect(OC::AudioIO::InputStream(), 1, mixer[0], 1);
       in_conn[1].connect(input, 0, mixer[0], 3);
 
       out_conn[0].connect(mixer[0], 0, output, 0);
-      mixer[0].gain(1, 0.0);
 
       peakpatch[0].connect(OC::AudioIO::InputStream(), 0, peakmeter[0], 0);
-      peakpatch[1].connect(OC::AudioIO::InputStream(), 1, peakmeter[1], 0);
     } else {
       for (int i = 0; i < Channels; ++i) {
         in_conn[i].connect(OC::AudioIO::InputStream(), i, mixer[i], 0);
@@ -29,11 +28,11 @@ public:
         in_conn[i + 2].connect(input, i, mixer[i], 3);
 
         out_conn[i].connect(mixer[i], 0, output, i);
-        mixer[i].gain(1, 0.0);
 
         peakpatch[i].connect(OC::AudioIO::InputStream(), i, peakmeter[i], 0);
       }
     }
+    UpdateMix();
   }
   void Controller() override {}
   void View() override {
@@ -88,6 +87,17 @@ public:
     }
 
     // update mix levels on any param change
+    UpdateMix();
+  }
+
+  AudioStream* InputStream() override {
+    return &input;
+  }
+  AudioStream* OutputStream() override {
+    return &output;
+  }
+
+  void UpdateMix() {
     if (Channels == MONO) {
       if (mono_mode == MIXED) {
         mixer[0].gain(0, level * 0.01f);
@@ -102,13 +112,6 @@ public:
       mixer[1].gain(0, level * 0.01f);
       mixer[1].gain(1, mixtomono ? level * 0.01f : 0.0);
     }
-  }
-
-  AudioStream* InputStream() override {
-    return &input;
-  }
-  AudioStream* OutputStream() override {
-    return &output;
   }
 
 protected:
@@ -131,5 +134,5 @@ private:
 
   enum SideMode { LEFT, RIGHT, MIXED, MODE_COUNT };
   enum { CHANNEL_MODE, IN_LEVEL, MAX_CURSOR = IN_LEVEL };
-  int cursor;
+  int cursor = 0;
 };
