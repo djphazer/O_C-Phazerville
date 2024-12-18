@@ -14,12 +14,12 @@
 
 const size_t NUM_SLOTS = 5;
 
-std::tuple<InputApplet<MONO>, UpsampledApplet<MONO>, OscApplet>
+DMAMEM std::tuple<InputApplet<MONO>, UpsampledApplet<MONO>, OscApplet>
   mono_input_pool[2];
-std::
+DMAMEM std::
   tuple<InputApplet<STEREO>, WavPlayerApplet<STEREO>, UpsampledApplet<STEREO>>
     stereo_input_pool;
-std::tuple<
+DMAMEM std::tuple<
   PassthruApplet<MONO>,
   InputApplet<MONO>,
   OscApplet,
@@ -29,15 +29,16 @@ std::tuple<
   VcaApplet<MONO>,
   UpsampledApplet<MONO>>
   mono_processors_pool[2][NUM_SLOTS - 1];
-std::tuple<
+DMAMEM std::tuple<
   PassthruApplet<STEREO>,
   InputApplet<STEREO>,
+  DelayApplet<STEREO>,
   LadderApplet<STEREO>,
   VcaApplet<STEREO>,
   FilterFolderApplet<STEREO>,
-  WavPlayerApplet<STEREO>
-  // UpsampledApplet<STEREO>
->
+  WavPlayerApplet<STEREO>,
+  UpsampledApplet<STEREO>
+  >
   stereo_processors_pool[NUM_SLOTS - 1];
 
 // Helper to extract the tuple type from an array... thanks ChatGPT...
