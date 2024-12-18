@@ -8,22 +8,21 @@
 #include "Audio/AudioPassthrough.h"
 #include <Audio.h>
 
+template <AudioChannels Channels>
 class DelayApplet : public HemisphereAudioApplet {
 public:
   const char* applet_name() {
     return "Delay";
   }
   void Start() {
-    delay.Acquire();
-
-    for (int i = 0; i < 8; i++) {
-      taps_conns[i].connect(delay, i, taps_mixer, i);
+    for (int ch = 0; ch < Channels; ch++) {
+      channels[ch].Start(ch, input_stream, output_stream);
     }
     set_taps(taps);
   }
 
   void Unload() {
-    delay.Release();
+    for (auto& ch : channels) ch.Stop();
     AllowRestart();
   }
 
@@ -58,26 +57,28 @@ public:
       CONSTRAIN(d, 0.0f, MAX_DELAY_SECS);
       switch (delay_mod_type) {
         case CROSSFADE:
-          delay.cf_delay(tap, t);
+          for (auto& ch : channels) ch.delay.cf_delay(tap, t);
           break;
         case STRETCH:
-          delay.delay(tap, t);
+          for (auto& ch : channels) ch.delay.delay(tap, t);
           break;
       }
     }
 
-    if (frozen) {
-      input_amp.gain(0.0f);
-      delay.feedback(8, 1.0f);
-      for (int tap = 0; tap < 8; tap++) {
-        delay.feedback(tap, 0.0f);
-      }
-    } else {
-      input_amp.gain(1.0f);
-      float fb
-        = constrain((0.01f * feedback + feedback_cv.InF()) / taps, 0.0, 2.0f);
-      for (int tap = 0; tap < 9; tap++) {
-        delay.feedback(tap, tap < taps ? fb : 0.0f);
+    for (auto& ch : channels) {
+      if (frozen) {
+        ch.input_amp.gain(0.0f);
+        ch.delay.feedback(8, 1.0f);
+        for (int tap = 0; tap < 8; tap++) {
+          ch.delay.feedback(tap, 0.0f);
+        }
+      } else {
+        ch.input_amp.gain(1.0f);
+        float fb
+          = constrain((0.01f * feedback + feedback_cv.InF()) / taps, 0.0, 2.0f);
+        for (int tap = 0; tap < 9; tap++) {
+          ch.delay.feedback(tap, tap < taps ? fb : 0.0f);
+        }
       }
     }
 
@@ -86,8 +87,10 @@ public:
       dry_gain, wet_gain, constrain(0.01f * wet + wet_cv.InF(), 0.0f, 1.0f)
     );
 
-    wet_dry_mixer.gain(WD_WET_CH, wet_gain);
-    wet_dry_mixer.gain(WD_DRY_CH, dry_gain);
+    for (auto& ch : channels) {
+      ch.wet_dry_mixer.gain(WD_WET_CH, wet_gain);
+      ch.wet_dry_mixer.gain(WD_DRY_CH, dry_gain);
+    }
   }
 
   void View() {
@@ -280,7 +283,7 @@ public:
   }
 
   AudioStream* OutputStream() {
-    return &wet_dry_mixer;
+    return &output_stream;
   }
 
   float DelaySecsFromPitch(int pitch) {
@@ -306,10 +309,10 @@ protected:
     taps = t;
     CONSTRAIN(taps, 1, 8);
     float tap_gain = EQUAL_POWER_EQUAL_MIX[taps];
-    for (int i = 0; i < taps; i++)
-      taps_mixer.gain(i, tap_gain);
-    for (int i = taps; i < 8; i++)
-      taps_mixer.gain(i, 0.0f);
+    for (auto& ch : channels) {
+      for (int i = 0; i < taps; i++) ch.taps_mixer.gain(i, tap_gain);
+      for (int i = taps; i < 8; i++) ch.taps_mixer.gain(i, 0.0f);
+    }
   }
 
 private:
@@ -383,25 +386,45 @@ private:
   int16_t knob_accel = 0;
   elapsedMillis millis_since_turn;
 
-  const uint8_t WD_DRY_CH = 0;
-  const uint8_t WD_WET_CH = 1;
+  static const uint8_t WD_DRY_CH = 0;
+  static const uint8_t WD_WET_CH = 1;
 
   // Uses 1MB of psram and gives just under 12 secs of delay time.
   static const size_t DELAY_LENGTH = 1024 * 512;
   static constexpr float MAX_DELAY_SECS = DELAY_LENGTH / AUDIO_SAMPLE_RATE;
 
-  AudioPassthrough<MONO> input_stream;
-  AudioAmplifier input_amp;
-  // 9th tap is freeze head
-  AudioDelayExt<DELAY_LENGTH, 9> delay;
-  AudioConnection input_to_amp{input_stream, input_amp};
-  AudioConnection amp_to_delay{input_amp, delay};
-  AudioConnection taps_conns[8];
-  AudioMixer<8> taps_mixer;
+  AudioPassthrough<Channels> input_stream;
+  struct {
+    AudioAmplifier input_amp;
+    // 9th tap is freeze head
+    AudioDelayExt<DELAY_LENGTH, 9> delay;
+    AudioMixer<8> taps_mixer;
+    AudioMixer<2> wet_dry_mixer;
 
-  AudioMixer<2> wet_dry_mixer;
-  AudioConnection wet_conn{taps_mixer, 0, wet_dry_mixer, WD_WET_CH};
-  AudioConnection dry_conn{input_stream, 0, wet_dry_mixer, WD_DRY_CH};
+    AudioConnection amp_to_delay{input_amp, delay};
+    AudioConnection wet_conn{taps_mixer, 0, wet_dry_mixer, WD_WET_CH};
+
+    AudioConnection input_to_amp;
+    AudioConnection taps_conns[8];
+    AudioConnection dry_conn;
+    AudioConnection mix_to_output;
+
+    void Start(int channel, AudioStream& input, AudioStream& output) {
+      delay.Acquire();
+
+      input_to_amp.connect(input, channel, input_amp, 0);
+      for (int i = 0; i < 8; i++) {
+        taps_conns[i].connect(delay, i, taps_mixer, i);
+      }
+      dry_conn.connect(input, channel, wet_dry_mixer, WD_DRY_CH);
+      mix_to_output.connect(wet_dry_mixer, 0, output, channel);
+    }
+
+    void Stop() {
+      delay.Release();
+    }
+  } channels[Channels];
+  AudioPassthrough<Channels> output_stream;
 
   // [-4,-2]=>-1, [-1,1]=>0, [2,4]=>1, etc
   int16_t semitones_to_div(int16_t semis) {

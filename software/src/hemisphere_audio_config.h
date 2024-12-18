@@ -23,7 +23,7 @@ std::tuple<
   PassthruApplet<MONO>,
   InputApplet<MONO>,
   OscApplet,
-  DelayApplet,
+  DelayApplet<MONO>,
   LadderApplet<MONO>,
   FilterFolderApplet<MONO>,
   VcaApplet<MONO>,

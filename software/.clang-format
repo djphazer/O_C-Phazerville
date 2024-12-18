@@ -28,6 +28,7 @@ Cpp11BracedListStyle: true
 AllowShortFunctionsOnASingleLine: Empty
 AllowShortIfStatementsOnASingleLine: AllIfsAndElse
 AllowAllArgumentsOnNextLine: true
+AllowShortLoopsOnASingleLine: true
 FixNamespaceComments: false
 ReflowComments: true
 NamespaceIndentation: All
