@@ -577,7 +577,7 @@ typedef struct IOFrame {
         if (value > GATE_THRESHOLD && outputs[channel] < GATE_THRESHOLD)
             clockout_q[channel] = true;
 
-        output_diff[channel] = value - outputs[channel];
+        output_diff[channel] += value - outputs[channel];
         outputs[channel] = value;
     }
     void ClockOut(DAC_CHANNEL ch, const int pulselength = HEMISPHERE_CLOCK_TICKS * HS::trig_length) {
