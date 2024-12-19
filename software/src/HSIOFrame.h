@@ -11,6 +11,7 @@
 
 #include <vector>
 #include "HSMIDI.h"
+#include "HSUtils.h"
 
 #ifdef ARDUINO_TEENSY41
 namespace OC {

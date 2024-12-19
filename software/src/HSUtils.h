@@ -82,6 +82,8 @@ static constexpr uint32_t HEMISPHERE_DOUBLE_CLICK_TIME = 8000;
 static constexpr uint32_t HEMISPHERE_PULSE_ANIMATION_TIME = 500;
 static constexpr uint32_t HEMISPHERE_PULSE_ANIMATION_TIME_LONG = 1200;
 
+extern const int HEMISPHERE_AVAILABLE_APPLETS;
+
 } // namespace HS
 
 //////////////// Calculation methods
@@ -153,7 +155,7 @@ void gfxLine(int x, int y, int x2, int y2);
 void gfxDottedLine(int x, int y, int x2, int y2, uint8_t p = 2);
 void gfxCircle(int x, int y, int r);
 void gfxBitmap(int x, int y, int w, const uint8_t *data);
-void gfxIcon(int x, int y, const uint8_t *data);
+void gfxIcon(int x, int y, const uint8_t *data, bool clearfirst = false);
 void gfxHeader(const char *str, const uint8_t *icon = nullptr);
 
 static constexpr uint8_t pad(int range, int number) {
@@ -213,7 +215,10 @@ namespace HS {
   extern uint8_t trig_length;
   extern uint8_t screensaver_mode;
 
+  extern OC::menu::ScreenCursor<5> showhide_cursor;
+
   void Init();
+  void DrawAppletList(bool blink = false);
 
   // --- Quantizer helpers
   int GetLatestNoteNumber(int ch);

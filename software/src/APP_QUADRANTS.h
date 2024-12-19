@@ -394,10 +394,6 @@ public:
         // execute Applets
         for (int h = 0; h < APPLET_SLOTS; h++)
         {
-            if (active_applet_index[h] != next_applet_index[h]) {
-              SetApplet(HEM_SIDE(h), next_applet_index[h]);
-            }
-
             // MIDI signals mixed with inputs to applets
             if (HS::available_applets[ active_applet_index[h] ].id != 150) // not MIDI In
             {
@@ -476,6 +472,10 @@ public:
             draw_applets = false;
             break;
 
+          case SHOWHIDE_APPLETS:
+            DrawAppletList();
+            draw_applets = false;
+            break;
           }
         }
         if (HS::q_edit)
@@ -491,9 +491,33 @@ public:
 
         if (draw_applets) {
           if (view_state == APPLET_FULLSCREEN) {
-            active_applet[zoom_slot]->BaseView(true);
-            // Applets 3 and 4 get inverted titles
-            if (zoom_slot > 1) gfxInvert(1 + (zoom_slot%2)*64, 1, 63, 10);
+            if (select_mode == zoom_slot) {
+              showhide_cursor.Scroll(next_applet_index[zoom_slot] - showhide_cursor.cursor_pos());
+              DrawAppletList(CursorBlink());
+              // dotted screen border during applet select
+              gfxFrame(0, 0, 128, 64, true);
+            } else {
+              active_applet[zoom_slot]->BaseView(true);
+              // Applets 3 and 4 get inverted titles
+              if (zoom_slot > 1) gfxInvert(1 + (zoom_slot%2)*64, 1, 63, 10);
+            }
+
+            // draw cursor for editing applet select and input maps
+            if (0 == zoom_cursor) {
+              if (select_mode != zoom_slot && CursorBlink())
+                gfxIcon(60, 1, (zoom_slot & 1)? RIGHT_ICON : LEFT_ICON, true);
+            } else if (isEditing) {
+              const int x = ((zoom_cursor-1)%2)*64;
+              const int y = 13 + 10*((zoom_cursor-1)/2);
+              gfxInvert(x, y, 19, 9);
+              gfxFrame(x, y, 19, 9, true);
+            } else {
+              if (CursorBlink()) {
+                const int x = 18 + 64*((zoom_cursor-1)%2);
+                const int y = 14 + 10*((zoom_cursor-1)/2);
+                gfxIcon(x, y, LEFT_ICON, true);
+              }
+            }
           } else {
             // only two applets visible at a time
             for (int h = 0; h < 2; h++)
@@ -507,11 +531,6 @@ public:
 
             // vertical separator
             graphics.drawLine(63, 0, 63, 63, 2);
-          }
-
-          if (select_mode) {
-            // screen border while X or Y is held, so they feel powerful (because they are)
-            graphics.drawFrame(0, 0, 128, 64);
           }
 
           // Clock setup is an overlay
@@ -539,6 +558,28 @@ public:
         }
         if (view_state == AUDIO_SETUP) {
           OC::AudioDSP::AudioSetupButtonAction(h);
+          return;
+        }
+        if (view_state == APPLET_FULLSCREEN) {
+          switch (zoom_cursor) {
+            case 0:
+              if (zoom_slot == select_mode) {
+                SetApplet(zoom_slot, next_applet_index[zoom_slot]);
+                ExitFullScreen();
+              } else
+                select_mode = zoom_slot;
+              break;
+            //// 0=select; 1,2=trigmap; 3,4=cvmap; 5,6=outmode
+            case 1:
+            case 2:
+            case 3:
+            case 4:
+            case 5:
+            case 6:
+            default:
+              isEditing = !isEditing;
+              break;
+          }
           return;
         }
 
@@ -634,6 +675,50 @@ public:
             ClockSetup_instance.OnLeftEncoderMove(event.value);
           else
             ClockSetup_instance.OnEncoderMove(event.value);
+          return;
+        }
+
+        if (view_state == APPLET_FULLSCREEN) {
+          if (select_mode == zoom_slot)
+            ChangeApplet(zoom_slot, event.value);
+          else if (isEditing) { // enc changes value
+            switch (zoom_cursor)
+            {
+              default:
+                break;
+
+              case 1:
+              case 2:
+              {
+                const int chan = zoom_slot*2 + zoom_cursor - 1;
+                if (clock_m.IsRunning()) // && clock_m.GetMultiply(chan))
+                {
+                  clock_m.SetMultiply(clock_m.GetMultiply(chan) + event.value, chan);
+                } else
+                  HS::trigger_mapping[chan] = constrain(
+                      HS::trigger_mapping[chan] + event.value,
+                      0, TRIGMAP_MAX);
+                break;
+              }
+              case 3:
+              case 4:
+                HS::cvmapping[zoom_slot*2 + zoom_cursor - 3] =
+                  constrain( HS::cvmapping[zoom_slot*2 + zoom_cursor - 3] + event.value,
+                      0, CVMAP_MAX);
+                break;
+              case 5:
+              case 6:
+                // TODO: per applet?
+                break;
+            }
+          } else { // enc moves cursor
+            zoom_cursor = constrain(zoom_cursor + event.value, 0, 4);
+            ResetCursor();
+          }
+        } else if (select_mode == h) {
+          // old style select mode
+          ChangeApplet(h, event.value);
+          SetApplet(h, next_applet_index[h]);
         } else if (event.mask & (OC::CONTROL_BUTTON_X | OC::CONTROL_BUTTON_Y)) {
             // hold down X or Y to change applet with encoder
             if (view_state == APPLET_FULLSCREEN) slot = zoom_slot;
@@ -679,23 +764,26 @@ public:
     }
     // this brings a specific applet into view on the appropriate side
     void SwitchToSlot(HEM_SIDE h) {
-      if (view_slot[h % 2] != h / 2) {
-        view_slot[h % 2] = h / 2;
-      }
+      view_slot[h % 2] = h / 2;
       zoom_slot = h;
     }
 
+    void ExitFullScreen() {
+      view_state = APPLETS;
+      isEditing = false;
+      select_mode = -1;
+    }
     void SetFullScreen(HEM_SIDE hemisphere) {
-      zoom_slot = hemisphere;
+      SwitchToSlot(hemisphere);
       view_state = APPLET_FULLSCREEN;
+      isEditing = false;
+      select_mode = -1;
     }
     void ToggleFullScreen() {
       view_state = (view_state == APPLET_FULLSCREEN) ? APPLETS : APPLET_FULLSCREEN;
     }
 
     void HandleButtonEvent(const UI::Event &event) {
-        // tracks whether X or Y are being held down
-        select_mode = (event.mask & (OC::CONTROL_BUTTON_X | OC::CONTROL_BUTTON_Y));
 
         switch (event.type) {
         case UI::EVENT_BUTTON_DOWN:
@@ -708,7 +796,7 @@ public:
               HS::NudgeOctave(HS::qview, -1);
             else {
               HS::q_edit = false;
-              select_mode = false;
+              select_mode = -1;
             }
 
             OC::ui.SetButtonIgnoreMask();
@@ -717,16 +805,6 @@ public:
 
           if (event.control == OC::CONTROL_BUTTON_Z)
           {
-              // X or Y + Z == go fullscreen
-              if (select_mode) {
-                bool h = (event.mask & OC::CONTROL_BUTTON_Y); // left or right
-                zoom_slot = HEM_SIDE(view_slot[h]*2 + h);
-                ToggleFullScreen();
-                select_mode = false;
-                OC::ui.SetButtonIgnoreMask();
-                break;
-              }
-
               // Z-button - Zap the CLOCK!!
               ToggleClockRun();
               OC::ui.SetButtonIgnoreMask();
@@ -747,8 +825,32 @@ public:
             event.control == OC::CONTROL_BUTTON_Y)
           {
               if (CheckButtonCombos(event)) {
-                select_mode = false;
+                select_mode = -1;
                 OC::ui.SetButtonIgnoreMask(); // ignore release and long-press
+              } else {
+                HEM_SIDE slot = ButtonToSlot(event);
+                if (OC::CORE::ticks - click_tick < HEMISPHERE_DOUBLE_CLICK_TIME
+                    && (slot == first_click))
+                {
+                    // This is a double-click on one button.
+                    SetFullScreen(slot);
+                    click_tick = 0;
+                    OC::ui.SetButtonIgnoreMask(); // ignore button release
+                    return;
+                }
+
+                // -- Single click
+                // If a help screen is already selected, and the button is for
+                // the opposite one, go to the other help screen
+                if (view_state == APPLET_FULLSCREEN) {
+                    if (zoom_slot != slot) SetFullScreen(slot);
+                    else ExitFullScreen(); // Exit help screen if same button is clicked
+                    OC::ui.SetButtonIgnoreMask(); // ignore release
+                }
+
+                // mark this single click
+                click_tick = OC::CORE::ticks;
+                first_click = slot;
               }
           }
 
@@ -791,8 +893,11 @@ private:
     bool view_slot[2] = {0, 0}; // Two applets on each side, only one visible at a time
     int config_cursor = 0;
 
-    bool select_mode = 0;
+    int select_mode = -1;
     HEM_SIDE zoom_slot; // Which of the hemispheres (if any) is in fullscreen/help mode
+    int zoom_cursor; // 0=select; 1,2=trigmap; 3,4=cvmap; 5,6=outmode
+    uint32_t click_tick; // Measure time between clicks for double-click
+    int first_click; // The first button pushed of a double-click set, to see if the same one is pressed
 
     // State machine
     enum QuadrantsView {
@@ -845,10 +950,12 @@ private:
         if (!isEditing && !preset_cursor) {
           if (h == 0) { // change pages
             config_page += dir;
-            config_page = constrain(config_page, LOADSAVE_POPUP, QUANTIZER_SETTINGS);
+            config_page = constrain(config_page, LOADSAVE_POPUP, LAST_PAGE);
 
             const int cursorpos[] = { 0, LOAD_PRESET, TRIG_LENGTH, TRIGMAP1, QUANT1, SHOWHIDELIST };
             config_cursor = cursorpos[config_page];
+          } else if (config_page == SHOWHIDE_APPLETS) {
+            showhide_cursor.Scroll(dir);
           } else { // move cursor
             config_cursor += dir;
             config_cursor = constrain(config_cursor, 0, MAX_CURSOR);
@@ -969,6 +1076,15 @@ private:
             HS::cursor_wrap = !HS::cursor_wrap;
             break;
 
+        case SHOWHIDELIST:
+            if (h == 0) // left encoder inverts selection
+            {
+              HS::hidden_applets[0] = ~HS::hidden_applets[0];
+              HS::hidden_applets[1] = ~HS::hidden_applets[1];
+            }
+            else // right encoder toggles current
+              HS::showhide_applet(showhide_cursor.cursor_pos());
+            break;
         default: break;
         }
     }
@@ -1109,9 +1225,11 @@ private:
             if (!quad_presets[i].is_valid())
                 gfxPrint(18, y, "(empty)");
             else {
-                gfxPrint(18, y, quad_presets[i].GetApplet(LEFT_HEMISPHERE)->applet_name());
+                gfxIcon(18, y, quad_presets[i].GetApplet(LEFT_HEMISPHERE)->applet_icon());
+                gfxPrint(26, y, quad_presets[i].GetApplet(LEFT_HEMISPHERE)->applet_name());
                 gfxPrint(", ");
                 gfxPrint(quad_presets[i].GetApplet(RIGHT_HEMISPHERE)->applet_name());
+                gfxIcon(120, y, quad_presets[i].GetApplet(RIGHT_HEMISPHERE)->applet_icon(), true);
             }
 
             y += 10;

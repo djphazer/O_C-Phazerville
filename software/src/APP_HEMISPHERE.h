@@ -48,6 +48,26 @@
 #include "APP_CALIBR8OR.h"
 #endif
 
+void HS::DrawAppletList(bool blink) {
+  const size_t LineH = 12;
+
+  int y = (64 - (5 * LineH)) / 2;
+
+  for (int current = showhide_cursor.first_visible();
+       current <= showhide_cursor.last_visible();
+       ++current, y += LineH) {
+
+    if (!HS::applet_is_hidden(current))
+      gfxIcon(  12, y + 1, HS::available_applets[current].instance[0]->applet_icon());
+    gfxPrint( 23, y + 2, HS::available_applets[current].instance[0]->applet_name());
+
+    if (current == showhide_cursor.cursor_pos()) {
+      gfxIcon(1, y + 1, RIGHT_ICON);
+      if (blink) gfxInvert(0, y, 10, 10);
+    }
+  }
+}
+
 // The settings specify the selected applets, and 64 bits of data for each applet,
 // plus 64 bits of data for the ClockSetup applet (which includes some misc config).
 // TRIGMAP and CVMAP are packed nibbles.
@@ -234,11 +254,8 @@ public:
     void Start() {
         //select_mode = -1; // Not selecting
 
-        help_hemisphere = -1;
+        zoom_slot = -1;
         clock_setup = 0;
-
-        showhide_cursor.Init(0, HEMISPHERE_AVAILABLE_APPLETS - 1);
-        showhide_cursor.Scroll(0);
 
         for (int i = 0; i < 4; ++i) {
             quant_scale[i] = OC::Scales::SCALE_SEMI;
@@ -372,10 +389,6 @@ public:
         next_applet[h] = index;
     }
 
-    bool SelectModeEnabled() {
-        return select_mode > -1;
-    }
-
 #if defined(__IMXRT1062__)
   #if defined(ARDUINO_TEENSY41)
     template <typename T1, typename T2, typename T3>
@@ -446,9 +459,6 @@ public:
         // execute Applets
         for (int h = 0; h < 2; h++)
         {
-            if (my_applet[h] != next_applet[h]) {
-              SetApplet(HEM_SIDE(h), next_applet[h]);
-            }
             int index = my_applet[h];
 
             // MIDI signals mixed with inputs to applets
@@ -558,9 +568,35 @@ public:
           PokePopup(QUANTIZER_POPUP);
 
         if (draw_applets) {
-          if (help_hemisphere > -1) {
-            int index = my_applet[help_hemisphere];
-            HS::available_applets[index].instance[help_hemisphere]->BaseView(true);
+          if (zoom_slot > -1) {
+            int index = my_applet[zoom_slot];
+
+            if (select_mode == zoom_slot) {
+              showhide_cursor.Scroll(next_applet[zoom_slot] - showhide_cursor.cursor_pos());
+              DrawAppletList(CursorBlink());
+              // dotted screen border during applet select
+              gfxFrame(0, 0, 128, 64, true);
+            }
+            else
+              HS::available_applets[index].instance[zoom_slot]->BaseView(true);
+
+            // draw cursor for editing applet select and input maps
+            if (0 == zoom_cursor) {
+              if (select_mode != zoom_slot && CursorBlink())
+                gfxIcon(60, 1, zoom_slot? RIGHT_ICON : LEFT_ICON, true);
+            } else if (isEditing) {
+              const int x = ((zoom_cursor-1)%2)*64;
+              const int y = 13 + 10*((zoom_cursor-1)/2);
+              gfxInvert(x, y, 19, 9);
+              gfxFrame(x, y, 19, 9, true);
+            } else {
+              if (CursorBlink()) {
+                const int x = 18 + 64*((zoom_cursor-1)%2);
+                const int y = 14 + 10*((zoom_cursor-1)/2);
+                gfxIcon(x, y, LEFT_ICON, true);
+              }
+            }
+
             draw_applets = false;
           } else {
             for (int h = 0; h < 2; h++)
@@ -615,6 +651,28 @@ public:
         }
 
         // button release
+        if (zoom_slot > -1) {
+          switch (zoom_cursor) {
+            case 0:
+              if (zoom_slot == select_mode) {
+                SetApplet(HEM_SIDE(zoom_slot), next_applet[zoom_slot]);
+                SetFullScreen(-1);
+              } else
+                select_mode = zoom_slot;
+              break;
+            //// 0=select; 1,2=trigmap; 3,4=cvmap; 5,6=outmode
+            case 1:
+            case 2:
+            case 3:
+            case 4:
+            case 5:
+            case 6:
+            default:
+              isEditing = !isEditing;
+              break;
+          }
+          return;
+        }
         if (select_mode == h) {
             select_mode = -1; // Pushing a button for the selected side turns off select mode
         } else if (!clock_setup) {
@@ -688,7 +746,7 @@ public:
             // dual press for Clock Setup... check first_click, so we only process the 2nd button event
             if (event.mask == (OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_B) && hemisphere != first_click) {
                 clock_setup = 1;
-                SetHelpScreen(-1);
+                SetFullScreen(-1);
                 select_mode = -1;
                 OC::ui.SetButtonIgnoreMask(); // ignore button release
                 return;
@@ -697,19 +755,20 @@ public:
             if (OC::CORE::ticks - click_tick < HEMISPHERE_DOUBLE_CLICK_TIME) {
                 // This is a double-click on one button. Activate corresponding help screen and deactivate select mode.
                 if (hemisphere == first_click)
-                    SetHelpScreen(hemisphere);
+                    SetFullScreen(hemisphere);
 
                 // reset double-click timer either way
                 click_tick = 0;
+                OC::ui.SetButtonIgnoreMask(); // ignore button release
                 return;
             }
 
             // -- Single click
             // If a help screen is already selected, and the button is for
             // the opposite one, go to the other help screen
-            if (help_hemisphere > -1) {
-                if (help_hemisphere != hemisphere) SetHelpScreen(hemisphere);
-                else SetHelpScreen(-1); // Exit help screen if same button is clicked
+            if (zoom_slot > -1) {
+                if (zoom_slot != hemisphere) SetFullScreen(hemisphere);
+                else SetFullScreen(-1); // Exit help screen if same button is clicked
                 OC::ui.SetButtonIgnoreMask(); // ignore release
             }
 
@@ -728,16 +787,14 @@ public:
             // select button becomes aux button while editing a param
             applet->AuxButton();
           } else {
-            // Select Mode
             if (hemisphere == select_mode) select_mode = -1; // Exit Select Mode if same button is pressed
-            else if (help_hemisphere < 0) // Otherwise, set Select Mode - UNLESS there's a help screen
-              select_mode = hemisphere;
+            else select_mode = hemisphere;
           }
         }
     }
 
     void DelegateEncoderMovement(const UI::Event &event) {
-        int h = (event.control == OC::CONTROL_ENCODER_L) ? LEFT_HEMISPHERE : RIGHT_HEMISPHERE;
+        HEM_SIDE h = (event.control == OC::CONTROL_ENCODER_L) ? LEFT_HEMISPHERE : RIGHT_HEMISPHERE;
 
         if (HS::q_edit) {
           HS::QEditEncoderMove(h, event.value);
@@ -760,8 +817,51 @@ public:
             ClockSetup_instance.OnLeftEncoderMove(event.value);
           else
             ClockSetup_instance.OnEncoderMove(event.value);
+
+          return;
+        }
+
+        // Fullscreen cursor stuff
+        if (zoom_slot > -1) {
+          if (select_mode == zoom_slot) ChangeApplet(HEM_SIDE(zoom_slot), event.value);
+          else if (isEditing) { // enc changes value
+            switch (zoom_cursor)
+            {
+              default:
+                break;
+
+              case 1:
+              case 2:
+              {
+                int chan = zoom_slot*2 + zoom_cursor - 1;
+                if (clock_m.IsRunning()) // && clock_m.GetMultiply(chan))
+                {
+                  clock_m.SetMultiply(clock_m.GetMultiply(chan) + event.value, chan);
+                } else
+                  HS::trigger_mapping[zoom_slot*2 + zoom_cursor - 1] = constrain(
+                      HS::trigger_mapping[zoom_slot*2 + zoom_cursor - 1] + event.value,
+                      0, TRIGMAP_MAX);
+                break;
+              }
+              case 3:
+              case 4:
+                HS::cvmapping[zoom_slot*2 + zoom_cursor - 3] =
+                  constrain( HS::cvmapping[zoom_slot*2 + zoom_cursor - 3] + event.value,
+                      0, CVMAP_MAX);
+                break;
+              case 5:
+              case 6:
+                // TODO: per applet?
+                break;
+            }
+          } else { // left enc moves cursor
+            zoom_cursor = constrain(zoom_cursor + event.value, 0, 4);
+            ResetCursor();
+          }
         } else if (select_mode == h) {
-            ChangeApplet(HEM_SIDE(h), event.value);
+          // old style select mode
+          ChangeApplet(h, event.value);
+          SetApplet(h, next_applet[h]);
         } else {
             int index = my_applet[h];
             HS::available_applets[index].instance[h]->OnEncoderMove(event.value);
@@ -771,7 +871,7 @@ public:
     void ToggleConfigMenu() {
       if (view_state != CONFIG_MENU) {
         view_state = CONFIG_MENU;
-        //SetHelpScreen(-1);
+        //SetFullScreen(-1);
       } else {
         view_state = APPLETS;
       }
@@ -782,8 +882,10 @@ public:
         preset_cursor = preset_id + 1;
     }
 
-    void SetHelpScreen(int hemisphere) {
-        help_hemisphere = hemisphere;
+    void SetFullScreen(int hemisphere) {
+        zoom_slot = hemisphere;
+        select_mode = -1;
+        isEditing = false;
     }
 
     void HandleButtonEvent(const UI::Event &event) {
@@ -841,17 +943,16 @@ private:
     int config_page = 0;
     int dummy_count = 0;
 
-    OC::menu::ScreenCursor<5> showhide_cursor;
-
     int select_mode = -1;
-    int help_hemisphere; // Which of the hemispheres (if any) is in help mode, or -1 if none
+    int zoom_slot; // Which of the hemispheres (if any) is in fullscreen/help mode, -1 if none
+    int zoom_cursor; // 0=select; 1,2=trigmap; 3,4=cvmap; 5,6=outmode
     uint32_t click_tick; // Measure time between clicks for double-click
     int first_click; // The first button pushed of a double-click set, to see if the same one is pressed
 
     // State machine
     enum HEMView {
       APPLETS,
-      APPLET_FULLSCREEN,
+      //APPLET_FULLSCREEN,
       CONFIG_MENU,
       PRESET_PICKER,
       CLOCK_SETUP,
@@ -1116,24 +1217,6 @@ private:
         }
     }
 
-    void DrawAppletList() {
-      const size_t LineH = 12;
-
-      int y = (64 - (5 * LineH)) / 2;
-
-      for (int current = showhide_cursor.first_visible();
-           current <= showhide_cursor.last_visible();
-           ++current, y += LineH) {
-
-        if (!HS::applet_is_hidden(current))
-          gfxIcon(  12, y + 1, HS::available_applets[current].instance[0]->applet_icon());
-        gfxPrint( 23, y + 2, HS::available_applets[current].instance[0]->applet_name());
-
-        if (current == showhide_cursor.cursor_pos())
-          gfxIcon(1, y + 1, RIGHT_ICON);
-          //gfxInvert(0, y, 127, LineH - 1);
-      }
-    }
     void DrawConfigMenu() {
         // --- Config Selection
         gfxHeader("< General Settings >");
@@ -1208,7 +1291,7 @@ private:
                 gfxPrint(26, y, hem_presets[i].GetApplet(0)->applet_name());
                 gfxPrint(", ");
                 gfxPrint(hem_presets[i].GetApplet(1)->applet_name());
-                gfxIcon(120, y, hem_presets[i].GetApplet(1)->applet_icon());
+                gfxIcon(120, y, hem_presets[i].GetApplet(1)->applet_icon(), true);
             }
 
             y += 10;

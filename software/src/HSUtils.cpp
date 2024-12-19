@@ -40,14 +40,18 @@ namespace HS {
   uint8_t trig_length = 10; // in ms, multiplier for HEMISPHERE_CLOCK_TICKS
   uint8_t screensaver_mode = 3; // 0 = blank, 1 = Meters, 2 = Scope/Zaps, 3 = Zips/Stars
 
+  OC::menu::ScreenCursor<5> showhide_cursor;
+
   void Init() {
     for (int i = 0; i < ADC_CHANNEL_LAST; ++i)
       input_quant[i].Init();
 
     for (int i = 0; i < QUANT_CHANNEL_COUNT; ++i)
       quantizer[i].Init();
-  }
 
+    showhide_cursor.Init(0, HEMISPHERE_AVAILABLE_APPLETS - 1);
+    showhide_cursor.Scroll(0);
+  }
 
   void PokePopup(PopupType pop) {
     popup_type = pop;
@@ -410,8 +414,9 @@ void gfxBitmap(int x, int y, int w, const uint8_t *data) {
 }
 
 // Like gfxBitmap, but always 8x8
-void gfxIcon(int x, int y, const uint8_t *data) {
-    gfxBitmap(x, y, 8, data);
+void gfxIcon(int x, int y, const uint8_t *data, bool clearfirst) {
+  if (clearfirst) graphics.clearRect(x, y, 8, 8);
+  gfxBitmap(x, y, 8, data);
 }
 
 void gfxHeader(const char *str, const uint8_t *icon) {
