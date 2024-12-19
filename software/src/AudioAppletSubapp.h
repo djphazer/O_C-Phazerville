@@ -58,7 +58,6 @@ public:
   }
 
   void Init() {
-    cursor_countdown = HSAPPLICATION_CURSOR_TICKS;
     for (size_t slot = 0; slot < Slots; slot++) {
       if (IsStereo(slot)) {
         get_stereo_applet(slot).BaseStart(LEFT_HEMISPHERE);
@@ -70,11 +69,11 @@ public:
         ConnectMonoToNext(RIGHT_HEMISPHERE, slot);
       }
     }
+    peak_conns[0][0].connect(OC::AudioIO::InputStream(), 0, peaks[0][0], 0);
+    peak_conns[1][0].connect(OC::AudioIO::InputStream(), 1, peaks[1][0], 0);
   }
 
   void Controller() {
-    if (--cursor_countdown < -HSAPPLICATION_CURSOR_TICKS)
-      cursor_countdown = HSAPPLICATION_CURSOR_TICKS;
     AudioNoInterrupts();
     // Call Controller instead of BaseController so we don't trigger
     // cursor_countdown multiple times. This is a stupid hack and we should do
@@ -105,16 +104,32 @@ public:
     for (size_t i = 0; i < Slots; i++) {
       print_applet_line(i);
     }
+    switch (edit_state) {
+      case EDIT_LEFT:
+        gfxInvert(0, left_cursor * 10 + 14, 64, 9);
+        break;
+      case EDIT_RIGHT:
+        gfxInvert(64, right_cursor * 10 + 14, 64, 9);
+        break;
+      case EDIT_NONE:
+        gfxIcon(0, left_cursor * 10 + 15, RIGHT_ICON);
+        gfxIcon(120, right_cursor * 10 + 15, LEFT_ICON);
+        break;
+    }
+    ForEachChannel(side) {
+      if (edit_state != (1 - side) + 1) {
+        for (int slot = 0; slot < Slots + 1; slot++) {
+          draw_peak(side, slot);
+        }
+      }
+    }
 
     if (edit_state == EDIT_LEFT) {
       HemisphereAudioApplet& applet = IsStereo(left_cursor)
         ? get_stereo_applet(left_cursor)
         : get_mono_applet(LEFT_HEMISPHERE, left_cursor);
       applet.BaseView();
-      gfxLine(64, 0, 64, 64);
-      gfxLine(64, 0, 127, 0);
     } else {
-      // gfxPrint(65, 2, "R Channel");
       gfxPos(65, 2);
       graphics.printf("MEM%3d%%) R", mem_percent);
       gfxDottedLine(64, 10, 126, 10);
@@ -124,8 +139,6 @@ public:
         ? get_stereo_applet(right_cursor)
         : get_mono_applet(RIGHT_HEMISPHERE, right_cursor);
       applet.BaseView();
-      gfxLine(64, 0, 64, 64);
-      gfxLine(0, 0, 64, 0);
     } else {
       // gfxPrint(1, 2, "L Channel");
       gfxPos(1, 2);
@@ -302,6 +315,8 @@ public:
         : &OC::AudioIO::OutputStream();
       conn.connect(*stream, 0, *next_stream, side);
     }
+    peak_conns[side][slot + 1].disconnect();
+    peak_conns[side][slot + 1].connect(*stream, 0, peaks[side][slot + 1], 0);
   }
 
   void ConnectStereoToNext(size_t slot) {
@@ -324,6 +339,10 @@ public:
       lconn.connect(*stream, 0, *next_stream, 0);
       rconn.connect(*stream, 1, *next_stream, 1);
     }
+    peak_conns[0][slot + 1].disconnect();
+    peak_conns[0][slot + 1].connect(*stream, 0, peaks[0][slot + 1], 0);
+    peak_conns[1][slot + 1].disconnect();
+    peak_conns[1][slot + 1].connect(*stream, 1, peaks[1][slot + 1], 0);
   }
 
 protected:
@@ -344,6 +363,8 @@ private:
   array<int, Slots> selected_stereo_applets;
 
   array<array<AudioConnection, Slots + 1>, 2> conns;
+  array<array<AudioAnalyzePeak, Slots + 1>, 2> peaks;
+  array<array<AudioConnection, Slots + 1>, 2> peak_conns;
 
   bool ready_for_press = false;
   size_t total, user, free;
@@ -393,42 +414,37 @@ private:
   void print_applet_line(int slot) {
     int y = 15 + 10 * slot;
     if (IsStereo(slot)) {
-      int xs[] = {32, 0, 64};
+      const char* name = get_stereo_applet(slot).applet_name();
+      const int l = strlen(name);
+      int xs[] = {64 - l * 3, 63 - l * 6, 64 };
       int x = xs[edit_state];
       gfxPrint(x, y, get_stereo_applet(slot).applet_name());
-      if (left_cursor == slot && edit_state != EDIT_RIGHT)
-        gfxCursor(edit_state == EDIT_LEFT, x, y + 8, 63);
-      if (right_cursor == slot && edit_state != EDIT_RIGHT)
-        gfxCursor(edit_state == EDIT_RIGHT, x, y + 8, 63);
     } else {
       if (edit_state != EDIT_RIGHT) {
-        gfxPrint(0, y, get_mono_applet(LEFT_HEMISPHERE, slot).applet_name());
-        if (left_cursor == slot)
-          gfxCursor(edit_state == EDIT_LEFT, 0, y + 8, 63);
+        gfxPrint(8, y, get_mono_applet(LEFT_HEMISPHERE, slot).applet_name());
       }
       if (edit_state != EDIT_LEFT) {
-        gfxPrint(64, y, get_mono_applet(RIGHT_HEMISPHERE, slot).applet_name());
-        if (right_cursor == slot)
-          gfxCursor(edit_state == EDIT_RIGHT, 64, y + 8, 63);
+        const char* name
+          = get_mono_applet(RIGHT_HEMISPHERE, slot).applet_name();
+        int l = strlen(name);
+        gfxPrint(118 - l * 6, y, name);
       }
     }
   }
 
-  void gfxCursor(bool isEditing, int x, int y, int w, int h = 9) {
-    if (isEditing) {
-      gfxInvert(x, y - h, w, h);
-    } else if (CursorBlink()) {
-      gfxLine(x, y, x + w - 1, y);
-      gfxPixel(x, y - 1);
-      gfxPixel(x + w - 1, y - 1);
+  int peak_width(HEM_SIDE side, int slot) {
+    AudioAnalyzePeak& p = peaks[side][slot];
+    if (p.available()) {
+      float db = scalarToDb(p.read());
+      if (db < -48.0f) db = -48.0f;
+      return ((db + 48.0f) / 48.0f) * 64;
+    } else {
+      return 0;
     }
   }
-
-  bool CursorBlink() {
-    return (cursor_countdown > 0);
-  }
-
-  void ResetCursor() {
-    cursor_countdown = HSAPPLICATION_CURSOR_TICKS;
+  void draw_peak(HEM_SIDE side, int slot, int y = -1) {
+    int w = peak_width(side, slot);
+    if (y < 0) y = slot * 10 + 13;
+    gfxInvert(side ? 64 : 64 - w, y, w, 1);
   }
 };

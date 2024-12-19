@@ -68,17 +68,22 @@ inline float dbToScalar(float db) {
   return fastexp(2.302585092994046f * 0.05f * db);
 }
 
+inline float scalarToDb(float scalar) {
+  // log10(x) = log(x) / log(10)
+  return 20.0f * 0.43429448190325176f * fastlog(scalar);
+}
+
 // Coefficients to use when equally mixing n sources for equal power
 static const float EQUAL_POWER_EQUAL_MIX[]{
   1.0f,
   1.0f,
   0.7071067811865475f,
-  0.5773502691896258,
-  0.5,
-  0.4472135954999579,
-  0.4082482904638631,
-  0.3779644730092272,
-  0.353553390593273731
+  0.5773502691896258f,
+  0.5f,
+  0.4472135954999579f,
+  0.4082482904638631f,
+  0.3779644730092272f,
+  0.353553390593273731f
 };
 
 // From https://signalsmith-audio.co.uk/writing/2021/cheap-energy-crossfade/
