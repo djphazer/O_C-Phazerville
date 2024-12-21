@@ -2,6 +2,7 @@
 
 #include "AudioAppletSubapp.h"
 #include "audio_applets/DelayApplet.h"
+#include "audio_applets/DynamicsApplet.h"
 #include "audio_applets/FilterFolderApplet.h"
 #include "audio_applets/InputApplet.h"
 #include "audio_applets/LadderApplet.h"
@@ -10,7 +11,6 @@
 #include "audio_applets/UpsampledApplet.h"
 #include "audio_applets/VCAApplet.h"
 #include "audio_applets/WAVPlayerApplet.h"
-// #include "audio_applets/DynamicsApplet.h"
 
 const size_t NUM_SLOTS = 5;
 
@@ -21,6 +21,7 @@ DMAMEM std::
     stereo_input_pool;
 DMAMEM std::tuple<
   PassthruApplet<MONO>,
+  DynamicsApplet<MONO>,
   InputApplet<MONO>,
   OscApplet,
   DelayApplet<MONO>,
@@ -31,14 +32,14 @@ DMAMEM std::tuple<
   mono_processors_pool[2][NUM_SLOTS - 1];
 DMAMEM std::tuple<
   PassthruApplet<STEREO>,
+  DynamicsApplet<STEREO>,
   InputApplet<STEREO>,
   DelayApplet<STEREO>,
   LadderApplet<STEREO>,
   VcaApplet<STEREO>,
   FilterFolderApplet<STEREO>,
   WavPlayerApplet<STEREO>,
-  UpsampledApplet<STEREO>
-  >
+  UpsampledApplet<STEREO>>
   stereo_processors_pool[NUM_SLOTS - 1];
 
 // Helper to extract the tuple type from an array... thanks ChatGPT...

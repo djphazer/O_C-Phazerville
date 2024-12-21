@@ -1,8 +1,6 @@
 #include "HemisphereAudioApplet.h"
 #include "../Audio/effect_dynamics.h"
 
-using OC::AudioIO::complimit;
-
 template <AudioChannels Channels>
 class DynamicsApplet : public HemisphereAudioApplet {
 public:
@@ -23,13 +21,11 @@ public:
 
   void Start() {
     for (int i = 0; i < Channels; i++) {
-      in_conns[i].connect(input, i, output, i);
 
-      //in_conns[i].connect(input, i, complimit[i], 0);
-      //out_conns[i].connect(complimit[i], 0, output, i);
+      in_conns[i].connect(input, i, complimit[i], 0);
+      out_conns[i].connect(complimit[i], 0, output, i);
 
-      //SetParams();
-      //GetParams();
+      SetParams();
     }
   }
 
@@ -70,7 +66,7 @@ public:
     gfxEndCursor(cursor == LIMIT_THRESH);
 
     gfxPrint(label_x, 45, "MakeUp:");
-    gfxStartCursor();
+    gfxStartCursor(label_x, 55);
     if (makeupgain < 0)
       gfxPrint("auto");
     else
@@ -138,7 +134,7 @@ private:
 
   AudioPassthrough<Channels> input;
   std::array<AudioConnection, Channels> in_conns;
-  //std::array<AudioEffectDynamics, Channels> complimit;
+  std::array<AudioEffectDynamics, Channels> complimit;
   std::array<AudioConnection, Channels> out_conns;
   AudioPassthrough<Channels> output;
 
