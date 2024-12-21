@@ -1,4 +1,3 @@
-#pragma once
 #ifdef ARDUINO_TEENSY41
 
   #include "AudioIO.h"

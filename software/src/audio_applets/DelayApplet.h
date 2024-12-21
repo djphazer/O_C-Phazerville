@@ -21,9 +21,9 @@ public:
     if (Channels == STEREO) {
       ForEachChannel(ch) {
         ping_pong_conns[ch].connect(
-          channels[ch].taps_mixer, 0, channels[1 - ch].input_mixer, 1
+          channels[ch].taps_mixer, 0, channels[1 - ch].input_mixer, PP_CH
         );
-        channels[1 - ch].input_mixer.gain(1, 0.0f);
+        channels[1 - ch].input_mixer.gain(PP_CH, 0.0f);
       }
     }
     set_taps(taps);
@@ -73,8 +73,12 @@ public:
       }
     }
 
-    const float total_feedback
-      = (0.01f * feedback + feedback_cv.InF()) * EQUAL_POWER_EQUAL_MIX[taps];
+    const float total_feedback = (0.01f * feedback + feedback_cv.InF());
+    // I'm not totally sure why equal amplitude feedback is necessary, but equal
+    // power was resulting in divergence when the feedback setting would pass
+    // the equal power coefficient. Thus, need equal amplitude instead.
+    float fb = constrain(total_feedback, 0.0, 2.0f) / taps;
+
     for (auto& ch : channels) {
       if (frozen) {
         ch.input_mixer.gain(0, 0.0f);
@@ -84,7 +88,6 @@ public:
         }
       } else {
         ch.input_mixer.gain(0, 1.0f);
-        float fb = constrain(total_feedback, 0.0, 2.0f);
         for (int tap = 0; tap < 9; tap++) {
           ch.delay.feedback(tap, tap < taps ? fb : 0.0f);
         }
@@ -93,7 +96,9 @@ public:
 
     if (Channels == STEREO) {
       for (auto& ch : channels) {
-        ch.input_mixer.gain(1, constrain(-total_feedback, 0.0f, 2.0f));
+        // The tap mixer has already used equal power mixing on the taps so no
+        // need to do it here.
+        ch.input_mixer.gain(PP_CH, constrain(-total_feedback, 0.0f, 2.0f));
       }
     }
     float dry_gain, wet_gain;
@@ -326,6 +331,7 @@ protected:
     for (auto& ch : channels) {
       for (int i = 0; i < taps; i++) ch.taps_mixer.gain(i, tap_gain);
       for (int i = taps; i < 8; i++) ch.taps_mixer.gain(i, 0.0f);
+      ch.delay.taps(taps);
     }
   }
 
@@ -403,6 +409,8 @@ private:
   static const uint8_t WD_DRY_CH = 0;
   static const uint8_t WD_WET_CH = 1;
 
+  static const uint8_t PP_CH = 1;
+
   // Uses 1MB of psram and gives just under 12 secs of delay time.
   static const size_t DELAY_LENGTH = 1024 * 512;
   static constexpr float MAX_DELAY_SECS = DELAY_LENGTH / AUDIO_SAMPLE_RATE;
@@ -420,6 +428,7 @@ private:
 
     AudioConnection input_to_mixer;
     AudioConnection taps_conns[8];
+    AudioConnection tap_mixer_to_mixer;
     AudioConnection dry_conn;
     AudioConnection mix_to_output;
 
@@ -430,6 +439,7 @@ private:
       for (int i = 0; i < 8; i++) {
         taps_conns[i].connect(delay, i, taps_mixer, i);
       }
+
       dry_conn.connect(input, channel, wet_dry_mixer, WD_DRY_CH);
       mix_to_output.connect(wet_dry_mixer, 0, output, channel);
     }

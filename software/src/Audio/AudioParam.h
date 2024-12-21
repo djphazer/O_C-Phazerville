@@ -1,16 +1,21 @@
 #pragma once
 
-#include <Audio.h>
 #include "dsputils.h"
+#include <Audio.h>
 
-template <typename T> class AudioParam {
+template <typename T>
+class AudioParam {
 public:
   AudioParam() : AudioParam(T()) {}
 
   AudioParam(T v, float lpf_coeff = 1.0f)
-      : value(v), prev(v), lpf(v), inc(0), lpf_coeff(lpf_coeff) {}
+    : value(v)
+    , prev(v)
+    , lpf(v)
+    , inc(0)
+    , lpf_coeff(lpf_coeff) {}
 
-  AudioParam &operator=(const T &newValue) {
+  AudioParam& operator=(const T& newValue) {
     value = newValue;
     inc = (value - prev) / AUDIO_BLOCK_SAMPLES;
     return *this;
@@ -28,7 +33,9 @@ public:
     return lpf;
   }
 
-  T Read() { return lpf; }
+  T Read() {
+    return lpf;
+  }
 
   void Reset() {
     inc = 0;
@@ -43,31 +50,42 @@ private:
   float lpf_coeff;
 };
 
-template <typename T> class Param {
+template <typename T>
+class Param {
 public:
   Param() : Param(0.0f) {}
   Param(T value) : value(value) {}
-  inline T ReadNext() { return value; }
-  inline T Read() { return value; }
-  inline Param &operator=(const T &newValue) {
+  inline T ReadNext() {
+    return value;
+  }
+  inline T Read() {
+    return value;
+  }
+  inline Param& operator=(const T& newValue) {
     value = newValue;
     return *this;
   }
   inline void Reset() {}
+  inline bool Done() {
+    return true;
+  }
 
 private:
   T value;
 };
 
-template <typename P> class OnePole {
+template <typename P>
+class OnePole {
 public:
   OnePole() : OnePole(P(), 1.0f) {}
 
   OnePole(float value, float coeff) : OnePole(Param(value), coeff) {}
 
   OnePole(P param, float coeff)
-      : param(param), coeff(coeff), lp_value(param.Read()) {}
-  inline OnePole &operator=(float new_value) {
+    : param(param)
+    , coeff(coeff)
+    , lp_value(param.Read()) {}
+  inline OnePole& operator=(float new_value) {
     param = new_value;
     return *this;
   }
@@ -82,7 +100,13 @@ public:
     lp_value = param.Read();
   }
 
-  inline float Read() { return param.Read(); }
+  inline float Read() {
+    return param.Read();
+  }
+
+  inline bool Done() {
+    return lp_value == Read() && param.Done();
+  }
 
 private:
   P param;
@@ -95,9 +119,12 @@ public:
   Interpolated() : Interpolated(0, 1) {}
 
   Interpolated(float value, size_t steps)
-      : value(value), target(value), steps(steps), inc(0) {}
+    : value(value)
+    , target(value)
+    , steps(steps)
+    , inc(0) {}
 
-  inline Interpolated &operator=(float new_value) {
+  inline Interpolated& operator=(float new_value) {
     target = new_value;
     inc = (target - value) / steps;
     return *this;
@@ -114,9 +141,17 @@ public:
     return value;
   }
 
-  inline float Read() { return value; }
+  inline float Read() {
+    return value;
+  }
 
-  inline void Reset() { value = target; }
+  inline void Reset() {
+    value = target;
+  }
+
+  inline bool Done() {
+    return value == target;
+  }
 
 private:
   float value;
@@ -137,10 +172,8 @@ struct NoiseSuppressor {
   float Process(float new_val) {
     float d = new_val - value;
     if (abs(d) < noise_floor) {
-      if (settle_count < settle_threshold)
-        settle_count++;
-      else
-        d = 0;
+      if (settle_count < settle_threshold) settle_count++;
+      else d = 0;
     } else {
       settle_count = 0;
     }

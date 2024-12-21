@@ -1,8 +1,8 @@
 #pragma once
 
+#include "dsputils.h"
 #include <Audio.h>
 #include <smalloc.h>
-#include "dsputils.h"
 
 // TODO: this should be backed by an ordinary ring buffer. I don't think the
 // std::copy helps performance much, so extracting and simplifying the ring
@@ -45,6 +45,21 @@ public:
     // Above code takes care of wrapping, so no need to do it here.
   }
 
+  void Write(const T* data, size_t size) {
+    size_t copied = 0;
+    // Just in case we're writing more data than we have, loop here instead of
+    // just if... We could precalculate exactly what would be written in that
+    // case but meh.
+    while (size - copied + write_ix > NumSamples) {
+      std::copy_n(data + copied, NumSamples - write_ix, buffer + write_ix);
+      copied += NumSamples - write_ix;
+      write_ix = 0;
+    }
+    std::copy_n(data + copied, size - copied, buffer + write_ix);
+    write_ix += size - copied;
+    // Above code takes care of wrapping, so no need to do it here.
+  }
+
   template <size_t N = AUDIO_BLOCK_SAMPLES>
   void ReadFromSecondsAgo(float seconds_ago, T (&data)[N]) {
     ReadFromSamplesAgo(
@@ -76,10 +91,29 @@ public:
     std::copy_n(buffer + read_ix, N - read, data + read);
   }
 
+  void ReadFromSecondsAgo(float seconds_ago, T* data, size_t size) {
+    ReadFromSamplesAgo(
+      static_cast<size_t>(seconds_ago * AUDIO_SAMPLE_RATE), data, size
+    );
+  }
+
+  void ReadFromSamplesAgo(size_t samples_back, T* data, size_t size) {
+    // TODO: This can read past the write head. It should stop reading at the
+    // write head instead and return the number of samples read.
+    size_t read = 0;
+    size_t read_ix = (write_ix - samples_back + NumSamples) % NumSamples;
+    while (size - read + read_ix > NumSamples) {
+      std::copy_n(buffer + read_ix, NumSamples - read_ix, data + read);
+      read += NumSamples - read_ix;
+      read_ix = 0;
+    }
+    std::copy_n(buffer + read_ix, size - read, data + read);
+  }
+
   // TODO:: This is prett innefficient for reading sequences. We should read
   // based on an array of ts instead, reducing dup reads and calcs
-  float ReadInterp(float seconds_ago) {
-    float samples_back = seconds_ago * AUDIO_SAMPLE_RATE;
+  float ReadInterp(float samples_back) {
+    // float samples_back = seconds_ago * AUDIO_SAMPLE_RATE;
     size_t samples_back_int = static_cast<size_t>(samples_back);
     // Need point from before target point and we're between samples_back_int
     // and +1, so + 2
