@@ -1,4 +1,4 @@
-/* Copyright (c) 2023 Nicholas J. Michalek
+/* Copyright (c) 2023-2024 Nicholas J. Michalek & Beau Sterling
  *
  * IOFrame & friends
  *   attempts at making applet I/O more flexible and portable
@@ -9,13 +9,14 @@
 
 #pragma once
 
+#include <vector>
 #include "HSMIDI.h"
 
 #ifdef ARDUINO_TEENSY41
 namespace OC {
-  namespace AudioDSP {
-    extern void Process(const int *values);
-  }
+    namespace AudioDSP {
+        extern void Process(const int *values);
+    }
 }
 #endif
 
@@ -50,6 +51,11 @@ typedef struct IOFrame {
     bool changed_cv[ADC_CHANNEL_LAST]; // Has the input changed by more than 1/8 semitone since the last read?
     int last_cv[ADC_CHANNEL_LAST]; // For change detection
 
+    struct midi_note_data {
+        int note; // data1 = MIDI note number
+        int vel; // data2 = MIDI note velocity
+    };
+
     /* MIDI message queue/cache */
     struct {
         int channel[ADC_CHANNEL_LAST]; // MIDI channel number
@@ -58,9 +64,40 @@ typedef struct IOFrame {
         uint16_t semitone_mask[ADC_CHANNEL_LAST]; // which notes are currently on
 
         // MIDI input stuff handled by MIDIIn applet
-        int8_t notes_on[16]; // attempts to track how many notes are on, per MIDI channel
+        std::vector<midi_note_data> note_buffer[16]; // note buffer for polyphonic input. one for each midi channel
         int outputs[DAC_CHANNEL_LAST]; // translated CV values
         bool trigout_q[DAC_CHANNEL_LAST];
+
+        void RemoveNoteData(std::vector<midi_note_data> &buffer, int note) {
+            buffer.erase(
+                std::remove_if(buffer.begin(), buffer.end(), [&](midi_note_data const &data) {
+                    return data.note == note;
+                }),
+                buffer.end()
+            );
+        }
+
+        void NoteStackPush(const int midi_chan, const int data1, const int data2) {
+            int c = midi_chan - 1;
+            uint8_t note = (uint8_t)data1;
+            uint8_t vel = (uint8_t)data2;
+            RemoveNoteData(note_buffer[c], note); // if new note is already in buffer, promote to latest and update velocity
+            note_buffer[c].push_back({note, vel}); // else just append to the end
+        }
+
+        void NoteStackPop(const int midi_chan, const int data1) {
+            int c = midi_chan - 1;
+            uint8_t note = (uint8_t)data1;
+            RemoveNoteData(note_buffer[c], note);
+            if (note_buffer[c].size() == 0) note_buffer[c].shrink_to_fit(); // free up memory when MIDI is not used
+        }
+
+        void NoteStackClear() {
+            for (int c = 0; c < 16; ++c) {
+                note_buffer[c].clear();
+                note_buffer[c].shrink_to_fit();
+            }
+        }
 
         // Clock/Start/Stop are handled by ClockSetup applet
         bool clock_run = 0;
@@ -72,29 +109,29 @@ typedef struct IOFrame {
 
         // MIDI output stuff
         int outchan[DAC_CHANNEL_LAST] = {
-          0, 0, 1, 1,
+            0, 0, 1, 1,
 #ifdef ARDUINO_TEENSY41
-          2, 2, 3, 3,
+            2, 2, 3, 3,
 #endif
         };
         int outchan_last[DAC_CHANNEL_LAST] = {
-          0, 0, 1, 1,
+            0, 0, 1, 1,
 #ifdef ARDUINO_TEENSY41
-          2, 2, 3, 3,
+            2, 2, 3, 3,
 #endif
         };
         int outfn[DAC_CHANNEL_LAST] = {
-          HEM_MIDI_NOTE_OUT, HEM_MIDI_GATE_OUT,
-          HEM_MIDI_NOTE_OUT, HEM_MIDI_GATE_OUT,
+            HEM_MIDI_NOTE_OUT, HEM_MIDI_GATE_OUT,
+            HEM_MIDI_NOTE_OUT, HEM_MIDI_GATE_OUT,
 #ifdef ARDUINO_TEENSY41
-          HEM_MIDI_NOTE_OUT, HEM_MIDI_GATE_OUT,
-          HEM_MIDI_NOTE_OUT, HEM_MIDI_GATE_OUT,
+            HEM_MIDI_NOTE_OUT, HEM_MIDI_GATE_OUT,
+            HEM_MIDI_NOTE_OUT, HEM_MIDI_GATE_OUT,
 #endif
         };
         uint8_t outccnum[DAC_CHANNEL_LAST] = {
-          1, 1, 1, 1,
+            1, 1, 1, 1,
 #ifdef ARDUINO_TEENSY41
-          5, 6, 7, 8,
+            5, 6, 7, 8,
 #endif
         };
         uint8_t current_note[16]; // note number, per MIDI channel
@@ -121,6 +158,7 @@ typedef struct IOFrame {
             }
             last_msg_tick = OC::CORE::ticks;
         }
+
         void ProcessMIDIMsg(const int midi_chan, const int message, const int data1, const int data2) {
             switch (message) {
             case usbMIDI.Clock:
@@ -158,18 +196,21 @@ typedef struct IOFrame {
                 stop_q = 1;
                 clock_run = false;
                 // a way to reset stuck notes
-                for (int i = 0; i < 16; ++i) notes_on[i] = 0;
+                NoteStackClear();
                 return;
                 break;
 
             case usbMIDI.NoteOn:
-                ++notes_on[midi_chan - 1];
+                NoteStackPush(midi_chan, data1, data2);
                 break;
             case usbMIDI.NoteOff:
-                --notes_on[midi_chan - 1];
+                NoteStackPop(midi_chan, data1);
                 break;
 
             }
+
+            bool log_skip = false;
+            int m_ch_prev = -1;
 
             for(int ch = 0; ch < ADC_CHANNEL_LAST; ++ch)
             {
@@ -177,6 +218,12 @@ typedef struct IOFrame {
 
                 // skip unwanted MIDI Channels
                 if (midi_chan - 1 != channel[ch]) continue;
+                int m_ch = midi_chan - 1;
+
+                // prevent duplicate log entries
+                if (m_ch == m_ch_prev) log_skip = true;
+                else log_skip = false;
+                m_ch_prev = m_ch;
 
                 bool log_this = false;
 
@@ -186,7 +233,7 @@ typedef struct IOFrame {
 
                     // Should this message go out on this channel?
                     if (function[ch] == HEM_MIDI_NOTE_OUT)
-                        outputs[ch] = MIDIQuantizer::CV(data1);
+                        outputs[ch] = MIDIQuantizer::CV(note_buffer[m_ch].back().note);
 
                     if (function[ch] == HEM_MIDI_TRIG_OUT)
                         trigout_q[ch] = 1;
@@ -195,23 +242,34 @@ typedef struct IOFrame {
                         outputs[ch] = PULSE_VOLTAGE * (12 << 7);
 
                     if (function[ch] == HEM_MIDI_VEL_OUT)
-                        outputs[ch] = Proportion(data2, 127, HEMISPHERE_MAX_CV);
+                        outputs[ch] = Proportion(note_buffer[m_ch].back().vel, 127, HEMISPHERE_MAX_CV);
 
-                    log_this = 1; // Log all MIDI notes. Other stuff is conditional.
+                    // TODO: don't print duplicate note-on messages for ADC channels mapped to the same midi channel
+                    if (!log_skip) log_this = 1; // Log all MIDI notes. Other stuff is conditional.
                     break;
 
                 case usbMIDI.NoteOff:
                     semitone_mask[ch] = semitone_mask[ch] & ~(1u << (data1 % 12));
 
+                    if (function[ch] == HEM_MIDI_NOTE_OUT)
+                        if (note_buffer[m_ch].size() > 0) // don't update output when last note is released
+                            outputs[ch] = MIDIQuantizer::CV(note_buffer[m_ch].back().note);
+
                     // turn gate off only when all notes are off
-                    if (notes_on[midi_chan - 1] <= 0)
-                    {
-                        notes_on[midi_chan - 1] = 0; // just in case it becomes negative...
+                    if (!(note_buffer[m_ch].size() > 0)) {
                         if (function[ch] == HEM_MIDI_GATE_OUT) {
                             outputs[ch] = 0;
-                            log_this = 1;
                         }
+                    } else {
+                        // TODO: create option to toggle note on / off retrig
+                        // if (function[ch] == HEM_MIDI_TRIG_OUT)
+                        //     trigout_q[ch] = 1;
                     }
+
+                    if (function[ch] == HEM_MIDI_VEL_OUT)
+                        outputs[ch] = (note_buffer[m_ch].size() > 0) ? Proportion(note_buffer[m_ch].back().vel, 127, HEMISPHERE_MAX_CV) : 0;
+
+                    if (!log_skip) log_this = 1;
                     break;
 
                 case usbMIDI.ControlChange: // Modulation wheel or other CC
@@ -220,7 +278,7 @@ typedef struct IOFrame {
 
                         if (function_cc[ch] == data1) {
                             outputs[ch] = Proportion(data2, 127, HEMISPHERE_MAX_CV);
-                            log_this = 1;
+                            if (!log_skip) log_this = 1;
                         }
                     }
                     break;
@@ -229,7 +287,7 @@ typedef struct IOFrame {
                 case usbMIDI.AfterTouchChannel:
                     if (function[ch] == HEM_MIDI_AT_OUT) {
                         outputs[ch] = Proportion(data1, 127, HEMISPHERE_MAX_CV);
-                        log_this = 1;
+                        if (!log_skip) log_this = 1;
                     }
                     break;
 
@@ -237,7 +295,7 @@ typedef struct IOFrame {
                     if (function[ch] == HEM_MIDI_PB_OUT) {
                         int data = (data2 << 7) + data1 - 8192;
                         outputs[ch] = Proportion(data, 8192, HEMISPHERE_3V_CV);
-                        log_this = 1;
+                        if (!log_skip) log_this = 1;
                     }
                     break;
 

@@ -53,6 +53,7 @@ public:
 
         frame.MIDIState.log_index = 0;
         frame.MIDIState.clock_count = 0;
+        frame.MIDIState.NoteStackClear();
     }
 
     void Controller() {
@@ -110,7 +111,7 @@ public:
         }
         ResetCursor();
     }
-        
+
     uint64_t OnDataRequest() {
         uint64_t data = 0;
         Pack(data, PackLocation {0,4}, frame.MIDIState.channel[io_offset + 0]);
@@ -148,7 +149,7 @@ protected:
 private:
     // Housekeeping
     int cursor; // 0=MIDI channel, 1=A/C function, 2=B/D function
-    
+
     void DrawMonitor() {
         if (OC::CORE::ticks - frame.MIDIState.last_msg_tick < 4000) {
             gfxBitmap(46, 1, 8, MIDI_ICON);
@@ -157,7 +158,7 @@ private:
 
     void DrawSelector() {
         // MIDI Channels
-        
+
         char out_label[] = { 'C', 'h', (char)('A' + io_offset), ':', '\0'  };
         gfxPrint(1, 15, out_label);
         gfxPrint(24, 15, frame.MIDIState.channel[io_offset + 0] + 1);
