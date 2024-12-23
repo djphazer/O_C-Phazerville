@@ -15,26 +15,31 @@
 
 
 #define HEMISPHERE_APPLETS { \
+    DECLARE_APPLET( 34, 0x01, ADEG), \
     DECLARE_APPLET( 47, 0x09, ASR), \
     DECLARE_APPLET( 56, 0x10, AttenuateOffset), \
     DECLARE_APPLET( 41, 0x41, Binary), \
     DECLARE_APPLET( 55, 0x80, BootsNCat), \
     DECLARE_APPLET( 51, 0x80, BugCrack), \
     DECLARE_APPLET( 31, 0x04, Burst), \
+    DECLARE_APPLET( 65, 0x10, Button), \
     DECLARE_APPLET( 12, 0x10, Calculate), \
     DECLARE_APPLET(  6, 0x04, ClockDivider), \
     DECLARE_APPLET( 28, 0x04, ClockSkip), \
     DECLARE_APPLET( 30, 0x10, Compare), \
     DECLARE_APPLET(  9, 0x08, DualQuant), \
     DECLARE_APPLET( 18, 0x02, DualTM), \
+    DECLARE_APPLET(  7, 0x01, EbbAndLfo), \
     DECLARE_APPLET( 42, 0x11, EnvFollow), \
     DECLARE_APPLET( 15, 0x02, EuclidX), \
     DECLARE_APPLET( 10, 0x44, Logic), \
+    DECLARE_APPLET( 50, 0x04, Metronome), \
     DECLARE_APPLET( 73, 0x08, MultiScale), \
     DECLARE_APPLET( 71, 0x02, Pigeons), \
     DECLARE_APPLET( 59, 0x04, ProbabilityDivider), \
     DECLARE_APPLET( 62, 0x04, ProbabilityMelody), \
     DECLARE_APPLET (65, 0x01, Relabi), \
+    DECLARE_APPLET( 70, 0x14, ResetClock), \
     DECLARE_APPLET( 69, 0x01, RndWalk), \
     DECLARE_APPLET( 44, 0x01, RunglBook), \
     DECLARE_APPLET( 40, 0x40, Schmitt), \
@@ -43,6 +48,7 @@
     DECLARE_APPLET( 48, 0x45, ShiftGate), \
     DECLARE_APPLET( 19, 0x01, Slew), \
     DECLARE_APPLET( 61, 0x01, Stairs), \
+    DECLARE_APPLET(  3, 0x10, Switch), \
     DECLARE_APPLET( 13, 0x40, TLNeuron), \
     DECLARE_APPLET( 39, 0x80, Tuner), \
     DECLARE_APPLET( 43, 0x10, Voltage), \
