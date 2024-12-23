@@ -21,12 +21,18 @@ public:
 
   void Start() {
     for (int i = 0; i < Channels; i++) {
+      complimit[i].Acquire();
 
       in_conns[i].connect(input, i, complimit[i], 0);
       out_conns[i].connect(complimit[i], 0, output, i);
 
       SetParams();
     }
+  }
+
+  void Unload() {
+    for (auto& cl : complimit) cl.Release();
+    AllowRestart();
   }
 
   void SetParams() {

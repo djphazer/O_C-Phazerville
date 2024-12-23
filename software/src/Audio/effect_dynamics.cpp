@@ -124,6 +124,9 @@ inline float dbToUnit(float db) {
 }
 
 void AudioEffectDynamics::update(void) {
+  if (!samplesSquared) {
+    return;
+  }
 
 	audio_block_t *block;
 
