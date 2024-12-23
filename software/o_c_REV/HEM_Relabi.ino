@@ -1,4 +1,10 @@
+// Copyright (c) 2024, Samuel Burt
+// Relabi code by Samuel Burt based on a concept by John Berndt.
+//
 // Copyright (c) 2018, Jason Justian
+// Jason Justian created the original Ornament & Crime Hemisphere applets.
+// This code is built on his initial work and from an app template. 
+// 
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
