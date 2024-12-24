@@ -61,7 +61,7 @@ public:
         break;
     }
     for (int tap = 0; tap < taps; tap++) {
-      float t = d * (tap + 1.0f) / taps;
+      float t = d * static_cast<float>(taps - tap) / taps;
       CONSTRAIN(d, 0.0f, MAX_DELAY_SECS);
       switch (delay_mod_type) {
         case CROSSFADE:
