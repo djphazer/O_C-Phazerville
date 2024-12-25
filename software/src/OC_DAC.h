@@ -10,6 +10,9 @@
 #include "OC_gpio.h"
 #include "util/util_math.h"
 #include "util/util_macros.h"
+#if defined(__IMXRT1062__)
+#include <SPI.h>
+#endif
 
 #if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
 static inline void dac8568_raw_write(uint32_t data) {

@@ -97,17 +97,16 @@ public:
   static void reInit() { Init(); }
   static void Scan();
 
-  // @return mask of all pins clocked since last Scan()
-  static inline uint32_t clocked() {
-    return clocked_mask_;
+  // @return mask of all pins cloked since last call
+  static inline uint32_t rising_edges() {
+    return rising_edges_;
   }
-  // @return mask if pin clocked since last Scan()
-  template <DigitalInput input> static inline uint32_t clocked() {
-    return clocked(input);
+
+  // @return mask of all pins that are raised (at last Scan)
+  static inline uint32_t raised_mask() {
+    return raised_mask_;
   }
-  static inline uint32_t clocked(DigitalInput input) {
-    return clocked_mask_ & (0x1 << input);
-  }
+
   template <DigitalInput input> static inline bool read_immediate() {
     return read_immediate(input);
   }
@@ -127,7 +126,8 @@ public:
     return false;
   }
 private:
-  static uint8_t clocked_mask_;
+  static uint32_t rising_edges_;
+  static uint32_t raised_mask_;
   static IMXRT_GPIO_t *port[DIGITAL_INPUT_LAST];
   static uint32_t bitmask[DIGITAL_INPUT_LAST];
 };
