@@ -92,7 +92,8 @@ void OC::DigitalInputs::Scan()
 #endif // Teensy 3.2
 
 #if defined(__IMXRT1062__) // Teensy 4.0 or 4.1
-uint8_t OC::DigitalInputs::clocked_mask_;
+uint32_t OC::DigitalInputs::rising_edges_;
+uint32_t OC::DigitalInputs::raised_mask_;
 IMXRT_GPIO_t * OC::DigitalInputs::port[DIGITAL_INPUT_LAST];
 uint32_t  OC::DigitalInputs::bitmask[DIGITAL_INPUT_LAST];
 
@@ -143,7 +144,7 @@ void OC::DigitalInputs::Scan() {
   mask[3] = port[3]->ISR & bitmask[3];
   port[3]->ISR = mask[3];
   interrupts();
-  uint8_t new_clocked_mask = 0;
+  uint32_t new_clocked_mask = 0;
   if (mask[0]) new_clocked_mask |= 0x01;
   if (mask[1]) new_clocked_mask |= 0x02;
   if (mask[2]) new_clocked_mask |= 0x04;
@@ -156,14 +157,6 @@ void OC::DigitalInputs::Scan() {
   if (read_immediate<DIGITAL_INPUT_3>()) raised_mask |= DIGITAL_INPUT_3_MASK;
   if (read_immediate<DIGITAL_INPUT_4>()) raised_mask |= DIGITAL_INPUT_4_MASK;
   raised_mask_ = raised_mask;
-
-  #if 0
-  if (clocked_mask_) {
-    static elapsedMicros usec;
-    Serial.printf("%u  %u\n", clocked_mask_, (int)usec);
-    usec = 0;
-  }
-  #endif
 }
 
 #endif // Teensy 4.0 or 4.1
