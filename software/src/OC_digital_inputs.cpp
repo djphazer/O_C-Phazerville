@@ -33,7 +33,7 @@ void FASTRUN OC::tr4_ISR() {
 /*static*/
 void OC::DigitalInputs::Init() {
 
-  static constexpr struct {
+  static const struct {
     uint8_t pin;
     void (*isr_fn)();
   } pins[DIGITAL_INPUT_LAST] =  {

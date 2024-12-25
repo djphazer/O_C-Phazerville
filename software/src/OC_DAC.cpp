@@ -60,7 +60,6 @@ void DAC::Init(const CalibrationData *calibration_data, const AutotuneCalibratio
   calibration_data_ = calibration_data;
   autotune_calibration_data_ = autotune_calibration_data;
 
-  restore_scaling(0x0);
   if (flip180) {
 #if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
     DAC_CHANNEL_A=7, DAC_CHANNEL_B=6, DAC_CHANNEL_C=5, DAC_CHANNEL_D=4;
