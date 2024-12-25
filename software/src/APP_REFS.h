@@ -35,11 +35,7 @@
 static constexpr int32_t kMaxOffsetError = (65536 / 5);
 static constexpr double kAaboveMidCtoC0 = 0.03716272234383494188492;
 
-#ifdef FLIP_180
-static constexpr DAC_CHANNEL DAC_CHANNEL_FTM = DAC_CHANNEL_A;
-#else
-static constexpr DAC_CHANNEL DAC_CHANNEL_FTM = DAC_CHANNEL_D;
-#endif
+static DAC_CHANNEL &DAC_CHANNEL_FTM = DAC_CHANNEL_D;
 
 enum ReferenceSetting {
   REF_SETTING_OCTAVE,

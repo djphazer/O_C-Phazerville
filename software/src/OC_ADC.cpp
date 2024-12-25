@@ -144,7 +144,7 @@ static PROGMEM const uint8_t adc2_pin_to_channel[] = {
 #endif  
 }
 
-#ifdef OC_ADC_ENABLE_DMA_INTERRUPT
+#if defined(__MK20DX256__) && defined(OC_ADC_ENABLE_DMA_INTERRUPT)
 /*static*/ void FASTRUN ADC::DMA_ISR() {
 
   ADC::ready_ = true;
@@ -153,8 +153,6 @@ static PROGMEM const uint8_t adc2_pin_to_channel[] = {
   /* restart DMA in ADC::Scan_DMA() */
 }
 #endif
-
-#endif // __IMXRT1062__
 
 /*
  * 

@@ -163,6 +163,7 @@ void setup() {
   SERIAL_PRINTLN("* %s", OC::Strings::VERSION);
 
   OC::DEBUG::Init();
+  OC::DigitalInputs::Init();
 
 #if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
   if (DAC8568_Uses_SPI) {
@@ -188,11 +189,10 @@ void setup() {
   Wire.begin();
   Wire.setClock(100000);
 #endif
-  OC::DigitalInputs::Init();
 
   OC::ADC::Init(&OC::calibration_data.adc, OC::calibration_data.flipcontrols());
   OC::ADC::Init_DMA();
-  OC::DAC::Init(&OC::calibration_data.dac, OC::calibration_data.flipcontrols());
+  OC::DAC::Init(&OC::calibration_data.dac, &OC::global_settings.autotune_calibration_data, OC::calibration_data.flipcontrols());
 
   display::AdjustOffset(OC::calibration_data.display_offset);
   display::SetFlipMode( OC::calibration_data.flipscreen() );

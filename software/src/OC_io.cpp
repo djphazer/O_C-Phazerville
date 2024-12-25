@@ -77,7 +77,7 @@ void InputDesc::set_printf(const char *fmt, ...)
   }
 }
 
-template <DAC_CHANNEL channel>
+template <DAC_CHANNEL &channel>
 static void IOFrameToChannel(const IOFrame *ioframe, const IOSettings *io_settings) 
 {
   DEBUG_PIN_SCOPE(OC_GPIO_DEBUG_PIN1);
