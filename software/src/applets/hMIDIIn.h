@@ -113,24 +113,30 @@ public:
     }
 
     uint64_t OnDataRequest() {
-        uint64_t data = 0;
-        Pack(data, PackLocation {0,4}, frame.MIDIState.channel[io_offset + 0]);
-        Pack(data, PackLocation {4,4}, frame.MIDIState.channel[io_offset + 1]);
-        Pack(data, PackLocation {8,3}, frame.MIDIState.function[io_offset + 0]);
-        Pack(data, PackLocation {11,3}, frame.MIDIState.function[io_offset + 1]);
-        Pack(data, PackLocation {14,7}, frame.MIDIState.function_cc[io_offset + 0] + 1);
-        Pack(data, PackLocation {21,7}, frame.MIDIState.function_cc[io_offset + 1] + 1);
-        return data;
-    }
+         uint64_t data = 0;
+         Pack(data, PackLocation {0,4}, frame.MIDIState.channel[io_offset + 0]);
+         Pack(data, PackLocation {4,4}, frame.MIDIState.channel[io_offset + 1]);
+         Pack(data, PackLocation {8,3}, frame.MIDIState.function[io_offset + 0]);
+         Pack(data, PackLocation {11,3}, frame.MIDIState.function[io_offset + 1]);
+         // 6 bits empty here
+         Pack(data, PackLocation {14,7}, frame.MIDIState.function_cc[io_offset + 0] + 1);
+         Pack(data, PackLocation {21,7}, frame.MIDIState.function_cc[io_offset + 1] + 1);
 
-    void OnDataReceive(uint64_t data) {
-        frame.MIDIState.channel[io_offset + 0] = Unpack(data, PackLocation {0,4});
-        frame.MIDIState.channel[io_offset + 1] = Unpack(data, PackLocation {4,4});
-        frame.MIDIState.function[io_offset + 0] = Unpack(data, PackLocation {8,3});
-        frame.MIDIState.function[io_offset + 1] = Unpack(data, PackLocation {11,3});
-        frame.MIDIState.function_cc[io_offset + 0] = Unpack(data, PackLocation {14,7}) - 1;
-        frame.MIDIState.function_cc[io_offset + 1] = Unpack(data, PackLocation {21,7}) - 1;
-    }
+         Pack(data, PackLocation {28,5}, frame.MIDIState.function[io_offset + 0]);
+         Pack(data, PackLocation {33,5}, frame.MIDIState.function[io_offset + 1]);
+         return data;
+     }
+
+     void OnDataReceive(uint64_t data) {
+         frame.MIDIState.channel[io_offset + 0] = Unpack(data, PackLocation {0,4});
+         frame.MIDIState.channel[io_offset + 1] = Unpack(data, PackLocation {4,4});
+         frame.MIDIState.function[io_offset + 0] = Unpack(data, PackLocation {8,3});
+         frame.MIDIState.function[io_offset + 1] = Unpack(data, PackLocation {11,3});
+         frame.MIDIState.function[io_offset + 0] = Unpack(data, PackLocation {28,5});
+         frame.MIDIState.function[io_offset + 1] = Unpack(data, PackLocation {33,5});
+         frame.MIDIState.function_cc[io_offset + 0] = Unpack(data, PackLocation {14,7}) - 1;
+         frame.MIDIState.function_cc[io_offset + 1] = Unpack(data, PackLocation {21,7}) - 1;
+     }
 
 protected:
   void SetHelp() {

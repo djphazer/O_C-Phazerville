@@ -87,10 +87,14 @@ enum MIDIFunctions {
     HEM_MIDI_CLOCK_OUT,
     HEM_MIDI_RUN_OUT,
     HEM_MIDI_START_OUT,
+    HEM_MIDI_POLY1_OUT,
+    HEM_MIDI_POLY2_OUT,
+    HEM_MIDI_POLY3_OUT,
+    HEM_MIDI_POLY4_OUT,
 
-    HEM_MIDI_MAX_FUNCTION = HEM_MIDI_START_OUT
+    HEM_MIDI_MAX_FUNCTION = HEM_MIDI_POLY4_OUT
 };
-const char* const midi_fn_name[HEM_MIDI_MAX_FUNCTION + 1] = {"None", "Note#", "Trig", "Gate", "Veloc", "CC#", "Aft", "Bend", "Clock", "Run", "Start"};
+const char* const midi_fn_name[HEM_MIDI_MAX_FUNCTION + 1] = {"None", "Note#", "Trig", "Gate", "Veloc", "CC#", "Aft", "Bend", "Clock", "Run", "Start", "Poly1", "Poly2", "Poly3", "Poly4"};
 
 
 /* Hemisphere Suite Data Packing

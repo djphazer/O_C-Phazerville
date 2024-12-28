@@ -463,6 +463,10 @@ public:
                     case HEM_MIDI_VEL_OUT:
                     case HEM_MIDI_AT_OUT:
                     case HEM_MIDI_PB_OUT:
+                    case HEM_MIDI_POLY1_OUT:
+                    case HEM_MIDI_POLY2_OUT:
+                    case HEM_MIDI_POLY3_OUT:
+                    case HEM_MIDI_POLY4_OUT:
                         HS::frame.inputs[chan] += HS::frame.MIDIState.outputs[chan];
                         break;
                     case HEM_MIDI_GATE_OUT:

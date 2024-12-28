@@ -232,8 +232,27 @@ typedef struct IOFrame {
                     semitone_mask[ch] = semitone_mask[ch] | (1u << (data1 % 12));
 
                     // Should this message go out on this channel?
-                    if (function[ch] == HEM_MIDI_NOTE_OUT)
+                    if (function[ch] == HEM_MIDI_NOTE_OUT || function[ch] == HEM_MIDI_POLY1_OUT) {
                         outputs[ch] = MIDIQuantizer::CV(note_buffer[m_ch].back().note);
+                    }
+                    if (function[ch] == HEM_MIDI_POLY2_OUT) {
+                        if (note_buffer[m_ch].size() > 1)
+                            outputs[ch] = MIDIQuantizer::CV(note_buffer[m_ch].at(note_buffer[m_ch].size()-2).note);
+                        else
+                            outputs[ch] = MIDIQuantizer::CV(note_buffer[m_ch].front().note);
+                    }
+                    if (function[ch] == HEM_MIDI_POLY3_OUT) {
+                        if (note_buffer[m_ch].size() > 2)
+                            outputs[ch] = MIDIQuantizer::CV(note_buffer[m_ch].at(note_buffer[m_ch].size()-3).note);
+                        else
+                            outputs[ch] = MIDIQuantizer::CV(note_buffer[m_ch].front().note);
+                    }
+                    if (function[ch] == HEM_MIDI_POLY4_OUT) {
+                        if (note_buffer[m_ch].size() > 3)
+                            outputs[ch] = MIDIQuantizer::CV(note_buffer[m_ch].at(note_buffer[m_ch].size()-4).note);
+                        else
+                            outputs[ch] = MIDIQuantizer::CV(note_buffer[m_ch].front().note);
+                    }
 
                     if (function[ch] == HEM_MIDI_TRIG_OUT)
                         trigout_q[ch] = 1;
@@ -251,9 +270,29 @@ typedef struct IOFrame {
                 case usbMIDI.NoteOff:
                     semitone_mask[ch] = semitone_mask[ch] & ~(1u << (data1 % 12));
 
-                    if (function[ch] == HEM_MIDI_NOTE_OUT)
-                        if (note_buffer[m_ch].size() > 0) // don't update output when last note is released
+                    if (note_buffer[m_ch].size() > 0) { // don't update output when last note is released
+                        if (function[ch] == HEM_MIDI_NOTE_OUT || function[ch] == HEM_MIDI_POLY1_OUT) {
                             outputs[ch] = MIDIQuantizer::CV(note_buffer[m_ch].back().note);
+                        }
+                        if (function[ch] == HEM_MIDI_POLY2_OUT) {
+                            if (note_buffer[m_ch].size() < 2)
+                                outputs[ch] = MIDIQuantizer::CV(note_buffer[m_ch].front().note);
+                            else
+                                outputs[ch] = MIDIQuantizer::CV(note_buffer[m_ch].at(note_buffer[m_ch].size()-2).note);
+                        }
+                        if (function[ch] == HEM_MIDI_POLY3_OUT) {
+                            if (note_buffer[m_ch].size() < 3)
+                                outputs[ch] = MIDIQuantizer::CV(note_buffer[m_ch].front().note);
+                            else
+                                outputs[ch] = MIDIQuantizer::CV(note_buffer[m_ch].at(note_buffer[m_ch].size()-3).note);
+                        }
+                        if (function[ch] == HEM_MIDI_POLY4_OUT) {
+                            if (note_buffer[m_ch].size() < 4)
+                                outputs[ch] = MIDIQuantizer::CV(note_buffer[m_ch].front().note);
+                            else
+                                outputs[ch] = MIDIQuantizer::CV(note_buffer[m_ch].at(note_buffer[m_ch].size()-4).note);
+                        }
+                    }
 
                     // turn gate off only when all notes are off
                     if (!(note_buffer[m_ch].size() > 0)) {

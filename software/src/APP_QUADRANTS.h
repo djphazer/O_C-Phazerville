@@ -410,6 +410,10 @@ public:
                     case HEM_MIDI_VEL_OUT:
                     case HEM_MIDI_AT_OUT:
                     case HEM_MIDI_PB_OUT:
+                    case HEM_MIDI_POLY1_OUT:
+                    case HEM_MIDI_POLY2_OUT:
+                    case HEM_MIDI_POLY3_OUT:
+                    case HEM_MIDI_POLY4_OUT:
                         HS::frame.inputs[chan] += HS::frame.MIDIState.outputs[chan];
                         break;
                     case HEM_MIDI_GATE_OUT:
@@ -1060,7 +1064,7 @@ private:
         const char * cursor_mode_name[3] = { "modal", "modal+wrap" };
         gfxPrint(1, 35, "Cursor:  ");
         gfxPrint(cursor_mode_name[HS::cursor_wrap]);
-        
+
         switch (config_cursor) {
         case TRIG_LENGTH:
             gfxCursor(80, 23, 24);
