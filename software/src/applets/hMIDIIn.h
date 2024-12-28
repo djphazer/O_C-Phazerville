@@ -152,7 +152,10 @@ private:
 
     void DrawMonitor() {
         if (OC::CORE::ticks - frame.MIDIState.last_msg_tick < 4000) {
-            gfxBitmap(46, 1, 8, MIDI_ICON);
+            if (hemisphere & 1)
+                gfxBitmap( 9, 1, 8, MIDI_ICON);
+            else
+                gfxBitmap(46, 1, 8, MIDI_ICON);
         }
     }
 
