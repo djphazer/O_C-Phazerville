@@ -99,6 +99,38 @@ typedef struct IOFrame {
             }
         }
 
+        int GetNote(std::vector<midi_note_data> &buffer, int n) {
+            return buffer.at(buffer.size()-n).note;
+        }
+
+        int GetNoteFront(std::vector<midi_note_data> &buffer) {
+            return buffer.front().note;
+        }
+
+        int GetNoteBack(std::vector<midi_note_data> &buffer) {
+            return buffer.back().note;
+        }
+
+        int GetNoteInv(std::vector<midi_note_data> &buffer) {
+            return 127 - buffer.back().note;
+        }
+
+        int GetNoteMin(std::vector<midi_note_data> &buffer) { // make these more efficient?
+            int m = 127;
+            std::for_each (buffer.begin(), buffer.end(), [&](midi_note_data const &data) {
+                if (data.note < m) m = data.note;
+            });
+            return m;
+        }
+
+        int GetNoteMax(std::vector<midi_note_data> &buffer) {
+            int m = 0;
+            std::for_each (buffer.begin(), buffer.end(), [&](midi_note_data const &data) {
+                if (data.note > m) m = data.note;
+            });
+            return m;
+        }
+
         // Clock/Start/Stop are handled by ClockSetup applet
         bool clock_run = 0;
         bool clock_q;
@@ -232,38 +264,66 @@ typedef struct IOFrame {
                     semitone_mask[ch] = semitone_mask[ch] | (1u << (data1 % 12));
 
                     // Should this message go out on this channel?
-                    if (function[ch] == HEM_MIDI_NOTE_OUT || function[ch] == HEM_MIDI_POLY1_OUT) {
-                        outputs[ch] = MIDIQuantizer::CV(note_buffer[m_ch].back().note);
-                    }
-                    if (function[ch] == HEM_MIDI_POLY2_OUT) {
-                        if (note_buffer[m_ch].size() > 1)
-                            outputs[ch] = MIDIQuantizer::CV(note_buffer[m_ch].at(note_buffer[m_ch].size()-2).note);
-                        else
-                            outputs[ch] = MIDIQuantizer::CV(note_buffer[m_ch].front().note);
-                    }
-                    if (function[ch] == HEM_MIDI_POLY3_OUT) {
-                        if (note_buffer[m_ch].size() > 2)
-                            outputs[ch] = MIDIQuantizer::CV(note_buffer[m_ch].at(note_buffer[m_ch].size()-3).note);
-                        else
-                            outputs[ch] = MIDIQuantizer::CV(note_buffer[m_ch].front().note);
-                    }
-                    if (function[ch] == HEM_MIDI_POLY4_OUT) {
-                        if (note_buffer[m_ch].size() > 3)
-                            outputs[ch] = MIDIQuantizer::CV(note_buffer[m_ch].at(note_buffer[m_ch].size()-4).note);
-                        else
-                            outputs[ch] = MIDIQuantizer::CV(note_buffer[m_ch].front().note);
+                    switch (function[ch]) { // note # output functions
+                        case HEM_MIDI_NOTE_OUT:
+                        case HEM_MIDI_NOTE_POLY1_OUT:
+                            outputs[ch] = MIDIQuantizer::CV(GetNoteBack(note_buffer[m_ch]));
+                            break;
+
+                        case HEM_MIDI_NOTE_POLY2_OUT:
+                            if (note_buffer[m_ch].size() > 1)
+                                outputs[ch] = MIDIQuantizer::CV(GetNote(note_buffer[m_ch], 2));
+                            else
+                                outputs[ch] = MIDIQuantizer::CV(GetNoteBack(note_buffer[m_ch]));
+                            break;
+
+                        case HEM_MIDI_NOTE_POLY3_OUT:
+                            if (note_buffer[m_ch].size() > 2)
+                                outputs[ch] = MIDIQuantizer::CV(GetNote(note_buffer[m_ch], 3));
+                            else
+                                if (note_buffer[m_ch].size() == 2) // distribute notes evenly when 2 are played
+                                    outputs[ch] = MIDIQuantizer::CV(GetNoteBack(note_buffer[m_ch]));
+                                else
+                                    outputs[ch] = MIDIQuantizer::CV(GetNoteFront(note_buffer[m_ch]));
+                            break;
+
+                        case HEM_MIDI_NOTE_POLY4_OUT:
+                            if (note_buffer[m_ch].size() > 3)
+                                outputs[ch] = MIDIQuantizer::CV(GetNote(note_buffer[m_ch], 4));
+                            else
+                                outputs[ch] = MIDIQuantizer::CV(GetNoteFront(note_buffer[m_ch]));
+                            break;
+
+                        case HEM_MIDI_NOTE_MIN_OUT:
+                            outputs[ch] = MIDIQuantizer::CV(GetNoteMin(note_buffer[m_ch]));
+                            break;
+
+                        case HEM_MIDI_NOTE_MAX_OUT:
+                            outputs[ch] = MIDIQuantizer::CV(GetNoteMax(note_buffer[m_ch]));
+                            break;
+
+                        case HEM_MIDI_NOTE_PEDAL_OUT:
+                            outputs[ch] = MIDIQuantizer::CV(GetNoteFront(note_buffer[m_ch]));
+                            break;
+
+                        case HEM_MIDI_NOTE_INV_OUT:
+                            outputs[ch] = MIDIQuantizer::CV(GetNoteInv(note_buffer[m_ch]));
+                            break;
                     }
 
-                    if (function[ch] == HEM_MIDI_TRIG_OUT)
+                    if ((function[ch] == HEM_MIDI_TRIG_OUT)
+                    || (function[ch] == HEM_MIDI_TRIG_ALWAYS_OUT)
+                    || ((function[ch] == HEM_MIDI_TRIG_1ST_OUT) && (note_buffer[m_ch].size() == 1)))
                         trigout_q[ch] = 1;
 
                     if (function[ch] == HEM_MIDI_GATE_OUT)
                         outputs[ch] = PULSE_VOLTAGE * (12 << 7);
+                    if (function[ch] == HEM_MIDI_GATE_INV_OUT)
+                        outputs[ch] = 0;
 
                     if (function[ch] == HEM_MIDI_VEL_OUT)
                         outputs[ch] = Proportion(note_buffer[m_ch].back().vel, 127, HEMISPHERE_MAX_CV);
 
-                    // TODO: don't print duplicate note-on messages for ADC channels mapped to the same midi channel
                     if (!log_skip) log_this = 1; // Log all MIDI notes. Other stuff is conditional.
                     break;
 
@@ -271,26 +331,48 @@ typedef struct IOFrame {
                     semitone_mask[ch] = semitone_mask[ch] & ~(1u << (data1 % 12));
 
                     if (note_buffer[m_ch].size() > 0) { // don't update output when last note is released
-                        if (function[ch] == HEM_MIDI_NOTE_OUT || function[ch] == HEM_MIDI_POLY1_OUT) {
-                            outputs[ch] = MIDIQuantizer::CV(note_buffer[m_ch].back().note);
-                        }
-                        if (function[ch] == HEM_MIDI_POLY2_OUT) {
-                            if (note_buffer[m_ch].size() < 2)
-                                outputs[ch] = MIDIQuantizer::CV(note_buffer[m_ch].front().note);
-                            else
-                                outputs[ch] = MIDIQuantizer::CV(note_buffer[m_ch].at(note_buffer[m_ch].size()-2).note);
-                        }
-                        if (function[ch] == HEM_MIDI_POLY3_OUT) {
-                            if (note_buffer[m_ch].size() < 3)
-                                outputs[ch] = MIDIQuantizer::CV(note_buffer[m_ch].front().note);
-                            else
-                                outputs[ch] = MIDIQuantizer::CV(note_buffer[m_ch].at(note_buffer[m_ch].size()-3).note);
-                        }
-                        if (function[ch] == HEM_MIDI_POLY4_OUT) {
-                            if (note_buffer[m_ch].size() < 4)
-                                outputs[ch] = MIDIQuantizer::CV(note_buffer[m_ch].front().note);
-                            else
-                                outputs[ch] = MIDIQuantizer::CV(note_buffer[m_ch].at(note_buffer[m_ch].size()-4).note);
+                        switch(function[ch]) { // note # output functions
+                            case HEM_MIDI_NOTE_OUT:
+                            case HEM_MIDI_NOTE_POLY1_OUT:
+                                outputs[ch] = MIDIQuantizer::CV(GetNoteBack(note_buffer[m_ch]));
+                                break;
+
+                            case HEM_MIDI_NOTE_POLY2_OUT:
+                                if (note_buffer[m_ch].size() < 2)
+                                    outputs[ch] = MIDIQuantizer::CV(GetNoteBack(note_buffer[m_ch]));
+                                else
+                                    outputs[ch] = MIDIQuantizer::CV(GetNote(note_buffer[m_ch], 2));
+                                break;
+
+                            case HEM_MIDI_NOTE_POLY3_OUT:
+                                if (note_buffer[m_ch].size() < 3)
+                                    outputs[ch] = MIDIQuantizer::CV(GetNoteFront(note_buffer[m_ch]));
+                                else
+                                    outputs[ch] = MIDIQuantizer::CV(GetNote(note_buffer[m_ch], 3));
+                                break;
+
+                            case HEM_MIDI_NOTE_POLY4_OUT:
+                                if (note_buffer[m_ch].size() < 4)
+                                    outputs[ch] = MIDIQuantizer::CV(GetNoteFront(note_buffer[m_ch]));
+                                else
+                                    outputs[ch] = MIDIQuantizer::CV(GetNote(note_buffer[m_ch], 4));
+                                break;
+
+                            case HEM_MIDI_NOTE_MIN_OUT:
+                                outputs[ch] = MIDIQuantizer::CV(GetNoteMin(note_buffer[m_ch]));
+                                break;
+
+                            case HEM_MIDI_NOTE_MAX_OUT:
+                                outputs[ch] = MIDIQuantizer::CV(GetNoteMax(note_buffer[m_ch]));
+                                break;
+
+                            case HEM_MIDI_NOTE_PEDAL_OUT:
+                                outputs[ch] = MIDIQuantizer::CV(GetNoteFront(note_buffer[m_ch]));
+                                break;
+
+                            case HEM_MIDI_NOTE_INV_OUT:
+                                outputs[ch] = MIDIQuantizer::CV(GetNoteInv(note_buffer[m_ch]));
+                                break;
                         }
                     }
 
@@ -299,10 +381,12 @@ typedef struct IOFrame {
                         if (function[ch] == HEM_MIDI_GATE_OUT) {
                             outputs[ch] = 0;
                         }
+                        if (function[ch] == HEM_MIDI_GATE_INV_OUT) {
+                            outputs[ch] = PULSE_VOLTAGE * (12 << 7);
+                        }
                     } else {
-                        // TODO: create option to toggle note on / off retrig
-                        // if (function[ch] == HEM_MIDI_TRIG_OUT)
-                        //     trigout_q[ch] = 1;
+                        if (function[ch] == HEM_MIDI_TRIG_ALWAYS_OUT)
+                            trigout_q[ch] = 1;
                     }
 
                     if (function[ch] == HEM_MIDI_VEL_OUT)
@@ -343,112 +427,113 @@ typedef struct IOFrame {
                 if (log_this) UpdateLog(message, data1, data2);
             }
         }
+
         void Send(const int *outvals) {
 
-          // first pass - calculate things and turn off notes
-          for (int i = 0; i < DAC_CHANNEL_LAST; ++i) {
-            const int midi_ch = outchan[i];
+            // first pass - calculate things and turn off notes
+            for (int i = 0; i < DAC_CHANNEL_LAST; ++i) {
+                const int midi_ch = outchan[i];
 
-            inputs[i] = outvals[i];
-            gate_high[i] = inputs[i] > (12 << 7);
-            clocked[i] = (gate_high[i] && last_cv[i] < (12 << 7));
-            if (abs(inputs[i] - last_cv[i]) > HEMISPHERE_CHANGE_THRESHOLD) {
-                changed_cv[i] = 1;
-                last_cv[i] = inputs[i];
-            } else changed_cv[i] = 0;
+                inputs[i] = outvals[i];
+                gate_high[i] = inputs[i] > (12 << 7);
+                clocked[i] = (gate_high[i] && last_cv[i] < (12 << 7));
+                if (abs(inputs[i] - last_cv[i]) > HEMISPHERE_CHANGE_THRESHOLD) {
+                    changed_cv[i] = 1;
+                    last_cv[i] = inputs[i];
+                } else changed_cv[i] = 0;
 
-            switch (outfn[i]) {
-              case HEM_MIDI_NOTE_OUT:
-                if (changed_cv[i]) {
-                  // a note has changed, turn the last one off first
-                  SendNoteOff(outchan_last[i]);
-                  current_note[midi_ch] = MIDIQuantizer::NoteNumber( inputs[i] );
+                switch (outfn[i]) {
+                    case HEM_MIDI_NOTE_OUT:
+                        if (changed_cv[i]) {
+                            // a note has changed, turn the last one off first
+                            SendNoteOff(outchan_last[i]);
+                            current_note[midi_ch] = MIDIQuantizer::NoteNumber( inputs[i] );
+                        }
+                        break;
+
+                    case HEM_MIDI_GATE_OUT:
+                        if (!gate_high[i] && changed_cv[i])
+                            SendNoteOff(midi_ch);
+                        break;
+
+                    case HEM_MIDI_CC_OUT:
+                    {
+                        const uint8_t newccval = ProportionCV(abs(inputs[i]), 127);
+                        if (newccval != current_ccval[i])
+                            SendCC(midi_ch, outccnum[i], newccval);
+                        current_ccval[i] = newccval;
+                        break;
+                    }
                 }
-                break;
 
-              case HEM_MIDI_GATE_OUT:
-                if (!gate_high[i] && changed_cv[i])
-                  SendNoteOff(midi_ch);
-                break;
-
-              case HEM_MIDI_CC_OUT:
-              {
-                const uint8_t newccval = ProportionCV(abs(inputs[i]), 127);
-                if (newccval != current_ccval[i])
-                  SendCC(midi_ch, outccnum[i], newccval);
-                current_ccval[i] = newccval;
-                break;
-              }
+                // Handle clock pulse timing
+                if (note_countdown[i] > 0) {
+                    if (--note_countdown[i] == 0) SendNoteOff(outchan_last[i]);
+                }
             }
 
-            // Handle clock pulse timing
-            if (note_countdown[i] > 0) {
-                if (--note_countdown[i] == 0) SendNoteOff(outchan_last[i]);
+            // 2nd pass - send eligible notes
+            for (int i = 0; i < 2; ++i) {
+                const int chA = i*2;
+                const int chB = chA + 1;
+
+                if (outfn[chB] == HEM_MIDI_GATE_OUT) {
+                if (clocked[chB]) {
+                    SendNoteOn(outchan[chB]);
+                    // no countdown
+                    outchan_last[chB] = outchan[chB];
+                }
+                } else if (outfn[chA] == HEM_MIDI_NOTE_OUT) {
+                if (changed_cv[chA]) {
+                    SendNoteOn(outchan[chA]);
+                    note_countdown[chA] = HEMISPHERE_CLOCK_TICKS * HS::trig_length;
+                    outchan_last[chA] = outchan[chA];
+                }
+                }
             }
-          }
 
-          // 2nd pass - send eligible notes
-          for (int i = 0; i < 2; ++i) {
-            const int chA = i*2;
-            const int chB = chA + 1;
-
-            if (outfn[chB] == HEM_MIDI_GATE_OUT) {
-              if (clocked[chB]) {
-                SendNoteOn(outchan[chB]);
-                // no countdown
-                outchan_last[chB] = outchan[chB];
-              }
-            } else if (outfn[chA] == HEM_MIDI_NOTE_OUT) {
-              if (changed_cv[chA]) {
-                SendNoteOn(outchan[chA]);
-                note_countdown[chA] = HEMISPHERE_CLOCK_TICKS * HS::trig_length;
-                outchan_last[chA] = outchan[chA];
-              }
-            }
-          }
-
-          // I think this can cause the UI to lag and miss input
-          //usbMIDI.send_now();
+            // I think this can cause the UI to lag and miss input
+            //usbMIDI.send_now();
         }
 
         void SendAfterTouch(const int midi_ch, uint8_t val) {
-          usbMIDI.sendAfterTouch(val, midi_ch + 1);
+            usbMIDI.sendAfterTouch(val, midi_ch + 1);
 #ifdef ARDUINO_TEENSY41
-          usbHostMIDI.sendAfterTouch(val, midi_ch + 1);
-          MIDI1.sendAfterTouch(val, midi_ch + 1);
+            usbHostMIDI.sendAfterTouch(val, midi_ch + 1);
+            MIDI1.sendAfterTouch(val, midi_ch + 1);
 #endif
         }
         void SendPitchBend(const int midi_ch, uint16_t bend) {
-          usbMIDI.sendPitchBend(bend, midi_ch + 1);
+            usbMIDI.sendPitchBend(bend, midi_ch + 1);
 #ifdef ARDUINO_TEENSY41
-          usbHostMIDI.sendPitchBend(bend, midi_ch + 1);
-          MIDI1.sendPitchBend(bend, midi_ch + 1);
+            usbHostMIDI.sendPitchBend(bend, midi_ch + 1);
+            MIDI1.sendPitchBend(bend, midi_ch + 1);
 #endif
         }
 
         void SendCC(const int midi_ch, int ccnum, uint8_t val) {
-          usbMIDI.sendControlChange(ccnum, val, midi_ch + 1);
+            usbMIDI.sendControlChange(ccnum, val, midi_ch + 1);
 #ifdef ARDUINO_TEENSY41
-          usbHostMIDI.sendControlChange(ccnum, val, midi_ch + 1);
-          MIDI1.sendControlChange(ccnum, val, midi_ch + 1);
+            usbHostMIDI.sendControlChange(ccnum, val, midi_ch + 1);
+            MIDI1.sendControlChange(ccnum, val, midi_ch + 1);
 #endif
         }
         void SendNoteOn(const int midi_ch, int note = -1, uint8_t vel = 100) {
-          if (note < 0) note = current_note[midi_ch];
-          else current_note[midi_ch] = note;
+            if (note < 0) note = current_note[midi_ch];
+            else current_note[midi_ch] = note;
 
-          usbMIDI.sendNoteOn(note, vel, midi_ch + 1);
+            usbMIDI.sendNoteOn(note, vel, midi_ch + 1);
 #ifdef ARDUINO_TEENSY41
-          usbHostMIDI.sendNoteOn(note, vel, midi_ch + 1);
-          MIDI1.sendNoteOn(note, vel, midi_ch + 1);
+            usbHostMIDI.sendNoteOn(note, vel, midi_ch + 1);
+            MIDI1.sendNoteOn(note, vel, midi_ch + 1);
 #endif
         }
         void SendNoteOff(const int midi_ch, int note = -1, uint8_t vel = 0) {
-          if (note < 0) note = current_note[midi_ch];
-          usbMIDI.sendNoteOff(note, vel, midi_ch + 1);
+            if (note < 0) note = current_note[midi_ch];
+            usbMIDI.sendNoteOff(note, vel, midi_ch + 1);
 #ifdef ARDUINO_TEENSY41
-          usbHostMIDI.sendNoteOff(note, vel, midi_ch + 1);
-          MIDI1.sendNoteOff(note, vel, midi_ch + 1);
+            usbHostMIDI.sendNoteOff(note, vel, midi_ch + 1);
+            MIDI1.sendNoteOff(note, vel, midi_ch + 1);
 #endif
         }
 
@@ -458,18 +543,18 @@ typedef struct IOFrame {
     void Out(DAC_CHANNEL channel, int value) {
         // rising edge detection for trigger loopback
         if (value > GATE_THRESHOLD && outputs[channel] < GATE_THRESHOLD)
-          clockout_q[channel] = true;
+            clockout_q[channel] = true;
 
         output_diff[channel] = value - outputs[channel];
         outputs[channel] = value;
     }
     void ClockOut(DAC_CHANNEL ch, const int pulselength = HEMISPHERE_CLOCK_TICKS * HS::trig_length) {
-      // short circuit if skip probability is zero to avoid consuming random numbers
-      if (0 == clockskip[ch] || random(100) >= clockskip[ch]) {
-        clock_countdown[ch] = pulselength;
-        outputs[ch] = PULSE_VOLTAGE * (12 << 7);
-        clockout_q[ch] = true;
-      }
+        // short circuit if skip probability is zero to avoid consuming random numbers
+        if (0 == clockskip[ch] || random(100) >= clockskip[ch]) {
+            clock_countdown[ch] = pulselength;
+            outputs[ch] = PULSE_VOLTAGE * (12 << 7);
+            clockout_q[ch] = true;
+        }
     }
     void NudgeSkip(int ch, int dir) {
         clockskip[ch] = constrain(clockskip[ch] + dir, 0, 100);
@@ -507,14 +592,14 @@ typedef struct IOFrame {
     }
 
     void Send() {
-      for (int i = 0; i < DAC_CHANNEL_LAST; ++i) {
-        OC::DAC::set_pitch_scaled(DAC_CHANNEL(i), outputs[i], 0);
-      }
-      if (autoMIDIOut) MIDIState.Send(outputs);
+        for (int i = 0; i < DAC_CHANNEL_LAST; ++i) {
+            OC::DAC::set_pitch_scaled(DAC_CHANNEL(i), outputs[i], 0);
+        }
+        if (autoMIDIOut) MIDIState.Send(outputs);
 
 #ifdef ARDUINO_TEENSY41
-      // this relies on the inputs and outputs arrays being contiguous...
-      OC::AudioDSP::Process(inputs);
+        // this relies on the inputs and outputs arrays being contiguous...
+        OC::AudioDSP::Process(inputs);
 #endif
     }
 

@@ -463,16 +463,23 @@ public:
                     case HEM_MIDI_VEL_OUT:
                     case HEM_MIDI_AT_OUT:
                     case HEM_MIDI_PB_OUT:
-                    case HEM_MIDI_POLY1_OUT:
-                    case HEM_MIDI_POLY2_OUT:
-                    case HEM_MIDI_POLY3_OUT:
-                    case HEM_MIDI_POLY4_OUT:
+                    case HEM_MIDI_NOTE_POLY1_OUT:
+                    case HEM_MIDI_NOTE_POLY2_OUT:
+                    case HEM_MIDI_NOTE_POLY3_OUT:
+                    case HEM_MIDI_NOTE_POLY4_OUT:
+                    case HEM_MIDI_NOTE_MIN_OUT:
+                    case HEM_MIDI_NOTE_MAX_OUT:
+                    case HEM_MIDI_NOTE_PEDAL_OUT:
+                    case HEM_MIDI_NOTE_INV_OUT:
                         HS::frame.inputs[chan] += HS::frame.MIDIState.outputs[chan];
                         break;
                     case HEM_MIDI_GATE_OUT:
+                    case HEM_MIDI_GATE_INV_OUT:
                         HS::frame.gate_high[chan] |= (HS::frame.MIDIState.outputs[chan] > (12 << 7));
                         break;
                     case HEM_MIDI_TRIG_OUT:
+                    case HEM_MIDI_TRIG_1ST_OUT:
+                    case HEM_MIDI_TRIG_ALWAYS_OUT:
                     case HEM_MIDI_CLOCK_OUT:
                     case HEM_MIDI_START_OUT:
                         HS::frame.clocked[chan] |= HS::frame.MIDIState.trigout_q[chan];

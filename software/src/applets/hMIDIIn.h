@@ -67,6 +67,8 @@ public:
             case HEM_MIDI_CLOCK_OUT:
             case HEM_MIDI_START_OUT:
             case HEM_MIDI_TRIG_OUT:
+            case HEM_MIDI_TRIG_1ST_OUT:
+            case HEM_MIDI_TRIG_ALWAYS_OUT:
                 if (frame.MIDIState.trigout_q[ch_]) {
                     frame.MIDIState.trigout_q[ch_] = 0;
                     ClockOut(ch);
@@ -113,29 +115,29 @@ public:
     }
 
     uint64_t OnDataRequest() {
-         uint64_t data = 0;
-         Pack(data, PackLocation {0,4}, frame.MIDIState.channel[io_offset + 0]);
-         Pack(data, PackLocation {4,4}, frame.MIDIState.channel[io_offset + 1]);
-         Pack(data, PackLocation {8,3}, frame.MIDIState.function[io_offset + 0]);
-         Pack(data, PackLocation {11,3}, frame.MIDIState.function[io_offset + 1]);
-         // 6 bits empty here
-         Pack(data, PackLocation {14,7}, frame.MIDIState.function_cc[io_offset + 0] + 1);
-         Pack(data, PackLocation {21,7}, frame.MIDIState.function_cc[io_offset + 1] + 1);
+        uint64_t data = 0;
+        Pack(data, PackLocation {0,4}, frame.MIDIState.channel[io_offset + 0]);
+        Pack(data, PackLocation {4,4}, frame.MIDIState.channel[io_offset + 1]);
+        Pack(data, PackLocation {8,3}, frame.MIDIState.function[io_offset + 0]);
+        Pack(data, PackLocation {11,3}, frame.MIDIState.function[io_offset + 1]);
+        // 6 bits empty here
+        Pack(data, PackLocation {14,7}, frame.MIDIState.function_cc[io_offset + 0] + 1);
+        Pack(data, PackLocation {21,7}, frame.MIDIState.function_cc[io_offset + 1] + 1);
 
-         Pack(data, PackLocation {28,5}, frame.MIDIState.function[io_offset + 0]);
-         Pack(data, PackLocation {33,5}, frame.MIDIState.function[io_offset + 1]);
-         return data;
+        Pack(data, PackLocation {28,5}, frame.MIDIState.function[io_offset + 0]);
+        Pack(data, PackLocation {33,5}, frame.MIDIState.function[io_offset + 1]);
+        return data;
      }
 
      void OnDataReceive(uint64_t data) {
-         frame.MIDIState.channel[io_offset + 0] = Unpack(data, PackLocation {0,4});
-         frame.MIDIState.channel[io_offset + 1] = Unpack(data, PackLocation {4,4});
-         frame.MIDIState.function[io_offset + 0] = Unpack(data, PackLocation {8,3});
-         frame.MIDIState.function[io_offset + 1] = Unpack(data, PackLocation {11,3});
-         frame.MIDIState.function[io_offset + 0] = Unpack(data, PackLocation {28,5});
-         frame.MIDIState.function[io_offset + 1] = Unpack(data, PackLocation {33,5});
-         frame.MIDIState.function_cc[io_offset + 0] = Unpack(data, PackLocation {14,7}) - 1;
-         frame.MIDIState.function_cc[io_offset + 1] = Unpack(data, PackLocation {21,7}) - 1;
+        frame.MIDIState.channel[io_offset + 0] = Unpack(data, PackLocation {0,4});
+        frame.MIDIState.channel[io_offset + 1] = Unpack(data, PackLocation {4,4});
+        frame.MIDIState.function[io_offset + 0] = Unpack(data, PackLocation {8,3});
+        frame.MIDIState.function[io_offset + 1] = Unpack(data, PackLocation {11,3});
+        frame.MIDIState.function[io_offset + 0] = Unpack(data, PackLocation {28,5});
+        frame.MIDIState.function[io_offset + 1] = Unpack(data, PackLocation {33,5});
+        frame.MIDIState.function_cc[io_offset + 0] = Unpack(data, PackLocation {14,7}) - 1;
+        frame.MIDIState.function_cc[io_offset + 1] = Unpack(data, PackLocation {21,7}) - 1;
      }
 
 protected:
@@ -170,27 +172,27 @@ private:
 
         char out_label[] = { 'C', 'h', (char)('A' + io_offset), ':', '\0'  };
         gfxPrint(1, 15, out_label);
-        gfxPrint(24, 15, frame.MIDIState.channel[io_offset + 0] + 1);
+        gfxPrint(27, 15, frame.MIDIState.channel[io_offset + 0] + 1);
         ++out_label[2];
         gfxPrint(1, 25, out_label);
-        gfxPrint(24, 25, frame.MIDIState.channel[io_offset + 1] + 1);
+        gfxPrint(27, 25, frame.MIDIState.channel[io_offset + 1] + 1);
 
         // Output 1 function
-        char out_label_fn[] = { (char)('A' + io_offset), ' ', ':', '\0'  };
+        char out_label_fn[] = { (char)('A' + io_offset), ':', '\0'  };
         gfxPrint(1, 35, out_label_fn);
-        gfxPrint(24, 35, midi_fn_name[frame.MIDIState.function[io_offset + 0]]);
+        gfxPrint(16, 35, midi_fn_name[frame.MIDIState.function[io_offset + 0]]);
         if (frame.MIDIState.function[io_offset + 0] == HEM_MIDI_CC_OUT)
             gfxPrint(frame.MIDIState.function_cc[io_offset + 0]);
 
         // Output 2 function
         ++out_label_fn[0];
         gfxPrint(1, 45, out_label_fn);
-        gfxPrint(24, 45, midi_fn_name[frame.MIDIState.function[io_offset + 1]]);
+        gfxPrint(16, 45, midi_fn_name[frame.MIDIState.function[io_offset + 1]]);
         if (frame.MIDIState.function[io_offset + 1] == HEM_MIDI_CC_OUT)
             gfxPrint(frame.MIDIState.function_cc[io_offset + 1]);
 
         // Cursor
-        gfxCursor(24, 23 + (cursor * 10), 39);
+        gfxCursor(24 - ((cursor > 1) * 12), 23 + (cursor * 10), 39 + ((cursor > 1) * 12));
 
         // Last log entry
         if (frame.MIDIState.log_index > 0) {

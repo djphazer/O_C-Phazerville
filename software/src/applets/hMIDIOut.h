@@ -186,7 +186,7 @@ public:
         }
         ResetCursor();
     }
-        
+
     uint64_t OnDataRequest() {
         uint64_t data = 0;
         Pack(data, PackLocation {0,4}, channel);
@@ -253,7 +253,10 @@ private:
 
     void DrawMonitor() {
         if (OC::CORE::ticks - last_tick < 4000) {
-            gfxBitmap(46, 1, 8, MIDI_ICON);
+            if (hemisphere & 1)
+                gfxBitmap( 9, 1, 8, MIDI_ICON);
+            else
+                gfxBitmap(46, 1, 8, MIDI_ICON);
         }
     }
 

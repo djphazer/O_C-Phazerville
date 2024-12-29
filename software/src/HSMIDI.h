@@ -87,14 +87,21 @@ enum MIDIFunctions {
     HEM_MIDI_CLOCK_OUT,
     HEM_MIDI_RUN_OUT,
     HEM_MIDI_START_OUT,
-    HEM_MIDI_POLY1_OUT,
-    HEM_MIDI_POLY2_OUT,
-    HEM_MIDI_POLY3_OUT,
-    HEM_MIDI_POLY4_OUT,
+    HEM_MIDI_NOTE_POLY1_OUT,
+    HEM_MIDI_NOTE_POLY2_OUT,
+    HEM_MIDI_NOTE_POLY3_OUT,
+    HEM_MIDI_NOTE_POLY4_OUT,
+    HEM_MIDI_NOTE_MIN_OUT,
+    HEM_MIDI_NOTE_MAX_OUT,
+    HEM_MIDI_NOTE_PEDAL_OUT,
+    HEM_MIDI_NOTE_INV_OUT,
+    HEM_MIDI_TRIG_1ST_OUT,
+    HEM_MIDI_TRIG_ALWAYS_OUT,
+    HEM_MIDI_GATE_INV_OUT,
 
-    HEM_MIDI_MAX_FUNCTION = HEM_MIDI_POLY4_OUT
+    HEM_MIDI_MAX_FUNCTION = HEM_MIDI_GATE_INV_OUT
 };
-const char* const midi_fn_name[HEM_MIDI_MAX_FUNCTION + 1] = {"None", "Note#", "Trig", "Gate", "Veloc", "CC#", "Aft", "Bend", "Clock", "Run", "Start", "Poly1", "Poly2", "Poly3", "Poly4"};
+const char* const midi_fn_name[HEM_MIDI_MAX_FUNCTION + 1] = {"None", "Note#", "Trig", "Gate", "Veloc", "CC#", "Aft", "Bend", "Clock", "Run", "Start", "Poly1", "Poly2", "Poly3", "Poly4", "LoNote", "HiNote", "PdlNote", "InvNote", "Trig1st", "TrgAlws", "GateInv"};
 
 
 /* Hemisphere Suite Data Packing
