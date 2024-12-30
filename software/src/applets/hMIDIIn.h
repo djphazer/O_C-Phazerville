@@ -157,13 +157,22 @@ protected:
 private:
     // Housekeeping
     int cursor; // 0=MIDI channel, 1=A/C function, 2=B/D function
+    int last_icon_ticks[2];
 
     void DrawMonitor() {
-        if (OC::CORE::ticks - frame.MIDIState.last_msg_tick < 4000) {
-            if (hemisphere & 1)
-                gfxBitmap( 9, 1, 8, MIDI_ICON);
-            else
-                gfxBitmap(46, 1, 8, MIDI_ICON);
+        if (cursor != LOG_VIEW) {
+            if ((OC::CORE::ticks - frame.MIDIState.last_msg_tick) < 100) {
+                // reset icon display timers
+                if (frame.MIDIState.channel[io_offset + 0] == frame.MIDIState.last_midi_channel)
+                    last_icon_ticks[0] = OC::CORE::ticks;
+                if (frame.MIDIState.channel[io_offset + 1] == frame.MIDIState.last_midi_channel)
+                    last_icon_ticks[1] = OC::CORE::ticks;
+            }
+
+            if (OC::CORE::ticks - last_icon_ticks[0] < 4000) // ChA midi activity
+                gfxBitmap( 54, 15, 8, MIDI_ICON);
+            if (OC::CORE::ticks - last_icon_ticks[1] < 4000) // ChB midi activity
+                gfxBitmap( 54, 25, 8, MIDI_ICON);
         }
     }
 

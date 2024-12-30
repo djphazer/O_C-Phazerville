@@ -67,6 +67,7 @@ typedef struct IOFrame {
         std::vector<midi_note_data> note_buffer[16]; // note buffer for polyphonic input. one for each midi channel
         int outputs[DAC_CHANNEL_LAST]; // translated CV values
         bool trigout_q[DAC_CHANNEL_LAST];
+        int last_midi_channel = 0;
 
         void RemoveNoteData(std::vector<midi_note_data> &buffer, int note) {
             buffer.erase(
@@ -103,15 +104,15 @@ typedef struct IOFrame {
             return buffer.at(buffer.size()-n).note;
         }
 
-        int GetNoteFront(std::vector<midi_note_data> &buffer) {
+        int GetNoteFirst(std::vector<midi_note_data> &buffer) {
             return buffer.front().note;
         }
 
-        int GetNoteBack(std::vector<midi_note_data> &buffer) {
+        int GetNoteLast(std::vector<midi_note_data> &buffer) {
             return buffer.back().note;
         }
 
-        int GetNoteInv(std::vector<midi_note_data> &buffer) {
+        int GetNoteLastInv(std::vector<midi_note_data> &buffer) {
             return 127 - buffer.back().note;
         }
 
@@ -129,6 +130,10 @@ typedef struct IOFrame {
                 if (data.note > m) m = data.note;
             });
             return m;
+        }
+
+        int GetVel(std::vector<midi_note_data> &buffer, int n) {
+            return buffer.at(buffer.size()-n).vel;
         }
 
         // Clock/Start/Stop are handled by ClockSetup applet
@@ -251,6 +256,7 @@ typedef struct IOFrame {
                 // skip unwanted MIDI Channels
                 if (midi_chan - 1 != channel[ch]) continue;
                 int m_ch = midi_chan - 1;
+                last_midi_channel = m_ch; // for MIDIIn activity monitor
 
                 // prevent duplicate log entries
                 if (m_ch == m_ch_prev) log_skip = true;
@@ -266,32 +272,31 @@ typedef struct IOFrame {
                     // Should this message go out on this channel?
                     switch (function[ch]) { // note # output functions
                         case HEM_MIDI_NOTE_OUT:
-                        case HEM_MIDI_NOTE_POLY1_OUT:
-                            outputs[ch] = MIDIQuantizer::CV(GetNoteBack(note_buffer[m_ch]));
+                            outputs[ch] = MIDIQuantizer::CV(GetNoteLast(note_buffer[m_ch]));
                             break;
 
                         case HEM_MIDI_NOTE_POLY2_OUT:
                             if (note_buffer[m_ch].size() > 1)
                                 outputs[ch] = MIDIQuantizer::CV(GetNote(note_buffer[m_ch], 2));
                             else
-                                outputs[ch] = MIDIQuantizer::CV(GetNoteBack(note_buffer[m_ch]));
+                                outputs[ch] = MIDIQuantizer::CV(GetNoteLast(note_buffer[m_ch]));
                             break;
 
                         case HEM_MIDI_NOTE_POLY3_OUT:
                             if (note_buffer[m_ch].size() > 2)
                                 outputs[ch] = MIDIQuantizer::CV(GetNote(note_buffer[m_ch], 3));
                             else
-                                if (note_buffer[m_ch].size() == 2) // distribute notes evenly when 2 are played
-                                    outputs[ch] = MIDIQuantizer::CV(GetNoteBack(note_buffer[m_ch]));
+                                if (note_buffer[m_ch].size() == 2) // distribute notes evenly when only 2 are played
+                                    outputs[ch] = MIDIQuantizer::CV(GetNoteLast(note_buffer[m_ch]));
                                 else
-                                    outputs[ch] = MIDIQuantizer::CV(GetNoteFront(note_buffer[m_ch]));
+                                    outputs[ch] = MIDIQuantizer::CV(GetNoteFirst(note_buffer[m_ch]));
                             break;
 
                         case HEM_MIDI_NOTE_POLY4_OUT:
                             if (note_buffer[m_ch].size() > 3)
                                 outputs[ch] = MIDIQuantizer::CV(GetNote(note_buffer[m_ch], 4));
                             else
-                                outputs[ch] = MIDIQuantizer::CV(GetNoteFront(note_buffer[m_ch]));
+                                outputs[ch] = MIDIQuantizer::CV(GetNoteFirst(note_buffer[m_ch]));
                             break;
 
                         case HEM_MIDI_NOTE_MIN_OUT:
@@ -303,11 +308,11 @@ typedef struct IOFrame {
                             break;
 
                         case HEM_MIDI_NOTE_PEDAL_OUT:
-                            outputs[ch] = MIDIQuantizer::CV(GetNoteFront(note_buffer[m_ch]));
+                            outputs[ch] = MIDIQuantizer::CV(GetNoteFirst(note_buffer[m_ch]));
                             break;
 
                         case HEM_MIDI_NOTE_INV_OUT:
-                            outputs[ch] = MIDIQuantizer::CV(GetNoteInv(note_buffer[m_ch]));
+                            outputs[ch] = MIDIQuantizer::CV(GetNoteLastInv(note_buffer[m_ch]));
                             break;
                     }
 
@@ -321,8 +326,20 @@ typedef struct IOFrame {
                     if (function[ch] == HEM_MIDI_GATE_INV_OUT)
                         outputs[ch] = 0;
 
-                    if (function[ch] == HEM_MIDI_VEL_OUT)
-                        outputs[ch] = Proportion(note_buffer[m_ch].back().vel, 127, HEMISPHERE_MAX_CV);
+                    switch (function[ch]) {
+                        case HEM_MIDI_VEL_OUT:
+                            outputs[ch] = (note_buffer[m_ch].size() > 0) ? Proportion(GetVel(note_buffer[m_ch], 1), 127, HEMISPHERE_MAX_CV) : 0;
+                            break;
+                        case HEM_MIDI_VEL2_OUT:
+                            outputs[ch] = (note_buffer[m_ch].size() > 1) ? Proportion(GetVel(note_buffer[m_ch], 2), 127, HEMISPHERE_MAX_CV) : 0;
+                            break;
+                        case HEM_MIDI_VEL3_OUT:
+                            outputs[ch] = (note_buffer[m_ch].size() > 2) ? Proportion(GetVel(note_buffer[m_ch], 3), 127, HEMISPHERE_MAX_CV) : 0;
+                            break;
+                        case HEM_MIDI_VEL4_OUT:
+                            outputs[ch] = (note_buffer[m_ch].size() > 3) ? Proportion(GetVel(note_buffer[m_ch], 4), 127, HEMISPHERE_MAX_CV) : 0;
+                            break;
+                    }
 
                     if (!log_skip) log_this = 1; // Log all MIDI notes. Other stuff is conditional.
                     break;
@@ -333,27 +350,30 @@ typedef struct IOFrame {
                     if (note_buffer[m_ch].size() > 0) { // don't update output when last note is released
                         switch(function[ch]) { // note # output functions
                             case HEM_MIDI_NOTE_OUT:
-                            case HEM_MIDI_NOTE_POLY1_OUT:
-                                outputs[ch] = MIDIQuantizer::CV(GetNoteBack(note_buffer[m_ch]));
+                                outputs[ch] = MIDIQuantizer::CV(GetNoteLast(note_buffer[m_ch]));
                                 break;
 
                             case HEM_MIDI_NOTE_POLY2_OUT:
                                 if (note_buffer[m_ch].size() < 2)
-                                    outputs[ch] = MIDIQuantizer::CV(GetNoteBack(note_buffer[m_ch]));
+                                    outputs[ch] = MIDIQuantizer::CV(GetNoteLast(note_buffer[m_ch]));
                                 else
                                     outputs[ch] = MIDIQuantizer::CV(GetNote(note_buffer[m_ch], 2));
                                 break;
 
                             case HEM_MIDI_NOTE_POLY3_OUT:
-                                if (note_buffer[m_ch].size() < 3)
-                                    outputs[ch] = MIDIQuantizer::CV(GetNoteFront(note_buffer[m_ch]));
-                                else
+                                if (note_buffer[m_ch].size() < 3) {
+                                    if (note_buffer[m_ch].size() == 2) // distribute notes evenly when only 2 are played
+                                        outputs[ch] = MIDIQuantizer::CV(GetNoteLast(note_buffer[m_ch]));
+                                    else
+                                        outputs[ch] = MIDIQuantizer::CV(GetNoteFirst(note_buffer[m_ch]));
+                                } else {
                                     outputs[ch] = MIDIQuantizer::CV(GetNote(note_buffer[m_ch], 3));
+                                }
                                 break;
 
                             case HEM_MIDI_NOTE_POLY4_OUT:
                                 if (note_buffer[m_ch].size() < 4)
-                                    outputs[ch] = MIDIQuantizer::CV(GetNoteFront(note_buffer[m_ch]));
+                                    outputs[ch] = MIDIQuantizer::CV(GetNoteFirst(note_buffer[m_ch]));
                                 else
                                     outputs[ch] = MIDIQuantizer::CV(GetNote(note_buffer[m_ch], 4));
                                 break;
@@ -367,11 +387,11 @@ typedef struct IOFrame {
                                 break;
 
                             case HEM_MIDI_NOTE_PEDAL_OUT:
-                                outputs[ch] = MIDIQuantizer::CV(GetNoteFront(note_buffer[m_ch]));
+                                outputs[ch] = MIDIQuantizer::CV(GetNoteFirst(note_buffer[m_ch]));
                                 break;
 
                             case HEM_MIDI_NOTE_INV_OUT:
-                                outputs[ch] = MIDIQuantizer::CV(GetNoteInv(note_buffer[m_ch]));
+                                outputs[ch] = MIDIQuantizer::CV(GetNoteLastInv(note_buffer[m_ch]));
                                 break;
                         }
                     }
@@ -389,8 +409,20 @@ typedef struct IOFrame {
                             trigout_q[ch] = 1;
                     }
 
-                    if (function[ch] == HEM_MIDI_VEL_OUT)
-                        outputs[ch] = (note_buffer[m_ch].size() > 0) ? Proportion(note_buffer[m_ch].back().vel, 127, HEMISPHERE_MAX_CV) : 0;
+                    switch (function[ch]) {
+                        case HEM_MIDI_VEL_OUT:
+                            outputs[ch] = (note_buffer[m_ch].size() > 0) ? Proportion(GetVel(note_buffer[m_ch], 1), 127, HEMISPHERE_MAX_CV) : 0;
+                            break;
+                        case HEM_MIDI_VEL2_OUT:
+                            outputs[ch] = (note_buffer[m_ch].size() > 1) ? Proportion(GetVel(note_buffer[m_ch], 2), 127, HEMISPHERE_MAX_CV) : 0;
+                            break;
+                        case HEM_MIDI_VEL3_OUT:
+                            outputs[ch] = (note_buffer[m_ch].size() > 2) ? Proportion(GetVel(note_buffer[m_ch], 3), 127, HEMISPHERE_MAX_CV) : 0;
+                            break;
+                        case HEM_MIDI_VEL4_OUT:
+                            outputs[ch] = (note_buffer[m_ch].size() > 3) ? Proportion(GetVel(note_buffer[m_ch], 4), 127, HEMISPHERE_MAX_CV) : 0;
+                            break;
+                    }
 
                     if (!log_skip) log_this = 1;
                     break;
