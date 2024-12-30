@@ -17,6 +17,10 @@ template <
   size_t CrossfadeSamples = 2048>
 class AudioDelayExt : public AudioStream {
 public:
+  static constexpr float MAX_DELAY_SECS
+    = BufferLength / AUDIO_SAMPLE_RATE_EXACT;
+  static constexpr float MIN_DELAY_SECS = ChunkSize / AUDIO_SAMPLE_RATE_EXACT;
+
   AudioDelayExt() : AudioStream(1, input_queue_array) {
     delay_secs.fill(OnePole(Interpolated(0.0f, AUDIO_BLOCK_SAMPLES), 0.0002f));
     fb.fill(Interpolated(0.0f, AUDIO_BLOCK_SAMPLES / ChunkSize));
@@ -27,9 +31,10 @@ public:
     // TODO xfade lut should be static
     xfade_in_scalars = new q15_t[CrossfadeSamples];
     xfade_out_scalars = new q15_t[CrossfadeSamples];
-    for (int i = 0; i < 2048; i++) {
+    float n = static_cast<float>(CrossfadeSamples - 1);
+    for (size_t i = 0; i < CrossfadeSamples; i++) {
       float out, in;
-      EqualPowerFade(out, in, i / 2047.0f);
+      EqualPowerFade(out, in, i / n);
       xfade_in_scalars[i] = float_to_q15(in);
       xfade_out_scalars[i] = float_to_q15(out);
     }
@@ -42,11 +47,13 @@ public:
   }
 
   void delay(size_t tap, float secs) {
+    CONSTRAIN(secs, MIN_DELAY_SECS, MAX_DELAY_SECS);
     delay_secs[tap] = secs;
     if (delay_secs[tap].Read() == 0.0f) delay_secs[tap].Reset();
   }
 
   void cf_delay(size_t tap, float secs) {
+    CONSTRAIN(secs, MIN_DELAY_SECS, MAX_DELAY_SECS);
     auto& t = target_delay[tap];
     if (t.phase >= CrossfadeSamples && t.target != secs) {
       // 0.0005f comes from variation

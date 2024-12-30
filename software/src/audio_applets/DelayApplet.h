@@ -3,6 +3,7 @@
 #include "HSicons.h"
 #include "HemisphereAudioApplet.h"
 #include "dsputils.h"
+#include "dsputils_arm.h"
 #include "Audio/AudioDelayExt.h"
 #include "Audio/AudioMixer.h"
 #include "Audio/AudioPassthrough.h"
@@ -57,7 +58,9 @@ public:
         break;
       default:
       case SECS:
-        d = DelaySecsFromMs(delay_time + delay_cv.Process(delay_time_cv.In()));
+        d = DelaySecsFromMs(
+          delay_time + 0.1f * delay_cv.Process(delay_time_cv.In())
+        );
         break;
     }
     for (int tap = 0; tap < taps; tap++) {
@@ -96,9 +99,14 @@ public:
 
     if (Channels == STEREO) {
       for (auto& ch : channels) {
-        // The tap mixer has already used equal power mixing on the taps so no
-        // need to do it here.
-        ch.input_mixer.gain(PP_CH, constrain(-total_feedback, 0.0f, 2.0f));
+        // The tap mixer has already used equal power mixing on the taps. With
+        // feedback, we want equal amplitude, so just multiply by one more
+        // factor of equal power and voila (since equal amplitude scalars are
+        // the square roots of equal power)
+        ch.input_mixer.gain(
+          PP_CH,
+          constrain(-total_feedback * EQUAL_POWER_EQUAL_MIX[taps], 0.0f, 2.0f)
+        );
       }
     }
     float dry_gain, wet_gain;
@@ -227,14 +235,18 @@ public:
             delay_time += knob_accel;
             delay_time *= 16;
 
-            // -8 * 12 * 128 -> ~1 Hz
-            // 6 * 12 * 128 -> ~17kHz
-            CONSTRAIN(delay_time, -8 * 12 * 128, 6 * 12 * 128);
+            CONSTRAIN(
+              delay_time,
+              static_cast<int>(PitchFromDelaySecs(1.0f)),
+              static_cast<int>(PitchFromDelaySecs(MIN_DELAY_SECS)) - 1
+            );
             break;
           case SECS:
             delay_time += knob_accel;
             CONSTRAIN(
-              delay_time, 1, static_cast<int>(MAX_DELAY_SECS * 1000) - 1
+              delay_time,
+              static_cast<int>(MIN_DELAY_SECS * 1000),
+              static_cast<int>(MAX_DELAY_SECS * 1000) - 1
             );
             break;
         }
@@ -305,12 +317,18 @@ public:
     return &output_stream;
   }
 
-  float DelaySecsFromPitch(int pitch) {
-    return constrain(PitchToRatio(-pitch) / (C3 * 2), 0.0f, MAX_DELAY_SECS);
+  int PitchFromDelaySecs(float secs) {
+    return -RatioToPitch(C3 * 2 * secs);
   }
 
-  float DelaySecsFromMs(int ms) {
-    return constrain(0.001f * ms, 0.0f, MAX_DELAY_SECS);
+  float DelaySecsFromPitch(int pitch) {
+    return constrain(
+      PitchToRatio(-pitch) / (C3 * 2), MIN_DELAY_SECS, MAX_DELAY_SECS
+    );
+  }
+
+  float DelaySecsFromMs(float ms) {
+    return constrain(0.001f * ms, MIN_DELAY_SECS, MAX_DELAY_SECS);
   }
 
   float DelaySecsFromRatio(int ratio) {
@@ -336,6 +354,12 @@ protected:
   }
 
 private:
+  // Uses 1MB of psram and gives just under 12 secs of delay time.
+  static const size_t DELAY_LENGTH = 1024 * 512;
+  typedef AudioDelayExt<DELAY_LENGTH, 9> DelayStream;
+  static constexpr float MAX_DELAY_SECS = DelayStream::MAX_DELAY_SECS;
+  static constexpr float MIN_DELAY_SECS = DelayStream::MIN_DELAY_SECS;
+
   enum Cursor {
     CLOCK_SOURCE,
     TIME,
@@ -411,15 +435,11 @@ private:
 
   static const uint8_t PP_CH = 1;
 
-  // Uses 1MB of psram and gives just under 12 secs of delay time.
-  static const size_t DELAY_LENGTH = 1024 * 512;
-  static constexpr float MAX_DELAY_SECS = DELAY_LENGTH / AUDIO_SAMPLE_RATE;
-
   AudioPassthrough<Channels> input_stream;
   struct {
     AudioMixer<2> input_mixer;
     // 9th tap is freeze head
-    AudioDelayExt<DELAY_LENGTH, 9> delay;
+    DelayStream delay;
     AudioMixer<8> taps_mixer;
     AudioMixer<2> wet_dry_mixer;
 
