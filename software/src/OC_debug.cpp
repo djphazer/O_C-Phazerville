@@ -197,7 +197,7 @@ static void debug_menu_audio() {
 
 #ifdef PEWPEWPEW
 static void debug_menu_pewpewpew() {
-  int i = 0;
+  uint32_t i = 0;
   do {
     graphics.drawBitmap8(i*8 % 120, (i+8) % 56, 8, ZAP_ICON);
   } while (++i < (millis() / 10 % 64));

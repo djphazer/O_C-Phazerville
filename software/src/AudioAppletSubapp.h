@@ -9,6 +9,7 @@
 #include "UI/ui_events.h"
 #include "util/util_tuples.h"
 #include <Audio.h>
+#include <cstdint>
 
 using std::array, std::tuple;
 
@@ -118,8 +119,8 @@ public:
     }
     ForEachChannel(side) {
       if (edit_state != (1 - side) + 1) {
-        for (int slot = 0; slot < Slots + 1; slot++) {
-          draw_peak(side, slot);
+        for (uint_fast8_t slot = 0; slot < Slots + 1; slot++) {
+          draw_peak(static_cast<HEM_SIDE>(side), slot);
         }
       }
     }
@@ -416,7 +417,7 @@ private:
     if (IsStereo(slot)) {
       const char* name = get_stereo_applet(slot).applet_name();
       const int l = strlen(name);
-      int xs[] = {64 - l * 3, 63 - l * 6, 64 };
+      int xs[] = {64 - l * 3, 63 - l * 6, 64};
       int x = xs[edit_state];
       gfxPrint(x, y, get_stereo_applet(slot).applet_name());
     } else {
