@@ -3,6 +3,7 @@
 #include "AudioBuffer.h"
 #include "AudioParam.h"
 #include "dsputils.h"
+#include "dsputils_arm.h"
 #include "util/util_macros.h"
 #include <Audio.h>
 #include <cstdint>
@@ -11,15 +12,17 @@ template <
   size_t BufferLength = static_cast<size_t>(AUDIO_SAMPLE_RATE),
   size_t Taps = 1,
   // ChunkSize *must* evenly divide AUDIO_BLOCK_SAMPLES
-  size_t ChunkSize = 16,
+  size_t ChunkSize = 8,
   // Crossfade time will be AUDIO_SAMPLE_RATE / CrossfadeSamples
   // 2048 give ~48ms, or ~22hz, just below human audio range
   size_t CrossfadeSamples = 2048>
 class AudioDelayExt : public AudioStream {
 public:
+  // -1 and +2 to ensure we have enough points for hermite interpolation
   static constexpr float MAX_DELAY_SECS
-    = BufferLength / AUDIO_SAMPLE_RATE_EXACT;
-  static constexpr float MIN_DELAY_SECS = ChunkSize / AUDIO_SAMPLE_RATE_EXACT;
+    = (BufferLength - 1) / AUDIO_SAMPLE_RATE_EXACT;
+  static constexpr float MIN_DELAY_SECS
+    = (ChunkSize + 2) / AUDIO_SAMPLE_RATE_EXACT;
 
   AudioDelayExt() : AudioStream(1, input_queue_array) {
     delay_secs.fill(OnePole(Interpolated(0.0f, AUDIO_BLOCK_SAMPLES), 0.0002f));
