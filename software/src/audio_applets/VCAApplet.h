@@ -1,3 +1,5 @@
+#pragma once
+
 #include "HemisphereAudioApplet.h"
 #include "dsputils.h"
 #include "dsputils_arm.h"
@@ -36,7 +38,7 @@ public:
   void Controller() {
     float lin_cv = level_cv.InF(1.0f);
     float cv = shape > 0 ? varexp(0.3f * shape, lin_cv) : lin_cv;
-    cv_stream.Push(float_to_q15(cv));
+    cv_stream.Push(float_to_q15(invert ? -cv : cv));
   }
 
   void View() {
@@ -65,6 +67,11 @@ public:
     gfxStartCursor();
     gfxPrintIcon(rectify ? CHECK_ON_ICON : CHECK_OFF_ICON);
     gfxEndCursor(cursor == 5);
+
+    gfxPrint(1, 55, "Invert:  ");
+    gfxStartCursor();
+    gfxPrintIcon(invert ? CHECK_ON_ICON : CHECK_OFF_ICON);
+    gfxEndCursor(cursor == 6);
   }
 
   void OnEncoderMove(int direction) {
@@ -90,6 +97,9 @@ public:
         break;
       case 5:
         SetRectify(!rectify);
+        break;
+      case 6:
+        invert = !invert;
         break;
     }
   }
@@ -127,7 +137,7 @@ protected:
   void SetHelp() override {}
 
 private:
-  static const int NUM_PARAMS = 6;
+  static const int NUM_PARAMS = 7;
   // -90 = 15bits of depth so no point in going lower
   static const int VCA_MIN_DB = -90;
   static const int VCA_MAX_DB = 90;
@@ -139,6 +149,7 @@ private:
   CVInput level_cv;
   CVInput shape_cv;
   bool rectify = true;
+  bool invert = false;
 
   AudioPassthrough<Channels> input;
   InterpolatingStream<> cv_stream;
