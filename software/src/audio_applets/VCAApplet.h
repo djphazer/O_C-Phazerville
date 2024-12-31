@@ -1,6 +1,8 @@
 #include "HemisphereAudioApplet.h"
 #include "dsputils.h"
+#include "dsputils_arm.h"
 #include "Audio/AudioPassthrough.h"
+#include "Audio/AudioVCA.h"
 #include "Audio/InterpolatingStream.h"
 #include <Audio.h>
 
@@ -17,12 +19,13 @@ public:
     cv_stream.Method(INTERPOLATION_LINEAR);
     cv_stream.Acquire();
     for (int i = 0; i < Channels; i++) {
-      in_conns[i].connect(input, i, muls[i], 0);
-      cv_conns[i].connect(cv_stream, 0, muls[i], 1);
-      mul_to_mixer[i].connect(muls[i], 0, bias_mixer[i], 0);
-      bias_to_mixer[i].connect(input, i, bias_mixer[i], 1);
-      out_conns[i].connect(bias_mixer[i], 0, output, i);
+      in_conns[i].connect(input, i, vcas[i], 0);
+      cv_conns[i].connect(cv_stream, 0, vcas[i], 1);
+      out_conns[i].connect(vcas[i], 0, output, i);
     }
+    SetLevel(level);
+    SetBias(bias);
+    SetRectify(rectify);
   }
 
   void Unload() {
@@ -32,15 +35,8 @@ public:
 
   void Controller() {
     float lin_cv = level_cv.InF(1.0f);
-    if (rectify && lin_cv < 0.0f) lin_cv = 0.0f;
-    float cv = 32768.0f * (shape > 0 ? varexp(0.3f * shape, lin_cv) : lin_cv);
-    cv_stream.Push(Clip16(cv));
-    float lvl_scalar = level < VCA_MIN_DB ? 0.0f : dbToScalar(level);
-    float off_scalar = offset < VCA_MIN_DB ? 0.0f : dbToScalar(offset);
-    for (int i = 0; i < Channels; i++) {
-      bias_mixer[i].gain(0, lvl_scalar);
-      bias_mixer[i].gain(1, off_scalar);
-    }
+    float cv = shape > 0 ? varexp(0.3f * shape, lin_cv) : lin_cv;
+    cv_stream.Push(float_to_q15(cv));
   }
 
   void View() {
@@ -54,7 +50,7 @@ public:
 
     gfxPrint(1, 25, "Off:");
     gfxStartCursor();
-    gfxPrintDb(offset);
+    gfxPrintDb(bias);
     gfxEndCursor(cursor == 2);
 
     gfxPrint(1, 35, "Exp: ");
@@ -78,13 +74,13 @@ public:
     }
     switch (cursor) {
       case 0:
-        level = constrain(level + direction, VCA_MIN_DB - 1.0f, VCA_MAX_DB);
+        SetLevel(level + direction);
         break;
       case 1:
         level_cv.ChangeSource(direction);
         break;
       case 2:
-        offset = constrain(offset + direction, VCA_MIN_DB - 1.0f, VCA_MAX_DB);
+        SetBias(bias + direction);
         break;
       case 3:
         shape = constrain(shape + direction, 0, 100);
@@ -93,7 +89,7 @@ public:
         shape_cv.ChangeSource(direction);
         break;
       case 5:
-        rectify = !rectify;
+        SetRectify(!rectify);
         break;
     }
   }
@@ -110,6 +106,23 @@ public:
     return &output;
   }
 
+  void SetLevel(int lvl) {
+    level = constrain(lvl, VCA_MIN_DB - 1, VCA_MAX_DB);
+    float lvl_scalar = level < VCA_MIN_DB ? 0.0f : dbToScalar(level);
+    for (auto& vca : vcas) vca.level(lvl_scalar);
+  }
+
+  void SetBias(int b) {
+    bias = constrain(b, VCA_MIN_DB - 1, VCA_MAX_DB);
+    float bias_scalar = bias < VCA_MIN_DB ? 0.0f : dbToScalar(bias);
+    for (auto& vca : vcas) vca.bias(bias_scalar);
+  }
+
+  void SetRectify(bool r) {
+    rectify = r;
+    for (auto& vca : vcas) vca.rectify(rectify);
+  }
+
 protected:
   void SetHelp() override {}
 
@@ -121,7 +134,7 @@ private:
 
   int8_t cursor = 0;
   int8_t level = 0;
-  int8_t offset = VCA_MIN_DB - 1;
+  int8_t bias = VCA_MIN_DB - 1;
   int8_t shape = 0;
   CVInput level_cv;
   CVInput shape_cv;
@@ -129,14 +142,11 @@ private:
 
   AudioPassthrough<Channels> input;
   InterpolatingStream<> cv_stream;
-  std::array<AudioEffectMultiply, Channels> muls;
-  std::array<AudioMixer<2>, Channels> bias_mixer;
+  std::array<AudioVCA, Channels> vcas;
   AudioPassthrough<Channels> output;
 
   std::array<AudioConnection, Channels> in_conns;
   std::array<AudioConnection, Channels> cv_conns;
-  std::array<AudioConnection, Channels> mul_to_mixer;
-  std::array<AudioConnection, Channels> bias_to_mixer;
   std::array<AudioConnection, Channels> out_conns;
 
   void gfxPrintDb(int db) {
