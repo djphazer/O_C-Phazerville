@@ -105,46 +105,29 @@ public:
     for (size_t i = 0; i < Slots; i++) {
       print_applet_line(i);
     }
-    switch (edit_state) {
-      case EDIT_LEFT:
-        gfxInvert(0, left_cursor * 10 + 14, 64, 9);
-        break;
-      case EDIT_RIGHT:
-        gfxInvert(64, right_cursor * 10 + 14, 64, 9);
-        break;
-      case EDIT_NONE:
-        gfxIcon(0, left_cursor * 10 + 15, RIGHT_ICON);
-        gfxIcon(120, right_cursor * 10 + 15, LEFT_ICON);
-        break;
-    }
-    ForEachChannel(side) {
-      if (edit_state != (1 - side) + 1) {
-        for (uint_fast8_t slot = 0; slot < Slots + 1; slot++) {
-          draw_peak(static_cast<HEM_SIDE>(side), slot);
-        }
-      }
-    }
 
-    if (edit_state == EDIT_LEFT) {
-      HemisphereAudioApplet& applet = IsStereo(left_cursor)
-        ? get_stereo_applet(left_cursor)
-        : get_mono_applet(LEFT_HEMISPHERE, left_cursor);
-      applet.BaseView();
-    } else {
-      gfxPos(65, 2);
-      graphics.printf("MEM%3d%%) R", mem_percent);
-      gfxDottedLine(64, 10, 126, 10);
-    }
-    if (edit_state == EDIT_RIGHT) {
-      HemisphereAudioApplet& applet = IsStereo(right_cursor)
-        ? get_stereo_applet(right_cursor)
-        : get_mono_applet(RIGHT_HEMISPHERE, right_cursor);
-      applet.BaseView();
-    } else {
-      // gfxPrint(1, 2, "L Channel");
-      gfxPos(1, 2);
-      graphics.printf("L (CPU%3d%%", cpu_percent);
-      gfxDottedLine(0, 10, 62, 10);
+    ForEachChannel(side) {
+      HEM_SIDE s = static_cast<HEM_SIDE>(side);
+      if (state[side] == EDIT_APPLET) {
+        HemisphereApplet* applet = get_selected_applet(s);
+        applet->SetDisplaySide(s);
+        applet->BaseView();
+      } else {
+        int y = cursor[side] * 10 + 14;
+        if (state[side] == SWITCH_APPLET) {
+          int x = IsStereo(cursor[side]) ? 32 : 64 * side;
+          gfxInvert(x, y, 64, 9);
+        } else {
+          gfxIcon(120 * side, y + 1, side ? LEFT_ICON : RIGHT_ICON);
+        }
+        for (uint_fast8_t slot = 0; slot < Slots + 1; slot++) {
+          draw_peak(s, slot);
+        }
+
+        gfxPos(1 + 64 * side, 2);
+        if (side) graphics.printf("MEM%3d%%) R", mem_percent);
+        else graphics.printf("L (CPU%3d%%", cpu_percent);
+      }
     }
 
     // Recall that unsigned substraction rolls over correclty, so when millis()
@@ -161,15 +144,11 @@ public:
     }
   }
 
+  // TODO: Rename this and change something else to aux button
   void HandleAuxButtonEvent(const UI::Event& event) {
-    if (event.type == UI::EVENT_BUTTON_DOWN) {
-      bool forwardPress
-        = (event.control == OC::CONTROL_BUTTON_X && edit_state == EDIT_LEFT)
-        || (event.control == OC::CONTROL_BUTTON_Y && edit_state == EDIT_RIGHT);
-
-      if (forwardPress) {
-        get_selected_applet()->AuxButton();
-      }
+    if (event.type == UI::EVENT_BUTTON_PRESS) {
+      if (event.control == OC::CONTROL_BUTTON_X) state[0] = MOVE_CURSOR;
+      if (event.control == OC::CONTROL_BUTTON_Y) state[1] = MOVE_CURSOR;
     }
   }
 
@@ -177,46 +156,47 @@ public:
     if ((event.mask & OC::CONTROL_BUTTON_L)
         && (event.mask & OC::CONTROL_BUTTON_R)) {
       // check ready_for_press to suppress double events on button combos
-      if (left_cursor == right_cursor && ready_for_press) {
-        stereo ^= 1 << left_cursor;
-        if (IsStereo(left_cursor)) {
-          get_mono_applet(LEFT_HEMISPHERE, left_cursor).Unload();
-          get_mono_applet(RIGHT_HEMISPHERE, left_cursor).Unload();
-          get_stereo_applet(left_cursor).BaseStart(LEFT_HEMISPHERE);
-          ConnectStereoToNext(left_cursor);
-          if (left_cursor > 0) ConnectSlotToNext(left_cursor - 1);
+      if (cursor[0] == cursor[1] && ready_for_press) {
+        int c = cursor[0];
+        stereo ^= 1 << c;
+        if (IsStereo(c)) {
+          get_mono_applet(LEFT_HEMISPHERE, c).Unload();
+          get_mono_applet(RIGHT_HEMISPHERE, c).Unload();
+          get_stereo_applet(c).BaseStart(LEFT_HEMISPHERE);
+          ConnectStereoToNext(c);
+          if (c > 0) ConnectSlotToNext(c - 1);
         } else {
-          get_stereo_applet(left_cursor).Unload();
-          get_mono_applet(LEFT_HEMISPHERE, left_cursor)
-            .BaseStart(LEFT_HEMISPHERE);
-          get_mono_applet(RIGHT_HEMISPHERE, left_cursor)
-            .BaseStart(RIGHT_HEMISPHERE);
-          ConnectMonoToNext(LEFT_HEMISPHERE, left_cursor);
-          ConnectMonoToNext(RIGHT_HEMISPHERE, left_cursor);
-          if (left_cursor > 0) ConnectSlotToNext(left_cursor - 1);
+          get_stereo_applet(c).Unload();
+          get_mono_applet(LEFT_HEMISPHERE, c).BaseStart(LEFT_HEMISPHERE);
+          get_mono_applet(RIGHT_HEMISPHERE, c).BaseStart(RIGHT_HEMISPHERE);
+          ConnectMonoToNext(LEFT_HEMISPHERE, c);
+          ConnectMonoToNext(RIGHT_HEMISPHERE, c);
+          if (c > 0) ConnectSlotToNext(c - 1);
         }
       }
       // Prevent press detection when doing a button combo
       ready_for_press = false;
     } else if (event.type == UI::EVENT_BUTTON_PRESS && ready_for_press) {
-      bool forwardPress
-        = (event.control == OC::CONTROL_BUTTON_R && edit_state == EDIT_LEFT)
-        || (event.control == OC::CONTROL_BUTTON_L && edit_state == EDIT_RIGHT);
-      if (forwardPress) {
-        get_selected_applet()->OnButtonPress();
-      } else {
-        edit_state = edit_state == EDIT_NONE
-          ? (event.control == OC::CONTROL_BUTTON_L ? EDIT_LEFT : EDIT_RIGHT)
-          : EDIT_NONE;
-        if (edit_state != EDIT_NONE) {
-          get_selected_applet()->SetDisplaySide(
-            event.control == OC::CONTROL_BUTTON_L ? RIGHT_HEMISPHERE
-                                                  : LEFT_HEMISPHERE
-          );
-        }
-      }
+      if (event.control == OC::CONTROL_BUTTON_L)
+        HandleEncoderPress(LEFT_HEMISPHERE);
+      if (event.control == OC::CONTROL_BUTTON_R)
+        HandleEncoderPress(RIGHT_HEMISPHERE);
     } else if (event.type == UI::EVENT_BUTTON_DOWN) {
       ready_for_press = true;
+    }
+  }
+
+  void HandleEncoderPress(HEM_SIDE side) {
+    switch (state[side]) {
+      case MOVE_CURSOR:
+        state[side] = SWITCH_APPLET;
+        break;
+      case SWITCH_APPLET:
+        state[side] = EDIT_APPLET;
+        break;
+      case EDIT_APPLET:
+        get_selected_applet(side)->OnButtonPress();
+        break;
     }
   }
 
@@ -227,9 +207,6 @@ public:
     sel = constrain(sel + dir, 0, n - 1);
     auto& app = get_stereo_applet(slot);
     app.BaseStart(side);
-    app.SetDisplaySide(
-      side == LEFT_HEMISPHERE ? RIGHT_HEMISPHERE : LEFT_HEMISPHERE
-    );
     ConnectStereoToNext(slot);
     if (slot > 0) ConnectSlotToNext(slot - 1);
   }
@@ -241,9 +218,6 @@ public:
     sel = constrain(sel + dir, 0, n - 1);
     auto& app = get_mono_applet(side, slot);
     app.BaseStart(side);
-    app.SetDisplaySide(
-      side == LEFT_HEMISPHERE ? RIGHT_HEMISPHERE : LEFT_HEMISPHERE
-    );
     ConnectMonoToNext(side, slot);
     if (slot > 0) ConnectSlotToNext(slot - 1);
   }
@@ -256,40 +230,25 @@ public:
 
   void HandleEncoderEvent(const UI::Event& event) {
     int dir = event.value;
-    if (event.control == OC::CONTROL_ENCODER_L) {
-      switch (edit_state) {
-        case EDIT_LEFT:
-          if (IsStereo(left_cursor)) {
-            ChangeStereoApplet(LEFT_HEMISPHERE, left_cursor, dir);
-          } else {
-            ChangeMonoApplet(LEFT_HEMISPHERE, left_cursor, dir);
-          }
-          break;
-        case EDIT_RIGHT: {
-          ForwardEncoderMove(RIGHT_HEMISPHERE, right_cursor, dir);
-          break;
-        }
-        case EDIT_NONE:
-          left_cursor = constrain(left_cursor + dir, 0, (int)Slots - 1);
-          break;
-      }
-    } else if (event.control == OC::CONTROL_ENCODER_R) {
-      switch (edit_state) {
-        case EDIT_RIGHT:
-          if (IsStereo(right_cursor)) {
-            ChangeStereoApplet(RIGHT_HEMISPHERE, right_cursor, dir);
-          } else {
-            ChangeMonoApplet(RIGHT_HEMISPHERE, right_cursor, dir);
-          }
-          break;
-        case EDIT_LEFT: {
-          ForwardEncoderMove(LEFT_HEMISPHERE, left_cursor, dir);
-          break;
-        }
-        case EDIT_NONE:
-          right_cursor = constrain(right_cursor + dir, 0, (int)Slots - 1);
-          break;
-      }
+    if (event.control == OC::CONTROL_ENCODER_L)
+      HandleEncoderEvent(LEFT_HEMISPHERE, dir);
+    if (event.control == OC::CONTROL_ENCODER_R)
+      HandleEncoderEvent(RIGHT_HEMISPHERE, dir);
+  }
+
+  void HandleEncoderEvent(HEM_SIDE side, int dir) {
+    int& c = cursor[side];
+    switch (state[side]) {
+      case MOVE_CURSOR:
+        c = constrain(c + dir, 0, static_cast<int>(Slots) - 1);
+        break;
+      case SWITCH_APPLET:
+        if (IsStereo(c)) ChangeStereoApplet(side, c, dir);
+        else ChangeMonoApplet(side, c, dir);
+        break;
+      case EDIT_APPLET:
+        ForwardEncoderMove(side, c, dir);
+        break;
     }
   }
 
@@ -377,14 +336,13 @@ private:
   uint32_t last_stats_update = 0;
 
   enum EditState {
-    EDIT_NONE,
-    EDIT_LEFT,
-    EDIT_RIGHT,
+    MOVE_CURSOR,
+    SWITCH_APPLET,
+    EDIT_APPLET,
   };
 
-  EditState edit_state = EDIT_NONE;
-  int left_cursor = 0;
-  int right_cursor = 0;
+  EditState state[2];
+  int cursor[2];
 
   int cursor_countdown;
 
@@ -400,15 +358,12 @@ private:
                      : *stereo_processor_applets[slot - 1][ix];
   }
 
-  HemisphereAudioApplet* get_selected_applet() {
-    if (edit_state == EDIT_NONE) return nullptr;
-    int cursor = edit_state == EDIT_LEFT ? left_cursor : right_cursor;
-    if (IsStereo(cursor)) {
-      return &get_stereo_applet(cursor);
+  HemisphereAudioApplet* get_selected_applet(HEM_SIDE side) {
+    int c = cursor[side];
+    if (IsStereo(c)) {
+      return &get_stereo_applet(c);
     } else {
-      return &get_mono_applet(
-        edit_state == EDIT_LEFT ? LEFT_HEMISPHERE : RIGHT_HEMISPHERE, cursor
-      );
+      return &get_mono_applet(side, c);
     }
   }
 
@@ -417,18 +372,23 @@ private:
     if (IsStereo(slot)) {
       const char* name = get_stereo_applet(slot).applet_name();
       const int l = strlen(name);
-      int xs[] = {64 - l * 3, 63 - l * 6, 64};
-      int x = xs[edit_state];
-      gfxPrint(x, y, get_stereo_applet(slot).applet_name());
-    } else {
-      if (edit_state != EDIT_RIGHT) {
-        gfxPrint(8, y, get_mono_applet(LEFT_HEMISPHERE, slot).applet_name());
+      if (state[0] != EDIT_APPLET && state[1] != EDIT_APPLET) {
+        gfxPrint(64 - l * 3, y, name);
+      } else {
+        ForEachChannel(side) {
+          if (state[side] != EDIT_APPLET && cursor[1 - side] != slot) {
+            gfxPrint(64 - (1 - side) * (1 + l * 6), y, name);
+          }
+        }
       }
-      if (edit_state != EDIT_LEFT) {
-        const char* name
-          = get_mono_applet(RIGHT_HEMISPHERE, slot).applet_name();
-        int l = strlen(name);
-        gfxPrint(118 - l * 6, y, name);
+    } else {
+      ForEachChannel(side) {
+        if (state[side] != EDIT_APPLET) {
+          const char* name
+            = get_mono_applet(static_cast<HEM_SIDE>(side), slot).applet_name();
+          int l = strlen(name);
+          gfxPrint(8 + side * (110 - l * 6), y, name);
+        }
       }
     }
   }
