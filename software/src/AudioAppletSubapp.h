@@ -115,7 +115,9 @@ public:
       } else {
         int y = cursor[side] * 10 + 14;
         if (state[side] == SWITCH_APPLET) {
-          int x = IsStereo(cursor[side]) ? 32 : 64 * side;
+          int x = IsStereo(cursor[side]) && state[1 - side] != EDIT_APPLET
+            ? 32
+            : 64 * side;
           gfxInvert(x, y, 64, 9);
         } else {
           gfxIcon(120 * side, y + 1, side ? LEFT_ICON : RIGHT_ICON);
