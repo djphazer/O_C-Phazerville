@@ -14,7 +14,7 @@ public:
     bias_ = gain;
   }
 
-  void rectify(float r) {
+  void rectify(bool r) {
     rectify_ = r;
   }
 
@@ -53,7 +53,7 @@ public:
 
 private:
   audio_block_t* inputQueueArray[2];
-  float level_ = 0.0f;
+  float level_ = 1.0f;
   float bias_ = 0.0f;
   bool rectify_ = false;
 };

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AudioAppletSubapp.h"
+#include "audio_applets/CrosspanApplet.h"
 #include "audio_applets/DelayApplet.h"
 #include "audio_applets/DynamicsApplet.h"
 #include "audio_applets/FilterFolderApplet.h"
@@ -32,6 +33,7 @@ DMAMEM std::tuple<
   mono_processors_pool[2][NUM_SLOTS - 1];
 DMAMEM std::tuple<
   PassthruApplet<STEREO>,
+  CrosspanApplet,
   DynamicsApplet<STEREO>,
   InputApplet<STEREO>,
   DelayApplet<STEREO>,
