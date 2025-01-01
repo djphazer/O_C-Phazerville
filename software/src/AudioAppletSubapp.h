@@ -62,12 +62,12 @@ public:
     for (size_t slot = 0; slot < Slots; slot++) {
       if (IsStereo(slot)) {
         get_stereo_applet(slot).BaseStart(LEFT_HEMISPHERE);
-        ConnectStereoToNext(slot);
+        ForEachChannel(side) ConnectStereoToNext(side, slot);
       } else {
-        get_mono_applet(LEFT_HEMISPHERE, slot).BaseStart(LEFT_HEMISPHERE);
-        get_mono_applet(RIGHT_HEMISPHERE, slot).BaseStart(RIGHT_HEMISPHERE);
-        ConnectMonoToNext(LEFT_HEMISPHERE, slot);
-        ConnectMonoToNext(RIGHT_HEMISPHERE, slot);
+        ForEachChannel(side) {
+          get_mono_applet(side, slot).BaseStart(side);
+          ConnectMonoToNext(side, slot);
+        }
       }
     }
     peak_conns[0][0].connect(OC::AudioIO::InputStream(), 0, peaks[0][0], 0);
@@ -173,18 +173,19 @@ public:
         int c = cursor[0];
         stereo ^= 1 << c;
         if (IsStereo(c)) {
-          get_mono_applet(LEFT_HEMISPHERE, c).Unload();
-          get_mono_applet(RIGHT_HEMISPHERE, c).Unload();
           get_stereo_applet(c).BaseStart(LEFT_HEMISPHERE);
-          ConnectStereoToNext(c);
-          if (c > 0) ConnectSlotToNext(c - 1);
+          ForEachChannel(side) {
+            get_mono_applet(side, c).Unload();
+            ConnectStereoToNext(side, c);
+            if (c > 0) ConnectSlotToNext(side, c - 1);
+          }
         } else {
           get_stereo_applet(c).Unload();
-          get_mono_applet(LEFT_HEMISPHERE, c).BaseStart(LEFT_HEMISPHERE);
-          get_mono_applet(RIGHT_HEMISPHERE, c).BaseStart(RIGHT_HEMISPHERE);
-          ConnectMonoToNext(LEFT_HEMISPHERE, c);
-          ConnectMonoToNext(RIGHT_HEMISPHERE, c);
-          if (c > 0) ConnectSlotToNext(c - 1);
+          ForEachChannel(side) {
+            get_mono_applet(side, c).BaseStart(side);
+            ConnectMonoToNext(side, c);
+            if (c > 0) ConnectSlotToNext(side, c - 1);
+          }
         }
       }
       // Prevent press detection when doing a button combo
@@ -220,8 +221,10 @@ public:
     sel = constrain(sel + dir, 0, n - 1);
     auto& app = get_stereo_applet(slot);
     app.BaseStart(side);
-    ConnectStereoToNext(slot);
-    if (slot > 0) ConnectSlotToNext(slot - 1);
+    ForEachChannel(side) ConnectStereoToNext(side, slot);
+    if (slot > 0) {
+      ForEachChannel(side) ConnectSlotToNext(side, slot - 1);
+    }
   }
 
   void ChangeMonoApplet(HEM_SIDE side, size_t slot, int dir) {
@@ -232,7 +235,7 @@ public:
     auto& app = get_mono_applet(side, slot);
     app.BaseStart(side);
     ConnectMonoToNext(side, slot);
-    if (slot > 0) ConnectSlotToNext(slot - 1);
+    if (slot > 0) ConnectSlotToNext(side, slot - 1);
   }
 
   void ForwardEncoderMove(HEM_SIDE side, size_t slot, int dir) {
@@ -265,12 +268,11 @@ public:
     }
   }
 
-  void ConnectSlotToNext(size_t slot) {
+  void ConnectSlotToNext(HEM_SIDE side, size_t slot) {
     if (IsStereo(slot)) {
-      ConnectStereoToNext(slot);
+      ConnectStereoToNext(side, slot);
     } else {
-      ConnectMonoToNext(LEFT_HEMISPHERE, slot);
-      ConnectMonoToNext(RIGHT_HEMISPHERE, slot);
+      ConnectMonoToNext(side, slot);
     }
   }
 
@@ -292,30 +294,21 @@ public:
     peak_conns[side][slot + 1].connect(*stream, 0, peaks[side][slot + 1], 0);
   }
 
-  void ConnectStereoToNext(size_t slot) {
+  void ConnectStereoToNext(HEM_SIDE side, size_t slot) {
     AudioStream* stream = get_stereo_applet(slot).OutputStream();
-    AudioConnection& lconn = conns[LEFT_HEMISPHERE][slot];
-    AudioConnection& rconn = conns[RIGHT_HEMISPHERE][slot];
-    lconn.disconnect();
-    rconn.disconnect();
+    AudioConnection& conn = conns[side][slot];
+    conn.disconnect();
     if (slot + 1 < Slots && !IsStereo(slot + 1)) {
-      AudioStream* lstream
-        = get_mono_applet(LEFT_HEMISPHERE, slot + 1).InputStream();
-      AudioStream* rstream
-        = get_mono_applet(RIGHT_HEMISPHERE, slot + 1).InputStream();
-      lconn.connect(*stream, 0, *lstream, 0);
-      rconn.connect(*stream, 1, *rstream, 0);
+      AudioStream* next_stream = get_mono_applet(side, slot + 1).InputStream();
+      conn.connect(*stream, side, *next_stream, 0);
     } else {
       AudioStream* next_stream = slot + 1 < Slots
         ? get_stereo_applet(slot + 1).InputStream()
         : &OC::AudioIO::OutputStream();
-      lconn.connect(*stream, 0, *next_stream, 0);
-      rconn.connect(*stream, 1, *next_stream, 1);
+      conn.connect(*stream, side, *next_stream, side);
     }
-    peak_conns[0][slot + 1].disconnect();
-    peak_conns[0][slot + 1].connect(*stream, 0, peaks[0][slot + 1], 0);
-    peak_conns[1][slot + 1].disconnect();
-    peak_conns[1][slot + 1].connect(*stream, 1, peaks[1][slot + 1], 0);
+    peak_conns[side][slot + 1].disconnect();
+    peak_conns[side][slot + 1].connect(*stream, side, peaks[side][slot + 1], 0);
   }
 
 protected:
