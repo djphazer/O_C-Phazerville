@@ -146,11 +146,22 @@ public:
     }
   }
 
-  // TODO: Rename this and change something else to aux button
   void HandleAuxButtonEvent(const UI::Event& event) {
     if (event.type == UI::EVENT_BUTTON_PRESS) {
-      if (event.control == OC::CONTROL_BUTTON_X) state[0] = MOVE_CURSOR;
-      if (event.control == OC::CONTROL_BUTTON_Y) state[1] = MOVE_CURSOR;
+      if (event.control == OC::CONTROL_BUTTON_X) {
+        HemisphereApplet *applet = get_selected_applet(LEFT_HEMISPHERE);
+        if (EDIT_APPLET == state[0] && applet->EditMode())
+          applet->AuxButton();
+        else
+          state[0] = MOVE_CURSOR; // close applet view
+      }
+      if (event.control == OC::CONTROL_BUTTON_Y) {
+        HemisphereApplet *applet = get_selected_applet(RIGHT_HEMISPHERE);
+        if (EDIT_APPLET == state[1] && applet->EditMode())
+          applet->AuxButton();
+        else
+          state[1] = MOVE_CURSOR; // close applet view
+      }
     }
   }
 
