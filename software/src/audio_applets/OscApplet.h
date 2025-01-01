@@ -10,7 +10,9 @@ public:
   void Start() override {}
   void Controller() override {
     float freq = PitchToRatio(pitch + pitch_cv.In()) * C3;
-    synth.begin(1.0f, freq, waveforms[waveform]);
+    // synth.begin(1.0f, freq, waveforms[waveform]);
+    synth.frequency(freq);
+    synth.amplitude(1.0f);
     synth.pulseWidth(0.01f * pw + pw_cv.InF());
 
     // built-in VCA
@@ -67,7 +69,7 @@ public:
     const int min_pitch = -3 * 12 * 128;
     switch (cursor) {
       case WAVEFORM:
-        waveform = constrain(waveform + direction, 0, 2);
+        SetWaveform(waveform + direction);
         break;
       case OCTAVE:
         pitch = constrain(pitch + direction * 1 * 128, min_pitch, max_pitch);
@@ -90,6 +92,8 @@ public:
       case LEVEL_CV:
         level_cv.ChangeSource(direction);
         break;
+      default:
+        break;
     }
   }
 
@@ -99,17 +103,30 @@ public:
   AudioStream* OutputStream() override {
     return &mixer;
   }
-  // AudioChannels NumChannels() override { return MONO; }
+
+  void SetWaveform(int wf) {
+    waveform = constrain(wf, 0, 2);
+    synth.begin(waveforms[waveform]);
+  }
 
 protected:
   void SetHelp() override {}
 
 private:
-  enum Cursor { WAVEFORM, OCTAVE, PITCH, PITCH_CV, PW, PW_CV, LEVEL, LEVEL_CV };
+  enum Cursor : int8_t {
+    WAVEFORM,
+    OCTAVE,
+    PITCH,
+    PITCH_CV,
+    PW,
+    PW_CV,
+    LEVEL,
+    LEVEL_CV
+  };
 
-  int cursor = 0;
+  int8_t cursor = WAVEFORM;
   const int8_t waveforms[3]
-    = {WAVEFORM_SINE, WAVEFORM_TRIANGLE_VARIABLE, WAVEFORM_PULSE};
+    = {WAVEFORM_SINE, WAVEFORM_TRIANGLE_VARIABLE, WAVEFORM_BANDLIMIT_PULSE};
   char const* waveform_names[3] = {"SINE", "TRIANGLE", "PULSE"};
 
   int8_t waveform;
