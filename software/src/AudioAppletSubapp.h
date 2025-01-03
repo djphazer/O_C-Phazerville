@@ -1,15 +1,15 @@
 #pragma once
 
 #include "AudioIO.h"
-#include "HSApplication.h"
 #include "HSUtils.h"
 #include "HemisphereAudioApplet.h"
 #include "OC_ui.h"
-#include "smalloc.h"
 #include "UI/ui_events.h"
 #include "util/util_tuples.h"
 #include <Audio.h>
 #include <cstdint>
+
+#define ForEachSide(ch) for(HEM_SIDE ch : {LEFT_HEMISPHERE, RIGHT_HEMISPHERE})
 
 using std::array, std::tuple;
 
@@ -17,7 +17,7 @@ template <class T, size_t N>
 class Slot {};
 
 template <
-  size_t Slots,
+  uint_fast8_t Slots,
   size_t NumMonoSources,
   size_t NumStereoSources,
   size_t NumMonoProcessors,
@@ -62,9 +62,9 @@ public:
     for (size_t slot = 0; slot < Slots; slot++) {
       if (IsStereo(slot)) {
         get_stereo_applet(slot).BaseStart(LEFT_HEMISPHERE);
-        ForEachChannel(side) ConnectStereoToNext(side, slot);
+        ForEachSide(side) ConnectStereoToNext(side, slot);
       } else {
-        ForEachChannel(side) {
+        ForEachSide(side) {
           get_mono_applet(side, slot).BaseStart(side);
           ConnectMonoToNext(side, slot);
         }
@@ -106,7 +106,7 @@ public:
       print_applet_line(i);
     }
 
-    ForEachChannel(side) {
+    ForEachSide(side) {
       HEM_SIDE s = static_cast<HEM_SIDE>(side);
       if (state[side] == EDIT_APPLET) {
         HemisphereApplet* applet = get_selected_applet(s);
@@ -174,14 +174,14 @@ public:
         stereo ^= 1 << c;
         if (IsStereo(c)) {
           get_stereo_applet(c).BaseStart(LEFT_HEMISPHERE);
-          ForEachChannel(side) {
+          ForEachSide(side) {
             get_mono_applet(side, c).Unload();
             ConnectStereoToNext(side, c);
             if (c > 0) ConnectSlotToNext(side, c - 1);
           }
         } else {
           get_stereo_applet(c).Unload();
-          ForEachChannel(side) {
+          ForEachSide(side) {
             get_mono_applet(side, c).BaseStart(side);
             ConnectMonoToNext(side, c);
             if (c > 0) ConnectSlotToNext(side, c - 1);
@@ -221,9 +221,9 @@ public:
     sel = constrain(sel + dir, 0, n - 1);
     auto& app = get_stereo_applet(slot);
     app.BaseStart(side);
-    ForEachChannel(side) ConnectStereoToNext(side, slot);
+    ForEachSide(side) ConnectStereoToNext(side, slot);
     if (slot > 0) {
-      ForEachChannel(side) ConnectSlotToNext(side, slot - 1);
+      ForEachSide(side) ConnectSlotToNext(side, slot - 1);
     }
   }
 
@@ -377,22 +377,22 @@ private:
     int y = 15 + 10 * slot;
     if (IsStereo(slot)) {
       const char* name = get_stereo_applet(slot).applet_name();
-      const int l = strlen(name);
+      const int l = static_cast<int>(strlen(name));
       if (state[0] != EDIT_APPLET && state[1] != EDIT_APPLET) {
         gfxPrint(64 - l * 3, y, name);
       } else {
-        ForEachChannel(side) {
+        ForEachSide(side) {
           if (state[side] != EDIT_APPLET && cursor[1 - side] != slot) {
             gfxPrint(64 - (1 - side) * (1 + l * 6), y, name);
           }
         }
       }
     } else {
-      ForEachChannel(side) {
+      ForEachSide(side) {
         if (state[side] != EDIT_APPLET) {
           const char* name
             = get_mono_applet(static_cast<HEM_SIDE>(side), slot).applet_name();
-          int l = strlen(name);
+          const int l = static_cast<int>(strlen(name));
           gfxPrint(8 + side * (110 - l * 6), y, name);
         }
       }
@@ -404,7 +404,7 @@ private:
     if (p.available()) {
       float db = scalarToDb(p.read());
       if (db < -48.0f) db = -48.0f;
-      return ((db + 48.0f) / 48.0f) * 64;
+      return static_cast<int>((db + 48.0f) / 48.0f * 64);
     } else {
       return 0;
     }
