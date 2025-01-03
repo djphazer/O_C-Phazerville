@@ -16,9 +16,9 @@ inline float SemitonesToRatio(float semitones) {
   return fastpow2(semitones / 12.0f);
 }
 
-// TODO: This is less accurate the LUT used in tideslite so might want to just
-// use those instead when performance isn't critical
-inline float PitchToRatio(int16_t pitch) {
+// TODO: This is less accurate than the LUT used in tideslite so might want to
+// just use those instead when performance isn't critical
+inline float PitchToRatio(int pitch) {
   return SemitonesToRatio(static_cast<float>(pitch) / 128.0f);
 }
 
@@ -123,4 +123,3 @@ inline float WarpPhase(float t, float curve) {
   }
   return t;
 }
-

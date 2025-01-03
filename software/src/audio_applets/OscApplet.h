@@ -1,5 +1,11 @@
 #include "HemisphereAudioApplet.h"
 #include "dsputils.h"
+#include "dsputils_arm.h"
+#include "hemisphere_audio_config.h"
+#include "synth_waveform.h"
+#include "Audio/AudioMixer.h"
+#include "Audio/AudioPassthrough.h"
+#include "Audio/InterpolatingStream.h"
 #include <Audio.h>
 
 class OscApplet : public HemisphereAudioApplet {
@@ -7,24 +13,55 @@ public:
   const char* applet_name() override {
     return "Osc";
   }
-  void Start() override {}
+  void Start() override {
+    pwm_stream.Acquire();
+    pwm_stream.Method(INTERPOLATION_LINEAR);
+    mod_cv_stream.Acquire();
+    mod_cv_stream.Method(INTERPOLATION_LINEAR);
+    mod_vca.level(1.0f);
+    mod_vca.rectify(true);
+    SetModType(mod_type);
+    SetModDepth(mod_depth);
+    AllowRestart();
+  }
+
+  void Unload() override {
+    pwm_stream.Release();
+    mod_cv_stream.Release();
+  }
+
   void Controller() override {
     float freq = PitchToRatio(pitch + pitch_cv.In()) * C3;
-    // synth.begin(1.0f, freq, waveforms[waveform]);
     synth.frequency(freq);
     synth.amplitude(1.0f);
-    synth.pulseWidth(0.01f * pw + pw_cv.InF());
+    pwm_stream.Push(
+      float_to_q15(0.01f * static_cast<float>(pw * 2 - 100) + pw_cv.InF())
+    );
+    mod_cv_stream.Push(float_to_q15(mod_cv.InF()));
 
-    // built-in VCA
-    float gain = 0.01f
-      * (level * static_cast<float>(level_cv.In(HEMISPHERE_MAX_INPUT_CV))
-         / HEMISPHERE_MAX_INPUT_CV);
-    mixer.gain(1, gain);
+    float m
+      = constrain(static_cast<float>(mix) * 0.01f + mix_cv.InF(), 0.0f, 1.0f);
+    float gain = 0.01f * static_cast<float>(level) * level_cv.InF(1.0f);
+    // There's a good chance of phase correlation if the incoming signal is
+    // internal, so use equal amplitude
+    mixer.gain(1, gain * m);
+    mixer.gain(0, 1.0f - m);
   }
+
   void View() override {
     gfxStartCursor(1, 15);
-    gfxPrint(waveform_names[waveform]);
+    gfxPrint(WAVEFORM_NAMES[waveform]);
     gfxEndCursor(cursor == WAVEFORM);
+
+    if (WAVEFORMS[waveform] != WAVEFORM_SINE) {
+      gfxStartCursor(1 + 3 * 6 + 2 * 6, 15);
+      graphics.printf("%3d%%", pw);
+      gfxEndCursor(cursor == PW);
+
+      gfxStartCursor();
+      gfxPrintIcon(pw_cv.Icon());
+      gfxEndCursor(cursor == PW_CV);
+    }
 
     gfxStartCursor(1, 25);
     gfxPrintTuningIndicator(pitch);
@@ -37,14 +74,18 @@ public:
     gfxPrintIcon(pitch_cv.Icon());
     gfxEndCursor(cursor == PITCH_CV);
 
-    gfxPrint(1, 35, "PW:  ");
-    gfxStartCursor();
-    graphics.printf("%3d%%", pw);
-    gfxEndCursor(cursor == PW);
+    gfxStartCursor(1, 35);
+    gfxPrint(MOD_TYPE_NAMES[mod_type]);
+    gfxEndCursor(cursor == MOD_TYPE);
+    gfxPrint(":  ");
 
     gfxStartCursor();
-    gfxPrintIcon(pw_cv.Icon());
-    gfxEndCursor(cursor == PW_CV);
+    graphics.printf("%1d.%02d", SPLIT_INT_DEC(mod_depth * 0.01f, 100));
+    gfxEndCursor(cursor == MOD_DEPTH);
+
+    gfxStartCursor();
+    gfxPrintIcon(mod_cv.Icon());
+    gfxEndCursor(cursor == MOD_CV);
 
     gfxPrint(1, 45, "Level:");
     gfxStartCursor();
@@ -54,6 +95,15 @@ public:
     gfxStartCursor();
     gfxPrintIcon(level_cv.Icon());
     gfxEndCursor(cursor == LEVEL_CV);
+
+    gfxPrint(1, 55, "Mix: ");
+    gfxStartCursor();
+    graphics.printf("%3d%%", mix);
+    gfxEndCursor(cursor == MIX);
+
+    gfxStartCursor();
+    gfxPrintIcon(mix_cv.Icon());
+    gfxEndCursor(cursor == MIX_CV);
   }
 
   uint64_t OnDataRequest() override {
@@ -62,7 +112,10 @@ public:
   void OnDataReceive(uint64_t data) override {}
   void OnEncoderMove(int direction) override {
     if (!EditMode()) {
-      MoveCursor(cursor, direction, 7);
+      do {
+        MoveCursor(cursor, direction, MIX_CV);
+      } while ((cursor == PW || cursor == PW_CV)
+               && WAVEFORMS[waveform] == WAVEFORM_SINE);
       return;
     }
     const int max_pitch = 7 * 12 * 128;
@@ -74,17 +127,26 @@ public:
       case OCTAVE:
         pitch = constrain(pitch + direction * 1 * 128, min_pitch, max_pitch);
         break;
+      case PW:
+        pw = constrain(pw + direction, 0, 100);
+        break;
+      case PW_CV:
+        pw_cv.ChangeSource(direction);
+        break;
       case PITCH:
         pitch = constrain(pitch + direction * 4, min_pitch, max_pitch);
         break;
       case PITCH_CV:
         pitch_cv.ChangeSource(direction);
         break;
-      case PW:
-        pw = constrain(pw + direction, 0, 100);
+      case MOD_TYPE:
+        SetModType(mod_type + direction);
         break;
-      case PW_CV:
-        pw_cv.ChangeSource(direction);
+      case MOD_DEPTH:
+        SetModDepth(mod_depth + direction);
+        break;
+      case MOD_CV:
+        mod_cv.ChangeSource(direction);
         break;
       case LEVEL:
         level = constrain(level + direction, 0, 100);
@@ -92,13 +154,19 @@ public:
       case LEVEL_CV:
         level_cv.ChangeSource(direction);
         break;
+      case MIX:
+        mix = constrain(mix + direction, 0, 100);
+        break;
+      case MIX_CV:
+        mix_cv.ChangeSource(direction);
+        break;
       default:
         break;
     }
   }
 
   AudioStream* InputStream() override {
-    return &mixer;
+    return &input_stream;
   }
   AudioStream* OutputStream() override {
     return &mixer;
@@ -106,7 +174,24 @@ public:
 
   void SetWaveform(int wf) {
     waveform = constrain(wf, 0, 2);
-    synth.begin(waveforms[waveform]);
+    synth.begin(WAVEFORMS[waveform]);
+  }
+
+  void SetModDepth(int depth) {
+    mod_depth = constrain(depth, 0, MOD_DEPTH_MAX);
+    mod_vca.bias(static_cast<float>(mod_depth) / MOD_DEPTH_MAX);
+  }
+
+  void SetModType(int t) {
+    mod_type = static_cast<ModType>(constrain(t, FM, PM));
+    switch (mod_type) {
+      case FM:
+        synth.frequencyModulation(FM_DEPTH);
+        break;
+      case PM:
+        synth.phaseModulation(PM_DEPTH);
+        break;
+    };
   }
 
 protected:
@@ -115,29 +200,57 @@ protected:
 private:
   enum Cursor : int8_t {
     WAVEFORM,
+    PW,
+    PW_CV,
     OCTAVE,
     PITCH,
     PITCH_CV,
-    PW,
-    PW_CV,
+    MOD_TYPE,
+    MOD_DEPTH,
+    MOD_CV,
     LEVEL,
-    LEVEL_CV
+    LEVEL_CV,
+    MIX,
+    MIX_CV,
   };
 
   int8_t cursor = WAVEFORM;
-  const int8_t waveforms[3]
+  static constexpr int8_t WAVEFORMS[3]
     = {WAVEFORM_SINE, WAVEFORM_TRIANGLE_VARIABLE, WAVEFORM_BANDLIMIT_PULSE};
-  char const* waveform_names[3] = {"SINE", "TRIANGLE", "PULSE"};
+  static constexpr char const* WAVEFORM_NAMES[3] = {"SIN", "TRI", "PLS"};
+  static constexpr char const* MOD_TYPE_NAMES[2] = {"FM", "PM"};
+  enum ModType : int8_t { FM, PM };
+  static const int MOD_DEPTH_MAX = 500;
+  // 5 octaves; empirically about what Plaits max FM corresponds to
+  static constexpr float FM_DEPTH = 5.0f;
+  // 5 periods; for reference, parasite Warps uses 4 but I liked the ability to
+  // go a bit deeper
+  static constexpr float PM_DEPTH = 180.0f * 5.0f;
 
   int8_t waveform;
-  int16_t pitch = 1 * 12 * 128; // C4
-  CVInput pitch_cv;
   int8_t pw = 50;
   CVInput pw_cv;
+  int16_t pitch = 1 * 12 * 128; // C4
+  CVInput pitch_cv;
+  ModType mod_type = PM;
+  int mod_depth = 0;
+  CVInput mod_cv;
   int level = 75;
   CVInput level_cv;
+  int8_t mix = 100;
+  CVInput mix_cv;
 
-  AudioSynthWaveform synth;
-  AudioMixer4 mixer;
+  AudioPassthrough<MONO> input_stream;
+  InterpolatingStream<> pwm_stream;
+  InterpolatingStream<> mod_cv_stream;
+  AudioVCA mod_vca;
+  AudioSynthWaveformModulated synth;
+  AudioMixer<2> mixer;
+
   AudioConnection synthConn{synth, 0, mixer, 1};
+  AudioConnection input_to_mod_vca{input_stream, 0, mod_vca, 0};
+  AudioConnection mod_cv_to_mod_vca{mod_cv_stream, 0, mod_vca, 1};
+  AudioConnection mod_vca_to_synth{mod_vca, 0, synth, 0};
+  AudioConnection in_conn{input_stream, 0, mixer, 0};
+  AudioConnection pwm_conn{pwm_stream, 0, synth, 1};
 };
