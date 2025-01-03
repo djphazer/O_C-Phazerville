@@ -19,7 +19,6 @@
 // SOFTWARE.
 
 #include "../SegmentDisplay.h"
-#define CVREC_MAX_STEP 384
 
 const char* const CVRecV2_MODES[4] = {
     "Play", "Rec 1", "Rec 2", "Rec 1+2"
@@ -27,6 +26,7 @@ const char* const CVRecV2_MODES[4] = {
 
 class CVRecV2 : public HemisphereApplet {
 public:
+    static constexpr int CVREC_MAX_STEP = 384;
 
     const char* applet_name() {
         return "CVRec";
@@ -37,12 +37,6 @@ public:
         cv[0] = new int16_t[CVREC_MAX_STEP];
         cv[1] = new int16_t[CVREC_MAX_STEP];
         segment.Init(SegmentSize::BIG_SEGMENTS);
-        AllowRestart();
-    }
-
-    void Unload() {
-        delete cv[0];
-        delete cv[1];
     }
 
     void Controller() {
