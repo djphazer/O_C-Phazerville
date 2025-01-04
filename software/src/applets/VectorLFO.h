@@ -21,7 +21,74 @@
 #include "../vector_osc/HSVectorOscillator.h"
 #include "../vector_osc/WaveformManager.h"
 
-static constexpr int pow10_lut[] = { 1, 10, 100, 1000 };
+// From https://stackoverflow.com/questions/36550388/power-of-2-approximation-in-fixed-point
+static const int32_t exp2_s15_16 (int32_t a) {
+    int32_t i, f, r, s;
+    /* split a = i + f, such that f in [-0.5, 0.5] */
+    i = (a + 0x8000) & ~0xffff; // 0.5
+    f = a - i;
+    s = ((15 << 16) - i) >> 16;
+    /* minimax approximation for exp2(f) on [-0.5, 0.5] */
+    r = 0x00000e20;                 // 5.5171669058037949e-2
+    r = (r * f + 0x3e1cc333) >> 17; // 2.4261112219321804e-1
+    r = (r * f + 0x58bd46a6) >> 16; // 6.9326098546062365e-1
+    r = r * f + 0x7ffde4a3;         // 9.9992807353939517e-1
+    return (uint32_t)r >> s;
+}
+
+static int pow10(int n) {
+  static const int pow10_lut[] = {
+    1,
+    10,
+    100,
+    1000,
+    10000,
+    100000,
+    1000000,
+    10000000,
+    100000000,
+    1000000000
+  };
+  return pow10_lut[n];
+}
+
+static int ix_to_4dec(int ix) {
+    const int twos_steps = 60;
+    const int fives_steps = 50;
+    const int tens_steps = 50;
+    const int ones_steps = 900 - (2 * twos_steps + 5 * fives_steps + 10 * tens_steps);
+    const int steps = ones_steps + twos_steps + fives_steps + tens_steps;
+
+    const int twos_max = ones_steps + twos_steps;
+    const int fives_max = twos_max + fives_steps;
+
+
+    // Start with step size of 100, which is the smallest unit that matters.
+    ix += ones_steps + twos_steps + fives_steps;
+    int oom = ix / steps;
+    int result = 100;
+    int fine = ix % steps;
+    if (fine < ones_steps) {
+        result += fine * 1;
+    } else if (fine < twos_max) {
+        result += ones_steps + (fine - ones_steps) * 2;
+    } else if (fine < fives_max) {
+        result += ones_steps + 2 * twos_steps + (fine - twos_max) * 5;
+    } else {
+        result += ones_steps + 2 * twos_steps + 5 * fives_steps + (fine - fives_max) * 10;
+    }
+    return result * pow10(oom) / 10;
+}
+
+static int pitch_to_freq_scalar(int pitch) {
+    // avoid overflow in voltage range
+    return exp2_s15_16(pitch * 512 / 12) * 100 / 64 * 100 / 1024;
+}
+
+static int scale_freq(int freq_4dec, int pitch) {
+    // fuck it I'm lazy
+    return int32_t(int64_t(freq_4dec) * pitch_to_freq_scalar(pitch) / 10000);
+}
 
 class VectorLFO : public HemisphereApplet {
 public:
@@ -61,7 +128,7 @@ public:
                 int new_freq = 1666666 / ticks;
                 new_freq = constrain(new_freq, 3, 99900);
                 osc[ch].SetFrequency(new_freq);
-                freq[ch] = new_freq * 10000;
+                freq[ch] = new_freq * 100;
                 osc[ch].Reset();
             }
 
@@ -240,72 +307,3 @@ private:
         }
     }
 };
-
-int ix_to_4dec(int ix) {
-    const int twos_steps = 60;
-    const int fives_steps = 50;
-    const int tens_steps = 50;
-    const int ones_steps = 900 - (2 * twos_steps + 5 * fives_steps + 10 * tens_steps);
-    const int steps = ones_steps + twos_steps + fives_steps + tens_steps;
-
-    const int twos_max = ones_steps + twos_steps;
-    const int fives_max = twos_max + fives_steps;
-
-
-    // Start with step size of 100, which is the smallest unit that matters.
-    ix += ones_steps + twos_steps + fives_steps;
-    int oom = ix / steps;
-    int result = 100;
-    int fine = ix % steps;
-    if (fine < ones_steps) {
-        result += fine * 1;
-    } else if (fine < twos_max) {
-        result += ones_steps + (fine - ones_steps) * 2;
-    } else if (fine < fives_max) {
-        result += ones_steps + 2 * twos_steps + (fine - twos_max) * 5;
-    } else {
-        result += ones_steps + 2 * twos_steps + 5 * fives_steps + (fine - fives_max) * 10;
-    }
-    return result * pow10(oom) / 10;
-}
-
-int pow10(int n) {
-    static int pow10_lut[] = {
-        1,
-        10,
-        100,
-        1000,
-        10000,
-        100000,
-        1000000,
-        10000000,
-        100000000,
-        1000000000
-    };
-    return pow10_lut[n];
-}
-
-int pitch_to_freq_scalar(int pitch) {
-    // avoid overflow in voltage range
-    return exp2_s15_16(pitch * 512 / 12) * 100 / 64 * 100 / 1024;
-}
-
-int scale_freq(int freq_4dec, int pitch) {
-    // fuck it I'm lazy
-    return int32_t(int64_t(freq_4dec) * pitch_to_freq_scalar(pitch) / 10000);
-}
-
-// From https://stackoverflow.com/questions/36550388/power-of-2-approximation-in-fixed-point
-int32_t exp2_s15_16 (int32_t a) {
-    int32_t i, f, r, s;
-    /* split a = i + f, such that f in [-0.5, 0.5] */
-    i = (a + 0x8000) & ~0xffff; // 0.5
-    f = a - i;
-    s = ((15 << 16) - i) >> 16;
-    /* minimax approximation for exp2(f) on [-0.5, 0.5] */
-    r = 0x00000e20;                 // 5.5171669058037949e-2
-    r = (r * f + 0x3e1cc333) >> 17; // 2.4261112219321804e-1
-    r = (r * f + 0x58bd46a6) >> 16; // 6.9326098546062365e-1
-    r = r * f + 0x7ffde4a3;         // 9.9992807353939517e-1
-    return (uint32_t)r >> s;
-}
