@@ -23,18 +23,18 @@
 // The functions available for each output
 class hMIDIOut : public HemisphereApplet {
 public:
-  enum MIDIOutCursor {
-    CHANNEL, TRANSPOSE, CV2_FUNC, LEGATO,
-    LOG_VIEW,
+    enum MIDIOutCursor {
+        CHANNEL, TRANSPOSE, CV2_FUNC, LEGATO,
+        LOG_VIEW,
 
-    MAX_CURSOR = LOG_VIEW
-  };
-  enum MIDIOutMode {
-    HEM_MIDI_CC_IN,
-    HEM_MIDI_AT_IN,
-    HEM_MIDI_PB_IN,
-    HEM_MIDI_VEL_IN,
-  };
+        MAX_CURSOR = LOG_VIEW
+    };
+    enum MIDIOutMode {
+        HEM_MIDI_CC_IN,
+        HEM_MIDI_AT_IN,
+        HEM_MIDI_PB_IN,
+        HEM_MIDI_VEL_IN,
+    };
 
     const char* applet_name() { // Maximum 10 characters
         return "MIDIOut";
@@ -110,10 +110,10 @@ public:
                 if (function == HEM_MIDI_CC_IN) {
                     int value = ProportionCV(In(1), 127);
                     if (value != last_cc) {
-                      hMIDI.SendCC(channel, 1, value);
-                      last_cc = value;
-                      UpdateLog(HEM_MIDI_CC, value, 0);
-                      last_tick = OC::CORE::ticks;
+                        hMIDI.SendCC(channel, 1, value);
+                        last_cc = value;
+                        UpdateLog(HEM_MIDI_CC, value, 0);
+                        last_tick = OC::CORE::ticks;
                     }
                 }
 
@@ -121,10 +121,10 @@ public:
                 if (function == HEM_MIDI_AT_IN) {
                     int value = ProportionCV(In(1), 127);
                     if (value != last_at) {
-                      hMIDI.SendAfterTouch(channel, value);
-                      last_at = value;
-                      UpdateLog(HEM_MIDI_AFTERTOUCH, value, 0);
-                      last_tick = OC::CORE::ticks;
+                        hMIDI.SendAfterTouch(channel, value);
+                        last_at = value;
+                        UpdateLog(HEM_MIDI_AFTERTOUCH_CHANNEL, value, 0);
+                        last_tick = OC::CORE::ticks;
                     }
                 }
 
@@ -133,10 +133,10 @@ public:
                     uint16_t bend = Proportion(In(1) + HEMISPHERE_3V_CV, HEMISPHERE_3V_CV * 2, 16383);
                     bend = constrain(bend, 0, 16383);
                     if (bend != last_bend) {
-                      hMIDI.SendPitchBend(channel, bend);
-                      last_bend = bend;
-                      UpdateLog(HEM_MIDI_PITCHBEND, bend - 8192, 0);
-                      last_tick = OC::CORE::ticks;
+                        hMIDI.SendPitchBend(channel, bend);
+                        last_bend = bend;
+                        UpdateLog(HEM_MIDI_PITCHBEND, bend - 8192, 0);
+                        last_tick = OC::CORE::ticks;
                     }
                 }
             }
@@ -166,22 +166,27 @@ public:
         }
 
         switch (cursor) {
-        case CHANNEL:
-          channel = constrain(channel + direction, 0, 15);
-          HS::frame.MIDIState.outchan[io_offset + 0] = channel;
-          HS::frame.MIDIState.outchan[io_offset + 1] = channel;
-          break;
-        case TRANSPOSE: transpose = constrain(transpose + direction, -24, 24);
+            case CHANNEL:
+                channel = constrain(channel + direction, 0, 15);
+                HS::frame.MIDIState.outchan[io_offset + 0] = channel;
+                HS::frame.MIDIState.outchan[io_offset + 1] = channel;
                 break;
-        case CV2_FUNC:
-          function = constrain(function + direction, 0, 3);
-          HS::frame.MIDIState.outfn[io_offset + 0] = HEM_MIDI_NOTE_OUT;
-          if (function == HEM_MIDI_CC_IN)
-            HS::frame.MIDIState.outfn[io_offset + 1] = HEM_MIDI_CC_OUT;
-          else
-            HS::frame.MIDIState.outfn[io_offset + 1] = HEM_MIDI_GATE_OUT;
-          break;
-        case LEGATO: legato = direction > 0 ? 1 : 0;
+
+            case TRANSPOSE:
+                transpose = constrain(transpose + direction, -24, 24);
+                break;
+
+            case CV2_FUNC:
+                function = constrain(function + direction, 0, 3);
+                HS::frame.MIDIState.outfn[io_offset + 0] = HEM_MIDI_NOTE_OUT;
+                if (function == HEM_MIDI_CC_IN)
+                    HS::frame.MIDIState.outfn[io_offset + 1] = HEM_MIDI_CC_OUT;
+                else
+                    HS::frame.MIDIState.outfn[io_offset + 1] = HEM_MIDI_GATE_OUT;
+                break;
+
+            case LEGATO:
+                legato = direction > 0 ? 1 : 0;
                 break;
         }
         ResetCursor();
@@ -202,18 +207,18 @@ public:
     }
 
 protected:
-  void SetHelp() {
-    //                    "-------" <-- Label size guide
-    help[HELP_DIGITAL1] = "Gate";
-    help[HELP_DIGITAL2] = "";
-    help[HELP_CV1]      = "Pitch";
-    help[HELP_CV2]      = fn_name[function];
-    help[HELP_OUT1]     = "";
-    help[HELP_OUT2]     = "";
-    help[HELP_EXTRA1]  = "";
-    help[HELP_EXTRA2]  = "";
-    //                   "---------------------" <-- Extra text size guide
-  }
+    void SetHelp() {
+        //                    "-------" <-- Label size guide
+        help[HELP_DIGITAL1] = "Gate";
+        help[HELP_DIGITAL2] = "";
+        help[HELP_CV1]      = "Pitch";
+        help[HELP_CV2]      = fn_name[function];
+        help[HELP_OUT1]     = "";
+        help[HELP_OUT2]     = "";
+        help[HELP_EXTRA1]   = "";
+        help[HELP_EXTRA2]   = "";
+        //                    "---------------------" <-- Extra text size guide
+    }
 
 private:
     // Settings
@@ -243,8 +248,7 @@ private:
     void UpdateLog(int message, int data1, int data2) {
         log[log_index++] = {message, data1, data2};
         if (log_index == 7) {
-            for (int i = 0; i < 6; i++)
-            {
+            for (int i = 0; i < 6; i++) {
                 memcpy(&log[i], &log[i+1], sizeof(log[i+1]));
             }
             log_index--;
@@ -292,8 +296,7 @@ private:
 
     void DrawLog() {
         if (log_index) {
-            for (int i = 0; i < log_index; i++)
-            {
+            for (int i = 0; i < log_index; i++) {
                 log_entry(15 + (i * 8), i);
             }
         }
@@ -316,7 +319,7 @@ private:
             gfxPrint(10, y, log[index].data1);
         }
 
-        if (log[index].message == HEM_MIDI_AFTERTOUCH) {
+        if (log[index].message == HEM_MIDI_AFTERTOUCH_CHANNEL) {
             gfxBitmap(1, y, 8, AFTERTOUCH_ICON);
             gfxPrint(10, y, log[index].data1);
         }

@@ -45,7 +45,8 @@ extern midi::MidiInterface<midi::SerialMIDI<HardwareSerial> > MIDI1;
 #define HEM_MIDI_NOTE_ON usbMIDI.NoteOn
 #define HEM_MIDI_NOTE_OFF usbMIDI.NoteOff
 #define HEM_MIDI_CC usbMIDI.ControlChange
-#define HEM_MIDI_AFTERTOUCH usbMIDI.AfterTouchChannel
+#define HEM_MIDI_AFTERTOUCH_CHANNEL usbMIDI.AfterTouchChannel
+#define HEM_MIDI_AFTERTOUCH_POLY usbMIDI.AfterTouchPoly
 #define HEM_MIDI_PITCHBEND usbMIDI.PitchBend
 #define HEM_MIDI_SYSEX usbMIDI.SystemExclusive
 
@@ -95,7 +96,11 @@ enum MIDIFunctions {
     HEM_MIDI_VEL3_OUT,
     HEM_MIDI_VEL4_OUT,
     HEM_MIDI_CC_OUT,
-    HEM_MIDI_AT_OUT,
+    HEM_MIDI_AT_CHAN_OUT,
+    HEM_MIDI_AT_KEY1_OUT,
+    HEM_MIDI_AT_KEY2_OUT,
+    HEM_MIDI_AT_KEY3_OUT,
+    HEM_MIDI_AT_KEY4_OUT,
     HEM_MIDI_PB_OUT,
     HEM_MIDI_CLOCK_OUT,
     HEM_MIDI_RUN_OUT,
@@ -103,7 +108,7 @@ enum MIDIFunctions {
 
     HEM_MIDI_MAX_FUNCTION = HEM_MIDI_START_OUT
 };
-const char* const midi_fn_name[HEM_MIDI_MAX_FUNCTION + 1] = {"None", "Note1", "Note2", "Note3", "Note4", "LoNote", "HiNote", "PdlNote", "InvNote", "Trig", "Trig1st", "TrgAlws", "Gate", "GateInv", "Veloc1", "Veloc2", "Veloc3", "Veloc4", "CC#", "Aft", "Bend", "Clock", "Run", "Start"};
+const char* const midi_fn_name[HEM_MIDI_MAX_FUNCTION + 1] = {"None", "Note1", "Note2", "Note3", "Note4", "LoNote", "HiNote", "PdlNote", "InvNote", "Trig", "Trig1st", "TrgAlws", "Gate", "GateInv", "Veloc1", "Veloc2", "Veloc3", "Veloc4", "CC#", "ChanAft", "KeyAft1", "KeyAft2", "KeyAft3", "KeyAft4", "Bend", "Clock", "Run", "Start"};
 
 
 /* Hemisphere Suite Data Packing

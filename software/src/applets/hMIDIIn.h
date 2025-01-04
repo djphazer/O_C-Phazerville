@@ -25,7 +25,6 @@
 
 class hMIDIIn : public HemisphereApplet {
 public:
-
     enum hMIDIInCursor {
         MIDI_CHANNEL_A,
         MIDI_CHANNEL_B,
@@ -42,8 +41,7 @@ public:
     const uint8_t* applet_icon() { return PhzIcons::midiIn; }
 
     void Start() {
-        ForEachChannel(ch)
-        {
+        ForEachChannel(ch) {
             int ch_ = ch + io_offset;
             frame.MIDIState.channel[ch_] = 0; // Default channel 1
             frame.MIDIState.function[ch_] = HEM_MIDI_NOOP;
@@ -85,9 +83,11 @@ public:
     }
 
     void View() {
-        DrawMonitor();
         if (cursor == LOG_VIEW) DrawLog();
-        else DrawSelector();
+        else {
+            DrawMonitor();
+            DrawSelector();
+        }
     }
 
     //void OnButtonPress() { }
@@ -137,18 +137,18 @@ public:
     }
 
 protected:
-  void SetHelp() {
-    //                    "-------" <-- Label size guide
-    //help[HELP_DIGITAL1] = "";
-    //help[HELP_DIGITAL2] = "";
-    //help[HELP_CV1]      = "";
-    //help[HELP_CV2]      = "";
-    help[HELP_OUT1]     = midi_fn_name[frame.MIDIState.function[io_offset + 0]];
-    help[HELP_OUT2]     = midi_fn_name[frame.MIDIState.function[io_offset + 1]];
-    //help[HELP_EXTRA1]  = "";
-    //help[HELP_EXTRA2]  = "";
-    //                   "---------------------" <-- Extra text size guide
-  }
+    void SetHelp() {
+        //                      "-------" <-- Label size guide
+        //help[HELP_DIGITAL1] = "";
+        //help[HELP_DIGITAL2] = "";
+        //help[HELP_CV1]      = "";
+        //help[HELP_CV2]      = "";
+        help[HELP_OUT1]       = midi_fn_name[frame.MIDIState.function[io_offset + 0]];
+        help[HELP_OUT2]       = midi_fn_name[frame.MIDIState.function[io_offset + 1]];
+        //help[HELP_EXTRA1]   = "";
+        //help[HELP_EXTRA2]   = "";
+        //                      "---------------------" <-- Extra text size guide
+    }
 
 private:
     // Housekeeping
@@ -156,26 +156,24 @@ private:
     int last_icon_ticks[2];
 
     void DrawMonitor() {
-        if (cursor != LOG_VIEW) {
-            if ((OC::CORE::ticks - frame.MIDIState.last_msg_tick) < 100) {
-                // reset icon display timers
-                if (frame.MIDIState.channel[io_offset + 0] == frame.MIDIState.last_midi_channel)
-                    last_icon_ticks[0] = OC::CORE::ticks;
-                if (frame.MIDIState.channel[io_offset + 1] == frame.MIDIState.last_midi_channel)
-                    last_icon_ticks[1] = OC::CORE::ticks;
-            }
-
-            if (OC::CORE::ticks - last_icon_ticks[0] < 4000) // ChA midi activity
-                gfxBitmap( 54, 15, 8, MIDI_ICON);
-            if (OC::CORE::ticks - last_icon_ticks[1] < 4000) // ChB midi activity
-                gfxBitmap( 54, 25, 8, MIDI_ICON);
+        if ((OC::CORE::ticks - frame.MIDIState.last_msg_tick) < 100) {
+            // reset icon display timers
+            if (frame.MIDIState.channel[io_offset + 0] == frame.MIDIState.last_midi_channel)
+                last_icon_ticks[0] = OC::CORE::ticks;
+            if (frame.MIDIState.channel[io_offset + 1] == frame.MIDIState.last_midi_channel)
+                last_icon_ticks[1] = OC::CORE::ticks;
         }
+
+        if (OC::CORE::ticks - last_icon_ticks[0] < 4000) // ChA midi activity
+            gfxBitmap( 54, 15, 8, MIDI_ICON);
+        if (OC::CORE::ticks - last_icon_ticks[1] < 4000) // ChB midi activity
+            gfxBitmap( 54, 25, 8, MIDI_ICON);
     }
 
     void DrawSelector() {
         // MIDI Channels
 
-        char out_label[] = { 'C', 'h', (char)('A' + io_offset), ':', '\0'  };
+        char out_label[] = { 'C', 'h', (char)('A' + io_offset), ':', '\0' };
         gfxPrint(1, 15, out_label);
         gfxPrint(27, 15, frame.MIDIState.channel[io_offset + 0] + 1);
         ++out_label[2];
@@ -183,7 +181,7 @@ private:
         gfxPrint(27, 25, frame.MIDIState.channel[io_offset + 1] + 1);
 
         // Output 1 function
-        char out_label_fn[] = { (char)('A' + io_offset), ':', '\0'  };
+        char out_label_fn[] = { (char)('A' + io_offset), ':', '\0' };
         gfxPrint(1, 35, out_label_fn);
         gfxPrint(16, 35, midi_fn_name[frame.MIDIState.function[io_offset + 0]]);
         if (frame.MIDIState.function[io_offset + 0] == HEM_MIDI_CC_OUT)
@@ -208,8 +206,7 @@ private:
 
     void DrawLog() {
         if (frame.MIDIState.log_index) {
-            for (int i = 0; i < frame.MIDIState.log_index; i++)
-            {
+            for (int i = 0; i < frame.MIDIState.log_index; i++) {
                 PrintLogEntry(15 + (i * 8), i);
             }
         }
@@ -235,9 +232,14 @@ private:
             gfxPrint(10, y, log_entry_.data2);
             break;
 
-        case HEM_MIDI_AFTERTOUCH:
+        case HEM_MIDI_AFTERTOUCH_CHANNEL:
             gfxBitmap(1, y, 8, AFTERTOUCH_ICON);
             gfxPrint(10, y, log_entry_.data1);
+            break;
+
+        case HEM_MIDI_AFTERTOUCH_POLY:
+            gfxBitmap(1, y, 8, AFTERTOUCH_ICON);
+            gfxPrint(10, y, log_entry_.data2);
             break;
 
         case HEM_MIDI_PITCHBEND: {

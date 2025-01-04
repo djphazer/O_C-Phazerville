@@ -750,7 +750,7 @@ private:
                 }
             }
 
-            if (message == HEM_MIDI_AFTERTOUCH && in_fn == MIDI_IN_AFTERTOUCH && in_ch == channel) {
+            if (message == HEM_MIDI_AFTERTOUCH_CHANNEL && in_fn == MIDI_IN_AFTERTOUCH && in_ch == channel) {
                 // Send aftertouch to CV
                 Out(ch, Proportion(data1, 127, HSAPPLICATION_5V));
                 UpdateLog(1, ch, 3, in_ch, data1, data2);

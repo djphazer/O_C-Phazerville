@@ -416,7 +416,11 @@ public:
                     case HEM_MIDI_VEL2_OUT:
                     case HEM_MIDI_VEL3_OUT:
                     case HEM_MIDI_VEL4_OUT:
-                    case HEM_MIDI_AT_OUT:
+                    case HEM_MIDI_AT_CHAN_OUT:
+                    case HEM_MIDI_AT_KEY1_OUT:
+                    case HEM_MIDI_AT_KEY2_OUT:
+                    case HEM_MIDI_AT_KEY3_OUT:
+                    case HEM_MIDI_AT_KEY4_OUT:
                     case HEM_MIDI_PB_OUT:
                         HS::frame.inputs[chan] += HS::frame.MIDIState.outputs[chan];
                         break;
