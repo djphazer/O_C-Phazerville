@@ -61,11 +61,11 @@ public:
   void Init() {
     for (size_t slot = 0; slot < Slots; slot++) {
       if (IsStereo(slot)) {
-        get_stereo_applet(slot).BaseStart(LEFT_HEMISPHERE);
+        get_selected_stereo_applet(slot).BaseStart(LEFT_HEMISPHERE);
         ForEachSide(side) ConnectStereoToNext(side, slot);
       } else {
         ForEachSide(side) {
-          get_mono_applet(side, slot).BaseStart(side);
+          get_selected_mono_applet(side, slot).BaseStart(side);
           ConnectMonoToNext(side, slot);
         }
       }
@@ -81,10 +81,10 @@ public:
     // something smarter.
     for (size_t i = 0; i < Slots; i++) {
       if (IsStereo(i)) {
-        get_stereo_applet(i).Controller();
+        get_selected_stereo_applet(i).Controller();
       } else {
-        get_mono_applet(LEFT_HEMISPHERE, i).Controller();
-        get_mono_applet(RIGHT_HEMISPHERE, i).Controller();
+        get_selected_mono_applet(LEFT_HEMISPHERE, i).Controller();
+        get_selected_mono_applet(RIGHT_HEMISPHERE, i).Controller();
       }
     }
     AudioInterrupts();
@@ -93,10 +93,10 @@ public:
   void mainloop() {
     for (size_t slot = 0; slot < Slots; slot++) {
       if (IsStereo(slot)) {
-        get_stereo_applet(slot).mainloop();
+        get_selected_stereo_applet(slot).mainloop();
       } else {
-        get_mono_applet(LEFT_HEMISPHERE, slot).mainloop();
-        get_mono_applet(RIGHT_HEMISPHERE, slot).mainloop();
+        get_selected_mono_applet(LEFT_HEMISPHERE, slot).mainloop();
+        get_selected_mono_applet(RIGHT_HEMISPHERE, slot).mainloop();
       }
     }
   }
@@ -109,9 +109,9 @@ public:
     ForEachSide(side) {
       HEM_SIDE s = static_cast<HEM_SIDE>(side);
       if (state[side] == EDIT_APPLET) {
-        HemisphereApplet* applet = get_selected_applet(s);
-        applet->SetDisplaySide(s);
-        applet->BaseView();
+        HemisphereApplet& applet = get_selected_applet(s);
+        applet.SetDisplaySide(s);
+        applet.BaseView();
       } else {
         int y = cursor[side] * 10 + 14;
         if (state[side] == SWITCH_APPLET) {
@@ -157,10 +157,10 @@ public:
           state[1] = MOVE_CURSOR;
           break;
         case OC::CONTROL_BUTTON_X:
-          get_selected_applet(LEFT_HEMISPHERE)->AuxButton();
+          get_selected_applet(LEFT_HEMISPHERE).AuxButton();
           break;
         case OC::CONTROL_BUTTON_Y:
-          get_selected_applet(RIGHT_HEMISPHERE)->AuxButton();
+          get_selected_applet(RIGHT_HEMISPHERE).AuxButton();
           break;
         default:
           break;
@@ -175,16 +175,16 @@ public:
         int c = cursor[0];
         stereo ^= 1 << c;
         if (IsStereo(c)) {
-          get_stereo_applet(c).BaseStart(LEFT_HEMISPHERE);
+          get_selected_stereo_applet(c).BaseStart(LEFT_HEMISPHERE);
           ForEachSide(side) {
-            get_mono_applet(side, c).Unload();
+            get_selected_mono_applet(side, c).Unload();
             ConnectStereoToNext(side, c);
             if (c > 0) ConnectSlotToNext(side, c - 1);
           }
         } else {
-          get_stereo_applet(c).Unload();
+          get_selected_stereo_applet(c).Unload();
           ForEachSide(side) {
-            get_mono_applet(side, c).BaseStart(side);
+            get_selected_mono_applet(side, c).BaseStart(side);
             ConnectMonoToNext(side, c);
             if (c > 0) ConnectSlotToNext(side, c - 1);
           }
@@ -203,25 +203,30 @@ public:
   }
 
   void HandleEncoderPress(HEM_SIDE side) {
+    int c = cursor[side];
     switch (state[side]) {
       case MOVE_CURSOR:
+        candidate[side] = IsStereo(c) ? selected_stereo_applets[c]
+                                      : selected_mono_applets[side][c];
         state[side] = SWITCH_APPLET;
         break;
       case SWITCH_APPLET:
+        if (IsStereo(c)) ChangeStereoApplet(side, c, candidate[side]);
+        else ChangeMonoApplet(side, c, candidate[side]);
         state[side] = EDIT_APPLET;
         break;
       case EDIT_APPLET:
-        get_selected_applet(side)->OnButtonPress();
+        get_selected_applet(side).OnButtonPress();
         break;
     }
   }
 
-  void ChangeStereoApplet(HEM_SIDE side, size_t slot, int dir) {
+  void ChangeStereoApplet(HEM_SIDE side, size_t slot, int ix) {
     int& sel = selected_stereo_applets[slot];
-    int n = slot == 0 ? NumStereoSources : NumStereoProcessors;
-    get_stereo_applet(slot).Unload();
-    sel = constrain(sel + dir, 0, n - 1);
-    auto& app = get_stereo_applet(slot);
+    if (ix == sel) return;
+    get_selected_stereo_applet(slot).Unload();
+    sel = ix;
+    auto& app = get_selected_stereo_applet(slot);
     app.BaseStart(side);
     ForEachSide(side) ConnectStereoToNext(side, slot);
     if (slot > 0) {
@@ -229,20 +234,20 @@ public:
     }
   }
 
-  void ChangeMonoApplet(HEM_SIDE side, size_t slot, int dir) {
+  void ChangeMonoApplet(HEM_SIDE side, size_t slot, int ix) {
     int& sel = selected_mono_applets[side][slot];
-    int n = slot == 0 ? NumMonoSources : NumMonoProcessors;
-    get_mono_applet(side, slot).Unload();
-    sel = constrain(sel + dir, 0, n - 1);
-    auto& app = get_mono_applet(side, slot);
+    if (ix == sel) return;
+    get_selected_mono_applet(side, slot).Unload();
+    sel = ix;
+    auto& app = get_selected_mono_applet(side, slot);
     app.BaseStart(side);
     ConnectMonoToNext(side, slot);
     if (slot > 0) ConnectSlotToNext(side, slot - 1);
   }
 
   void ForwardEncoderMove(HEM_SIDE side, size_t slot, int dir) {
-    auto& app
-      = IsStereo(slot) ? get_stereo_applet(slot) : get_mono_applet(side, slot);
+    auto& app = IsStereo(slot) ? get_selected_stereo_applet(slot)
+                               : get_selected_mono_applet(side, slot);
     app.OnEncoderMove(dir);
   }
 
@@ -260,10 +265,12 @@ public:
       case MOVE_CURSOR:
         c = constrain(c + dir, 0, static_cast<int>(Slots) - 1);
         break;
-      case SWITCH_APPLET:
-        if (IsStereo(c)) ChangeStereoApplet(side, c, dir);
-        else ChangeMonoApplet(side, c, dir);
+      case SWITCH_APPLET: {
+        int n = IsStereo(c) ? (c == 0 ? NumStereoSources : NumStereoProcessors)
+                            : (c == 0 ? NumMonoSources : NumMonoProcessors);
+        candidate[side] = constrain(candidate[side] + dir, 0, n - 1);
         break;
+      }
       case EDIT_APPLET:
         ForwardEncoderMove(side, c, dir);
         break;
@@ -279,16 +286,16 @@ public:
   }
 
   void ConnectMonoToNext(HEM_SIDE side, size_t slot) {
-    AudioStream* stream = get_mono_applet(side, slot).OutputStream();
+    AudioStream* stream = get_selected_mono_applet(side, slot).OutputStream();
     AudioConnection& conn = conns[side][slot];
     conn.disconnect();
     if (slot + 1 < Slots && !IsStereo(slot + 1)) {
       conn.connect(
-        *stream, 0, *get_mono_applet(side, slot + 1).InputStream(), 0
+        *stream, 0, *get_selected_mono_applet(side, slot + 1).InputStream(), 0
       );
     } else {
       AudioStream* next_stream = slot + 1 < Slots
-        ? get_stereo_applet(slot + 1).InputStream()
+        ? get_selected_stereo_applet(slot + 1).InputStream()
         : &OC::AudioIO::OutputStream();
       conn.connect(*stream, 0, *next_stream, side);
     }
@@ -297,15 +304,16 @@ public:
   }
 
   void ConnectStereoToNext(HEM_SIDE side, size_t slot) {
-    AudioStream* stream = get_stereo_applet(slot).OutputStream();
+    AudioStream* stream = get_selected_stereo_applet(slot).OutputStream();
     AudioConnection& conn = conns[side][slot];
     conn.disconnect();
     if (slot + 1 < Slots && !IsStereo(slot + 1)) {
-      AudioStream* next_stream = get_mono_applet(side, slot + 1).InputStream();
+      AudioStream* next_stream
+        = get_selected_mono_applet(side, slot + 1).InputStream();
       conn.connect(*stream, side, *next_stream, 0);
     } else {
       AudioStream* next_stream = slot + 1 < Slots
-        ? get_stereo_applet(slot + 1).InputStream()
+        ? get_selected_stereo_applet(slot + 1).InputStream()
         : &OC::AudioIO::OutputStream();
       conn.connect(*stream, side, *next_stream, side);
     }
@@ -350,35 +358,61 @@ private:
   };
 
   EditState state[2];
-  int cursor[2];
+  int cursor[2]; // selected slot for each side
+  // candidate applet for each side, referenced by index into applets arrays
+  int candidate[2];
 
   int cursor_countdown;
 
-  HemisphereAudioApplet& get_mono_applet(HEM_SIDE side, size_t slot) {
-    const size_t ix = selected_mono_applets[side][slot];
+  HemisphereAudioApplet& get_mono_applet(
+    HEM_SIDE side, size_t slot, size_t ix
+  ) {
     return slot == 0 ? *mono_input_applets[side][ix]
                      : *mono_processor_applets[side][slot - 1][ix];
   }
 
-  HemisphereAudioApplet& get_stereo_applet(size_t slot) {
-    const size_t ix = selected_stereo_applets[slot];
+  HemisphereAudioApplet& get_stereo_applet(size_t slot, size_t ix) {
     return slot == 0 ? *stereo_input_applets[ix]
                      : *stereo_processor_applets[slot - 1][ix];
   }
 
-  HemisphereAudioApplet* get_selected_applet(HEM_SIDE side) {
+  HemisphereAudioApplet& get_selected_mono_applet(HEM_SIDE side, size_t slot) {
+    return get_mono_applet(side, slot, selected_mono_applets[side][slot]);
+  }
+
+  HemisphereAudioApplet& get_selected_stereo_applet(size_t slot) {
+    return get_stereo_applet(slot, selected_stereo_applets[slot]);
+  }
+
+  HemisphereAudioApplet& get_listed_mono_applet(HEM_SIDE side, int slot) {
+    if (cursor[side] == slot && state[side] == SWITCH_APPLET) {
+      return get_mono_applet(side, slot, candidate[side]);
+    }
+    return get_selected_mono_applet(side, slot);
+  }
+
+  HemisphereAudioApplet& get_listed_stereo_applet(int slot) {
+    ForEachSide(side) {
+      if (cursor[side] == slot && state[side] == SWITCH_APPLET) {
+        return get_stereo_applet(slot, candidate[side]);
+      }
+    }
+    return get_selected_stereo_applet(slot);
+  }
+
+  HemisphereAudioApplet& get_selected_applet(HEM_SIDE side) {
     int c = cursor[side];
     if (IsStereo(c)) {
-      return &get_stereo_applet(c);
+      return get_selected_stereo_applet(c);
     } else {
-      return &get_mono_applet(side, c);
+      return get_selected_mono_applet(side, c);
     }
   }
 
   void print_applet_line(int slot) {
     int y = 15 + 10 * slot;
     if (IsStereo(slot)) {
-      const char* name = get_stereo_applet(slot).applet_name();
+      const char* name = get_listed_stereo_applet(slot).applet_name();
       const int l = static_cast<int>(strlen(name));
       if (state[0] != EDIT_APPLET && state[1] != EDIT_APPLET) {
         gfxPrint(64 - l * 3, y, name);
@@ -392,8 +426,7 @@ private:
     } else {
       ForEachSide(side) {
         if (state[side] != EDIT_APPLET) {
-          const char* name
-            = get_mono_applet(static_cast<HEM_SIDE>(side), slot).applet_name();
+          const char* name = get_listed_mono_applet(side, slot).applet_name();
           const int l = static_cast<int>(strlen(name));
           gfxPrint(8 + side * (110 - l * 6), y, name);
         }
