@@ -7,6 +7,7 @@
 #include "audio_applets/FilterFolderApplet.h"
 #include "audio_applets/InputApplet.h"
 #include "audio_applets/LadderApplet.h"
+#include "audio_applets/MidSideApplet.h"
 #include "audio_applets/OscApplet.h"
 #include "audio_applets/PassthruApplet.h"
 #include "audio_applets/UpsampledApplet.h"
@@ -34,6 +35,7 @@ DMAMEM std::tuple<
 DMAMEM std::tuple<
   PassthruApplet<STEREO>,
   CrosspanApplet,
+  MidSideApplet,
   DynamicsApplet<STEREO>,
   InputApplet<STEREO>,
   DelayApplet<STEREO>,
