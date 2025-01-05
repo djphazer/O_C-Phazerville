@@ -51,11 +51,17 @@ enum UiControl {
 };
 
 // Runtime aliases for UI remapping
-extern UiControl CONTROL_BUTTON_A;
-extern UiControl CONTROL_BUTTON_B;
-extern UiControl CONTROL_BUTTON_X;
-extern UiControl CONTROL_BUTTON_Y;
-extern UiControl CONTROL_BUTTON_Z;
+#if defined(NLM_hOC) || defined(NLM_cardOC)
+// hack to swap Hemisphere left/right just for hOC/cOC
+const UiControl CONTROL_BUTTON_A = CONTROL_BUTTON_DOWN;
+const UiControl CONTROL_BUTTON_B = CONTROL_BUTTON_UP;
+#else
+const UiControl CONTROL_BUTTON_A = CONTROL_BUTTON_UP;
+const UiControl CONTROL_BUTTON_B = CONTROL_BUTTON_DOWN;
+#endif
+const UiControl CONTROL_BUTTON_X = CONTROL_BUTTON_UP2;
+const UiControl CONTROL_BUTTON_Y = CONTROL_BUTTON_DOWN2;
+const UiControl CONTROL_BUTTON_Z = CONTROL_BUTTON_M;
 
 static inline uint16_t control_mask(unsigned i) {
   return 1 << i;

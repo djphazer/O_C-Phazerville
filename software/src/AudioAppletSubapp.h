@@ -9,7 +9,7 @@
 #include <Audio.h>
 #include <cstdint>
 
-#define ForEachSide(ch) for(HEM_SIDE ch : {LEFT_HEMISPHERE, RIGHT_HEMISPHERE})
+#define ForEachSide(ch) for (HEM_SIDE ch : {LEFT_HEMISPHERE, RIGHT_HEMISPHERE})
 
 using std::array, std::tuple;
 
@@ -146,28 +146,30 @@ public:
     }
   }
 
-  void HandleAuxButtonEvent(const UI::Event& event) {
+  // TODO: Rename this and change something else to aux button
+  void HandleButtonEvent(const UI::Event& event) {
     if (event.type == UI::EVENT_BUTTON_PRESS) {
-      if (event.control == OC::CONTROL_BUTTON_X) {
-        HemisphereApplet *applet = get_selected_applet(LEFT_HEMISPHERE);
-        if (EDIT_APPLET == state[0] && applet->EditMode())
-          applet->AuxButton();
-        else
-          state[0] = MOVE_CURSOR; // close applet view
-      }
-      if (event.control == OC::CONTROL_BUTTON_Y) {
-        HemisphereApplet *applet = get_selected_applet(RIGHT_HEMISPHERE);
-        if (EDIT_APPLET == state[1] && applet->EditMode())
-          applet->AuxButton();
-        else
-          state[1] = MOVE_CURSOR; // close applet view
+      switch (event.control) {
+        case OC::CONTROL_BUTTON_A:
+          state[0] = MOVE_CURSOR;
+          break;
+        case OC::CONTROL_BUTTON_B:
+          state[1] = MOVE_CURSOR;
+          break;
+        case OC::CONTROL_BUTTON_X:
+          get_selected_applet(LEFT_HEMISPHERE)->AuxButton();
+          break;
+        case OC::CONTROL_BUTTON_Y:
+          get_selected_applet(RIGHT_HEMISPHERE)->AuxButton();
+          break;
+        default:
+          break;
       }
     }
   }
 
   void HandleEncoderButtonEvent(const UI::Event& event) {
-    if ((event.mask & OC::CONTROL_BUTTON_L)
-        && (event.mask & OC::CONTROL_BUTTON_R)) {
+    if (event.mask == (OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_R)) {
       // check ready_for_press to suppress double events on button combos
       if (cursor[0] == cursor[1] && ready_for_press) {
         int c = cursor[0];

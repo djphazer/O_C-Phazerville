@@ -28,6 +28,7 @@
 #include "OC_ui.h"
 
 #include "OC_patterns.h"
+#include "UI/ui_events.h"
 #include "src/drivers/FreqMeasure/OC_FreqMeasure.h"
 
 #include "HemisphereApplet.h"
@@ -614,23 +615,23 @@ public:
         HEM_SIDE slot = ButtonToSlot(event);
 
         // dual press A+B for Clock Setup
-        if (event.mask == (OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_B)) {
+        if (CheckButtonCombo(OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_B)) {
             view_state = CLOCK_SETUP;
             return true;
         }
         // dual press X+Y for Audio Setup
-        if (event.mask == (OC::CONTROL_BUTTON_X | OC::CONTROL_BUTTON_Y)) {
+        if (CheckButtonCombo(OC::CONTROL_BUTTON_X | OC::CONTROL_BUTTON_Y)) {
             view_state = AUDIO_SETUP;
             return true;
         }
         // dual press A+X for Load Preset
-        if (event.mask == (OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_X)) {
+        if (CheckButtonCombo(OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_X)) {
             ShowPresetSelector();
             return true;
         }
 
         // dual press B+Y for Input Mapping
-        if (event.mask == (OC::CONTROL_BUTTON_B | OC::CONTROL_BUTTON_Y)) {
+        if (CheckButtonCombo(OC::CONTROL_BUTTON_B | OC::CONTROL_BUTTON_Y)) {
             config_page = INPUT_SETTINGS;
             config_cursor = TRIGMAP1;
             return true;
@@ -791,17 +792,32 @@ public:
     }
 
     void HandleButtonEvent(const UI::Event &event) {
-        //serial_printf("mask=%d type=%d value=%d control=%d\n", event.mask, event.type, event.value, event.control);
+        last_mask = mask;
+        mask = event.mask;
+        SERIAL_PRINTLN(
+          "mask=%d type=%d value=%d control=%d last_mask=%d",
+          event.mask,
+          event.type,
+          event.value,
+          event.control,
+          last_mask
+        );
 
         if (AUDIO_SETUP == view_state) {
-          if ((event.control == OC::CONTROL_BUTTON_L || event.control== OC::CONTROL_BUTTON_R))
-          {
+          if (CheckButtonCombo(OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_B)) {
+            view_state = APPLETS;
+            return;
+          }
+          if ((event.control == OC::CONTROL_BUTTON_L
+               || event.control == OC::CONTROL_BUTTON_R)) {
             audio_app.HandleEncoderButtonEvent(event);
             return;
           }
-          if ((event.control == OC::CONTROL_BUTTON_X || event.control== OC::CONTROL_BUTTON_Y))
-          {
-            audio_app.HandleAuxButtonEvent(event);
+          if (event.control == OC::CONTROL_BUTTON_X
+              || event.control == OC::CONTROL_BUTTON_Y
+              || event.control == OC::CONTROL_BUTTON_A
+              || event.control == OC::CONTROL_BUTTON_B) {
+            audio_app.HandleButtonEvent(event);
             return;
           }
         }
@@ -901,6 +917,11 @@ public:
         }
     }
 
+protected:
+    bool CheckButtonCombo(uint16_t combo) {
+        return mask == combo && mask != last_mask;
+    }
+
 private:
     int preset_id = 0;
     int queued_preset = 0;
@@ -919,6 +940,13 @@ private:
     int zoom_cursor; // 0=select; 1,2=trigmap; 3,4=cvmap; 5,6=outmode
     uint32_t click_tick; // Measure time between clicks for double-click
     int first_click; // The first button pushed of a double-click set, to see if the same one is pressed
+
+    // Button combos can cause multiple triggers if the buttons are pressed
+    // close enough together. Each press will have its own event with both
+    // button marked in the mask. So, we track mask history to ensure button
+    // state has actually changed between events to register a combo.
+    uint16_t mask = 0;
+    uint16_t last_mask = 0;
 
     // State machine
     enum QuadrantsView {

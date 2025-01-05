@@ -26,19 +26,6 @@ namespace OC {
 
 Ui ui;
 
-// Runtime aliases for UI remapping
-#if defined(NLM_hOC) || defined(NLM_cardOC)
-// hack to swap Hemisphere left/right just for hOC/cOC
-UiControl CONTROL_BUTTON_A = CONTROL_BUTTON_DOWN;
-UiControl CONTROL_BUTTON_B = CONTROL_BUTTON_UP;
-#else
-UiControl CONTROL_BUTTON_A = CONTROL_BUTTON_UP;
-UiControl CONTROL_BUTTON_B = CONTROL_BUTTON_DOWN;
-#endif
-UiControl CONTROL_BUTTON_X = CONTROL_BUTTON_UP2;
-UiControl CONTROL_BUTTON_Y = CONTROL_BUTTON_DOWN2;
-UiControl CONTROL_BUTTON_Z = CONTROL_BUTTON_M;
-
 void Ui::Init() {
   ticks_ = 0;
   set_screensaver_timeout(SCREENSAVER_TIMEOUT_S);
