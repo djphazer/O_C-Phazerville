@@ -38,7 +38,11 @@ public:
       static_cast<float>(crosspan) * 0.01f + crosspan_cv.InF(), 0.0f, 1.0f
     );
     float out, in;
-    EqualPowerFade(out, in, total_crosspan);
+    if (xfade_shape == EQUAL_POWER) EqualPowerFade(out, in, total_crosspan);
+    else {
+      out = 1.0f - total_crosspan;
+      in = total_crosspan;
+    }
     attenuations[0].Push(float_to_q15(out));
     attenuations[1].Push(float_to_q15(in));
   }
@@ -57,11 +61,15 @@ public:
     gfxStartCursor(28, 42);
     gfxPrintIcon(PARAM_MAP_ICONS + 8 * crosspan_cv.source, 9);
     gfxEndCursor(cursor == 1);
+
+    gfxStartCursor(32 - 3 * 9, 55);
+    gfxPrint(xfade_shape == EQUAL_POWER ? "Equal pow" : "Equal amp");
+    gfxEndCursor(cursor == 2);
   }
 
   void OnEncoderMove(int direction) override {
     if (!EditMode()) {
-      MoveCursor(cursor, direction, 1);
+      MoveCursor(cursor, direction, 2);
       return;
     }
     switch (cursor) {
@@ -69,8 +77,12 @@ public:
         crosspan = constrain(crosspan + direction, 0, 100);
         break;
       case 1:
-      default:
         crosspan_cv.ChangeSource(direction);
+        break;
+      case 2:
+        xfade_shape = static_cast<XfadeShape>(xfade_shape + direction);
+
+      default:
         break;
     }
   }
@@ -95,9 +107,11 @@ protected:
   void SetHelp() override {}
 
 private:
+  enum XfadeShape : bool { EQUAL_POWER, EQUAL_AMPLITUDE };
   int8_t cursor = 0;
   int8_t crosspan = 0;
   CVInput crosspan_cv;
+  XfadeShape xfade_shape;
 
   AudioPassthrough<2> input;
   std::array<InterpolatingStream<>, 2> attenuations;
