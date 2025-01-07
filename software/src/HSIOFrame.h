@@ -57,10 +57,11 @@ typedef struct IOFrame {
         uint16_t semitone_mask[ADC_CHANNEL_LAST]; // which notes are currently on
 
         // MIDI input stuff handled by MIDIIn applet
-        std::vector<MIDINoteData> note_buffer[16]; // note buffer for polyphonic input. one for each midi channel
+        std::vector<MIDINoteData> note_buffer[16]; // note buffer for polyphonic input. one for each MIDI channel
         int outputs[DAC_CHANNEL_LAST]; // translated CV values
         bool trigout_q[DAC_CHANNEL_LAST];
         int last_midi_channel = 0; // for MIDI In activity monitor
+        uint16_t sustain_latch; // each bit is a MIDI channel's sustain state
 
         void RemoveNoteData(std::vector<MIDINoteData> &buffer, int note) {
             buffer.erase(
@@ -86,10 +87,15 @@ typedef struct IOFrame {
             if (note_buffer[c].size() == 0) note_buffer[c].shrink_to_fit(); // free up memory when MIDI is not used
         }
 
-        void NoteStackClear() {
-            for (int c = 0; c < 16; ++c) {
-                note_buffer[c].clear();
-                note_buffer[c].shrink_to_fit();
+        void ClearNoteStack(int ch = -1) {
+            if (ch > 0) {
+                note_buffer[ch].clear();
+                note_buffer[ch].shrink_to_fit();
+            } else { // clear on all channels if no args passed
+                for (int c = 0; c < 16; ++c) {
+                    note_buffer[c].clear();
+                    note_buffer[c].shrink_to_fit();
+                }
             }
         }
 
@@ -127,6 +133,22 @@ typedef struct IOFrame {
 
         int GetVel(std::vector<MIDINoteData> &buffer, int n) {
             return buffer.at(buffer.size()-n).vel;
+        }
+
+        void ClearSustainLatch(int m_ch = -1) {
+            if (m_ch > 0) sustain_latch &= ~(1 << m_ch);
+            else { // clear on all channels if no args passed
+                for (int c = 0; c < 16; ++c)
+                    sustain_latch &= ~(1 << c);
+            }
+        }
+
+        void SetSustainLatch(int m_ch) {
+            sustain_latch |= (1 << m_ch);
+        }
+
+        bool CheckSustainLatch(int m_ch) {
+            return sustain_latch & (1 << m_ch);
         }
 
         // Clock/Start/Stop are handled by ClockSetup applet
@@ -224,7 +246,12 @@ typedef struct IOFrame {
                 stop_q = 1;
                 clock_run = false;
                 // a way to reset stuck notes
-                NoteStackClear();
+                ClearNoteStack();
+                ClearSustainLatch();
+                // for (int c = 0; c < 4; ++c) {
+                //     outputs[c] = 0;
+                //     trigout_q[c] = 0;
+                // }
                 return;
                 break;
 
@@ -276,11 +303,12 @@ typedef struct IOFrame {
                             case HEM_MIDI_NOTE_POLY3_OUT:
                                 if (note_buffer[m_ch].size() > 2)
                                     outputs[ch] = MIDIQuantizer::CV(GetNote(note_buffer[m_ch], 3));
-                                else
+                                else {
                                     if (note_buffer[m_ch].size() == 2) // distribute notes evenly when only 2 are played
                                         outputs[ch] = MIDIQuantizer::CV(GetNoteLast(note_buffer[m_ch]));
                                     else
                                         outputs[ch] = MIDIQuantizer::CV(GetNoteFirst(note_buffer[m_ch]));
+                                }
                                 break;
 
                             case HEM_MIDI_NOTE_POLY4_OUT:
@@ -341,10 +369,12 @@ typedef struct IOFrame {
                         if (note_buffer[m_ch].size() > 0) { // don't update output when last note is released
                             switch(function[ch]) { // note # output functions
                                 case HEM_MIDI_NOTE_OUT:
+                                    if (CheckSustainLatch(m_ch)) break;
                                     outputs[ch] = MIDIQuantizer::CV(GetNoteLast(note_buffer[m_ch]));
                                     break;
 
                                 case HEM_MIDI_NOTE_POLY2_OUT:
+                                    if (CheckSustainLatch(m_ch)) break;
                                     if (note_buffer[m_ch].size() < 2)
                                         outputs[ch] = MIDIQuantizer::CV(GetNoteLast(note_buffer[m_ch]));
                                     else
@@ -352,17 +382,18 @@ typedef struct IOFrame {
                                     break;
 
                                 case HEM_MIDI_NOTE_POLY3_OUT:
+                                    if (CheckSustainLatch(m_ch)) break;
                                     if (note_buffer[m_ch].size() < 3) {
                                         if (note_buffer[m_ch].size() == 2) // distribute notes evenly when only 2 are played
                                             outputs[ch] = MIDIQuantizer::CV(GetNoteLast(note_buffer[m_ch]));
                                         else
                                             outputs[ch] = MIDIQuantizer::CV(GetNoteFirst(note_buffer[m_ch]));
-                                    } else {
+                                    } else
                                         outputs[ch] = MIDIQuantizer::CV(GetNote(note_buffer[m_ch], 3));
-                                    }
                                     break;
 
                                 case HEM_MIDI_NOTE_POLY4_OUT:
+                                    if (CheckSustainLatch(m_ch)) break;
                                     if (note_buffer[m_ch].size() < 4)
                                         outputs[ch] = MIDIQuantizer::CV(GetNoteFirst(note_buffer[m_ch]));
                                     else
@@ -370,34 +401,37 @@ typedef struct IOFrame {
                                     break;
 
                                 case HEM_MIDI_NOTE_MIN_OUT:
+                                    if (CheckSustainLatch(m_ch)) break;
                                     outputs[ch] = MIDIQuantizer::CV(GetNoteMin(note_buffer[m_ch]));
                                     break;
 
                                 case HEM_MIDI_NOTE_MAX_OUT:
+                                    if (CheckSustainLatch(m_ch)) break;
                                     outputs[ch] = MIDIQuantizer::CV(GetNoteMax(note_buffer[m_ch]));
                                     break;
 
                                 case HEM_MIDI_NOTE_PEDAL_OUT:
+                                    if (CheckSustainLatch(m_ch)) break;
                                     outputs[ch] = MIDIQuantizer::CV(GetNoteFirst(note_buffer[m_ch]));
                                     break;
 
                                 case HEM_MIDI_NOTE_INV_OUT:
+                                    if (CheckSustainLatch(m_ch)) break;
                                     outputs[ch] = MIDIQuantizer::CV(GetNoteLastInv(note_buffer[m_ch]));
                                     break;
                             }
                         }
 
-                        // turn gate off only when all notes are off
-                        if (!(note_buffer[m_ch].size() > 0)) {
+                        if (function[ch] == HEM_MIDI_TRIG_ALWAYS_OUT) trigout_q[ch] = 1;
+
+                        // turn gate off only when all notes are off, and sustain pedal up
+                        if (!(note_buffer[m_ch].size() > 0) && !CheckSustainLatch(m_ch)) {
                             if (function[ch] == HEM_MIDI_GATE_OUT) {
                                 outputs[ch] = 0;
                             }
                             if (function[ch] == HEM_MIDI_GATE_INV_OUT) {
                                 outputs[ch] = PULSE_VOLTAGE * (12 << 7);
                             }
-                        } else {
-                            if (function[ch] == HEM_MIDI_TRIG_ALWAYS_OUT)
-                                trigout_q[ch] = 1;
                         }
 
                         switch (function[ch]) {
@@ -419,6 +453,23 @@ typedef struct IOFrame {
                         break;
 
                     case usbMIDI.ControlChange: // Modulation wheel or other CC
+                        // handle sustain pedal
+                        if (data1 == 64) {
+                            if (data2 > 63) {
+                                if (!CheckSustainLatch(m_ch)) SetSustainLatch(m_ch);
+                            } else {
+                                ClearSustainLatch(m_ch);
+                                if (!(note_buffer[m_ch].size() > 0)) {
+                                    if (function[ch] == HEM_MIDI_GATE_OUT) {
+                                        outputs[ch] = 0;
+                                    }
+                                    if (function[ch] == HEM_MIDI_GATE_INV_OUT) {
+                                        outputs[ch] = PULSE_VOLTAGE * (12 << 7);
+                                    }
+                                }
+                            }
+                        }
+
                         if (function[ch] == HEM_MIDI_CC_OUT) {
                             if (function_cc[ch] < 0) function_cc[ch] = data1;
 

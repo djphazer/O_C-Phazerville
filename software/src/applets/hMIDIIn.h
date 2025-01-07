@@ -51,7 +51,7 @@ public:
 
         frame.MIDIState.log_index = 0;
         frame.MIDIState.clock_count = 0;
-        frame.MIDIState.NoteStackClear();
+        frame.MIDIState.ClearNoteStack();
     }
 
     void Controller() {
