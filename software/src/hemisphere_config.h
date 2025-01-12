@@ -91,6 +91,7 @@
 #include "applets/VectorMod.h"
 #include "applets/VectorMorph.h"
 #include "applets/Voltage.h"
+#include "applets/WTVCO.h"
 #include "applets/hMIDIIn.h"
 #include "applets/hMIDIOut.h"
 
@@ -200,6 +201,7 @@ AppletRegistry reg{
     DeclareApplet<VectorMod>{53, 0x01},
     DeclareApplet<VectorMorph>{54, 0x01},
     DeclareApplet<Voltage>{43, 0x10},
+    DeclareApplet<WTVCO>{111, 0x80},
 };
 
 
