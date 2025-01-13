@@ -296,24 +296,26 @@ void FASTRUN loop() {
           case 'z':
             Serial.println("-=[ PEW PEW NERDS! ]=-");
             Serial.println("Secret Menu Options:");
-            Serial.printf("'i' = Toggle App ISR [%s]\n", OC::CORE::app_isr_enabled ? "ON" : "OFF");
-            Serial.printf("'d' = Toggle Display Redraw [%s]\n", OC::CORE::display_update_enabled ? "ON" : "OFF");
-            Serial.printf("'l' = Toggle App Loop [%s]\n", OC::CORE::app_loop_enabled ? "ON" : "OFF");
+            Serial.printf("'I' = Toggle App ISR [%s]\n", OC::CORE::app_isr_enabled ? "ON" : "OFF");
+            Serial.printf("'D' = Toggle Display Redraw [%s]\n", OC::CORE::display_update_enabled ? "ON" : "OFF");
+            Serial.printf("'L' = Toggle App Loop [%s]\n", OC::CORE::app_loop_enabled ? "ON" : "OFF");
 #if defined(__IMXRT1062__)
+            Serial.println("'l' = list all files in flash (LittleFS)");
             Serial.println("'p' = Show Power Cycle Count");
-            Serial.println("'P' = clear/reset Config file");
+            Serial.println("'C' = clear/reset Config file");
+            Serial.println("'F' = format/erase LittleFS files");
 #endif
             break;
 
-          case 'i':
+          case 'I':
             OC::CORE::app_isr_enabled = !OC::CORE::app_isr_enabled;
             Serial.printf("App ISR = %s\n", OC::CORE::app_isr_enabled ? "ON" : "OFF");
             break;
-          case 'd':
+          case 'D':
             OC::CORE::display_update_enabled = !OC::CORE::display_update_enabled;
             Serial.printf("Display Redraw = %s\n", OC::CORE::display_update_enabled ? "ON" : "OFF");
             break;
-          case 'l':
+          case 'L':
             OC::CORE::app_loop_enabled = !OC::CORE::app_loop_enabled;
             Serial.printf("App Loop = %s\n", OC::CORE::app_loop_enabled ? "ON" : "OFF");
             break;
@@ -327,13 +329,18 @@ void FASTRUN loop() {
             break;
           }
 
-          case 'P':
-            Serial.println("CLEARING CONFIG FILE!!");
+          case 'C':
+            Serial.println("Resetting Config File!!");
             PhzConfig::clear_config();
             PhzConfig::setValue(PhzConfig::POWER_CYCLE_COUNT, 0);
             PhzConfig::save_config();
+          case 'l':
             PhzConfig::listFiles();
-            PhzConfig::load_config();
+            //PhzConfig::load_config();
+            break;
+          case 'F':
+            Serial.println("!! ERASING ALL FILES on LittleFS !!");
+            PhzConfig::eraseFiles();
             break;
 #endif
 
