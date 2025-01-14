@@ -137,7 +137,11 @@ const char * const start_footer   = "[CANCEL]         [OK]";
 const char * const end_footer     = "[PREV]         [EXIT]";
 const char * const default_footer = "[PREV]         [NEXT]";
 const char * const default_help_r = "[R] => Adjust";
+#ifdef ARDUINO_TEENSY41
+const char * const long_press_hint = "Hold [B] to set";
+#else
 const char * const long_press_hint = "Hold [DOWN] to set";
+#endif
 const char * const select_help    = "[R] => Select";
 
 const CalibrationStep calibration_steps[CALIBRATION_STEP_LAST] = {
