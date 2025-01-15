@@ -100,7 +100,7 @@ enum ASR_CV4_DEST {
   ASR_DEST_LAST
 };
 
-typedef int16_t ASR_pitch;
+using ASR_pitch = int16_t;
 
 class ASRApp : public settings::SettingsBase<ASRApp, ASR_SETTING_LAST> {
 public:

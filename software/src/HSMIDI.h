@@ -165,7 +165,7 @@ const char* const midi_poly_mode_name[POLY_LAST + 1] = {
  * and unpacked data, several typedefs are included to disambiguate the role of the data in
  * your code.
  */
-typedef struct _SysExData {
+struct _SysExData {
     int size;
     uint8_t data[SYSEX_DATA_MAX_SIZE];
 
@@ -257,7 +257,10 @@ typedef struct _SysExData {
         packed.set_data(psize, pdata);
         return packed;
     }
-} SysExData, UnpackedData, PackedData;
+};
+using SysExData = _SysExData;
+using UnpackedData = _SysExData;
+using PackedData = _SysExData;
 
 /*
  * Base class for applications that need MIDI SysEx support.

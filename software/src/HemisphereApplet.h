@@ -49,11 +49,11 @@ class HemisphereApplet;
 
 namespace HS {
 
-typedef struct Applet {
+struct Applet {
   const int id;
   const uint8_t categories;
   std::array<HemisphereApplet *, APPLET_SLOTS> instance;
-} Applet;
+};
 
 extern IOFrame frame;
 

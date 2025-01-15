@@ -24,7 +24,7 @@ static inline void dac8568_set_channel(uint32_t channel, uint32_t data) {
 #endif
 extern void SPI_init();
 
-typedef int DAC_CHANNEL;
+using DAC_CHANNEL = int;
 
 extern DAC_CHANNEL DAC_CHANNEL_A, DAC_CHANNEL_B, DAC_CHANNEL_C, DAC_CHANNEL_D;
 #if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)

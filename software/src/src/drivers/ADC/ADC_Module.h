@@ -952,7 +952,7 @@ private:
     uint32_t adc_offset;
 
     // registers point to the correct ADC module
-    typedef volatile uint32_t* const reg;
+    using reg = volatile uint32_t* const;
 
     // registers that control the adc modulesetSoftwareTrigger
     reg ADC_SC1A; //reg ADC_SC1A_aien; reg ADC_SC1A_coco;

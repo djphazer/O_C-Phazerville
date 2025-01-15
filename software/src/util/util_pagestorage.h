@@ -86,9 +86,9 @@ public:
   static const size_t PAGES = LENGTH / PAGESIZE;
 
   // throw compiler error if no pages
-  typedef bool CHECK_PAGES[PAGES > 0 ? 1 : -1 ];
+  static_assert(PAGES > 0, "PageStorage - no pages!");
   // throw compiler error if OOB
-  typedef bool CHECK_BASEADDR[BASE_ADDR + LENGTH > STORAGE::LENGTH ? -1 : 1];
+  static_assert(BASE_ADDR + LENGTH <= STORAGE::LENGTH, "PageStorage - out of bounds!");
 
   /**
    * @return index of page in storage; only valid after ::load

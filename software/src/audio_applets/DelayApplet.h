@@ -348,7 +348,7 @@ protected:
 private:
   // Uses 1MB of psram and gives just under 12 secs of delay time.
   static const size_t DELAY_LENGTH = 1024 * 512;
-  typedef AudioDelayExt<DELAY_LENGTH, 9> DelayStream;
+  using DelayStream = AudioDelayExt<DELAY_LENGTH, 9>;
   static constexpr float MAX_DELAY_SECS = DelayStream::MAX_DELAY_SECS;
   static constexpr float MIN_DELAY_SECS = DelayStream::MIN_DELAY_SECS;
 

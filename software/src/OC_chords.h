@@ -5,7 +5,7 @@
 
 namespace OC {
 
-typedef OC::Chord Chord;
+using Chord = OC::Chord;
 
 class Chords {
 public:

@@ -10,7 +10,7 @@
 #ifndef int2simfloat
 #define int2simfloat(x) (x << 14)
 #define simfloat2int(x) (x >> 14)
-typedef int32_t simfloat;
+using simfloat = int32_t;
 #endif
 
 // Reference Constants
@@ -126,10 +126,10 @@ constexpr int ProportionCV(const int cv_value, const int max_pixels) {
 
 
 // Specifies where data goes in flash storage for each selcted applet, and how big it is
-typedef struct PackLocation {
+struct PackLocation {
     size_t location;
     size_t size;
-} PackLocation;
+};
 
 /* Add value to a 64-bit storage unit at the specified location */
 constexpr void Pack(uint64_t &data, const PackLocation p, const uint64_t value) {

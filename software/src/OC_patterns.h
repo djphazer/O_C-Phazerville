@@ -6,7 +6,7 @@
 
 namespace OC {
 
-typedef OC::Pattern Pattern;
+using Pattern = OC::Pattern;
 
 static constexpr int kMaxPatternLength = 16;
 static constexpr int kMinPatternLength = 2;

@@ -54,7 +54,7 @@ DMAMEM VOSegment user_waveforms[VO_SEGMENT_COUNT];
 
 #define int2signal(x) (x << 10)
 #define signal2int(x) (x >> 10)
-typedef int32_t vosignal_t;
+using vosignal_t = int32_t;
 
 enum {
     VO_TRIANGLE,
@@ -63,7 +63,7 @@ enum {
     VO_NUMBER_OF_WAVEFORMS
 };
 
-typedef HS::VOSegment VOSegment;
+using VOSegment = HS::VOSegment;
 
 class VectorOscillator {
 public:

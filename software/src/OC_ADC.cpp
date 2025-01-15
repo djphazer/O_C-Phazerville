@@ -31,12 +31,12 @@ DMAMEM static volatile uint16_t __attribute__((aligned(DMA_BUF_SIZE+0))) adcbuff
 #define ADC33131_SAMPLE_RATE 300000.0f // TODO: test various input capacitors vs channel crosstalk
 extern "C" void xbar_connect(unsigned int input, unsigned int output);
 DMAChannel dma0(false);
-typedef struct {
-        uint16_t adc[4];
-} adcframe_t;
-typedef struct {
-        int16_t in[8];
-} adc33131_frame_t;
+struct adcframe_t {
+  uint16_t adc[4];
+};
+struct adc33131_frame_t {
+  int16_t in[8];
+};
 // sizeof(adc_buffer) must be multiple of 32 byte cache row size
 static const int adc_buffer_len = 32;
 static DMAMEM __attribute__((aligned(32))) adcframe_t adc_buffer[adc_buffer_len];

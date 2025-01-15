@@ -11,7 +11,7 @@
 // If enabled, use an interrupt to track DMA completion; otherwise use polling
 //#define OC_ADC_ENABLE_DMA_INTERRUPT
 
-typedef int ADC_CHANNEL;
+using ADC_CHANNEL = int;
 
 extern ADC_CHANNEL ADC_CHANNEL_1, ADC_CHANNEL_2, ADC_CHANNEL_3, ADC_CHANNEL_4;
 #if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)

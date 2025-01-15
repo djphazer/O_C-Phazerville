@@ -7,7 +7,7 @@
 // Common scales and stuff
 namespace OC {
 
-typedef braids::Scale Scale;
+using Scale = braids::Scale;
 
 static constexpr int kMaxScaleLength = 16;
 static constexpr int kMinScaleLength = 4;

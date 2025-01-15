@@ -30,7 +30,7 @@
 #ifndef int2simfloat
 #define int2simfloat(x) (x << 14)
 #define simfloat2int(x) (x >> 14)
-typedef int32_t simfloat;
+using simfloat = int32_t;
 #endif
 
 #include "HSicons.h"
@@ -252,7 +252,7 @@ private:
 };
 
 // --- Phazerville Screensaver Library ---
-typedef struct {
+struct Zap {
     int x = 0;
     int y = 0;
     int x_v = 6;
@@ -282,7 +282,7 @@ typedef struct {
             if (y_v == 0) ++y_v;
         }
     }
-} Zap;
+};
 static constexpr int HOW_MANY_ZAPS = 30;
 static Zap zaps[HOW_MANY_ZAPS];
 static void ZapScreensaver(const bool stars = false) {

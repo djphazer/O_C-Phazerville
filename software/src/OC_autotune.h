@@ -6,7 +6,7 @@
 
 namespace OC {
 
-typedef OC::Autotune_data Autotune_data;
+using Autotune_data = OC::Autotune_data;
 
 class AUTOTUNE {
 public:

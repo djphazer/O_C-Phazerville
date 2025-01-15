@@ -49,7 +49,7 @@ const Map input_maps[] = {
 
 namespace OC {
 
-  typedef OC::Map Map;
+  using Map = OC::Map;
 
   class InputMaps {
   public:

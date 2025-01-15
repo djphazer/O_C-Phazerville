@@ -19,11 +19,11 @@ static constexpr int GATE_THRESHOLD = 15 << 7; // 1.25 volts
 static constexpr int TRIGMAP_MAX = OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_LAST + DAC_CHANNEL_LAST;
 static constexpr int CVMAP_MAX = ADC_CHANNEL_LAST + DAC_CHANNEL_LAST;
 
-typedef struct MIDILogEntry {
+struct MIDILogEntry {
     uint8_t message;
     uint8_t data1;
     uint8_t data2;
-} MIDILogEntry;
+};
 
 struct MIDINoteData {
     uint8_t note; // data1
@@ -38,7 +38,7 @@ struct PolyphonyData {
 
 // shared IO Frame, updated every tick
 // this will allow chaining applets together, multiple stages of processing
-typedef struct IOFrame {
+struct IOFrame {
     bool autoMIDIOut = false;
     bool clocked[OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_LAST];
     bool gate_high[OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_LAST];
@@ -715,7 +715,7 @@ typedef struct IOFrame {
         if (autoMIDIOut) MIDIState.Send(outputs);
     }
 
-} IOFrame;
+};
 
 } // namespace HS
 

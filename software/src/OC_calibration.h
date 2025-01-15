@@ -198,7 +198,7 @@ static_assert(sizeof(ADC::CalibrationData) == 20, "ADC::CalibrationData size cha
 static_assert(sizeof(CalibrationData) == 212, "Calibration data size changed!");
 #endif
 
-typedef PageStorage<EEPROMStorage, EEPROM_CALIBRATIONDATA_START, EEPROM_CALIBRATIONDATA_END, CalibrationData> CalibrationStorage;
+using CalibrationStorage = PageStorage<EEPROMStorage, EEPROM_CALIBRATIONDATA_START, EEPROM_CALIBRATIONDATA_END, CalibrationData>;
 
 extern const CalibrationStep calibration_steps[CALIBRATION_STEP_LAST];
 extern CalibrationData calibration_data;
