@@ -7,6 +7,10 @@
 template <AudioChannels Channels>
 class InputApplet : public HemisphereAudioApplet {
 public:
+  const uint64_t applet_id() override {
+    return strhash("Input");
+  }
+
   const char* applet_name() override {
     return Channels == MONO ? (mono_mode == LEFT ? "Input L" : "Input R")
                             : "Inputs";

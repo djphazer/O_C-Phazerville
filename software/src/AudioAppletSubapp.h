@@ -2,9 +2,9 @@
 
 #include "AudioIO.h"
 #include "HSUtils.h"
-#include "PhzConfig.h"
 #include "HemisphereAudioApplet.h"
 #include "OC_ui.h"
+#include "PhzConfig.h"
 #include "UI/ui_events.h"
 #include "util/util_tuples.h"
 #include <Audio.h>
@@ -332,70 +332,96 @@ public:
     STEREO_APPLETS = 1 << 8,
     APPLET_CONFIGS = 1 << 9,
   };
+
   void LoadPreset(int id) {
     char filename[] = "AUDIO00.CFG";
     filename[5] += (id / 10);
-    filename[6] += id;
-    if ( !PhzConfig::load_config(filename) ) return;
+    filename[6] += id % 10;
+    if (!PhzConfig::load_config(filename)) return;
 
-    int idx = 0;
     uint64_t data = 0;
     uint64_t oldstereo = stereo;
     PhzConfig::getValue(STEREO_MODE_FLAGS, data);
     stereo = data & 0xFFFFFFFF;
 
-    for ( size_t slot = 0; slot < Slots; ++slot ) {
+    for (size_t slot = 0; slot < Slots; ++slot) {
 
       if (IsStereo(slot)) {
         if (0 == ((oldstereo >> slot) & 1)) {
           SetupMonoStereo(slot);
         }
-        data = 0;
-        //stereo applets
+        data = 0; // Default to input/passthrough if nothing is found.
+        // stereo applets
         PhzConfig::getValue(STEREO_APPLETS + slot, data);
-        ChangeStereoApplet(LEFT_HEMISPHERE, slot, (int)data);
+        int ix = get_stereo_applet_ix_by_id(slot, data, 0);
+        Serial.printf("%lu: Loading applet id=", slot);
+        Serial.print(data);
+        Serial.printf(" ix=%d", ix);
+        ChangeStereoApplet(LEFT_HEMISPHERE, slot, ix);
 
         if (data) {
           PhzConfig::getValue(STEREO_APPLETS + APPLET_CONFIGS + slot, data);
+          Serial.print("... got data=");
+          Serial.print(data, BIN);
           get_selected_stereo_applet(slot).OnDataReceive(data);
         }
+        Serial.println();
       } else {
         if ((oldstereo >> slot) & 1) {
           SetupMonoStereo(slot);
         }
-        //mono applets
+        // mono applets
         ForEachSide(ch) {
-          data = 0;
+          data = 0; // Default to input/passthrough if nothing is found.
           PhzConfig::getValue(MONO_APPLETS + slot + ch * Slots, data);
-          ChangeMonoApplet(ch, slot, (int)data);
+          int ix = get_mono_applet_ix_by_id(ch, slot, data, 0);
+          Serial.printf("%lu, %d: Loading applet id=", slot, ch);
+          Serial.print(data);
+          Serial.printf(" ix=%d", ix);
+          ChangeMonoApplet(ch, slot, ix);
 
           if (data) {
             PhzConfig::getValue(APPLET_CONFIGS + slot + ch * Slots, data);
+            Serial.print("... got data=");
+            Serial.print(data, BIN);
             get_selected_mono_applet(ch, slot).OnDataReceive(data);
           }
+          Serial.println();
         }
       }
     }
-
   }
+
   void SavePreset(int id) {
     PhzConfig::clear_config();
 
     PhzConfig::setValue(STEREO_MODE_FLAGS, (uint64_t)stereo); // bitset
-    int idx = 0;
-    ForEachSide(ch) {
-      for ( size_t slot = 0; slot < Slots; ++slot ) {
-          idx = selected_mono_applets[ch][slot];
-          PhzConfig::setValue(MONO_APPLETS + slot + ch * Slots, idx);
-          PhzConfig::setValue(APPLET_CONFIGS + slot + ch * Slots,
-              get_selected_mono_applet(ch, slot).OnDataRequest());
+    uint64_t applet_id = 0;
+    uint64_t data = 0;
+    for (size_t slot = 0; slot < Slots; ++slot) {
+      auto& stereo_applet = get_selected_stereo_applet(slot);
+      applet_id = stereo_applet.applet_id();
+      data = stereo_applet.OnDataRequest();
+      Serial.printf("%lu: Saving applet id=", slot);
+      Serial.print(applet_id);
+      Serial.print(" data=");
+      Serial.println(data, BIN);
+      PhzConfig::setValue(STEREO_APPLETS + slot, applet_id);
+      PhzConfig::setValue(STEREO_APPLETS + APPLET_CONFIGS + slot, data);
 
-          if (0 == ch) {
-            idx = selected_stereo_applets[slot];
-            PhzConfig::setValue(STEREO_APPLETS + slot, idx);
-            PhzConfig::setValue(STEREO_APPLETS + APPLET_CONFIGS + slot,
-                get_selected_stereo_applet(slot).OnDataRequest());
-          }
+      ForEachSide(ch) {
+        auto& mono_applet = get_selected_mono_applet(ch, slot);
+        applet_id = mono_applet.applet_id();
+        data = mono_applet.OnDataRequest();
+        Serial.printf("%lu, %d: Saving applet id=", slot, ch);
+        Serial.print(applet_id);
+        Serial.print(" data=");
+        Serial.println(data, BIN);
+        PhzConfig::setValue(MONO_APPLETS + slot + ch * Slots, applet_id);
+        PhzConfig::setValue(
+          APPLET_CONFIGS + slot + ch * Slots,
+          get_selected_mono_applet(ch, slot).OnDataRequest()
+        );
       }
     }
 
@@ -473,6 +499,38 @@ private:
       return get_mono_applet(side, slot, candidate[side]);
     }
     return get_selected_mono_applet(side, slot);
+  }
+
+  template <size_t N>
+  int get_applet_ix_by_id(
+    array<HemisphereAudioApplet*, N> applets,
+    uint64_t id,
+    int default_value = -1
+  ) {
+    for (size_t i = 0; i < applets.size(); i++) {
+      if (applets[i]->applet_id() == id) return static_cast<int>(i);
+    }
+    return default_value;
+  }
+
+  int get_mono_applet_ix_by_id(
+    HEM_SIDE side, int slot, uint64_t id, int default_value = -1
+  ) {
+    if (slot == 0)
+      return get_applet_ix_by_id(mono_input_applets[side], id, default_value);
+    return get_applet_ix_by_id(
+      mono_processor_applets[side][slot - 1], id, default_value
+    );
+  }
+
+  int get_stereo_applet_ix_by_id(
+    int slot, uint64_t id, int default_value = -1
+  ) {
+    if (slot == 0)
+      return get_applet_ix_by_id(stereo_input_applets, id, default_value);
+    return get_applet_ix_by_id(
+      stereo_processor_applets[slot - 1], id, default_value
+    );
   }
 
   HemisphereAudioApplet& get_listed_stereo_applet(int slot) {

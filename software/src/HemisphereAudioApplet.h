@@ -134,6 +134,18 @@ private:
   }
 };
 
+// For ascii strings of 9 characters or less, will just be the ascii bits
+// concatenated together. More characters than that and the xor plus misaligned
+// shifting should avoid collisions.
+constexpr uint64_t strhash(const char* str) {
+  uint64_t id = 0;
+  for (const char* c = str; *c != '\0'; c++) {
+    id = (id << 7) | (id >> (64 - 7));
+    id ^= (*c);
+  }
+  return id;
+}
+
 enum AudioChannels {
   NONE,
   MONO,
@@ -142,6 +154,11 @@ enum AudioChannels {
 
 class HemisphereAudioApplet : public HemisphereApplet {
 public:
+  // If applet_name() can return different things at different times, you *must*
+  // override this or saving and loading won't work!
+  virtual const uint64_t applet_id() {
+    return strhash(applet_name());
+  };
   virtual AudioStream* InputStream() = 0;
   virtual AudioStream* OutputStream() = 0;
   virtual void mainloop() {}
