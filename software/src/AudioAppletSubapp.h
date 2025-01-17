@@ -147,13 +147,18 @@ public:
     }
   }
 
-  void HandleButtonEvent(const UI::Event& event) {
+  // returns true to exit
+  bool HandleButtonEvent(const UI::Event& event) {
     if (event.type == UI::EVENT_BUTTON_PRESS) {
       switch (event.control) {
         case OC::CONTROL_BUTTON_A:
+          if (MOVE_CURSOR == state[0])
+            return true;
           state[0] = MOVE_CURSOR;
           break;
         case OC::CONTROL_BUTTON_B:
+          if (MOVE_CURSOR == state[1])
+            return true;
           state[1] = MOVE_CURSOR;
           break;
         case OC::CONTROL_BUTTON_X:
@@ -166,6 +171,7 @@ public:
           break;
       }
     }
+    return false;
   }
 
   void SetupMonoStereo(int c) {

@@ -817,7 +817,8 @@ public:
               || event.control == OC::CONTROL_BUTTON_Y
               || event.control == OC::CONTROL_BUTTON_A
               || event.control == OC::CONTROL_BUTTON_B) {
-            audio_app.HandleButtonEvent(event);
+            if (audio_app.HandleButtonEvent(event))
+              view_state = APPLETS;
             return;
           }
         }
