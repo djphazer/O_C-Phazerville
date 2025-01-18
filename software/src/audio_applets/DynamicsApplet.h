@@ -129,10 +129,10 @@ protected:
 private:
   int cursor = 0;
   // thresholds in db
-  int8_t gate_threshold = -50;
+  int8_t gate_threshold = -70;
   int8_t comp_threshold = -6;
   int8_t limit_threshold = -1;
-  int8_t makeupgain = -1; // negative means auto
+  int8_t makeupgain = 0; // negative means auto
 
   // TODO: more params for attack/release of each stage, comp ratio & knee
   //
