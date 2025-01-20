@@ -1,16 +1,20 @@
 #pragma once
 
+#include "HSUtils.h"
 #include "HemisphereApplet.h"
 #include "dsputils.h"
 #include <AudioStream.h>
+#include <cstdint>
+#include <type_traits>
 
 const int NUM_CV_INPUTS = ADC_CHANNEL_LAST * 2 + 1;
 // We *could* reuse HS::input_quant for inputs, but easier to just do it
 // independently, and semitone quantizers are lightwieght.
-OC::SemitoneQuantizer cv_semitone_quants[NUM_CV_INPUTS];
+inline std::array<OC::SemitoneQuantizer, NUM_CV_INPUTS> cv_semitone_quants;
 
 struct CVInput {
   int8_t source = 0;
+  int8_t attenuversion = 100;
 
   int In(int default_value = 0) {
     if (!source) return default_value;
@@ -20,7 +24,8 @@ struct CVInput {
   }
 
   float InF(float default_value = 0.0f) {
-    return In(static_cast<int>(default_value * HEMISPHERE_MAX_INPUT_CV))
+    if (!source) return default_value;
+    return static_cast<float>(In())
       / static_cast<float>(HEMISPHERE_MAX_INPUT_CV);
   }
 
@@ -43,6 +48,15 @@ struct CVInput {
   uint8_t const* Icon() const {
     return PARAM_MAP_ICONS + 8 * source;
   }
+
+  uint16_t Serialize() const {
+    return source | (attenuversion << 8);
+  }
+
+  void Deserialize(uint16_t data) {
+    source = data & 0xFF;
+    attenuversion = extract_value<int8_t>(data >> 8);
+  }
 };
 
 struct DigitalInput {
@@ -54,6 +68,7 @@ struct DigitalInput {
   };
 
   int8_t source = 0;
+  int8_t division = 0; // -2 = /3, -1 = /2, 0 = x1, 1 = x2, 2 = x3...
   bool last_gate_state = true; // for detecting clocks
   static const int ppqn = 4;
   static constexpr float internal_clocked_gate_pw = 0.5f;
@@ -84,8 +99,8 @@ struct DigitalInput {
   }
 
   /**
-   * Returns to on rising gate input. Will return true once and then go back to
-   * false until the gate goes low again.
+   * Returns true on rising gate input. Will return true once and then go back
+   * to false until the gate goes low again.
    **/
   bool Clock() {
     bool gate = Gate();
@@ -106,6 +121,15 @@ struct DigitalInput {
       default:
         return PARAM_MAP_ICONS + 0;
     }
+  }
+
+  uint16_t Serialize() const {
+    return source | as_unsigned(division << 8);
+  }
+
+  void Deserialize(uint16_t data) {
+    source = data & 0xFF;
+    division = extract_value<int8_t>(data >> 8);
   }
 
 private:
@@ -134,6 +158,25 @@ private:
   }
 };
 
+template <typename... Inputs>
+uint64_t PackInputs(Inputs... inputs) {
+  static_assert(
+    sizeof...(Inputs) <= 4, "Can pack up to 4 inputs in a config block"
+  );
+  uint_fast8_t i = 0;
+  uint64_t result = 0;
+  return ((result |= (inputs.Serialize() << (16 * i++))), ...);
+}
+
+template <typename... Inputs>
+void UnpackInputs(uint64_t data, Inputs&&... inputs) {
+  static_assert(
+    sizeof...(Inputs) <= 4, "Can unpack up to 4 inputs in a config block"
+  );
+  uint_fast8_t i = 0;
+  (inputs.Deserialize((data >> (16 * i++)) & 0xFFFF), ...);
+}
+
 // For ascii strings of 9 characters or less, will just be the ascii bits
 // concatenated together. More characters than that and the xor plus misaligned
 // shifting should avoid collisions.
@@ -154,14 +197,26 @@ enum AudioChannels {
 
 class HemisphereAudioApplet : public HemisphereApplet {
 public:
-  // If applet_name() can return different things at different times, you *must*
-  // override this or saving and loading won't work!
+  static const uint_fast8_t CONFIG_SIZE = 4;
+  // If applet_name() can return different things at different times, you
+  // *must* override this or saving and loading won't work!
   virtual const uint64_t applet_id() {
     return strhash(applet_name());
   };
   virtual AudioStream* InputStream() = 0;
   virtual AudioStream* OutputStream() = 0;
   virtual void mainloop() {}
+
+  virtual void OnDataReceive(uint64_t data) {}
+  virtual uint64_t OnDataRequest() {
+    return 0;
+  }
+  virtual void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) {
+    OnDataReceive(data[0]);
+  }
+  virtual void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) {
+    data[0] = OnDataRequest();
+  }
 
   void gfxPrintTuningIndicator(int16_t pitch) {
     // TODO this assumes pitch = C, which might not be true for some applets

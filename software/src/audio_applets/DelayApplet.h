@@ -287,26 +287,27 @@ public:
     millis_since_turn = 0;
   }
 
-  uint64_t OnDataRequest() {
-    uint64_t data = 0;
-    Pack(data, delay_loc, delay_time);
-    Pack(data, time_rep_loc, time_units);
-    Pack(data, ratio_loc, ratio);
-    Pack(data, wet_loc, wet);
-    Pack(data, fb_loc, feedback);
-    Pack(data, taps_loc, taps - 1);
-    return data;
+  void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) {
+    uint64_t& d = data[0];
+    Pack(d, delay_loc, delay_time);
+    Pack(d, time_rep_loc, time_units);
+    Pack(d, ratio_loc, ratio);
+    Pack(d, delay_mod_type_loc, delay_mod_type);
+    Pack(d, wet_loc, wet);
+    Pack(d, fb_loc, feedback);
+    Pack(d, taps_loc, taps - 1);
+    data[1] = PackInputs(delay_time_cv, feedback_cv, wet_cv, clock_source);
   }
 
-  void OnDataReceive(uint64_t data) {
-    if (data != 0) {
-      delay_time = Unpack(data, delay_loc);
-      time_units = Unpack(data, time_rep_loc);
-      ratio = Unpack(data, ratio_loc);
-      wet = Unpack(data, wet_loc);
-      feedback = Unpack(data, fb_loc);
-      taps = Unpack(data, taps_loc) + 1;
-    }
+  void OnDataReceive(std::array<uint64_t, CONFIG_SIZE>& data) {
+    uint64_t& d = data[0];
+    delay_time = Unpack(d, delay_loc);
+    time_units = Unpack(d, time_rep_loc);
+    ratio = Unpack(d, ratio_loc);
+    wet = Unpack(d, wet_loc);
+    feedback = Unpack(d, fb_loc);
+    taps = Unpack(d, taps_loc) + 1;
+    UnpackInputs(data[1], delay_time_cv, feedback_cv, wet_cv, clock_source);
   }
 
   AudioStream* InputStream() {
@@ -405,13 +406,10 @@ private:
   static constexpr PackLocation delay_loc{0, 16};
   static constexpr PackLocation time_rep_loc{16, 3};
   static constexpr PackLocation ratio_loc{19, 8};
-  static constexpr PackLocation delay_time_cv_loc{27, 5};
+  static constexpr PackLocation delay_mod_type_loc{27, 1};
   static constexpr PackLocation wet_loc{32, 7};
   static constexpr PackLocation fb_loc{39, 7};
   static constexpr PackLocation taps_loc{46, 3};
-  static constexpr PackLocation clock_source_loc{49, 5};
-  static constexpr PackLocation feedback_cv_loc{54, 5};
-  static constexpr PackLocation wet_cv_loc{59, 5};
 
   NoiseSuppressor delay_cv{
     0.0f,

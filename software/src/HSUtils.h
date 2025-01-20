@@ -142,6 +142,68 @@ constexpr int Unpack(const uint64_t &data, const PackLocation p) {
     return (data >> p.location) & mask;
 }
 
+template <typename T>
+constexpr uint64_t as_unsigned(T value) {
+  static_assert(std::is_integral_v<T>);
+  union {
+    std::remove_reference_t<T> value;
+    uint64_t unsigned_value;
+  } u = {value};
+  return u.unsigned_value;
+}
+
+/**
+ * Convert the first N bits of a 64-bit value to the given type. Will correctly
+ * handle signed, negative integers.
+ */
+template <typename T>
+constexpr std::remove_reference_t<T> extract_value(uint64_t value) {
+  value <<= (64 - sizeof(T) * 8);
+  value >>= (64 - sizeof(T) * 8);
+  union {
+    uint64_t unsigned_value;
+    std::remove_reference_t<T> value;
+  } u = {value};
+  return u.value;
+}
+
+/**
+ * Pack 8, 16, and 32 bit signed or unsigned ints into a 64-bit value. Useful
+ * when you're packing things that all use standard int sizes. First argument
+ * will make up the first N bits, second argument the next N bits, etc.
+ */
+template <typename... Params>
+uint64_t PackByteAligned(Params... params) {
+  static_assert(
+    (... + (sizeof(params))) <= 8, "Can pack up to 8 bytes in a config block"
+  );
+  uint_fast8_t shift = 0;
+  uint64_t result = 0;
+  return (
+    ...,
+    (result
+     |= (as_unsigned(params) << (8 * ((shift += sizeof(params)) - sizeof(params))))
+    )
+  );
+}
+
+/**
+ * Unpack 8, 16, and 32 bit signed or unsigned ints from a 64-bit value. Useful
+ * when you're unpacking things that all use standard int sizes. First argument
+ * will be filled with the first N bits, second argument the next N bits, etc.
+ * Takes care of masking for you to support negative values.
+ */
+template <typename... Params>
+void UnpackByteAligned(uint64_t data, Params&&... params) {
+  static_assert(
+    (... + (sizeof(params))) <= 8, "Can unpack up to 8 bytes in a config block"
+  );
+  uint_fast8_t shift = 0;
+  (...,
+   (params = extract_value<Params>(
+      data >> (8 * ((shift += sizeof(params)) - sizeof(params)))
+    )));
+}
 
 void gfxPos(int x, int y);
 void gfxPrint(int x, int y, const char *str);
