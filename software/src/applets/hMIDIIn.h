@@ -1,4 +1,4 @@
-// Copyright (c) 2018, Jason Justian
+// Copyright (c) 2018, Jason Justian and 2025, Beau Sterling
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -25,14 +25,29 @@
 
 class hMIDIIn : public HemisphereApplet {
 public:
-    enum hMIDIInCursor {
-        MIDI_CHANNEL_A,
-        MIDI_CHANNEL_B,
-        OUTPUT_MODE_A,
-        OUTPUT_MODE_B,
-        LOG_VIEW,
 
-        MIDI_CURSOR_LAST = LOG_VIEW
+    enum hMIDIIn_Page_Cursor {
+        hMIDIIn_CHAN_A = 0,
+        hMIDIIn_CHAN_B,
+        hMIDIIn_GLOBAL,
+        hMIDIIn_LOG_VIEW,
+
+        hMIDIIn_PAGE_LAST = hMIDIIn_LOG_VIEW
+    };
+
+    enum hMIDIIn_Channel_Cursor {
+        MIDI_CHANNEL = 1,
+        OUTPUT_MODE,
+        POLY_VOICE,
+
+        hMIDIIn_CHAN_LAST = POLY_VOICE
+    };
+
+    enum hMIDIIn_Global_Cursor {
+        POLY_MODE = 1,
+        POLY_CHANNEL_FILTER,
+
+        hMIDIIN_GLOB_LAST = POLY_CHANNEL_FILTER
     };
 
     const char* applet_name() {
@@ -41,17 +56,21 @@ public:
     const uint8_t* applet_icon() { return PhzIcons::midiIn; }
 
     void Start() {
+        // int v = 2 * hemisphere;
         ForEachChannel(ch) {
             int ch_ = ch + io_offset;
             frame.MIDIState.channel[ch_] = 0; // Default channel 1
-            frame.MIDIState.function[ch_] = HEM_MIDI_NOOP;
+            frame.MIDIState.function[ch_] = (ch_ % 2) ? HEM_MIDI_GATE_POLY_OUT : HEM_MIDI_NOTE_POLY_OUT;
             frame.MIDIState.outputs[ch_] = 0;
+            frame.MIDIState.dac_polyvoice[ch_] = hemisphere;
             Out(ch, 0);
         }
 
         frame.MIDIState.log_index = 0;
         frame.MIDIState.clock_count = 0;
-        frame.MIDIState.ClearNoteStack();
+        frame.MIDIState.ClearMonoBuffer();
+        frame.MIDIState.ClearPolyBuffer();
+        frame.MIDIState.UpdateMaxPoly();
     }
 
     void Controller() {
@@ -83,33 +102,76 @@ public:
     }
 
     void View() {
-        if (cursor == LOG_VIEW) DrawLog();
-        else {
-            DrawMonitor();
-            DrawSelector();
+        switch (page) {
+            case hMIDIIn_CHAN_A:
+            case hMIDIIn_CHAN_B:
+                DrawChannelPage();
+                DrawMonitor();
+                break;
+            case hMIDIIn_GLOBAL:
+                DrawGlobalPage();
+                break;
+            case hMIDIIn_LOG_VIEW:
+            default:
+                DrawLog();
+                break;
         }
     }
 
-    //void OnButtonPress() { }
+    // void OnButtonPress() { }
 
     void OnEncoderMove(int direction) {
-        if (!EditMode()) {
-            MoveCursor(cursor, direction, MIDI_CURSOR_LAST);
-            return;
-        }
-
-        // Log view
-        if (cursor == LOG_VIEW) return;
-
-        if (cursor == MIDI_CHANNEL_A || cursor == MIDI_CHANNEL_B) {
-            int ch = io_offset + cursor - MIDI_CHANNEL_A;
-            frame.MIDIState.channel[ch] = constrain(frame.MIDIState.channel[ch] + direction, 0, 15);
-        }
-        else {
-            int ch = io_offset + cursor - OUTPUT_MODE_A;
-            frame.MIDIState.function[ch] = constrain(frame.MIDIState.function[ch] + direction, 0, HEM_MIDI_MAX_FUNCTION);
-            frame.MIDIState.function_cc[ch] = -1; // auto-learn MIDI CC
-            frame.MIDIState.clock_count = 0;
+        int ch = io_offset + page;
+        switch (page) {
+            case hMIDIIn_CHAN_A:
+            case hMIDIIn_CHAN_B:
+                if (!EditMode()) {
+                    MoveCursor(cursor, direction, hMIDIIn_CHAN_LAST);
+                    return;
+                }
+                switch (cursor) {
+                    case 0:
+                        page = constrain(page + direction, 0, hMIDIIn_PAGE_LAST);
+                        break;
+                    case MIDI_CHANNEL:
+                        frame.MIDIState.channel[ch] = constrain(frame.MIDIState.channel[ch] + direction, 0, 15);
+                        break;
+                    case OUTPUT_MODE:
+                        frame.MIDIState.function[ch] = constrain(frame.MIDIState.function[ch] + direction, 0, HEM_MIDI_MAX_FUNCTION);
+                        frame.MIDIState.function_cc[ch] = -1; // auto-learn MIDI CC
+                        frame.MIDIState.clock_count = 0;
+                        break;
+                    case POLY_VOICE:
+                        frame.MIDIState.dac_polyvoice[ch] = constrain(frame.MIDIState.dac_polyvoice[ch] + direction, 0, DAC_CHANNEL_LAST-1);
+                        frame.MIDIState.UpdateMaxPoly();
+                    default: break;
+                } break;
+            case hMIDIIn_GLOBAL:
+                if (!EditMode()) {
+                    MoveCursor(cursor, direction, hMIDIIN_GLOB_LAST);
+                    return;
+                }
+                switch (cursor) {
+                    case 0:
+                        page = constrain(page + direction, 0, hMIDIIn_PAGE_LAST);
+                        break;
+                    case POLY_MODE:
+                        frame.MIDIState.poly_mode = constrain(frame.MIDIState.poly_mode + direction, 0, POLY_LAST);
+                        break;
+                    case POLY_CHANNEL_FILTER:
+                        frame.MIDIState.poly_channel_filter = constrain(frame.MIDIState.poly_channel_filter + direction, 0, 16); // 16 = omni
+                        break;
+                    default: break;
+                } break;
+            case hMIDIIn_LOG_VIEW:
+            default:
+                if (!EditMode()) {
+                    MoveCursor(cursor, direction, 1);
+                    return;
+                }
+                if (cursor == 0) page = constrain(page + direction, 0, hMIDIIn_PAGE_LAST);
+                else return;
+                break;
         }
         ResetCursor();
     }
@@ -124,6 +186,12 @@ public:
 
         Pack(data, PackLocation {28,5}, frame.MIDIState.function[io_offset + 0]);
         Pack(data, PackLocation {33,5}, frame.MIDIState.function[io_offset + 1]);
+
+        Pack(data, PackLocation {38,3}, frame.MIDIState.dac_polyvoice[io_offset + 0]);
+        Pack(data, PackLocation {41,3}, frame.MIDIState.dac_polyvoice[io_offset + 1]);
+
+        Pack(data, PackLocation {44,4}, frame.MIDIState.poly_mode);
+        Pack(data, PackLocation {48,5}, frame.MIDIState.poly_channel_filter);
         return data;
     }
 
@@ -134,6 +202,12 @@ public:
         frame.MIDIState.function[io_offset + 1] = Unpack(data, PackLocation {33,5});
         frame.MIDIState.function_cc[io_offset + 0] = Unpack(data, PackLocation {14,7}) - 1;
         frame.MIDIState.function_cc[io_offset + 1] = Unpack(data, PackLocation {21,7}) - 1;
+        frame.MIDIState.dac_polyvoice[io_offset + 0] = Unpack(data, PackLocation {38,3});
+        frame.MIDIState.dac_polyvoice[io_offset + 1] = Unpack(data, PackLocation {41,3});
+        frame.MIDIState.poly_mode = Unpack(data, PackLocation {44,4});
+        frame.MIDIState.poly_channel_filter = Unpack(data, PackLocation {48,5});
+
+        frame.MIDIState.UpdateMaxPoly();
     }
 
 protected:
@@ -152,7 +226,8 @@ protected:
 
 private:
     // Housekeeping
-    int cursor; // 0=MIDI channel, 1=A/C function, 2=B/D function
+    int cursor;
+    int page = hMIDIIn_CHAN_A;
     int last_icon_ticks[2];
 
     void DrawMonitor() {
@@ -164,38 +239,66 @@ private:
                 last_icon_ticks[1] = OC::CORE::ticks;
         }
 
-        if (OC::CORE::ticks - last_icon_ticks[0] < 4000) // ChA midi activity
-            gfxBitmap( 54, 15, 8, MIDI_ICON);
-        if (OC::CORE::ticks - last_icon_ticks[1] < 4000) // ChB midi activity
-            gfxBitmap( 54, 25, 8, MIDI_ICON);
+        if (OC::CORE::ticks - last_icon_ticks[page] < 4000) // ChA midi activity
+            gfxBitmap(54, 13, 8, MIDI_ICON);
     }
 
-    void DrawSelector() {
-        // MIDI Channels
+    void DrawChannelPage() {
+        char out_label[] = {(char)('A' + io_offset + page), '\0' };
+        gfxPrint(1, 13, "DAC "); gfxPrint(out_label);
+        gfxLine(1, 22, 63, 22);
 
-        char out_label[] = { 'C', 'h', (char)('A' + io_offset), ':', '\0' };
-        gfxPrint(1, 15, out_label);
-        gfxPrint(27, 15, frame.MIDIState.channel[io_offset + 0] + 1);
-        ++out_label[2];
-        gfxPrint(1, 25, out_label);
-        gfxPrint(27, 25, frame.MIDIState.channel[io_offset + 1] + 1);
+        gfxPrint(1, 25, "MIDICh: "); gfxPrint(frame.MIDIState.channel[io_offset + page] + 1);
 
-        // Output 1 function
-        char out_label_fn[] = { (char)('A' + io_offset), ':', '\0' };
-        gfxPrint(1, 35, out_label_fn);
-        gfxPrint(16, 35, midi_fn_name[frame.MIDIState.function[io_offset + 0]]);
-        if (frame.MIDIState.function[io_offset + 0] == HEM_MIDI_CC_OUT)
-            gfxPrint(frame.MIDIState.function_cc[io_offset + 0]);
+        gfxBitmap(2, 34, 8, MIDI_ICON); gfxPrint(13, 35, midi_fn_name[frame.MIDIState.function[io_offset + page]]);
+        if (frame.MIDIState.function[io_offset + page] == HEM_MIDI_CC_OUT)
+            gfxPrint(frame.MIDIState.function_cc[io_offset + page]);
 
-        // Output 2 function
-        ++out_label_fn[0];
-        gfxPrint(1, 45, out_label_fn);
-        gfxPrint(16, 45, midi_fn_name[frame.MIDIState.function[io_offset + 1]]);
-        if (frame.MIDIState.function[io_offset + 1] == HEM_MIDI_CC_OUT)
-            gfxPrint(frame.MIDIState.function_cc[io_offset + 1]);
+        gfxPrint(1, 45, "Voice:  "); gfxPrint(frame.MIDIState.dac_polyvoice[io_offset + page] + 1);
 
         // Cursor
-        gfxCursor(24 - ((cursor > 1) * 12), 23 + (cursor * 10), 39 + ((cursor > 1) * 12));
+        switch (cursor) {
+            case 0:
+                gfxCursor(1, 21, 52);
+                break;
+            case OUTPUT_MODE:
+                gfxCursor(12, 23 + (cursor * 10), 51);
+                break;
+            case MIDI_CHANNEL:
+            case POLY_VOICE:
+                gfxCursor(49, 23 + (cursor * 10), 14);
+            default: break;
+        }
+
+        // Last log entry
+        if (frame.MIDIState.log_index > 0) {
+            PrintLogEntry(56, frame.MIDIState.log_index - 1);
+        }
+        gfxInvert(0, 55, 63, 9);
+    }
+
+    void DrawGlobalPage() {
+        gfxPrint(1, 13, "Poly Cfg");
+        gfxLine(1, 22, 63, 22);
+
+        gfxPrint(1, 25, "Md: "); gfxPrint(midi_poly_mode_name[frame.MIDIState.poly_mode]);
+
+        gfxPrint(1, 35, "ChnFlt:");
+        if (frame.MIDIState.poly_channel_filter > 15) gfxPrint(49, 35, "Om");
+        else gfxPrint(49, 35, frame.MIDIState.poly_channel_filter + 1);
+
+        // Cursor
+        switch (cursor) {
+            case 0:
+                gfxCursor(1, 21, 52);
+                break;
+            case POLY_MODE:
+                gfxCursor(19, 23 + (cursor * 10), 45);
+                break;
+            case POLY_CHANNEL_FILTER:
+                gfxCursor(49, 23 + (cursor * 10), 14);
+            default: break;
+        }
 
         // Last log entry
         if (frame.MIDIState.log_index > 0) {

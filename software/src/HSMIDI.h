@@ -78,37 +78,60 @@ const char* const midi_channels[17] = {
 // The functions available for each output
 enum MIDIFunctions {
     HEM_MIDI_NOOP = 0,
+
     HEM_MIDI_NOTE_OUT,
-    HEM_MIDI_NOTE_POLY2_OUT,
-    HEM_MIDI_NOTE_POLY3_OUT,
-    HEM_MIDI_NOTE_POLY4_OUT,
+    HEM_MIDI_NOTE_POLY_OUT,
     HEM_MIDI_NOTE_MIN_OUT,
     HEM_MIDI_NOTE_MAX_OUT,
     HEM_MIDI_NOTE_PEDAL_OUT,
     HEM_MIDI_NOTE_INV_OUT,
+
     HEM_MIDI_TRIG_OUT,
     HEM_MIDI_TRIG_1ST_OUT,
     HEM_MIDI_TRIG_ALWAYS_OUT,
+
     HEM_MIDI_GATE_OUT,
+    HEM_MIDI_GATE_POLY_OUT,
     HEM_MIDI_GATE_INV_OUT,
+
     HEM_MIDI_VEL_OUT,
-    HEM_MIDI_VEL2_OUT,
-    HEM_MIDI_VEL3_OUT,
-    HEM_MIDI_VEL4_OUT,
+    HEM_MIDI_VEL_POLY_OUT,
+
     HEM_MIDI_CC_OUT,
+
     HEM_MIDI_AT_CHAN_OUT,
-    HEM_MIDI_AT_KEY1_OUT,
-    HEM_MIDI_AT_KEY2_OUT,
-    HEM_MIDI_AT_KEY3_OUT,
-    HEM_MIDI_AT_KEY4_OUT,
+    HEM_MIDI_AT_KEY_POLY_OUT,
+
     HEM_MIDI_PB_OUT,
+
     HEM_MIDI_CLOCK_OUT,
     HEM_MIDI_RUN_OUT,
     HEM_MIDI_START_OUT,
 
     HEM_MIDI_MAX_FUNCTION = HEM_MIDI_START_OUT
 };
-const char* const midi_fn_name[HEM_MIDI_MAX_FUNCTION + 1] = {"None", "Note1", "Note2", "Note3", "Note4", "LoNote", "HiNote", "PdlNote", "InvNote", "Trig", "Trig1st", "TrgAlws", "Gate", "GateInv", "Veloc1", "Veloc2", "Veloc3", "Veloc4", "CC#", "ChanAft", "KeyAft1", "KeyAft2", "KeyAft3", "KeyAft4", "Bend", "Clock", "Run", "Start"};
+const char* const midi_fn_name[HEM_MIDI_MAX_FUNCTION + 1] = {
+    "None",
+    "Note", "PolyN", "LoNote", "HiNote", "PdlNote", "InvNote",
+    "Trig", "Trig1st", "TrgAlws",
+    "Gate", "PolyG", "GateInv",
+    "Veloc", "PolyV",
+    "CC#",
+    "ChanAft", "KeyAT",
+    "Bend",
+    "Clock", "Run", "Start"
+};
+
+enum MIDIPolyMode {
+    POLY_RESET = 0,
+    POLY_ROTATE,
+    POLY_REUSE,
+
+    POLY_LAST = POLY_REUSE
+};
+const char* const midi_poly_mode_name[POLY_LAST + 1] = {
+    "Reset", "Rotate", "Reuse"
+};
 
 
 /* Hemisphere Suite Data Packing

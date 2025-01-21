@@ -404,9 +404,9 @@ public:
         HS::IOFrame &f = HS::frame;
 
         while (device.read()) {
-            const int message = device.getType();
-            const int data1 = device.getData1();
-            const int data2 = device.getData2();
+            const uint8_t message = device.getType();
+            const uint8_t data1 = device.getData1();
+            const uint8_t data2 = device.getData2();
 
             if (message == usbMIDI.SystemExclusive) {
                 ReceiveManagerSysEx();
@@ -414,7 +414,7 @@ public:
             }
 
             if (message == usbMIDI.ProgramChange) {
-                int slot = device.getData1();
+                uint8_t slot = device.getData1();
                 if (slot < HEM_NR_OF_PRESETS) {
                   if (HS::clock_m.IsRunning()) {
                     queued_preset = slot;
@@ -470,26 +470,20 @@ public:
                     switch (HS::frame.MIDIState.function[chan]) {
                     case HEM_MIDI_CC_OUT:
                     case HEM_MIDI_NOTE_OUT:
-                    case HEM_MIDI_NOTE_POLY2_OUT:
-                    case HEM_MIDI_NOTE_POLY3_OUT:
-                    case HEM_MIDI_NOTE_POLY4_OUT:
+                    case HEM_MIDI_NOTE_POLY_OUT:
                     case HEM_MIDI_NOTE_MIN_OUT:
                     case HEM_MIDI_NOTE_MAX_OUT:
                     case HEM_MIDI_NOTE_PEDAL_OUT:
                     case HEM_MIDI_NOTE_INV_OUT:
                     case HEM_MIDI_VEL_OUT:
-                    case HEM_MIDI_VEL2_OUT:
-                    case HEM_MIDI_VEL3_OUT:
-                    case HEM_MIDI_VEL4_OUT:
+                    case HEM_MIDI_VEL_POLY_OUT:
                     case HEM_MIDI_AT_CHAN_OUT:
-                    case HEM_MIDI_AT_KEY1_OUT:
-                    case HEM_MIDI_AT_KEY2_OUT:
-                    case HEM_MIDI_AT_KEY3_OUT:
-                    case HEM_MIDI_AT_KEY4_OUT:
+                    case HEM_MIDI_AT_KEY_POLY_OUT:
                     case HEM_MIDI_PB_OUT:
                         HS::frame.inputs[chan] += HS::frame.MIDIState.outputs[chan];
                         break;
                     case HEM_MIDI_GATE_OUT:
+                    case HEM_MIDI_GATE_POLY_OUT:
                     case HEM_MIDI_GATE_INV_OUT:
                         HS::frame.gate_high[chan] |= (HS::frame.MIDIState.outputs[chan] > (12 << 7));
                         break;

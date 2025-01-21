@@ -362,9 +362,9 @@ public:
     template <typename T1, typename T2, typename T3>
     void ProcessMIDI(T1 &device, T2 &next_device, T3 &dev3) {
         while (device.read()) {
-            const int message = device.getType();
-            const int data1 = device.getData1();
-            const int data2 = device.getData2();
+            const uint8_t message = device.getType();
+            const uint8_t data1 = device.getData1();
+            const uint8_t data2 = device.getData2();
 
             if (message == usbMIDI.SystemExclusive) {
                 QuadrantSysExHandler();
@@ -372,9 +372,9 @@ public:
             }
 
             if (message == usbMIDI.ProgramChange) {
-                int slot = device.getData1();
+                uint8_t slot = device.getData1();
                 if (slot < QUAD_PRESET_COUNT) {
-                  QueuePresetLoad(slot);
+                    QueuePresetLoad(slot);
                 }
                 continue;
             }
@@ -407,26 +407,20 @@ public:
                     switch (HS::frame.MIDIState.function[chan]) {
                     case HEM_MIDI_CC_OUT:
                     case HEM_MIDI_NOTE_OUT:
-                    case HEM_MIDI_NOTE_POLY2_OUT:
-                    case HEM_MIDI_NOTE_POLY3_OUT:
-                    case HEM_MIDI_NOTE_POLY4_OUT:
+                    case HEM_MIDI_NOTE_POLY_OUT:
                     case HEM_MIDI_NOTE_MIN_OUT:
                     case HEM_MIDI_NOTE_MAX_OUT:
                     case HEM_MIDI_NOTE_PEDAL_OUT:
                     case HEM_MIDI_NOTE_INV_OUT:
                     case HEM_MIDI_VEL_OUT:
-                    case HEM_MIDI_VEL2_OUT:
-                    case HEM_MIDI_VEL3_OUT:
-                    case HEM_MIDI_VEL4_OUT:
+                    case HEM_MIDI_VEL_POLY_OUT:
                     case HEM_MIDI_AT_CHAN_OUT:
-                    case HEM_MIDI_AT_KEY1_OUT:
-                    case HEM_MIDI_AT_KEY2_OUT:
-                    case HEM_MIDI_AT_KEY3_OUT:
-                    case HEM_MIDI_AT_KEY4_OUT:
+                    case HEM_MIDI_AT_KEY_POLY_OUT:
                     case HEM_MIDI_PB_OUT:
                         HS::frame.inputs[chan] += HS::frame.MIDIState.outputs[chan];
                         break;
                     case HEM_MIDI_GATE_OUT:
+                    case HEM_MIDI_GATE_POLY_OUT:
                     case HEM_MIDI_GATE_INV_OUT:
                         HS::frame.gate_high[chan] |= (HS::frame.MIDIState.outputs[chan] > (12 << 7));
                         break;
@@ -731,8 +725,8 @@ public:
           }
         } else if (select_mode == h) {
           // old style select mode
-          ChangeApplet(h, event.value);
-          SetApplet(h, next_applet_index[h]);
+          ChangeApplet((HEM_SIDE)h, event.value);
+          SetApplet((HEM_SIDE)h, next_applet_index[h]);
         } else if (event.mask & (OC::CONTROL_BUTTON_X | OC::CONTROL_BUTTON_Y)) {
             // hold down X or Y to change applet with encoder
             if (view_state == APPLET_FULLSCREEN) slot = zoom_slot;

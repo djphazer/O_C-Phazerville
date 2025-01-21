@@ -20,14 +20,20 @@ static constexpr int TRIGMAP_MAX = OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_LAST + D
 static constexpr int CVMAP_MAX = ADC_CHANNEL_LAST + DAC_CHANNEL_LAST;
 
 typedef struct MIDILogEntry {
-    int message;
-    int data1;
-    int data2;
+    uint8_t message;
+    uint8_t data1;
+    uint8_t data2;
 } MIDILogEntry;
 
 struct MIDINoteData {
-    int note; // data1
-    int vel;  // data2
+    uint8_t note; // data1
+    uint8_t vel;  // data2
+};
+
+struct PolyphonyData {
+    uint8_t note;
+    uint8_t vel;
+    bool gate;
 };
 
 // shared IO Frame, updated every tick
@@ -50,20 +56,106 @@ typedef struct IOFrame {
     int last_cv[ADC_CHANNEL_LAST]; // For change detection
 
     /* MIDI message queue/cache */
-    struct {
-        int channel[ADC_CHANNEL_LAST]; // MIDI channel number
-        int function[ADC_CHANNEL_LAST]; // Function for each channel
-        int function_cc[ADC_CHANNEL_LAST]; // CC# for each channel
-        uint16_t semitone_mask[ADC_CHANNEL_LAST]; // which notes are currently on
+    struct MIDIFrame {
+        uint8_t channel[DAC_CHANNEL_LAST]; // MIDI channel number
+        int function[DAC_CHANNEL_LAST]; // Function for each channel
+        int function_cc[DAC_CHANNEL_LAST]; // CC# for each channel
+        uint16_t semitone_mask[DAC_CHANNEL_LAST]; // which notes are currently on
+        uint8_t dac_polyvoice[DAC_CHANNEL_LAST]; // select which voice to send from output
 
         // MIDI input stuff handled by MIDIIn applet
-        std::vector<MIDINoteData> note_buffer[16]; // note buffer for polyphonic input. one for each MIDI channel
+        std::vector<MIDINoteData> note_buffer[16]; // note buffer to track all held notes on all channels
         int outputs[DAC_CHANNEL_LAST]; // translated CV values
         bool trigout_q[DAC_CHANNEL_LAST];
-        int last_midi_channel = 0; // for MIDI In activity monitor
+        uint8_t last_midi_channel = 0; // for MIDI In activity monitor
         uint16_t sustain_latch; // each bit is a MIDI channel's sustain state
 
-        void RemoveNoteData(std::vector<MIDINoteData> &buffer, int note) {
+        PolyphonyData poly_buffer[DAC_CHANNEL_LAST]; // buffer for polyphonic data tracking
+        uint8_t max_voice = 1;
+        uint8_t poly_channel_filter = 0; // default to channel 1
+        int poly_mode = 0;
+        int8_t rotate_index = -1;
+
+        void UpdateMaxPoly() { // find max voice number to determine how much to buffer
+            int voice = 0;
+            for (int ch = 0; ch < DAC_CHANNEL_LAST; ++ch) {
+                if (dac_polyvoice[ch] > voice) voice = dac_polyvoice[ch];
+            }
+            if (max_voice != voice+1) {
+                ClearPolyBuffer();
+                max_voice = voice+1;
+            }
+        }
+
+        bool CheckPolyVoice(uint8_t voice) {
+            return (poly_buffer[voice].gate);
+        }
+
+        int FindNextAvailPolyVoice(uint8_t note) {
+            if (max_voice == 1) return 0;
+
+            switch (poly_mode) {
+                case POLY_RESET:
+                    for (int v = 0; v < max_voice; ++v)
+                        if (!CheckPolyVoice(v)) return v;
+                    return max_voice - 1;
+                    break;
+                case POLY_REUSE:
+                    for (int v = 0; v < max_voice; ++v)
+                        if (poly_buffer[v].note == note) return v;
+                    // fallthrough
+                case POLY_ROTATE:
+                    for (int v = 0; v < max_voice; ++v) {
+                        if (++rotate_index >= max_voice) rotate_index = 0;
+                        if (!CheckPolyVoice(rotate_index)) return rotate_index;
+                    }
+                    // if no voices empty
+                    if (++rotate_index >= max_voice) rotate_index = 0;
+                    return rotate_index;
+                    break;
+                default:
+                    return 0;
+            }
+        }
+
+        int FindPolyNoteIndex(uint8_t note) {
+            for (int v = 0; v < max_voice; ++v)
+                if (poly_buffer[v].note == note) return v;
+            return -1;
+        }
+
+        void WritePolyNoteData(uint8_t note, uint8_t vel, uint8_t voice) {
+            poly_buffer[voice].note = note;
+            poly_buffer[voice].vel = vel;
+            poly_buffer[voice].gate = 1;
+        }
+
+        void ClearPolyVoice(uint8_t voice) {
+            poly_buffer[voice].vel = 0;
+            poly_buffer[voice].gate = 0;
+        }
+
+
+        void PolyBufferPush(uint8_t midi_chan, uint8_t note, uint8_t vel) {
+            if (midi_chan == poly_channel_filter || poly_channel_filter == 16) // channel match or omni
+                WritePolyNoteData(note, vel, FindNextAvailPolyVoice(note));
+        }
+
+        void PolyBufferPop(uint8_t midi_chan, uint8_t note) {
+            if (midi_chan == poly_channel_filter || poly_channel_filter == 16) { // channel match or omni
+                for (int v = 0; v < max_voice; ++v) {
+                    if (poly_buffer[v].note == note) ClearPolyVoice(v);
+                }
+            }
+        }
+
+        void ClearPolyBuffer() {
+            for (int n = 0; n < DAC_CHANNEL_LAST; ++n) {
+                ClearPolyVoice(n);
+            }
+        }
+
+        void RemoveNoteData(std::vector<MIDINoteData> &buffer, uint8_t note) {
             buffer.erase(
                 std::remove_if(buffer.begin(), buffer.end(), [&](MIDINoteData const &data) {
                     return data.note == note;
@@ -72,22 +164,22 @@ typedef struct IOFrame {
             );
         }
 
-        void NoteStackPush(const int midi_chan, const int data1, const int data2) {
-            int c = midi_chan - 1;
-            uint8_t note = (uint8_t)data1;
-            uint8_t vel = (uint8_t)data2;
+        void MonoBufferPush(const uint8_t midi_chan, const uint8_t data1, const uint8_t data2) {
+            uint8_t c = midi_chan;
+            uint8_t note = data1;
+            uint8_t vel = data2;
             RemoveNoteData(note_buffer[c], note); // if new note is already in buffer, promote to latest and update velocity
             note_buffer[c].push_back({note, vel}); // else just append to the end
         }
 
-        void NoteStackPop(const int midi_chan, const int data1) {
-            int c = midi_chan - 1;
-            uint8_t note = (uint8_t)data1;
+        void MonoBufferPop(const uint8_t midi_chan, const uint8_t data1) {
+            uint8_t c = midi_chan;
+            uint8_t note = data1;
             RemoveNoteData(note_buffer[c], note);
             if (note_buffer[c].size() == 0) note_buffer[c].shrink_to_fit(); // free up memory when MIDI is not used
         }
 
-        void ClearNoteStack(int ch = -1) {
+        void ClearMonoBuffer(int ch = -1) {
             if (ch > 0) {
                 note_buffer[ch].clear();
                 note_buffer[ch].shrink_to_fit();
@@ -157,7 +249,7 @@ typedef struct IOFrame {
         bool start_q;
         bool stop_q;
         uint8_t clock_count; // MIDI clock counter (24ppqn)
-        int last_msg_tick; // Tick of last received message
+        uint32_t last_msg_tick; // Tick of last received message
 
         // MIDI output stuff
         int outchan[DAC_CHANNEL_LAST] = {
@@ -199,7 +291,7 @@ typedef struct IOFrame {
         MIDILogEntry log[7];
         int log_index;
 
-        void UpdateLog(int message, int data1, int data2) {
+        void UpdateLog(uint8_t message, uint8_t data1, uint8_t data2) {
             log[log_index++] = {message, data1, data2};
             if (log_index == 7) {
                 for (int i = 0; i < 6; i++) {
@@ -210,69 +302,72 @@ typedef struct IOFrame {
             last_msg_tick = OC::CORE::ticks;
         }
 
-        void ProcessMIDIMsg(const int midi_chan, const int message, const int data1, const int data2) {
+        void ProcessMIDIMsg(const uint8_t midi_chan, const uint8_t message, const uint8_t data1, const uint8_t data2) {
             switch (message) {
-            case usbMIDI.Clock:
-                if (++clock_count == 1) {
-                    clock_q = 1;
+                case usbMIDI.Clock:
+                    if (++clock_count == 1) {
+                        clock_q = 1;
+                        for(int ch = 0; ch < ADC_CHANNEL_LAST; ++ch) {
+                            if (function[ch] == HEM_MIDI_CLOCK_OUT) {
+                                trigout_q[ch] = 1;
+                            }
+                        }
+                    }
+                    if (clock_count == HEM_MIDI_CLOCK_DIVISOR) clock_count = 0;
+                    return;
+                    break;
+
+                case usbMIDI.Continue: // treat Continue like Start
+                case usbMIDI.Start:
+                    start_q = 1;
+                    clock_count = 0;
+                    clock_run = true;
+
                     for(int ch = 0; ch < ADC_CHANNEL_LAST; ++ch) {
-                        if (function[ch] == HEM_MIDI_CLOCK_OUT) {
+                        if (function[ch] == HEM_MIDI_START_OUT) {
                             trigout_q[ch] = 1;
                         }
                     }
-                }
-                if (clock_count == HEM_MIDI_CLOCK_DIVISOR) clock_count = 0;
-                return;
-                break;
 
-            case usbMIDI.Continue: // treat Continue like Start
-            case usbMIDI.Start:
-                start_q = 1;
-                clock_count = 0;
-                clock_run = true;
+                    // UpdateLog(message, data1, data2);
+                    return;
+                    break;
 
-                for(int ch = 0; ch < ADC_CHANNEL_LAST; ++ch) {
-                    if (function[ch] == HEM_MIDI_START_OUT) {
-                        trigout_q[ch] = 1;
+                case usbMIDI.SystemReset:
+                case usbMIDI.Stop:
+                    stop_q = 1;
+                    clock_run = false;
+                    // a way to reset stuck notes
+                    ClearMonoBuffer();
+                    ClearSustainLatch();
+                    ClearPolyBuffer();
+                    for (int c = 0; c < DAC_CHANNEL_LAST; ++c) {
+                        outputs[c] = 0;
+                        trigout_q[c] = 0;
                     }
-                }
+                    return;
+                    break;
 
-                // UpdateLog(message, data1, data2);
-                return;
-                break;
+                case usbMIDI.NoteOn:
+                    MonoBufferPush(midi_chan-1, data1, data2);
+                    PolyBufferPush(midi_chan-1, data1, data2);
+                    break;
 
-            case usbMIDI.SystemReset:
-            case usbMIDI.Stop:
-                stop_q = 1;
-                clock_run = false;
-                // a way to reset stuck notes
-                ClearNoteStack();
-                ClearSustainLatch();
-                // for (int c = 0; c < 4; ++c) {
-                //     outputs[c] = 0;
-                //     trigout_q[c] = 0;
-                // }
-                return;
-                break;
-
-            case usbMIDI.NoteOn:
-                NoteStackPush(midi_chan, data1, data2);
-                break;
-            case usbMIDI.NoteOff:
-                NoteStackPop(midi_chan, data1);
-                break;
-
+                case usbMIDI.NoteOff:
+                    MonoBufferPop(midi_chan-1, data1);
+                    PolyBufferPop(midi_chan-1, data1);
+                    break;
             }
 
             bool log_skip = false;
-            int m_ch_prev = -1;
+            uint8_t m_ch_prev = 255; // initialize to invalid channel
 
-            for(int ch = 0; ch < ADC_CHANNEL_LAST; ++ch) {
+            for(int ch = 0; ch < DAC_CHANNEL_LAST; ++ch) {
                 if (function[ch] == HEM_MIDI_NOOP) continue;
 
                 // skip unwanted MIDI Channels
                 if (midi_chan - 1 != channel[ch]) continue;
-                int m_ch = midi_chan - 1;
+                uint8_t m_ch = midi_chan - 1;
 
                 last_midi_channel = m_ch;
 
@@ -293,29 +388,8 @@ typedef struct IOFrame {
                                 outputs[ch] = MIDIQuantizer::CV(GetNoteLast(note_buffer[m_ch]));
                                 break;
 
-                            case HEM_MIDI_NOTE_POLY2_OUT:
-                                if (note_buffer[m_ch].size() > 1)
-                                    outputs[ch] = MIDIQuantizer::CV(GetNote(note_buffer[m_ch], 2));
-                                else
-                                    outputs[ch] = MIDIQuantizer::CV(GetNoteLast(note_buffer[m_ch]));
-                                break;
-
-                            case HEM_MIDI_NOTE_POLY3_OUT:
-                                if (note_buffer[m_ch].size() > 2)
-                                    outputs[ch] = MIDIQuantizer::CV(GetNote(note_buffer[m_ch], 3));
-                                else {
-                                    if (note_buffer[m_ch].size() == 2) // distribute notes evenly when only 2 are played
-                                        outputs[ch] = MIDIQuantizer::CV(GetNoteLast(note_buffer[m_ch]));
-                                    else
-                                        outputs[ch] = MIDIQuantizer::CV(GetNoteFirst(note_buffer[m_ch]));
-                                }
-                                break;
-
-                            case HEM_MIDI_NOTE_POLY4_OUT:
-                                if (note_buffer[m_ch].size() > 3)
-                                    outputs[ch] = MIDIQuantizer::CV(GetNote(note_buffer[m_ch], 4));
-                                else
-                                    outputs[ch] = MIDIQuantizer::CV(GetNoteFirst(note_buffer[m_ch]));
+                            case HEM_MIDI_NOTE_POLY_OUT:
+                                if (CheckPolyVoice(dac_polyvoice[ch])) outputs[ch] = MIDIQuantizer::CV(poly_buffer[dac_polyvoice[ch]].note);
                                 break;
 
                             case HEM_MIDI_NOTE_MIN_OUT:
@@ -336,7 +410,7 @@ typedef struct IOFrame {
                         }
 
                         if ((function[ch] == HEM_MIDI_TRIG_OUT)
-                        || (function[ch] == HEM_MIDI_TRIG_ALWAYS_OUT)
+                        ||  (function[ch] == HEM_MIDI_TRIG_ALWAYS_OUT)
                         || ((function[ch] == HEM_MIDI_TRIG_1ST_OUT) && (note_buffer[m_ch].size() == 1)))
                             trigout_q[ch] = 1;
 
@@ -344,20 +418,13 @@ typedef struct IOFrame {
                             outputs[ch] = PULSE_VOLTAGE * (12 << 7);
                         if (function[ch] == HEM_MIDI_GATE_INV_OUT)
                             outputs[ch] = 0;
+                        if (function[ch] == HEM_MIDI_GATE_POLY_OUT)
+                                if (CheckPolyVoice(dac_polyvoice[ch])) outputs[ch] = PULSE_VOLTAGE * (12 << 7);
 
-                        switch (function[ch]) {
-                            case HEM_MIDI_VEL_OUT:
-                                outputs[ch] = (note_buffer[m_ch].size() > 0) ? Proportion(GetVel(note_buffer[m_ch], 1), 127, HEMISPHERE_MAX_CV) : 0;
-                                break;
-                            case HEM_MIDI_VEL2_OUT:
-                                outputs[ch] = (note_buffer[m_ch].size() > 1) ? Proportion(GetVel(note_buffer[m_ch], 2), 127, HEMISPHERE_MAX_CV) : 0;
-                                break;
-                            case HEM_MIDI_VEL3_OUT:
-                                outputs[ch] = (note_buffer[m_ch].size() > 2) ? Proportion(GetVel(note_buffer[m_ch], 3), 127, HEMISPHERE_MAX_CV) : 0;
-                                break;
-                            case HEM_MIDI_VEL4_OUT:
-                                outputs[ch] = (note_buffer[m_ch].size() > 3) ? Proportion(GetVel(note_buffer[m_ch], 4), 127, HEMISPHERE_MAX_CV) : 0;
-                                break;
+                        if (function[ch] == HEM_MIDI_VEL_OUT)
+                            outputs[ch] = (note_buffer[m_ch].size() > 0) ? Proportion(GetVel(note_buffer[m_ch], 1), 127, HEMISPHERE_MAX_CV) : 0;
+                        if (function[ch] == HEM_MIDI_VEL_POLY_OUT) {
+                            outputs[ch] = (CheckPolyVoice(dac_polyvoice[ch])) ? Proportion(poly_buffer[dac_polyvoice[ch]].vel, 127, HEMISPHERE_MAX_CV) : 0;
                         }
 
                         if (!log_skip) log_this = 1; // Log all MIDI notes. Other stuff is conditional.
@@ -373,31 +440,9 @@ typedef struct IOFrame {
                                     outputs[ch] = MIDIQuantizer::CV(GetNoteLast(note_buffer[m_ch]));
                                     break;
 
-                                case HEM_MIDI_NOTE_POLY2_OUT:
+                                case HEM_MIDI_NOTE_POLY_OUT:
                                     if (CheckSustainLatch(m_ch)) break;
-                                    if (note_buffer[m_ch].size() < 2)
-                                        outputs[ch] = MIDIQuantizer::CV(GetNoteLast(note_buffer[m_ch]));
-                                    else
-                                        outputs[ch] = MIDIQuantizer::CV(GetNote(note_buffer[m_ch], 2));
-                                    break;
-
-                                case HEM_MIDI_NOTE_POLY3_OUT:
-                                    if (CheckSustainLatch(m_ch)) break;
-                                    if (note_buffer[m_ch].size() < 3) {
-                                        if (note_buffer[m_ch].size() == 2) // distribute notes evenly when only 2 are played
-                                            outputs[ch] = MIDIQuantizer::CV(GetNoteLast(note_buffer[m_ch]));
-                                        else
-                                            outputs[ch] = MIDIQuantizer::CV(GetNoteFirst(note_buffer[m_ch]));
-                                    } else
-                                        outputs[ch] = MIDIQuantizer::CV(GetNote(note_buffer[m_ch], 3));
-                                    break;
-
-                                case HEM_MIDI_NOTE_POLY4_OUT:
-                                    if (CheckSustainLatch(m_ch)) break;
-                                    if (note_buffer[m_ch].size() < 4)
-                                        outputs[ch] = MIDIQuantizer::CV(GetNoteFirst(note_buffer[m_ch]));
-                                    else
-                                        outputs[ch] = MIDIQuantizer::CV(GetNote(note_buffer[m_ch], 4));
+                                    if (CheckPolyVoice(dac_polyvoice[ch])) outputs[ch] = MIDIQuantizer::CV(poly_buffer[dac_polyvoice[ch]].note);
                                     break;
 
                                 case HEM_MIDI_NOTE_MIN_OUT:
@@ -424,30 +469,20 @@ typedef struct IOFrame {
 
                         if (function[ch] == HEM_MIDI_TRIG_ALWAYS_OUT) trigout_q[ch] = 1;
 
-                        // turn gate off only when all notes are off, and sustain pedal up
-                        if (!(note_buffer[m_ch].size() > 0) && !CheckSustainLatch(m_ch)) {
-                            if (function[ch] == HEM_MIDI_GATE_OUT) {
-                                outputs[ch] = 0;
+                        if (!CheckSustainLatch(m_ch)) {
+                            if (!(note_buffer[m_ch].size() > 0)) { // turn mono gate off, only when all notes are off
+                                if (function[ch] == HEM_MIDI_GATE_OUT) outputs[ch] = 0;
+                                if (function[ch] == HEM_MIDI_GATE_INV_OUT) outputs[ch] = PULSE_VOLTAGE * (12 << 7);
                             }
-                            if (function[ch] == HEM_MIDI_GATE_INV_OUT) {
-                                outputs[ch] = PULSE_VOLTAGE * (12 << 7);
+                            if (function[ch] == HEM_MIDI_GATE_POLY_OUT) {
+                                if (!CheckPolyVoice(dac_polyvoice[ch])) outputs[ch] = 0;
                             }
                         }
 
-                        switch (function[ch]) {
-                            case HEM_MIDI_VEL_OUT:
-                                outputs[ch] = (note_buffer[m_ch].size() > 0) ? Proportion(GetVel(note_buffer[m_ch], 1), 127, HEMISPHERE_MAX_CV) : 0;
-                                break;
-                            case HEM_MIDI_VEL2_OUT:
-                                outputs[ch] = (note_buffer[m_ch].size() > 1) ? Proportion(GetVel(note_buffer[m_ch], 2), 127, HEMISPHERE_MAX_CV) : 0;
-                                break;
-                            case HEM_MIDI_VEL3_OUT:
-                                outputs[ch] = (note_buffer[m_ch].size() > 2) ? Proportion(GetVel(note_buffer[m_ch], 3), 127, HEMISPHERE_MAX_CV) : 0;
-                                break;
-                            case HEM_MIDI_VEL4_OUT:
-                                outputs[ch] = (note_buffer[m_ch].size() > 3) ? Proportion(GetVel(note_buffer[m_ch], 4), 127, HEMISPHERE_MAX_CV) : 0;
-                                break;
-                        }
+                        if (function[ch] == HEM_MIDI_VEL_OUT)
+                            outputs[ch] = (note_buffer[m_ch].size() > 0) ? Proportion(GetVel(note_buffer[m_ch], 1), 127, HEMISPHERE_MAX_CV) : 0;
+                        if (function[ch] == HEM_MIDI_VEL_POLY_OUT)
+                            outputs[ch] = (CheckPolyVoice(dac_polyvoice[ch])) ? Proportion(poly_buffer[dac_polyvoice[ch]].vel, 127, HEMISPHERE_MAX_CV) : 0;
 
                         if (!log_skip) log_this = 1;
                         break;
@@ -460,8 +495,11 @@ typedef struct IOFrame {
                             } else {
                                 ClearSustainLatch(m_ch);
                                 if (!(note_buffer[m_ch].size() > 0)) {
-                                    if (function[ch] == HEM_MIDI_GATE_OUT) {
-                                        outputs[ch] = 0;
+                                    switch (function[ch]) {
+                                        case HEM_MIDI_GATE_OUT:
+                                        case HEM_MIDI_GATE_POLY_OUT:
+                                            outputs[ch] = 0;
+                                            break;
                                     }
                                     if (function[ch] == HEM_MIDI_GATE_INV_OUT) {
                                         outputs[ch] = PULSE_VOLTAGE * (12 << 7);
@@ -481,31 +519,10 @@ typedef struct IOFrame {
                         break;
 
                     case usbMIDI.AfterTouchPoly:
-                        switch (function[ch]) {
-                            case HEM_MIDI_AT_KEY1_OUT:
-                                if (note_buffer[m_ch].size() > 0) {
-                                    if (GetNote(note_buffer[m_ch], 1) == data1) outputs[ch] = Proportion(data2, 127, HEMISPHERE_MAX_CV);
-                                    if (!log_skip) log_this = 1;
-                                } else outputs[ch] = 0;
-                                break;
-                            case HEM_MIDI_AT_KEY2_OUT:
-                                if (note_buffer[m_ch].size() > 1) {
-                                    if (GetNote(note_buffer[m_ch], 2) == data1) outputs[ch] = Proportion(data2, 127, HEMISPHERE_MAX_CV);
-                                    if (!log_skip) log_this = 1;
-                                } else outputs[ch] = 0;
-                                break;
-                            case HEM_MIDI_AT_KEY3_OUT:
-                                if (note_buffer[m_ch].size() > 2) {
-                                    if (GetNote(note_buffer[m_ch], 3) == data1) outputs[ch] = Proportion(data2, 127, HEMISPHERE_MAX_CV);
-                                    if (!log_skip) log_this = 1;
-                                } else outputs[ch] = 0;
-                                break;
-                            case HEM_MIDI_AT_KEY4_OUT:
-                                if (note_buffer[m_ch].size() > 3) {
-                                    if (GetNote(note_buffer[m_ch], 4) == data1) outputs[ch] = Proportion(data2, 127, HEMISPHERE_MAX_CV);
-                                    if (!log_skip) log_this = 1;
-                                } else outputs[ch] = 0;
-                                break;
+                        if (function[ch] == HEM_MIDI_AT_KEY_POLY_OUT) {
+                            if (FindPolyNoteIndex(data1) == dac_polyvoice[ch])
+                                outputs[ch] = Proportion(data2, 127, HEMISPHERE_MAX_CV);
+                            if (!log_skip) log_this = 1;
                         }
                         break;
 
@@ -530,10 +547,9 @@ typedef struct IOFrame {
         }
 
         void Send(const int *outvals) {
-
             // first pass - calculate things and turn off notes
             for (int i = 0; i < DAC_CHANNEL_LAST; ++i) {
-                const int midi_ch = outchan[i];
+                const uint8_t midi_ch = outchan[i];
 
                 inputs[i] = outvals[i];
                 gate_high[i] = inputs[i] > (12 << 7);
@@ -597,14 +613,14 @@ typedef struct IOFrame {
             //usbMIDI.send_now();
         }
 
-        void SendAfterTouch(const int midi_ch, uint8_t val) {
+        void SendAfterTouch(const uint8_t midi_ch, uint8_t val) {
             usbMIDI.sendAfterTouch(val, midi_ch + 1);
 #ifdef ARDUINO_TEENSY41
             usbHostMIDI.sendAfterTouch(val, midi_ch + 1);
             MIDI1.sendAfterTouch(val, midi_ch + 1);
 #endif
         }
-        void SendPitchBend(const int midi_ch, uint16_t bend) {
+        void SendPitchBend(const uint8_t midi_ch, uint16_t bend) {
             usbMIDI.sendPitchBend(bend, midi_ch + 1);
 #ifdef ARDUINO_TEENSY41
             usbHostMIDI.sendPitchBend(bend, midi_ch + 1);
@@ -612,15 +628,15 @@ typedef struct IOFrame {
 #endif
         }
 
-        void SendCC(const int midi_ch, int ccnum, uint8_t val) {
+        void SendCC(const uint8_t midi_ch, uint8_t ccnum, uint8_t val) {
             usbMIDI.sendControlChange(ccnum, val, midi_ch + 1);
 #ifdef ARDUINO_TEENSY41
             usbHostMIDI.sendControlChange(ccnum, val, midi_ch + 1);
             MIDI1.sendControlChange(ccnum, val, midi_ch + 1);
 #endif
         }
-        void SendNoteOn(const int midi_ch, int note = -1, uint8_t vel = 100) {
-            if (note < 0) note = current_note[midi_ch];
+        void SendNoteOn(const uint8_t midi_ch, uint8_t note = 255, uint8_t vel = 100) {
+            if (note > 127) note = current_note[midi_ch];
             else current_note[midi_ch] = note;
 
             usbMIDI.sendNoteOn(note, vel, midi_ch + 1);
@@ -629,8 +645,8 @@ typedef struct IOFrame {
             MIDI1.sendNoteOn(note, vel, midi_ch + 1);
 #endif
         }
-        void SendNoteOff(const int midi_ch, int note = -1, uint8_t vel = 0) {
-            if (note < 0) note = current_note[midi_ch];
+        void SendNoteOff(const uint8_t midi_ch, uint8_t note = 255, uint8_t vel = 0) {
+            if (note > 127) note = current_note[midi_ch];
             usbMIDI.sendNoteOff(note, vel, midi_ch + 1);
 #ifdef ARDUINO_TEENSY41
             usbHostMIDI.sendNoteOff(note, vel, midi_ch + 1);
@@ -693,10 +709,10 @@ typedef struct IOFrame {
     }
 
     void Send() {
-      for (int i = 0; i < DAC_CHANNEL_LAST; ++i) {
-        OC::DAC::set_pitch_scaled(DAC_CHANNEL(i), outputs[i], 0);
-      }
-      if (autoMIDIOut) MIDIState.Send(outputs);
+        for (int i = 0; i < DAC_CHANNEL_LAST; ++i) {
+            OC::DAC::set_pitch_scaled(DAC_CHANNEL(i), outputs[i], 0);
+        }
+        if (autoMIDIOut) MIDIState.Send(outputs);
     }
 
 } IOFrame;

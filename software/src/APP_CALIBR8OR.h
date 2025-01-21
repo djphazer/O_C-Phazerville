@@ -222,7 +222,7 @@ public:
 
         autotuner.Init();
     }
-	
+
     void ClearPreset() {
         for (int ch = 0; ch < QUANT_CHANNEL_COUNT; ++ch) {
             HS::quantizer[ch].Init();
@@ -290,9 +290,9 @@ public:
         bool dothething = false;
 
         while (usbMIDI.read()) {
-            const int message = usbMIDI.getType();
-            const int data1 = usbMIDI.getData1();
-            const int data2 = usbMIDI.getData2();
+            const uint8_t message = usbMIDI.getType();
+            const uint8_t data1 = usbMIDI.getData1();
+            const uint8_t data2 = usbMIDI.getData2();
 
             if (message == usbMIDI.SystemExclusive) {
                 // TODO: consider implementing SysEx import/export for Calibr8or
@@ -309,9 +309,9 @@ public:
 #if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
         thisUSB.Task();
         while (usbHostMIDI.read()) {
-            const int message = usbHostMIDI.getType();
-            const int data1 = usbHostMIDI.getData1();
-            const int data2 = usbHostMIDI.getData2();
+            const uint8_t message = usbHostMIDI.getType();
+            const uint8_t data1 = usbHostMIDI.getData1();
+            const uint8_t data2 = usbHostMIDI.getData2();
 
             if (message == usbMIDI.SystemExclusive) {
                 // TODO: consider implementing SysEx import/export for Calibr8or
@@ -325,9 +325,9 @@ public:
             }
         }
         while (MIDI1.read()) {
-            const int message = MIDI1.getType();
-            const int data1 = MIDI1.getData1();
-            const int data2 = MIDI1.getData2();
+            const uint8_t message = MIDI1.getType();
+            const uint8_t data1 = MIDI1.getData1();
+            const uint8_t data2 = MIDI1.getData2();
 
             if (message == usbMIDI.SystemExclusive) {
                 // TODO: consider implementing SysEx import/export for Calibr8or
@@ -845,7 +845,7 @@ void Calibr8or_handleButtonEvent(const UI::Event &event) {
     Calibr8or_instance.autotuner.HandleButtonEvent(event);
     return;
   }
-  
+
     // For left encoder, handle press and long press
     // For right encoder, only handle press (long press is reserved)
     // For up button, handle only press (long press is reserved)
