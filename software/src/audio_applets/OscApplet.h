@@ -1,3 +1,4 @@
+#include "HSUtils.h"
 #include "HemisphereAudioApplet.h"
 #include "dsputils.h"
 #include "dsputils_arm.h"
@@ -106,10 +107,23 @@ public:
     gfxEndCursor(cursor == MIX_CV);
   }
 
-  uint64_t OnDataRequest() override {
-    return 0;
+  void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
+    data[0] = PackByteAligned(pitch, pw, mod_depth, level, mix); // 48 bits
+    Pack(data[0], {48, 2}, waveform);
+    Pack(data[0], {50, 2}, mod_type);
+    data[1] = PackInputs(pw_cv, pitch_cv, mod_cv, level_cv);
+    data[2] = PackInputs(mix_cv);
   }
-  void OnDataReceive(uint64_t data) override {}
+
+  void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
+    UnpackByteAligned(data[0], pitch, pw, mod_depth, level, mix); // 48 bits
+    SetWaveform(Unpack(data[0], {48, 2}));
+    SetModType(static_cast<ModType>(Unpack(data[0], {50, 2})));
+    SetModDepth(mod_depth);
+    UnpackInputs(data[1], pw_cv, pitch_cv, mod_cv, level_cv);
+    UnpackInputs(data[2], mix_cv);
+  }
+
   void OnEncoderMove(int direction) override {
     if (!EditMode()) {
       do {
@@ -229,15 +243,16 @@ private:
 
   int8_t waveform;
   int8_t pw = 50;
-  CVInput pw_cv;
   int16_t pitch = 1 * 12 * 128; // C4
-  CVInput pitch_cv;
   ModType mod_type = PM;
-  int mod_depth = 0;
-  CVInput mod_cv;
-  int level = 75;
-  CVInput level_cv;
+  int8_t mod_depth = 0;
+  int8_t level = 75;
   int8_t mix = 100;
+
+  CVInput pw_cv;
+  CVInput pitch_cv;
+  CVInput mod_cv;
+  CVInput level_cv;
   CVInput mix_cv;
 
   AudioPassthrough<MONO> input_stream;
