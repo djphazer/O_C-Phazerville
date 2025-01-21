@@ -173,7 +173,7 @@ constexpr std::remove_reference_t<T> extract_value(uint64_t value) {
  * will make up the first N bits, second argument the next N bits, etc.
  */
 template <typename... Params>
-uint64_t PackByteAligned(Params... params) {
+constexpr uint64_t PackByteAligned(Params... params) {
   static_assert(
     (... + (sizeof(params))) <= 8, "Can pack up to 8 bytes in a config block"
   );
@@ -194,7 +194,7 @@ uint64_t PackByteAligned(Params... params) {
  * Takes care of masking for you to support negative values.
  */
 template <typename... Params>
-void UnpackByteAligned(uint64_t data, Params&&... params) {
+constexpr void UnpackByteAligned(uint64_t data, Params&&... params) {
   static_assert(
     (... + (sizeof(params))) <= 8, "Can unpack up to 8 bytes in a config block"
   );

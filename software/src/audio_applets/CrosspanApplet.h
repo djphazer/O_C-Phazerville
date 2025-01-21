@@ -1,5 +1,6 @@
 #pragma once
 
+#include "HSUtils.h"
 #include "HemisphereAudioApplet.h"
 #include "dspinst.h"
 #include "dsputils_arm.h"
@@ -88,11 +89,16 @@ public:
   }
 
   uint64_t OnDataRequest() override {
-    return crosspan;
+    uint64_t data = PackByteAligned(crosspan);
+    Pack(data, {8, 1}, xfade_shape);
+    Pack(data, {32, 16}, PackInputs(crosspan_cv));
+    return data;
   }
 
   void OnDataReceive(uint64_t data) override {
-    crosspan = static_cast<int8_t>(data);
+    UnpackByteAligned(data, crosspan);
+    xfade_shape = static_cast<XfadeShape>(Unpack(data, {8, 1}));
+    UnpackInputs(Unpack(data, {32, 16}), crosspan_cv);
   }
 
   AudioStream* InputStream() override {

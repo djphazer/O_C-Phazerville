@@ -216,6 +216,9 @@ public:
   }
   virtual void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) {
     data[0] = OnDataRequest();
+    data[1] = 0;
+    data[2] = 0;
+    data[3] = 0;
   }
 
   void gfxPrintTuningIndicator(int16_t pitch) {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "HSUtils.h"
 #include "HemisphereAudioApplet.h"
 #include "dsputils.h"
 #include "dsputils_arm.h"
@@ -104,10 +105,21 @@ public:
     }
   }
 
-  uint64_t OnDataRequest() {
-    return 0;
+  void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) {
+    uint64_t& d = data[0];
+    d = PackByteAligned(level, bias, shape);
+    Pack(d, {62, 1}, rectify);
+    Pack(d, {63, 1}, invert);
+    data[1] = PackInputs(level_cv, shape_cv);
   }
-  void OnDataReceive(uint64_t data) {}
+
+  void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) {
+    uint64_t d = data[0];
+    UnpackByteAligned(d, level, bias, shape);
+    rectify = Unpack(d, {62, 1});
+    invert = Unpack(d, {63, 1});
+    UnpackInputs(data[1], level_cv, shape_cv);
+  }
 
   AudioStream* InputStream() override {
     return &input;

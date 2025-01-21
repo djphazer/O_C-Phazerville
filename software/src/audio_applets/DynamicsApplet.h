@@ -1,5 +1,7 @@
+#include "HSUtils.h"
 #include "HemisphereAudioApplet.h"
 #include "../Audio/effect_dynamics.h"
+#include <cstdint>
 
 template <AudioChannels Channels>
 class DynamicsApplet : public HemisphereAudioApplet {
@@ -108,9 +110,11 @@ public:
   }
 
   uint64_t OnDataRequest() {
-    return 0;
+    return PackByteAligned(gate_threshold, comp_threshold, limit_threshold, makeupgain);
   }
-  void OnDataReceive(uint64_t data) {}
+  void OnDataReceive(uint64_t data) {
+    UnpackByteAligned(data, gate_threshold, comp_threshold, limit_threshold, makeupgain);
+  }
 
   AudioStream* InputStream() override {
     return &input;
@@ -125,10 +129,10 @@ protected:
 private:
   int cursor = 0;
   // thresholds in db
-  int16_t gate_threshold = -50;
-  int16_t comp_threshold = -6;
-  int16_t limit_threshold = -1;
-  int16_t makeupgain = -1; // negative means auto
+  int8_t gate_threshold = -50;
+  int8_t comp_threshold = -6;
+  int8_t limit_threshold = -1;
+  int8_t makeupgain = -1; // negative means auto
 
   // TODO: more params for attack/release of each stage, comp ratio & knee
   //
