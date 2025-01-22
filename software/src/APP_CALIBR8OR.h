@@ -258,11 +258,10 @@ public:
 
         // initiate actual EEPROM save
         OC::CORE::app_isr_enabled = false;
-        OC::draw_save_message(16);
-        delay(1);
         OC::draw_save_message(32);
         OC::save_app_data();
         OC::draw_save_message(64);
+        OC::CORE::app_isr_enabled = true;
 
         const uint32_t timeout = 100;
         uint32_t start = millis();
@@ -274,8 +273,6 @@ public:
           graphics.print("to EEPROM!");
           GRAPHICS_END_FRAME();
         }
-
-        OC::CORE::app_isr_enabled = true;
     }
 
     void Resume() {
