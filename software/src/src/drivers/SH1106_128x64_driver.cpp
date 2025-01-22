@@ -53,11 +53,10 @@ static int sendpage_count;
 static const uint32_t *sendpage_src;
 #endif
 
-static uint8_t disp_offset = 0;
 static uint8_t SH1106_data_start_seq[] = {
 // u8g_dev_ssd1306_128x64_data_start
   0x10, /* set upper 4 bit of the col adr to 0 */
-  0x00, /* set lower 4 bit of the col adr to 0 */
+  0x02, /* set lower 4 bit of the col adr to 0 */
   0x00  /* 0xb0 | page */
 };
 
@@ -70,17 +69,17 @@ static uint8_t SH1106_init_seq[] = {
   0x0d3, 0x000,   /* set display offset */
   0x040,          /* start line */
 
-  // Charge pump setting - only for SSD1306
-  0x8d, 0x14,   /* [2] charge pump setting (p62): 0x014 enable, 0x010 disable */
+  // Charge pump setting - for SSD1306
+  0x08d, 0x014,   /* [2] charge pump setting (p62): 0x014 enable, 0x010 disable */
 
-  0x020, 0x002,   /* Memory addressing mode: 0x00 horiz, 0x01 vert, 0x02 page */
-#ifdef FLIP_180
+  0x020, 0x000,   /* 2012-05-27: page addressing mode */ // PLD: Seems to work in conjuction with lower 4 bits of column data?
+  #ifdef FLIP_180
   0x0a0,          /* segment remap a0/a1*/
   0x0c0,          /* c0: scan dir normal, c8: reverse */
-#else
+  #else
   0x0a1,          /* segment remap a0/a1*/
   0x0c8,          /* c0: scan dir normal, c8: reverse */
-#endif
+  #endif
   0x0da, 0x012,   /* com pin HW config, sequential com pin config (bit 4), disable left/right remap (bit 5) */
   0x081, 0x0cf,   /* [2] set contrast control */
   0x0d9, 0x0f1,   /* [2] pre-charge period 0x022/f1*/
@@ -106,34 +105,6 @@ static uint8_t SH1106_display_on_seq[] = {
 };
 
 /*static*/
-void SH1106_128x64_Driver::Reinit() {
-  // u8g_dev_ssd1306_128x64_adafruit3_init_seq
-  digitalWriteFast(OLED_CS, OLED_CS_INACTIVE); // U8G_ESC_CS(0),
-#if defined(__MK20DX256__)
-  ChangeSpeed(SPICLOCK_30MHz);
-#endif
-  digitalWriteFast(OLED_DC, LOW); // U8G_ESC_ADR(0),           /* instruction mode */
-
-  digitalWriteFast(OLED_RST, LOW); // U8G_ESC_RST(1),           /* do reset low pulse with (1*16)+2 milliseconds */
-  delay(20);
-  digitalWriteFast(OLED_RST, HIGH);
-  delay(20);
-#if defined(__MK20DX256__)
-  ChangeSpeed(SPI_CLOCK_8MHz);
-#endif
-  digitalWriteFast(OLED_CS, OLED_CS_ACTIVE); // U8G_ESC_CS(1),             /* enable chip */
-
-  // assumes SPI bus is already initialized !!
-  SPI_send(SH1106_init_seq, sizeof(SH1106_init_seq));
-
-  digitalWriteFast(OLED_CS, OLED_CS_INACTIVE); // U8G_ESC_CS(0),             /* disable chip */
-  delayMicroseconds(1);
-#if defined(__MK20DX256__)
-  ChangeSpeed(SPICLOCK_30MHz);
-#endif
-}
-
-/*static*/
 void SH1106_128x64_Driver::Init() {
   OC::pinMode(OLED_CS, OUTPUT);
   OC::pinMode(OLED_RST, OUTPUT);
@@ -148,19 +119,14 @@ void SH1106_128x64_Driver::Init() {
   digitalWriteFast(OLED_RST, HIGH);
 
   // u8g_dev_ssd1306_128x64_adafruit3_init_seq
-  digitalWriteFast(OLED_CS, OLED_CS_INACTIVE); // U8G_ESC_CS(0),
-#if defined(__MK20DX256__)
-  ChangeSpeed(SPICLOCK_30MHz);
-#endif
+  digitalWriteFast(OLED_CS, OLED_CS_INACTIVE); // U8G_ESC_CS(0),             /* disable chip */
   digitalWriteFast(OLED_DC, LOW); // U8G_ESC_ADR(0),           /* instruction mode */
 
   digitalWriteFast(OLED_RST, LOW); // U8G_ESC_RST(1),           /* do reset low pulse with (1*16)+2 milliseconds */
   delay(20);
   digitalWriteFast(OLED_RST, HIGH);
   delay(20);
-#if defined(__MK20DX256__)
-  ChangeSpeed(SPI_CLOCK_8MHz);
-#endif
+
   digitalWriteFast(OLED_CS, OLED_CS_ACTIVE); // U8G_ESC_CS(1),             /* enable chip */
 
   // assumes SPI bus is already initialized !!
@@ -168,15 +134,12 @@ void SH1106_128x64_Driver::Init() {
 
   digitalWriteFast(OLED_CS, OLED_CS_INACTIVE); // U8G_ESC_CS(0),             /* disable chip */
   delayMicroseconds(1);
-#if defined(__MK20DX256__)
-  ChangeSpeed(SPICLOCK_30MHz);
-#endif
 
 #if defined(__MK20DX256__)
 #ifdef DMA_PAGE_TRANSFER
   page_dma.destination((volatile uint8_t&)SPI0_PUSHR);
   page_dma.transferSize(1);
-  page_dma.transferCount(kSubpageSize);
+  page_dma.transferCount(kPageSize);
   page_dma.disableOnCompletion();
   page_dma.triggerAtHardwareEvent(DMAMUX_SOURCE_SPI0_TX);
   page_dma.disable();
@@ -231,7 +194,6 @@ void SH1106_128x64_Driver::Flush() {
     page_dma_active = false;
 
     digitalWriteFast(OLED_CS, OLED_CS_INACTIVE); // U8G_ESC_CS(0)
-    ChangeSpeed(SPICLOCK_30MHz);
     page_dma.clearComplete();
     page_dma.disable();
     // DmaSpi.h::post_finishCurrentTransfer_impl
@@ -253,9 +215,6 @@ void SH1106_128x64_Driver::Clear() {
 
   SH1106_data_start_seq[2] = 0xb0 | 0;
   digitalWriteFast(OLED_DC, LOW);
-#if defined(__MK20DX256__)
-  ChangeSpeed(SPI_CLOCK_8MHz);
-#endif
   digitalWriteFast(OLED_CS, OLED_CS_ACTIVE);
   SPI_send(SH1106_data_start_seq, sizeof(SH1106_data_start_seq));
   digitalWriteFast(OLED_DC, HIGH);
@@ -273,15 +232,9 @@ void SH1106_128x64_Driver::Clear() {
 
 #if defined(__MK20DX256__)
 /*static*/
-void SH1106_128x64_Driver::SendPage(uint_fast8_t index, uint_fast8_t subpage, const uint8_t *data) {
-  uint8_t startCol = subpage * kSubpageSize;
-  const uint8_t* startData = data + startCol;
-  startCol += disp_offset;
-
-  SH1106_data_start_seq[0] = 0x10 | (startCol >> 4);
-  SH1106_data_start_seq[1] = 0x00 | (startCol & 0x0F);
+void SH1106_128x64_Driver::SendPage(uint_fast8_t index, const uint8_t *data) {
   SH1106_data_start_seq[2] = 0xb0 | index;
-  ChangeSpeed(SPI_CLOCK_8MHz);
+
   digitalWriteFast(OLED_DC, LOW); // U8G_ESC_ADR(0),           /* instruction mode */
   digitalWriteFast(OLED_CS, OLED_CS_ACTIVE); // U8G_ESC_CS(1),             /* enable chip */
   SPI_send(SH1106_data_start_seq, sizeof(SH1106_data_start_seq)); // u8g_WriteEscSeqP(u8g, dev, u8g_dev_ssd1306_128x64_data_start);
@@ -292,7 +245,7 @@ void SH1106_128x64_Driver::SendPage(uint_fast8_t index, uint_fast8_t subpage, co
   SPI0_SR = 0xFF0F0000;
   SPI0_RSER = SPI_RSER_RFDF_RE | SPI_RSER_RFDF_DIRS | SPI_RSER_TFFF_RE | SPI_RSER_TFFF_DIRS;
 
-  page_dma.sourceBuffer(startData, kSubpageSize);
+  page_dma.sourceBuffer(data, kPageSize);
   page_dma.enable(); // go
   page_dma_active = true;
 #else // not DMA_PAGE_TRANSFER
@@ -303,17 +256,11 @@ void SH1106_128x64_Driver::SendPage(uint_fast8_t index, uint_fast8_t subpage, co
 
 #elif defined(__IMXRT1062__)
 /*static*/
-void SH1106_128x64_Driver::SendPage(uint_fast8_t index, uint_fast8_t subpage, const uint8_t *data) {
-  uint8_t startCol = subpage * kSubpageSize;
-  const uint8_t* startData = data + startCol;
-  startCol += disp_offset;
-
-  SH1106_data_start_seq[0] = 0x10 | (startCol >> 4);
-  SH1106_data_start_seq[1] = 0x00 | (startCol & 0x0F);
+void SH1106_128x64_Driver::SendPage(uint_fast8_t index, const uint8_t *data) {
   SH1106_data_start_seq[2] = 0xb0 | index;
   sendpage_state = 1;
-  sendpage_src = (const uint32_t *)startData; // frame buffer is 32 bit aligned
-  sendpage_count = kSubpageSize >> 2; // number of 32 bit words to write into FIFO
+  sendpage_src = (const uint32_t *)data; // frame buffer is 32 bit aligned
+  sendpage_count = kPageSize >> 2; // number of 32 bit words to write into FIFO
   #if defined(ARDUINO_TEENSY41)
   if (OLED_Uses_SPI1) {
     // DAC does not use SPI1, so we must forcibly trigger first interrupt
@@ -353,7 +300,7 @@ static void spi_sendpage_isr() {
     digitalWriteFast(OLED_DC, HIGH);
     lpspi->CR |= LPSPI_CR_RRF | LPSPI_CR_RTF; // clear FIFO
     lpspi->IER = LPSPI_IER_TDIE; // run spi_sendpage_isr() when FIFO wants data
-    const size_t nbits = SH1106_128x64_Driver::kSubpageSize * 8;
+    const size_t nbits = SH1106_128x64_Driver::kPageSize * 8;
     lpspi->TCR = (lpspi->TCR & 0xF8000000) | LPSPI_TCR_FRAMESZ(nbits-1)
       | LPSPI_TCR_PCS(3) | LPSPI_TCR_RXMSK | LPSPI_TCR_BYSW;
     sendpage_state = 3;
@@ -439,13 +386,13 @@ void SH1106_128x64_Driver::SPI_send(void *bufr, size_t n) {
 void SH1106_128x64_Driver::SPI_send(void *bufr, size_t n) {
   #if defined(ARDUINO_TEENSY41)
     if (OLED_Uses_SPI1) {
-      SPI1.beginTransaction(SPISettings(8000000, MSBFIRST, SPI_MODE0));
+      SPI1.beginTransaction(SPISettings(24000000, MSBFIRST, SPI_MODE0));
       SPI1.transfer(bufr, NULL, n);
       SPI1.endTransaction();
       return;
     }
   #endif
-  SPI.beginTransaction(SPISettings(8000000, MSBFIRST, SPI_MODE0));
+  SPI.beginTransaction(SPISettings(24000000, MSBFIRST, SPI_MODE0));
   LPSPI4_TCR |= LPSPI_TCR_PCS(3); // do not interfere with DAC's CS pin
   SPI.transfer(bufr, NULL, n);
   SPI.endTransaction();
@@ -454,7 +401,7 @@ void SH1106_128x64_Driver::SPI_send(void *bufr, size_t n) {
 
 /*static*/
 void SH1106_128x64_Driver::AdjustOffset(uint8_t offset) {
-  disp_offset = offset;
+  SH1106_data_start_seq[1] = offset; // lower 4 bits of col adr
 }
 
 /*static*/
