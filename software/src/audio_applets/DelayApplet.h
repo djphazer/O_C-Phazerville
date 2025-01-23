@@ -287,27 +287,18 @@ public:
     millis_since_turn = 0;
   }
 
-  void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) {
-    uint64_t& d = data[0];
-    Pack(d, delay_loc, delay_time);
-    Pack(d, time_rep_loc, time_units);
-    Pack(d, ratio_loc, ratio);
-    Pack(d, delay_mod_type_loc, delay_mod_type);
-    Pack(d, wet_loc, wet);
-    Pack(d, fb_loc, feedback);
-    Pack(d, taps_loc, taps - 1);
-    data[1] = PackInputs(delay_time_cv, feedback_cv, wet_cv, clock_source);
+#define DELAY_PARAMS \
+  delay_time, pack<3>(time_units), ratio, pack<1>(delay_mod_type), feedback, \
+    wet, pack<4>(taps)
+  void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
+    data[0] = PackPackables(DELAY_PARAMS);
+    data[1] = PackPackables(delay_time_cv, feedback_cv, wet_cv, clock_source);
   }
 
-  void OnDataReceive(std::array<uint64_t, CONFIG_SIZE>& data) {
-    uint64_t& d = data[0];
-    delay_time = Unpack(d, delay_loc);
-    time_units = Unpack(d, time_rep_loc);
-    ratio = Unpack(d, ratio_loc);
-    wet = Unpack(d, wet_loc);
-    feedback = Unpack(d, fb_loc);
-    taps = Unpack(d, taps_loc) + 1;
-    UnpackInputs(data[1], delay_time_cv, feedback_cv, wet_cv, clock_source);
+  void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
+    UnpackPackables(data[0], DELAY_PARAMS);
+    set_taps(taps);
+    UnpackPackables(data[1], delay_time_cv, feedback_cv, wet_cv, clock_source);
   }
 
   AudioStream* InputStream() {
@@ -390,26 +381,18 @@ private:
 
   int cursor = TIME;
 
-  int delay_time = 500;
-  CVInput delay_time_cv;
-  int16_t ratio = 0;
-  DigitalInput clock_source;
+  int16_t delay_time = 500;
+  CVInputMap delay_time_cv;
+  int8_t ratio = 0;
+  DigitalInputMap clock_source;
   uint8_t time_units = 0;
   // Only need 7 bits on these but the sign makes CONSTRAIN work
   int8_t feedback = 0;
-  CVInput feedback_cv;
+  CVInputMap feedback_cv;
   int8_t wet = 50;
-  CVInput wet_cv;
+  CVInputMap wet_cv;
   int8_t taps = 1;
   int8_t delay_mod_type = CROSSFADE;
-
-  static constexpr PackLocation delay_loc{0, 16};
-  static constexpr PackLocation time_rep_loc{16, 3};
-  static constexpr PackLocation ratio_loc{19, 8};
-  static constexpr PackLocation delay_mod_type_loc{27, 1};
-  static constexpr PackLocation wet_loc{32, 7};
-  static constexpr PackLocation fb_loc{39, 7};
-  static constexpr PackLocation taps_loc{46, 3};
 
   NoiseSuppressor delay_cv{
     0.0f,

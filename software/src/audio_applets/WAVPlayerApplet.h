@@ -226,9 +226,9 @@ private:
 
   int cursor = 0;
   int level = 90;
-  CVInput level_cv;
+  CVInputMap level_cv;
   int playrate = 100;
-  CVInput playrate_cv;
+  CVInputMap playrate_cv;
   bool go_time;
 
   AudioPassthrough<Channels> input;

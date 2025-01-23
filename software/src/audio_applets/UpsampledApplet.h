@@ -100,9 +100,14 @@ public:
         break;
     }
   }
-  void OnDataReceive(uint64_t data) override {}
-  uint64_t OnDataRequest() override {
-    return 0;
+  void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
+    data[0] = PackPackables(pack(gain), pack<1>(ac_couple), pack<2>(method));
+    data[1] = PackPackables(input);
+  }
+
+  void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
+    UnpackPackables(data[0], pack(gain), pack<1>(ac_couple), pack<2>(method));
+    UnpackPackables(data[1], input);
   }
 
   AudioStream* InputStream() override {
@@ -125,7 +130,7 @@ private:
   AudioConnection interp_conn[Channels];
   AudioConnection out_conn[Channels];
 
-  CVInput input;
+  CVInputMap input;
   float lp = 0.0f;
   static constexpr float scalar = -31267.0f / HEMISPHERE_MAX_CV;
   int cursor = 0;

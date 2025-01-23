@@ -449,7 +449,7 @@ public:
   }
 
   void SaveAppletData(uint16_t key, HemisphereAudioApplet& applet) {
-    array<uint64_t, APPLET_CONFIG_SIZE> data;
+    array<uint64_t, APPLET_CONFIG_SIZE> data = {0};
     applet.OnDataRequest(data);
     for (uint_fast8_t i = 0; i < APPLET_CONFIG_SIZE; ++i) {
       // We default to 0, so may as well skip them to save space

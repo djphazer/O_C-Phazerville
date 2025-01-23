@@ -110,10 +110,10 @@ public:
   }
 
   uint64_t OnDataRequest() {
-    return PackByteAligned(gate_threshold, comp_threshold, limit_threshold, makeupgain);
+    return PackPackables(gate_threshold, comp_threshold, limit_threshold, makeupgain);
   }
   void OnDataReceive(uint64_t data) {
-    UnpackByteAligned(data, gate_threshold, comp_threshold, limit_threshold, makeupgain);
+    UnpackPackables(data, gate_threshold, comp_threshold, limit_threshold, makeupgain);
   }
 
   AudioStream* InputStream() override {

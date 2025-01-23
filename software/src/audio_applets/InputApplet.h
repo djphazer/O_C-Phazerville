@@ -1,6 +1,8 @@
 #pragma once
 
 #include "AudioIO.h"
+#include "HSUtils.h"
+#include "PackingUtils.h"
 #include "HemisphereAudioApplet.h"
 #include <Audio.h>
 
@@ -67,9 +69,13 @@ public:
     }
   }
   uint64_t OnDataRequest() override {
-    return 0;
+    return PackPackables(pack<4>(mono_mode), pack(level), pack<1>(mixtomono));
   }
-  void OnDataReceive(uint64_t data) override {}
+  void OnDataReceive(uint64_t data) override {
+    UnpackPackables(data, pack<4>(mono_mode), pack(level), pack<1>(mixtomono));
+    UpdateMix();
+  }
+
   void OnEncoderMove(int direction) override {
     if (!EditMode()) {
       MoveCursor(cursor, direction, MAX_CURSOR);
@@ -132,9 +138,9 @@ private:
   AudioAnalyzePeak peakmeter[Channels];
   AudioConnection peakpatch[Channels];
 
-  int mono_mode = LEFT;
+  int8_t mono_mode = LEFT;
+  int8_t level = 90;
   bool mixtomono = 0;
-  int level = 90;
 
   enum SideMode { LEFT, RIGHT, MIXED, MODE_COUNT };
   enum { CHANNEL_MODE, IN_LEVEL, MAX_CURSOR = IN_LEVEL };

@@ -1,10 +1,10 @@
+#include "HSUtils.h"
 #include "HemisphereAudioApplet.h"
 
 template <AudioChannels Channels>
 class FilterFolderApplet : public HemisphereAudioApplet {
 
 public:
-
   const char* applet_name() {
     return "Filt/Fold";
   }
@@ -20,7 +20,9 @@ public:
     for (int i = 0; i < Channels; i++) {
       filtfolder[i].filter.frequency(PitchToRatio(pitch + pitch_cv.In()) * C3);
       filtfolder[i].filter.resonance(0.01f * (res + res_cv.InRescaled(500)));
-      filtfolder[i].AmpAndFold(fold + fold_cv.InRescaled(100), amplevel + amp_cv.InRescaled(100));
+      filtfolder[i].AmpAndFold(
+        fold + fold_cv.InRescaled(100), amplevel + amp_cv.InRescaled(100)
+      );
     }
   }
 
@@ -91,10 +93,15 @@ public:
     }
   }
 
-  uint64_t OnDataRequest() {
-    return 0;
+  void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
+    data[0] = PackPackables(pitch, res, fold, amplevel);
+    data[1] = PackPackables(pitch_cv, res_cv, fold_cv, amp_cv);
   }
-  void OnDataReceive(uint64_t data) {}
+
+  void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
+    UnpackPackables(data[0], pitch, res, fold, amplevel);
+    UnpackPackables(data[1], pitch_cv, res_cv, fold_cv, amp_cv);
+  }
 
   AudioStream* InputStream() override {
     return &input;
@@ -108,14 +115,14 @@ protected:
 
 private:
   int cursor = 0;
-  int pitch = 1 * 12 * 128; // C4
-  CVInput pitch_cv;
+  int16_t pitch = 1 * 12 * 128; // C4
+  CVInputMap pitch_cv;
   int16_t res = 75;
-  CVInput res_cv;
+  CVInputMap res_cv;
   int16_t fold = 0;
-  CVInput fold_cv;
+  CVInputMap fold_cv;
   int16_t amplevel = 100;
-  CVInput amp_cv;
+  CVInputMap amp_cv;
 
   struct FilterFolder {
     AudioFilterStateVariable filter;

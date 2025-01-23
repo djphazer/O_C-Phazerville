@@ -107,18 +107,18 @@ public:
 
   void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) {
     uint64_t& d = data[0];
-    d = PackByteAligned(level, bias, shape);
+    d = PackPackables(level, bias, shape);
     Pack(d, {62, 1}, rectify);
     Pack(d, {63, 1}, invert);
-    data[1] = PackInputs(level_cv, shape_cv);
+    data[1] = PackPackables(level_cv, shape_cv);
   }
 
   void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) {
     uint64_t d = data[0];
-    UnpackByteAligned(d, level, bias, shape);
+    UnpackPackables(d, level, bias, shape);
     rectify = Unpack(d, {62, 1});
     invert = Unpack(d, {63, 1});
-    UnpackInputs(data[1], level_cv, shape_cv);
+    UnpackPackables(data[1], level_cv, shape_cv);
   }
 
   AudioStream* InputStream() override {
@@ -158,8 +158,8 @@ private:
   int8_t level = 0;
   int8_t bias = VCA_MIN_DB - 1;
   int8_t shape = 0;
-  CVInput level_cv;
-  CVInput shape_cv;
+  CVInputMap level_cv;
+  CVInputMap shape_cv;
   bool rectify = true;
   bool invert = false;
 

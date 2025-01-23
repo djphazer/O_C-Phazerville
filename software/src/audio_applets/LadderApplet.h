@@ -1,4 +1,5 @@
 #include "Audio/AudioPassthrough.h"
+#include "HSUtils.h"
 #include "HemisphereAudioApplet.h"
 #include "dsputils.h"
 #include <Audio.h>
@@ -88,10 +89,15 @@ public:
     }
   }
 
-  uint64_t OnDataRequest() {
-    return 0;
+  void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) {
+    data[0] = PackPackables(pitch, res, gain, pb_gain);
+    data[1] = PackPackables(pitch_cv, res_cv, gain_cv);
   }
-  void OnDataReceive(uint64_t data) {}
+
+  void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) {
+    UnpackPackables(data[0], pitch, res, gain, pb_gain);
+    UnpackPackables(data[1], pitch_cv, res_cv, gain_cv);
+  }
 
   AudioStream* InputStream() override {
     return &input;
@@ -104,14 +110,14 @@ protected:
   void SetHelp() override {}
 
 private:
-  int cursor = 0;
-  int pitch = 1 * 12 * 128; // C4
-  CVInput pitch_cv;
+  int8_t cursor = 0;
+  int16_t pitch = 1 * 12 * 128; // C4
   int16_t res = 0;
-  CVInput res_cv;
   int16_t gain = 100;
-  CVInput gain_cv;
   int16_t pb_gain = 50;
+  CVInputMap pitch_cv;
+  CVInputMap res_cv;
+  CVInputMap gain_cv;
 
   AudioPassthrough<Channels> input;
   std::array<AudioFilterLadder, Channels> filters;

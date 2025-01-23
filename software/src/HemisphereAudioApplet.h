@@ -12,9 +12,11 @@ const int NUM_CV_INPUTS = ADC_CHANNEL_LAST * 2 + 1;
 // independently, and semitone quantizers are lightwieght.
 inline std::array<OC::SemitoneQuantizer, NUM_CV_INPUTS> cv_semitone_quants;
 
-struct CVInput {
+struct CVInputMap {
   int8_t source = 0;
   int8_t attenuversion = 100;
+
+  static constexpr size_t Size = 16; // Make this compatible with Packable
 
   int In(int default_value = 0) {
     if (!source) return default_value;
@@ -49,17 +51,23 @@ struct CVInput {
     return PARAM_MAP_ICONS + 8 * source;
   }
 
-  uint16_t Serialize() const {
+  uint16_t Pack() const {
     return source | (attenuversion << 8);
   }
 
-  void Deserialize(uint16_t data) {
+  void Unpack(uint16_t data) {
     source = data & 0xFF;
     attenuversion = extract_value<int8_t>(data >> 8);
   }
 };
 
-struct DigitalInput {
+// Let's PackingUtils know this is Packable as is.
+constexpr CVInputMap& pack(CVInputMap& input) {
+  return input;
+}
+
+
+struct DigitalInputMap {
   enum DigitalSourceType {
     NONE,
     CLOCK,
@@ -73,6 +81,8 @@ struct DigitalInput {
   static const int ppqn = 4;
   static constexpr float internal_clocked_gate_pw = 0.5f;
   static const int num_sources = 2 + OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_LAST;
+
+  static constexpr size_t Size = 16; // Make this compatible with Packable
 
   void ChangeSource(int dir) {
     source = constrain(source + dir, 0, num_sources);
@@ -123,11 +133,11 @@ struct DigitalInput {
     }
   }
 
-  uint16_t Serialize() const {
+  uint16_t Pack() const {
     return source | as_unsigned(division << 8);
   }
 
-  void Deserialize(uint16_t data) {
+  void Unpack(uint16_t data) {
     source = data & 0xFF;
     division = extract_value<int8_t>(data >> 8);
   }
@@ -158,23 +168,9 @@ private:
   }
 };
 
-template <typename... Inputs>
-uint64_t PackInputs(Inputs... inputs) {
-  static_assert(
-    sizeof...(Inputs) <= 4, "Can pack up to 4 inputs in a config block"
-  );
-  uint_fast8_t i = 0;
-  uint64_t result = 0;
-  return ((result |= (inputs.Serialize() << (16 * i++))), ...);
-}
-
-template <typename... Inputs>
-void UnpackInputs(uint64_t data, Inputs&&... inputs) {
-  static_assert(
-    sizeof...(Inputs) <= 4, "Can unpack up to 4 inputs in a config block"
-  );
-  uint_fast8_t i = 0;
-  (inputs.Deserialize((data >> (16 * i++)) & 0xFFFF), ...);
+// Let's PackingUtils know this is Packable as is.
+constexpr DigitalInputMap& pack(DigitalInputMap& input) {
+  return input;
 }
 
 // For ascii strings of 9 characters or less, will just be the ascii bits
@@ -207,8 +203,11 @@ public:
   virtual AudioStream* OutputStream() = 0;
   virtual void mainloop() {}
 
-  virtual void OnDataReceive(uint64_t data) {}
+  virtual void OnDataReceive(uint64_t data) {
+    Serial.println("Warning: default OnDataReceive() called; either override this or OnDataReceive(const std::<array<uint64_t, CONFIG_SIZE>& data)");
+  }
   virtual uint64_t OnDataRequest() {
+    Serial.println("Warning: default OnDataRequest() called; either override this or OnDataRequest(std::<array<uint64_t, CONFIG_SIZE>& data)");
     return 0;
   }
   virtual void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) {

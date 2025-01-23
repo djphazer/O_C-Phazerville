@@ -89,16 +89,11 @@ public:
   }
 
   uint64_t OnDataRequest() override {
-    uint64_t data = PackByteAligned(crosspan);
-    Pack(data, {8, 1}, xfade_shape);
-    Pack(data, {32, 16}, PackInputs(crosspan_cv));
-    return data;
+    return PackPackables(crosspan, crosspan_cv, pack<1>(xfade_shape));
   }
 
   void OnDataReceive(uint64_t data) override {
-    UnpackByteAligned(data, crosspan);
-    xfade_shape = static_cast<XfadeShape>(Unpack(data, {8, 1}));
-    UnpackInputs(Unpack(data, {32, 16}), crosspan_cv);
+    return UnpackPackables(crosspan, crosspan_cv, pack<1>(xfade_shape));
   }
 
   AudioStream* InputStream() override {
@@ -116,7 +111,7 @@ private:
   enum XfadeShape : bool { EQUAL_POWER, EQUAL_AMPLITUDE };
   int8_t cursor = 0;
   int8_t crosspan = 0;
-  CVInput crosspan_cv;
+  CVInputMap crosspan_cv;
   XfadeShape xfade_shape;
 
   AudioPassthrough<2> input;

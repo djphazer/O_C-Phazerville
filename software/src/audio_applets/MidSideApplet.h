@@ -1,5 +1,6 @@
 #pragma once
 
+#include "HSUtils.h"
 #include "HemisphereAudioApplet.h"
 #include "Audio/AudioMixer.h"
 #include "Audio/AudioPassthrough.h"
@@ -31,11 +32,12 @@ public:
   }
 
   uint64_t OnDataRequest() override {
-    return gain;
+    return PackPackables(gain);
   }
 
   void OnDataReceive(uint64_t data) override {
-    SetGain(static_cast<int8_t>(Unpack(data, {0, 8})));
+    UnpackPackables(data, gain);
+    SetGain(gain);
   }
 
   AudioStream* InputStream() override {
