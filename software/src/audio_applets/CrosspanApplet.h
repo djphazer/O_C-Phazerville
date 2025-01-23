@@ -93,7 +93,7 @@ public:
   }
 
   void OnDataReceive(uint64_t data) override {
-    return UnpackPackables(crosspan, crosspan_cv, pack<1>(xfade_shape));
+    UnpackPackables(data, crosspan, crosspan_cv, pack<1>(xfade_shape));
   }
 
   AudioStream* InputStream() override {
