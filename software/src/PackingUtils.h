@@ -92,12 +92,10 @@ constexpr uint64_t PackPackables(Packables&&... params) {
   );
   uint64_t result = 0;
   size_t shift = 0;
-  return (
-    ...,
-    (result
-     |= (pack(params).Pack() << ((shift += pack(params).Size) - pack(params).Size))
-    )
-  );
+  (...,
+   (result |= (static_cast<uint64_t>(pack(params).Pack()) << shift),
+    shift += pack(params).Size));
+  return result;
 }
 
 template <typename... Packables>
@@ -120,8 +118,5 @@ constexpr void UnpackPackables(uint64_t data, Packables&&... params) {
     "Can unpack up to 64 bits"
   );
   size_t shift = 0;
-  (...,
-   (pack(params).Unpack(
-     data >> ((shift += pack(params).Size) - pack(params).Size)
-   )));
+  (..., (pack(params).Unpack(data >> shift), shift += pack(params).Size));
 }
