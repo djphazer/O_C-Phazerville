@@ -196,16 +196,16 @@ public:
     }
 
     void OnDataReceive(uint64_t data) {
-        frame.MIDIState.channel[io_offset + 0] = Unpack(data, PackLocation {0,4});
-        frame.MIDIState.channel[io_offset + 1] = Unpack(data, PackLocation {4,4});
-        frame.MIDIState.function[io_offset + 0] = Unpack(data, PackLocation {28,5});
-        frame.MIDIState.function[io_offset + 1] = Unpack(data, PackLocation {33,5});
-        frame.MIDIState.function_cc[io_offset + 0] = Unpack(data, PackLocation {14,7}) - 1;
-        frame.MIDIState.function_cc[io_offset + 1] = Unpack(data, PackLocation {21,7}) - 1;
-        frame.MIDIState.dac_polyvoice[io_offset + 0] = Unpack(data, PackLocation {38,3});
-        frame.MIDIState.dac_polyvoice[io_offset + 1] = Unpack(data, PackLocation {41,3});
-        frame.MIDIState.poly_mode = Unpack(data, PackLocation {44,4});
-        frame.MIDIState.poly_channel_filter = Unpack(data, PackLocation {48,5});
+        frame.MIDIState.channel[io_offset + 0] = constrain(Unpack(data, PackLocation {0,4}), 0, 15);
+        frame.MIDIState.channel[io_offset + 1] = constrain(Unpack(data, PackLocation {4,4}), 0, 15);
+        frame.MIDIState.function[io_offset + 0] = constrain(Unpack(data, PackLocation {28,5}), 0, HEM_MIDI_MAX_FUNCTION);
+        frame.MIDIState.function[io_offset + 1] = constrain(Unpack(data, PackLocation {33,5}), 0, HEM_MIDI_MAX_FUNCTION);
+        frame.MIDIState.function_cc[io_offset + 0] = constrain(Unpack(data, PackLocation {14,7}) - 1, -1, 127);
+        frame.MIDIState.function_cc[io_offset + 1] = constrain(Unpack(data, PackLocation {21,7}) - 1, -1, 127);
+        frame.MIDIState.dac_polyvoice[io_offset + 0] = constrain(Unpack(data, PackLocation {38,3}), 0, DAC_CHANNEL_LAST-1);
+        frame.MIDIState.dac_polyvoice[io_offset + 1] = constrain(Unpack(data, PackLocation {41,3}), 0, DAC_CHANNEL_LAST-1);
+        frame.MIDIState.poly_mode = constrain(Unpack(data, PackLocation {44,4}), 0, POLY_LAST);
+        frame.MIDIState.poly_channel_filter = constrain(Unpack(data, PackLocation {48,5}), 0, 16); // 16 = omni
 
         frame.MIDIState.UpdateMaxPoly();
     }
