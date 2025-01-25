@@ -23,6 +23,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+#if defined(ARDUINO_TEENSY41)
 
 #include <Arduino.h>
 #include "filter_variable.h"
@@ -282,5 +283,7 @@ void AudioFilterStateVariable::update(void)
 	block = receiveReadOnly(1);
 	if (block) release(block);
 }
+
+#endif
 
 #endif
