@@ -45,9 +45,10 @@ public:
 
     enum hMIDIIn_Global_Cursor {
         POLY_MODE = 1,
-        POLY_CHANNEL_FILTER,
+        // POLY_CHANNEL_FILTER,
 
-        hMIDIIN_GLOB_LAST = POLY_CHANNEL_FILTER
+        // hMIDIIN_GLOB_LAST = POLY_CHANNEL_FILTER
+        hMIDIIN_GLOB_LAST = POLY_MODE
     };
 
     const char* applet_name() {
@@ -70,7 +71,8 @@ public:
         frame.MIDIState.clock_count = 0;
         frame.MIDIState.ClearMonoBuffer();
         frame.MIDIState.ClearPolyBuffer();
-        frame.MIDIState.UpdateMaxPoly();
+        frame.MIDIState.UpdateMidiChannelFilter();
+        frame.MIDIState.UpdateMaxPolyphony();
     }
 
     void Controller() {
@@ -134,7 +136,8 @@ public:
                         page = constrain(page + direction, 0, hMIDIIn_PAGE_LAST);
                         break;
                     case MIDI_CHANNEL:
-                        frame.MIDIState.channel[ch] = constrain(frame.MIDIState.channel[ch] + direction, 0, 15);
+                        frame.MIDIState.channel[ch] = constrain(frame.MIDIState.channel[ch] + direction, 0, 16); // 16 = omni
+                        frame.MIDIState.UpdateMidiChannelFilter();
                         break;
                     case OUTPUT_MODE:
                         frame.MIDIState.function[ch] = constrain(frame.MIDIState.function[ch] + direction, 0, HEM_MIDI_MAX_FUNCTION);
@@ -143,7 +146,7 @@ public:
                         break;
                     case POLY_VOICE:
                         frame.MIDIState.dac_polyvoice[ch] = constrain(frame.MIDIState.dac_polyvoice[ch] + direction, 0, DAC_CHANNEL_LAST-1);
-                        frame.MIDIState.UpdateMaxPoly();
+                        frame.MIDIState.UpdateMaxPolyphony();
                     default: break;
                 } break;
             case hMIDIIn_GLOBAL:
@@ -157,9 +160,6 @@ public:
                         break;
                     case POLY_MODE:
                         frame.MIDIState.poly_mode = constrain(frame.MIDIState.poly_mode + direction, 0, POLY_LAST);
-                        break;
-                    case POLY_CHANNEL_FILTER:
-                        frame.MIDIState.poly_channel_filter = constrain(frame.MIDIState.poly_channel_filter + direction, 0, 16); // 16 = omni
                         break;
                     default: break;
                 } break;
@@ -191,7 +191,6 @@ public:
         Pack(data, PackLocation {41,3}, frame.MIDIState.dac_polyvoice[io_offset + 1]);
 
         Pack(data, PackLocation {44,4}, frame.MIDIState.poly_mode);
-        Pack(data, PackLocation {48,5}, frame.MIDIState.poly_channel_filter);
         return data;
     }
 
@@ -205,9 +204,8 @@ public:
         frame.MIDIState.dac_polyvoice[io_offset + 0] = constrain(Unpack(data, PackLocation {38,3}), 0, DAC_CHANNEL_LAST-1);
         frame.MIDIState.dac_polyvoice[io_offset + 1] = constrain(Unpack(data, PackLocation {41,3}), 0, DAC_CHANNEL_LAST-1);
         frame.MIDIState.poly_mode = constrain(Unpack(data, PackLocation {44,4}), 0, POLY_LAST);
-        frame.MIDIState.poly_channel_filter = constrain(Unpack(data, PackLocation {48,5}), 0, 16); // 16 = omni
-
-        frame.MIDIState.UpdateMaxPoly();
+        frame.MIDIState.UpdateMidiChannelFilter();
+        frame.MIDIState.UpdateMaxPolyphony();
     }
 
 protected:
@@ -239,7 +237,7 @@ private:
                 last_icon_ticks[1] = OC::CORE::ticks;
         }
 
-        if (OC::CORE::ticks - last_icon_ticks[page] < 4000) // ChA midi activity
+        if (OC::CORE::ticks - last_icon_ticks[page] < 4000) // Ch midi activity
             gfxBitmap(54, 13, 8, MIDI_ICON);
     }
 
@@ -248,7 +246,9 @@ private:
         gfxPrint(1, 13, "DAC "); gfxPrint(out_label);
         gfxLine(1, 22, 63, 22);
 
-        gfxPrint(1, 25, "MIDICh: "); gfxPrint(frame.MIDIState.channel[io_offset + page] + 1);
+        gfxPrint(1, 25, "MIDICh: ");
+        if (frame.MIDIState.channel[io_offset + page] > 15) gfxPrint("Om");
+        else gfxPrint(frame.MIDIState.channel[io_offset + page] + 1);
 
         gfxBitmap(2, 34, 8, MIDI_ICON); gfxPrint(13, 35, midi_fn_name[frame.MIDIState.function[io_offset + page]]);
         if (frame.MIDIState.function[io_offset + page] == HEM_MIDI_CC_OUT)
@@ -283,9 +283,11 @@ private:
 
         gfxPrint(1, 25, "Md: "); gfxPrint(midi_poly_mode_name[frame.MIDIState.poly_mode]);
 
-        gfxPrint(1, 35, "ChnFlt:");
-        if (frame.MIDIState.poly_channel_filter > 15) gfxPrint(49, 35, "Om");
-        else gfxPrint(49, 35, frame.MIDIState.poly_channel_filter + 1);
+        gfxPrint(1, 35, "ChFilt:");
+        for (int i = 0; i <= 16; ++i) {
+            if (frame.MIDIState.CheckMidiChannelFilter(i)) gfxRect(1 + (i*4), 45, 2, 7);
+            else gfxRect(1 + (i*4), 51, 2, 1);
+        }
 
         // Cursor
         switch (cursor) {
@@ -295,8 +297,6 @@ private:
             case POLY_MODE:
                 gfxCursor(19, 23 + (cursor * 10), 45);
                 break;
-            case POLY_CHANNEL_FILTER:
-                gfxCursor(49, 23 + (cursor * 10), 14);
             default: break;
         }
 

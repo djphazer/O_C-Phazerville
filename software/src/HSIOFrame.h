@@ -72,11 +72,27 @@ struct IOFrame {
 
         PolyphonyData poly_buffer[DAC_CHANNEL_LAST]; // buffer for polyphonic data tracking
         uint8_t max_voice = 1;
-        uint8_t poly_channel_filter = 0; // default to channel 1
         int poly_mode = 0;
-        int8_t rotate_index = -1;
+        int8_t poly_rotate_index = -1;
+        uint16_t midi_channel_filter = 0; // each bit state represents a channel. 1 means enabled. all 0's means Omni (no channel filter)
+        bool any_channel_omni = false;
 
-        void UpdateMaxPoly() { // find max voice number to determine how much to buffer
+        void UpdateMidiChannelFilter() {
+            uint16_t filter = 0;
+            bool omni = false;
+            for (int ch = 0; ch < DAC_CHANNEL_LAST; ++ch) {
+                if (channel[ch] < 16) filter |= (1 << channel[ch]);
+                else omni = true;
+            }
+            midi_channel_filter = filter;
+            any_channel_omni = omni;
+        }
+
+        bool CheckMidiChannelFilter(const uint8_t m_ch) {
+            return midi_channel_filter & (1 << m_ch);
+        }
+
+        void UpdateMaxPolyphony() { // find max voice number to determine how much to buffer
             int voice = 0;
             for (int ch = 0; ch < DAC_CHANNEL_LAST; ++ch) {
                 if (dac_polyvoice[ch] > voice) voice = dac_polyvoice[ch];
@@ -87,11 +103,11 @@ struct IOFrame {
             }
         }
 
-        bool CheckPolyVoice(uint8_t voice) {
+        bool CheckPolyVoice(const uint8_t voice) {
             return (poly_buffer[voice].gate);
         }
 
-        int FindNextAvailPolyVoice(uint8_t note) {
+        int FindNextAvailPolyVoice(const uint8_t note) {
             if (max_voice == 1) return 0;
 
             switch (poly_mode) {
@@ -106,56 +122,55 @@ struct IOFrame {
                     // fallthrough
                 case POLY_ROTATE:
                     for (int v = 0; v < max_voice; ++v) {
-                        if (++rotate_index >= max_voice) rotate_index = 0;
-                        if (!CheckPolyVoice(rotate_index)) return rotate_index;
+                        if (++poly_rotate_index >= max_voice) poly_rotate_index = 0;
+                        if (!CheckPolyVoice(poly_rotate_index)) return poly_rotate_index;
                     }
                     // if no voices empty
-                    if (++rotate_index >= max_voice) rotate_index = 0;
-                    return rotate_index;
+                    if (++poly_rotate_index >= max_voice) poly_rotate_index = 0;
+                    return poly_rotate_index;
                     break;
                 default:
                     return 0;
             }
         }
 
-        int FindPolyNoteIndex(uint8_t note) {
+        int FindPolyNoteIndex(const uint8_t note) {
             for (int v = 0; v < max_voice; ++v)
                 if (poly_buffer[v].note == note) return v;
             return -1;
         }
 
-        void WritePolyNoteData(uint8_t note, uint8_t vel, uint8_t voice) {
+        void WritePolyNoteData(const uint8_t note, const uint8_t vel, const uint8_t voice) {
             poly_buffer[voice].note = note;
             poly_buffer[voice].vel = vel;
             poly_buffer[voice].gate = 1;
         }
 
-        void ClearPolyVoice(uint8_t voice) {
+        void ClearPolyVoice(const uint8_t voice) {
             poly_buffer[voice].vel = 0;
             poly_buffer[voice].gate = 0;
         }
 
-
-        void PolyBufferPush(uint8_t midi_chan, uint8_t note, uint8_t vel) {
-            if (midi_chan == poly_channel_filter || poly_channel_filter == 16) // channel match or omni
+        void PolyBufferPush(const uint8_t m_ch, const uint8_t note, const uint8_t vel) {
+            if (CheckMidiChannelFilter(m_ch) || any_channel_omni)
                 WritePolyNoteData(note, vel, FindNextAvailPolyVoice(note));
         }
 
-        void PolyBufferPop(uint8_t midi_chan, uint8_t note) {
-            if (midi_chan == poly_channel_filter || poly_channel_filter == 16) { // channel match or omni
-                for (int v = 0; v < max_voice; ++v) {
+        void PolyBufferPop(const uint8_t m_ch, const uint8_t note) {
+            if (CheckMidiChannelFilter(m_ch) || any_channel_omni) {
+                for (uint8_t v = 0; v < max_voice; ++v) {
                     if (poly_buffer[v].note == note) ClearPolyVoice(v);
                 }
             }
         }
 
         void ClearPolyBuffer() {
-            for (int n = 0; n < DAC_CHANNEL_LAST; ++n) {
-                ClearPolyVoice(n);
+            for (int ch = 0; ch < DAC_CHANNEL_LAST; ++ch) {
+                ClearPolyVoice(ch);
             }
         }
 
-        void RemoveNoteData(std::vector<MIDINoteData> &buffer, uint8_t note) {
+        void RemoveNoteData(std::vector<MIDINoteData> &buffer, const uint8_t note) {
             buffer.erase(
                 std::remove_if(buffer.begin(), buffer.end(), [&](MIDINoteData const &data) {
                     return data.note == note;
@@ -164,34 +179,33 @@ struct IOFrame {
             );
         }
 
-        void MonoBufferPush(const uint8_t midi_chan, const uint8_t data1, const uint8_t data2) {
-            uint8_t c = midi_chan;
-            uint8_t note = data1;
-            uint8_t vel = data2;
-            RemoveNoteData(note_buffer[c], note); // if new note is already in buffer, promote to latest and update velocity
-            note_buffer[c].push_back({note, vel}); // else just append to the end
+        void MonoBufferPush(const uint8_t m_ch, const uint8_t note, const uint8_t vel) {
+            if (CheckMidiChannelFilter(m_ch) || any_channel_omni) {
+                RemoveNoteData(note_buffer[m_ch], note); // if new note is already in buffer, promote to latest and update velocity
+                note_buffer[m_ch].push_back({note, vel}); // else just append to the end
+            }
         }
 
-        void MonoBufferPop(const uint8_t midi_chan, const uint8_t data1) {
-            uint8_t c = midi_chan;
-            uint8_t note = data1;
-            RemoveNoteData(note_buffer[c], note);
-            if (note_buffer[c].size() == 0) note_buffer[c].shrink_to_fit(); // free up memory when MIDI is not used
+        void MonoBufferPop(const uint8_t m_ch, const uint8_t note) {
+            if (CheckMidiChannelFilter(m_ch) || any_channel_omni) {
+                RemoveNoteData(note_buffer[m_ch], note);
+                if (note_buffer[m_ch].size() == 0) note_buffer[m_ch].shrink_to_fit(); // free up memory when MIDI is not used
+            }
         }
 
-        void ClearMonoBuffer(int ch = -1) {
-            if (ch > 0) {
-                note_buffer[ch].clear();
-                note_buffer[ch].shrink_to_fit();
+        void ClearMonoBuffer(const int8_t m_ch = -1) {
+            if (m_ch > 0) {
+                note_buffer[m_ch].clear();
+                note_buffer[m_ch].shrink_to_fit();
             } else { // clear on all channels if no args passed
-                for (int c = 0; c < 16; ++c) {
+                for (uint8_t c = 0; c < 16; ++c) {
                     note_buffer[c].clear();
                     note_buffer[c].shrink_to_fit();
                 }
             }
         }
 
-        int GetNote(std::vector<MIDINoteData> &buffer, int n) {
+        int GetNote(std::vector<MIDINoteData> &buffer, const int n) {
             return buffer.at(buffer.size()-n).note;
         }
 
@@ -208,7 +222,7 @@ struct IOFrame {
         }
 
         int GetNoteMin(std::vector<MIDINoteData> &buffer) {
-            int m = 127;
+            uint8_t m = 127;
             std::for_each (buffer.begin(), buffer.end(), [&](MIDINoteData const &data) {
                 if (data.note < m) m = data.note;
             });
@@ -216,30 +230,30 @@ struct IOFrame {
         }
 
         int GetNoteMax(std::vector<MIDINoteData> &buffer) {
-            int m = 0;
+            uint8_t m = 0;
             std::for_each (buffer.begin(), buffer.end(), [&](MIDINoteData const &data) {
                 if (data.note > m) m = data.note;
             });
             return m;
         }
 
-        int GetVel(std::vector<MIDINoteData> &buffer, int n) {
+        int GetVel(std::vector<MIDINoteData> &buffer, const int n) {
             return buffer.at(buffer.size()-n).vel;
         }
 
-        void ClearSustainLatch(int m_ch = -1) {
+        void ClearSustainLatch(int8_t m_ch = -1) {
             if (m_ch > 0) sustain_latch &= ~(1 << m_ch);
             else { // clear on all channels if no args passed
-                for (int c = 0; c < 16; ++c)
+                for (uint8_t c = 0; c < 16; ++c)
                     sustain_latch &= ~(1 << c);
             }
         }
 
-        void SetSustainLatch(int m_ch) {
+        void SetSustainLatch(const uint8_t m_ch) {
             sustain_latch |= (1 << m_ch);
         }
 
-        bool CheckSustainLatch(int m_ch) {
+        bool CheckSustainLatch(const uint8_t m_ch) {
             return sustain_latch & (1 << m_ch);
         }
 
@@ -341,9 +355,9 @@ struct IOFrame {
                     ClearMonoBuffer();
                     ClearSustainLatch();
                     ClearPolyBuffer();
-                    for (int c = 0; c < DAC_CHANNEL_LAST; ++c) {
-                        outputs[c] = 0;
-                        trigout_q[c] = 0;
+                    for (int ch = 0; ch < DAC_CHANNEL_LAST; ++ch) {
+                        outputs[ch] = 0;
+                        trigout_q[ch] = 0;
                     }
                     return;
                     break;
@@ -366,8 +380,8 @@ struct IOFrame {
                 if (function[ch] == HEM_MIDI_NOOP) continue;
 
                 // skip unwanted MIDI Channels
-                if (midi_chan - 1 != channel[ch]) continue;
                 uint8_t m_ch = midi_chan - 1;
+                if (channel[ch] != m_ch && channel[ch] != 16) continue;
 
                 last_midi_channel = m_ch;
 
