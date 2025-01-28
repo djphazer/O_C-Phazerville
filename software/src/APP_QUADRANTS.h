@@ -307,7 +307,8 @@ public:
     }
     void StoreToPreset(int id, bool skip_eeprom = false) {
         StoreToPreset( (QuadrantsPreset*)(quad_presets + id), skip_eeprom );
-        audio_app.SavePreset(id);
+        if (!skip_eeprom)
+          audio_app.SavePreset(id);
         preset_id = id;
     }
     void LoadFromPreset(int id) {
