@@ -209,7 +209,7 @@ AppletRegistry reg{
 
 namespace HS {
   static constexpr auto & available_applets = reg.applets;
-  static constexpr int HEMISPHERE_AVAILABLE_APPLETS = ARRAY_SIZE(available_applets);
+  constexpr int HEMISPHERE_AVAILABLE_APPLETS = ARRAY_SIZE(available_applets);
 
   uint64_t hidden_applets[2] = { 0, 0 };
   bool applet_is_hidden(const int& index) {
