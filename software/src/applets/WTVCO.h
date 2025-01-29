@@ -178,17 +178,14 @@ public:
         if (menu_page == MENU_WAVETABLES) {
             switch ((Wave_Cursor)cursor) {
                 case WAVEFORM_A:
-                    if (waveform[A] == WAVE_NOISE) noise_freeze = !noise_freeze;
-                    else if (waveform[A] == WAVE_RAND_STEPPED) GenerateWaveForm_RandStepped(wavetable[A]);
-                    break;
                 case WAVEFORM_B:
-                    if (waveform[B] == WAVE_NOISE) noise_freeze = !noise_freeze;
-                    else if (waveform[B] == WAVE_RAND_STEPPED) GenerateWaveForm_RandStepped(wavetable[B]);
-                    break;
                 case WAVEFORM_C:
-                    if (waveform[C] == WAVE_NOISE) noise_freeze = !noise_freeze;
-                    else if (waveform[C] == WAVE_RAND_STEPPED) GenerateWaveForm_RandStepped(wavetable[C]);
+                  {
+                    const int idx = cursor - WAVEFORM_A;
+                    if (waveform[idx] == WAVE_NOISE) noise_freeze = !noise_freeze;
+                    else if (waveform[idx] == WAVE_RAND_STEPPED) GenerateWaveForm_RandStepped(wavetable[idx]);
                     break;
+                  }
                 default: break;
             }
         }
@@ -203,17 +200,14 @@ public:
                 }
                 switch((Wave_Cursor)cursor) {
                     case WAVEFORM_A:
-                        waveform[A] = (WaveForms) constrain(((int)waveform[A]) + direction, 0, WAVEFORM_COUNT-1);
-                        GenerateWaveTable(A);
-                        break;
                     case WAVEFORM_B:
-                        waveform[B] = (WaveForms) constrain(((int)waveform[B]) + direction, 0, WAVEFORM_COUNT-1);
-                        GenerateWaveTable(B);
-                        break;
                     case WAVEFORM_C:
-                        waveform[C] = (WaveForms) constrain(((int)waveform[C]) + direction, 0, WAVEFORM_COUNT-1);
-                        GenerateWaveTable(C);
+                      {
+                        const int idx = cursor - WAVEFORM_A;
+                        waveform[idx] = (WaveForms) constrain(((int)waveform[idx]) + direction, 0, WAVEFORM_COUNT-1);
+                        GenerateWaveTable(idx);
                         break;
+                      }
                     default: break;
                 }
                 break;
@@ -253,10 +247,8 @@ public:
                 }
                 switch((ModSrc_Cursor)cursor) { // PARAM_LAST-1 excludes noise latch, update if more params added
                     case MOD_CV1:
-                        cv_dest[0] = constrain(cv_dest[0] + direction, 0, PARAM_LAST-1);
-                        break;
                     case MOD_CV2:
-                        cv_dest[1] = constrain(cv_dest[1] + direction, 0, PARAM_LAST-1);
+                        cv_dest[cursor - MOD_CV1] = constrain(cv_dest[cursor - MOD_CV1] + direction, 0, PARAM_LAST-1);
                         break;
                     default: break;
                 }
@@ -266,9 +258,9 @@ public:
 
     uint64_t OnDataRequest() {
         uint64_t data = 0;
-        Pack(data, PackLocation { 0,8}, waveform[0]);
-        Pack(data, PackLocation { 8,8}, waveform[1]);
-        Pack(data, PackLocation {16,8}, waveform[2]);
+        for (size_t w = 0; w < 3; ++w) {
+          Pack(data, PackLocation {0 + w*8,8}, waveform[w]);
+        }
         Pack(data, PackLocation {24,8}, cv_dest[0]);
         Pack(data, PackLocation {32,8}, cv_dest[1]);
         Pack(data, PackLocation {40,1}, noise_freeze);
@@ -276,13 +268,13 @@ public:
     }
 
     void OnDataReceive(uint64_t data) {
-        waveform[0] = (WaveForms) constrain(Unpack(data, PackLocation { 0,8}), 0, WAVEFORM_COUNT); // oops must cast
-        waveform[1] = (WaveForms) constrain(Unpack(data, PackLocation { 8,8}), 0, WAVEFORM_COUNT);
-        waveform[2] = (WaveForms) constrain(Unpack(data, PackLocation {16,8}), 0, WAVEFORM_COUNT);
+        for (size_t w = 0; w < 3; ++w) {
+          waveform[w] = (WaveForms) constrain(Unpack(data, PackLocation {0 + w*8,8}), 0, WAVEFORM_COUNT);
+          GenerateWaveTable(w);
+        }
         cv_dest[0] = constrain(Unpack(data, PackLocation {24,8}), 0, PARAM_LAST);
         cv_dest[1] = constrain(Unpack(data, PackLocation {32,8}), 0, PARAM_LAST);
         noise_freeze = constrain(Unpack(data, PackLocation {40,1}), 0, 1);
-        for (int w = 0; w < 3; ++w) GenerateWaveTable(w);
     }
 
 protected:
@@ -338,22 +330,40 @@ private:
     }
 
     void DrawSelector() {
+        int x = 0;
+        int y = HEADER_HEIGHT + Y_DIV;
+        int w = X_DIV;
+
         switch (menu_page) {
             case MENU_WAVETABLES:
-                if(!EditMode()) gfxSpicyCursor((cursor * X_DIV), HEADER_HEIGHT + Y_DIV, X_DIV);
+                if(!EditMode()) x = cursor * X_DIV;
+                else return;
                 break;
             case MENU_PARAMS:
-                if (cursor == 0) gfxSpicyCursor(0, HEADER_HEIGHT + Y_DIV, X_DIV);
-                else if (cursor < 3) gfxSpicyCursor(36, MENU_ROW + 8 + (cursor * Y_DIV), 27);
-                else if (cursor < 6) gfxSpicyCursor(42, MENU_ROW + 8 + ((cursor-2) * Y_DIV), 21);
-                else gfxSpicyCursor(36, MENU_ROW + 8 + ((cursor-5) * Y_DIV), 21);
+                if (cursor == 0) break;
+                if (cursor < 3) {
+                  x = 36;
+                  y = MENU_ROW + 8 + (cursor * Y_DIV);
+                  w = 27;
+                } else if (cursor < 6) {
+                  x = 42;
+                  y = MENU_ROW + 8 + ((cursor-2) * Y_DIV);
+                  w = 21;
+                } else {
+                  x = 36;
+                  y = MENU_ROW + 8 + ((cursor-5) * Y_DIV);
+                  w = 21;
+                }
                 break;
             case MENU_MOD_SOURCES:
-                if (cursor == 0) gfxSpicyCursor(0, HEADER_HEIGHT + Y_DIV, X_DIV);
-                else gfxSpicyCursor(24, MENU_ROW + 8 + (cursor * Y_DIV), 39);
+                if (cursor == 0) break;
+                x = 24;
+                y = MENU_ROW + 8 + (cursor * Y_DIV);
+                w = 39;
                 break;
-            default: break;
+            default: return;
         }
+        gfxSpicyCursor(x, y, w);
     }
 
     void DrawWaveMenu() {
@@ -362,26 +372,24 @@ private:
 
         if (!EditMode()) {
             gfxBitmap(x+1, y, 8, WAVEFORM_ICON);
-            x += X_DIV;
-            gfxPrint(x+2, y, "A");
-            x += X_DIV;
-            gfxPrint(x+2, y, "B");
-            x += X_DIV;
-            gfxPrint(x+2, y, "C");
+            char label[] = {'A', '\0'};
+            for (int i = 0; i<3; ++i) {
+              x += X_DIV;
+              gfxPrint(x+2, y, label);
+              ++label[0];
+            }
         } else {
             switch((Wave_Cursor)cursor) {
                 case WAVEFORM_A:
-                    gfxPrint(3, MENU_ROW, "A:");
-                    gfxPrint(waveform_names[waveform[A]]);
-                    break;
                 case WAVEFORM_B:
-                    gfxPrint(3, MENU_ROW, "B:");
-                    gfxPrint(waveform_names[waveform[B]]);
-                    break;
                 case WAVEFORM_C:
-                    gfxPrint(3, MENU_ROW, "C:");
-                    gfxPrint(waveform_names[waveform[C]]);
+                  {
+                    const int idx = cursor - WAVEFORM_A;
+                    char label[] = {char('A'+idx), ':', '\0'};
+                    gfxPrint(3, MENU_ROW, label);
+                    gfxPrint(waveform_names[waveform[idx]]);
                     break;
+                  }
                 default: break;
             }
         }
@@ -396,13 +404,9 @@ private:
                 gfxRenderWave(OUT);
                 break;
             case WAVEFORM_A:
-                gfxRenderWave(A);
-                break;
             case WAVEFORM_B:
-                gfxRenderWave(B);
-                break;
             case WAVEFORM_C:
-                gfxRenderWave(C);
+                gfxRenderWave(cursor - WAVEFORM_A);
                 break;
             default: break;
         }
@@ -463,11 +467,12 @@ private:
     }
 
     void DrawModSources() {
-        int y = MENU_ROW + Y_DIV;
-
-        gfxPrint(1, y, "CV1"); gfxPrint(":"); gfxPrint(param_names[cv_dest[0]]);
-        y += Y_DIV;
-        gfxPrint(1, y, "CV2"); gfxPrint(":"); gfxPrint(param_names[cv_dest[1]]);
+        const int y = MENU_ROW + Y_DIV;
+        ForEachChannel(ch) {
+          gfxPrint(1, y + ch*Y_DIV, OC::Strings::cv_input_names[ch + io_offset]);
+          gfxPrint(":");
+          gfxPrint(param_names[cv_dest[0]]);
+        }
     }
 
 // WAVETABLE STUFF:
