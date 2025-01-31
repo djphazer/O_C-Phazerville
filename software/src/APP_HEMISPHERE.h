@@ -48,6 +48,21 @@
 #include "APP_CALIBR8OR.h"
 #endif
 
+void HS::Init() {
+  for (int i = 0; i < ADC_CHANNEL_LAST; ++i)
+    input_quant[i].Init();
+
+  for (int i = 0; i < QUANT_CHANNEL_COUNT; ++i)
+    quantizer[i].Init();
+
+#ifdef ARDUINO_TEENSY41
+  wavplayer_available = SD.begin(BUILTIN_SDCARD);
+#endif
+
+  showhide_cursor.Init(0, HEMISPHERE_AVAILABLE_APPLETS - 1);
+  showhide_cursor.Scroll(0);
+}
+
 void HS::DrawAppletList(bool blink) {
   const size_t LineH = 12;
 

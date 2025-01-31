@@ -86,8 +86,6 @@ static constexpr uint32_t HEMISPHERE_DOUBLE_CLICK_TIME = 8000;
 static constexpr uint32_t HEMISPHERE_PULSE_ANIMATION_TIME = 500;
 static constexpr uint32_t HEMISPHERE_PULSE_ANIMATION_TIME_LONG = 1200;
 
-extern const int HEMISPHERE_AVAILABLE_APPLETS;
-
 } // namespace HS
 
 //////////////// Calculation methods
