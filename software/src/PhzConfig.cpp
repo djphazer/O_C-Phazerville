@@ -96,6 +96,7 @@ void save_config(const char* filename)
 
 bool load_config(const char* filename)
 {
+  cfg_store.clear();
   Serial.println("\nLoading Config!!!");
   dataFile = myfs.open(filename);
   if (!dataFile) {
@@ -105,7 +106,6 @@ bool load_config(const char* filename)
 
   uint8_t buf[12];
   size_t pos = 0;
-  cfg_store.clear();
 
   while (dataFile.available()) {
     uint8_t n = dataFile.read();

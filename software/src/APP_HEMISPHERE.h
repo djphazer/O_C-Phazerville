@@ -39,6 +39,9 @@
 
 #include "hemisphere_config.h"
 
+#ifdef __IMXRT1062__
+#include "PhzConfig.h"
+#endif
 #ifdef ARDUINO_TEENSY41
 #include "hemisphere_audio_config.h"
 #endif
@@ -108,7 +111,11 @@ enum HEMISPHERE_SETTINGS {
     HEMISPHERE_SETTING_LAST
 };
 
-#if defined(MOAR_PRESETS)
+#ifdef __IMXRT1062__
+// TODO: consider separate, smaller files - this could get slow
+static constexpr int HEM_NR_OF_PRESETS = 50;
+static const char* const PRESET_FILENAME = "HEM_PRESETS.DAT";
+#elif defined(MOAR_PRESETS)
 static constexpr int HEM_NR_OF_PRESETS = 16;
 #elif defined(PEWPEWPEW)
 static constexpr int HEM_NR_OF_PRESETS = 8;
@@ -119,6 +126,8 @@ static constexpr int HEM_NR_OF_PRESETS = 8;
 /* Hemisphere Preset
  * - conveniently store/recall multiple configurations
  */
+#ifdef __IMXRT1062__
+#else
 class HemispherePreset : public SystemExclusiveHandler,
     public settings::SettingsBase<HemispherePreset, HEMISPHERE_SETTING_LAST> {
 public:
@@ -250,10 +259,9 @@ public:
 
 };
 
-// HemispherePreset hem_config; // special place for Clock data and Config data, 64 bits each
-
 HemispherePreset hem_presets[HEM_NR_OF_PRESETS + 1];
 HemispherePreset *hem_active_preset = 0;
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 //// Hemisphere Manager
@@ -283,8 +291,15 @@ public:
     }
 
     void Resume() {
+#ifdef __IMXRT1062__
+        // XXX: this assumes no other config file gets loaded while Hemisphere is active...
+        PhzConfig::load_config(PRESET_FILENAME);
+        if (preset_id < 0)
+          LoadFromPreset(0);
+#else
         if (!hem_active_preset)
             LoadFromPreset(0);
+#endif
         // restore quantizer settings
         for (int i = 0; i < 4; ++i) {
             quantizer[i].Init();
@@ -292,12 +307,18 @@ public:
         }
     }
     void Suspend() {
+#ifdef __IMXRT1062__
+        if (HS::auto_save_enabled)
+            StoreToPreset(preset_id);
+#else
         if (hem_active_preset) {
             if (HS::auto_save_enabled || 0 == preset_id) StoreToPreset(preset_id, !HS::auto_save_enabled);
             hem_active_preset->OnSendSysEx();
         }
+#endif
     }
 
+#if defined(__MK20DX256__)
     void StoreToPreset(HemispherePreset* preset, bool skip_eeprom = false) {
         bool doSave = (preset != hem_active_preset);
 
@@ -326,9 +347,6 @@ public:
 
         if (hem_active_preset->StoreInputMap()) doSave = 1;
 
-        if (doSave) {
-        }
-
         // initiate actual EEPROM save - ONLY if necessary!
         if (doSave && !skip_eeprom) {
 #ifdef ENABLE_APP_CALIBR8OR
@@ -355,13 +373,116 @@ public:
           //}
 #endif
         }
-
     }
+#endif
+
+    // lower 9 bits of PhzConfig KEY
+    enum PresetDataKeys : uint16_t {
+        APPLET_METADATA_KEY = 0, // applet ids
+        CLOCK_DATA_KEY = 1,
+        GLOBALS_KEY = 2,
+        INPUT_MAP_KEY = 3,
+        APPLET_L_DATA_KEY = 10,
+        APPLET_R_DATA_KEY = 11,
+
+        FILTERMASK1_KEY = 100,
+        FILTERMASK2_KEY = 101,
+    };
+
     void StoreToPreset(int id, bool skip_eeprom = false) {
+#ifdef __IMXRT1062__
+        uint16_t preset_key = id << 9;
+
+        // clock data
+        clock_data = ClockSetup_instance.OnDataRequest();
+        PhzConfig::setValue(preset_key | CLOCK_DATA_KEY, clock_data);
+
+        // vague globals
+        global_data = ClockSetup_instance.GetGlobals();
+        PhzConfig::setValue(preset_key | GLOBALS_KEY, global_data);
+
+        // Input Mappings
+        uint64_t data = 0;
+        for (size_t i = 0; i < 4; ++i) {
+          Pack(data, PackLocation{0 + i*16, 4}, HS::trigger_mapping[i] + 1);
+          Pack(data, PackLocation{4 + i*16, 4}, HS::cvmapping[i] + 1);
+          Pack(data, PackLocation{8 + i*16, 8}, HS::frame.clockskip[i]);
+        }
+        PhzConfig::setValue(preset_key | INPUT_MAP_KEY, data);
+
+        data = 0;
+        for (size_t h = 0; h < 2; h++)
+        {
+            int index = my_applet[h];
+            Pack(data, PackLocation{h*8,8}, HS::available_applets[index].id);
+
+            // applet data
+            applet_data[h] = HS::available_applets[index].instance[h]->OnDataRequest();
+            PhzConfig::setValue(preset_key | (APPLET_L_DATA_KEY + h), applet_data[h]);
+        }
+
+        // applet ids, and maybe some other stuff?
+        PhzConfig::setValue(preset_key | APPLET_METADATA_KEY, data);
+
+        // applet filtering is actually just global
+        PhzConfig::setValue(FILTERMASK1_KEY, HS::hidden_applets[0]);
+        PhzConfig::setValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
+
+        // TODO: store quant settings in same file?
+        //Calibr8or_instance.SavePreset();
+
+        PhzConfig::save_config(PRESET_FILENAME);
+#else
         StoreToPreset( (HemispherePreset*)(hem_presets + id), skip_eeprom );
+#endif
         preset_id = id;
     }
     void LoadFromPreset(int id) {
+        preset_id = id;
+#ifdef __IMXRT1062__
+        uint16_t preset_key = id << 9;
+        uint64_t data;
+
+        // applet ids + misc
+        if (!PhzConfig::getValue(preset_key | APPLET_METADATA_KEY, data)) return;
+        if (!data) return;
+
+        for (size_t h = 0; h < 2; h++)
+        {
+            int index = HS::get_applet_index_by_id( Unpack(data, PackLocation{h*8, 8}) );
+
+            // applet data
+            PhzConfig::getValue(preset_key | (APPLET_L_DATA_KEY + h), applet_data[h]);
+            SetApplet(HEM_SIDE(h), index);
+            HS::available_applets[index].instance[h]->OnDataReceive(applet_data[h]);
+        }
+
+        // clock data
+        if (!PhzConfig::getValue(preset_key | CLOCK_DATA_KEY, data)) return;
+        ClockSetup_instance.OnDataReceive(data);
+        // if the first key exists, we are assuming the rest are present...
+
+        // vague globals
+        PhzConfig::getValue(preset_key | GLOBALS_KEY, data);
+        ClockSetup_instance.SetGlobals(global_data);
+
+        // Input Mappings
+        PhzConfig::getValue(preset_key | INPUT_MAP_KEY, data);
+        for (size_t i = 0; i < 4; ++i)
+        {
+          int val = Unpack(data, PackLocation{i*16, 4});
+          if (val != 0) HS::trigger_mapping[i] = constrain(val - 1, 0, TRIGMAP_MAX);
+
+          val = Unpack(data, PackLocation{4 + i*16, 4});
+          if (val != 0) HS::cvmapping[i] = constrain(val - 1, 0, CVMAP_MAX);
+
+          HS::frame.clockskip[i] = Unpack(data, PackLocation{8 + i*16, 8});
+        }
+
+        // applet filtering is actually just global
+        PhzConfig::getValue(FILTERMASK1_KEY, HS::hidden_applets[0]);
+        PhzConfig::getValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
+#else
         hem_active_preset = (HemispherePreset*)(hem_presets + id);
         if (hem_active_preset->is_valid()) {
             clock_data = hem_active_preset->GetClockData();
@@ -379,10 +500,8 @@ public:
                 SetApplet(HEM_SIDE(h), index);
                 HS::available_applets[index].instance[h]->OnDataReceive(applet_data[h]);
             }
-
-
         }
-        preset_id = id;
+#endif
         PokePopup(PRESET_POPUP);
     }
     void ProcessQueue() {
@@ -942,7 +1061,7 @@ public:
     }
 
 private:
-    int preset_id = 0;
+    int preset_id = -1;
     int queued_preset = 0;
     int preset_cursor = 0;
     int my_applet[2]; // Indexes to available_applets
@@ -1278,6 +1397,25 @@ private:
         }
     }
 
+    bool isValidPreset(int id) {
+#ifdef __IMXRT1062__
+      uint64_t data;
+      return PhzConfig::getValue(id << 9 | APPLET_METADATA_KEY, data);
+#else
+      return hem_presets[id].is_valid();
+#endif
+    }
+
+    HemisphereApplet* GetApplet(int id, size_t h) {
+#ifdef __IMXRT1062__
+        uint64_t data = 0;
+        PhzConfig::getValue(id << 9 | APPLET_METADATA_KEY, data);
+        int idx = HS::get_applet_index_by_id( Unpack(data, PackLocation{h*8, 8}) );
+        return HS::available_applets[idx].instance[h];
+#else
+        return hem_presets[id].GetApplet(h);
+#endif
+    }
     void DrawPresetSelector() {
         gfxHeader((config_cursor == SAVE_PRESET) ? "Save" : "Load");
         gfxPrint(30, 1, "Preset");
@@ -1294,14 +1432,14 @@ private:
             else
               gfxPrint(8, y, OC::Strings::capital_letters[i]);
 
-            if (!hem_presets[i].is_valid())
+            if (!isValidPreset(i))
                 gfxPrint(18, y, "(empty)");
             else {
-                gfxIcon(18, y, hem_presets[i].GetApplet(0)->applet_icon());
-                gfxPrint(26, y, hem_presets[i].GetApplet(0)->applet_name());
+                gfxIcon(18, y, GetApplet(i, 0)->applet_icon());
+                gfxPrint(26, y, GetApplet(i, 0)->applet_name());
                 gfxPrint(", ");
-                gfxPrint(hem_presets[i].GetApplet(1)->applet_name());
-                gfxIcon(120, y, hem_presets[i].GetApplet(1)->applet_icon(), true);
+                gfxPrint(GetApplet(i, 1)->applet_name());
+                gfxIcon(120, y, GetApplet(i, 1)->applet_icon(), true);
             }
 
             y += 10;
@@ -1310,6 +1448,8 @@ private:
 
 };
 
+#ifdef __IMXRT1062__
+#else
 // TOTAL EEPROM SIZE: 8 presets * 32 bytes
 SETTINGS_DECLARE(HemispherePreset, HEMISPHERE_SETTING_LAST) {
     {0, 0, 255, "Applet ID L", NULL, settings::STORAGE_TYPE_U8},
@@ -1330,12 +1470,17 @@ SETTINGS_DECLARE(HemispherePreset, HEMISPHERE_SETTING_LAST) {
     {0, 0, 65535, "CV Input Map", NULL, settings::STORAGE_TYPE_U16},
     {0, 0, 65535, "Misc Globals", NULL, settings::STORAGE_TYPE_U16}
 };
+#endif
 
 HemisphereManager manager;
 
 void ReceiveManagerSysEx() {
+#ifdef __IMXRT1062__
+    // TODO: reimplement SysEx backup
+#else
     if (hem_active_preset)
         hem_active_preset->OnReceiveSysEx();
+#endif
 }
 void BeatSyncProcess() {
   manager.ProcessQueue();
@@ -1351,10 +1496,17 @@ void HEMISPHERE_init() {
 }
 
 static constexpr size_t HEMISPHERE_storageSize() {
+#ifdef __IMXRT1062__
+    return 0;
+#else
     return HemispherePreset::storageSize() * (HEM_NR_OF_PRESETS + 1);
+#endif
 }
 
 static size_t HEMISPHERE_save(void *storage) {
+#ifdef __IMXRT1062__
+    return 0;
+#else
     // store hidden applet mask in secret preset
     hem_presets[HEM_NR_OF_PRESETS].SetData(HEM_SIDE(0), HS::hidden_applets[0]);
     hem_presets[HEM_NR_OF_PRESETS].SetData(HEM_SIDE(1), HS::hidden_applets[1]);
@@ -1364,9 +1516,13 @@ static size_t HEMISPHERE_save(void *storage) {
         used += hem_presets[i].Save(static_cast<char*>(storage) + used);
     }
     return used;
+#endif
 }
 
 static size_t HEMISPHERE_restore(const void *storage) {
+#ifdef __IMXRT1062__
+    return 0;
+#else
     size_t used = 0;
     for (int i = 0; i <= HEM_NR_OF_PRESETS; ++i) {
         used += hem_presets[i].Restore(static_cast<const char*>(storage) + used);
@@ -1375,6 +1531,7 @@ static size_t HEMISPHERE_restore(const void *storage) {
     HS::hidden_applets[0] = hem_presets[HEM_NR_OF_PRESETS].GetData(HEM_SIDE(0));
     HS::hidden_applets[1] = hem_presets[HEM_NR_OF_PRESETS].GetData(HEM_SIDE(1));
     return used;
+#endif
 }
 
 void FASTRUN HEMISPHERE_isr() {
