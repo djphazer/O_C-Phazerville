@@ -458,12 +458,12 @@ public:
         }
 
         // clock data
-        if (!PhzConfig::getValue(preset_key | CLOCK_DATA_KEY, data)) return;
-        ClockSetup_instance.OnDataReceive(data);
+        if (!PhzConfig::getValue(preset_key | CLOCK_DATA_KEY, clock_data)) return;
+        ClockSetup_instance.OnDataReceive(clock_data);
         // if the first key exists, we are assuming the rest are present...
 
         // vague globals
-        PhzConfig::getValue(preset_key | GLOBALS_KEY, data);
+        PhzConfig::getValue(preset_key | GLOBALS_KEY, global_data);
         ClockSetup_instance.SetGlobals(global_data);
 
         // Input Mappings
