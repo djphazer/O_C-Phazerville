@@ -58,9 +58,8 @@ public:
     } else {
       if (cursor == CHANNEL_MODE) gfxCursor(3, 23, 31);
     }
-    gfxPrint(2, 45, "Lvl:");
-    gfxPrint(level);
-    gfxPrint("%");
+    gfxPrint(1, 45, "Lvl:");
+    gfxPrintDb(level);
     if (cursor == IN_LEVEL) gfxCursor(26, 53, 26);
 
     if (peakmeter[0].available()) {
@@ -83,7 +82,7 @@ public:
     }
     switch (cursor) {
       case IN_LEVEL:
-        level = constrain(level + direction, 0, 200);
+        level = constrain(level + direction, LVL_MIN_DB - 1, LVL_MAX_DB);
         break;
       case CHANNEL_MODE:
         if (Channels == MONO) {
@@ -108,19 +107,20 @@ public:
   }
 
   void UpdateMix() {
+    float lvl_scalar = level < LVL_MIN_DB ? 0.0f : dbToScalar(level);
     if (Channels == MONO) {
       if (mono_mode == MIXED) {
-        mixer[0].gain(0, level * 0.01f);
-        mixer[0].gain(1, level * 0.01f);
+        mixer[0].gain(0, lvl_scalar);
+        mixer[0].gain(1, lvl_scalar);
       } else {
-        mixer[0].gain(mono_mode, level * 0.01f);
+        mixer[0].gain(mono_mode, lvl_scalar);
         mixer[0].gain(1 - mono_mode, 0.0);
       }
     } else {
-      mixer[0].gain(0, level * 0.01f);
-      mixer[0].gain(1, mixtomono ? level * 0.01f : 0.0);
-      mixer[1].gain(0, level * 0.01f);
-      mixer[1].gain(1, mixtomono ? level * 0.01f : 0.0);
+      mixer[0].gain(0, lvl_scalar);
+      mixer[0].gain(1, mixtomono ? lvl_scalar : 0.0);
+      mixer[1].gain(0, lvl_scalar);
+      mixer[1].gain(1, mixtomono ? lvl_scalar : 0.0);
     }
   }
 
@@ -128,6 +128,9 @@ protected:
   void SetHelp() override {}
 
 private:
+  static const int LVL_MIN_DB = -90;
+  static const int LVL_MAX_DB = 90;
+
   AudioPassthrough<Channels> input;
   AudioConnection in_conn[Channels * 2];
   AudioConnection cross_conn[Channels];
@@ -139,10 +142,15 @@ private:
   AudioConnection peakpatch[Channels];
 
   int8_t mono_mode = LEFT;
-  int8_t level = 90;
+  int8_t level = 0;
   bool mixtomono = 0;
 
   enum SideMode { LEFT, RIGHT, MIXED, MODE_COUNT };
   enum { CHANNEL_MODE, IN_LEVEL, MAX_CURSOR = IN_LEVEL };
   int cursor = 0;
+
+  void gfxPrintDb(int db) {
+    if (db < LVL_MIN_DB) gfxPrint("    - ");
+    else graphics.printf("%3ddB", db);
+  }
 };
