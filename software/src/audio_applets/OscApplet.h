@@ -42,7 +42,7 @@ public:
 
     float m
       = constrain(static_cast<float>(mix) * 0.01f + mix_cv.InF(), 0.0f, 1.0f);
-    float gain = 0.01f * static_cast<float>(level) * level_cv.InF(1.0f);
+    float gain = dbToScalar(level) * level_cv.InF(1.0f);
     // There's a good chance of phase correlation if the incoming signal is
     // internal, so use equal amplitude
     mixer.gain(1, gain * m);
@@ -88,9 +88,9 @@ public:
     gfxPrintIcon(mod_cv.Icon());
     gfxEndCursor(cursor == MOD_CV);
 
-    gfxPrint(1, 45, "Level:");
+    gfxPrint(1, 45, "Lvl:");
     gfxStartCursor();
-    graphics.printf("%3d", level);
+    graphics.printf("%3ddB", level);
     gfxEndCursor(cursor == LEVEL);
 
     gfxStartCursor();
@@ -164,7 +164,7 @@ public:
         mod_cv.ChangeSource(direction);
         break;
       case LEVEL:
-        level = constrain(level + direction, 0, 100);
+        level = constrain(level + direction, -90, 90);
         break;
       case LEVEL_CV:
         level_cv.ChangeSource(direction);
@@ -247,7 +247,7 @@ private:
   int16_t pitch = 1 * 12 * 128; // C4
   ModType mod_type = PM;
   int16_t mod_depth = 0;
-  int8_t level = 75;
+  int8_t level = 0; // dB
   int8_t mix = 100;
 
   CVInputMap pw_cv;
