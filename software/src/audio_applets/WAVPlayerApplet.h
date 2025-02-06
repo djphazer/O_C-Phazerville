@@ -35,9 +35,9 @@ public:
   }
 
   void Controller() {
-    float gain = 0.01f
-      * (level * static_cast<float>(level_cv.In(HEMISPHERE_MAX_INPUT_CV))
-           / HEMISPHERE_MAX_INPUT_CV);
+    float gain = dbToScalar(level)
+      * static_cast<float>(level_cv.In(HEMISPHERE_MAX_INPUT_CV))
+      / HEMISPHERE_MAX_INPUT_CV;
 
     // TODO: we probably don't need 2 in one applet
     // orrrr, we could have dynamic number of players...
@@ -119,9 +119,9 @@ public:
     }
 
     y += 20;
-    gfxPrint(1, y, "Lvl: ");
+    gfxPrint(1, y, "Lvl:");
     gfxStartCursor();
-    graphics.printf("%3d%%", level);
+    graphics.printf("%3ddB", level);
     gfxEndCursor(cursor == LEVEL);
     gfxStartCursor();
     gfxPrintIcon(level_cv.Icon());
@@ -175,7 +175,7 @@ public:
         CursorToggle();
         break;
       case LEVEL:
-        level = constrain(level + direction, 0, 200);
+        level = constrain(level + direction, -90, 90);
         break;
       case LEVEL_CV:
         level_cv.ChangeSource(direction);
@@ -225,7 +225,7 @@ private:
   char titlestat[10] = "WavPlay  ";
 
   int cursor = 0;
-  int level = 90;
+  int8_t level = -3; // dB
   CVInputMap level_cv;
   int playrate = 100;
   CVInputMap playrate_cv;
@@ -253,7 +253,6 @@ private:
   bool wavplayer_reload[2] = {true, true};
   bool wavplayer_playtrig[2] = {false};
   uint8_t wavplayer_select[2] = { 1, 10 };
-  float wavlevel[2] = { 1.0, 1.0 };
   uint8_t loop_length[2] = { 8, 8 };
   int8_t loop_count[2] = { 0, 0 };
   bool loop_on[2] = { false, false };
@@ -344,9 +343,8 @@ private:
     wavplayer[ch].matchTempo(HS::clock_m.GetTempoFloat() * playrate * 0.01f);
   }
   void FileLevel(int ch, float lvl) {
-    wavlevel[ch] = lvl;
-    mixer[0].gain(0 + ch, 0.9 * wavlevel[ch]);
-    mixer[1].gain(0 + ch, 0.9 * wavlevel[ch]);
+    mixer[0].gain(0 + ch, lvl);
+    mixer[1].gain(0 + ch, lvl);
   }
   void FileRate(int ch, float rate) {
     // bipolar CV has +/- 50% pitch bend
