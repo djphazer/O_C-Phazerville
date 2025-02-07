@@ -50,12 +50,11 @@ public:
         PARAM_ATTENUATION,
         PARAM_PULSE_DUTY,
         PARAM_SAMPLE_RATE_DIV,
-        PARAM_NOISE_FREEZE,
 
-        PARAM_LAST = PARAM_NOISE_FREEZE
+        PARAM_LAST = PARAM_SAMPLE_RATE_DIV
     };
     static constexpr const char* const param_names[PARAM_LAST+1] = { // 7 char max
-        "None", "Pitch", "Blend", "Volume", "SqDuty", "SR.Div", "Noise"
+        "None", "Pitch", "Blend", "Volume", "SqDuty", "SR.Div"
     };
 
     enum ModSrc_Cursor {
@@ -83,19 +82,19 @@ public:
         WAVE_EXP_DECAY,
         WAVE_SIGMOID,
         WAVE_GAUSSIAN,
-
         // add more waves here and generator functions at the bottom
 
         WAVEFORM_COUNT
     };
     static constexpr const char* const waveform_names[WAVEFORM_COUNT] = {
-      "Sine", "Triangl", "Pulse", "Saw", "Ramp", "Stepped", "RandStp", "Noise",
-      "ShrkFin", "Parabla", "ExpGrth", "ExpDcay", "Sigmoid", "Gauss"
+        "Sine", "Triangl", "Pulse", "Saw", "Ramp", "Stepped", "RandStp", "Noise",
+        "ShrkFin", "Parabla", "ExpGrth", "ExpDcay", "Sigmoid", "Gauss"
     };
 
     const char* applet_name() {
         return "WTVCO";
     }
+    const uint8_t* applet_icon() { return PhzIcons::trending; }
 
     void Start() {
         waveform[A] = WAVE_SINE;
@@ -105,49 +104,53 @@ public:
     }
 
     void Controller() {
-        if (Clock(0)) pitch_range_shift = constrain(pitch_range_shift - 1, 0, 8);
-        if (Clock(1)) pitch_range_shift = constrain(pitch_range_shift + 1, 0, 8);
+        if (Clock(0)) pitch = constrain(pitch - (128 * 12), MIN_PITCH, MAX_PITCH);
+        if (Clock(1)) pitch = constrain(pitch + (128 * 12), MIN_PITCH, MAX_PITCH);
 
-        int atn;
+        int16_t _pitch = pitch;
+        int _wt_blend = wt_blend;
+        uint8_t _attenuation = attenuation;
+        uint8_t _pulse_duty = pulse_duty;
+        uint8_t _sample_rate_div = sample_rate_div;
+
         ForEachChannel(ch) {
             switch (cv_dest[ch]) {
                 case PARAM_PITCH:
-                    pitch = In(ch);
+                    _pitch = pitch + In(ch);
                     break;
                 case PARAM_WT_BLEND:
-                    wt_blend = Proportion(In(ch), 5 * HEMISPHERE_MAX_INPUT_CV / 6, 255);
+                    _wt_blend = wt_blend + Proportion(In(ch), 5 * HEMISPHERE_MAX_INPUT_CV / 6, WT_SIZE-1);
                     break;
                 case PARAM_ATTENUATION:
-                    atn = Proportion(In(ch), 5 * HEMISPHERE_MAX_INPUT_CV / 6, 100);
-                    attenuation = constrain(atn, 0, 100);
+                    _attenuation = constrain(attenuation + Proportion(In(ch), 5 * HEMISPHERE_MAX_INPUT_CV / 6, 100), 0, 100);
                     break;
                 case PARAM_PULSE_DUTY:
-                    pulse_duty = Proportion(In(ch), 5 * HEMISPHERE_MAX_INPUT_CV / 6, 255);
+                    _pulse_duty = pulse_duty + Proportion(In(ch), 5 * HEMISPHERE_MAX_INPUT_CV / 6, WT_SIZE-1);
                     break;
                 case PARAM_SAMPLE_RATE_DIV:
-                    sample_rate_div = Proportion(In(ch), 5 * HEMISPHERE_MAX_INPUT_CV / 6, 31);
+                    _sample_rate_div = constrain(sample_rate_div + Proportion(In(ch), 5 * HEMISPHERE_MAX_INPUT_CV / 6, SR_DIV_LIMIT), 0, SR_DIV_LIMIT);
                     break;
                 default: break;
             }
         }
 
-        phase_inc = ComputePhaseIncrement(pitch);
-        if (++inc_count > sample_rate_div) {
+        phase_inc = ComputePhaseIncrement(_pitch);
+        if (++inc_count > _sample_rate_div) {
             phase += phase_inc;
             inc_count = 0;
         }
 
-        uint8_t phase_acc_msb = (uint8_t)(phase >> (24 - pitch_range_shift));
+        uint8_t phase_acc_msb = (uint8_t)(phase >> 24);
 
-        InterpolateSample(wavetable[OUT], (wt_sample != phase_acc_msb) ? wt_sample++ : ++wt_sample); // gurantee ui update even at low freq
+        InterpolateSample(wavetable[OUT], _wt_blend, (wt_sample != phase_acc_msb) ? wt_sample++ : ++wt_sample); // gurantee ui update even at low freq
         for (int w = A; w <= C; ++w) {
-            if (waveform[w] == WAVE_PULSE) UpdatePulseDuty(wavetable[w], wt_sample, pulse_duty);
+            if (waveform[w] == WAVE_PULSE) UpdatePulseDuty(wavetable[w], wt_sample, _pulse_duty);
             if (waveform[w] == WAVE_NOISE && !noise_freeze) UpdateNoiseSample(wavetable[w], wt_sample);
         }
-        InterpolateSample(wavetable[OUT], phase_acc_msb);
+        InterpolateSample(wavetable[OUT], _wt_blend, phase_acc_msb);
 
-        Out(0, attenuation * (wavetable[OUT][phase_acc_msb] * HEMISPHERE_MAX_CV / 127) / 100);
-        Out(1, attenuation * (wavetable[OUT][255-phase_acc_msb] * HEMISPHERE_MAX_CV / 127) / 100); // backwards wave
+        Out(0, _attenuation * (wavetable[OUT][phase_acc_msb] * HEMISPHERE_MAX_CV / 127) / 100);
+        Out(1, _attenuation * (wavetable[OUT][255-phase_acc_msb] * HEMISPHERE_MAX_CV / 127) / 100); // backwards wave
     }
 
     void View() {
@@ -180,12 +183,12 @@ public:
                 case WAVEFORM_A:
                 case WAVEFORM_B:
                 case WAVEFORM_C:
-                  {
+                {
                     const int idx = cursor - WAVEFORM_A;
                     if (waveform[idx] == WAVE_NOISE) noise_freeze = !noise_freeze;
                     else if (waveform[idx] == WAVE_RAND_STEPPED) GenerateWaveForm_RandStepped(wavetable[idx]);
                     break;
-                  }
+                }
                 default: break;
             }
         }
@@ -202,12 +205,12 @@ public:
                     case WAVEFORM_A:
                     case WAVEFORM_B:
                     case WAVEFORM_C:
-                      {
+                    {
                         const int idx = cursor - WAVEFORM_A;
                         waveform[idx] = (WaveForms) constrain(((int)waveform[idx]) + direction, 0, WAVEFORM_COUNT-1);
                         GenerateWaveTable(idx);
                         break;
-                      }
+                    }
                     default: break;
                 }
                 break;
@@ -219,22 +222,19 @@ public:
                 }
                 switch((Param_Cursor)cursor) {
                     case PARAM_PITCH:
-                        pitch = constrain(pitch + (direction * 72), 0, HEMISPHERE_MAX_INPUT_CV);
+                        pitch = constrain(pitch + (direction * 128), MIN_PITCH, MAX_PITCH);
                         break;
                     case PARAM_WT_BLEND:
-                        wt_blend = constrain(wt_blend + direction, 0, 255);
+                        wt_blend = constrain(wt_blend + direction, 0, (uint8_t)(WT_SIZE-1));
                         break;
                     case PARAM_ATTENUATION:
                         attenuation = constrain(attenuation + direction, 0, 100);
                         break;
                     case PARAM_PULSE_DUTY:
-                        pulse_duty = constrain(pulse_duty + direction, 0, 255);
+                        pulse_duty = constrain(pulse_duty + direction, 0, (uint8_t)(WT_SIZE-1));
                         break;
                     case PARAM_SAMPLE_RATE_DIV:
-                        sample_rate_div = constrain(sample_rate_div + direction, 0, 31);
-                        break;
-                    case PARAM_NOISE_FREEZE:
-                        noise_freeze = constrain(noise_freeze + direction, 0, 1);
+                        sample_rate_div = constrain(sample_rate_div + direction, 0, SR_DIV_LIMIT);
                         break;
                     default: break;
                 }
@@ -245,10 +245,10 @@ public:
                     MoveCursor(cursor, direction, MOD_LAST);
                     return;
                 }
-                switch((ModSrc_Cursor)cursor) { // PARAM_LAST-1 excludes noise latch, update if more params added
+                switch((ModSrc_Cursor)cursor) {
                     case MOD_CV1:
                     case MOD_CV2:
-                        cv_dest[cursor - MOD_CV1] = constrain(cv_dest[cursor - MOD_CV1] + direction, 0, PARAM_LAST-1);
+                        cv_dest[cursor - MOD_CV1] = constrain(cv_dest[cursor - MOD_CV1] + direction, 0, PARAM_LAST);
                         break;
                     default: break;
                 }
@@ -259,7 +259,7 @@ public:
     uint64_t OnDataRequest() {
         uint64_t data = 0;
         for (size_t w = 0; w < 3; ++w) {
-          Pack(data, PackLocation {0 + w*8,8}, waveform[w]);
+            Pack(data, PackLocation {0 + w*8,8}, waveform[w]);
         }
         Pack(data, PackLocation {24,8}, cv_dest[0]);
         Pack(data, PackLocation {32,8}, cv_dest[1]);
@@ -269,8 +269,8 @@ public:
 
     void OnDataReceive(uint64_t data) {
         for (size_t w = 0; w < 3; ++w) {
-          waveform[w] = (WaveForms) constrain(Unpack(data, PackLocation {0 + w*8,8}), 0, WAVEFORM_COUNT);
-          GenerateWaveTable(w);
+            waveform[w] = (WaveForms) constrain(Unpack(data, PackLocation {0 + w*8,8}), 0, WAVEFORM_COUNT);
+            GenerateWaveTable(w);
         }
         cv_dest[0] = constrain(Unpack(data, PackLocation {24,8}), 0, PARAM_LAST);
         cv_dest[1] = constrain(Unpack(data, PackLocation {32,8}), 0, PARAM_LAST);
@@ -285,7 +285,7 @@ protected:
         help[HELP_CV1]      = param_names[cv_dest[0]];
         help[HELP_CV2]      = param_names[cv_dest[1]];
         help[HELP_OUT1]     = "OscOut";
-        help[HELP_OUT2]     = "";
+        help[HELP_OUT2]     = "RevOsc";
         help[HELP_EXTRA1]   = "Encoder: Select/Edit";
         help[HELP_EXTRA2]   = "AuxBtn: Frz/Reroll";
         //                    "---------------------" <-- Extra text size guide
@@ -297,18 +297,20 @@ private:
 
     uint8_t cv_dest[2] = { PARAM_PITCH, PARAM_WT_BLEND };
 
-    int16_t pitch = 0;
-    int wt_blend = 127;
+    static constexpr int16_t MAX_PITCH = 13824;
+    static constexpr int16_t MIN_PITCH = -13824;
+    static constexpr size_t WT_SIZE = 256;
+    static constexpr uint8_t SR_DIV_LIMIT = 24;
+
+    int16_t pitch = 36 * 128; // default base pitch of C2
+    int wt_blend = 0;
     uint8_t attenuation = 100;
-    int pulse_duty = 127;
+    uint8_t pulse_duty = 127;
     bool noise_freeze = false;
     uint8_t sample_rate_div = 0;
-    uint8_t pitch_range_shift = 3;
 
     uint32_t phase_inc = 0;
     uint32_t phase;
-
-    static constexpr size_t WT_SIZE = 256;
 
     WaveForms waveform[3];
     std::array<int8_t, WT_SIZE> wavetable[4];
@@ -317,22 +319,22 @@ private:
     uint8_t inc_count = 0; // count each time the phase increments to divide sample rate
 
 // GRAPHIC STUFF:
-    static constexpr int HEADER_HEIGHT = 11;
-    static constexpr int X_DIV = 64 / 4;
-    static constexpr int MENU_ROW = 14;
-    static constexpr int Y_DIV = (64 - HEADER_HEIGHT) / 4;
+    static constexpr uint8_t HEADER_HEIGHT = 11;
+    static constexpr uint8_t X_DIV = 64 / 4;
+    static constexpr uint8_t MENU_ROW = 14;
+    static constexpr uint8_t Y_DIV = (64 - HEADER_HEIGHT) / 4;
 
     void gfxRenderWave(int w) {
         for (size_t x = 0; x < WT_SIZE; x+=4) {
-            int y = 44 - Proportion(wavetable[w][x], 127, 16);
+            uint8_t y = 44 - Proportion(wavetable[w][x], 127, 16);
             gfxPixel(x/4, y);
         }
     }
 
     void DrawSelector() {
-        int x = 0;
-        int y = HEADER_HEIGHT + Y_DIV;
-        int w = X_DIV;
+        uint8_t x = 0;
+        uint8_t y = HEADER_HEIGHT + Y_DIV;
+        uint8_t w = X_DIV;
 
         switch (menu_page) {
             case MENU_WAVETABLES:
@@ -342,17 +344,17 @@ private:
             case MENU_PARAMS:
                 if (cursor == 0) break;
                 if (cursor < 3) {
-                  x = 36;
-                  y = MENU_ROW + 8 + (cursor * Y_DIV);
-                  w = 27;
+                    x = 36;
+                    y = MENU_ROW + 8 + (cursor * Y_DIV);
+                    w = 27;
                 } else if (cursor < 6) {
-                  x = 42;
-                  y = MENU_ROW + 8 + ((cursor-2) * Y_DIV);
-                  w = 21;
+                    x = 42;
+                    y = MENU_ROW + 8 + ((cursor-2) * Y_DIV);
+                    w = 21;
                 } else {
-                  x = 36;
-                  y = MENU_ROW + 8 + ((cursor-5) * Y_DIV);
-                  w = 21;
+                    x = 36;
+                    y = MENU_ROW + 8 + ((cursor-5) * Y_DIV);
+                    w = 21;
                 }
                 break;
             case MENU_MOD_SOURCES:
@@ -367,29 +369,29 @@ private:
     }
 
     void DrawWaveMenu() {
-        int x = 3;
-        int y = MENU_ROW;
+        uint8_t x = 3;
+        uint8_t y = MENU_ROW;
 
         if (!EditMode()) {
             gfxBitmap(x+1, y, 8, WAVEFORM_ICON);
             char label[] = {'A', '\0'};
-            for (int i = 0; i<3; ++i) {
-              x += X_DIV;
-              gfxPrint(x+2, y, label);
-              ++label[0];
+            for (int i = 0; i < 3; ++i) {
+                x += X_DIV;
+                gfxPrint(x+2, y, label);
+                ++label[0];
             }
         } else {
             switch((Wave_Cursor)cursor) {
                 case WAVEFORM_A:
                 case WAVEFORM_B:
                 case WAVEFORM_C:
-                  {
+                {
                     const int idx = cursor - WAVEFORM_A;
                     char label[] = {char('A'+idx), ':', '\0'};
                     gfxPrint(3, MENU_ROW, label);
                     gfxPrint(waveform_names[waveform[idx]]);
                     break;
-                  }
+                }
                 default: break;
             }
         }
@@ -413,8 +415,8 @@ private:
     }
 
     void DrawParamMenu() {
-        int x = 3;
-        int y = MENU_ROW;
+        uint8_t x = 3;
+        uint8_t y = MENU_ROW;
 
         gfxBitmap(x+1, y, 8, EDIT_ICON);
         x += X_DIV;
@@ -425,13 +427,13 @@ private:
     }
 
     void DrawParams() {
-        int y = MENU_ROW + Y_DIV;
+        uint8_t y = MENU_ROW + Y_DIV;
 
         switch ((Param_Cursor)cursor) {
             case PARAM_NEXT_PAGE:
             case PARAM_PITCH:
             case PARAM_WT_BLEND:
-                gfxPrint(1, y, param_names[PARAM_PITCH]); gfxPrint(":"); gfxPrint(pitch/72);
+                gfxPrint(1, y, param_names[PARAM_PITCH]); gfxPrint(":"); gfxPrint(pitch/128);
                 y += Y_DIV;
                 gfxPrint(1, y, param_names[PARAM_WT_BLEND]); gfxPrint(":"); gfxPrint(wt_blend);
                 y += Y_DIV;
@@ -446,17 +448,13 @@ private:
                 y += Y_DIV;
                 gfxPrint(1, y, param_names[PARAM_SAMPLE_RATE_DIV]); gfxPrint(":"); gfxPrint(sample_rate_div);
                 break;
-            case PARAM_NOISE_FREEZE:
-                gfxPrint(1, y, param_names[PARAM_NOISE_FREEZE]); gfxPrint(":"); gfxPrint((noise_freeze) ? "Frz" : "RT");
-                y += Y_DIV;
-                gfxPrint(1, y, "FrqShft:"); gfxPrint(pitch_range_shift);
             default: break;
         }
     }
 
     void DrawModSourceMenu() {
-        int x = 3;
-        int y = MENU_ROW;
+        uint8_t x = 3;
+        uint8_t y = MENU_ROW;
 
         gfxBitmap(x+1, y, 8, ZAP_ICON);
         x += X_DIV;
@@ -467,18 +465,18 @@ private:
     }
 
     void DrawModSources() {
-        const int y = MENU_ROW + Y_DIV;
+        const uint8_t y = MENU_ROW + Y_DIV;
         ForEachChannel(ch) {
-          gfxPrint(1, y + ch*Y_DIV, OC::Strings::cv_input_names[ch + io_offset]);
-          gfxPrint(":");
-          gfxPrint(param_names[cv_dest[0]]);
+            gfxPrint(1, y + ch*Y_DIV, OC::Strings::cv_input_names[ch + io_offset]);
+            gfxPrint(":");
+            gfxPrint(param_names[cv_dest[ch]]);
         }
     }
 
 // WAVETABLE STUFF:
-    void InterpolateSample(std::array<int8_t, WT_SIZE>& wt, uint8_t sample) {
-        wt[sample] = (int8_t) ((((wt_blend <= 127) * ((127 - wt_blend) * (int)wavetable[A][sample] + wt_blend * (int)wavetable[B][sample]))
-                                + ((wt_blend > 127) * ((255 - wt_blend) * (int)wavetable[B][sample] + (wt_blend - 128) * (int)wavetable[C][sample]))) / 127);
+    void InterpolateSample(std::array<int8_t, WT_SIZE>& wt, int blend, uint8_t sample) {
+        wt[sample] = (int8_t) ((((blend <= 127) * ((127 - blend) * (int)wavetable[A][sample] + blend * (int)wavetable[B][sample]))
+                               + ((blend > 127) * ((255 - blend) * (int)wavetable[B][sample] + (blend - 128) * (int)wavetable[C][sample]))) / 127);
     }
 
     void UpdatePulseDuty(std::array<int8_t, WT_SIZE>& wt, uint8_t sample, uint8_t duty) {
@@ -538,7 +536,6 @@ private:
         }
     }
 
-
 // standard waves
     void GenerateWaveForm_Sine(std::array<int8_t, WT_SIZE>& waveform) {
         for (size_t i = 0; i < WT_SIZE; ++i) {
@@ -548,7 +545,7 @@ private:
     }
 
     void GenerateWaveForm_Triangle(std::array<int8_t, WT_SIZE>& waveform) {
-        int sign = 1;
+        int8_t sign = 1;
         int8_t value = 0;
         for (size_t i = 0; i < WT_SIZE; ++i) {
             waveform[i] = value * 255 / 128;
@@ -667,14 +664,11 @@ private:
 
 
 
-
-
 // MOAR WAVEZ
 // the wave generator functions below were created by ChatGPT
 // and have not all been tested. its on the TODO list.
 
 // seems like lots are redundant, or useless. still need to go through the rest.
-
 
 
 // steps
@@ -697,7 +691,6 @@ private:
     // }
 
 
-
 // noise
 
     // void GenerateWaveForm_GaussianNoise(std::array<int8_t, WT_SIZE>& waveform, const size_t size) {
@@ -708,9 +701,7 @@ private:
     // }
 
 
-
 // exponential
-
 
 
 // modified sinusoids
@@ -785,9 +776,7 @@ private:
 //     }
 
 
-
 // // geometric
-
 
 
 // // probably harsh
@@ -824,6 +813,8 @@ private:
 //         }
 //     }
 
-    // add more wave generators here, and add to enum
+
+// add more wave generators here, and add to enum
+
 
 };
