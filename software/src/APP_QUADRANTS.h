@@ -40,6 +40,8 @@
 #include "hemisphere_config.h"
 #include "hemisphere_audio_config.h"
 
+#include "PhzConfig.h"
+
 // We depend on Calibr8or now
 #include "APP_CALIBR8OR.h"
 
@@ -82,7 +84,8 @@ enum QUADRANTS_SETTINGS {
     QUADRANTS_SETTING_LAST
 };
 
-static constexpr int QUAD_PRESET_COUNT = 8;
+// per bank
+static constexpr int QUAD_PRESET_COUNT = 32;
 
 /* Preset
  * - conveniently store/recall multiple applet configurations
@@ -119,7 +122,6 @@ public:
 
     // returns true if changed
     bool StoreInputMap() {
-      // TODO: cvmap
       uint64_t trigmap = 0;
       uint64_t cvmap = 0;
       for (size_t i = 0; i < 8; ++i) {
@@ -230,9 +232,6 @@ public:
 
 };
 
-QuadrantsPreset quad_presets[QUAD_PRESET_COUNT];
-QuadrantsPreset *quad_active_preset = 0;
-
 ////////////////////////////////////////////////////////////////////////////////
 //// Hemisphere Manager
 ////////////////////////////////////////////////////////////////////////////////
@@ -260,78 +259,156 @@ public:
     }
 
     void Resume() {
-        if (!quad_active_preset)
-            LoadFromPreset(0);
+        PhzConfig::load_config(bank_filename);
+        if (preset_id < 0)
+          LoadFromPreset(0);
         // TODO: restore quantizer settings...
     }
     void Suspend() {
-        if (quad_active_preset) {
-            if (HS::auto_save_enabled || 0 == preset_id) StoreToPreset(preset_id, !HS::auto_save_enabled);
-            quad_active_preset->OnSendSysEx();
+        if (preset_id >= 0) {
+            if (HS::auto_save_enabled)
+              StoreToPreset(preset_id);
+            // TODO
+            //OnSendSysEx();
         }
     }
+    void SetBank(int id) {
+      bank_filename[5] = '0' + char(id / 100);
+      bank_filename[6] = '0' + char(id / 10);
+      bank_filename[7] = '0' + char(id % 10);
 
-    void StoreToPreset(QuadrantsPreset* preset, bool skip_eeprom = false) {
-        bool doSave = (preset != quad_active_preset);
+      PhzConfig::load_config(bank_filename);
+    }
 
-        quad_active_preset = preset;
-        for (int h = 0; h < APPLET_SLOTS; h++)
+    // lower 8 bits of PhzConfig KEY
+    enum PresetDataKeys : uint16_t {
+        APPLET_METADATA_KEY = 0, // applet ids
+        CLOCK_DATA_KEY = 1,
+        GLOBALS_KEY = 2,
+        TRIGMAP_KEY = 3,
+        CVMAP_KEY = 4,
+        OUTSKIP_KEY = 5,
+
+        APPLET_L1_DATA_KEY = 10,
+        APPLET_R1_DATA_KEY = 11,
+        APPLET_L2_DATA_KEY = 12,
+        APPLET_R2_DATA_KEY = 13,
+
+        FILTERMASK1_KEY = 100,
+        FILTERMASK2_KEY = 101,
+    };
+
+    void StoreToPreset(int id) {
+        // preset id is upper 5 bits - 32 presets per bank
+        uint16_t preset_key = id << 11;
+
+        // clock data
+        clock_data = ClockSetup_instance.OnDataRequest();
+        PhzConfig::setValue(preset_key | CLOCK_DATA_KEY, clock_data);
+
+        // vague globals
+        global_data = ClockSetup_instance.GetGlobals();
+        PhzConfig::setValue(preset_key | GLOBALS_KEY, global_data);
+
+        uint64_t data = 0;
+        // Input Mappings
+        for (size_t i = 0; i < 8; ++i) {
+          Pack(data, PackLocation{i*5, 5}, HS::trigger_mapping[i] + 1);
+        }
+        PhzConfig::setValue(preset_key | TRIGMAP_KEY, data);
+
+        data = 0;
+        for (size_t i = 0; i < 8; ++i) {
+          Pack(data, PackLocation{i*5, 5}, HS::cvmapping[i] + 1);
+        }
+        PhzConfig::setValue(preset_key | CVMAP_KEY, data);
+
+        data = 0;
+        for (size_t i = 0; i < 8; ++i) {
+          Pack(data, PackLocation{i*8, 8}, HS::frame.clockskip[i]);
+        }
+        PhzConfig::setValue(preset_key | OUTSKIP_KEY, data);
+
+        data = 0;
+        for (size_t h = 0; h < APPLET_SLOTS; h++)
         {
             int index = active_applet_index[h];
-            if (quad_active_preset->GetAppletId(HEM_SIDE(h)) != HS::available_applets[index].id)
-                doSave = 1;
-            quad_active_preset->SetAppletId(HEM_SIDE(h), HS::available_applets[index].id);
+            Pack(data, PackLocation{h*8,8}, HS::available_applets[index].id);
 
-            uint64_t data = HS::available_applets[index].instance[h]->OnDataRequest();
-            if (data != applet_data[h]) doSave = 1;
-            applet_data[h] = data;
-            quad_active_preset->SetData(HEM_SIDE(h), data);
-        }
-        uint64_t data = ClockSetup_instance.OnDataRequest();
-        if (data != clock_data) doSave = 1;
-        clock_data = data;
-        quad_active_preset->SetClockData(data);
-
-        data = ClockSetup_instance.GetGlobals();
-        if (data != global_data) doSave = 1;
-        global_data = data;
-        quad_active_preset->SetGlobals(data);
-
-        if (quad_active_preset->StoreInputMap()) doSave = 1;
-
-        // initiate actual EEPROM save - ONLY if necessary!
-        if (doSave && !skip_eeprom) {
-          Calibr8or_instance.SavePreset();
+            // applet data
+            applet_data[h] = HS::available_applets[index].instance[h]->OnDataRequest();
+            PhzConfig::setValue(preset_key | (APPLET_L1_DATA_KEY + h), applet_data[h]);
         }
 
-    }
-    void StoreToPreset(int id, bool skip_eeprom = false) {
-        StoreToPreset( (QuadrantsPreset*)(quad_presets + id), skip_eeprom );
-        if (!skip_eeprom)
-          audio_app.SavePreset(id);
+        // applet ids, and maybe some other stuff?
+        PhzConfig::setValue(preset_key | APPLET_METADATA_KEY, data);
+
+        // applet filtering is actually just global
+        PhzConfig::setValue(FILTERMASK1_KEY, HS::hidden_applets[0]);
+        PhzConfig::setValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
+
+        // TODO: store quant settings in same file?
+        //Calibr8or_instance.SavePreset();
+
+        PhzConfig::save_config(bank_filename);
+        audio_app.SavePreset(id);
         preset_id = id;
     }
     void LoadFromPreset(int id) {
-        quad_active_preset = (QuadrantsPreset*)(quad_presets + id);
-        if (quad_active_preset->is_valid()) {
-            clock_data = quad_active_preset->GetClockData();
-            ClockSetup_instance.OnDataReceive(clock_data);
-
-            global_data = quad_active_preset->GetGlobals();
-            ClockSetup_instance.SetGlobals(global_data);
-
-            quad_active_preset->LoadInputMap();
-
-            for (int h = 0; h < APPLET_SLOTS; h++)
-            {
-                int index = HS::get_applet_index_by_id( quad_active_preset->GetAppletId(HEM_SIDE(h)) );
-                applet_data[h] = quad_active_preset->GetData(HEM_SIDE(h));
-                SetApplet(HEM_SIDE(h), index);
-                HS::available_applets[index].instance[h]->OnDataReceive(applet_data[h]);
-            }
-        }
-        audio_app.LoadPreset(id);
         preset_id = id;
+
+        uint16_t preset_key = id << 11;
+        uint64_t data;
+
+        // applet ids + misc
+        if (!PhzConfig::getValue(preset_key | APPLET_METADATA_KEY, data)) return;
+        if (!data) return;
+
+        for (size_t h = 0; h < APPLET_SLOTS; h++)
+        {
+            int index = HS::get_applet_index_by_id( Unpack(data, PackLocation{h*8, 8}) );
+
+            // applet data
+            PhzConfig::getValue(preset_key | (APPLET_L1_DATA_KEY + h), applet_data[h]);
+            SetApplet(HEM_SIDE(h), index);
+            HS::available_applets[index].instance[h]->OnDataReceive(applet_data[h]);
+        }
+
+        // clock data
+        if (!PhzConfig::getValue(preset_key | CLOCK_DATA_KEY, clock_data)) return;
+        ClockSetup_instance.OnDataReceive(clock_data);
+        // if the first key exists, we are assuming the rest are present...
+
+        // vague globals
+        PhzConfig::getValue(preset_key | GLOBALS_KEY, global_data);
+        ClockSetup_instance.SetGlobals(global_data);
+
+        // Input Mappings
+        PhzConfig::getValue(preset_key | TRIGMAP_KEY, data);
+        for (size_t i = 0; i < 8; ++i)
+        {
+          const int val = Unpack(data, PackLocation{i*5, 5});
+          if (val != 0) HS::trigger_mapping[i] = constrain(val - 1, 0, TRIGMAP_MAX);
+        }
+
+        PhzConfig::getValue(preset_key | CVMAP_KEY, data);
+        for (size_t i = 0; i < 8; ++i)
+        {
+          const int val = Unpack(data, PackLocation{i*5, 5});
+          if (val != 0) HS::cvmapping[i] = constrain(val - 1, 0, CVMAP_MAX);
+        }
+
+        PhzConfig::getValue(preset_key | OUTSKIP_KEY, data);
+        for (size_t i = 0; i < 8; ++i)
+        {
+          HS::frame.clockskip[i] = Unpack(data, PackLocation{i*8, 8});
+        }
+
+        // applet filtering is actually just global
+        PhzConfig::getValue(FILTERMASK1_KEY, HS::hidden_applets[0]);
+        PhzConfig::getValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
+
+        audio_app.LoadPreset(id);
         PokePopup(PRESET_POPUP);
     }
     void ProcessQueue() {
@@ -925,7 +1002,8 @@ protected:
     }
 
 private:
-    int preset_id = 0;
+    char bank_filename[16] = "BANK_000.DAT";
+    int preset_id = -1;
     int queued_preset = 0;
     int preset_cursor = 0;
     HemisphereApplet *active_applet[4]; // Pointers to actual applets
@@ -1257,6 +1335,16 @@ private:
         }
     }
 
+    bool isValidPreset(int id) {
+      uint64_t data;
+      return PhzConfig::getValue(id << 11 | APPLET_METADATA_KEY, data);
+    }
+    HemisphereApplet* GetApplet(int id, size_t h) {
+        uint64_t data = 0;
+        PhzConfig::getValue(id << 11 | APPLET_METADATA_KEY, data);
+        int idx = HS::get_applet_index_by_id( Unpack(data, PackLocation{h*8, 8}) );
+        return HS::available_applets[idx].instance[h];
+    }
     void DrawPresetSelector() {
         gfxHeader((config_cursor == SAVE_PRESET) ? "Save" : "Load");
         gfxPrint(30, 1, "Preset");
@@ -1273,14 +1361,14 @@ private:
             else
               gfxPrint(8, y, OC::Strings::capital_letters[i]);
 
-            if (!quad_presets[i].is_valid())
+            if (!isValidPreset(i))
                 gfxPrint(18, y, "(empty)");
             else {
-                gfxIcon(18, y, quad_presets[i].GetApplet(LEFT_HEMISPHERE)->applet_icon());
-                gfxPrint(26, y, quad_presets[i].GetApplet(LEFT_HEMISPHERE)->applet_name());
+                gfxIcon(18, y, GetApplet(i, LEFT_HEMISPHERE)->applet_icon());
+                gfxPrint(26, y, GetApplet(i, LEFT_HEMISPHERE)->applet_name());
                 gfxPrint(", ");
-                gfxPrint(quad_presets[i].GetApplet(RIGHT_HEMISPHERE)->applet_name());
-                gfxIcon(120, y, quad_presets[i].GetApplet(RIGHT_HEMISPHERE)->applet_icon(), true);
+                gfxPrint(GetApplet(i, RIGHT_HEMISPHERE)->applet_name());
+                gfxIcon(120, y, GetApplet(i, RIGHT_HEMISPHERE)->applet_icon(), true);
             }
 
             y += 10;
@@ -1327,8 +1415,7 @@ SETTINGS_DECLARE(QuadrantsPreset, QUADRANTS_SETTING_LAST) {
 QuadAppletManager quad_manager;
 
 void QuadrantSysExHandler() {
-    if (quad_active_preset)
-        quad_active_preset->OnReceiveSysEx();
+  // TODO
 }
 void QuadrantBeatSync() {
   quad_manager.ProcessQueue();
@@ -1344,22 +1431,16 @@ void QUADRANTS_init() {
 }
 
 static constexpr size_t QUADRANTS_storageSize() {
-    return QuadrantsPreset::storageSize() * QUAD_PRESET_COUNT;
+    return 0;
 }
 
 static size_t QUADRANTS_save(void *storage) {
     size_t used = 0;
-    for (int i = 0; i < QUAD_PRESET_COUNT; ++i) {
-        used += quad_presets[i].Save(static_cast<char*>(storage) + used);
-    }
     return used;
 }
 
 static size_t QUADRANTS_restore(const void *storage) {
     size_t used = 0;
-    for (int i = 0; i < QUAD_PRESET_COUNT; ++i) {
-        used += quad_presets[i].Restore(static_cast<const char*>(storage) + used);
-    }
     return used;
 }
 

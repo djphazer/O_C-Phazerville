@@ -332,12 +332,13 @@ public:
     peak_conns[side][slot + 1].connect(*stream, side, peaks[side][slot + 1], 0);
   }
 
+  // 3 bits, cannot be 0
   enum AudioConfigSections : uint8_t {
-    MAIN,
-    MONO_APPLETS,
-    STEREO_APPLETS,
-    MONO_APPLET_PARAMS,
-    STEREO_APPLET_PARAMS,
+    MAIN = 1,
+    MONO_APPLETS = 2,
+    STEREO_APPLETS = 3,
+    MONO_APPLET_PARAMS = 4,
+    STEREO_APPLET_PARAMS = 5,
   };
 
   enum AudioConfigMainKeys : uint8_t { STEREO_MODE_FLAGS };
@@ -347,14 +348,12 @@ public:
   }
 
   void LoadPreset(int id) {
-    char filename[] = "AUDIO00.CFG";
-    filename[5] += (id / 10);
-    filename[6] += id % 10;
-    if (!PhzConfig::load_config(filename)) return;
+    // preset id is upper 5 bits - 32 presets per bank
+    uint16_t preset_key = id << 11;
 
     uint64_t data = 0;
     uint64_t oldstereo = stereo;
-    PhzConfig::getValue(key(MAIN, STEREO_MODE_FLAGS), data);
+    PhzConfig::getValue(preset_key | key(MAIN, STEREO_MODE_FLAGS), data);
     stereo = data & 0xFFFFFFFF;
 
     for (size_t slot = 0; slot < Slots; ++slot) {
@@ -365,7 +364,7 @@ public:
         }
         data = 0; // Default to input/passthrough if nothing is found.
         // stereo applets
-        PhzConfig::getValue(key(STEREO_APPLETS, slot), data);
+        PhzConfig::getValue(preset_key | key(STEREO_APPLETS, slot), data);
         int ix = get_stereo_applet_ix_by_id(slot, data, 0);
         Serial.printf("%lu: Loading applet id=", slot);
         Serial.print(data);
@@ -374,7 +373,7 @@ public:
 
         if (data) {
           LoadAppletData(
-            key(STEREO_APPLET_PARAMS, slot * APPLET_CONFIG_SIZE),
+            preset_key | key(STEREO_APPLET_PARAMS, slot * APPLET_CONFIG_SIZE),
             get_selected_stereo_applet(slot)
           );
         }
@@ -386,7 +385,7 @@ public:
         ForEachSide(ch) {
           uint8_t slot_key = slot + ch * Slots;
           data = 0; // Default to input/passthrough if nothing is found.
-          PhzConfig::getValue(key(MONO_APPLETS, slot_key), data);
+          PhzConfig::getValue(preset_key | key(MONO_APPLETS, slot_key), data);
           int ix = get_mono_applet_ix_by_id(ch, slot, data, 0);
           Serial.printf("%lu, %d: Loading applet id=", slot, ch);
           Serial.print(data);
@@ -395,7 +394,7 @@ public:
 
           if (data) {
             LoadAppletData(
-              key(MONO_APPLET_PARAMS, slot_key * APPLET_CONFIG_SIZE),
+              preset_key | key(MONO_APPLET_PARAMS, slot_key * APPLET_CONFIG_SIZE),
               get_selected_mono_applet(ch, slot)
             );
           }
@@ -405,19 +404,24 @@ public:
   }
 
   void SavePreset(int id) {
-    PhzConfig::clear_config();
+    //PhzConfig::clear_config();
+    // We assume the config file is already loaded somewhere else,
+    // we're just injecting our keys into it.
 
-    PhzConfig::setValue(STEREO_MODE_FLAGS, (uint64_t)stereo); // bitset
+    // preset id is upper 5 bits - 32 presets per bank
+    uint16_t preset_key = id << 11;
+
+    PhzConfig::setValue(preset_key | key(MAIN, STEREO_MODE_FLAGS), (uint64_t)stereo); // bitset
     uint64_t applet_id = 0;
     for (size_t slot = 0; slot < Slots; ++slot) {
       auto& stereo_applet = get_selected_stereo_applet(slot);
       applet_id = stereo_applet.applet_id();
       Serial.printf("%lu: Saving applet id=", slot);
       Serial.println(applet_id);
-      PhzConfig::setValue(key(STEREO_APPLETS, slot), applet_id);
+      PhzConfig::setValue(preset_key | key(STEREO_APPLETS, slot), applet_id);
 
       SaveAppletData(
-        key(STEREO_APPLET_PARAMS, slot * APPLET_CONFIG_SIZE), stereo_applet
+        preset_key | key(STEREO_APPLET_PARAMS, slot * APPLET_CONFIG_SIZE), stereo_applet
       );
 
       ForEachSide(ch) {
@@ -426,18 +430,13 @@ public:
         applet_id = mono_applet.applet_id();
         Serial.printf("%lu, %d: Saving applet id=", slot, ch);
         Serial.println(applet_id);
-        PhzConfig::setValue(key(MONO_APPLETS, slot_key), applet_id);
+        PhzConfig::setValue(preset_key | key(MONO_APPLETS, slot_key), applet_id);
 
         SaveAppletData(
-          key(MONO_APPLET_PARAMS, slot_key * APPLET_CONFIG_SIZE), mono_applet
+          preset_key | key(MONO_APPLET_PARAMS, slot_key * APPLET_CONFIG_SIZE), mono_applet
         );
       }
     }
-
-    char filename[] = "AUDIO00.CFG";
-    filename[5] += (id / 10);
-    filename[6] += id;
-    PhzConfig::save_config(filename);
   }
 
   void LoadAppletData(uint16_t key, HemisphereAudioApplet& applet) {
