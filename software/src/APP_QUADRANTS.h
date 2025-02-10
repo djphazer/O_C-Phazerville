@@ -522,6 +522,39 @@ public:
         audio_app.Controller();
     }
 
+    void DrawOverview() {
+      active_applet[0]->gfxHeader(0);
+      active_applet[1]->gfxHeader(0);
+      active_applet[2]->gfxHeader(54);
+      active_applet[3]->gfxHeader(54);
+
+      gfxDottedLine(63, 0, 63, 63); // vert
+      gfxDottedLine(0, 32, 127, 32); // horiz
+
+      ForAllChannels(applet) {
+        ForEachChannel(ch) {
+            int length;
+            int max_length = 60; // max transpose value from above
+            int in_bar_y = 15 + (applet>>1)*20 + (ch * 10);
+            int out_bar_y = 17 + (applet>>1)*20 + (ch * 10);
+
+            // positive values extend bars from left side of screen to the right
+            // negative values go from right side to left
+            length = ProportionCV(abs(In(applet*2 + ch)), max_length);
+            if (In(applet*2 + ch) < 0)
+                active_applet[applet]->gfxFrame(max_length - length, in_bar_y, length, 1);
+            else
+                active_applet[applet]->gfxFrame(1, in_bar_y, length, 1);
+
+            length = ProportionCV(abs(ViewOut(applet*2 + ch)), max_length);
+            if (ViewOut(applet*2 + ch) < 0)
+                active_applet[applet]->gfxFrame(max_length - length, out_bar_y, length, 2);
+            else
+                active_applet[applet]->gfxFrame(1, out_bar_y, length, 2);
+        }
+      }
+    }
+
     void View() {
         bool draw_applets = true;
 
@@ -602,6 +635,8 @@ public:
                 gfxIcon(x, y, LEFT_ICON, true);
               }
             }
+          } else if (view_state == OVERVIEW) {
+            DrawOverview();
           } else {
             // only two applets visible at a time
             for (int h = 0; h < 2; h++)
@@ -901,6 +936,12 @@ public:
           }
         }
 
+        if (CheckButtonCombo(OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_Y) ||
+            CheckButtonCombo(OC::CONTROL_BUTTON_X | OC::CONTROL_BUTTON_B)) {
+          view_state = OVERVIEW;
+          return;
+        }
+
         switch (event.type) {
         case UI::EVENT_BUTTON_DOWN:
 
@@ -1032,6 +1073,7 @@ private:
     enum QuadrantsView {
       APPLETS,
       APPLET_FULLSCREEN,
+      OVERVIEW,
       //CONFIG_MENU,
       //PRESET_PICKER,
       CLOCK_SETUP,
@@ -1237,7 +1279,7 @@ private:
           gfxPrint(4 + ch*32, 54, OC::Strings::cv_input_names_none[ HS::cvmapping[ch + 4] ] );
         }
 
-        gfxDottedLine(64, 11, 64, 63); // vert
+        gfxDottedLine(63, 11, 63, 63); // vert
         gfxDottedLine(0, 38, 127, 38); // horiz
 
         // Cursor location is within a 4x4 grid

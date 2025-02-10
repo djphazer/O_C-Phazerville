@@ -478,16 +478,22 @@ public:
         }
     }
 
-    void gfxHeader(const char *str, const uint8_t *icon = nullptr) {
+    void gfxHeader(int y = 2) {
+      gfxHeader(applet_name(), applet_icon(), y, false);
+    }
+
+    void gfxHeader(const char *str, const uint8_t *icon = nullptr, int y = 2,
+        bool underline = true) {
       int x = 1;
       if (icon) {
-        gfxIcon(x, 2, icon);
+        gfxIcon(x, y, icon);
         x += 9;
       }
       if (hemisphere & 1) // right side
         x = 62 - strlen(str) * 6;
-      gfxPrint(x, 2, str);
-      gfxDottedLine(0, 10, 62, 10);
+      gfxPrint(x, y, str);
+      if (underline)
+        gfxDottedLine(0, y + 8, 62, y + 8);
     }
 
     void DrawSlider(uint8_t x, uint8_t y, uint8_t len, uint8_t value, uint8_t max_val, bool is_cursor) {
