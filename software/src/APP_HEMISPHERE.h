@@ -51,21 +51,6 @@
 #include "APP_CALIBR8OR.h"
 #endif
 
-void HS::Init() {
-  for (int i = 0; i < ADC_CHANNEL_LAST; ++i)
-    input_quant[i].Init();
-
-  for (int i = 0; i < QUANT_CHANNEL_COUNT; ++i)
-    quantizer[i].Init();
-
-#ifdef ARDUINO_TEENSY41
-  wavplayer_available = SD.begin(BUILTIN_SDCARD);
-#endif
-
-  showhide_cursor.Init(0, HEMISPHERE_AVAILABLE_APPLETS - 1);
-  showhide_cursor.Scroll(0);
-}
-
 void HS::DrawAppletList(bool blink) {
   const size_t LineH = 12;
 
@@ -285,6 +270,9 @@ public:
             quantizer[i].Init();
             quantizer[i].Configure(OC::Scales::GetScale(quant_scale[i]), 0xffff);
         }
+
+        showhide_cursor.Init(0, HEMISPHERE_AVAILABLE_APPLETS - 1);
+        showhide_cursor.Scroll(0);
 
         SetApplet(LEFT_HEMISPHERE, HS::get_applet_index_by_id(18)); // DualTM
         SetApplet(RIGHT_HEMISPHERE, HS::get_applet_index_by_id(15)); // EuclidX

@@ -43,6 +43,18 @@ namespace HS {
 
   OC::menu::ScreenCursor<5> showhide_cursor;
 
+  void Init() {
+    for (int i = 0; i < ADC_CHANNEL_LAST; ++i)
+      input_quant[i].Init();
+
+    for (int i = 0; i < QUANT_CHANNEL_COUNT; ++i)
+      quantizer[i].Init();
+
+#ifdef ARDUINO_TEENSY41
+    wavplayer_available = SD.begin(BUILTIN_SDCARD);
+#endif
+  }
+
   void PokePopup(PopupType pop) {
     popup_type = pop;
     popup_tick = OC::CORE::ticks;
