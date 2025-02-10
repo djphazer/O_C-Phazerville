@@ -534,23 +534,23 @@ public:
       ForAllChannels(applet) {
         ForEachChannel(ch) {
             int length;
-            int max_length = 60; // max transpose value from above
-            int in_bar_y = 15 + (applet>>1)*20 + (ch * 10);
-            int out_bar_y = 17 + (applet>>1)*20 + (ch * 10);
+            int max_length = 62;
+            int in_bar_y = 13 + (applet>>1)*22 + (ch * 10);
+            int out_bar_y = 16 + (applet>>1)*22 + (ch * 10);
 
             // positive values extend bars from left side of screen to the right
             // negative values go from right side to left
-            length = ProportionCV(abs(In(applet*2 + ch)), max_length);
-            if (In(applet*2 + ch) < 0)
-                active_applet[applet]->gfxFrame(max_length - length, in_bar_y, length, 1);
+            length = ProportionCV(abs(DetentedIn(applet*2 + ch)), max_length);
+            if (DetentedIn(applet*2 + ch) < 0)
+                active_applet[applet]->gfxFrame(max_length - length, in_bar_y, length, 2);
             else
-                active_applet[applet]->gfxFrame(1, in_bar_y, length, 1);
+                active_applet[applet]->gfxFrame(0, in_bar_y, length, 2);
 
             length = ProportionCV(abs(ViewOut(applet*2 + ch)), max_length);
             if (ViewOut(applet*2 + ch) < 0)
-                active_applet[applet]->gfxFrame(max_length - length, out_bar_y, length, 2);
+                active_applet[applet]->gfxRect(max_length - length, out_bar_y, length, 3);
             else
-                active_applet[applet]->gfxFrame(1, out_bar_y, length, 2);
+                active_applet[applet]->gfxRect(0, out_bar_y, length, 3);
         }
       }
     }
@@ -656,7 +656,7 @@ public:
           if (view_state == CLOCK_SETUP) {
             ClockSetup_instance.View();
           } else {
-            ClockSetup_instance.DrawIndicator();
+            ClockSetup_instance.DrawIndicator(view_state == OVERVIEW);
           }
         }
 

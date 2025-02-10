@@ -114,16 +114,17 @@ public:
         if (slide_anim) --slide_anim;
     }
 
-    void DrawIndicator() {
+    void DrawIndicator(const bool centered = false) {
+      const int x = centered? 27 : 4;
       // Clock indicator icons overlay
       if (HS::clock_m.IsRunning() || HS::clock_m.IsPaused()) {
-        graphics.clearRect(59, 4, 10, 10);
+        graphics.clearRect(59, x, 10, 10);
 
         if (HS::clock_m.IsPaused()) {
-          gfxFrame(59, 4, 10, 10);
-          gfxIcon(60, 5, PAUSE_ICON);
+          gfxFrame(59, x, 10, 10);
+          gfxIcon(60, x+1, PAUSE_ICON);
         } else {
-          gfxIcon(60, 5, HS::clock_m.Cycle() ? METRO_L_ICON : METRO_R_ICON);
+          gfxIcon(60, x+1, HS::clock_m.Cycle() ? METRO_L_ICON : METRO_R_ICON);
         }
       }
     }
