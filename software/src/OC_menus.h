@@ -150,7 +150,7 @@ void DrawEditIcon(weegfx::coord_t x, weegfx::coord_t y, int value, const setting
 
 inline void DrawChord(weegfx::coord_t x, weegfx::coord_t y, int width, int value, int mem_offset) {
   
-   OC::Chord *active_chord = &OC::user_chords[value + mem_offset * OC::Chords::NUM_CHORDS];
+   OC::Chord *active_chord = &OC::user_chords[value + mem_offset * OC::Chords::NUM_CHORDS_PER_CHAN];
    int8_t _quality = active_chord->quality;
    int8_t _voicing = active_chord->voicing;
    int y_pos;

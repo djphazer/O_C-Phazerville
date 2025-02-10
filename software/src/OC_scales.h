@@ -20,15 +20,15 @@ public:
     SCALE_USER_1,
     SCALE_USER_2,
     SCALE_USER_3,
-    SCALE_USER_LAST, // index 0 in braids::scales
+    SCALE_USER_COUNT, // index 0 in braids::scales
     SCALE_SEMI,
-    SCALE_NONE = SCALE_USER_LAST,
+    SCALE_NONE = SCALE_USER_COUNT,
   };
 
   static void Init();
   static void Validate();
   static const Scale &GetScale(int index);
-  static constexpr int NUM_SCALES = SCALE_USER_LAST + sizeof(braids::scales) / sizeof(braids::scales[0]);
+  static constexpr int NUM_SCALES = SCALE_USER_COUNT + sizeof(braids::scales) / sizeof(braids::scales[0]);
 };
 
 // H1200/A11Z are semitone based, so don't need to go "full quanty" for now.
@@ -59,7 +59,7 @@ private:
 
 extern const char *const scale_names[];
 extern const char *const scale_names_short[];
-extern Scale user_scales[OC::Scales::SCALE_USER_LAST];
+extern Scale user_scales[OC::Scales::SCALE_USER_COUNT];
 extern Scale dummy_scale;
 extern const char *const voltage_scalings[];
 

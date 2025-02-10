@@ -136,7 +136,7 @@ public:
 void UpdateArpeggiator(int channel_id, int sequence_id, int sequence_mask, int sequence_length) {
 
     // sort notes:
-    uint8_t _channel_offset = !channel_id ? 0x0 : OC::Patterns::NUM_PATTERNS;
+    uint8_t _channel_offset = !channel_id ? 0x0 : OC::Patterns::NUM_PATTERNS_PER_CHAN;
     OC::Pattern *arp_pattern_ = &OC::user_patterns[sequence_id + _channel_offset];
     for (int i = 0; i < sequence_length; i++) 
       note_stack_[i] = arp_pattern_->notes[i];

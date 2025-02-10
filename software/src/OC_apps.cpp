@@ -181,11 +181,11 @@ struct GlobalSettings {
   uint32_t DAC_scaling;
   uint16_t current_app_id;
 
-  OC::Scale user_scales[OC::Scales::SCALE_USER_LAST];
-  OC::Pattern user_patterns[OC::Patterns::PATTERN_USER_ALL];
+  OC::Scale user_scales[OC::Scales::SCALE_USER_COUNT];
+  OC::Pattern user_patterns[OC::Patterns::PATTERN_USER_COUNT];
   // These both occupy 160 bytes
 #ifdef ENABLE_APP_CHORDS
-  OC::Chord user_chords[OC::Chords::CHORDS_USER_LAST];
+  OC::Chord user_chords[OC::Chords::CHORDS_USER_COUNT];
 #else
   HS::TuringMachine user_turing_machines[HS::TURING_MACHINE_COUNT];
 #endif

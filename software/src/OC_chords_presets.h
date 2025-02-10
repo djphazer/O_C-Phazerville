@@ -8,7 +8,6 @@
 namespace OC {
 
   struct Chord {
-   
     int8_t quality;
     int8_t inversion;
     int8_t voicing;

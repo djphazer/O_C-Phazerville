@@ -6,8 +6,6 @@
 
 namespace OC {
 
-using Autotune_data = OC::Autotune_data;
-
 class AUTOTUNE {
 public:
   static const int NUM_DAC_CHANNELS;

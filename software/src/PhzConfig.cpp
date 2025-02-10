@@ -3,7 +3,6 @@
  * supercedes previous EEPROM mechanism
  */
 #ifdef __IMXRT1062__
-#include <LittleFS.h>
 #include "PhzConfig.h"
 
 // NOTE: This option is only available on the Teensy 4.0, Teensy 4.1 and Teensy Micromod boards.

@@ -49,8 +49,6 @@ const Map input_maps[] = {
 
 namespace OC {
 
-  using Map = OC::Map;
-
   class InputMaps {
   public:
     static const Map &GetInputMap(int index) { 

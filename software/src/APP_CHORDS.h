@@ -687,7 +687,7 @@ public:
 
                num_chords = get_num_chords(num_progression) + num_chords_cv;
                if (num_chords_cv)
-                  CONSTRAIN(num_chords, 0, OC::Chords::NUM_CHORDS - 0x1);
+                  CONSTRAIN(num_chords, 0, OC::Chords::NUM_CHORDS_PER_CHAN - 0x1);
                // length changed?
                if (num_chords_last_ != num_chords)
                   update_inputmap(num_chords + 0x1, 0x0);
@@ -707,7 +707,7 @@ public:
           {
              num_chords = get_num_chords(num_progression) + num_chords_cv;
              if (num_chords_cv)
-                CONSTRAIN(num_chords, 0, OC::Chords::NUM_CHORDS - 0x1);
+                CONSTRAIN(num_chords, 0, OC::Chords::NUM_CHORDS_PER_CHAN - 0x1);
              // length changed ?
              if (num_chords_last_ != num_chords)
                 update_inputmap(num_chords + 0x1, 0x0);
@@ -737,7 +737,7 @@ public:
 
         num_chords = get_num_chords(num_progression) + num_chords_cv;
         if (num_chords_cv)
-            CONSTRAIN(num_chords, 0, OC::Chords::NUM_CHORDS - 0x1);
+            CONSTRAIN(num_chords, 0, OC::Chords::NUM_CHORDS_PER_CHAN - 0x1);
 
         CONSTRAIN(active_chord_, 0x0, num_chords);
 
@@ -748,7 +748,7 @@ public:
 
       display_num_chords_ = num_chords;
       // active chord:
-      OC::Chord *active_chord = &OC::user_chords[active_chord_ + num_progression * OC::Chords::NUM_CHORDS];
+      OC::Chord *active_chord = &OC::user_chords[active_chord_ + num_progression * OC::Chords::NUM_CHORDS_PER_CHAN];
 
       int8_t _base_note = active_chord->base_note;
       int8_t _octave = active_chord->octave;
@@ -1015,11 +1015,11 @@ SETTINGS_DECLARE(Chords, CHORDS_SETTING_LAST) {
   { 0, 0, OC::kNumDelayTimes - 1, "TR1 delay", OC::Strings::trigger_delay_times, settings::STORAGE_TYPE_U8 },
   { 0, -5, 7, "transpose", NULL, settings::STORAGE_TYPE_I8 },
   { 0, -4, 4, "octave", NULL, settings::STORAGE_TYPE_I8 },
-  { 0, 0, OC::Chords::CHORDS_USER_LAST - 1, "chord:", chords_slots, settings::STORAGE_TYPE_U8 },
-  { 0, 0, OC::Chords::CHORDS_USER_LAST - 1, "num.chords", NULL, settings::STORAGE_TYPE_U8 }, // progression 1
-  { 0, 0, OC::Chords::CHORDS_USER_LAST - 1, "num.chords", NULL, settings::STORAGE_TYPE_U8 }, // progression 2
-  { 0, 0, OC::Chords::CHORDS_USER_LAST - 1, "num.chords", NULL, settings::STORAGE_TYPE_U8 }, // progression 3
-  { 0, 0, OC::Chords::CHORDS_USER_LAST - 1, "num.chords", NULL, settings::STORAGE_TYPE_U8 }, // progression 4
+  { 0, 0, OC::Chords::CHORDS_USER_COUNT - 1, "chord:", chords_slots, settings::STORAGE_TYPE_U8 },
+  { 0, 0, OC::Chords::CHORDS_USER_COUNT - 1, "num.chords", NULL, settings::STORAGE_TYPE_U8 }, // progression 1
+  { 0, 0, OC::Chords::CHORDS_USER_COUNT - 1, "num.chords", NULL, settings::STORAGE_TYPE_U8 }, // progression 2
+  { 0, 0, OC::Chords::CHORDS_USER_COUNT - 1, "num.chords", NULL, settings::STORAGE_TYPE_U8 }, // progression 3
+  { 0, 0, OC::Chords::CHORDS_USER_COUNT - 1, "num.chords", NULL, settings::STORAGE_TYPE_U8 }, // progression 4
   { 0, 0, 0, "chords -->", NULL, settings::STORAGE_TYPE_U4 }, // = chord editor
   // CV
   { 0, 0, ADC_CHANNEL_LAST, "root CV      >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },

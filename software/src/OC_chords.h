@@ -5,8 +5,6 @@
 
 namespace OC {
 
-using Chord = OC::Chord;
-
 class Chords {
 public:
 
@@ -44,7 +42,7 @@ public:
     CHORDS_USER_5_3,
     CHORDS_USER_6_3,
     CHORDS_USER_7_3,
-    CHORDS_USER_LAST
+    CHORDS_USER_COUNT
   };
 
   enum QUALITY 
@@ -94,14 +92,12 @@ public:
   static const Chord &GetChord(int index, int progression);
 
   static constexpr int NUM_CHORD_PROGRESSIONS = 0x4;
-  static constexpr int NUM_CHORDS_TOTAL = CHORDS_USER_LAST; // = 8
-  static constexpr int NUM_CHORDS_PROPERTIES = sizeof(Chord);
-  static constexpr int NUM_CHORDS = NUM_CHORDS_TOTAL / NUM_CHORD_PROGRESSIONS;
+  static constexpr int NUM_CHORDS_PER_CHAN = CHORDS_USER_COUNT / NUM_CHORD_PROGRESSIONS;
 
 };
 
 
-extern Chord user_chords[OC::Chords::CHORDS_USER_LAST];
+extern Chord user_chords[OC::Chords::CHORDS_USER_COUNT];
 };
 
 #endif // OC_CHORDS_H_

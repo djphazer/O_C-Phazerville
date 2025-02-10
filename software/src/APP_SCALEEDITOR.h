@@ -233,7 +233,7 @@ private:
     // Control handler activities
     /////////////////////////////////////////////////////////////////
     void SwitchScale(int direction) { // Up/Down buttons
-        current_scale = constrain(current_scale + direction, 0, OC::Scales::SCALE_USER_LAST - 1);
+        current_scale = constrain(current_scale + direction, 0, OC::Scales::SCALE_USER_COUNT - 1);
 
         // Configure and force requantize for real-time monitoring purposes
         HS::quantizer[0].Configure(OC::Scales::GetScale(current_scale), 0xffff);

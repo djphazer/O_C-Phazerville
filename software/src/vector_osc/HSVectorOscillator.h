@@ -23,8 +23,8 @@
 
 namespace HS {
 
-const byte VO_SEGMENT_COUNT = 64; // The total number of segments in user memory
-const byte VO_MAX_SEGMENTS = 12; // The maximum number of segments in a waveform
+const uint8_t VO_SEGMENT_COUNT = 64; // The total number of segments in user memory
+const uint8_t VO_MAX_SEGMENTS = 12; // The maximum number of segments in a waveform
 
 /*
  * The VOSegment is a single segment of the VectorOscillator that specifies a target
@@ -34,17 +34,17 @@ const byte VO_MAX_SEGMENTS = 12; // The maximum number of segments in a waveform
  *
  */
 struct VOSegment {
-    byte level;
-    byte time;
+    uint8_t level;
+    uint8_t time;
 
     bool IsTOC() {return (time == 0xff && level > 0);}
-    void SetTOC(byte segments) {
+    void SetTOC(uint8_t segments) {
         time = 0xff;
         level = segments;
     }
 
     /* If this is a TOC segment, Segments() will return how many segments are in the waveform */
-    byte Segments() {return level;}
+    uint8_t Segments() {return level;}
 
 };
 
@@ -94,7 +94,7 @@ public:
     }
 
     /* Update an existing segment */
-    void SetSegment(byte ix, HS::VOSegment segment) {
+    void SetSegment(uint8_t ix, HS::VOSegment segment) {
         ix = constrain(ix, 0, segment_count - 1);
         total_time -= segments[ix].time;
         memcpy(&segments[ix], &segment, sizeof(segments[ix]));
@@ -102,7 +102,7 @@ public:
         if (ix == segment_count) segment_count++;
     }
 
-    HS::VOSegment GetSegment(byte ix) {
+    HS::VOSegment GetSegment(uint8_t ix) {
         ix = constrain(ix, 0, segment_count - 1);
         return segments[ix];
     }
@@ -120,9 +120,9 @@ public:
 
     bool GetEOC() {return eoc;}
 
-    byte TotalTime() {return total_time;}
+    uint8_t TotalTime() {return total_time;}
 
-    byte SegmentCount() {return segment_count;}
+    uint8_t SegmentCount() {return segment_count;}
 
     void Start() {
         Reset();
@@ -166,10 +166,10 @@ public:
     		degrees = abs(degrees);
 
     		// I need to find out which segment the specified phase occurs in
-    		byte time_index = Proportion(degrees, 3600, total_time);
-    		byte segment = 0;
-    		byte time = 0;
-    		for (byte ix = 0; ix < segment_count; ix++)
+    		uint8_t time_index = Proportion(degrees, 3600, total_time);
+    		uint8_t segment = 0;
+    		uint8_t time = 0;
+    		for (uint8_t ix = 0; ix < segment_count; ix++)
     		{
     			time += segments[ix].time;
     			if (time > time_index) {
@@ -194,12 +194,12 @@ public:
 
 private:
     VOSegment segments[12]; // Array of segments in this Oscillator
-    byte segment_count = 0; // Number of segments
+    uint8_t segment_count = 0; // Number of segments
     int total_time = 0; // Sum of time values for all segments
     vosignal_t signal = 0; // Current scaled signal << 10 for more precision
     vosignal_t target = 0; // Target scaled signal. When the target is reached, the Oscillator moves to the next segment.
     bool eoc = 1; // The most recent tick's next() read was the end of a cycle
-    byte segment_index = 0; // Which segment the Oscillator is currently traversing
+    uint8_t segment_index = 0; // Which segment the Oscillator is currently traversing
     uint32_t frequency; // In centihertz
     uint16_t scale; // The maximum (and minimum negative) output for this Oscillator
     bool cycle = 1; // Waveform will cycle
@@ -240,7 +240,7 @@ private:
      * Provide a signal value based on a segment level. The segment level is internally
      * 0-255, and this is converted to a bipolar value by subtracting 128.
      */
-    vosignal_t scale_level(byte level) {
+    vosignal_t scale_level(uint8_t level) {
         int b_level = constrain(level, 0, 255) - 128;
         int scaled = Proportion(b_level, 127, scale);
         vosignal_t scaled_level = int2signal(scaled);
@@ -298,9 +298,9 @@ private:
         return delta;
     }
 
-    void calculate_rise(byte ix) {
+    void calculate_rise(uint8_t ix) {
         // Determine the target level for this segment
-        byte level = segments[ix].level;
+        uint8_t level = segments[ix].level;
         int time = static_cast<uint32_t>(segments[ix].time);
         target = scale_level(level);
 

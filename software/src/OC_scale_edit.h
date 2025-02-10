@@ -52,7 +52,7 @@ public:
     if (OC::Scales::SCALE_NONE == scale)
       return;
 
-    if (scale < OC::Scales::SCALE_USER_LAST) {
+    if (scale < OC::Scales::SCALE_USER_COUNT) {
       scale_ = mutable_scale_ = &OC::user_scales[scale];
       scale_name_ = OC::scale_names_short[scale];
       // Serial.print("Editing mutable scale "); 
@@ -334,7 +334,7 @@ void ScaleEditor<Owner>::HandleEncoderEvent(const UI::Event &event) {
           owner_->set_scale_at_slot(_scale, mask_, owner_->get_root(edit_this_scale_), owner_->get_transpose(edit_this_scale_), edit_this_scale_); 
           scale_changed = true; 
           
-          if (_scale < OC::Scales::SCALE_USER_LAST) {
+          if (_scale < OC::Scales::SCALE_USER_COUNT) {
             scale_ = mutable_scale_ = &OC::user_scales[_scale];
             scale_name_ = OC::scale_names_short[_scale];
           } 
@@ -479,7 +479,7 @@ void ScaleEditor<Owner>::handleButtonUp(const UI::Event &event) {
           
         uint8_t scale = owner_->get_scale(edit_this_scale_);  
         // Serial.println(scale);
-        if (scale < OC::Scales::SCALE_USER_LAST) {
+        if (scale < OC::Scales::SCALE_USER_COUNT) {
           scale_ = mutable_scale_ = &OC::user_scales[scale];
           scale_name_ = OC::scale_names_short[scale];
           // Serial.print("Editing mutable scale "); 
@@ -517,7 +517,7 @@ void ScaleEditor<Owner>::handleButtonDown(const UI::Event &event) {
           
         uint8_t scale = owner_->get_scale(edit_this_scale_);  
         // Serial.println(scale);
-        if (scale < OC::Scales::SCALE_USER_LAST) {
+        if (scale < OC::Scales::SCALE_USER_COUNT) {
           scale_ = mutable_scale_ = &OC::user_scales[scale];
           scale_name_ = OC::scale_names_short[scale];
           // Serial.print("Editing mutable scale "); 

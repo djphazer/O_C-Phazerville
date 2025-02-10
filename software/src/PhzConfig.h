@@ -1,18 +1,20 @@
 #pragma once
 
+#ifdef __IMXRT1062__
+#include <LittleFS.h>
+#include <SD.h>
 #include <unordered_map>
 
 namespace PhzConfig {
   enum ConfigKeys : uint16_t {
-    POWER_CYCLE_COUNT,
-    AUDIO_CONFIG,
+    POWER_CYCLE_COUNT = 0,
   };
 
   using KEY = uint16_t;
   using VALUE = uint64_t;
   using ConfigMap = std::unordered_map<KEY, VALUE>;
 
-  const char * const CONFIG_FILENAME = "PEWPEW.CFG";
+  const char * const CONFIG_FILENAME = "GLOBALS.CFG";
 
   // Forward Decl
   void listFiles();
@@ -30,3 +32,4 @@ namespace PhzConfig {
   void eraseFiles();
 
 }
+#endif
