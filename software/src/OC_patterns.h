@@ -29,7 +29,11 @@ namespace OC {
       PATTERN_USER_1_2,
       PATTERN_USER_2_2,
       PATTERN_USER_3_2, 
+#ifdef __IMXRT1062__
+      PATTERN_USER_COUNT = 32,
+#else
       PATTERN_USER_COUNT,
+#endif
     };
 
     static const int PATTERN_NONE = -1;

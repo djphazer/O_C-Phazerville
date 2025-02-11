@@ -80,7 +80,7 @@ public:
         if (!write_mode) {
           // CV modulation of pattern and transposition
           pattern_mod = pattern_index;
-          Modulate(pattern_mod, 1, 0, 7);
+          Modulate(pattern_mod, 1, 0, MiniSeq::SEQUENCE_COUNT - 1);
           seq.SetPattern(pattern_mod);
 
           trans_mod = transpose;
