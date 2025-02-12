@@ -350,8 +350,8 @@ public:
         // TODO: store quant settings in same file?
         //Calibr8or_instance.SavePreset();
 
-        PhzConfig::save_config(bank_filename);
         audio_app.SavePreset(id);
+        PhzConfig::save_config(bank_filename);
         preset_id = id;
     }
     void LoadFromPreset(int id) {
