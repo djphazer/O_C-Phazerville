@@ -42,6 +42,7 @@
 #include "applets/DrumMap.h"
 #include "applets/DualQuant.h"
 #include "applets/DualTM.h"
+#include "applets/DuoTET.h"
 #include "applets/EbbAndLfo.h"
 #include "applets/EnigmaJr.h"
 //#include "applets/EnsOscKey.h"
@@ -152,6 +153,7 @@ AppletRegistry reg{
     DeclareApplet<DrumMap>{57, 0x02},
     DeclareApplet<DualQuant>{9, 0x08},
     DeclareApplet<DualTM>{18, 0x02},
+    DeclareApplet<DuoTET>{63, 0x08},
     DeclareApplet<EbbAndLfo>{7, 0x01},
     DeclareApplet<EnigmaJr>{45, 0x02},
     DeclareApplet<EnvFollow>{42, 0x11},
