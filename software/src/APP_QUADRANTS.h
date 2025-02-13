@@ -37,13 +37,11 @@
 #include "HSMIDI.h"
 #include "HSClockManager.h"
 
+#include "PackingUtils.h"
 #include "hemisphere_config.h"
 #include "hemisphere_audio_config.h"
 
 #include "PhzConfig.h"
-
-// We depend on Calibr8or now
-#include "APP_CALIBR8OR.h"
 
 // The settings specify the selected applets, and 64 bits of data for each applet,
 // plus 64 bits of data for the ClockSetup applet (which includes some misc config).
@@ -296,6 +294,7 @@ public:
 
         FILTERMASK1_KEY = 100,
         FILTERMASK2_KEY = 101,
+        Q_ENGINE_KEY    = 200, // + slot number
     };
 
     void StoreToPreset(int id) {
@@ -347,8 +346,21 @@ public:
         PhzConfig::setValue(FILTERMASK1_KEY, HS::hidden_applets[0]);
         PhzConfig::setValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
 
-        // TODO: store quant settings in same file?
-        //Calibr8or_instance.SavePreset();
+        // Global quantizer settings
+        for (size_t qslot = 0; qslot < QUANT_CHANNEL_COUNT; ++qslot) {
+          /*
+            // XXX: fine-tuning stuff from Calibr8or that should also be global
+            int8_t offset;
+            int16_t scale_factor; // precision of 0.01% as an offset from 100%
+            int8_t transpose; // in semitones
+          */
+          data = PackPackables(
+              HS::quant_scale[qslot],
+              HS::q_octave[qslot],
+              HS::root_note[qslot],
+              HS::q_mask[qslot]);
+          PhzConfig::setValue(Q_ENGINE_KEY + qslot, data);
+        }
 
         audio_app.SavePreset(id);
         PhzConfig::save_config(bank_filename);
@@ -407,6 +419,17 @@ public:
         // applet filtering is actually just global
         PhzConfig::getValue(FILTERMASK1_KEY, HS::hidden_applets[0]);
         PhzConfig::getValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
+
+        // Global quantizer settings
+        for (size_t qslot = 0; qslot < QUANT_CHANNEL_COUNT; ++qslot) {
+          if (!PhzConfig::getValue(Q_ENGINE_KEY + qslot, data))
+              break;
+          UnpackPackables(data,
+              HS::quant_scale[qslot],
+              HS::q_octave[qslot],
+              HS::root_note[qslot],
+              HS::q_mask[qslot]);
+        }
 
         audio_app.LoadPreset(id);
         PokePopup(PRESET_POPUP);

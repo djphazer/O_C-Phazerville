@@ -200,7 +200,7 @@ namespace HS {
   extern OC::SemitoneQuantizer input_quant[ADC_CHANNEL_LAST];
 
   extern braids::Quantizer quantizer[QUANT_CHANNEL_COUNT]; // global shared quantizers
-  extern int quant_scale[QUANT_CHANNEL_COUNT];
+  extern int16_t quant_scale[QUANT_CHANNEL_COUNT];
   extern int8_t root_note[QUANT_CHANNEL_COUNT];
   extern int8_t q_octave[QUANT_CHANNEL_COUNT];
   extern uint16_t q_mask[QUANT_CHANNEL_COUNT];

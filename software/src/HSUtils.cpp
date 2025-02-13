@@ -17,7 +17,7 @@ namespace HS {
   OC::SemitoneQuantizer input_quant[ADC_CHANNEL_LAST];
 
   braids::Quantizer quantizer[QUANT_CHANNEL_COUNT]; // global shared quantizers
-  int quant_scale[QUANT_CHANNEL_COUNT];
+  int16_t quant_scale[QUANT_CHANNEL_COUNT];
   int8_t root_note[QUANT_CHANNEL_COUNT];
   int8_t q_octave[QUANT_CHANNEL_COUNT];
   uint16_t q_mask[QUANT_CHANNEL_COUNT];
@@ -134,7 +134,7 @@ namespace HS {
   }
   void NudgeScale(int ch, int dir) {
     const int max = OC::Scales::NUM_SCALES;
-    int &s = quant_scale[ch];
+    int16_t &s = quant_scale[ch];
 
     s+= dir;
     if (s >= max) s = 0;
