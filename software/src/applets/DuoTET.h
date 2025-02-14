@@ -33,6 +33,68 @@
 // ideal to be able to modulate the parameters of the two quantizers
 // using other applets.
 
+const int _NUM_CV_INPUTS = ADC_CHANNEL_LAST * 2 + 1;
+
+static int wrap(int val, int max) {
+    while(val >= max) val -= max;
+    while(val < 0) val += max;
+    return val;   
+}
+
+struct DuoCVInputMap {
+  int8_t source = 0;
+  int8_t attenuversion = 100;
+
+  static constexpr size_t Size = 16; // Make this compatible with Packable
+
+  int In(int default_value = 0) {
+    if (!source) return default_value;
+    return source <= ADC_CHANNEL_LAST
+      ? frame.inputs[source - 1]
+      : frame.outputs[source - 1 - ADC_CHANNEL_LAST];
+  }
+
+  float InF(float default_value = 0.0f) {
+    if (!source) return default_value;
+    return static_cast<float>(In())
+      / static_cast<float>(HEMISPHERE_MAX_INPUT_CV);
+  }
+
+  int InRescaled(int max_value) {
+    return Proportion(In(), HEMISPHERE_MAX_INPUT_CV, max_value);
+  }
+
+  void ChangeSource(int dir) {
+    source = constrain(source + dir, 0, _NUM_CV_INPUTS - 1);
+  }
+
+  void RotateSource(int dir) {
+    source = wrap(source + dir, _NUM_CV_INPUTS);
+  }
+
+  char const* InputName() const {
+    return OC::Strings::cv_input_names_none[source];
+  }
+
+  uint8_t const* Icon() const {
+    return PARAM_MAP_ICONS + 8 * source;
+  }
+
+  uint16_t Pack() const {
+    return source | (attenuversion << 8);
+  }
+
+  void Unpack(uint16_t data) {
+    source = data & 0xFF;
+    attenuversion = extract_value<int8_t>(data >> 8);
+  }
+};
+
+// Let's PackingUtils know this is Packable as is.
+constexpr DuoCVInputMap& pack(DuoCVInputMap& input) {
+  return input;
+}
+
 #define DUOTET_SCALE_MAX_LEN 32
 
 class DuoTET : public HemisphereApplet {
@@ -47,17 +109,11 @@ public:
         return ( *(int16_t*)a - *(int16_t*)b );
     }
 
-    static int wrap(int val, int max) {
-        while(val >= max) val -= max;
-        while(val < 0) val += max;
-        return val;   
-    }
-
     void conditionParams() {
         for(int i=0; i<DUOTET_PARAM_LAST; i++) {
             switch(i) {
                 case DUOTET_PARAM_TET:
-                    params[i] = constrain(params[i], 1, 255);
+                    params[i] = constrain(params[i], 1, 63);
                     break;
                 case DUOTET_PARAM_INTERVALA:
                     params[i] = constrain(params[i], 0, params[DUOTET_PARAM_TET]);
@@ -71,14 +127,23 @@ public:
                 case DUOTET_PARAM_SCALELEN:
                     params[i] = constrain(params[i], 1, DUOTET_SCALE_MAX_LEN);
                     break;
-                case DUOTET_PARAM_OCTAVE:
-                    params[i] = constrain(params[i], -8, 8);
-                    break;
                 case DUOTET_PARAM_BpA:
                     params[i] = constrain(params[i], 0, 1);
                     break;
                 case DUOTET_PARAM_Bp:
-                    params[i] = constrain(params[i], -127, 127);
+                    params[i] = constrain(params[i], -31, 31);
+                    break;
+                case DUOTET_PARAM_Bu:
+                    params[i] = constrain(params[i], -63, 63);
+                    break;
+                case DUOTET_PARAM_Bl:
+                    params[i] = constrain(params[i], -63, 63);
+                    break;
+                case DUOTET_PARAM_Au:
+                    params[i] = constrain(params[i], -63, 63);
+                    break;
+                case DUOTET_PARAM_Al:
+                    params[i] = constrain(params[i], -63, 63);
                     break;
                 default:
                     break;
@@ -111,7 +176,7 @@ public:
         if(degree < -72) degree = -72;
         int tet = params[DUOTET_PARAM_TET];
         int len = params[DUOTET_PARAM_SCALELEN];
-        int octave = params[DUOTET_PARAM_OCTAVE];
+        int octave = 0;
         while(degree < 0) { degree += len; octave--; }
         while(degree >= len) { degree -= len; octave++; }
         return scale[degree] + (octave * tet);
@@ -136,9 +201,12 @@ public:
         params[DUOTET_PARAM_INTERVALB]  = 6;
         params[DUOTET_PARAM_SCALELEN]   = 7;
         params[DUOTET_PARAM_OFFSET]     = 0;
-        params[DUOTET_PARAM_OCTAVE]     = 0;
         params[DUOTET_PARAM_BpA]        = 1;
         params[DUOTET_PARAM_Bp]         = 2;
+        params[DUOTET_PARAM_Bu]         = 63;
+        params[DUOTET_PARAM_Bl]         = -63;
+        params[DUOTET_PARAM_Au]         = 63;
+        params[DUOTET_PARAM_Al]         = -63;
         genScale();
     }
 
@@ -149,16 +217,39 @@ public:
         if(f < threshold || forceUpdate) pitch = w;
     }
 
+    int constrainOctave(int note, int l, int u, int o) {
+        while(note < l) note += o;
+        while(note > u) note -= o;
+        return note;
+    }
+
+    int getNoteA() {
+        int len = processedParams[DUOTET_PARAM_SCALELEN];
+        int au = processedParams[DUOTET_PARAM_Au];
+        int al = processedParams[DUOTET_PARAM_Al];
+        int note = noteA;
+        note = constrainOctave(note, al, au, len);
+        return note;
+    }
+
     int getNoteB() {
-        int bpa = params[DUOTET_PARAM_BpA];
-        int bp = params[DUOTET_PARAM_Bp];
-        return noteB + bp + (bpa > 0 ? noteA : 0);
+        int len = processedParams[DUOTET_PARAM_SCALELEN];
+        int bpa = processedParams[DUOTET_PARAM_BpA];
+        int bp = processedParams[DUOTET_PARAM_Bp];
+        int bu = processedParams[DUOTET_PARAM_Bu];
+        int bl = processedParams[DUOTET_PARAM_Bl];
+        int note  = noteB + bp + (bpa > 0 ? noteA : 0);
+        note = constrainOctave(note, bl, bu, len);
+        return note;
     }
 
     void Controller() {
+        for(int i=0; i<DUOTET_PARAM_LAST; i++) {
+            processedParams[i] = params[i] + (cv_inputs[i].In()>>7);
+        }
         cv2note(noteA, In(0), forceUpdate); cv2note(noteB, In(1), forceUpdate);
         forceUpdate = false;
-        int outA = noteToVoltage(getScaleNote(noteA));
+        int outA = noteToVoltage(getScaleNote(getNoteA()));
         int outB = noteToVoltage(getScaleNote(getNoteB()));
         Out(0, outA); Out(1, outB);
     }
@@ -173,35 +264,34 @@ public:
         int y = (h>>1)+yoff;
         int r = h>>1;
 
-        gfxPrint(x-3*6-1, y-4, DUOTET_PARAM_STR[cursor]);
+        gfxPrint(x-4*6-1, y-4, DUOTET_PARAM_STR[cursor]);
+        gfxStartCursor();
         if(cursor == DUOTET_PARAM_BpA) {
-            gfxPrint(x+5, y-4, params[cursor] > 0 ? "Y" : "N");
+            gfxPrint(x+5-7, y-4, processedParams[cursor] > 0 ? "Y" : "N");
         } else {
-            gfxPrint(x+5, y-4, params[cursor]);
+            gfxPrint(x+5-7, y-4, processedParams[cursor]);
         }
-
-        if(EditMode()) {
-            gfxInvert(x+5, y-5, 6*2+1, 10);
-        }
+        if(cursor > DUOTET_PARAM_OFFSET) gfxPrintIcon(cv_inputs[cursor].Icon());
+        gfxEndCursor(EditMode());
 
         for(int i=0; i<tet; i++) {
             gfxPixel(
-                (int)(x+sin(2.0*M_PI*i/tet)*r),
-                (int)(y-cos(2.0*M_PI*i/tet)*r)
+                (int)(x+sin(2.0*M_PI*i/tet)*((w-5)>>1)),
+                (int)(y-cos(2.0*M_PI*i/tet)*(h>>1))
             );
         }
 
         for(int i=0; i<len; i++) {
             int note = scale[i];
             gfxCircle(
-                (int)(x+sin(2.0*M_PI*note/tet)*r),
-                (int)(y-cos(2.0*M_PI*note/tet)*r),
+                (int)(x+sin(2.0*M_PI*note/tet)*((w-5)>>1)),
+                (int)(y-cos(2.0*M_PI*note/tet)*(h>>1)),
                 2
             );
-            if(getPitchClass(noteA) == note || getPitchClass(getNoteB()) == note) {
+            if(getPitchClass(getNoteA()) == note || getPitchClass(getNoteB()) == note) {
                 gfxFrame(
-                    (int)(x+sin(2.0*M_PI*note/tet)*r)-1,
-                    (int)(y-cos(2.0*M_PI*note/tet)*r)-1,
+                    (int)(x+sin(2.0*M_PI*note/tet)*((w-5)>>1))-1,
+                    (int)(y-cos(2.0*M_PI*note/tet)*(h>>1))-1,
                     3, 3
                 );
             }
@@ -209,6 +299,10 @@ public:
     }
 
     // void OnButtonPress() {}
+
+    void AuxButton() {
+        cv_inputs[cursor].RotateSource(1);
+    }
 
     void OnEncoderMove(int direction) {
         if(EditMode()) {
@@ -223,20 +317,37 @@ public:
         
     uint64_t OnDataRequest() {
         uint64_t data = 0;
+        uint32_t offset = 0;
         for(uint32_t i=0; i<DUOTET_PARAM_LAST; i++) {
             int param = params[i];
-            if(i == DUOTET_PARAM_OCTAVE) param += 8;
-            if(i == DUOTET_PARAM_Bp) param += 127;
-            Pack(data, PackLocation {i*8,8}, param);
+            // if(i == DUOTET_PARAM_OCTAVE) param += 8;
+            if( i == DUOTET_PARAM_Bp || \
+                i == DUOTET_PARAM_Bu || \
+                i == DUOTET_PARAM_Bl || \
+                i == DUOTET_PARAM_Au || \
+                i == DUOTET_PARAM_Al)
+            {
+                param += (1<<(DUOTET_PARAM_BITS[i]-1))-1;
+            }
+            Pack(data, PackLocation {offset, DUOTET_PARAM_BITS[i]}, param);
+            offset += DUOTET_PARAM_BITS[i];
         }
         return data;
     }
 
     void OnDataReceive(uint64_t data) {
+        uint32_t offset = 0;
         for(uint32_t i=0; i<DUOTET_PARAM_LAST; i++) {
-            params[i] = Unpack(data, PackLocation {i*8,8});
-            if(i == DUOTET_PARAM_OCTAVE) params[i] -= 8;
-            if(i == DUOTET_PARAM_Bp) params[i] -= 127;
+            params[i] = Unpack(data, PackLocation {offset, DUOTET_PARAM_BITS[i]});
+            if( i == DUOTET_PARAM_Bp || \
+                i == DUOTET_PARAM_Bu || \
+                i == DUOTET_PARAM_Bl || \
+                i == DUOTET_PARAM_Au || \
+                i == DUOTET_PARAM_Al)
+            {
+                params[i] -= (1<<(DUOTET_PARAM_BITS[i]-1))-1;
+            }
+            offset += DUOTET_PARAM_BITS[i];
         }
         genScale();
         forceUpdate = true;
@@ -270,9 +381,13 @@ private:
         DUOTET_PARAM_INTERVALB,
         DUOTET_PARAM_SCALELEN,
         DUOTET_PARAM_OFFSET,
-        DUOTET_PARAM_OCTAVE,
+        // DUOTET_PARAM_OCTAVE,
         DUOTET_PARAM_BpA,
         DUOTET_PARAM_Bp,
+        DUOTET_PARAM_Bu,
+        DUOTET_PARAM_Bl,
+        DUOTET_PARAM_Au,
+        DUOTET_PARAM_Al,
         DUOTET_PARAM_LAST
     } DUOTET_PARAM;
 
@@ -282,9 +397,28 @@ private:
         " iB:",
         "len:",
         "off:",
-        "oct:",
+        // "oct:",
         "B+A:",
-        " B+:"
+        " B+:",
+        " B^:",
+        " Bv:",
+        " A^:",
+        " Av:",
+    };
+
+    uint8_t DUOTET_PARAM_BITS[DUOTET_PARAM_LAST] = {
+        6,
+        6,
+        6,
+        5,
+        5,
+        // 4,
+        1,
+        7,
+        7,
+        7,
+        7,
+        7
     };
 
     int scale[DUOTET_SCALE_MAX_LEN];
@@ -293,8 +427,11 @@ private:
     int noteB = 0;
 
     int cursor = 0;
-    int params[DUOTET_PARAM_LAST];
+    int16_t params[DUOTET_PARAM_LAST];
+    int16_t processedParams[DUOTET_PARAM_LAST];
     int mode = DUOTET_MODE_ADD;
+
+    DuoCVInputMap cv_inputs[DUOTET_PARAM_LAST];
 
     bool forceUpdate = false;
 };
