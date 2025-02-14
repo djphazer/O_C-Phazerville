@@ -33,67 +33,7 @@
 // ideal to be able to modulate the parameters of the two quantizers
 // using other applets.
 
-const int _NUM_CV_INPUTS = ADC_CHANNEL_LAST * 2 + 1;
-
-static int wrap(int val, int max) {
-    while(val >= max) val -= max;
-    while(val < 0) val += max;
-    return val;   
-}
-
-struct DuoCVInputMap {
-  int8_t source = 0;
-  int8_t attenuversion = 100;
-
-  static constexpr size_t Size = 16; // Make this compatible with Packable
-
-  int In(int default_value = 0) {
-    if (!source) return default_value;
-    return source <= ADC_CHANNEL_LAST
-      ? frame.inputs[source - 1]
-      : frame.outputs[source - 1 - ADC_CHANNEL_LAST];
-  }
-
-  float InF(float default_value = 0.0f) {
-    if (!source) return default_value;
-    return static_cast<float>(In())
-      / static_cast<float>(HEMISPHERE_MAX_INPUT_CV);
-  }
-
-  int InRescaled(int max_value) {
-    return Proportion(In(), HEMISPHERE_MAX_INPUT_CV, max_value);
-  }
-
-  void ChangeSource(int dir) {
-    source = constrain(source + dir, 0, _NUM_CV_INPUTS - 1);
-  }
-
-  void RotateSource(int dir) {
-    source = wrap(source + dir, _NUM_CV_INPUTS);
-  }
-
-  char const* InputName() const {
-    return OC::Strings::cv_input_names_none[source];
-  }
-
-  uint8_t const* Icon() const {
-    return PARAM_MAP_ICONS + 8 * source;
-  }
-
-  uint16_t Pack() const {
-    return source | (attenuversion << 8);
-  }
-
-  void Unpack(uint16_t data) {
-    source = data & 0xFF;
-    attenuversion = extract_value<int8_t>(data >> 8);
-  }
-};
-
-// Let's PackingUtils know this is Packable as is.
-constexpr DuoCVInputMap& pack(DuoCVInputMap& input) {
-  return input;
-}
+#include "../CVInputMap.h"
 
 #define DUOTET_SCALE_MAX_LEN 32
 
@@ -107,6 +47,12 @@ public:
 
     static int cmpfunc(const void * a, const void * b) {
         return ( *(int16_t*)a - *(int16_t*)b );
+    }
+
+    static int wrap(int val, int max) {
+        while(val >= max) val -= max;
+        while(val < 0) val += max;
+        return val;   
     }
 
     void conditionParams() {
@@ -210,11 +156,16 @@ public:
         genScale();
     }
 
-    void cv2note(int& pitch, int cv=0, bool forceUpdate = false, int threshold=8) {
+    bool cv2note(int16_t& pitch, int cv=0, bool forceUpdate = false, int threshold=8) {
         cv = cv+64;
         int w = cv>>7;
         int f = abs((cv & 0x7F)-64);
-        if(f < threshold || forceUpdate) pitch = w;
+        if(f < threshold || forceUpdate) {
+            pitch = w;
+            return true;
+        } else {
+            return false;
+        }
     }
 
     int constrainOctave(int note, int l, int u, int o) {
@@ -245,7 +196,8 @@ public:
 
     void Controller() {
         for(int i=0; i<DUOTET_PARAM_LAST; i++) {
-            processedParams[i] = params[i] + (cv_inputs[i].In()>>7);
+            cv2note(cvInValues[i], cv_inputs[i].In());
+            processedParams[i] = cvInValues[i] + params[i];
         }
         cv2note(noteA, In(0), forceUpdate); cv2note(noteB, In(1), forceUpdate);
         forceUpdate = false;
@@ -262,7 +214,6 @@ public:
         int w = 64;
         int x = w>>1;
         int y = (h>>1)+yoff;
-        int r = h>>1;
 
         gfxPrint(x-4*6-1, y-4, DUOTET_PARAM_STR[cursor]);
         gfxStartCursor();
@@ -423,15 +374,16 @@ private:
 
     int scale[DUOTET_SCALE_MAX_LEN];
 
-    int noteA = 0;
-    int noteB = 0;
+    int16_t noteA = 0;
+    int16_t noteB = 0;
 
     int cursor = 0;
     int16_t params[DUOTET_PARAM_LAST];
     int16_t processedParams[DUOTET_PARAM_LAST];
+    int16_t cvInValues[DUOTET_PARAM_LAST];
     int mode = DUOTET_MODE_ADD;
 
-    DuoCVInputMap cv_inputs[DUOTET_PARAM_LAST];
+    CVInputMap cv_inputs[DUOTET_PARAM_LAST];
 
     bool forceUpdate = false;
 };
