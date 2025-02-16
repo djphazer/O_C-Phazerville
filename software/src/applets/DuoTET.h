@@ -222,8 +222,12 @@ public:
         } else {
             gfxPrint(x+5-7, y-4, processedParams[cursor]);
         }
-        if(cursor > DUOTET_PARAM_OFFSET) gfxPrintIcon(cv_inputs[cursor].Icon());
-        gfxEndCursor(EditMode());
+        gfxEndCursor(EditMode() && (!aux_cursor || cursor <= DUOTET_PARAM_OFFSET));
+        if(cursor > DUOTET_PARAM_OFFSET) {
+          gfxStartCursor();
+          gfxPrintIcon(cv_inputs[cursor].Icon());
+          gfxEndCursor(EditMode() && aux_cursor);
+        }
 
         for(int i=0; i<tet; i++) {
             gfxPixel(
@@ -252,20 +256,24 @@ public:
     // void OnButtonPress() {}
 
     void AuxButton() {
-        cv_inputs[cursor].RotateSource(1);
+      aux_cursor = !aux_cursor;
     }
 
     void OnEncoderMove(int direction) {
         if(EditMode()) {
+          if (aux_cursor && cursor > DUOTET_PARAM_OFFSET) {
+            cv_inputs[cursor].RotateSource(direction);
+          } else {
             params[cursor] += direction;
             if(direction != 0) conditionParams();
             genScale();
             forceUpdate = true;
+          }
         } else {
             MoveCursor(cursor, direction, DUOTET_PARAM_LAST-1);
         }
     }
-        
+
     uint64_t OnDataRequest() {
         uint64_t data = 0;
         uint32_t offset = 0;
@@ -357,7 +365,7 @@ private:
         " Av:",
     };
 
-    uint8_t DUOTET_PARAM_BITS[DUOTET_PARAM_LAST] = {
+    const uint8_t DUOTET_PARAM_BITS[DUOTET_PARAM_LAST] = {
         6,
         6,
         6,
@@ -385,5 +393,6 @@ private:
 
     CVInputMap cv_inputs[DUOTET_PARAM_LAST];
 
+    bool aux_cursor = false;
     bool forceUpdate = false;
 };
