@@ -29,6 +29,7 @@ DMAMEM std::tuple<
   DelayApplet<MONO>,
   LadderApplet<MONO>,
   FilterFolderApplet<MONO>,
+  WavPlayerApplet<MONO>,
   VcaApplet<MONO>,
   UpsampledApplet<MONO>>
   mono_processors_pool[2][NUM_SLOTS - 1];
