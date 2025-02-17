@@ -128,9 +128,6 @@ protected:
   void SetHelp() override {}
 
 private:
-  static const int LVL_MIN_DB = -90;
-  static const int LVL_MAX_DB = 90;
-
   AudioPassthrough<Channels> input;
   AudioConnection in_conn[Channels * 2];
   AudioConnection cross_conn[Channels];
@@ -148,9 +145,4 @@ private:
   enum SideMode { LEFT, RIGHT, MIXED, MODE_COUNT };
   enum { CHANNEL_MODE, IN_LEVEL, MAX_CURSOR = IN_LEVEL };
   int cursor = 0;
-
-  void gfxPrintDb(int db) {
-    if (db < LVL_MIN_DB) gfxPrint("    - ");
-    else graphics.printf("%3ddB", db);
-  }
 };

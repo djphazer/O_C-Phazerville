@@ -129,14 +129,14 @@ public:
   }
 
   void SetLevel(int lvl) {
-    level = constrain(lvl, VCA_MIN_DB - 1, VCA_MAX_DB);
-    float lvl_scalar = level < VCA_MIN_DB ? 0.0f : dbToScalar(level);
+    level = constrain(lvl, LVL_MIN_DB - 1, LVL_MAX_DB);
+    float lvl_scalar = level < LVL_MIN_DB ? 0.0f : dbToScalar(level);
     for (auto& vca : vcas) vca.level(lvl_scalar);
   }
 
   void SetBias(int b) {
-    bias = constrain(b, VCA_MIN_DB - 1, VCA_MAX_DB);
-    float bias_scalar = bias < VCA_MIN_DB ? 0.0f : dbToScalar(bias);
+    bias = constrain(b, LVL_MIN_DB - 1, LVL_MAX_DB);
+    float bias_scalar = bias < LVL_MIN_DB ? 0.0f : dbToScalar(bias);
     for (auto& vca : vcas) vca.bias(bias_scalar);
   }
 
@@ -150,13 +150,10 @@ protected:
 
 private:
   static const int NUM_PARAMS = 7;
-  // -90 = 15bits of depth so no point in going lower
-  static const int VCA_MIN_DB = -90;
-  static const int VCA_MAX_DB = 90;
 
   int8_t cursor = 0;
   int8_t level = 0;
-  int8_t bias = VCA_MIN_DB - 1;
+  int8_t bias = LVL_MIN_DB - 1;
   int8_t shape = 0;
   CVInputMap level_cv;
   CVInputMap shape_cv;
@@ -171,11 +168,6 @@ private:
   std::array<AudioConnection, Channels> in_conns;
   std::array<AudioConnection, Channels> cv_conns;
   std::array<AudioConnection, Channels> out_conns;
-
-  void gfxPrintDb(int db) {
-    if (db < VCA_MIN_DB) gfxPrint("    - ");
-    else graphics.printf("%3ddB", db);
-  }
 
   // Gives variable curve exponent by controlling the base normalized to go from
   // 0 to 1 for powers 0 to 1.

@@ -135,6 +135,11 @@ enum AudioChannels {
 class HemisphereAudioApplet : public HemisphereApplet {
 public:
   static const uint_fast8_t CONFIG_SIZE = 4;
+
+  // -90 = 15bits of depth so no point in going lower
+  static const int LVL_MIN_DB = -90;
+  static const int LVL_MAX_DB = 90;
+
   // If applet_name() can return different things at different times, you
   // *must* override this or saving and loading won't work!
   virtual const uint64_t applet_id() {
@@ -188,5 +193,9 @@ public:
     else graphics.printf("%4d.%01d", int_part, dec);
     gfxPrintIcon(HZ);
     // gfxPrint("Hz");
+  }
+  void gfxPrintDb(int db) {
+    if (db < LVL_MIN_DB) gfxPrint("    - ");
+    else graphics.printf("%3ddB", db);
   }
 };

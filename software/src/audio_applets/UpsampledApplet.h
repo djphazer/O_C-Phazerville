@@ -36,7 +36,7 @@ public:
     ONE_POLE(lp, in, 0.001f);
 
     if (ac_couple) in -= lp;
-    interp_stream.Push(Clip16(0.01f * gain * scalar * in));
+    interp_stream.Push(Clip16(dbToScalar(gain) * scalar * in));
   }
 
   void View() override {
@@ -60,9 +60,9 @@ public:
     }
     gfxEndCursor(cursor == 1);
 
-    gfxPrint(1, 35, "Gain:");
+    gfxPrint(1, 35, "Lvl:");
     gfxStartCursor();
-    graphics.printf("%4d%%", gain);
+    gfxPrintDb(gain);
     gfxEndCursor(cursor == 2);
 
     gfxPrint(1, 45, "AC:    ");
@@ -130,11 +130,11 @@ private:
   AudioConnection interp_conn[Channels];
   AudioConnection out_conn[Channels];
 
-  CVInputMap input;
-  float lp = 0.0f;
   static constexpr float scalar = -31267.0f / HEMISPHERE_MAX_CV;
+  float lp = 0.0f;
   int cursor = 0;
+  CVInputMap input;
+  int16_t gain = -1; // dB
   int8_t method = INTERPOLATION_HERMITE;
-  int16_t gain = 90;
   boolean ac_couple = 0;
 };
