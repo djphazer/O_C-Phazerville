@@ -162,10 +162,12 @@ public:
           state[1] = MOVE_CURSOR;
           break;
         case OC::CONTROL_BUTTON_X:
-          get_selected_applet(LEFT_HEMISPHERE).AuxButton();
+          if (MOVE_CURSOR != state[0])
+            get_selected_applet(LEFT_HEMISPHERE).AuxButton();
           break;
         case OC::CONTROL_BUTTON_Y:
-          get_selected_applet(RIGHT_HEMISPHERE).AuxButton();
+          if (MOVE_CURSOR != state[1])
+            get_selected_applet(RIGHT_HEMISPHERE).AuxButton();
           break;
         default:
           break;
