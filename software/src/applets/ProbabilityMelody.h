@@ -1,4 +1,5 @@
 // Copyright (c) 2022, Benjamin Rosenbach
+// Modified (M) 2025, Beau Sterling
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -30,7 +31,8 @@ public:
     enum ProbMeloCursor {
         LOWER, UPPER,
         FIRST_NOTE = 2,
-        LAST_NOTE = 13
+        LAST_NOTE = 13,
+        ROTATE
     };
 
     const char* applet_name() {
@@ -51,13 +53,23 @@ public:
         int oldDown = down_mod;
         int oldUp = up_mod;
 
-        // CV modulation
-        down_mod = down;
-        up_mod = up;
-        // down scales to the up setting
-        Modulate(down_mod, 0, 1, up);
-        // up scales full range, with down value as a floor
-        Modulate(up_mod, 1, down_mod, HEM_PROB_MEL_MAX_RANGE);
+        if (cv_rotate) { // override original cv mod functions to rotate probabilities
+            ForEachChannel(ch) {
+                int last_rotation = rotation[ch];
+                rotation[ch] = Proportion(DetentedIn(ch), 5 * HEMISPHERE_MAX_INPUT_CV / 6, 12);
+                int step = rotation[ch] - last_rotation;
+                if (ch) RotatePositiveWeights(weights, step);
+                else RotateAllWeights(weights, step);
+            }
+        } else {
+            // CV modulation
+            down_mod = down;
+            up_mod = up;
+            // down scales to the up setting
+            Modulate(down_mod, 0, 1, up);
+            // up scales full range, with down value as a floor
+            Modulate(up_mod, 1, down_mod, HEM_PROB_MEL_MAX_RANGE);
+        }
 
         // regen when looping was enabled from ProbDiv
         bool regen = loop_linker->IsLooping() && !isLooping;
@@ -65,7 +77,7 @@ public:
 
         // reseed from ProbDiv
         regen = regen || loop_linker->ShouldReseed();
-        
+
         // reseed loop if range has changed due to CV
         regen = regen || (isLooping && (down_mod != oldDown || up_mod != oldUp));
 
@@ -108,25 +120,37 @@ public:
 
     void OnEncoderMove(int direction) {
         if (!EditMode()) {
-            MoveCursor(cursor, direction, LAST_NOTE);
+            MoveCursor(cursor, direction, ROTATE);
             return;
         }
 
-        if (cursor >= FIRST_NOTE) {
+        if (cursor == ROTATE) {
+            RotateAllWeights(weights, direction);
+        } else if (cursor >= FIRST_NOTE) {
             // editing note probability
             int i = cursor - FIRST_NOTE;
             weights[i] = constrain(weights[i] + direction, 0, HEM_PROB_MEL_MAX_WEIGHT);
             value_animation = HEMISPHERE_CURSOR_TICKS;
         } else {
             // editing scaling
-            if (cursor == LOWER) down = constrain(down + direction, 1, up);
-            if (cursor == UPPER) up = constrain(up + direction, down, 60);
+            if (cv_rotate) {
+                if (cursor == LOWER) down_mod = constrain(down_mod + direction, 1, up_mod);
+                if (cursor == UPPER) up_mod = constrain(up_mod + direction, down_mod, 60);
+            } else {
+                if (cursor == LOWER) down = constrain(down + direction, 1, up);
+                if (cursor == UPPER) up = constrain(up + direction, down, 60);
+            }
         }
         if (isLooping) {
             GenerateLoop(); // regenerate loop on any param changes
         }
     }
-        
+
+    void AuxButton() {
+        // if (cursor == ROTATE)
+            cv_rotate = !cv_rotate;
+    }
+
     uint64_t OnDataRequest() {
         uint64_t data = 0;
         Pack(data, PackLocation {0, 4}, weights[0]);
@@ -168,23 +192,25 @@ protected:
     //                    "-------" <-- Label size guide
     help[HELP_DIGITAL1] = "Clock 1";
     help[HELP_DIGITAL2] = "Clock 2";
-    help[HELP_CV1]      = "Lower";
-    help[HELP_CV2]      = "Upper";
+    help[HELP_CV1]      = "Lo/Semi";
+    help[HELP_CV2]      = "Hi/Posi";
     help[HELP_OUT1]     = "Pitch 1";
     help[HELP_OUT2]     = "Pitch 2";
-    help[HELP_EXTRA1] = "Set: Range bounds /";
-    help[HELP_EXTRA2] = "     Note weights";
-    //                  "---------------------" <-- Extra text size guide
+    help[HELP_EXTRA1]   = "Set: Range bounds /";
+    help[HELP_EXTRA2]   = "     Note weights";
+    //                    "---------------------" <-- Extra text size guide
   }
 
 private:
-    int cursor; // ProbMeloCursor 
+    int cursor; // ProbMeloCursor
     int weights[12] = {10,0,0,2,0,0,0,2,0,0,4,0};
     int up, up_mod;
     int down, down_mod;
     int pitch;
     bool isLooping = false;
     int seqloop[2][HEM_PROB_MEL_MAX_LOOP_LENGTH];
+    bool cv_rotate = false;
+    int rotation[2] = {0};
 
     ProbLoopLinker *loop_linker = loop_linker->get();
 
@@ -193,6 +219,47 @@ private:
     const uint8_t x[12] = {2, 7, 10, 15, 18, 26, 31, 34, 39, 42, 47, 50};
     const uint8_t p[12] = {0, 1,  0,  1,  0,  0,  1,  0,  1,  0,  1,  0};
     const char* n[12] = {"C", "C", "D", "D", "E", "F", "F", "G", "G", "A", "A", "B"};
+
+    void RotateAllWeights(int weights[], int r) {
+        if (r == 0) return;
+        r = r % 12;
+        if (r < 0) r += 12;
+
+        int temp[12];
+        for (int i = 0; i < 12; ++i) {
+            temp[i] = weights[i];
+        }
+
+        for (int i = 0; i < 12; i++) {
+            weights[(i + r) % 12] = temp[i];
+        }
+    }
+
+    void RotatePositiveWeights(int weights[], int r) {
+        if (r == 0) return;
+        r = r % 12;
+        if (r < 0) r += 12;
+
+        std::vector<int> indices;
+        std::vector<int> values;
+        for (int i = 0; i < 12; ++i) {
+            if (weights[i] > 0) {
+                indices.push_back(i);
+                values.push_back(weights[i]);
+            }
+        }
+        int n = indices.size();
+        if (n == 0) return;
+
+        std::vector<int> temp(n);
+        for (int i = 0; i < n; ++i) {
+            temp[(i + r) % n] = values[i];
+        }
+
+        for (int i = 0; i < n; ++i) {
+            weights[indices[i]] = temp[i];
+        }
+    }
 
     int GetNextWeightedPitch() {
         int total_weights = 0;
@@ -264,7 +331,7 @@ private:
                         gfxDottedLine(xOffset, yOffset, xOffset, yOffset + 10);
                     }
                 } else {
-                    gfxDottedLine(xOffset, yOffset, xOffset, yOffset + 10);    
+                    gfxDottedLine(xOffset, yOffset, xOffset, yOffset + 10);
                 }
                 gfxLine(xOffset - 1, yOffset + 10 - weights[i], xOffset + 1, yOffset + 10 - weights[i]);
             }
@@ -272,11 +339,23 @@ private:
 
         // cursor for keys
         if (!EditMode()) {
-            if (cursor >= FIRST_NOTE) {
+            if (cursor == ROTATE) {
+                gfxCursor(56, 60, 7);
+                gfxCursor(56, 61, 7);
+            } else if (cursor >= FIRST_NOTE) {
                 int i = cursor - FIRST_NOTE;
-                gfxCursor(x[i] - 1, p[i] ? 24 : 60, p[i] ? 5 : 6);
-                gfxCursor(x[i] - 1, p[i] ? 25 : 61, p[i] ? 5 : 6);
+                gfxCursor(x[i] - 1, p[i] ? 24 : 60, p[i] ? 5 : 7);
+                gfxCursor(x[i] - 1, p[i] ? 25 : 61, p[i] ? 5 : 7);
             }
+        } else {
+            if (cursor == ROTATE) {
+                gfxRect(56, 60, 7, 4);
+                gfxClear(57, 61, 5, 2);
+            }
+        }
+
+        if (cv_rotate) {
+            gfxRect(57, 61, 5, 2);
         }
 
         // scaling params
