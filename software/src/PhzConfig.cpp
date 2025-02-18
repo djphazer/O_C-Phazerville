@@ -16,7 +16,7 @@ namespace PhzConfig {
 const char * const EEPROM_FILENAME = "EEPROM.DAT";
 
 LittleFS_Program myfs;
-File dataFile;  // Specifes that dataFile is of File type
+File dataFile;
 
 ConfigMap cfg_store;
 int record_count = 0;
@@ -37,7 +37,8 @@ void setup()
 
     // convenient for testing and for longevity
     cfg_store[POWER_CYCLE_COUNT] += 1;
-    save_config();
+    // let's maybe not write back to flash every single time
+    //save_config();
   }
 }
 
@@ -63,6 +64,7 @@ bool getValue(KEY key, VALUE &value)
 void save_config(const char* filename)
 {
     Serial.println("\nSaving Config!!!");
+    Serial.printf("\nSaving Config: %s\n", filename);
 
     size_t bytes_written = 0;
     record_count = 0;
@@ -76,11 +78,14 @@ void save_config(const char* filename)
     if (dataFile) {
       for (auto &i : cfg_store)
       {
-        bytes_written += dataFile.write((const uint8_t*)&i.first, sizeof(i.first));
-        bytes_written += dataFile.write((const uint8_t*)&i.second, sizeof(i.second));
-
-        // print to the serial port too:
-        //Serial.println(dataString);
+        int result = dataFile.write((const uint8_t*)&i.first, sizeof(i.first)) +
+                    dataFile.write((const uint8_t*)&i.second, sizeof(i.second));
+        if (result != (sizeof(i.first) + sizeof(i.second))) {
+          // something went wrong
+          Serial.printf("!! ERROR while writing file !!\n   Result = %d\n", result);
+          break;
+        }
+        bytes_written += result;
 
         record_count += 1;
       }
@@ -96,10 +101,12 @@ void save_config(const char* filename)
 bool load_config(const char* filename)
 {
   cfg_store.clear();
-  Serial.println("\nLoading Config!!!");
+  record_count = 0;
+
+  Serial.printf("\nLoading Config: %s\n", filename);
   dataFile = myfs.open(filename);
   if (!dataFile) {
-    Serial.printf("error opening %s\n", filename);
+    Serial.printf("ERROR opening %s\n", filename);
     return false;
   }
 
@@ -111,14 +118,14 @@ bool load_config(const char* filename)
     buf[pos++] = n;
 
     // debug print
-    if (n < 16) Serial.print("0");
-    Serial.print(n, HEX);
+    //if (n < 16) Serial.print("0");
+    //Serial.print(n, HEX);
 
     static_assert(sizeof(KEY) + sizeof(VALUE) == 10, "config data size mismatch");
     if (pos >= 10) {
       cfg_store.insert_or_assign(
-          (uint32_t)buf[0] |
-          (uint32_t)buf[1] << 8,
+          (uint16_t)buf[0] |
+          (uint16_t)buf[1] << 8,
 
           (uint64_t)buf[2] |
           (uint64_t)buf[3] << 8 |
@@ -129,10 +136,12 @@ bool load_config(const char* filename)
           (uint64_t)buf[8] << 48 |
           (uint64_t)buf[9] << 56
           );
+      ++record_count;
       pos = 0;
-      Serial.println();
+      //Serial.println();
     }
   }
+  Serial.printf("Loaded %d Records.\n", record_count);
 
   dataFile.close();
   return true;
@@ -140,7 +149,7 @@ bool load_config(const char* filename)
 
 void listFiles()
 {
-  Serial.print("\n Space Used = ");
+  Serial.print("\n     Space Used = ");
   Serial.println(myfs.usedSize());
   Serial.print("Filesystem Size = ");
   Serial.println(myfs.totalSize());

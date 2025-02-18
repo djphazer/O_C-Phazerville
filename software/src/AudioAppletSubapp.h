@@ -368,9 +368,9 @@ public:
         // stereo applets
         PhzConfig::getValue(preset_key | key(STEREO_APPLETS, slot), data);
         int ix = get_stereo_applet_ix_by_id(slot, data, 0);
-        Serial.printf("%lu: Loading applet id=", slot);
-        Serial.print(data);
-        Serial.printf(" ix=%d\n", ix);
+        Serial.printf("\n%lu: Loading applet id=", slot);
+        Serial.print(data, HEX);
+        Serial.printf(" ix=%d", ix);
         ChangeStereoApplet(LEFT_HEMISPHERE, slot, ix);
 
         if (data) {
@@ -389,9 +389,9 @@ public:
           data = 0; // Default to input/passthrough if nothing is found.
           PhzConfig::getValue(preset_key | key(MONO_APPLETS, slot_key), data);
           int ix = get_mono_applet_ix_by_id(ch, slot, data, 0);
-          Serial.printf("%lu, %d: Loading applet id=", slot, ch);
-          Serial.print(data);
-          Serial.printf(" ix=%d\n", ix);
+          Serial.printf("\n%lu, %d: Loading applet id=", slot, ch);
+          Serial.print(data, HEX);
+          Serial.printf(" ix=%d", ix);
           ChangeMonoApplet(ch, slot, ix);
 
           if (data) {
@@ -418,8 +418,8 @@ public:
     for (size_t slot = 0; slot < Slots; ++slot) {
       auto& stereo_applet = get_selected_stereo_applet(slot);
       applet_id = stereo_applet.applet_id();
-      Serial.printf("%lu: Saving applet id=", slot);
-      Serial.println(applet_id);
+      Serial.printf("\n%lu: Saving applet id=", slot);
+      Serial.print(applet_id, HEX);
       PhzConfig::setValue(preset_key | key(STEREO_APPLETS, slot), applet_id);
 
       SaveAppletData(
@@ -430,8 +430,8 @@ public:
         uint8_t slot_key = slot + ch * Slots;
         auto& mono_applet = get_selected_mono_applet(ch, slot);
         applet_id = mono_applet.applet_id();
-        Serial.printf("%lu, %d: Saving applet id=", slot, ch);
-        Serial.println(applet_id);
+        Serial.printf("\n%lu, %d: Saving applet id=", slot, ch);
+        Serial.print(applet_id, HEX);
         PhzConfig::setValue(preset_key | key(MONO_APPLETS, slot_key), applet_id);
 
         SaveAppletData(
@@ -445,10 +445,10 @@ public:
     array<uint64_t, APPLET_CONFIG_SIZE> data;
     for (uint_fast8_t i = 0; i < APPLET_CONFIG_SIZE; ++i) {
       if (PhzConfig::getValue(key + i, data[i])) {
-        Serial.printf("... got data[%u]=", i);
-        Serial.println(data[i], HEX);
+        Serial.printf(" | data[%u]=", i);
+        Serial.print(data[i], HEX);
       } else {
-        Serial.printf("... no data[%u]\n", i);
+        Serial.printf(" | no data[%u]", i);
         data[i] = 0;
       }
     }
@@ -461,8 +461,8 @@ public:
     for (uint_fast8_t i = 0; i < APPLET_CONFIG_SIZE; ++i) {
       // We default to 0, so may as well skip them to save space
       if (data[i]) PhzConfig::setValue(key + i, data[i]);
-      Serial.printf("... saved data[%u]=", i);
-      Serial.println(data[i], HEX);
+      Serial.printf(" | data[%u]=", i);
+      Serial.print(data[i], HEX);
     }
   }
 
