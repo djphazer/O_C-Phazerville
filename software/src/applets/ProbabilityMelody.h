@@ -56,7 +56,7 @@ public:
         if (cv_rotate) { // override original cv mod functions to rotate probabilities
             ForEachChannel(ch) {
                 int last_rotation = rotation[ch];
-                rotation[ch] = Proportion(DetentedIn(ch), 5 * HEMISPHERE_MAX_INPUT_CV / 6, 12);
+                rotation[ch] = SemitoneIn(ch) / 3;
                 int step = rotation[ch] - last_rotation;
                 if (ch) RotatePositiveWeights(weights, step);
                 else RotateAllWeights(weights, step);
@@ -221,27 +221,23 @@ private:
 
     void RotatePositiveWeights(uint8_t weights[], int r) {
         if (r == 0) return;
-        r = r % 12;
-        if (r < 0) r += 12;
 
-        std::vector<int> indices;
-        std::vector<int> values;
+        int count = 0;
+        uint8_t indices[12];
+        uint8_t values[12];
         for (int i = 0; i < 12; ++i) {
             if (weights[i] > 0) {
-                indices.push_back(i);
-                values.push_back(weights[i]);
+                indices[count] = i;
+                values[count] = weights[i];
+                ++count;
             }
         }
-        int n = indices.size();
-        if (n == 0) return;
+        if (count == 0) return;
 
-        std::vector<int> temp(n);
-        for (int i = 0; i < n; ++i) {
-            temp[(i + r) % n] = values[i];
-        }
-
-        for (int i = 0; i < n; ++i) {
-            weights[indices[i]] = temp[i];
+        r = r % count;
+        if (r < 0) r += count;
+        for (int i = 0; i < count; ++i) {
+            weights[indices[(i + r) % count]] = values[i];
         }
     }
 
