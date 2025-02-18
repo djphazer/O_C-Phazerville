@@ -153,38 +153,22 @@ public:
 
     uint64_t OnDataRequest() {
         uint64_t data = 0;
-        Pack(data, PackLocation {0, 4}, weights[0]);
-        Pack(data, PackLocation {4, 4}, weights[1]);
-        Pack(data, PackLocation {8, 4}, weights[2]);
-        Pack(data, PackLocation {12, 4}, weights[3]);
-        Pack(data, PackLocation {16, 4}, weights[4]);
-        Pack(data, PackLocation {20, 4}, weights[5]);
-        Pack(data, PackLocation {24, 4}, weights[6]);
-        Pack(data, PackLocation {28, 4}, weights[7]);
-        Pack(data, PackLocation {32, 4}, weights[8]);
-        Pack(data, PackLocation {36, 4}, weights[9]);
-        Pack(data, PackLocation {40, 4}, weights[10]);
-        Pack(data, PackLocation {44, 4}, weights[11]);
+        for (size_t i = 0; i < 12; ++i) {
+          Pack(data, PackLocation {i*4, 4}, weights[i]);
+        }
         Pack(data, PackLocation {48, 6}, down);
         Pack(data, PackLocation {54, 6}, up);
+        Pack(data, PackLocation {60, 1}, cv_rotate);
         return data;
     }
 
     void OnDataReceive(uint64_t data) {
-        weights[0] = Unpack(data, PackLocation {0,4});
-        weights[1] = Unpack(data, PackLocation {4,4});
-        weights[2] = Unpack(data, PackLocation {8,4});
-        weights[3] = Unpack(data, PackLocation {12,4});
-        weights[4] = Unpack(data, PackLocation {16,4});
-        weights[5] = Unpack(data, PackLocation {20,4});
-        weights[6] = Unpack(data, PackLocation {24,4});
-        weights[7] = Unpack(data, PackLocation {28,4});
-        weights[8] = Unpack(data, PackLocation {32,4});
-        weights[9] = Unpack(data, PackLocation {36,4});
-        weights[10] = Unpack(data, PackLocation {40,4});
-        weights[11] = Unpack(data, PackLocation {44,4});
+        for (size_t i = 0; i < 12; ++i) {
+          weights[i] = Unpack(data, PackLocation {i*4,4});
+        }
         down = Unpack(data, PackLocation{48,6});
         up = Unpack(data, PackLocation{54,6});
+        cv_rotate = Unpack(data, PackLocation{60,1});
     }
 
 protected:
@@ -192,8 +176,8 @@ protected:
     //                    "-------" <-- Label size guide
     help[HELP_DIGITAL1] = "Clock 1";
     help[HELP_DIGITAL2] = "Clock 2";
-    help[HELP_CV1]      = "Lo/Semi";
-    help[HELP_CV2]      = "Hi/Posi";
+    help[HELP_CV1]      = cv_rotate? "Rotate" : "Lo/Semi";
+    help[HELP_CV2]      = cv_rotate? "RotMask" : "Hi/Posi";
     help[HELP_OUT1]     = "Pitch 1";
     help[HELP_OUT2]     = "Pitch 2";
     help[HELP_EXTRA1]   = "Set: Range bounds /";
@@ -203,7 +187,7 @@ protected:
 
 private:
     int cursor; // ProbMeloCursor
-    int weights[12] = {10,0,0,2,0,0,0,2,0,0,4,0};
+    uint8_t weights[12] = {10,0,0,2,0,0,0,2,0,0,4,0};
     int up, up_mod;
     int down, down_mod;
     int pitch;
@@ -220,12 +204,12 @@ private:
     const uint8_t p[12] = {0, 1,  0,  1,  0,  0,  1,  0,  1,  0,  1,  0};
     const char* n[12] = {"C", "C", "D", "D", "E", "F", "F", "G", "G", "A", "A", "B"};
 
-    void RotateAllWeights(int weights[], int r) {
+    void RotateAllWeights(uint8_t weights[], int r) {
         if (r == 0) return;
         r = r % 12;
         if (r < 0) r += 12;
 
-        int temp[12];
+        uint8_t temp[12];
         for (int i = 0; i < 12; ++i) {
             temp[i] = weights[i];
         }
@@ -235,7 +219,7 @@ private:
         }
     }
 
-    void RotatePositiveWeights(int weights[], int r) {
+    void RotatePositiveWeights(uint8_t weights[], int r) {
         if (r == 0) return;
         r = r % 12;
         if (r < 0) r += 12;
