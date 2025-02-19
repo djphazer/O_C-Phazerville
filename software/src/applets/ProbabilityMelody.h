@@ -49,26 +49,38 @@ public:
     void Controller() {
         loop_linker->RegisterMelo(hemisphere);
 
+        ForEachChannel(ch) { // prevent ranges from jumping to new values when changing mod modes
+            if (mod_latch[ch]) {
+                if (cv_rotate) {
+                    // if (abs(SemitoneIn(ch) - last_rot_cv[ch]) < 2) mod_latch[ch] = false;
+                } else {
+                    if (abs(SemitoneIn(ch) - last_range_cv[ch]) < 2) mod_latch[ch] = false;
+                }
+            }
+        }
+
         // stash these to check for regen
         int oldDown = down_mod;
         int oldUp = up_mod;
 
-        if (cv_rotate) { // override original cv mod functions to rotate probabilities
+        if (cv_rotate && range_init) { // override original cv mod functions to rotate probabilities
             ForEachChannel(ch) {
                 int last_rotation = rotation[ch];
                 rotation[ch] = SemitoneIn(ch);
                 int step = rotation[ch] - last_rotation;
-                if (ch) RotatePositiveWeights(weights, step);
-                else RotateAllWeights(weights, step);
+                if (ch && step) RotateMaskedWeights(weights, step);
+                else if (step) RotateAllWeights(weights, step);
             }
-        } else {
-            // CV modulation
-            down_mod = down;
-            up_mod = up;
-            // down scales to the up setting
-            Modulate(down_mod, 0, 1, up);
-            // up scales full range, with down value as a floor
-            Modulate(up_mod, 1, down_mod, HEM_PROB_MEL_MAX_RANGE);
+        } else { // CV modulation
+            if (!mod_latch[0]) {
+                down_mod = down;
+                Modulate(down_mod, 0, 1, up); // down scales to the up setting
+            }
+            if (!mod_latch[1]) {
+                up_mod = up;
+                Modulate(up_mod, 1, down_mod, HEM_PROB_MEL_MAX_RANGE); // up scales full range, with down value as a floor
+            }
+            range_init = true;
         }
 
         // regen when looping was enabled from ProbDiv
@@ -129,7 +141,7 @@ public:
         } else if (cursor >= FIRST_NOTE) {
             // editing note probability
             int i = cursor - FIRST_NOTE;
-            weights[i] = constrain(weights[i] + direction, 0, HEM_PROB_MEL_MAX_WEIGHT);
+            weights[i] = constrain(weights[i] + direction, -1, HEM_PROB_MEL_MAX_WEIGHT); // -1 removes note from mask
             value_animation = HEMISPHERE_CURSOR_TICKS;
         } else {
             // editing scaling
@@ -147,14 +159,18 @@ public:
     }
 
     void AuxButton() {
-        // if (cursor == ROTATE)
-            cv_rotate = !cv_rotate;
+        cv_rotate = !cv_rotate;
+        ForEachChannel(ch) { // prevent ranges from jumping to new values when changing mod modes
+            mod_latch[ch] = true;
+            if (cv_rotate) last_range_cv[ch] = SemitoneIn(ch);
+            // else last_rot_cv[ch] = SemitoneIn(ch);
+        }
     }
 
     uint64_t OnDataRequest() {
         uint64_t data = 0;
         for (size_t i = 0; i < 12; ++i) {
-          Pack(data, PackLocation {i*4, 4}, weights[i]);
+            Pack(data, PackLocation {i*4, 4}, weights[i]+1);
         }
         Pack(data, PackLocation {48, 6}, down);
         Pack(data, PackLocation {54, 6}, up);
@@ -164,37 +180,43 @@ public:
 
     void OnDataReceive(uint64_t data) {
         for (size_t i = 0; i < 12; ++i) {
-          weights[i] = Unpack(data, PackLocation {i*4,4});
+            weights[i] = Unpack(data, PackLocation {i*4,4})-1;
         }
-        down = Unpack(data, PackLocation{48,6});
-        up = Unpack(data, PackLocation{54,6});
+        down = constrain(Unpack(data, PackLocation{48,6}), 1, up);
+        up = constrain(Unpack(data, PackLocation{54,6}), down, 60);
         cv_rotate = Unpack(data, PackLocation{60,1});
+
+        if (cv_rotate) range_init = false;
     }
 
 protected:
-  void SetHelp() {
-    //                    "-------" <-- Label size guide
-    help[HELP_DIGITAL1] = "Clock 1";
-    help[HELP_DIGITAL2] = "Clock 2";
-    help[HELP_CV1]      = cv_rotate? "Rotate" : "Lo/Semi";
-    help[HELP_CV2]      = cv_rotate? "RotMask" : "Hi/Posi";
-    help[HELP_OUT1]     = "Pitch 1";
-    help[HELP_OUT2]     = "Pitch 2";
-    help[HELP_EXTRA1]   = "Set: Range bounds /";
-    help[HELP_EXTRA2]   = "     Note weights";
-    //                    "---------------------" <-- Extra text size guide
-  }
+    void SetHelp() {
+        //                    "-------" <-- Label size guide
+        help[HELP_DIGITAL1] = "Clock 1";
+        help[HELP_DIGITAL2] = "Clock 2";
+        help[HELP_CV1]      = cv_rotate? "RotKey" : "Lower";
+        help[HELP_CV2]      = cv_rotate? "RotMask" : "Upper";
+        help[HELP_OUT1]     = "Pitch 1";
+        help[HELP_OUT2]     = "Pitch 2";
+        help[HELP_EXTRA1]   = "Set: Range bounds /";
+        help[HELP_EXTRA2]   = "     Note weights";
+        //                    "---------------------" <-- Extra text size guide
+    }
 
 private:
     int cursor; // ProbMeloCursor
-    uint8_t weights[12] = {10,0,0,2,0,0,0,2,0,0,4,0};
+    int8_t weights[12] = {10,0,0,2,0,0,0,2,0,0,4,0};
     int up, up_mod;
     int down, down_mod;
     int pitch;
     bool isLooping = false;
     int seqloop[2][HEM_PROB_MEL_MAX_LOOP_LENGTH];
     bool cv_rotate = false;
-    int rotation[2] = {0};
+    int8_t rotation[2] = {0};
+    bool mod_latch[2] = {false};
+    // int8_t last_rot_cv[2];
+    int8_t last_range_cv[2];
+    bool range_init = false;
 
     ProbLoopLinker *loop_linker = loop_linker->get();
 
@@ -204,29 +226,29 @@ private:
     const uint8_t p[12] = {0, 1,  0,  1,  0,  0,  1,  0,  1,  0,  1,  0};
     const char* n[12] = {"C", "C", "D", "D", "E", "F", "F", "G", "G", "A", "A", "B"};
 
-    void RotateAllWeights(uint8_t weights[], int r) {
+    void RotateAllWeights(int8_t weights[], int r) {
         if (r == 0) return;
         r = r % 12;
         if (r < 0) r += 12;
 
-        uint8_t temp[12];
+        int8_t temp[12];
         for (int i = 0; i < 12; ++i) {
             temp[i] = weights[i];
         }
 
-        for (int i = 0; i < 12; i++) {
+        for (int i = 0; i < 12; ++i) {
             weights[(i + r) % 12] = temp[i];
         }
     }
 
-    void RotatePositiveWeights(uint8_t weights[], int r) {
+    void RotateMaskedWeights(int8_t weights[], int r) {
         if (r == 0) return;
 
         int count = 0;
         uint8_t indices[12];
-        uint8_t values[12];
+        int8_t values[12];
         for (int i = 0; i < 12; ++i) {
-            if (weights[i] > 0) {
+            if (weights[i] >= 0) {
                 indices[count] = i;
                 values[count] = weights[i];
                 ++count;
@@ -244,13 +266,13 @@ private:
     int GetNextWeightedPitch() {
         int total_weights = 0;
 
-        for(int i = down_mod-1; i < up_mod; i++) {
-            total_weights += weights[i % 12];
+        for(int i = down_mod-1; i < up_mod; ++i) {
+            total_weights += max(0, weights[i % 12]);
         }
 
         int rnd = random(0, total_weights + 1);
-        for(int i = down_mod-1; i < up_mod; i++) {
-            int weight = weights[i % 12];
+        for(int i = down_mod-1; i < up_mod; ++i) {
+            int weight = max(0, weights[i % 12]);
             if (rnd <= weight && weight > 0) {
                 return i;
             }
@@ -261,7 +283,7 @@ private:
 
     void GenerateLoop() {
         // always fill the whole loop to make things easier
-        for (int i = 0; i < HEM_PROB_MEL_MAX_LOOP_LENGTH; i++) {
+        for (int i = 0; i < HEM_PROB_MEL_MAX_LOOP_LENGTH; ++i) {
             seqloop[0][i] = GetNextWeightedPitch();
             seqloop[1][i] = GetNextWeightedPitch();
         }
@@ -272,8 +294,7 @@ private:
         gfxFrame(0, 27, 63, 32);
 
         // White keys
-        for (uint8_t x = 0; x < 8; x++)
-        {
+        for (uint8_t x = 0; x < 8; ++x) {
             if (x == 3 || x == 7) {
                 gfxLine(x * 8, 27, x * 8, 58);
             } else {
@@ -282,8 +303,7 @@ private:
         }
 
         // Black keys
-        for (uint8_t i = 0; i < 6; i++)
-        {
+        for (uint8_t i = 0; i < 6; ++i) {
             if (i != 2) { // Skip the third position
                 uint8_t x = (i * 8) + 6;
                 gfxInvert(x, 28, 5, 15);
@@ -295,8 +315,7 @@ private:
         int note = pitch % 12;
         int octave = (pitch - 60) / 12;
 
-        for (uint8_t i = 0; i < 12; i++)
-        {
+        for (uint8_t i = 0; i < 12; ++i) {
             uint8_t xOffset = x[i] + (p[i] ? 1 : 2);
             uint8_t yOffset = p[i] ? 31 : 45;
 
@@ -313,7 +332,7 @@ private:
                 } else {
                     gfxDottedLine(xOffset, yOffset, xOffset, yOffset + 10);
                 }
-                gfxLine(xOffset - 1, yOffset + 10 - weights[i], xOffset + 1, yOffset + 10 - weights[i]);
+                if (!(weights[i] < 0)) gfxLine(xOffset - 1, yOffset + 10 - weights[i], xOffset + 1, yOffset + 10 - weights[i]);
             }
         }
 
@@ -354,25 +373,26 @@ private:
         if (cursor == UPPER) gfxCursor(39, 23, 21);
 
         if (pulse_animation > 0) {
-        //     int note = pitch % 12;
-        //     int octave = (pitch - 60) / 12;
+            // int note = pitch % 12;
+            // int octave = (pitch - 60) / 12;
 
-        //     gfxRect(x[note] + (p[note] ? 0 : 1), p[note] ? 29 : 54, 3, 2);
+            // gfxRect(x[note] + (p[note] ? 0 : 1), p[note] ? 29 : 54, 3, 2);
             gfxRect(58, 54 - (octave * 6), 3, 3);
         }
 
         if (value_animation > 0 && cursor >= FIRST_NOTE) {
-          int i = cursor - FIRST_NOTE;
+            int i = cursor - FIRST_NOTE;
 
-          gfxRect(1, 15, 60, 10);
-          gfxInvert(1, 15, 60, 10);
+            gfxRect(1, 15, 60, 10);
+            gfxInvert(1, 15, 60, 10);
 
-          gfxPrint(18, 16, n[i]);
-          if (p[i]) {
-            gfxPrint(24, 16, "#");
-          }
-          gfxPrint(34, 16, weights[i]);
-          gfxInvert(1, 15, 60, 10);
+            gfxPrint(18, 16, n[i]);
+            if (p[i]) {
+                gfxPrint(24, 16, "#");
+            }
+            if (weights[i] < 0) gfxPrint(34, 16, "X");
+            else gfxPrint(34, 16, weights[i]);
+            gfxInvert(1, 15, 60, 10);
         }
     }
 };
