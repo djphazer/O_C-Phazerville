@@ -56,7 +56,7 @@ public:
         if (cv_rotate) { // override original cv mod functions to rotate probabilities
             ForEachChannel(ch) {
                 int last_rotation = rotation[ch];
-                rotation[ch] = SemitoneIn(ch) / 3;
+                rotation[ch] = SemitoneIn(ch);
                 int step = rotation[ch] - last_rotation;
                 if (ch) RotatePositiveWeights(weights, step);
                 else RotateAllWeights(weights, step);
