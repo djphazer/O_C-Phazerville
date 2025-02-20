@@ -50,6 +50,9 @@ public:
             GateOut(ch, false);
         }
     }
+    void Unload() {
+        loop_linker->SetLooping(0);
+    };
 
     void Controller() {
         loop_linker->RegisterDiv(hemisphere);
