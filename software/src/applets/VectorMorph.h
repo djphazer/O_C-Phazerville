@@ -147,13 +147,14 @@ private:
         VOSegment seg = osc[ch].GetSegment(osc[ch].SegmentCount() - 1);
         byte prev_x = 0; // Starting coordinates
         byte prev_y = 63 - Proportion(seg.level, 255, 38);
+        uint16_t time = 0;
 
         for (byte i = 0; i < osc[ch].SegmentCount(); i++)
         {
             seg = osc[ch].GetSegment(i);
+            time += seg.time;
             byte y = 63 - Proportion(seg.level, 255, 38);
-            byte seg_x = Proportion(seg.time, total_time, 62);
-            byte x = prev_x + seg_x;
+            byte x = Proportion(time, total_time, 62);
             x = constrain(x, 0, 62);
             y = constrain(y, 25, 62);
             gfxLine(prev_x, prev_y, x, y);
