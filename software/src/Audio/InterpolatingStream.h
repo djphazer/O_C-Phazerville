@@ -81,6 +81,7 @@ public:
         UpdateLinear(d, out);
         break;
       case INTERPOLATION_HERMITE:
+      default:
         UpdateHermite(d, out);
         break;
     }

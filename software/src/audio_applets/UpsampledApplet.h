@@ -55,6 +55,7 @@ public:
         gfxPrint("Lin");
         break;
       case INTERPOLATION_HERMITE:
+      default:
         gfxPrint("Spl");
         break;
     }
@@ -90,13 +91,12 @@ public:
         input.ChangeSource(direction);
         break;
       case 1:
-        method += direction;
-        CONSTRAIN(method, 0, 2);
+        method = constrain(method + direction, 0, 2);
         interp_stream.Method(static_cast<InterpolationMethod>(method));
         break;
       case 2:
         gain += direction;
-        CONSTRAIN(direction, -999, 999);
+        CONSTRAIN(gain, LVL_MIN_DB, LVL_MAX_DB);
         break;
     }
   }
@@ -108,6 +108,8 @@ public:
   void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
     UnpackPackables(data[0], pack(gain), pack<1>(ac_couple), pack<2>(method));
     UnpackPackables(data[1], input);
+    CONSTRAIN(gain, LVL_MIN_DB, LVL_MAX_DB);
+    CONSTRAIN(method, 0, 2);
   }
 
   AudioStream* InputStream() override {
@@ -134,7 +136,7 @@ private:
   float lp = 0.0f;
   int cursor = 0;
   CVInputMap input;
-  int16_t gain = -1; // dB
-  int8_t method = INTERPOLATION_HERMITE;
+  int8_t gain = -1; // dB
+  uint8_t method = INTERPOLATION_HERMITE;
   boolean ac_couple = 0;
 };
