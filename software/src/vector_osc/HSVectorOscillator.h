@@ -82,7 +82,7 @@ public:
     }
 
     /* The offset amount will be added to each voltage output */
-    void Offset(int32_t offset_) {offset = offset_;}
+    void Offset(int16_t offset_) {offset = offset_;}
 
     /* Add a new segment to the end */
     void SetSegment(HS::VOSegment segment) {
@@ -162,34 +162,35 @@ public:
 
     /* Get the value of the waveform at a specific phase. Degrees are expressed in tenths of a degree */
     int32_t Phase(int degrees) {
-    		degrees = degrees % 3600;
-    		degrees = abs(degrees);
+        uint32_t phase = 0xffffffff / 3600 * degrees;
+        uint32_t tu = time_unit();
+        uint8_t segment = 0;
+        for (uint8_t i = 0; i < segment_count; i++) {
+            uint32_t segment_dur = segments[i].time * tu;
+            if (phase < segment_dur) {
+                segment = i;
+                break;
+            }
+            phase -= segment_dur;
+        }
+        uint32_t segment_dur = tu * segments[segment].time;
+        uint32_t segment_phase = (phase / (segment_dur >> 16)) << 16;
+        return Phase32(segment, segment_phase);
+    }
 
-    		// I need to find out which segment the specified phase occurs in
-    		uint8_t time_index = Proportion(degrees, 3600, total_time);
-    		uint8_t segment = 0;
-    		uint8_t time = 0;
-    		for (uint8_t ix = 0; ix < segment_count; ix++)
-    		{
-    			time += segments[ix].time;
-    			if (time > time_index) {
-    				segment = ix;
-    				break;
-    			}
-    		}
-
-    		// Where does this segment start, and how many degrees does it span?
-    		int start_degree = Proportion(time - segments[segment].time, total_time, 3600);
-    		int segment_degrees = Proportion(segments[segment].time, total_time, 3600);
-
-    		// Start and end point of the total segment
-    		int start = signal2int(scale_level(segment == 0 ? segments[segment_count - 1].level : segments[segment - 1].level));
-    		int end = signal2int(scale_level(segments[segment].level));
-
-    		// Determine the signal based on the levels and the position within the segment
-    		int signal = Proportion(degrees - start_degree, segment_degrees, end - start) + start;
-
-        return signal + offset;
+    int32_t Phase32(uint8_t segment, uint32_t segment_phase) {
+        // Start and end point of the total segment
+        int start = segments[segment == 0 ? segment_count - 1 : segment - 1].level - 128;
+        int end = segments[segment].level - 128;
+        segment_phase >>= 9; // shift down to 23 bits
+        int delta = (end - start) * segment_phase; // 9 bits * 23 bits = 32 bits
+        delta /= 32768; // shift to 16 bits plus a sign bit 
+        // delta + (start * 256) will stay between (start * 256) and (end *
+        // 256). Hence, it will be 16 bit signed. * 16 bit unsigned scale gives
+        // 32 bit signed. Result is supposed to be +/- scale. Hence, we divide
+        // by the max abs value of (delta + (start * 256)), 32768
+        int unscaled = (delta + (start * 256));
+        return  unscaled * scale / 32768 + offset;
     }
 
 private:
@@ -203,7 +204,7 @@ private:
     uint32_t frequency; // In centihertz
     uint16_t scale; // The maximum (and minimum negative) output for this Oscillator
     bool cycle = 1; // Waveform will cycle
-    int32_t offset = 0; // Amount added to each voltage output (e.g., to make it unipolar)
+    int16_t offset = 0; // Amount added to each voltage output (e.g., to make it unipolar)
     bool sustain = 0; // Waveform stops when it reaches the end of the penultimate stage
     bool sustained = 0; // Current state of sustain. Only active when sustain = 1
 
