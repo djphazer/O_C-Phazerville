@@ -391,7 +391,7 @@ private:
   CVInputMap feedback_cv;
   int8_t wet = 50;
   CVInputMap wet_cv;
-  int8_t taps = 1;
+  uint8_t taps = 1;
   int8_t delay_mod_type = CROSSFADE;
 
   NoiseSuppressor delay_cv{
