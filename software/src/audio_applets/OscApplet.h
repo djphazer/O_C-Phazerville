@@ -234,7 +234,7 @@ private:
     = {WAVEFORM_SINE, WAVEFORM_TRIANGLE_VARIABLE, WAVEFORM_BANDLIMIT_PULSE};
   static constexpr char const* WAVEFORM_NAMES[3] = {"SIN", "TRI", "PLS"};
   static constexpr char const* MOD_TYPE_NAMES[2] = {"FM", "PM"};
-  enum ModType : int8_t { FM, PM };
+  enum ModType : uint8_t { FM, PM };
   static const int MOD_DEPTH_MAX = 500;
   // 5 octaves; empirically about what Plaits max FM corresponds to
   static constexpr float FM_DEPTH = 5.0f;
@@ -242,11 +242,11 @@ private:
   // go a bit deeper
   static constexpr float PM_DEPTH = 180.0f * 5.0f;
 
-  int8_t waveform;
+  uint8_t waveform;
   int8_t pw = 50;
   int16_t pitch = 1 * 12 * 128; // C4
   ModType mod_type = PM;
-  int16_t mod_depth = 0;
+  uint16_t mod_depth = 0;
   int8_t level = 0; // dB
   int8_t mix = 100;
 
