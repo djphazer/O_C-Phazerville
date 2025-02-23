@@ -187,7 +187,11 @@ public:
     // Buffered I/O functions
     int ViewIn(int ch) {return frame.inputs[io_offset + ch];}
     int ViewOut(int ch) {return frame.outputs[io_offset + ch];}
-    uint32_t ClockCycleTicks(int ch) {return frame.cycle_ticks[io_offset + ch];}
+    uint32_t ClockCycleTicks(int ch) {
+      if (clock_m.IsRunning() && clock_m.GetMultiply(io_offset + ch) != 0)
+          return clock_m.GetCycleTicks(io_offset + ch);
+      return frame.cycle_ticks[io_offset + ch];
+    }
     bool Changed(int ch) {return frame.changed_cv[io_offset + ch];}
 
     //////////////// Offset I/O methods
