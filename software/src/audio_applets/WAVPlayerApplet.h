@@ -32,9 +32,7 @@ public:
   }
 
   void Controller() {
-    float gain = dbToScalar(level)
-      * static_cast<float>(level_cv.In(HEMISPHERE_MAX_INPUT_CV))
-      / HEMISPHERE_MAX_INPUT_CV;
+    float gain = dbToScalar(level) * level_cv.InF(1.0f);
 
     const int i = 0;
     FileLevel(gain);

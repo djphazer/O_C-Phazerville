@@ -21,7 +21,8 @@ public:
       filtfolder[i].filter.frequency(PitchToRatio(pitch + pitch_cv.In()) * C3);
       filtfolder[i].filter.resonance(0.01f * (res + res_cv.InRescaled(500)));
       filtfolder[i].AmpAndFold(
-        fold + fold_cv.InRescaled(100), amplevel + amp_cv.InRescaled(100)
+        0.01f * fold * fold_cv.InF(1.0f),
+        dbToScalar(amplevel) * amp_cv.InF(1.0f)
       );
     }
   }
@@ -51,9 +52,9 @@ public:
     gfxPrintIcon(fold_cv.Icon());
     gfxEndCursor(cursor == 5);
 
-    gfxPrint(label_x, 45, "Amp: ");
+    gfxPrint(label_x, 45, "Amp:");
     gfxStartCursor();
-    graphics.printf("%3d", amplevel);
+    gfxPrintDb(amplevel);
     gfxEndCursor(cursor == 6);
     gfxStartCursor();
     gfxPrintIcon(amp_cv.Icon());
@@ -85,7 +86,7 @@ public:
         fold_cv.ChangeSource(direction);
         break;
       case 6:
-        amplevel = constrain(amplevel + direction, 0, 100);
+        amplevel = constrain(amplevel + direction, LVL_MIN_DB, LVL_MAX_DB);
         break;
       case 7:
         amp_cv.ChangeSource(direction);
@@ -121,7 +122,7 @@ private:
   CVInputMap res_cv;
   int16_t fold = 0;
   CVInputMap fold_cv;
-  int16_t amplevel = 100;
+  int8_t amplevel = 0;
   CVInputMap amp_cv;
 
   struct FilterFolder {
@@ -135,10 +136,9 @@ private:
     AudioConnection conn3{folder, 0, mixer, 3};
     AudioConnection conn4{drive, 0, folder, 1};
 
-    void AmpAndFold(int foldamt, int amplevel) {
-      float foldF = 0.01f * foldamt;
+    void AmpAndFold(float foldF, float level) {
       drive.amplitude(foldF);
-      mixer.gain(0, 0.01f * amplevel * (1.0 - abs(foldF)));
+      mixer.gain(0, level * (1.0 - abs(foldF)));
       mixer.gain(3, foldF * 0.9);
     }
   };
