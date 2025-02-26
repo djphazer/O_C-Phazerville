@@ -21,6 +21,8 @@
 #ifndef HS_VECTOR_OSCILLATOR
 #define HS_VECTOR_OSCILLATOR
 
+#include "util/util_math.h"
+
 namespace HS {
 
 const uint8_t VO_SEGMENT_COUNT = 64; // The total number of segments in user memory
@@ -75,10 +77,12 @@ public:
 
     /* Move to the release stage after sustain */
     void Release() {
+        segment_start_level = update_current();
         sustained = 0;
+        uint32_t tu = time_unit();
         segment_index = segment_count - 1;
-        calculate_rise(segment_index);
-        total_run = 0;
+        segment_time = total_time - segments[segment_index].time;
+        phase = segment_time * tu;
     }
 
     /* The offset amount will be added to each voltage output */
@@ -111,11 +115,17 @@ public:
 
     /* frequency is centihertz (e.g., 440 Hz is 44000) */
     void SetFrequency(uint32_t frequency_) {
-        SetFrequency_4dec(100 * frequency_);
+        SetPhaseIncrement(0xffffffff / 1666667 * frequency_);
     }
 
+    // Frequency in 10ths of millihertz
+    // TODO: This is going to be quite innaccurate and should just be removed
     void SetFrequency_4dec(uint32_t frequency_) {
-        frequency = frequency_;
+        phase_increment = 0xffffffff / 166666667 * frequency_;
+    }
+    
+    void SetPhaseIncrement(uint32_t phase_inc) {
+        phase_increment = phase_inc;
     }
 
     bool GetEOC() {return eoc;}
@@ -131,9 +141,9 @@ public:
 
     void Reset() {
         segment_index = 0;
-        signal = scale_level(segments[segment_count - 1].level);
-        calculate_rise(segment_index);
-        total_run = 0;
+        segment_time = 0;
+        segment_start_level = (segments[segment_count - 1].level - 128) * 256;
+        phase = 0;
         sustained = 0;
         eoc = !cycle;
     }
@@ -141,40 +151,33 @@ public:
     int32_t Next() {
         // For non-cycling waveforms, send the level of the last step if eoc
         if (eoc && cycle == 0) {
-            vosignal_t nr_signal = scale_level(segments[segment_count - 1].level);
-            return signal2int(nr_signal) + offset;
+            return Phase32(segment_count - 1, 0xffffffff);
         }
+        uint32_t old_phase = phase;
         if (!sustained) { // Observe sustain state
             eoc = 0;
             if (validate()) {
-                vosignal_t overflow = step_by(vosignal_t(frequency));
-                if (overflow > 0) {
-                    // If we overflow again, just add it to run_delta to be taken care of in next iteration.
-                    // We could while-loop this instead, but it really shouldn't happen (as segments are
-                    // longer than 9990, the max frequency in available apps) and I was observing occassional
-                    // infinite loops when switch shapes.
-                    run_delta += step_by(overflow);
-                }
-			}
+                phase += phase_increment;
+            }
         }
-        return signal2int(signal) + offset;
+        if (!cycle && phase < old_phase) {
+            phase = 0xffffffff;
+            eoc = true;
+            return Phase32(segment_count - 1, 0xffffffff);
+        }
+        return rescale(update_current());
     }
 
     /* Get the value of the waveform at a specific phase. Degrees are expressed in tenths of a degree */
     int32_t Phase(int degrees) {
         uint32_t phase = 0xffffffff / 3600 * degrees;
-        uint32_t tu = time_unit();
         uint8_t segment = 0;
-        for (uint8_t i = 0; i < segment_count; i++) {
-            uint32_t segment_dur = segments[i].time * tu;
-            if (phase < segment_dur) {
-                segment = i;
-                break;
-            }
-            phase -= segment_dur;
-        }
-        uint32_t segment_dur = tu * segments[segment].time;
-        uint32_t segment_phase = (phase / (segment_dur >> 16)) << 16;
+        uint8_t segment_start = 0;
+        uint32_t segment_phase = 0;
+        int16_t ignored;
+        find_segment(
+            phase, false, segment, segment_start, ignored, segment_phase
+        );
         return Phase32(segment, segment_phase);
     }
 
@@ -182,38 +185,25 @@ public:
         // Start and end point of the total segment
         int start = segments[segment == 0 ? segment_count - 1 : segment - 1].level - 128;
         int end = segments[segment].level - 128;
-        segment_phase >>= 9; // shift down to 23 bits
-        int delta = (end - start) * segment_phase; // 9 bits * 23 bits = 32 bits
-        delta /= 32768; // shift to 16 bits plus a sign bit 
-        // delta + (start * 256) will stay between (start * 256) and (end *
-        // 256). Hence, it will be 16 bit signed. * 16 bit unsigned scale gives
-        // 32 bit signed. Result is supposed to be +/- scale. Hence, we divide
-        // by the max abs value of (delta + (start * 256)), 32768
-        int unscaled = (delta + (start * 256));
-        return  unscaled * scale / 32768 + offset;
+        return rescale(InterpLinear16(start * 256, end * 256, segment_phase >> 16));
     }
 
 private:
     VOSegment segments[12]; // Array of segments in this Oscillator
     uint8_t segment_count = 0; // Number of segments
     int total_time = 0; // Sum of time values for all segments
-    vosignal_t signal = 0; // Current scaled signal << 10 for more precision
-    vosignal_t target = 0; // Target scaled signal. When the target is reached, the Oscillator moves to the next segment.
     bool eoc = 1; // The most recent tick's next() read was the end of a cycle
-    uint8_t segment_index = 0; // Which segment the Oscillator is currently traversing
-    uint32_t frequency; // In centihertz
-    uint16_t scale; // The maximum (and minimum negative) output for this Oscillator
     bool cycle = 1; // Waveform will cycle
-    int16_t offset = 0; // Amount added to each voltage output (e.g., to make it unipolar)
     bool sustain = 0; // Waveform stops when it reaches the end of the penultimate stage
     bool sustained = 0; // Current state of sustain. Only active when sustain = 1
-
-    vosignal_t rise; // The amount the signal is expected to rise this segment
-    vosignal_t run; // The expect duration of the segment (in ticks)
-    vosignal_t run_delta; // amount of temporal change without level change
-    vosignal_t run_mod; // Corrects for division errors
-    vosignal_t rise_mod; // Corrects for division errors
-    vosignal_t total_run; // How many ticks we've been in this segment
+    
+    uint32_t phase = 0;
+    uint32_t phase_increment = 0;
+    int16_t segment_start_level = 0; // Needed for when sustain ends before reaching penultimate stage
+    uint8_t segment_index = 0; // Which segment the Oscillator is currently traversing
+    uint8_t segment_time = 0; // Start time of current segment (out of total_time)
+    uint16_t scale; // The maximum (and minimum negative) output for this Oscillator
+    int16_t offset = 0; // Amount added to each voltage output (e.g., to make it unipolar)
 
     /*
      * The Oscillator can only oscillate if the following conditions are true:
@@ -224,7 +214,7 @@ private:
      */
     bool validate() {
         bool valid = 1;
-        if (frequency == 0) valid = 0;
+        if (phase_increment == 0) valid = 0;
         if (segment_count < 2) valid = 0;
         if (total_time == 0) valid = 0;
         if (scale == 0) valid = 0;
@@ -237,99 +227,65 @@ private:
         return scaled;
     }
 
-    /*
-     * Provide a signal value based on a segment level. The segment level is internally
-     * 0-255, and this is converted to a bipolar value by subtracting 128.
-     */
-    vosignal_t scale_level(uint8_t level) {
-        int b_level = constrain(level, 0, 255) - 128;
-        int scaled = Proportion(b_level, 127, scale);
-        vosignal_t scaled_level = int2signal(scaled);
-        return scaled_level;
+    inline uint32_t time_unit() {
+        return 0xffffffff / total_time;
     }
 
-    void advance_segment() {
+    void find_segment(
+        uint32_t phase,
+        bool sustain,
+        uint8_t& segment,
+        uint8_t& segment_start,
+        int16_t& segment_start_level,
+        uint32_t& segment_phase
+    ) {
+        if (total_time == 0) return; // vector osc hasn't been setup yet so bail
+        const uint32_t tu = time_unit();
+        uint32_t start_phase = tu * segment_start;
+        uint32_t end_phase = start_phase + tu * segments[segment].time;
+        // Note: unless a segment transition has occurred, you won't enter this
+        // loop. Even then, it will normally only loop once unless a segment is
+        // 0 length or frequency is extremely high
+        while (!(start_phase <= phase && phase < end_phase)) {
+            if (sustain && segment == segment_count - 2) return;
+            segment_start_level = (segments[segment].level - 128) * 256;
+            segment_start += segments[segment].time;
+            segment++;
+            if (segment >= segment_count) {
+                segment = 0;
+                segment_start = 0;
+            }
+            start_phase = tu * segment_start;
+            end_phase = start_phase + tu * segments[segment].time;
+        }
+        segment_phase = ((phase - start_phase) / ((end_phase - start_phase) >> 16)) << 16;
+    }
+
+    // Rescales full 16 bit signed valued based on scale and offset
+    int16_t rescale(int16_t unscaled) {
+        int32_t mult = unscaled * scale;
+        return mult / 32768 + offset;
+    }
+    
+    int16_t update_current() {
+        uint32_t segment_phase;
+        find_segment(
+            phase,
+            sustain,
+            segment_index,
+            segment_time,
+            segment_start_level,
+            segment_phase
+        );
         if (sustain && segment_index == segment_count - 2) {
-            sustained = 1;
-        } else {
-            if (++segment_index >= segment_count) {
-                if (cycle) Reset();
-                eoc = 1;
-            } else {
-                calculate_rise(segment_index);
-                total_run = 0;
-            }
-            sustained = 0;
+            sustained = true;
+            phase = segment_time * time_unit();
         }
-    }
-
-    vosignal_t step_by(vosignal_t delta) {
-        run_delta += delta;
-        delta = 0;
-        // Dividing run by run_delta (as opposed to the more typical multiplying) avoids
-        // possibilities of overflow. We can then also correct for error by including it in then
-        // next pass (via run_mod).
-        vosignal_t denom = (run + run_mod) / run_delta;
-        run_mod = (run + run_mod) % run_delta;
-        vosignal_t rise_delta = target - signal;
-        if (denom != 0) {
-            rise_delta = (rise + rise_mod) / denom;
-            // If rise_delta is 0, we're going to accumulate it anyway, so there's no rise error to
-            // correct for.
-            rise_mod = rise_delta == 0 ? 0 : (rise + rise_mod) % denom;
-        }
-        if (rise_delta != 0) {
-            signal += rise_delta;
-            total_run += run_delta;
-            run_delta = 0;
-        }
-        bool at_target = (rise > 0 && signal >= target) || (rise < 0 && signal <= target);
-        vosignal_t total = total_run + run_delta;
-
-        // Advancing segment by time is way more accurate than by value, but doesn't work with sustain.
-        if (((!sustain || rise == 0) && total > run) || (rise != 0 && sustain && at_target)) {
-            run_delta = 0;
-            rise_mod = 0;
-            if (!sustain && total > run) {
-                delta = sustain ? 0 : total - run;
-            }
-            signal = target;
-            advance_segment();
-        }
-        return delta;
-    }
-
-    void calculate_rise(uint8_t ix) {
-        // Determine the target level for this segment
-        uint8_t level = segments[ix].level;
-        int time = static_cast<uint32_t>(segments[ix].time);
-        target = scale_level(level);
-
-        // Determine the starting level of this segment to get the total segment rise
-        if (ix > 0) ix--;
-        else ix = segment_count - 1;
-        level = segments[ix].level;
-        vosignal_t starting = scale_level(level);
-
-        //run = Proportion(time, total_time, 1666667);
-        run = time * 166666667 / total_time;
-        rise = (target - starting);
-        // The following line is here to deal with the cases where the signal is coming from a different
-        // direction than it would be coming from if it were coming from the previous segment. This can
-        // only happen when the Vector Oscillator is being used as an envelope generator with Sustain/Release,
-        // and the envelope is ungated prior to the sustain (penultimate) segment, and one of these happens:
-        //
-        // (1) The signal level at release is lower than the final signal level, but the sustain segment's
-        //     level is higher, OR
-        // (2) The signal level at release is higher than the final signal level, but the sustain segment's
-        //     level is lower.
-        //
-        // This scenario would result in a rise with the wrong polarity; that is, the signal would move away
-        // from the target instead of toward it. The remedy, as the Third Doctor would say, is to Reverse
-        // The Polarity. So I test for a difference in sign via multiplication. A negative result (value < 0)
-        // indicates that the rise is the reverse of what it should be:
-        if ((signal2int(target) - signal2int(starting)) * (signal2int(target) - signal2int(signal)) < 0) rise = -rise;
+        return InterpLinear16(
+            segment_start_level,
+            (segments[segment_index].level - 128) * 255,
+            segment_phase >> 16
+        );
     }
 };
-
 #endif // HS_VECTOR_OSCILLATOR
