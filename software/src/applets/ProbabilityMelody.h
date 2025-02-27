@@ -318,6 +318,7 @@ private:
         for (uint8_t i = 0; i < 12; ++i) {
             uint8_t xOffset = x[i] + (p[i] ? 1 : 2);
             uint8_t yOffset = p[i] ? 31 : 45;
+            bool unmasked = (weights[i] >= 0);
 
             if (pulse_animation > 0 && note == i) {
                 gfxRect(xOffset - 1, yOffset, 3, 10);
@@ -329,10 +330,11 @@ private:
                     } else {
                         gfxDottedLine(xOffset, yOffset, xOffset, yOffset + 10);
                     }
-                } else {
+                } else if (unmasked) {
                     gfxDottedLine(xOffset, yOffset, xOffset, yOffset + 10);
                 }
-                if (!(weights[i] < 0)) gfxLine(xOffset - 1, yOffset + 10 - weights[i], xOffset + 1, yOffset + 10 - weights[i]);
+                if (unmasked)
+                  gfxLine(xOffset - 1, yOffset + 10 - weights[i], xOffset + 1, yOffset + 10 - weights[i]);
             }
         }
 
