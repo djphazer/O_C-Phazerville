@@ -257,10 +257,11 @@ public:
     }
 
     void Resume() {
-        PhzConfig::load_config(bank_filename);
+        SetBank(0);
+
         if (preset_id < 0)
           LoadFromPreset(0);
-        // TODO: restore quantizer settings...
+        // TODO: restore quantizer settings...?
     }
     void Suspend() {
         if (preset_id >= 0) {
@@ -275,7 +276,12 @@ public:
       bank_filename[6] = '0' + char(id / 10);
       bank_filename[7] = '0' + char(id % 10);
 
-      PhzConfig::load_config(bank_filename);
+      bool success = false;
+      if (HS::wavplayer_available)
+        success = PhzConfig::load_config(bank_filename, SD);
+
+      if (!success)
+        PhzConfig::load_config(bank_filename);
     }
 
     // lower 8 bits of PhzConfig KEY
@@ -363,7 +369,12 @@ public:
         }
 
         audio_app.SavePreset(id);
-        PhzConfig::save_config(bank_filename);
+
+        if (HS::wavplayer_available)
+          PhzConfig::save_config(bank_filename, SD);
+        else
+          PhzConfig::save_config(bank_filename);
+
         preset_id = id;
     }
     void LoadFromPreset(int id) {

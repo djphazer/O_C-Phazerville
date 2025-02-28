@@ -31,7 +31,7 @@ void setup()
   Serial.println("LittleFS initialized.");
 
   if (myfs.mediaPresent()) {
-    listFiles();
+    listFiles(myfs);
 
     load_config();
 
@@ -39,6 +39,11 @@ void setup()
     cfg_store[POWER_CYCLE_COUNT] += 1;
     // let's maybe not write back to flash every single time
     //save_config();
+  }
+
+  if (HS::wavplayer_available) {
+    Serial.println("SD card available for preset storage");
+    listFiles(SD);
   }
 }
 
@@ -61,7 +66,7 @@ bool getValue(KEY key, VALUE &value)
   return false;
 }
 
-void save_config(const char* filename)
+void save_config(const char* filename, FS &fs)
 {
     Serial.println("\nSaving Config!!!");
     Serial.printf("\nSaving Config: %s\n", filename);
@@ -73,8 +78,8 @@ void save_config(const char* filename)
     // FILE_WRITE will append data
     // FILE_WRITE_BEGIN will overwrite from 0
     // O_TRUNC to truncate file size to what was written
-    myfs.remove(filename);
-    dataFile = myfs.open(filename, FILE_WRITE_BEGIN);
+    fs.remove(filename);
+    dataFile = fs.open(filename, FILE_WRITE_BEGIN);
     if (dataFile) {
       for (auto &i : cfg_store)
       {
@@ -98,13 +103,13 @@ void save_config(const char* filename)
     }
 }
 
-bool load_config(const char* filename)
+bool load_config(const char* filename, FS &fs)
 {
   cfg_store.clear();
   record_count = 0;
 
   Serial.printf("\nLoading Config: %s\n", filename);
-  dataFile = myfs.open(filename);
+  dataFile = fs.open(filename);
   if (!dataFile) {
     Serial.printf("ERROR opening %s\n", filename);
     return false;
@@ -147,20 +152,21 @@ bool load_config(const char* filename)
   return true;
 }
 
-void listFiles()
+void listFiles(FS &fs)
 {
   Serial.print("\n     Space Used = ");
-  Serial.println(myfs.usedSize());
+  Serial.println(fs.usedSize());
   Serial.print("Filesystem Size = ");
-  Serial.println(myfs.totalSize());
+  Serial.println(fs.totalSize());
 
-  printDirectory(myfs);
+  printDirectory(fs);
 }
 
-void eraseFiles()
+void eraseFiles(FS &fs)
 {
-  myfs.quickFormat();
-  Serial.println("\nLittleFS quick-format - All files erased !");
+  //myfs.quickFormat();
+  fs.format();
+  Serial.println("\nFilesystem formatted - All files erased !");
 }
 
 void printDirectory(FS &fs) {
