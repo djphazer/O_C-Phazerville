@@ -392,5 +392,5 @@ void gfxHeader(const char *str, const uint8_t *icon) {
   }
   gfxPrint(x, 1, str);
   gfxLine(0, 10, 127, 10);
-  gfxLine(0, 11, 127, 11);
+  //gfxLine(0, 11, 127, 11);
 }

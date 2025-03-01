@@ -33,18 +33,24 @@
 #include "HemisphereApplet.h"
 
 static const int NR_OF_SCENE_PRESETS = 4;
-static const int NR_OF_SCENE_CHANNELS = 4;
+#ifdef __IMXRT1062__
+static const int NR_OF_SCENES = 8;
+#else
+static const int NR_OF_SCENES = 4;
+#endif
+static const int NR_OF_OUTPUTS = DAC_CHANNEL_LAST;
 
 #define SCENE_MAX_VAL HEMISPHERE_MAX_CV
 #define SCENE_MIN_VAL HEMISPHERE_MIN_CV
-#define SCENE_ACCEL_MIN 16
-#define SCENE_ACCEL_MAX 256
+
+static constexpr int SCENE_ACCEL_MIN = 16;
+static constexpr int SCENE_ACCEL_MAX = 256;
 
 struct Scene {
-    int16_t values[4];
+    int16_t values[NR_OF_OUTPUTS];
 
     void Init() {
-        for (int i = 0; i < NR_OF_SCENE_CHANNELS; ++i) values[i] = 0;
+        for (int i = 0; i < NR_OF_OUTPUTS; ++i) values[i] = 0;
     }
 };
 
@@ -76,6 +82,25 @@ enum ScenesSettings {
     SCENES_SETTING_LAST
 };
 
+#ifdef __IMXRT1062__
+static int preset_count = 0;
+struct ScenesAppPreset {
+  bool valid = false;
+  int index = 0;
+
+  ScenesAppPreset() {
+    index = preset_count++;
+  }
+  const bool is_valid() { return valid; }
+  bool load_preset(Scene *s) {
+    // TODO: LFS file logic
+    return true;
+  }
+  void save_preset(Scene *s) {
+    // TODO: LFS file logic
+  }
+};
+#else
 class ScenesAppPreset : public settings::SettingsBase<ScenesAppPreset, SCENES_SETTING_LAST> {
 public:
 
@@ -86,12 +111,10 @@ public:
         if (!is_valid()) return false; // don't try to load a blank
 
         int ix = 1; // skip validity flag
-        for (int ch = 0; ch < NR_OF_SCENE_CHANNELS; ++ch) {
-            // somestuff = values_[ix++];
-            s[ch].values[0] = values_[ix++];
-            s[ch].values[1] = values_[ix++];
-            s[ch].values[2] = values_[ix++];
-            s[ch].values[3] = values_[ix++];
+        for (int i = 0; i < NR_OF_SCENES; ++i) {
+            for (int d = 0; d < NR_OF_OUTPUTS; ++d) {
+              s[i].values[d] = values_[ix++];
+            }
         }
 
         return true;
@@ -101,18 +124,17 @@ public:
 
         values_[ix++] = 1; // validity flag
 
-        for (int ch = 0; ch < NR_OF_SCENE_CHANNELS; ++ch) {
-            values_[ix++] = s[ch].values[0];
-            values_[ix++] = s[ch].values[1];
-            values_[ix++] = s[ch].values[2];
-            values_[ix++] = s[ch].values[3];
+        for (int i = 0; i < NR_OF_SCENES; ++i) {
+            for (int d = 0; d < NR_OF_OUTPUTS; ++d) {
+              values_[ix++] = s[i].values[d];
+            }
         }
     }
 
 };
+#endif
 
 ScenesAppPreset scene_presets[NR_OF_SCENE_PRESETS];
-static const char * scene_preset_id[] = { "A", "B", "C", "D" };
 
 class ScenesApp : public HSApplication {
 public:
@@ -124,7 +146,7 @@ public:
 	}
 	
     void ClearPreset() {
-        for (int ch = 0; ch < NR_OF_SCENE_CHANNELS; ++ch) {
+        for (int ch = 0; ch < NR_OF_SCENES; ++ch) {
             scene[ch].Init();
         }
         //SavePreset();
@@ -132,8 +154,6 @@ public:
     void LoadPreset() {
         bool success = scene_presets[index].load_preset(scene);
         if (success) {
-            for (int ch = 0; ch < NR_OF_SCENE_CHANNELS; ++ch) {
-            }
             preset_modified = 0;
         }
         else
@@ -142,6 +162,7 @@ public:
     void SavePreset() {
         scene_presets[index].save_preset(scene);
 
+#ifndef __IMXRT1062__
         // initiate actual EEPROM save - ONLY if necessary!
         if (preset_modified) {
             OC::CORE::app_isr_enabled = false;
@@ -151,6 +172,7 @@ public:
             delay(1);
             OC::CORE::app_isr_enabled = true;
         }
+#endif
 
         preset_modified = 0;
     }
@@ -200,13 +222,13 @@ public:
             int volt = cv / OCTAVE;
             int partial = abs(cv % OCTAVE);
 
-            // for display cursor - scaled to pixels, 32px per volt
-            smooth_offset = cv * 32 / OCTAVE;
+            // for display cursor - scaled to pixels
+            smooth_offset = cv * SWIDTH / OCTAVE;
 
-            int first = (trig_chan + volt + NR_OF_SCENE_CHANNELS) % NR_OF_SCENE_CHANNELS;
-            int second = (first + direction + NR_OF_SCENE_CHANNELS) % NR_OF_SCENE_CHANNELS;
+            int first = (trig_chan + volt + NR_OF_SCENES) % NR_OF_SCENES;
+            int second = (first + direction + NR_OF_SCENES) % NR_OF_SCENES;
 
-            for (int i = 0; i < NR_OF_SCENE_CHANNELS; ++i) {
+            for (int i = 0; i < NR_OF_OUTPUTS; ++i) {
                 int16_t v1 = scene[first].values[i];
                 int16_t v2 = scene[second].values[i];
 
@@ -225,14 +247,14 @@ public:
                 slew(active_scene.values[i], target);
             }
         } else if (scene4seq && trig_chan == 3) { // looped sequence for TR4
-            for (int i = 0; i < NR_OF_SCENE_CHANNELS; ++i) {
+            for (int i = 0; i < NR_OF_OUTPUTS; ++i) {
                 int target = scene[ Sequence.Get(i) / 4 ].values[ Sequence.Get(i) % 4 ];
                 target = constrain(target + cv_offset, SCENE_MIN_VAL, SCENE_MAX_VAL);
                 slew(active_scene.values[i], target);
             }
             smooth_offset = 0;
         } else { // a simple scene copy will suffice
-            for (int i = 0; i < NR_OF_SCENE_CHANNELS; ++i) {
+            for (int i = 0; i < NR_OF_OUTPUTS; ++i) {
                 int target = constrain(scene[trig_chan].values[i] + cv_offset, SCENE_MIN_VAL, SCENE_MAX_VAL);
                 slew(active_scene.values[i], target);
             }
@@ -240,7 +262,7 @@ public:
         }
 
         // set outputs
-        for (int ch = 0; ch < NR_OF_SCENE_CHANNELS; ++ch) {
+        for (int ch = 0; ch < NR_OF_OUTPUTS; ++ch) {
             if (trigsum_mode && ch == 3) { // TrigSum output overrides D
                 if (Clock(0) || Clock(1) || Clock(2) || Clock(3))
                     ClockOut(3);
@@ -250,23 +272,22 @@ public:
         }
 
         // encoder deceleration
-        if (left_accel > SCENE_ACCEL_MIN) --left_accel;
-        else left_accel = SCENE_ACCEL_MIN; // just in case lol
-
         if (right_accel > SCENE_ACCEL_MIN) --right_accel;
         else right_accel = SCENE_ACCEL_MIN;
+
+        if (edit_timer) --edit_timer;
     }
 
     void View() {
-        gfxHeader("Scenes");
+        gfxHeader("Scenery", PhzIcons::mixerBal);
 
         if (preset_select) {
             gfxPrint(70, 1, "- Presets");
             DrawPresetSelector();
         } else {
-            gfxPos(110, 1);
+            gfxPos(116, 1);
             if (preset_modified) gfxPrint("*");
-            if (scene_presets[index].is_valid()) gfxPrint(scene_preset_id[index]);
+            if (scene_presets[index].is_valid()) gfxPrint(OC::Strings::capital_letters[index]);
 
             DrawInterface();
         }
@@ -276,12 +297,7 @@ public:
     // Control handlers
     /////////////////////////////////////////////////////////////////
     void OnLeftButtonPress() {
-        // Toggle between A or B editing
-        // also doubles as Load or Save for preset select
-        edit_mode_left = !edit_mode_left;
-
-        // prevent saving to the (clear) slot
-        if (edit_mode_left && preset_select == 5) preset_select = 4;
+        isEditing = !isEditing;
     }
 
     void OnLeftButtonLongPress() {
@@ -292,13 +308,13 @@ public:
     void OnRightButtonPress() {
         if (preset_select) {
             // special case to clear values
-            if (!edit_mode_left && preset_select == NR_OF_SCENE_PRESETS + 1) {
+            if (!save_select && preset_select == NR_OF_SCENE_PRESETS + 1) {
                 ClearPreset();
                 preset_modified = 1;
             }
             else {
                 index = preset_select - 1;
-                if (edit_mode_left) SavePreset();
+                if (save_select) SavePreset();
                 else LoadPreset();
             }
 
@@ -306,14 +322,13 @@ public:
             return;
         }
 
-        // Toggle between C or D editing
-        edit_mode_right = !edit_mode_right;
+        isEditing = !isEditing;
     }
 
-    void SwitchChannel(bool up) {
+    void SwitchEditChannel(bool up) {
         if (!preset_select) {
-            sel_chan += (up? 1 : -1) + NR_OF_SCENE_CHANNELS;
-            sel_chan %= NR_OF_SCENE_CHANNELS;
+            sel_chan += (up? 1 : -1) + NR_OF_SCENES;
+            sel_chan %= NR_OF_SCENES;
         } else {
             // always cancel preset select on single click
             preset_select = 0;
@@ -325,37 +340,42 @@ public:
         preset_select = 1 + index;
     }
 
-    // Left encoder: Edit A or B on current scene
+    // Left encoder: move cursor or coarse adjust
     void OnLeftEncoderMove(int direction) {
         if (preset_select) {
-            edit_mode_left = (direction>0);
+            save_select = (direction>0);
             // prevent saving to the (clear) slot
-            if (edit_mode_left && preset_select == 5) preset_select = 4;
+            if (save_select && preset_select == 5) preset_select = 4;
             return;
+        }
+        if (!isEditing) {
+          cursor = constrain(cursor + direction, 0, NR_OF_OUTPUTS - 1);
+          ResetCursor();
+          return;
         }
 
         preset_modified = 1;
-
-        int idx = 0 + edit_mode_left;
-        scene[sel_chan].values[idx] += direction * left_accel;
-        scene[sel_chan].values[idx] = constrain( scene[sel_chan].values[idx], SCENE_MIN_VAL, SCENE_MAX_VAL );
-
-        left_accel <<= 3;
-        if (left_accel > SCENE_ACCEL_MAX) left_accel = SCENE_ACCEL_MAX;
+        edit_timer = EDIT_TIMEOUT;
+        scene[sel_chan].values[cursor] += direction * (12 << 7); // coarse 1volt steps
+        CONSTRAIN( scene[sel_chan].values[cursor], SCENE_MIN_VAL, SCENE_MAX_VAL );
     }
 
-    // Right encoder: Edit C or D on current scene
+    // Right encoder: move cursor or fine-tune adjust
     void OnRightEncoderMove(int direction) {
         if (preset_select) {
-            preset_select = constrain(preset_select + direction, 1, NR_OF_SCENE_PRESETS + (1-edit_mode_left));
+            preset_select = constrain(preset_select + direction, 1, NR_OF_SCENE_PRESETS + (1-save_select));
             return;
+        }
+        if (!isEditing) {
+          cursor = constrain(cursor + direction, 0, NR_OF_OUTPUTS - 1);
+          ResetCursor();
+          return;
         }
 
         preset_modified = 1;
-
-        int idx = 2 + edit_mode_right;
-        scene[sel_chan].values[idx] += direction * right_accel;
-        scene[sel_chan].values[idx] = constrain( scene[sel_chan].values[idx], SCENE_MIN_VAL, SCENE_MAX_VAL );
+        edit_timer = EDIT_TIMEOUT;
+        scene[sel_chan].values[cursor] += direction * right_accel;
+        CONSTRAIN( scene[sel_chan].values[cursor], SCENE_MIN_VAL, SCENE_MAX_VAL );
 
         right_accel <<= 3;
         if (right_accel > SCENE_ACCEL_MAX) right_accel = SCENE_ACCEL_MAX;
@@ -363,27 +383,31 @@ public:
 
 private:
     static const int SEQ_LENGTH = 16;
+    static const int EDIT_TIMEOUT = HEMISPHERE_CURSOR_TICKS * 2;
+    static const int CHWIDTH = 128/NR_OF_OUTPUTS;
+    static const int SWIDTH = 128/NR_OF_SCENES;
 
+    int cursor = 0;
+    int edit_timer = 0;
     int index = 0;
     int cv_offset = 0;
 
-	int sel_chan = 0;
+    int sel_chan = 0;
     int trig_chan = 0;
     int preset_select = 0; // both a flag and an index
     bool preset_modified = 0;
-    bool edit_mode_left = 0;
-    bool edit_mode_right = 0;
+    bool save_select = 0;
     bool trigsum_mode = 0;
     bool scene4seq = 0;
     // oh jeez, why do we have so many bools?!
 
     struct {
         bool active = 0;
-        uint64_t sequence[4]; // four 16-step sequences of 4-bit values
+        uint64_t sequence[NR_OF_OUTPUTS]; // 16-step sequences of 4-bit values
         uint8_t step;
 
         void Generate() {
-            for (int i = 0; i < NR_OF_SCENE_PRESETS; ++i) {
+            for (int i = 0; i < NR_OF_OUTPUTS; ++i) {
                 sequence[i] = random() | (uint64_t(random()) << 32);
             }
             step = 0;
@@ -397,12 +421,11 @@ private:
         }
     } Sequence;
 
-    uint16_t left_accel = SCENE_ACCEL_MIN;
     uint16_t right_accel = SCENE_ACCEL_MIN;
 
     int smooth_offset = 0; // -128 to 128, for display
 
-    Scene scene[NR_OF_SCENE_CHANNELS];
+    Scene scene[NR_OF_SCENES];
     Scene active_scene;
 
     int smoothing, smoothing_mod;
@@ -420,67 +443,81 @@ private:
         // index is the currently loaded preset (0-3)
         // preset_select is current selection (1-4, 5=clear)
         int y = 5 + 10*preset_select;
-        gfxPrint(25, y, edit_mode_left ? "Save" : "Load");
+        gfxPrint(25, y, save_select ? "Save" : "Load");
         gfxIcon(50, y, RIGHT_ICON);
 
         for (int i = 0; i < NR_OF_SCENE_PRESETS; ++i) {
-            gfxPrint(60, 15 + i*10, scene_preset_id[i]);
+            gfxPrint(60, 15 + i*10, OC::Strings::capital_letters[i]);
             if (!scene_presets[i].is_valid())
                 gfxPrint(" (empty)");
             else if (i == index)
                 gfxPrint(" *");
         }
-        if (!edit_mode_left)
+        if (!save_select)
             gfxPrint(60, 55, "[CLEAR]");
     }
 
     void DrawInterface() {
-        for (int i = 0; i < NR_OF_SCENE_CHANNELS; ++i) {
-            gfxPrint(i*32 + 13, 14, i+1);
+        for (int i = 0; i < NR_OF_SCENES; ++i) {
+            gfxPrint(i*SWIDTH + SWIDTH/2 - 3, 12, i+1);
         }
+
+        // edit indicator
+        gfxFrame(sel_chan*SWIDTH + SWIDTH/2 - 4, 11, 9, 10, true);
         // active scene indicator
-        uint8_t x = (12 + trig_chan*32 + smooth_offset + 128) % 128;
-        gfxInvert(x, 13, 9, 10);
+        {
+          const uint8_t scene_x = (SWIDTH/2 - 4 + trig_chan*SWIDTH + smooth_offset + 128) % 128;
+          gfxInvert(scene_x, 11, 9, 10);
+        }
 
-        // edit pointer
-        gfxIcon(sel_chan*32 + 13, 25, UP_ICON);
+        for (int ch = 0; ch < NR_OF_OUTPUTS; ++ch) {
+          const int x = CHWIDTH/2 + ch*CHWIDTH;
+          const int y = 20;
+          const int target = constrain(scene[sel_chan].values[ch] + cv_offset, SCENE_MIN_VAL, SCENE_MAX_VAL);
+          const int v = 48 - ProportionCV(target, 28);
 
-        gfxPrint(8, 35, "A:");
-        gfxPrintVoltage(scene[sel_chan].values[0]);
-        gfxPrint(8, 45, "B:");
-        gfxPrintVoltage(scene[sel_chan].values[1]);
+          if (cursor == ch && (isEditing || CursorBlink())) {
+            gfxLine(x, y, x, y + 42);
+            if (isEditing)
+              gfxLine(x+1, y, x+1, y + 42);
+            gfxRect(x - 3, v - 1, 7+isEditing, 3);
+          } else {
+            gfxDottedLine(x, y, x, y + 42);
+            gfxFrame(x - 2, v - 1, 5, 3);
+          }
 
-        gfxIcon(0, 35 + 10*edit_mode_left, RIGHT_ICON);
+        }
 
-        gfxPrint(72, 35, "C:");
-        gfxPrintVoltage(scene[sel_chan].values[2]);
-        gfxPrint(72, 45, "D:");
         if (trigsum_mode)
-            gfxPrint("(trig)");
-        else
-            gfxPrintVoltage(scene[sel_chan].values[3]);
-
-        gfxIcon(64, 35 + 10*edit_mode_right, RIGHT_ICON);
+          gfxIcon(1, 1, PhzIcons::pigeons, true);
 
         // ------------------- //
-        gfxLine(0, 54, 127, 54);
+        gfxDottedLine(0, 48, 127, 48, 4);
 
         // -- Input indicators
         // bias (CV2)
         if (cv_offset) {
             gfxIcon(0, 56, UP_DOWN_ICON);
-            gfxPos(10, 56);
-            gfxPrintVoltage(cv_offset);
         }
         // slew amount (CV3)
-        gfxIcon(64, 56, SLEW_ICON);
-        gfxPrint(74, 56, smoothing_mod);
+        gfxIcon(64, 1, SLEW_ICON);
+        gfxPrint(73, 1, smoothing_mod);
 
         // sequencer (CV4)
-        if (scene4seq) gfxIcon( 108, 56, LOOP_ICON );
+        if (scene4seq) gfxIcon( 108, 1, LOOP_ICON );
+
+        if (edit_timer) {
+          // popup value display
+          const int w = 40;
+          graphics.clearRect(64 - w/2, 32 - 5, w+1, 13);
+          gfxFrame(64 - w/2, 32 - 5, w+1, 13);
+          gfxPos(66 - w/2, 33 - 3);
+          gfxPrintVoltage(scene[sel_chan].values[cursor]);
+        }
     }
 };
 
+#ifndef __IMXRT1062__
 // TOTAL EEPROM SIZE: 264 bytes
 SETTINGS_DECLARE(ScenesAppPreset, SCENES_SETTING_LAST) {
     {0, 0, 255, "Flags", NULL, settings::STORAGE_TYPE_U8},
@@ -505,6 +542,7 @@ SETTINGS_DECLARE(ScenesAppPreset, SCENES_SETTING_LAST) {
     {0, 0, 65535, "Scene4ValC", NULL, settings::STORAGE_TYPE_U16},
     {0, 0, 65535, "Scene4ValD", NULL, settings::STORAGE_TYPE_U16},
 };
+#endif
 
 
 ScenesApp ScenesApp_instance;
@@ -513,22 +551,30 @@ ScenesApp ScenesApp_instance;
 void ScenesApp_init() { ScenesApp_instance.BaseStart(); }
 
 static constexpr size_t ScenesApp_storageSize() {
+#ifdef __IMXRT1062__
+  return 0;
+#else
     return ScenesAppPreset::storageSize() * NR_OF_SCENE_PRESETS;
+#endif
 }
 
 static size_t ScenesApp_save(void *storage) {
     size_t used = 0;
+#ifndef __IMXRT1062__
     for (int i = 0; i < 4; ++i) {
         used += scene_presets[i].Save(static_cast<char*>(storage) + used);
     }
+#endif
     return used;
 }
 
 static size_t ScenesApp_restore(const void *storage) {
     size_t used = 0;
+#ifndef __IMXRT1062__
     for (int i = 0; i < 4; ++i) {
         used += scene_presets[i].Restore(static_cast<const char*>(storage) + used);
     }
+#endif
     ScenesApp_instance.LoadPreset();
     return used;
 }
@@ -576,7 +622,7 @@ void ScenesApp_handleButtonEvent(const UI::Event &event) {
             break;
         case OC::CONTROL_BUTTON_DOWN:
         case OC::CONTROL_BUTTON_UP:
-            ScenesApp_instance.SwitchChannel(event.control == OC::CONTROL_BUTTON_DOWN);
+            ScenesApp_instance.SwitchEditChannel(event.control == OC::CONTROL_BUTTON_DOWN);
             break;
         default: break;
         }

@@ -91,7 +91,7 @@ static constexpr OC::App available_apps[] = {
   DECLARE_APP('C','8', "Calibr8or", Calibr8or),
   #endif
   #ifdef ENABLE_APP_SCENES
-  DECLARE_APP('S','X', "Scenes", ScenesApp),
+  DECLARE_APP('S','X', "Scenery", ScenesApp),
   #endif
 
 #ifndef NO_HEMISPHERE
