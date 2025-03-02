@@ -202,7 +202,11 @@ public:
           if (!Sequence.active) Sequence.Generate();
           if (Clock(3)) Sequence.Advance();
         } else {
-            Sequence.active = 0;
+          Sequence.active = 0;
+          bool altseq = (In(3) < -2 * OCTAVE); // negative gate
+          if (altseq && Clock(3)) {
+            NextScene();
+          }
         }
 
         // CV2: bipolar offset added to all values
@@ -296,6 +300,16 @@ public:
     /////////////////////////////////////////////////////////////////
     // Control handlers
     /////////////////////////////////////////////////////////////////
+    void PreviousScene() {
+      if (--trig_chan < 0) trig_chan = NR_OF_SCENES - 1;
+    }
+    void NextScene() {
+      ++trig_chan %= NR_OF_SCENES;
+    }
+    void ZapButton() {
+      trig_chan = random(NR_OF_SCENES);
+    }
+
     void OnLeftButtonPress() {
         isEditing = !isEditing;
     }
@@ -611,6 +625,12 @@ void ScenesApp_handleButtonEvent(const UI::Event &event) {
     // For down button, handle press and long press
     switch (event.type) {
     case UI::EVENT_BUTTON_DOWN:
+        if (event.control == OC::CONTROL_BUTTON_Z)
+          ScenesApp_instance.ZapButton();
+        if (event.control == OC::CONTROL_BUTTON_X)
+          ScenesApp_instance.PreviousScene();
+        if (event.control == OC::CONTROL_BUTTON_Y)
+          ScenesApp_instance.NextScene();
         break;
     case UI::EVENT_BUTTON_PRESS: {
         switch (event.control) {
