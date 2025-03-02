@@ -27,12 +27,12 @@
  * Thanks to Tom Whitwell for creating the concept, and for clarifying some things
  * Thanks to Jon Wheeler for the CV length and probability updates
  *
- * Heavily adapted as DualTM from ShiftReg/TM by djphazer (Nicholas J. Michalek)
+ * Heavily adapted as TwoRings from ShiftReg/TM by djphazer (Nicholas J. Michalek)
  */
 
-class DualTM : public HemisphereApplet {
+class TwoRings : public HemisphereApplet {
 public:
-    
+
     static constexpr int MAX_SCALE = OC::Scales::NUM_SCALES;
     static constexpr int MIN_LENGTH = 2;
     static constexpr int MAX_LENGTH = 32;
@@ -89,7 +89,7 @@ public:
     };
 
     const char* applet_name() {
-        return "DualTM";
+        return "TwoRings";
     }
     const uint8_t* applet_icon() {
         return PhzIcons::DualTM;
@@ -181,7 +181,7 @@ public:
           else
             ShiftLeft(prob);
         }
- 
+
         // Send 8-bit scaled and quantized CV
         const int32_t note[2] = {
           Proportion(reg[0] & 0xff, 0xff, range_mod) + 64,
@@ -334,7 +334,7 @@ public:
         default: break;
         }
     }
-        
+
     uint64_t OnDataRequest() {
         uint64_t data = 0;
         Pack(data, PackLocation {0,7}, p);
@@ -390,7 +390,7 @@ protected:
     help[HELP_EXTRA2]  = "AuxBtn: Reverse/Lock";
     //                   "---------------------" <-- Extra text size guide
   }
-    
+
 private:
     int cursor; // TM2Cursor
 
@@ -618,4 +618,3 @@ private:
     }
 
 };
-

@@ -41,7 +41,7 @@
 #include "applets/DivSeq.h"
 #include "applets/DrumMap.h"
 #include "applets/DualQuant.h"
-#include "applets/DualTM.h"
+#include "applets/TwoRings.h"
 #include "applets/DuoTET.h"
 #include "applets/EbbAndLfo.h"
 #include "applets/EnigmaJr.h"
@@ -152,7 +152,6 @@ AppletRegistry reg{
     DeclareApplet<DrLoFi>{16, 0x80},
     DeclareApplet<DrumMap>{57, 0x02},
     DeclareApplet<DualQuant>{9, 0x08},
-    DeclareApplet<DualTM>{18, 0x02},
     DeclareApplet<DuoTET>{63, 0x08},
     DeclareApplet<EbbAndLfo>{7, 0x01},
     DeclareApplet<EnigmaJr>{45, 0x02},
@@ -198,6 +197,7 @@ AppletRegistry reg{
     DeclareApplet<TrigSeq>{11, 0x06},
     DeclareApplet<TrigSeq16>{25, 0x06},
     DeclareApplet<Tuner>{39, 0x80},
+    DeclareApplet<TwoRings>{18, 0x02},
     DeclareApplet<VectorEG>{52, 0x01},
     DeclareApplet<VectorLFO>{49, 0x01},
     DeclareApplet<VectorMod>{53, 0x01},
