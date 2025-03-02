@@ -34,6 +34,7 @@
 
 static const int NR_OF_SCENE_PRESETS = 4;
 #ifdef __IMXRT1062__
+static const char * const SCENERY_SAVEFILE = "SCENERY.DAT";
 static const int NR_OF_SCENES = 8;
 #else
 static const int NR_OF_SCENES = 4;
@@ -83,21 +84,43 @@ enum ScenesSettings {
 };
 
 #ifdef __IMXRT1062__
-static int preset_count = 0;
 struct ScenesAppPreset {
   bool valid = false;
-  int index = 0;
+  size_t index = 0;
 
-  ScenesAppPreset() {
-    index = preset_count++;
-  }
   const bool is_valid() { return valid; }
   bool load_preset(Scene *s) {
-    // TODO: LFS file logic
+    uint64_t data;
+    size_t word = 0, blob = index << 8;
+
+    for (int sn = 0; sn < NR_OF_SCENES; ++sn) {
+      for (int ch = 0; ch < NR_OF_OUTPUTS; ++ch) {
+        if (word == 0) {
+          if (!PhzConfig::getValue(blob++, data))
+            return false;
+        }
+        s[sn].values[ch] = Unpack(data, PackLocation{word*16, 16});
+        ++word %= 4;
+      }
+    }
+    valid = true;
     return true;
   }
   void save_preset(Scene *s) {
-    // TODO: LFS file logic
+    uint64_t data = 0;
+    size_t word = 0, blob = index << 8;
+    for (int sn = 0; sn < NR_OF_SCENES; ++sn) {
+      for (int ch = 0; ch < NR_OF_OUTPUTS; ++ch) {
+        Pack(data, PackLocation{word*16, 16}, (uint16_t)s[sn].values[ch]);
+        if (++word == 4) {
+          PhzConfig::setValue(blob++, data);
+          data = 0;
+          word = 0;
+        }
+      }
+    }
+    valid = true;
+    PhzConfig::save_config(SCENERY_SAVEFILE);
   }
 };
 #else
@@ -180,7 +203,16 @@ public:
     void Suspend() {
       if (preset_modified) SavePreset();
     }
-    void Resume() { }
+    void Resume() {
+#ifdef __IMXRT1062__
+      PhzConfig::load_config(SCENERY_SAVEFILE);
+      uint64_t data;
+      for (int id = 0; id < NR_OF_SCENE_PRESETS; ++id) {
+        scene_presets[id].index = id;
+        scene_presets[id].valid = PhzConfig::getValue(id << 8, data);
+      }
+#endif
+    }
 
     void Controller() {
         const int OCTAVE = (12 << 7);
@@ -598,7 +630,7 @@ void ScenesApp_isr() { return ScenesApp_instance.BaseController(); }
 void ScenesApp_handleAppEvent(OC::AppEvent event) {
     switch (event) {
     case OC::APP_EVENT_RESUME:
-        //ScenesApp_instance.Resume();
+        ScenesApp_instance.Resume();
         break;
 
     case OC::APP_EVENT_SUSPEND:
