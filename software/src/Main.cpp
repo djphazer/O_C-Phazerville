@@ -335,7 +335,10 @@ void FASTRUN loop() {
             PhzConfig::setValue(PhzConfig::POWER_CYCLE_COUNT, 0);
             PhzConfig::save_config();
           case 'l':
+            Serial.println(" -=- LittleFS -=- ");
             PhzConfig::listFiles();
+            Serial.println(" -=- SD Card -=- ");
+            PhzConfig::listFiles(SD);
             //PhzConfig::load_config();
             break;
           case 'F':
