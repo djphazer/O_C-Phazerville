@@ -117,7 +117,7 @@ const char* const midi_fn_name[HEM_MIDI_MAX_FUNCTION + 1] = {
     "Gate", "PolyG", "GateInv",
     "Veloc", "PolyV",
     "CC#",
-    "ChanAft", "KeyAT",
+    "ChnAft", "KeyAft",
     "Bend",
     "Clock", "Run", "Start"
 };

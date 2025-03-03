@@ -61,9 +61,9 @@ public:
         ForEachChannel(ch) {
             int ch_ = ch + io_offset;
             frame.MIDIState.channel[ch_] = 0; // Default channel 1
-            frame.MIDIState.function[ch_] = (ch_ % 2) ? HEM_MIDI_GATE_POLY_OUT : HEM_MIDI_NOTE_POLY_OUT;
+            frame.MIDIState.function[ch_] = 0; // (ch_ % 2) ? HEM_MIDI_GATE_POLY_OUT : HEM_MIDI_NOTE_POLY_OUT;
             frame.MIDIState.outputs[ch_] = 0;
-            frame.MIDIState.dac_polyvoice[ch_] = hemisphere;
+            frame.MIDIState.dac_polyvoice[ch_] = 0; // hemisphere;
             Out(ch, 0);
         }
 
@@ -243,7 +243,7 @@ private:
 
     void DrawChannelPage() {
         char out_label[] = {(char)('A' + io_offset + page), '\0' };
-        gfxPrint(1, 13, "DAC "); gfxPrint(out_label);
+        gfxPrint(1, 13, out_label); gfxPrint(":");
         gfxLine(1, 22, 63, 22);
 
         gfxPrint(1, 25, "MIDICh: ");
