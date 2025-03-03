@@ -203,9 +203,13 @@ public:
   }
 
   uint64_t OnDataRequest() {
-    return 0;
+    return PackPackables(level, level_cv, playrate, playrate_cv, wavplayer_select[0], djfilter);
   }
-  void OnDataReceive(uint64_t data) {}
+  void OnDataReceive(uint64_t data) {
+    UnpackPackables(data, level, level_cv, playrate, playrate_cv, wavplayer_select[0], djfilter);
+    SetFilter(djfilter * filter_on);
+    ChangeToFile(0, wavplayer_select[0]);
+  }
 
   AudioStream* InputStream() override {
     return &input;
@@ -240,7 +244,7 @@ private:
   bool lowcut = false;
   bool filter_on = false;
   CVInputMap level_cv;
-  int playrate = 100;
+  int8_t playrate = 100; // TODO: we need 9 bits for +/-200%
   CVInputMap playrate_cv;
   bool go_time;
   bool tempo_sync = true;
