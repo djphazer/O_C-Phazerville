@@ -36,9 +36,9 @@ public:
 
     const int i = 0;
     FileLevel(gain);
-    const int speed_cv = 0; // TODO:
-    if (speed_cv > 0)
-      FileRate(0.01f * playrate);
+    const int speed_cv = abs(playrate_cv.In(0)) >> 2;
+    if (speed_cv)
+      FileRate(0.01f * playrate + playrate_cv.InF(0.0f));
     else if (tempo_sync)
       FileMatchTempo();
 
@@ -374,7 +374,9 @@ private:
     return (uint16_t)wavplayer[ch].getBPM();
   }
   void FileMatchTempo() {
-    wavplayer[0].matchTempo(HS::clock_m.GetTempoFloat() * playrate * 0.01f);
+    wavplayer[0].matchTempo(
+      HS::clock_m.GetTempoFloat() * (playrate * 0.01f + playrate_cv.InF(0.0f))
+    );
   }
   void FileLevel(float lvl) {
     mixer[0].gain(0, lvl * (1-lowcut));
