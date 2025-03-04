@@ -149,8 +149,14 @@ public:
         }
         InterpolateSample(wavetable[OUT], _wt_blend, phase_acc_msb);
 
-        Out(0, _attenuation * (wavetable[OUT][phase_acc_msb] * HEMISPHERE_MAX_CV / 127) / 100);
-        Out(1, _attenuation * (wavetable[OUT][255-phase_acc_msb] * HEMISPHERE_MAX_CV / 127) / 100); // backwards wave
+#if defined(VOR)
+        int16_t MAX_AMPLITUDE = HEMISPHERE_MAX_CV;
+#else
+        int16_t MAX_AMPLITUDE = -HEMISPHERE_MIN_CV;
+#endif
+
+        Out(0, _attenuation * (wavetable[OUT][phase_acc_msb] * MAX_AMPLITUDE / 127) / 100);
+        Out(1, _attenuation * (wavetable[OUT][255-phase_acc_msb] * MAX_AMPLITUDE / 127) / 100); // backwards wave
     }
 
     void View() {
