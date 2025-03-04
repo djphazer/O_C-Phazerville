@@ -522,6 +522,11 @@ private:
           const int target = constrain(scene[sel_chan].values[ch] + cv_offset, SCENE_MIN_VAL, SCENE_MAX_VAL);
           const int v = 48 - ProportionCV(target, 28);
 
+          if (trigsum_mode && ch == 3) {
+            gfxIcon(x, y + 20, CLOCK_ICON);
+            continue;
+          }
+
           if (cursor == ch && (isEditing || CursorBlink())) {
             gfxLine(x, y, x, y + 42);
             if (isEditing)
@@ -532,6 +537,9 @@ private:
             gfxFrame(x - 2, v - 1, 5, 3);
           }
 
+          // actual output level meters
+          const int height = ProportionCV(ViewOut(ch), 28);
+          gfxInvert(x + 5, y + constrain(28 - height, 0, 28), 3, abs(height));
         }
 
         if (trigsum_mode)
@@ -552,7 +560,7 @@ private:
         // sequencer (CV4)
         if (scene4seq) gfxIcon( 108, 1, LOOP_ICON );
 
-        if (edit_timer) {
+        if (isEditing || edit_timer) {
           // popup value display
           const int w = 40;
           graphics.clearRect(64 - w/2, 32 - 5, w+1, 13);
