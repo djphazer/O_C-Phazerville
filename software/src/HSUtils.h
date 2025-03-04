@@ -42,7 +42,7 @@ using simfloat = int32_t;
 #define BottomAlign(h) (62 - (h))
 #define ForEachChannel(ch) for(int_fast8_t ch = 0; (ch) < 2; ++(ch))
 #define ForAllChannels(ch) for(int_fast8_t ch = 0; (ch) < 4; ++(ch))
-// #define gfx_offset ((hemisphere % 2) * 64) // Graphics offset, based on the side
+#define gfx_offset ((hemisphere & 1) * 64) // Graphics offset, based on the side
 #define io_offset (hemisphere * 2) // Input/Output offset, based on the side
 #define SPLIT_INT_DEC(x, mul) \
   static_cast<int>(x), \

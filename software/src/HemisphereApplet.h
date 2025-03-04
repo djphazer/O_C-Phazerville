@@ -87,11 +87,8 @@ public:
     void BaseView(bool full_screen = false);
 
     void BaseStart(const HEM_SIDE hemisphere_) {
-        hemisphere = hemisphere_;
-        SetDisplaySide(hemisphere);
-
-        // Initialize some things for startup
-        cursor_countdown[hemisphere] = HEMISPHERE_CURSOR_TICKS;
+        SetDisplaySide(hemisphere_);
+        ResetCursor();
 
         // Maintain previous app state by skipping Start
         if (!applet_started) {
@@ -509,13 +506,12 @@ public:
     }
 
     void SetDisplaySide(HEM_SIDE side) {
-        gfx_offset = (side % 2) * 64;
+        hemisphere = side;
     }
 
 protected:
     HEM_SIDE hemisphere; // Which hemisphere (0, 1, ...) this applet uses
     bool isEditing = false; // modal editing toggle
-    int gfx_offset = 0;
     virtual void SetHelp() = 0;
 
     /* Forces applet's Start() method to run the next time the applet is selected. This
