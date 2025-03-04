@@ -170,7 +170,7 @@ private:
 
 
     void DrawSelector() {
-        a_display = isEditing ? outmode[0] : a_mod;
+        a_display = EditMode() ? outmode[0] : a_mod;
         gfxIcon(1, 15, CLOCK_ICON);
         gfxPrint(12, 15, OP_NAMES[accoperator]);
 
@@ -199,7 +199,7 @@ private:
         gfxPrint(1, 52, "Z");
 
         // when editing modulating parameters show original value
-        b_display = isEditing ? b_constant : b_constant_mod;
+        b_display = EditMode() ? b_constant : b_constant_mod;
 
         for (int i = 0; i < 8; i++) {
             gfxPrint(12 + (i * 6), 52, (acc_register >> (7 - i)) & 1);

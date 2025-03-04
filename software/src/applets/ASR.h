@@ -73,7 +73,7 @@ public:
       if (cursor > 0)
         HS::QuantizerEdit(cursor - 1 + io_offset);
       else
-        isEditing = !isEditing;
+        CursorToggle();
     }
 
     void OnEncoderMove(int direction) {

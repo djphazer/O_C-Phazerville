@@ -276,7 +276,7 @@ public:
       case QUANT_B:
         HS::QuantizerEdit(qselect[cursor - QUANT_A]);
       default:
-        isEditing = false;
+        CancelEdit();
         break;
 
       case PROB:

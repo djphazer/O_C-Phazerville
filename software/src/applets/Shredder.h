@@ -108,7 +108,7 @@ public:
         Shred(cursor);
       }
       else
-        isEditing = false;
+        CancelEdit();
     }
 
     void OnButtonPress() {

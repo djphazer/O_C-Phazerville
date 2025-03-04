@@ -200,7 +200,7 @@ public:
       const int ch = (cursor) / NUM_STEPS;
       const int s = (cursor) % NUM_STEPS;
       div_seq[ch].ToggleStep(s);
-      isEditing = false;
+      CancelEdit();
     }
 
     void OnEncoderMove(int direction) {

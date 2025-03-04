@@ -94,7 +94,7 @@ public:
     void AuxButton() {
       const int s = cursor % SEQX_STEPS;
       muted ^= (0x01 << s);
-      isEditing = false;
+      CancelEdit();
     }
 
     void OnEncoderMove(int direction) {

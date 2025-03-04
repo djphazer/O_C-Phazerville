@@ -55,6 +55,10 @@ struct Applet {
   std::array<HemisphereApplet *, APPLET_SLOTS> instance;
 };
 
+struct EncoderEditor {
+  bool isEditing;
+};
+
 extern IOFrame frame;
 
 static constexpr bool ALWAYS_SHOW_ICONS = false;
@@ -65,7 +69,10 @@ using namespace HS;
 class HemisphereApplet {
 public:
     static int cursor_countdown[APPLET_SLOTS];
+    static int16_t cursor_start_x;
+    static int16_t cursor_start_y;
     static const char* help[HELP_LABEL_COUNT];
+    static EncoderEditor enc_edit[APPLET_SLOTS];
 
     virtual const char* applet_name() = 0; // Maximum of 9 characters
     virtual const uint8_t* applet_icon() { return ZAP_ICON; }
@@ -89,6 +96,7 @@ public:
     void BaseStart(const HEM_SIDE hemisphere_) {
         SetDisplaySide(hemisphere_);
         ResetCursor();
+        CancelEdit();
 
         // Maintain previous app state by skipping Start
         if (!applet_started) {
@@ -152,21 +160,19 @@ public:
         graphics.print( help[HELP_EXTRA2] );
     }
     virtual void AuxButton() {
-      isEditing = false;
+      CancelEdit();
     }
 
     /* Check cursor blink cycle. */
     bool CursorBlink() { return (cursor_countdown[hemisphere] > 0); }
     void ResetCursor() { cursor_countdown[hemisphere] = HEMISPHERE_CURSOR_TICKS; }
 
-    // legacy cursor mode has been removed
-    [[deprecated("Use CursorToggle() instead")]] void CursorAction(int &cursor, int max) {
-      CursorToggle();
-    }
-
     void CursorToggle() {
-      isEditing = !isEditing;
+      enc_edit[hemisphere].isEditing ^= 1;
       ResetCursor();
+    }
+    void CancelEdit() {
+      enc_edit[hemisphere].isEditing = false;
     }
 
     template<typename T>
@@ -293,7 +299,7 @@ public:
     }
 
     inline bool EditMode() {
-        return (isEditing);
+        return (enc_edit[hemisphere].isEditing);
     }
 
     // Override HSUtils function to only return positive values
@@ -306,7 +312,7 @@ public:
     //////////////// Offset graphics methods
     ////////////////////////////////////////////////////////////////////////////////
     void gfxCursor(int x, int y, int w, int h = 9) { // assumes standard text height for highlighting
-      if (isEditing) {
+      if (EditMode()) {
         gfxInvert(x, y - h, w, h);
       } else if (CursorBlink()) {
         gfxLine(x, y, x + w - 1, y);
@@ -315,7 +321,7 @@ public:
       }
     }
     void gfxSpicyCursor(int x, int y, int w, int h = 9) {
-      if (isEditing) {
+      if (EditMode()) {
         if (CursorBlink())
           gfxFrame(x, y - h, w, h, true);
         gfxInvert(x, y - h, w, h);
@@ -511,7 +517,6 @@ public:
 
 protected:
     HEM_SIDE hemisphere; // Which hemisphere (0, 1, ...) this applet uses
-    bool isEditing = false; // modal editing toggle
     virtual void SetHelp() = 0;
 
     /* Forces applet's Start() method to run the next time the applet is selected. This
@@ -544,8 +549,6 @@ protected:
 
 private:
     bool applet_started; // Allow the app to maintain state during switching
-    int16_t cursor_start_x;
-    int16_t cursor_start_y;
 };
 
 #endif // _HEM_APPLET_H_

@@ -50,7 +50,7 @@ using simfloat = int32_t;
 
 namespace HS {
 
-enum HEM_SIDE {
+enum HEM_SIDE : uint8_t {
   LEFT_HEMISPHERE = 0,
   RIGHT_HEMISPHERE = 1,
 #ifdef ARDUINO_TEENSY41

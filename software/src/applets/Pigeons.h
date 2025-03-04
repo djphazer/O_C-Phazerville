@@ -107,9 +107,9 @@ public:
       if (cursor == QUANT_A || cursor == QUANT_B) {
         HS::QuantizerEdit( qselect[(cursor == QUANT_B)] );
       }
-      isEditing = false;
+      CancelEdit();
     }
-        
+
     uint64_t OnDataRequest() {
         uint64_t data = 0;
         Pack(data, PackLocation {0,6}, pigeons[0].val[0]);

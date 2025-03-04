@@ -105,9 +105,7 @@ static constexpr int MAX_LENGTH = 16;
       DrawIndicator();
     }
 
-    void OnButtonPress() {
-      isEditing = !isEditing;
-    }
+    //void OnButtonPress() { }
 
     void OnEncoderMove(int direction) {
         if (!EditMode()) {

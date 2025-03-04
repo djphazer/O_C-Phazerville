@@ -187,7 +187,7 @@ class TB_3PO: public HemisphereApplet {
     if (cursor == QSELECT) {
       HS::QuantizerEdit(qselect);
     }
-    isEditing = false;
+    CancelEdit();
   }
 
   void OnEncoderMove(int direction) {

@@ -189,7 +189,7 @@ public:
         seq.Clear();
 
       flash_ticker = 1000;
-      isEditing = false;
+      CancelEdit();
     }
 
     void OnEncoderMove(int direction) {
