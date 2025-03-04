@@ -58,13 +58,6 @@ DMAMEM VOSegment user_waveforms[VO_SEGMENT_COUNT];
 #define signal2int(x) (x >> 10)
 using vosignal_t = int32_t;
 
-enum {
-    VO_TRIANGLE,
-    VO_SAWTOOTH,
-    VO_SQUARE,
-    VO_NUMBER_OF_WAVEFORMS
-};
-
 using VOSegment = HS::VOSegment;
 
 class VectorOscillator {
@@ -79,10 +72,9 @@ public:
     void Release() {
         segment_start_level = update_current();
         sustained = 0;
-        uint32_t tu = time_unit();
         segment_index = segment_count - 1;
         segment_time = total_time - segments[segment_index].time;
-        phase = segment_time * tu;
+        phase = segment_time * time_unit;
     }
 
     /* The offset amount will be added to each voltage output */
@@ -92,7 +84,7 @@ public:
     void SetSegment(HS::VOSegment segment) {
         if (segment_count < HS::VO_MAX_SEGMENTS) {
             memcpy(&segments[segment_count], &segment, sizeof(segments[segment_count]));
-            total_time += segments[segment_count].time;
+            change_total_time(segments[segment_count].time);
             segment_count++;
         }
     }
@@ -100,9 +92,9 @@ public:
     /* Update an existing segment */
     void SetSegment(uint8_t ix, HS::VOSegment segment) {
         ix = constrain(ix, 0, segment_count - 1);
-        total_time -= segments[ix].time;
+        change_total_time(segments[ix].time);
         memcpy(&segments[ix], &segment, sizeof(segments[ix]));
-        total_time += segments[ix].time;
+        change_total_time(segments[ix].time);
         if (ix == segment_count) segment_count++;
     }
 
@@ -196,7 +188,7 @@ private:
     bool cycle = 1; // Waveform will cycle
     bool sustain = 0; // Waveform stops when it reaches the end of the penultimate stage
     bool sustained = 0; // Current state of sustain. Only active when sustain = 1
-    
+    uint32_t time_unit = 0;
     uint32_t phase = 0;
     uint32_t phase_increment = 0;
     int16_t segment_start_level = 0; // Needed for when sustain ends before reaching penultimate stage
@@ -227,8 +219,9 @@ private:
         return scaled;
     }
 
-    inline uint32_t time_unit() {
-        return 0xffffffff / total_time;
+    void change_total_time(int8_t delta) {
+        total_time += delta;
+        if (total_time != 0) time_unit = 0xffffffff / total_time;
     }
 
     void find_segment(
@@ -240,13 +233,12 @@ private:
         uint32_t& segment_phase
     ) {
         if (total_time == 0) return; // vector osc hasn't been setup yet so bail
-        const uint32_t tu = time_unit();
-        uint32_t start_phase = tu * segment_start;
-        uint32_t end_phase = start_phase + tu * segments[segment].time;
+        uint32_t start_phase = time_unit * segment_start;
+        uint32_t end_phase = start_phase + time_unit * segments[segment].time;
         // Note: unless a segment transition has occurred, you won't enter this
         // loop. Even then, it will normally only loop once unless a segment is
         // 0 length or frequency is extremely high
-        while (!(start_phase <= phase && phase < end_phase)) {
+        while (!(start_phase <= phase && (phase < end_phase || segment == segment_count - 1))) {
             if (sustain && segment == segment_count - 2) return;
             segment_start_level = (segments[segment].level - 128) * 256;
             segment_start += segments[segment].time;
@@ -255,8 +247,8 @@ private:
                 segment = 0;
                 segment_start = 0;
             }
-            start_phase = tu * segment_start;
-            end_phase = start_phase + tu * segments[segment].time;
+            start_phase = time_unit * segment_start;
+            end_phase = start_phase + time_unit * segments[segment].time;
         }
         segment_phase = ((phase - start_phase) / ((end_phase - start_phase) >> 16)) << 16;
     }
@@ -279,7 +271,7 @@ private:
         );
         if (sustain && segment_index == segment_count - 2) {
             sustained = true;
-            phase = segment_time * time_unit();
+            phase = segment_time * time_unit;
         }
         return InterpLinear16(
             segment_start_level,
