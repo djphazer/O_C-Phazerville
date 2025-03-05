@@ -212,6 +212,7 @@ public:
         scene_presets[id].valid = PhzConfig::getValue(id << 8, data);
       }
 #endif
+      HS::Init(); // to reset input mappings
     }
 
     void Controller() {
