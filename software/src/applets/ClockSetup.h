@@ -127,15 +127,15 @@ public:
     }
 
     void OnButtonPress() {
-        if (!EditMode()) { // special cases for toggle buttons
+        if (!isEditing) { // special cases for toggle buttons
             if (cursor == PLAY_STOP) PlayStop();
             else if (cursor >= BOOP1 && cursor <= BOOP4) {
                 clock_m.Boop(cursor-BOOP1);
                 button_ticker = HEMISPHERE_PULSE_ANIMATION_TIME_LONG;
             }
-            else CursorToggle();
+            else isEditing ^= 1;
         }
-        else CursorToggle();
+        else isEditing ^= 1;
 
         if (cursor == TEMPO) {
             // Tap Tempo detection
@@ -158,7 +158,7 @@ public:
     void OnEncoderMove(int direction) {
         taps = 0;
         last_tap_tick = 0;
-        if (!EditMode()) {
+        if (!isEditing) {
             MoveCursor(cursor, direction, LAST_SETTING);
             return;
         }
@@ -211,7 +211,7 @@ public:
         }
     }
     void OnLeftEncoderMove(const int direction) {
-      if (EditMode() && cursor >= MULT1 && cursor <= MULT4) {
+      if (isEditing && cursor >= MULT1 && cursor <= MULT4) {
         int mult = clock_m.GetMultiply(cursor - MULT1);
 
         if (0 == mult) mult += direction;
@@ -286,6 +286,7 @@ protected:
 
 private:
     int cursor; // ClockSetupCursor
+    bool isEditing;
     //int flash_ticker[4];
     int button_ticker;
     int slide_anim = 0;
