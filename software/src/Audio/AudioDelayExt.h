@@ -9,7 +9,6 @@
 #include <cstdint>
 
 template <
-  size_t BufferLength = static_cast<size_t>(AUDIO_SAMPLE_RATE),
   size_t Taps = 1,
   // ChunkSize *must* evenly divide AUDIO_BLOCK_SAMPLES
   size_t ChunkSize = 8,
@@ -18,15 +17,15 @@ template <
   size_t CrossfadeSamples = 2048>
 class AudioDelayExt : public AudioStream {
 public:
-  // -1 and +2 to ensure we have enough points for hermite interpolation
-  static constexpr float MAX_DELAY_SECS
-    = (BufferLength - 1) / AUDIO_SAMPLE_RATE_EXACT;
-  static constexpr float MIN_DELAY_SECS
-    = (ChunkSize + 2) / AUDIO_SAMPLE_RATE_EXACT;
+  float MAX_DELAY_SECS, MIN_DELAY_SECS;
 
-  AudioDelayExt() : AudioStream(1, input_queue_array) {
+  AudioDelayExt(size_t BufferLength = static_cast<size_t>(AUDIO_SAMPLE_RATE)) : AudioStream(1, input_queue_array), buffer(BufferLength) {
     delay_secs.fill(OnePole(Interpolated(0.0f, AUDIO_BLOCK_SAMPLES), 0.0002f));
     fb.fill(Interpolated(0.0f, AUDIO_BLOCK_SAMPLES / ChunkSize));
+
+    // -1 and +2 to ensure we have enough points for hermite interpolation
+    MAX_DELAY_SECS = (BufferLength - 1) / AUDIO_SAMPLE_RATE_EXACT;
+    MIN_DELAY_SECS = (ChunkSize + 2) / AUDIO_SAMPLE_RATE_EXACT;
   }
 
   void Acquire() {
@@ -140,7 +139,7 @@ private:
   std::array<CrossfadeTarget, Taps> target_delay;
   std::array<OnePole<Interpolated>, Taps> delay_secs;
   std::array<Interpolated, Taps> fb;
-  ExtAudioBuffer<BufferLength, int16_t> buffer;
+  ExtAudioBuffer<int16_t> buffer;
   size_t taps_ = Taps;
 
   void ReadCrossfadeChunk(

@@ -9,6 +9,8 @@
 #include "Audio/AudioPassthrough.h"
 #include <Audio.h>
 
+extern "C" uint8_t external_psram_size;
+
 template <AudioChannels Channels>
 class DelayApplet : public HemisphereAudioApplet {
 public:
@@ -28,6 +30,8 @@ public:
       }
     }
     set_taps(taps);
+    MAX_DELAY_SECS = channels[0].delaystream.MAX_DELAY_SECS;
+    MIN_DELAY_SECS = channels[0].delaystream.MIN_DELAY_SECS;
   }
 
   void Unload() {
@@ -68,10 +72,10 @@ public:
       CONSTRAIN(d, 0.0f, MAX_DELAY_SECS);
       switch (delay_mod_type) {
         case CROSSFADE:
-          for (auto& ch : channels) ch.delay.cf_delay(tap, t);
+          for (auto& ch : channels) ch.delaystream.cf_delay(tap, t);
           break;
         case STRETCH:
-          for (auto& ch : channels) ch.delay.delay(tap, t);
+          for (auto& ch : channels) ch.delaystream.delay(tap, t);
           break;
       }
     }
@@ -85,14 +89,14 @@ public:
     for (auto& ch : channels) {
       if (frozen) {
         ch.input_mixer.gain(0, 0.0f);
-        ch.delay.feedback(8, 1.0f);
+        ch.delaystream.feedback(8, 1.0f);
         for (int tap = 0; tap < 8; tap++) {
-          ch.delay.feedback(tap, 0.0f);
+          ch.delaystream.feedback(tap, 0.0f);
         }
       } else {
         ch.input_mixer.gain(0, 1.0f);
         for (int tap = 0; tap < 9; tap++) {
-          ch.delay.feedback(tap, tap < taps ? fb : 0.0f);
+          ch.delaystream.feedback(tap, tap < taps ? fb : 0.0f);
         }
       }
     }
@@ -341,16 +345,14 @@ protected:
     for (auto& ch : channels) {
       for (int i = 0; i < taps; i++) ch.taps_mixer.gain(i, tap_gain);
       for (int i = taps; i < 8; i++) ch.taps_mixer.gain(i, 0.0f);
-      ch.delay.taps(taps);
+      ch.delaystream.taps(taps);
     }
   }
 
 private:
   // Uses 1MB of psram and gives just under 12 secs of delay time.
   static const size_t DELAY_LENGTH = 1024 * 512;
-  using DelayStream = AudioDelayExt<DELAY_LENGTH, 9>;
-  static constexpr float MAX_DELAY_SECS = DelayStream::MAX_DELAY_SECS;
-  static constexpr float MIN_DELAY_SECS = DelayStream::MIN_DELAY_SECS;
+  using DelayStream = AudioDelayExt<9>;
 
   enum Cursor {
     CLOCK_SOURCE,
@@ -380,6 +382,8 @@ private:
   };
 
   int cursor = TIME;
+
+  float MAX_DELAY_SECS, MIN_DELAY_SECS;
 
   int16_t delay_time = 500;
   CVInputMap delay_time_cv;
@@ -417,14 +421,14 @@ private:
   static const uint8_t PP_CH = 1;
 
   AudioPassthrough<Channels> input_stream;
-  struct {
+  struct DelayChannel {
     AudioMixer<2> input_mixer;
     // 9th tap is freeze head
-    DelayStream delay;
+    DelayStream delaystream;
     AudioMixer<8> taps_mixer;
     AudioMixer<2> wet_dry_mixer;
 
-    AudioConnection mixer_to_delay{input_mixer, 0, delay, 0};
+    AudioConnection mixer_to_delay{input_mixer, 0, delaystream, 0};
     AudioConnection wet_conn{taps_mixer, 0, wet_dry_mixer, WD_WET_CH};
 
     AudioConnection input_to_mixer;
@@ -433,12 +437,14 @@ private:
     AudioConnection dry_conn;
     AudioConnection mix_to_output;
 
+    DelayChannel() : delaystream(external_psram_size? DELAY_LENGTH : DELAY_LENGTH / 16) { }
+
     void Start(int channel, AudioStream& input, AudioStream& output) {
-      delay.Acquire();
+      delaystream.Acquire();
 
       input_to_mixer.connect(input, channel, input_mixer, 0);
       for (int i = 0; i < 8; i++) {
-        taps_conns[i].connect(delay, i, taps_mixer, i);
+        taps_conns[i].connect(delaystream, i, taps_mixer, i);
       }
 
       dry_conn.connect(input, channel, wet_dry_mixer, WD_DRY_CH);
@@ -446,7 +452,7 @@ private:
     }
 
     void Stop() {
-      delay.Release();
+      delaystream.Release();
     }
   } channels[Channels];
   AudioPassthrough<Channels> output_stream;

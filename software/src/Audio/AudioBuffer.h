@@ -7,13 +7,15 @@
 // TODO: this should be backed by an ordinary ring buffer. I don't think the
 // std::copy helps performance much, so extracting and simplifying the ring
 // logic would both make this easier to work with and simplify things.
-template <size_t NumSamples, typename T = int16_t>
+template <typename T = int16_t>
 class AudioBuffer {
 public:
+  size_t NumSamples;
+
   /**
    * Make sure buffer has NumSamples elements and that it is 0 filled!
    **/
-  AudioBuffer(T* buffer) : buffer(buffer) {}
+  AudioBuffer(T* buffer, size_t NumSamples) : NumSamples(NumSamples), buffer(buffer) {}
 
   void WriteSample(const T sample) {
     buffer[write_ix++] = sample;
@@ -133,17 +135,17 @@ protected:
   size_t write_ix = 0;
 };
 
-template <size_t NumSamples, typename T = int16_t>
-class ExtAudioBuffer : public AudioBuffer<NumSamples, T> {
+template <typename T = int16_t>
+class ExtAudioBuffer : public AudioBuffer<T> {
 public:
-  ExtAudioBuffer() : AudioBuffer<NumSamples, T>(nullptr) {}
+  ExtAudioBuffer(size_t samples) : AudioBuffer<T>(nullptr, samples) {}
   ~ExtAudioBuffer() {
     Release();
   }
 
   void Acquire() {
     if (this->buffer == nullptr) {
-      this->buffer = static_cast<T*>(extmem_calloc(NumSamples, sizeof(T)));
+      this->buffer = static_cast<T*>(extmem_calloc(this->NumSamples, sizeof(T)));
     }
   }
 
