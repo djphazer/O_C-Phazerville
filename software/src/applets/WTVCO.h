@@ -104,10 +104,12 @@ public:
     }
 
     void Controller() {
-        if (Clock(0)) pitch = constrain(pitch - (128 * 12), MIN_PITCH, MAX_PITCH);
-        if (Clock(1)) pitch = constrain(pitch + (128 * 12), MIN_PITCH, MAX_PITCH);
+        ForEachChannel(ch) {
+            if (Clock(0)) pitch[ch] = constrain(pitch[ch] - (128 * 12), MIN_PITCH, MAX_PITCH);
+            if (Clock(1)) pitch[ch] = constrain(pitch[ch] + (128 * 12), MIN_PITCH, MAX_PITCH);
+        }
 
-        int16_t _pitch = pitch;
+        int16_t _pitch[2] = { pitch[0], pitch[1] };
         int _wt_blend = wt_blend;
         uint8_t _attenuation = attenuation;
         uint8_t _pulse_duty = pulse_duty;
@@ -116,7 +118,7 @@ public:
         ForEachChannel(ch) {
             switch (cv_dest[ch]) {
                 case PARAM_PITCH:
-                    _pitch = pitch + In(ch);
+                    _pitch[ch] = pitch[ch] + In(ch);
                     break;
                 case PARAM_WT_BLEND:
                     _wt_blend = wt_blend + Proportion(In(ch), 5 * HEMISPHERE_MAX_INPUT_CV / 6, WT_SIZE-1);
@@ -134,20 +136,20 @@ public:
             }
         }
 
-        phase_inc = ComputePhaseIncrement(_pitch);
         if (++inc_count > _sample_rate_div) {
-            phase += phase_inc;
+            ForEachChannel(ch) { phase[ch] += ComputePhaseIncrement(_pitch[ch]); }
             inc_count = 0;
         }
 
-        uint8_t phase_acc_msb = (uint8_t)(phase >> 24);
+        uint8_t phase_acc_msb[2];
+        ForEachChannel(ch) { phase_acc_msb[ch] = (uint8_t)(phase[ch] >> 24); }
 
-        InterpolateSample(wavetable[OUT], _wt_blend, (wt_sample != phase_acc_msb) ? wt_sample++ : ++wt_sample); // gurantee ui update even at low freq
+        InterpolateSample(wavetable[OUT], _wt_blend, (wt_sample != phase_acc_msb[0]) ? wt_sample++ : ++wt_sample); // gurantee ui update even at low freq
         for (int w = A; w <= C; ++w) {
             if (waveform[w] == WAVE_PULSE) UpdatePulseDuty(wavetable[w], wt_sample, _pulse_duty);
             if (waveform[w] == WAVE_NOISE && !noise_freeze) UpdateNoiseSample(wavetable[w], wt_sample);
         }
-        InterpolateSample(wavetable[OUT], _wt_blend, phase_acc_msb);
+        InterpolateSample(wavetable[OUT], _wt_blend, phase_acc_msb[0]);
 
 #if defined(VOR)
         int16_t MAX_AMPLITUDE = HEMISPHERE_MAX_CV;
@@ -155,8 +157,8 @@ public:
         int16_t MAX_AMPLITUDE = -HEMISPHERE_MIN_CV;
 #endif
 
-        Out(0, _attenuation * (wavetable[OUT][phase_acc_msb] * MAX_AMPLITUDE / 127) / 100);
-        Out(1, _attenuation * (wavetable[OUT][255-phase_acc_msb] * MAX_AMPLITUDE / 127) / 100); // backwards wave
+        Out(0, _attenuation * (wavetable[OUT][phase_acc_msb[0]] * MAX_AMPLITUDE / 127) / 100);
+        Out(1, _attenuation * (wavetable[OUT][(osc2_rev*255)+(1-2*osc2_rev)*phase_acc_msb[1]] * MAX_AMPLITUDE / 127) / 100); // optional backwards wave
     }
 
     void View() {
@@ -170,8 +172,8 @@ public:
                 DrawParams();
                 break;
             case MENU_MOD_SOURCES:
-                DrawModSourceMenu();
-                DrawModSources();
+                DrawCVDestMenu();
+                DrawCVDestinations();
                 break;
             default: break;
         }
@@ -197,6 +199,9 @@ public:
                 }
                 default: break;
             }
+        } else if (menu_page == MENU_PARAMS) {
+            if (cursor == PARAM_PITCH) osc = !osc;
+            if (cursor == PARAM_WT_BLEND) osc2_rev = !osc2_rev;
         }
     }
 
@@ -228,7 +233,7 @@ public:
                 }
                 switch((Param_Cursor)cursor) {
                     case PARAM_PITCH:
-                        pitch = constrain(pitch + (direction * 128), MIN_PITCH, MAX_PITCH);
+                        pitch[osc] = constrain(pitch[osc] + (direction * 128), MIN_PITCH, MAX_PITCH);
                         break;
                     case PARAM_WT_BLEND:
                         wt_blend = constrain(wt_blend + direction, 0, (uint8_t)(WT_SIZE-1));
@@ -264,23 +269,31 @@ public:
 
     uint64_t OnDataRequest() {
         uint64_t data = 0;
+        Pack(data, PackLocation {0,16}, pitch[0]);
+        Pack(data, PackLocation {16,16}, pitch[1]);
+        Pack(data, PackLocation {32,1}, noise_freeze);
+        Pack(data, PackLocation {33,1}, osc);
+        Pack(data, PackLocation {34,1}, osc2_rev);
+        Pack(data, PackLocation {35,3}, cv_dest[0]);
+        Pack(data, PackLocation {38,3}, cv_dest[1]);
         for (size_t w = 0; w < 3; ++w) {
-            Pack(data, PackLocation {0 + w*8,8}, waveform[w]);
+            Pack(data, PackLocation {41 + w*5,5}, waveform[w]);
         }
-        Pack(data, PackLocation {24,8}, cv_dest[0]);
-        Pack(data, PackLocation {32,8}, cv_dest[1]);
-        Pack(data, PackLocation {40,1}, noise_freeze);
         return data;
     }
 
     void OnDataReceive(uint64_t data) {
+        pitch[0] = constrain(Unpack(data, PackLocation {0,16}), MIN_PITCH, MAX_PITCH);
+        pitch[1] = constrain(Unpack(data, PackLocation {16,16}), MIN_PITCH, MAX_PITCH);
+        noise_freeze = constrain(Unpack(data, PackLocation {32,1}), 0, 1);
+        osc = constrain(Unpack(data, PackLocation {33,1}), 0, 1);
+        osc2_rev = constrain(Unpack(data, PackLocation {34,1}), 0, 1);
+        cv_dest[0] = constrain(Unpack(data, PackLocation {35,3}), 0, PARAM_LAST);
+        cv_dest[1] = constrain(Unpack(data, PackLocation {38,3}), 0, PARAM_LAST);
         for (size_t w = 0; w < 3; ++w) {
-            waveform[w] = (WaveForms) constrain(Unpack(data, PackLocation {0 + w*8,8}), 0, WAVEFORM_COUNT);
+            waveform[w] = (WaveForms) constrain(Unpack(data, PackLocation {41 + w*5,5}), 0, WAVEFORM_COUNT);
             GenerateWaveTable(w);
         }
-        cv_dest[0] = constrain(Unpack(data, PackLocation {24,8}), 0, PARAM_LAST);
-        cv_dest[1] = constrain(Unpack(data, PackLocation {32,8}), 0, PARAM_LAST);
-        noise_freeze = constrain(Unpack(data, PackLocation {40,1}), 0, 1);
     }
 
 protected:
@@ -290,8 +303,8 @@ protected:
         help[HELP_DIGITAL2] = "OctUp";
         help[HELP_CV1]      = param_names[cv_dest[0]];
         help[HELP_CV2]      = param_names[cv_dest[1]];
-        help[HELP_OUT1]     = "OscOut";
-        help[HELP_OUT2]     = "RevOsc";
+        help[HELP_OUT1]     = "Osc";
+        help[HELP_OUT2]     = "Osc2";
         help[HELP_EXTRA1]   = "Encoder: Select/Edit";
         help[HELP_EXTRA2]   = "AuxBtn: Frz/Reroll";
         //                    "---------------------" <-- Extra text size guide
@@ -308,15 +321,18 @@ private:
     static constexpr size_t WT_SIZE = 256;
     static constexpr uint8_t SR_DIV_LIMIT = 24;
 
-    int16_t pitch = 36 * 128; // default base pitch of C2
+    int16_t pitch[2] = { 36*128, 48*128 }; // default base pitches of C2, and C3
     int wt_blend = 0;
     uint8_t attenuation = 100;
     uint8_t pulse_duty = 127;
-    bool noise_freeze = false;
     uint8_t sample_rate_div = 0;
 
-    uint32_t phase_inc = 0;
-    uint32_t phase;
+    uint32_t phase[2];
+
+    bool noise_freeze = false;
+    bool osc = false;
+    bool osc2_rev = false;
+    // uint8_t toggle_params = 0; // bit0 = noise_freeze, bit1 = osc_select, bit2 = osc2_rev
 
     WaveForms waveform[3];
     std::array<int8_t, WT_SIZE> wavetable[4];
@@ -349,18 +365,14 @@ private:
                 break;
             case MENU_PARAMS:
                 if (cursor == 0) break;
+                x = 42;
+                w = 21;
                 if (cursor < 3) {
-                    x = 36;
                     y = MENU_ROW + 8 + (cursor * Y_DIV);
-                    w = 27;
                 } else if (cursor < 6) {
-                    x = 42;
                     y = MENU_ROW + 8 + ((cursor-2) * Y_DIV);
-                    w = 21;
                 } else {
-                    x = 36;
                     y = MENU_ROW + 8 + ((cursor-5) * Y_DIV);
-                    w = 21;
                 }
                 break;
             case MENU_MOD_SOURCES:
@@ -439,9 +451,9 @@ private:
             case PARAM_NEXT_PAGE:
             case PARAM_PITCH:
             case PARAM_WT_BLEND:
-                gfxPrint(1, y, param_names[PARAM_PITCH]); gfxPrint(":"); gfxPrint(pitch/128);
+                gfxPrint(1, y, param_names[PARAM_PITCH]); gfxPrint(1+osc); gfxPrint(":"); gfxPrint(pitch[osc]/128);
                 y += Y_DIV;
-                gfxPrint(1, y, param_names[PARAM_WT_BLEND]); gfxPrint(":"); gfxPrint(wt_blend);
+                gfxPrint(1, y, param_names[PARAM_WT_BLEND]); gfxPrint(":"); gfxPrint(osc2_rev ? "!" : " "); gfxPrint(wt_blend);
                 y += Y_DIV;
                 gfxPrint(1, y, param_names[PARAM_ATTENUATION]); gfxPrint(":"); gfxPrint(attenuation);
                 break;
@@ -458,19 +470,19 @@ private:
         }
     }
 
-    void DrawModSourceMenu() {
+    void DrawCVDestMenu() {
         uint8_t x = 3;
         uint8_t y = MENU_ROW;
 
         gfxBitmap(x+1, y, 8, ZAP_ICON);
         x += X_DIV;
-        gfxPrint(x-2, y, "Mod Src");
+        gfxPrint(x-2, y, "CV Dest");
 
         gfxLine(0, y+11, 63, y+11);
         gfxLine(0, 63, 63, 63);
     }
 
-    void DrawModSources() {
+    void DrawCVDestinations() {
         const uint8_t y = MENU_ROW + Y_DIV;
         ForEachChannel(ch) {
             gfxPrint(1, y + ch*Y_DIV, OC::Strings::cv_input_names[ch + io_offset]);
@@ -542,7 +554,7 @@ private:
         }
     }
 
-// standard waves
+// WAVE GENERATORS:
     void GenerateWaveForm_Sine(std::array<int8_t, WT_SIZE>& waveform) {
         for (size_t i = 0; i < WT_SIZE; ++i) {
             q15_t t = static_cast<q15_t>(i * 32768 / WT_SIZE);
@@ -668,159 +680,6 @@ private:
         }
     }
 
-
-
-// MOAR WAVEZ
-// the wave generator functions below were created by ChatGPT
-// and have not all been tested. its on the TODO list.
-
-// seems like lots are redundant, or useless. still need to go through the rest.
-
-
-// steps
-
-    // void GenerateWaveForm_SinusoidalStep(std::array<int8_t, WT_SIZE>& waveform) {
-    //     for (size_t i = 0; i < WT_SIZE; ++i) {
-    //         waveform[i] = static_cast<int8_t>(127 * std::round(std::sin(TWO_PI * i / size)));
-    //     }
-    // }
-
-    // void GenerateWaveForm_WavyStaircase(std::array<int8_t, WT_SIZE>& waveform) {
-    //     size_t stepSize = WT_SIZE / 8;
-    //     for (size_t i = 0; i < WT_SIZE; ++i) {
-    //         size_t step = i / stepSize;
-    //         waveform[i] = static_cast<int8_t>(127 * std::sin(TWO_PI * step / 8));
-    //     }
-
-    //         q15_t t = static_cast<q15_t>(i * 32767 / WT_SIZE);
-    //         waveform[i] = arm_sin_q15(t) >> 8;
-    // }
-
-
-// noise
-
-    // void GenerateWaveForm_GaussianNoise(std::array<int8_t, WT_SIZE>& waveform, const size_t size) {
-    //     std::normal_distribution<> dist(0, 50); // Mean 0, std deviation 50
-    //     for (size_t i = 0; i < size; ++i) {
-    //         waveform[i] = static_cast<int8_t>(std::clamp<int>(dist(random()), -128, 127));
-    //     }
-    // }
-
-
-// exponential
-
-
-// modified sinusoids
-
-//     void GenerateWaveForm_OffsetSine(std::array<int8_t, WT_SIZE>& waveform, double offset = 0.5) {
-//         for (size_t i = 0; i < WT_SIZE; ++i) {
-//             double t = static_cast<double>(i) / WT_SIZE;
-//             waveform[i] = static_cast<int8_t>(127 * (std::sin(TWO_PI * t) + offset));
-//         }
-//     }
-
-//     void GenerateWaveForm_OffsetSine2(std::array<int8_t, WT_SIZE>& waveform) {
-//         for (size_t i = 0; i < WT_SIZE; ++i) {
-//             double t = static_cast<double>(i) / WT_SIZE;
-//             double value = 0.5 + 0.5 * std::sin(2 * M_PI * t); // Sine wave offset to [0, 1]
-//             waveform[i] = static_cast<int8_t>(127 * value - 64); // Offset to [-64, 63]
-//         }
-//     }
-
-//     void GenerateWaveForm_Cosine(std::array<int8_t, WT_SIZE>& waveform) {
-//         for (size_t i = 0; i < WT_SIZE; ++i) {
-//             double t = static_cast<double>(i) / WT_SIZE;
-//             waveform[i] = static_cast<int8_t>(127 * std::cos(TWO_PI * t));
-//         }
-//     }
-
-//     void GenerateWaveForm_SinusoidalAM(std::array<int8_t, WT_SIZE>& waveform) {
-//         for (size_t i = 0; i < WT_SIZE; ++i) {
-//             double t = static_cast<double>(i) / WT_SIZE;
-//             double value = std::sin(2 * M_PI * t) * (0.5 + 0.5 * std::sin(4 * M_PI * t)); // Sine modulated by sine
-//             waveform[i] = static_cast<int8_t>(127 * value);
-//         }
-//     }
-
-//     void GenerateWaveForm_ClippedSine(std::array<int8_t, WT_SIZE>& waveform, double clip = 0.5) {
-//         for (size_t i = 0; i < WT_SIZE; ++i) {
-//             double t = static_cast<double>(i) / WT_SIZE;
-//             double sineValue = std::sin(TWO_PI * t);
-//             sineValue = std::clamp(sineValue, -clip, clip);
-//             waveform[i] = static_cast<int8_t>(127 * sineValue);
-//         }
-//     }
-
-//     void GenerateWaveForm_StretchedSine(std::array<int8_t, WT_SIZE>& waveform, double frequency = 2.0) {
-//         for (size_t i = 0; i < WT_SIZE; ++i) {
-//             double t = static_cast<double>(i) / WT_SIZE;
-//             waveform[i] = static_cast<int8_t>(127 * std::sin(TWO_PI * frequency * t));
-//         }
-//     }
-
-//     void GenerateWaveForm_FullRectifiedSine(std::array<int8_t, WT_SIZE>& waveform) {
-//         for (size_t i = 0; i < WT_SIZE; ++i) {
-//             double t = static_cast<double>(i) / WT_SIZE;
-//             waveform[i] = static_cast<int8_t>(127 * std::fabs(std::sin(TWO_PI * t)));
-//         }
-//     }
-
-//     void GenerateWaveForm_HalfRectifiedSine(std::array<int8_t, WT_SIZE>& waveform) {
-//         for (size_t i = 0; i < WT_SIZE; ++i) {
-//             double t = static_cast<double>(i) / WT_SIZE;
-//             double sineValue = std::sin(TWO_PI * t);
-//             waveform[i] = static_cast<int8_t>(127 * std::max((int)sineValue, 0));
-//         }
-//     }
-
-//     void GenerateWaveForm_HalfSine(std::array<int8_t, WT_SIZE>& waveform) {
-//         for (size_t i = 0; i < WT_SIZE; ++i) {
-//             double t = static_cast<double>(i) / WT_SIZE;
-//             double value = std::sin(M_PI * t); // Half sine wave
-//             waveform[i] = static_cast<int8_t>(127 * value);
-//         }
-//     }
-
-
-// // geometric
-
-
-// // probably harsh
-
-//     void GenerateWaveForm_Ripple(std::array<int8_t, WT_SIZE>& waveform) {
-//         for (size_t i = 0; i < WT_SIZE; ++i) {
-//             double t = static_cast<double>(i) / WT_SIZE;
-//             double value = std::sin(2 * M_PI * t) + 0.3 * std::sin(10 * M_PI * t);
-//             waveform[i] = static_cast<int8_t>(127 * value);
-//         }
-//     }
-
-//     void GenerateWaveForm_Zigzag(std::array<int8_t, WT_SIZE>& waveform) {
-//         for (size_t i = 0; i < WT_SIZE; ++i) {
-//             waveform[i] = static_cast<int8_t>((i % 64) - 32);
-//         }
-//     }
-
-//     void GenerateWaveForm_Spike(std::array<int8_t, WT_SIZE>& waveform) {
-//         for (size_t i = 0; i < WT_SIZE; i += WT_SIZE / 8) {
-//             waveform[i] = 127; // Set spikes periodically
-//         }
-//     }
-
-//     void GenerateWaveForm_Alternating(std::array<int8_t, WT_SIZE>& waveform) {
-//         for (size_t i = 0; i < WT_SIZE; ++i) {
-//             waveform[i] = (i % 32 < 16) ? 127 : -128;
-//         }
-//     }
-
-//     void GenerateWaveForm_SquarePulseTrain(std::array<int8_t, WT_SIZE>& waveform) {
-//         for (size_t i = 0; i < WT_SIZE; ++i) {
-//             waveform[i] = ((i / 16) % 2 == 0) ? 127 : -128;
-//         }
-//     }
-
-
-// add more wave generators here, and add to enum
-
+    // add more wave generators here, and add to enum
 
 };
