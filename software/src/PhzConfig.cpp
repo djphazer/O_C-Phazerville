@@ -4,6 +4,7 @@
  */
 #ifdef __IMXRT1062__
 #include "PhzConfig.h"
+#include "HSUtils.h"
 
 // NOTE: This option is only available on the Teensy 4.0, Teensy 4.1 and Teensy Micromod boards.
 // With the additonal option for security on the T4 the maximum flash available for a
@@ -66,11 +67,12 @@ bool getValue(KEY key, VALUE &value)
   return false;
 }
 
-void save_config(const char* filename, FS &fs)
+bool save_config(const char* filename, FS &fs)
 {
     Serial.println("\nSaving Config!!!");
     Serial.printf("\nSaving Config: %s\n", filename);
 
+    bool success = true;
     size_t bytes_written = 0;
     record_count = 0;
 
@@ -88,6 +90,8 @@ void save_config(const char* filename, FS &fs)
         if (result != (sizeof(i.first) + sizeof(i.second))) {
           // something went wrong
           Serial.printf("!! ERROR while writing file !!\n   Result = %d\n", result);
+          HS::PokePopup(HS::MESSAGE_POPUP, HS::LFS_WRITE_ERROR);
+          success = false;
           break;
         }
         bytes_written += result;
@@ -100,7 +104,10 @@ void save_config(const char* filename, FS &fs)
       dataFile.close();
     } else {
       Serial.printf("error opening %s\n", filename);
+      success = false;
     }
+
+    return success;
 }
 
 bool load_config(const char* filename, FS &fs)

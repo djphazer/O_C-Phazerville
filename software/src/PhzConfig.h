@@ -25,7 +25,7 @@ namespace PhzConfig {
   // Forward Decl
   void listFiles(FS &fs = myfs);
   bool load_config(const char* filename = CONFIG_FILENAME, FS &fs = myfs);
-  void save_config(const char* filename = CONFIG_FILENAME, FS &fs = myfs);
+  bool save_config(const char* filename = CONFIG_FILENAME, FS &fs = myfs);
   void clear_config();
 
   void setValue(KEY key, VALUE value);

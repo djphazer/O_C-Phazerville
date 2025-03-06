@@ -370,10 +370,14 @@ public:
 
         audio_app.SavePreset(id);
 
+        bool success = false;
         if (HS::wavplayer_available)
-          PhzConfig::save_config(bank_filename, SD);
+          success = PhzConfig::save_config(bank_filename, SD);
         else
-          PhzConfig::save_config(bank_filename);
+          success = PhzConfig::save_config(bank_filename);
+
+        if (success)
+          PokePopup(HS::MESSAGE_POPUP, HS::PRESET_SAVED);
 
         preset_id = id;
     }
@@ -695,7 +699,7 @@ public:
         }
 
         // Overlay popup window last
-        if (OC::CORE::ticks - HS::popup_tick < HEMISPHERE_CURSOR_TICKS * 2) {
+        if (OC::CORE::ticks - HS::popup_tick < HEMISPHERE_CURSOR_TICKS * 4) {
           HS::DrawPopup(config_cursor, preset_id, CursorBlink());
         }
     }

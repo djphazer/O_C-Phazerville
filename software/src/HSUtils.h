@@ -1,5 +1,7 @@
 #pragma once
 
+#include "OC_core.h"
+#include "OC_ADC.h"
 #include "OC_scales.h"
 #include "PackingUtils.h"
 
@@ -176,6 +178,16 @@ namespace HS {
     MENU_POPUP,
     CLOCK_POPUP, PRESET_POPUP,
     QUANTIZER_POPUP,
+    MESSAGE_POPUP,
+
+    POPUP_TYPE_COUNT
+  };
+
+  enum ErrMsgIndex {
+    NO_ERROR,
+    LFS_WRITE_ERROR,
+    PRESET_SAVED,
+    MYSTERIOUS_ERROR,
   };
 
   enum QUANT_CHANNEL {
@@ -195,6 +207,7 @@ namespace HS {
   extern PopupType popup_type;
   extern uint8_t qview; // which quantizer's setting is shown in popup
   extern int q_edit;
+  extern ErrMsgIndex msg_idx;
 
   // input quantizers, because sometimes we need hysteresis
   extern OC::SemitoneQuantizer input_quant[ADC_CHANNEL_LAST];
@@ -237,6 +250,6 @@ namespace HS {
   void QEditEncoderMove(bool rightenc, int dir);
   void DrawPopup(const int config_cursor = 0, const int preset_id = 0, const bool blink = 0);
   void ToggleClockRun();
-  void PokePopup(PopupType pop);
+  void PokePopup(PopupType pop, ErrMsgIndex err = NO_ERROR);
 
 } // namespace HS

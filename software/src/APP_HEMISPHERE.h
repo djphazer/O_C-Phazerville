@@ -738,7 +738,7 @@ public:
         }
 
         // Overlay popup window last
-        if (OC::CORE::ticks - HS::popup_tick < HEMISPHERE_CURSOR_TICKS * 2) {
+        if (OC::CORE::ticks - HS::popup_tick < HEMISPHERE_CURSOR_TICKS * 4) {
           HS::DrawPopup(config_cursor, preset_id, CursorBlink());
         }
     }

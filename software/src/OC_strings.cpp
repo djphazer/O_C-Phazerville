@@ -29,6 +29,12 @@ namespace OC {
   const char * const SHORT_NAME = "o_C";
 #endif
 
+  const char * const err_msg[] = { "(missing msg)",
+    "LFS WRITE ERROR!",
+    "PRESET SAVED!",
+    "MYSTERIOUS ERROR",
+  };
+
   const char * const seq_playmodes[] = {" -", "SEQ+1", "SEQ+2", "SEQ+3", "TR+1", "TR+2", "TR+3", "ARP", "S+H#1", "S+H#2", "S+H#3", "S+H#4", "CV#1", "CV#2", "CV#3", "CV#4"};
 
   const char * const channel_trigger_sources[] = {"TR1", "TR2", "TR3", "TR4", "cnt+", "cnt-"};

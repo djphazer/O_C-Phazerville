@@ -15,6 +15,7 @@ namespace OC {
     extern const char * const VERSION;
     extern const char * const BUILD_TAG;
 
+    extern const char * const err_msg[];
     extern const char * const seq_playmodes[];
     extern const char * const channel_trigger_sources[];
     extern const char * const seq_directions[];

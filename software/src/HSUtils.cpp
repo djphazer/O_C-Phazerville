@@ -11,8 +11,9 @@ namespace HS {
 
   uint32_t popup_tick; // for button feedback
   PopupType popup_type = MENU_POPUP;
-  uint8_t qview = 0; // which quantizer's setting is shown in popup
   int q_edit = 0; // edit cursor for quantizer popup, 0 = not editing
+  uint8_t qview = 0; // which quantizer's setting is shown in popup
+  ErrMsgIndex msg_idx;
 
   OC::SemitoneQuantizer input_quant[ADC_CHANNEL_LAST];
 
@@ -60,7 +61,8 @@ namespace HS {
 #endif
   }
 
-  void PokePopup(PopupType pop) {
+  void PokePopup(PopupType pop, ErrMsgIndex err) {
+    msg_idx = err;
     popup_type = pop;
     popup_tick = OC::CORE::ticks;
   }
@@ -195,20 +197,46 @@ namespace HS {
         CONFIG_DUMMY, // past this point goes full screen
     };
 
+    int px, py, pw, ph;
+
+    /*
+    MENU_POPUP,
+    CLOCK_POPUP,
+    PRESET_POPUP,
+    QUANTIZER_POPUP,
+    MESSAGE_POPUP,
+    */
     if (popup_type == MENU_POPUP) {
-      graphics.clearRect(73, 25, 54, 38);
-      graphics.drawFrame(74, 26, 52, 36);
+      px = 73;
+      py = 25;
+      pw = 54;
+      ph = 38;
     } else if (popup_type == QUANTIZER_POPUP) {
-      graphics.clearRect(20, 23, 88, 28);
-      graphics.drawFrame(21, 24, 86, 26);
-      graphics.setPrintPos(26, 28);
+      px = 20;
+      py = 23;
+      pw = 88;
+      ph = 28;
+    } else if (popup_type == MESSAGE_POPUP) {
+      px = 16;
+      py = 23;
+      pw = 96;
+      ph = 18;
     } else {
-      graphics.clearRect(23, 23, 82, 18);
-      graphics.drawFrame(24, 24, 80, 16);
-      graphics.setPrintPos(28, 28);
+      px = 23;
+      py = 23;
+      pw = 82;
+      ph = 18;
     }
 
+    graphics.clearRect(px, py, pw, ph);
+    graphics.drawFrame(px+1, py+1, pw-2, ph-2);
+    graphics.setPrintPos(px+5, py+5);
+
     switch (popup_type) {
+      default:
+      case MESSAGE_POPUP:
+        gfxPrint(OC::Strings::err_msg[msg_idx]);
+        break;
       case MENU_POPUP:
         gfxPrint(78, 30, "Load");
         gfxPrint(78, 40, config_cursor == AUTO_SAVE ? "(auto)" : "Save");
