@@ -35,8 +35,11 @@ public:
   }
 
   void Unload() {
+    /* what if we just... kept it forever?
+     * the problem is, unloading & reloading is slow when jumping presets
     for (auto& ch : channels) ch.Stop();
     AllowRestart();
+    */
   }
 
   void Controller() {
