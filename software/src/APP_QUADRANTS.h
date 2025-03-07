@@ -444,6 +444,7 @@ public:
               HS::q_octave[qslot],
               HS::root_note[qslot],
               HS::q_mask[qslot]);
+          QuantizerConfigure(qslot, quant_scale[qslot], q_mask[qslot]);
         }
 
         audio_app.LoadPreset(id);
