@@ -261,13 +261,7 @@ public:
         DrawIndicator();
     }
 
-    void DrawFullScreen() {
-      HemisphereApplet::DrawFullScreen();
-      if (cursor >= CVMODE1 && cursor <= OUT_B) {
-        // this is an ugly hack, but it'll work lol
-        gfxCursor(19 - gfx_offset + 64*((cursor-CVMODE1)%2), 32 + 10*((cursor-CVMODE1)/2), 44);
-      }
-    }
+    // void DrawFullScreen() { }
     // void OnButtonPress() { }
 
     void AuxButton() {
