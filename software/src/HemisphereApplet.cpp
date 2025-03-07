@@ -3,11 +3,11 @@
 HS::IOFrame HS::frame;
 HS::ClockManager HS::clock_m;
 
-int HemisphereApplet::cursor_countdown[APPLET_SLOTS];
+int HemisphereApplet::cursor_countdown[APPLET_SLOTS + 1];
 int16_t HemisphereApplet::cursor_start_x;
 int16_t HemisphereApplet::cursor_start_y;
 const char* HemisphereApplet::help[HELP_LABEL_COUNT];
-HS::EncoderEditor HemisphereApplet::enc_edit[APPLET_SLOTS];
+HS::EncoderEditor HemisphereApplet::enc_edit[APPLET_SLOTS + 1];
 
 void HemisphereApplet::BaseController() {
     // I moved the IO-related stuff to the parent HemisphereManager app.

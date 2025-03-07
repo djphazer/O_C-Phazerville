@@ -60,7 +60,8 @@ enum HEM_SIDE : uint8_t {
   RIGHT2_HEMISPHERE = 3,
 #endif
 
-  APPLET_SLOTS
+  APPLET_SLOTS,
+  GLOBAL_CURSOR = APPLET_SLOTS,
 };
 
 // Codes for help system labels

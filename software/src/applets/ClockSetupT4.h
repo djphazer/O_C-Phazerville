@@ -87,7 +87,6 @@ public:
         // Paused means wait for clock-sync to start
         if (HS::clock_m.IsPaused() && clock_sync)
             HS::clock_m.Start();
-        // TODO: automatically stop...
 
         // Advance internal clock, sync to external clock / reset
         if (HS::clock_m.IsRunning())
@@ -129,6 +128,7 @@ public:
       }
     }
     void View() {
+      hemisphere = HS::GLOBAL_CURSOR;
       if (OC::CORE::ticks - view_tick > 1000) {
         slide_anim = SLIDEOUT_TIME;
       }
@@ -138,11 +138,11 @@ public:
     }
 
     void OnButtonPress() {
-        if (!isEditing) { // special cases for toggle buttons
+        if (!EditMode()) { // special cases for toggle buttons
             if (cursor == PLAY_STOP) PlayStop();
-            else isEditing ^= 1;
+            else CursorToggle();
         }
-        else isEditing ^= 1;
+        else CursorToggle();
 
         if (cursor == TEMPO) {
             // Tap Tempo detection
@@ -165,7 +165,7 @@ public:
     void OnEncoderMove(int direction) {
         taps = 0;
         last_tap_tick = 0;
-        if (!isEditing) {
+        if (!EditMode()) {
             MoveCursor(cursor, direction, LAST_SETTING);
             return;
         }
@@ -232,7 +232,7 @@ public:
         }
     }
     void OnLeftEncoderMove(const int direction) {
-      if (isEditing && cursor >= MULT1 && cursor <= MULT8) {
+      if (EditMode() && cursor >= MULT1 && cursor <= MULT8) {
         int mult = clock_m.GetMultiply(cursor - MULT1);
 
         if (0 == mult) mult += direction;
@@ -294,7 +294,6 @@ protected:
 
 private:
     int cursor; // ClockSetupCursor
-    bool isEditing;
     int flash_ticker[8];
     int button_ticker;
     int slide_anim = 0;

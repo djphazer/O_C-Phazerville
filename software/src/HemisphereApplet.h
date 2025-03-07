@@ -68,11 +68,11 @@ using namespace HS;
 
 class HemisphereApplet {
 public:
-    static int cursor_countdown[APPLET_SLOTS];
+    static int cursor_countdown[APPLET_SLOTS + 1];
     static int16_t cursor_start_x;
     static int16_t cursor_start_y;
     static const char* help[HELP_LABEL_COUNT];
-    static EncoderEditor enc_edit[APPLET_SLOTS];
+    static EncoderEditor enc_edit[APPLET_SLOTS + 1];
 
     virtual const char* applet_name() = 0; // Maximum of 9 characters
     virtual const uint8_t* applet_icon() { return ZAP_ICON; }
