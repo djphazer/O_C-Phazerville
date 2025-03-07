@@ -560,6 +560,38 @@ public:
         audio_app.Controller();
     }
 
+    void DrawFullScreen() {
+      if (select_mode == zoom_slot) {
+        showhide_cursor.Scroll(next_applet_index[zoom_slot] - showhide_cursor.cursor_pos());
+        DrawAppletList(CursorBlink());
+        // dotted screen border during applet select
+        gfxFrame(0, 0, 128, 64, true);
+      } else {
+        active_applet[zoom_slot]->BaseView(true, zoom_cursor < 0);
+        // Applets 3 and 4 get inverted titles
+        if (zoom_slot > 1) gfxInvert(1 + (zoom_slot%2)*64, 1, 63, 10);
+      }
+
+      // draw cursor for editing applet select and input maps
+      if (zoom_cursor < 0) {
+        gfxIcon(64 - 8*(zoom_slot & 1), 1, DOWN_ICON, true);
+      } else if (0 == zoom_cursor) {
+        if (select_mode != zoom_slot && CursorBlink())
+          gfxIcon(64 - 8*(zoom_slot & 1), 1, (zoom_slot & 1)? RIGHT_ICON : LEFT_ICON, true);
+      } else if (isEditing) {
+        const int x = ((zoom_cursor-1)%2)*64;
+        const int y = 13 + 10*((zoom_cursor-1)/2);
+        gfxInvert(x, y, 19, 9);
+        gfxFrame(x, y, 19, 9, true);
+      } else {
+        if (CursorBlink()) {
+          const int x = 18 + 64*((zoom_cursor-1)%2);
+          const int y = 14 + 10*((zoom_cursor-1)/2);
+          gfxIcon(x, y, LEFT_ICON, true);
+        }
+      }
+    }
+
     void DrawOverview() {
       active_applet[0]->gfxHeader(0);
       active_applet[1]->gfxHeader(0);
@@ -646,33 +678,7 @@ public:
 
         if (draw_applets) {
           if (view_state == APPLET_FULLSCREEN) {
-            if (select_mode == zoom_slot) {
-              showhide_cursor.Scroll(next_applet_index[zoom_slot] - showhide_cursor.cursor_pos());
-              DrawAppletList(CursorBlink());
-              // dotted screen border during applet select
-              gfxFrame(0, 0, 128, 64, true);
-            } else {
-              active_applet[zoom_slot]->BaseView(true);
-              // Applets 3 and 4 get inverted titles
-              if (zoom_slot > 1) gfxInvert(1 + (zoom_slot%2)*64, 1, 63, 10);
-            }
-
-            // draw cursor for editing applet select and input maps
-            if (0 == zoom_cursor) {
-              if (select_mode != zoom_slot && CursorBlink())
-                gfxIcon(60, 1, (zoom_slot & 1)? RIGHT_ICON : LEFT_ICON, true);
-            } else if (isEditing) {
-              const int x = ((zoom_cursor-1)%2)*64;
-              const int y = 13 + 10*((zoom_cursor-1)/2);
-              gfxInvert(x, y, 19, 9);
-              gfxFrame(x, y, 19, 9, true);
-            } else {
-              if (CursorBlink()) {
-                const int x = 18 + 64*((zoom_cursor-1)%2);
-                const int y = 14 + 10*((zoom_cursor-1)/2);
-                gfxIcon(x, y, LEFT_ICON, true);
-              }
-            }
+            DrawFullScreen();
           } else if (view_state == OVERVIEW) {
             DrawOverview();
           } else {
@@ -720,6 +726,10 @@ public:
         }
         if (view_state == APPLET_FULLSCREEN) {
           switch (zoom_cursor) {
+            case -1:
+              active_applet[zoom_slot]->OnButtonPress();
+              break;
+
             case 0:
               if (zoom_slot == select_mode) {
                 SetApplet(zoom_slot, next_applet_index[zoom_slot]);
@@ -838,50 +848,48 @@ public:
         }
 
         if (view_state == APPLET_FULLSCREEN) {
-          if (select_mode == zoom_slot)
-            ChangeApplet(zoom_slot, event.value);
-          else if (isEditing) { // enc changes value
-            switch (zoom_cursor)
-            {
-              default:
-                break;
-
-              case 1:
-              case 2:
+            if (select_mode == zoom_slot)
+              ChangeApplet(zoom_slot, event.value);
+            else if (h == LEFT_HEMISPHERE)
+              zoom_cursor = (event.value > 0)? 0 : -1;
+            else if (zoom_cursor < 0)
+              active_applet[zoom_slot]->OnEncoderMove(event.value);
+            else if (isEditing) { // enc changes value
+              switch (zoom_cursor)
               {
-                const int chan = zoom_slot*2 + zoom_cursor - 1;
-                if (clock_m.IsRunning()) // && clock_m.GetMultiply(chan))
+                case 1:
+                case 2:
                 {
-                  clock_m.SetMultiply(clock_m.GetMultiply(chan) + event.value, chan);
-                } else
-                  HS::trigger_mapping[chan] = constrain(
-                      HS::trigger_mapping[chan] + event.value,
-                      0, TRIGMAP_MAX);
-                break;
+                  const int chan = zoom_slot*2 + zoom_cursor - 1;
+                  if (clock_m.IsRunning()) // && clock_m.GetMultiply(chan))
+                  {
+                    clock_m.SetMultiply(clock_m.GetMultiply(chan) + event.value, chan);
+                  } else
+                    HS::trigger_mapping[chan] = constrain(
+                        HS::trigger_mapping[chan] + event.value,
+                        0, TRIGMAP_MAX);
+                  break;
+                }
+                case 3:
+                case 4:
+                  HS::cvmapping[zoom_slot*2 + zoom_cursor - 3] =
+                    constrain( HS::cvmapping[zoom_slot*2 + zoom_cursor - 3] + event.value,
+                        0, CVMAP_MAX);
+                  break;
+                case 5:
+                case 6:
+                  // TODO: per applet?
+                default:
+                  break;
               }
-              case 3:
-              case 4:
-                HS::cvmapping[zoom_slot*2 + zoom_cursor - 3] =
-                  constrain( HS::cvmapping[zoom_slot*2 + zoom_cursor - 3] + event.value,
-                      0, CVMAP_MAX);
-                break;
-              case 5:
-              case 6:
-                // TODO: per applet?
-                break;
+            } else { // enc moves cursor
+              zoom_cursor = constrain(zoom_cursor + event.value, 0, 4);
+              ResetCursor();
             }
-          } else { // enc moves cursor
-            zoom_cursor = constrain(zoom_cursor + event.value, 0, 4);
-            ResetCursor();
-          }
-        } else if (select_mode == h) {
-          // old style select mode
-          ChangeApplet((HEM_SIDE)h, event.value);
-          SetApplet((HEM_SIDE)h, next_applet_index[h]);
         } else if (event.mask & (OC::CONTROL_BUTTON_X | OC::CONTROL_BUTTON_Y)) {
             // hold down X or Y to change applet with encoder
-            if (view_state == APPLET_FULLSCREEN) slot = zoom_slot;
             ChangeApplet(slot, event.value);
+            SetApplet(slot, next_applet_index[slot]);
         } else {
             active_applet[slot]->OnEncoderMove(event.value);
         }

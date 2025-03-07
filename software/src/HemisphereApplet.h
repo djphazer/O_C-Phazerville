@@ -91,7 +91,7 @@ public:
 
     //void BaseStart(const HEM_SIDE hemisphere_);
     void BaseController();
-    void BaseView(bool full_screen = false);
+    void BaseView(bool full_screen = false, bool parked = true);
 
     void BaseStart(const HEM_SIDE hemisphere_) {
         SetDisplaySide(hemisphere_);
@@ -113,8 +113,9 @@ public:
     // to avoid breaking applets based on the old boilerplate
     void BaseScreensaverView() {}
 
+    virtual void DrawFullScreen() { View(); }
     /* Formerly Help Screen */
-    virtual void DrawFullScreen() {
+    void DrawConfigHelp() {
         for (int i=0; i<HELP_LABEL_COUNT; ++i) help[i] = "";
         SetHelp();
         const bool clockrun = HS::clock_m.IsRunning();

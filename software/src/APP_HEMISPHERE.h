@@ -695,12 +695,14 @@ public:
               gfxFrame(0, 0, 128, 64, true);
             }
             else
-              HS::available_applets[index].instance[zoom_slot]->BaseView(true);
+              HS::available_applets[index].instance[zoom_slot]->BaseView(true, zoom_cursor < 0);
 
             // draw cursor for editing applet select and input maps
-            if (0 == zoom_cursor) {
+            if (zoom_cursor < 0) {
+              gfxIcon(64 - 8*zoom_slot, 1, DOWN_ICON, true);
+            } else if (0 == zoom_cursor) {
               if (select_mode != zoom_slot && CursorBlink())
-                gfxIcon(60, 1, zoom_slot? RIGHT_ICON : LEFT_ICON, true);
+                gfxIcon(64 - 8*zoom_slot, 1, zoom_slot? RIGHT_ICON : LEFT_ICON, true);
             } else if (isEditing) {
               const int x = ((zoom_cursor-1)%2)*64;
               const int y = 13 + 10*((zoom_cursor-1)/2);
@@ -770,6 +772,13 @@ public:
         // button release
         if (zoom_slot > -1) {
           switch (zoom_cursor) {
+            case -1:
+            {
+              int index = my_applet[zoom_slot];
+              HS::available_applets[index].instance[zoom_slot]->OnButtonPress();
+              break;
+            }
+
             case 0:
               if (zoom_slot == select_mode) {
                 SetApplet(HEM_SIDE(zoom_slot), next_applet[zoom_slot]);
@@ -941,12 +950,14 @@ public:
         // Fullscreen cursor stuff
         if (zoom_slot > -1) {
           if (select_mode == zoom_slot) ChangeApplet(HEM_SIDE(zoom_slot), event.value);
-          else if (isEditing) { // enc changes value
+          else if (LEFT_HEMISPHERE == h) // left enc jumps between applet or config
+            zoom_cursor = (event.value > 0)? 0 : -1;
+          else if (zoom_cursor < 0) { // right enc is normal applet behavior
+            int index = my_applet[zoom_slot];
+            HS::available_applets[index].instance[zoom_slot]->OnEncoderMove(event.value);
+          } else if (isEditing) { // either enc changes config value
             switch (zoom_cursor)
             {
-              default:
-                break;
-
               case 1:
               case 2:
               {
@@ -969,9 +980,10 @@ public:
               case 5:
               case 6:
                 // TODO: per applet?
+              default:
                 break;
             }
-          } else { // left enc moves cursor
+          } else { // right enc moves cursor
             zoom_cursor = constrain(zoom_cursor + event.value, 0, 4);
             ResetCursor();
           }
