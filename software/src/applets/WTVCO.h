@@ -125,12 +125,15 @@ public:
                     break;
                 case PARAM_ATTENUATION:
                     _attenuation = constrain(attenuation + Proportion(In(ch), 5 * HEMISPHERE_MAX_INPUT_CV / 6, 100), 0, 100);
+                    // Modulate(_attenuation, ch, 0, 100);
                     break;
                 case PARAM_PULSE_DUTY:
                     _pulse_duty = pulse_duty + Proportion(In(ch), 5 * HEMISPHERE_MAX_INPUT_CV / 6, WT_SIZE-1);
+                    // Modulate(_pulse_duty, ch, 8, 248);
                     break;
                 case PARAM_SAMPLE_RATE_DIV:
                     _sample_rate_div = constrain(sample_rate_div + Proportion(In(ch), 5 * HEMISPHERE_MAX_INPUT_CV / 6, SR_DIV_LIMIT), 0, SR_DIV_LIMIT);
+                    // Modulate(_sample_rate_div, ch, 0, SR_DIV_LIMIT);
                     break;
                 default: break;
             }
@@ -158,7 +161,7 @@ public:
 #endif
 
         Out(0, _attenuation * (wavetable[OUT][phase_acc_msb[0]] * MAX_AMPLITUDE / 127) / 100);
-        Out(1, _attenuation * (wavetable[OUT][(osc2_rev*255)+(1-2*osc2_rev)*phase_acc_msb[1]] * MAX_AMPLITUDE / 127) / 100); // optional backwards wave
+        Out(1, _attenuation * (wavetable[OUT][(255 * osc2_rev) + (1 - 2 * osc2_rev) * phase_acc_msb[1]] * MAX_AMPLITUDE / 127) / 100); // optional backwards wave
     }
 
     void View() {
@@ -316,8 +319,8 @@ private:
 
     uint8_t cv_dest[2] = { PARAM_PITCH, PARAM_WT_BLEND };
 
-    static constexpr int16_t MAX_PITCH = 13824;
-    static constexpr int16_t MIN_PITCH = -13824;
+    static constexpr int16_t MAX_PITCH = 16256;
+    static constexpr int16_t MIN_PITCH = -16384;
     static constexpr size_t WT_SIZE = 256;
     static constexpr uint8_t SR_DIV_LIMIT = 24;
 
