@@ -271,6 +271,7 @@ public:
         Pack(data, PackLocation { 2, 2 }, HS::screensaver_mode);
         Pack(data, PackLocation { 4, 7 }, HS::trig_length);
         Pack(data, PackLocation { 11, 5 }, HS::clock_m.GetClockPPQN());
+        Pack(data, PackLocation { 16, 1 }, (HS::clock_m.IsRunning() || HS::clock_m.IsPaused()));
         // 48 bits free
         return data;
     }
@@ -280,17 +281,12 @@ public:
         HS::screensaver_mode = Unpack(data, PackLocation { 2, 2 });
         HS::trig_length = constrain( Unpack(data, PackLocation { 4, 7 }), 1, 127);
         HS::clock_m.SetClockPPQN(Unpack(data, PackLocation { 11, 5 }));
+        if (Unpack(data, PackLocation{16, 1}) && !HS::clock_m.IsRunning())
+          HS::clock_m.Start(true);
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "";
-        help[HEMISPHERE_HELP_CVS]      = "";
-        help[HEMISPHERE_HELP_OUTS]     = "";
-        help[HEMISPHERE_HELP_ENCODER]  = "";
-        //                               "------------------" <-- Size Guide
-    }
+    void SetHelp() { }
 
 private:
     int cursor; // ClockSetupCursor

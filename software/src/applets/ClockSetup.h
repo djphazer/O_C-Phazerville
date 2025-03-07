@@ -259,6 +259,8 @@ public:
         VBiasManager *v = v->get();
         Pack(data, PackLocation { 11, 2 }, v->GetState());
 #endif
+
+        Pack(data, PackLocation{13, 1}, (clock_m.IsRunning() || clock_m.IsPaused()));
         return data;
     }
     void SetGlobals(const uint64_t &data) {
@@ -272,18 +274,14 @@ public:
         VBiasManager::VState bias_state = (VBiasManager::VState)Unpack(data, PackLocation { 11, 2 });
         v->SetState( bias_state );
 #endif
+
+        if (Unpack(data, PackLocation{13, 1}) && !clock_m.IsRunning())
+          clock_m.Start(true);
     }
 
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "";
-        help[HEMISPHERE_HELP_CVS]      = "";
-        help[HEMISPHERE_HELP_OUTS]     = "";
-        help[HEMISPHERE_HELP_ENCODER]  = "";
-        //                               "------------------" <-- Size Guide
-    }
+    void SetHelp() { }
 
 private:
     int cursor; // ClockSetupCursor
