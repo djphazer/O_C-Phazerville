@@ -72,6 +72,7 @@ bool save_config(const char* filename, FS &fs)
     Serial.println("\nSaving Config!!!");
     Serial.printf("\nSaving Config: %s\n", filename);
 
+    const char* const TEMPFILE = "PEWPEW.TMP";
     bool success = true;
     size_t bytes_written = 0;
     record_count = 0;
@@ -80,8 +81,8 @@ bool save_config(const char* filename, FS &fs)
     // FILE_WRITE will append data
     // FILE_WRITE_BEGIN will overwrite from 0
     // O_TRUNC to truncate file size to what was written
-    fs.remove(filename);
-    dataFile = fs.open(filename, FILE_WRITE_BEGIN);
+    fs.remove(TEMPFILE);
+    dataFile = fs.open(TEMPFILE, FILE_WRITE_BEGIN);
     if (dataFile) {
       for (auto &i : cfg_store)
       {
@@ -105,6 +106,11 @@ bool save_config(const char* filename, FS &fs)
     } else {
       Serial.printf("error opening %s\n", filename);
       success = false;
+    }
+
+    if (success) {
+      fs.remove(filename);
+      fs.rename(TEMPFILE, filename);
     }
 
     return success;
