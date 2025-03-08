@@ -78,6 +78,14 @@ class Quantizer {
   // Force Process to process again (for after re-configuring)
   void Requantize() { requantize_ = true; }
 
+  void ConfigureOctaveConstraint(bool octave_constraint, int octave_constraint_min, int octave_constraint_max) {
+    octave_constraint_ = octave_constraint;
+    octave_constraint_min_ = octave_constraint_min;
+    octave_constraint_max_ = octave_constraint_max;
+  }
+
+  int16_t ConstrainOctave(int16_t octave) const;
+
  private:
   bool enabled_;
   int32_t codeword_;
@@ -87,6 +95,9 @@ class Quantizer {
   int32_t span_;
   int16_t notes_[16];
   uint8_t num_notes_;
+  bool octave_constraint_;
+  int octave_constraint_min_;
+  int octave_constraint_max_;
 
   uint16_t note_number_;
   bool requantize_;
