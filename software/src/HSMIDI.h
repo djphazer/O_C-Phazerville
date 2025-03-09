@@ -54,7 +54,7 @@ extern midi::MidiInterface<midi::SerialMIDI<HardwareSerial> > MIDI1;
 #define HEM_MIDI_START usbMIDI.Start
 #define HEM_MIDI_STOP usbMIDI.Stop
 
-#define HEM_MIDI_CLOCK_DIVISOR 12
+#define HEM_MIDI_CLOCK_DIVISOR 6
 
 const char* const midi_note_numbers[128] = {
     "C-1","C#-1","D-1","D#-1","E-1","F-1","F#-1","G-1","G#-1","A-1","A#-1","B-1",
