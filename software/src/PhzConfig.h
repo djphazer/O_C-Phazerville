@@ -10,10 +10,6 @@ namespace HS {
 }
 
 namespace PhzConfig {
-  enum ConfigKeys : uint16_t {
-    POWER_CYCLE_COUNT = 0,
-  };
-
   using KEY = uint16_t;
   using VALUE = uint64_t;
   using ConfigMap = std::unordered_map<KEY, VALUE>;

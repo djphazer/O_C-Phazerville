@@ -1,30 +1,29 @@
 /* Phazerville Config File
- * stored on LittleFS in flash storage
- * supercedes previous EEPROM mechanism
+ *
+ * Primarily stored on LittleFS in flash storage,
+ * or SD card if available, or other any similar FS object.
+ * Supercedes previous EEPROM mechanism
  */
 #ifdef __IMXRT1062__
 #include "PhzConfig.h"
 #include "HSUtils.h"
 
-// NOTE: This option is only available on the Teensy 4.0, Teensy 4.1 and Teensy Micromod boards.
-// With the additonal option for security on the T4 the maximum flash available for a
-// program disk with LittleFS is 960 blocks of 1024 bytes
-#define PROG_FLASH_SIZE 1024 * 512 // Specify size to use of onboard Teensy Program Flash chip
-                                   // This creates a LittleFS drive in Teensy PCB FLash.
-
 namespace PhzConfig {
-
-const char * const EEPROM_FILENAME = "EEPROM.DAT";
 
 LittleFS_Program myfs;
 File dataFile;
-
 ConfigMap cfg_store;
-int record_count = 0;
-static constexpr uint32_t diskSize = PROG_FLASH_SIZE;
+size_t record_count = 0;
+
+// Specify size to use of onboard Teensy Program Flash chip.
+// the maximum flash available for LittleFS is 960 blocks of 1024 bytes
+static constexpr uint32_t diskSize = 1024 * 512;
+// custom file format header
+static constexpr uint32_t HEADER_SIZE = 12;
 
 void setup()
 {
+  // This mounts or creates a LittleFS drive in Teensy PCB Flash.
   if (!myfs.begin(diskSize)) {
     Serial.println("LittleFS unavailable!! Settings WILL NOT BE SAVED!");
     return;
@@ -33,18 +32,12 @@ void setup()
 
   if (myfs.mediaPresent()) {
     listFiles(myfs);
-
-    load_config();
-
-    // convenient for testing and for longevity
-    cfg_store[POWER_CYCLE_COUNT] += 1;
-    // let's maybe not write back to flash every single time
-    //save_config();
+    //load_config();
   }
 
   if (HS::wavplayer_available) {
     Serial.println("SD card available for preset storage");
-    listFiles(SD);
+    //listFiles(SD);
   }
 }
 
@@ -84,8 +77,18 @@ bool save_config(const char* filename, FS &fs)
     fs.remove(TEMPFILE);
     dataFile = fs.open(TEMPFILE, FILE_WRITE_BEGIN);
     if (dataFile) {
+      // 12-byte header:
+      const char header_buf[HEADER_SIZE] = {
+        'P', 'Z', // signature
+        0, 0, // record count
+        0, 0, 0, 0, 0, 0, 0, 0, // checksum
+      };
+      dataFile.write(header_buf, HEADER_SIZE);
+
+      uint64_t checksum = 0;
       for (auto &i : cfg_store)
       {
+        checksum ^= i.second;
         int result = dataFile.write((const uint8_t*)&i.first, sizeof(i.first)) +
                     dataFile.write((const uint8_t*)&i.second, sizeof(i.second));
         if (result != (sizeof(i.first) + sizeof(i.second))) {
@@ -100,8 +103,16 @@ bool save_config(const char* filename, FS &fs)
         record_count += 1;
       }
 
-      Serial.printf("Records written = %d\n", record_count);
+      if (success && dataFile.seek(2)) {
+        dataFile.write((const uint8_t*)&record_count, 2);
+        dataFile.write((const uint8_t*)&checksum, 8);
+      }
+
+      Serial.printf("Records written = %u\n", record_count);
       Serial.printf("Bytes written = %u\n", bytes_written);
+      Serial.printf("Checksum: %lx%lx\n",
+          (uint32_t)checksum, (uint32_t)(checksum >> 32));
+
       dataFile.close();
     } else {
       Serial.printf("error opening %s\n", filename);
@@ -131,16 +142,37 @@ bool load_config(const char* filename, FS &fs)
   uint8_t buf[12];
   size_t pos = 0;
 
+  while (dataFile.available() && pos < HEADER_SIZE) {
+    uint8_t n = dataFile.read();
+    buf[pos++] = n;
+  }
+
+  // header signature
+  if (buf[0] != 'P' || buf[1] != 'Z') {
+    Serial.print("Bad PZ signature...");
+    dataFile.close();
+    return false;
+  }
+
+  size_t expected_record_count = uint16_t(buf[2]) | uint16_t(buf[3]) << 8;
+  uint64_t expected_checksum =
+          (uint64_t)buf[4] |
+          (uint64_t)buf[5] << 8 |
+          (uint64_t)buf[6] << 16 |
+          (uint64_t)buf[7] << 24 |
+          (uint64_t)buf[8] << 32 |
+          (uint64_t)buf[9] << 40 |
+          (uint64_t)buf[10] << 48 |
+          (uint64_t)buf[11] << 56;
+  uint64_t computed_checksum = 0;
+
+  pos = 0;
   while (dataFile.available()) {
     uint8_t n = dataFile.read();
     buf[pos++] = n;
 
-    // debug print
-    //if (n < 16) Serial.print("0");
-    //Serial.print(n, HEX);
-
     static_assert(sizeof(KEY) + sizeof(VALUE) == 10, "config data size mismatch");
-    if (pos >= 10) {
+    if (pos >= (sizeof(KEY) + sizeof(VALUE))) {
       cfg_store.insert_or_assign(
           (uint16_t)buf[0] |
           (uint16_t)buf[1] << 8,
@@ -154,15 +186,35 @@ bool load_config(const char* filename, FS &fs)
           (uint64_t)buf[8] << 48 |
           (uint64_t)buf[9] << 56
           );
+
+      computed_checksum ^=
+          (uint64_t)buf[2] |
+          (uint64_t)buf[3] << 8 |
+          (uint64_t)buf[4] << 16 |
+          (uint64_t)buf[5] << 24 |
+          (uint64_t)buf[6] << 32 |
+          (uint64_t)buf[7] << 40 |
+          (uint64_t)buf[8] << 48 |
+          (uint64_t)buf[9] << 56;
+
       ++record_count;
       pos = 0;
-      //Serial.println();
+
+      // XXX: if we utilize the expected record count,
+      // multiple chunks could be packed in series in one file... for whatever purpose.
+      // For now, we'll just load everything regardless.
+      //if (record_count == expected_record_count) break;
     }
   }
-  Serial.printf("Loaded %d Records.\n", record_count);
+  Serial.printf("Loaded %u Records. (expected %u)\n", record_count, expected_record_count);
+  Serial.printf("Checksum: %s (actual: %lx%lx)\n",
+      (computed_checksum == expected_checksum)? "OK" : "ERROR",
+      (uint32_t)computed_checksum, (uint32_t)(computed_checksum >> 32));
+  Serial.printf("(File header checksum: %lx%lx)\n",
+      (uint32_t)expected_checksum, (uint32_t)(expected_checksum >> 32));
 
   dataFile.close();
-  return true;
+  return computed_checksum == expected_checksum;
 }
 
 void listFiles(FS &fs)
