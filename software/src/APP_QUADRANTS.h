@@ -493,7 +493,7 @@ public:
                 if (slot < QUAD_PRESET_COUNT) {
                     QueuePresetLoad(slot);
                 }
-                continue;
+                //continue;
             }
 
             HS::frame.MIDIState.ProcessMIDIMsg(device.getChannel(), message, data1, data2);
