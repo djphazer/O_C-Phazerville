@@ -5,7 +5,10 @@
 template <AudioChannels Channels>
 class WavPlayerApplet : public HemisphereAudioApplet {
 public:
-  const char* applet_name() {
+  const uint64_t applet_id() override {
+    return strhash("WavPlay");
+  }
+  const char* applet_name() override {
     return titlestat;
   }
 
