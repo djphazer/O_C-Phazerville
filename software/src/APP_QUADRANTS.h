@@ -257,7 +257,7 @@ public:
     }
 
     void Resume() {
-        SetBank(0);
+        SetBank(bank_num);
 
         if (preset_id < 0)
           LoadFromPreset(0);
@@ -271,16 +271,16 @@ public:
             //OnSendSysEx();
         }
     }
-    void SetBank(int id) {
+    void SetBank(uint8_t id) {
       bank_filename[5] = '0' + char(id / 100);
-      bank_filename[6] = '0' + char(id / 10);
+      bank_filename[6] = '0' + char(id / 10 % 10);
       bank_filename[7] = '0' + char(id % 10);
 
       bool success = false;
-      if (HS::wavplayer_available)
+      if (HS::wavplayer_available) // load from SD card
         success = PhzConfig::load_config(bank_filename, SD);
 
-      if (!success)
+      if (!success) // fallback load from LFS
         PhzConfig::load_config(bank_filename);
     }
 
@@ -1091,6 +1091,7 @@ protected:
 
 private:
     char bank_filename[16] = "BANK_000.DAT";
+    uint8_t bank_num = 0;
     int preset_id = -1;
     int queued_preset = 0;
     int preset_cursor = 0;
@@ -1147,6 +1148,7 @@ private:
         TRIG_LENGTH,
         SCREENSAVER_MODE,
         CURSOR_MODE,
+        PRESET_BANK_NUM,
 
         // Input Remapping
         TRIGMAP1, TRIGMAP2, TRIGMAP3, TRIGMAP4,
@@ -1216,6 +1218,9 @@ private:
         case TRIG_LENGTH:
             HS::trig_length = (uint32_t) constrain( int(HS::trig_length + dir), 1, 127);
             break;
+        case PRESET_BANK_NUM:
+            bank_num = constrain(bank_num + dir, 0, 99);
+            break;
         //case SCREENSAVER_MODE:
             // TODO?
             //break;
@@ -1284,6 +1289,11 @@ private:
         case CVMAP8:
         case TRIG_LENGTH:
             isEditing = !isEditing;
+            break;
+
+        case PRESET_BANK_NUM:
+            isEditing = !isEditing;
+            if (!isEditing) SetBank(bank_num);
             break;
 
         case SCREENSAVER_MODE:
@@ -1408,6 +1418,9 @@ private:
         gfxPrint(1, 35, "Cursor:  ");
         gfxPrint(cursor_mode_name[HS::cursor_wrap]);
 
+        gfxPrint(1, 45, "Preset Bank# ");
+        gfxPrint(bank_num);
+
         switch (config_cursor) {
         case TRIG_LENGTH:
             gfxCursor(80, 23, 24);
@@ -1417,6 +1430,9 @@ private:
             break;
         case CURSOR_MODE:
             gfxIcon(43, 35, RIGHT_ICON);
+            break;
+        case PRESET_BANK_NUM:
+            gfxCursor(78, 53, 19);
             break;
         case CONFIG_DUMMY:
             gfxIcon(2, 1, LEFT_ICON);
