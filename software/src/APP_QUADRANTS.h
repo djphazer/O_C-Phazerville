@@ -1193,6 +1193,7 @@ private:
             SetConfigPageFromCursor();
           }
           ResetCursor();
+          if (config_cursor >= CONFIG_DUMMY) HS::popup_tick = 0;
           return;
         }
 

@@ -240,7 +240,7 @@ namespace HS {
       case MENU_POPUP:
         gfxPrint(78, 30, "Load");
         gfxPrint(78, 40, config_cursor == AUTO_SAVE ? "(auto)" : "Save");
-        gfxPrint(78, 50, "Config");
+        gfxPrint(78, 50, "Config>");
 
         switch (config_cursor) {
           case LOAD_PRESET:
