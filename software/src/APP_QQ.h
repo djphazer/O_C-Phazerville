@@ -108,8 +108,7 @@ enum ChannelSetting {
   CHANNEL_SETTING_INT_SEQ_STRIDE_CV_SOURCE,
   CHANNEL_SETTING_INT_SEQ_RESET_TRIGGER,
   CHANNEL_SETTING_OCTAVE_CONSTRAINT,
-  CHANNEL_SETTING_OCTAVE_CONSTRAINT_MIN,
-  CHANNEL_SETTING_OCTAVE_CONSTRAINT_MAX,
+  CHANNEL_SETTING_OCTAVE_CONSTRAINT_LEN,
   CHANNEL_SETTING_LAST
 };
 
@@ -227,12 +226,8 @@ public:
     return values_[CHANNEL_SETTING_OCTAVE_CONSTRAINT];
   }
 
-  int get_octave_constraint_min() const {
-    return values_[CHANNEL_SETTING_OCTAVE_CONSTRAINT_MIN];
-  }
-
-  int get_octave_constraint_max() const {
-    return values_[CHANNEL_SETTING_OCTAVE_CONSTRAINT_MAX];
+  uint8_t get_octave_constraint_len() const {
+    return values_[CHANNEL_SETTING_OCTAVE_CONSTRAINT_LEN];
   }
 
   int get_fine() const {
@@ -479,7 +474,7 @@ public:
     int32_t temp_sample = 0;
     int32_t history_sample = 0;
 
-    quantizer_.ConfigureOctaveConstraint(get_octave_constraint(), get_octave_constraint_min(), get_octave_constraint_max());
+    quantizer_.ConfigureOctaveConstraint(get_octave_constraint(), get_octave_constraint_len());
 
     switch (source) {
       case CHANNEL_SOURCE_TURING: {
@@ -1036,8 +1031,7 @@ public:
     *settings++ = CHANNEL_SETTING_FINE;
     *settings++ = CHANNEL_SETTING_OCTAVE_CONSTRAINT;
     if (get_octave_constraint()) {
-      *settings++ = CHANNEL_SETTING_OCTAVE_CONSTRAINT_MIN;
-      *settings++ = CHANNEL_SETTING_OCTAVE_CONSTRAINT_MAX;
+      *settings++ = CHANNEL_SETTING_OCTAVE_CONSTRAINT_LEN;
     }
 
     num_enabled_settings_ = settings - enabled_settings_;
@@ -1083,8 +1077,7 @@ public:
       case CHANNEL_SETTING_INT_SEQ_RESET_TRIGGER:
       case CHANNEL_SETTING_CLKDIV:
       case CHANNEL_SETTING_DELAY:
-      case CHANNEL_SETTING_OCTAVE_CONSTRAINT_MIN:
-      case CHANNEL_SETTING_OCTAVE_CONSTRAINT_MAX:
+      case CHANNEL_SETTING_OCTAVE_CONSTRAINT_LEN:
         return true;
       default: break;
     }
@@ -1199,9 +1192,8 @@ SETTINGS_DECLARE(QuantizerChannel, CHANNEL_SETTING_LAST) {
   { 0, 0, 4, "IntSeq rng CV", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
   { 0, 0, 4, "F. stride CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
   { 0, 0, 4, "IntSeq reset", OC::Strings::trigger_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 1, "Oct constraint", OC::Strings::off_on, settings::STORAGE_TYPE_U8 },
-  { 0, -4, 4, "Oct constraint min", NULL, settings::STORAGE_TYPE_I8 },
-  { 0, -4, 4, "Oct constraint max", NULL, settings::STORAGE_TYPE_I8 }
+  { braids::OCTAVE_CONSTRAINT_OFF, braids::OCTAVE_CONSTRAINT_OFF, braids::OCTAVE_CONSTRAINT_LAST - 1, "Oct constraint", OC::Strings::octave_constraint, settings::STORAGE_TYPE_U4 },
+  { 0, 0, 4, "Oct constraint len", NULL, settings::STORAGE_TYPE_U4 },
 };
 
 // WIP refactoring to better encapsulate and for possible app interface change

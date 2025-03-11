@@ -49,9 +49,9 @@ void Quantizer::Init() {
   transpose_ = 0;
   previous_boundary_ = 0;
   next_boundary_ = 0;
-  octave_constraint_ = false;
-  octave_constraint_min_ = -4;
-  octave_constraint_max_ = 4;
+  octave_constraint_ = OCTAVE_CONSTRAINT_OFF;
+  octave_constraint_min_ = 0;
+  octave_constraint_max_ = 0;
 }
 
 int32_t Quantizer::Process(int32_t pitch, int32_t root, int32_t transpose) {
