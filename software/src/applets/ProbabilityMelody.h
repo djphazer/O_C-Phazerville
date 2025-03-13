@@ -69,7 +69,6 @@ public:
 
         if (cv_rotate && range_init) { // override original cv mod functions to rotate probabilities
             ForEachChannel(ch) rotation[ch] = SemitoneIn(ch);
-            UpdateRotatedWeights(weights, rotated_weights, rotation[0], rotation[1]);
         } else { // CV modulation
             if (!mod_latch[0]) {
                 Modulate(down_mod, 0, 1, up); // down scales to the up setting
@@ -200,7 +199,6 @@ protected:
 private:
     int8_t cursor; // ProbMeloCursor
     int8_t weights[12] = {10,-1,0,2,-1,0,-1,2,0,-1,4,-1}; // scale=Cmin, chord=Cmin7
-    int8_t rotated_weights[12];
     int8_t up, up_mod;
     int8_t down, down_mod;
     int16_t pitch;
@@ -295,6 +293,8 @@ private:
 
     int GetNextWeightedPitch() {
         int total_weights = 0;
+        int8_t rotated_weights[12];
+        UpdateRotatedWeights(weights, rotated_weights, rotation[0], rotation[1]);
 
         for(int i = down_mod-1; i < up_mod; ++i) {
             total_weights += max(0, rotated_weights[i % 12]);
@@ -344,7 +344,12 @@ private:
     void DrawParams() {
         int note = pitch % 12;
         int octave = (pitch - 60) / 12;
-        int8_t* ws = FIRST_NOTE <= cursor && cursor <= LAST_NOTE ? weights : rotated_weights;
+        int8_t ws[12];
+        if (FIRST_NOTE <= cursor && cursor <= LAST_NOTE) {
+            std::copy(weights, weights + 12, ws);
+        } else {
+            UpdateRotatedWeights(weights, ws, rotation[0], rotation[1]);
+        }
 
         for (uint8_t i = 0; i < 12; ++i) {
             uint8_t xOffset = x[i] + (p[i] ? 1 : 2);
