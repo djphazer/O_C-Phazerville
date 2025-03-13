@@ -64,13 +64,8 @@ public:
         int oldUp = up_mod;
 
         if (cv_rotate && range_init) { // override original cv mod functions to rotate probabilities
-            ForEachChannel(ch) {
-                int last_rotation = rotation[ch];
-                rotation[ch] = SemitoneIn(ch);
-                int step = rotation[ch] - last_rotation;
-                if (ch && step) RotateMaskedWeights(weights, step);
-                else if (step) RotateAllWeights(weights, step);
-            }
+            ForEachChannel(ch) rotation[ch] = SemitoneIn(ch);
+            UpdateRotatedWeights(weights, rotated_weights, rotation[0], rotation[1]);
         } else { // CV modulation
             if (!mod_latch[0]) {
                 down_mod = down;
@@ -137,11 +132,13 @@ public:
         }
 
         if (cursor == ROTATE) {
-            RotateAllWeights(weights, direction);
+            rotate_masked_left(weights, 0xffff, 12, -direction);
         } else if (cursor >= FIRST_NOTE) {
             // editing note probability
             int i = cursor - FIRST_NOTE;
-            weights[i] = constrain(weights[i] + direction, -1, HEM_PROB_MEL_MAX_WEIGHT); // -1 removes note from mask
+            weights[i] = constrain(
+                weights[i] + direction, -1, HEM_PROB_MEL_MAX_WEIGHT
+            ); // -1 removes note from mask
             value_animation = HEMISPHERE_CURSOR_TICKS;
         } else {
             // editing scaling
@@ -206,6 +203,7 @@ protected:
 private:
     int cursor; // ProbMeloCursor
     int8_t weights[12] = {10,0,0,2,0,0,0,2,0,0,4,0};
+    int8_t rotated_weights[12];
     int up, up_mod;
     int down, down_mod;
     int pitch;
@@ -226,53 +224,88 @@ private:
     const uint8_t p[12] = {0, 1,  0,  1,  0,  0,  1,  0,  1,  0,  1,  0};
     const char* n[12] = {"C", "C", "D", "D", "E", "F", "F", "G", "G", "A", "A", "B"};
 
-    void RotateAllWeights(int8_t weights[], int r) {
-        if (r == 0) return;
-        r = r % 12;
-        if (r < 0) r += 12;
-
-        int8_t temp[12];
-        for (int i = 0; i < 12; ++i) {
-            temp[i] = weights[i];
-        }
-
-        for (int i = 0; i < 12; ++i) {
-            weights[(i + r) % 12] = temp[i];
-        }
-    }
-
-    void RotateMaskedWeights(int8_t weights[], int r) {
-        if (r == 0) return;
-
-        int count = 0;
-        uint8_t indices[12];
-        int8_t values[12];
-        for (int i = 0; i < 12; ++i) {
-            if (weights[i] >= 0) {
-                indices[count] = i;
-                values[count] = weights[i];
-                ++count;
+    template <typename T>
+    uint32_t get_non_neg_mask(T* arr, int n) {
+        uint32_t mask = 0;
+        for (int i = 0; i < n; ++i) {
+            if (arr[i] >= 0) {
+                mask |= 1 << i;
             }
         }
-        if (count == 0) return;
+        return mask;
+    }
 
-        r = r % count;
-        if (r < 0) r += count;
-        for (int i = 0; i < count; ++i) {
-            weights[indices[(i + r) % count]] = values[i];
+    int semitones_to_degrees(uint32_t scale_mask, int semitones) {
+        semitones = ((semitones % 12) + 12) % 12;
+        semitones -= __builtin_ctz(scale_mask);
+        scale_mask >>= __builtin_ctz(scale_mask);
+        int degrees = 0;
+        while (semitones > 0 && scale_mask) {
+            int rot = __builtin_ctz(scale_mask>>1) + 1;
+            semitones -= rot;
+            scale_mask >>= rot;
+            degrees++;
         }
+        return scale_mask ? degrees : 0;
+    }
+
+    /**
+     * Rotate the elements of arr indicated by the mask by r steps to the left.
+     * To rotate right, use -r.
+     * I like this implementation because its in-place, O(1) space, O(n) time
+     * even if traversing the mask required traversing the underlying array, and
+     * O(popcount) if traversing the mask is constant time (which, thanks to
+     * ctz, it is). Even though it requires recursion, it's a tail call, so
+     * should get TCOed away (though, the depth is going to be so shallow, it
+     * doesn't really matter).
+     */
+    template <typename T>
+    void rotate_masked_left(T* arr, uint32_t mask, int n, int r) {
+        // Clear any bits that are out of range cause they'll mess ctz and
+        // popcounts
+        if (n < 32) mask = mask & ~(~0u << n);
+        if (!mask) return;
+        int count = __builtin_popcount(mask);
+        r = (r % count + count) % count;
+        if (r == 0) return;
+        // j is always r steps ahead of i on the mask. So start j at the first bit
+        // and hop bits r times.
+        int j = __builtin_ctz(mask);
+        for (int i = 0; i < r; ++i) j += __builtin_ctz(mask >> (j + 1)) + 1;
+        int i = __builtin_ctz(mask);
+        for (int c = 0; c < count - r; ++c) {
+            std::swap(arr[i], arr[j]);
+            uint16_t jm = mask >> (++j);
+            // Check if we need to loop by seeing if we've run out of bits
+            j = jm ? j + __builtin_ctz(jm) : __builtin_ctz(mask);
+            // since i is only iterating count times, don't need to loop around
+            i += __builtin_ctz(mask >> (i + 1)) + 1;
+        }
+        int m = count % r;
+        if (m) rotate_masked_left(arr + i, mask >> i, n - i, -m);
+    }
+
+    void UpdateRotatedWeights(
+        int8_t* src_weights, int8_t* rot_weights, int semitone_rot, int masked_rot
+    ) {
+      std::copy(src_weights, src_weights + 12, rot_weights);
+      rotate_masked_left(rot_weights, 0xffff, 12, -semitone_rot);
+      uint32_t scale_mask = get_non_neg_mask(rot_weights, 12);
+      int degrees = semitones_to_degrees(scale_mask, masked_rot);
+      // Serial.printf("degrees = %d, scale_mask = %x\n", degrees, scale_mask);
+      rotate_masked_left(rot_weights, scale_mask, 12, -degrees);
     }
 
     int GetNextWeightedPitch() {
         int total_weights = 0;
 
         for(int i = down_mod-1; i < up_mod; ++i) {
-            total_weights += max(0, weights[i % 12]);
+            total_weights += max(0, rotated_weights[i % 12]);
         }
 
         int rnd = random(0, total_weights + 1);
         for(int i = down_mod-1; i < up_mod; ++i) {
-            int weight = max(0, weights[i % 12]);
+            int weight = max(0, rotated_weights[i % 12]);
             if (rnd <= weight && weight > 0) {
                 return i;
             }
@@ -314,11 +347,12 @@ private:
     void DrawParams() {
         int note = pitch % 12;
         int octave = (pitch - 60) / 12;
+        int8_t* ws = FIRST_NOTE <= cursor && cursor <= LAST_NOTE ? weights : rotated_weights;
 
         for (uint8_t i = 0; i < 12; ++i) {
             uint8_t xOffset = x[i] + (p[i] ? 1 : 2);
             uint8_t yOffset = p[i] ? 31 : 45;
-            bool unmasked = (weights[i] >= 0);
+            bool unmasked = (ws[i] >= 0);
 
             if (pulse_animation > 0 && note == i) {
                 gfxRect(xOffset - 1, yOffset, 3, 10);
@@ -334,7 +368,7 @@ private:
                     gfxDottedLine(xOffset, yOffset, xOffset, yOffset + 10);
                 }
                 if (unmasked)
-                  gfxLine(xOffset - 1, yOffset + 10 - weights[i], xOffset + 1, yOffset + 10 - weights[i]);
+                  gfxLine(xOffset - 1, yOffset + 10 - ws[i], xOffset + 1, yOffset + 10 - ws[i]);
             }
         }
 
@@ -392,8 +426,8 @@ private:
             if (p[i]) {
                 gfxPrint(24, 16, "#");
             }
-            if (weights[i] < 0) gfxPrint(34, 16, "X");
-            else gfxPrint(34, 16, weights[i]);
+            if (ws[i] < 0) gfxPrint(34, 16, "X");
+            else gfxPrint(34, 16, ws[i]);
             gfxInvert(1, 15, 60, 10);
         }
     }
