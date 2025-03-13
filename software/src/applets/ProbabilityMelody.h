@@ -198,14 +198,14 @@ protected:
     }
 
 private:
-    int cursor; // ProbMeloCursor
+    int8_t cursor; // ProbMeloCursor
     int8_t weights[12] = {10,-1,0,2,-1,0,-1,2,0,-1,4,-1}; // scale=Cmin, chord=Cmin7
     int8_t rotated_weights[12];
-    int up, up_mod;
-    int down, down_mod;
-    int pitch;
+    int8_t up, up_mod;
+    int8_t down, down_mod;
+    int16_t pitch;
     bool isLooping = false;
-    int seqloop[2][HEM_PROB_MEL_MAX_LOOP_LENGTH];
+    int16_t seqloop[2][HEM_PROB_MEL_MAX_LOOP_LENGTH];
     bool cv_rotate = false;
     int8_t rotation[2] = {0};
     bool mod_latch[2] = {false};
