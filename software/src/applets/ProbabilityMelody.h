@@ -19,7 +19,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#pragma once
 #include "../HSProbLoopLinker.h" // singleton for linking ProbDiv and ProbMelo
+#include "../HemisphereApplet.h"
 
 #define HEM_PROB_MEL_MAX_WEIGHT 10
 #define HEM_PROB_MEL_MAX_RANGE 60
@@ -197,7 +199,7 @@ protected:
 
 private:
     int cursor; // ProbMeloCursor
-    int8_t weights[12] = {10,0,0,2,0,0,0,2,0,0,4,0};
+    int8_t weights[12] = {10,-1,0,2,-1,0,-1,2,0,-1,4,-1}; // scale=Cmin, chord=Cmin7
     int8_t rotated_weights[12];
     int up, up_mod;
     int down, down_mod;
