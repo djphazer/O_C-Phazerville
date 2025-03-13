@@ -62,17 +62,17 @@ public:
         // stash these to check for regen
         int oldDown = down_mod;
         int oldUp = up_mod;
+        down_mod = down;
+        up_mod = up;
 
         if (cv_rotate && range_init) { // override original cv mod functions to rotate probabilities
             ForEachChannel(ch) rotation[ch] = SemitoneIn(ch);
             UpdateRotatedWeights(weights, rotated_weights, rotation[0], rotation[1]);
         } else { // CV modulation
             if (!mod_latch[0]) {
-                down_mod = down;
                 Modulate(down_mod, 0, 1, up); // down scales to the up setting
             }
             if (!mod_latch[1]) {
-                up_mod = up;
                 Modulate(up_mod, 1, down_mod, HEM_PROB_MEL_MAX_RANGE); // up scales full range, with down value as a floor
             }
             range_init = true;
@@ -142,13 +142,8 @@ public:
             value_animation = HEMISPHERE_CURSOR_TICKS;
         } else {
             // editing scaling
-            if (cv_rotate) {
-                if (cursor == LOWER) down_mod = constrain(down_mod + direction, 1, up_mod);
-                if (cursor == UPPER) up_mod = constrain(up_mod + direction, down_mod, 60);
-            } else {
-                if (cursor == LOWER) down = constrain(down + direction, 1, up);
-                if (cursor == UPPER) up = constrain(up + direction, down, 60);
-            }
+            if (cursor == LOWER) down = constrain(down + direction, 1, up);
+            if (cursor == UPPER) up = constrain(up + direction, down, 60);
         }
         if (isLooping) {
             GenerateLoop(); // regenerate loop on any param changes
@@ -179,7 +174,7 @@ public:
         for (size_t i = 0; i < 12; ++i) {
             weights[i] = Unpack(data, PackLocation {i*4,4})-1;
         }
-        down = constrain(Unpack(data, PackLocation{48,6}), 1, up);
+        down = constrain(Unpack(data, PackLocation{48,6}), 1, 60);
         up = constrain(Unpack(data, PackLocation{54,6}), down, 60);
         cv_rotate = Unpack(data, PackLocation{60,1});
 
@@ -396,17 +391,20 @@ private:
         // scaling params
 
         gfxIcon(0, 13, DOWN_BTN_ICON);
-        gfxPrint(8, 15, ((down_mod - 1) / 12) + 1);
-        gfxPrint(13, 15, ".");
-        gfxPrint(17, 15, ((down_mod - 1) % 12) + 1);
-
         gfxIcon(30, 16, UP_BTN_ICON);
-        gfxPrint(38, 15, ((up_mod - 1) / 12) + 1);
-        gfxPrint(43, 15, ".");
-        gfxPrint(47, 15, ((up_mod - 1) % 12) + 1);
 
-        if (cursor == LOWER) gfxCursor(9, 23, 21);
-        if (cursor == UPPER) gfxCursor(39, 23, 21);
+        if (cursor == LOWER) {
+            gfxPrintOctDotSemi(8, 15, down);
+            gfxCursor(9, 23, 21);
+        } else {
+            gfxPrintOctDotSemi(8, 15, down_mod);
+        }
+        if (cursor == UPPER) {
+            gfxPrintOctDotSemi(38, 15, up);
+            gfxCursor(39, 23, 21);
+        } else {
+            gfxPrintOctDotSemi(38, 15, up_mod);
+        }
 
         if (pulse_animation > 0) {
             // int note = pitch % 12;
@@ -430,5 +428,11 @@ private:
             else gfxPrint(34, 16, ws[i]);
             gfxInvert(1, 15, 60, 10);
         }
+    }
+
+    void gfxPrintOctDotSemi(int x, int y, int semitone) {
+        gfxPrint(x, y, ((semitone - 1) / 12) + 1);
+        gfxPrint(x + 5, y, ".");
+        gfxPrint(x + 9, y, ((semitone - 1) % 12) + 1);
     }
 };
