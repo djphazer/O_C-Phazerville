@@ -27,6 +27,50 @@
 #define HEM_PROB_MEL_MAX_RANGE 60
 #define HEM_PROB_MEL_MAX_LOOP_LENGTH 32
 
+namespace probmelod {
+enum CV_SOURCE : uint8_t {
+    // yes these assignments are unnecessary: just making the bitmasking explicit
+    NONE = 0b00, 
+    CV1 = 0b01,
+    CV2 = 0b10,
+    BOTH = 0b11
+};
+
+struct LabelledCvConfig {
+    char cv1_label[6];
+    char cv2_label[6];
+    // [semi source][mask source][down source][up source]
+    // 00 -> none
+    // 01 -> cv1
+    // 10 -> cv2
+    // 11 -> both
+    uint8_t cv_config;
+};
+
+static constexpr uint8_t cv_config(CV_SOURCE semi, CV_SOURCE mask, CV_SOURCE lower, CV_SOURCE upper) {
+    return (semi << 6) | (mask << 4) | (lower << 2) | upper;
+}
+
+static constexpr LabelledCvConfig cv_modes[] = {
+    {"Lower", "Upper", cv_config(NONE, NONE, CV1,  CV2)},
+    {"Semi",  "Mask",  cv_config(CV1,  CV2,  NONE, NONE)},
+    {"Semi",  "Upper", cv_config(CV1,  NONE, NONE, CV2)},
+    {"Semi",  "Lower", cv_config(CV1,  NONE, CV2,  NONE)},
+    {"Semi",  "Pos",   cv_config(CV1,  NONE, CV2,  CV2)},
+    {"Mask",  "Upper", cv_config(NONE, CV1,  NONE, CV2)},
+    {"Mask",  "Lower", cv_config(NONE, CV1,  CV2,  NONE)},
+    {"Mask",  "Pos",   cv_config(NONE, CV1,  CV2,  CV2)},
+    {"Semi+", "Mask",  cv_config(CV1,  CV2,  NONE, CV1)},
+    {"Semi-", "Mask",  cv_config(CV1,  CV2,  CV1,  NONE)},
+    {"Semi*", "Mask",  cv_config(CV1,  CV2,  CV1,  CV1)},
+    {"Semi",  "Mask+", cv_config(CV1,  CV2,  NONE, CV2)},
+    {"Semi",  "Mask-", cv_config(CV1,  CV2,  CV2,  NONE)},
+    {"Semi",  "Mask*", cv_config(CV1,  CV2,  CV2,  CV2)},
+    {"Semi*", "Mask*", cv_config(CV1,  CV2,  BOTH,  BOTH)},
+};
+}
+
+
 class ProbabilityMelody : public HemisphereApplet {
 public:
 
@@ -34,7 +78,8 @@ public:
         LOWER, UPPER,
         FIRST_NOTE = 2,
         LAST_NOTE = 13,
-        ROTATE
+        ROTATE,
+        CV_MODE
     };
 
     const char* applet_name() {
@@ -51,33 +96,17 @@ public:
     void Controller() {
         loop_linker->RegisterMelo(hemisphere);
 
-        ForEachChannel(ch) { // prevent ranges from jumping to new values when changing mod modes
-            if (mod_latch[ch]) {
-                if (cv_rotate) {
-                    // if (abs(SemitoneIn(ch) - last_rot_cv[ch]) < 2) mod_latch[ch] = false;
-                } else {
-                    if (abs(SemitoneIn(ch) - last_range_cv[ch]) < 2) mod_latch[ch] = false;
-                }
-            }
-        }
-
         // stash these to check for regen
         int oldDown = down_mod;
         int oldUp = up_mod;
         down_mod = down;
         up_mod = up;
 
-        if (cv_rotate && range_init) { // override original cv mod functions to rotate probabilities
-            ForEachChannel(ch) rotation[ch] = SemitoneIn(ch);
-        } else { // CV modulation
-            if (!mod_latch[0]) {
-                Modulate(down_mod, 0, 1, up); // down scales to the up setting
-            }
-            if (!mod_latch[1]) {
-                Modulate(up_mod, 1, down_mod, HEM_PROB_MEL_MAX_RANGE); // up scales full range, with down value as a floor
-            }
-            range_init = true;
-        }
+        uint8_t cvm = probmelod::cv_modes[cv_mode].cv_config;
+        rotation[0] = semitone_cv_in((cvm >> 6) & 0b11);
+        rotation[1] = semitone_cv_in((cvm >> 4) & 0b11);
+        down_mod = constrain(down + semitone_cv_in((cvm >> 2) & 0b11), 1, up);
+        up_mod = constrain(up + semitone_cv_in(cvm & 0b11), down_mod, HEM_PROB_MEL_MAX_RANGE);
 
         // regen when looping was enabled from ProbDiv
         bool regen = loop_linker->IsLooping() && !isLooping;
@@ -128,35 +157,37 @@ public:
 
     void OnEncoderMove(int direction) {
         if (!EditMode()) {
-            MoveCursor(cursor, direction, ROTATE);
+            MoveCursor(cursor, direction, CV_MODE);
             return;
         }
 
-        if (cursor == ROTATE) {
-            rotate_masked_left(weights, 0xffff, 12, -direction);
-        } else if (cursor >= FIRST_NOTE) {
-            // editing note probability
-            int i = cursor - FIRST_NOTE;
-            weights[i] = constrain(
+        switch (cursor) {
+            case LOWER:
+                down = constrain(down + direction, 1, up);
+                break;
+            case UPPER:
+                up = constrain(up + direction, down, 60);
+                break;
+            case ROTATE:
+                rotate_masked_left(weights, 0xffff, 12, -direction);
+                break;
+            case CV_MODE:
+                cv_mode = constrain(
+                    cv_mode + direction,
+                    0,
+                    static_cast<int8_t>(std::size(probmelod::cv_modes) - 1)
+                );
+                break;
+            default:
+              // editing note probability
+              int i = cursor - FIRST_NOTE;
+              weights[i] = constrain(
                 weights[i] + direction, -1, HEM_PROB_MEL_MAX_WEIGHT
-            ); // -1 removes note from mask
-            value_animation = HEMISPHERE_CURSOR_TICKS;
-        } else {
-            // editing scaling
-            if (cursor == LOWER) down = constrain(down + direction, 1, up);
-            if (cursor == UPPER) up = constrain(up + direction, down, 60);
+              ); // -1 removes note from mask
+              value_animation = HEMISPHERE_CURSOR_TICKS;
         }
         if (isLooping) {
             GenerateLoop(); // regenerate loop on any param changes
-        }
-    }
-
-    void AuxButton() {
-        cv_rotate = !cv_rotate;
-        ForEachChannel(ch) { // prevent ranges from jumping to new values when changing mod modes
-            mod_latch[ch] = true;
-            if (cv_rotate) last_range_cv[ch] = SemitoneIn(ch);
-            // else last_rot_cv[ch] = SemitoneIn(ch);
         }
     }
 
@@ -167,7 +198,7 @@ public:
         }
         Pack(data, PackLocation {48, 6}, down);
         Pack(data, PackLocation {54, 6}, up);
-        Pack(data, PackLocation {60, 1}, cv_rotate);
+        Pack(data, PackLocation {60, 4}, cv_mode);
         return data;
     }
 
@@ -177,9 +208,8 @@ public:
         }
         down = constrain(Unpack(data, PackLocation{48,6}), 1, 60);
         up = constrain(Unpack(data, PackLocation{54,6}), down, 60);
-        cv_rotate = Unpack(data, PackLocation{60,1});
+        cv_mode = Unpack(data, PackLocation{60,4});
 
-        if (cv_rotate) range_init = false;
     }
 
 protected:
@@ -187,8 +217,8 @@ protected:
         //                    "-------" <-- Label size guide
         help[HELP_DIGITAL1] = "Clock 1";
         help[HELP_DIGITAL2] = "Clock 2";
-        help[HELP_CV1]      = cv_rotate? "RotKey" : "Lower";
-        help[HELP_CV2]      = cv_rotate? "RotMask" : "Upper";
+        help[HELP_CV1]      = probmelod::cv_modes[cv_mode].cv1_label;
+        help[HELP_CV2]      = probmelod::cv_modes[cv_mode].cv2_label;
         help[HELP_OUT1]     = "Pitch 1";
         help[HELP_OUT2]     = "Pitch 2";
         help[HELP_EXTRA1]   = "Set: Range bounds /";
@@ -204,12 +234,8 @@ private:
     int16_t pitch;
     bool isLooping = false;
     int16_t seqloop[2][HEM_PROB_MEL_MAX_LOOP_LENGTH];
-    bool cv_rotate = false;
     int8_t rotation[2] = {0};
-    bool mod_latch[2] = {false};
-    // int8_t last_rot_cv[2];
-    int8_t last_range_cv[2];
-    bool range_init = false;
+    int8_t cv_mode = 0;
 
     ProbLoopLinker *loop_linker = loop_linker->get();
 
@@ -379,7 +405,7 @@ private:
             if (cursor == ROTATE) {
                 gfxCursor(56, 60, 7);
                 gfxCursor(56, 61, 7);
-            } else if (cursor >= FIRST_NOTE) {
+            } else if (FIRST_NOTE <= cursor && cursor <= LAST_NOTE) {
                 int i = cursor - FIRST_NOTE;
                 gfxCursor(x[i] - 1, p[i] ? 24 : 60, p[i] ? 5 : 7);
                 gfxCursor(x[i] - 1, p[i] ? 25 : 61, p[i] ? 5 : 7);
@@ -391,26 +417,30 @@ private:
             }
         }
 
-        if (cv_rotate) {
-            gfxRect(57, 61, 5, 2);
-        }
-
         // scaling params
 
-        gfxIcon(0, 13, DOWN_BTN_ICON);
-        gfxIcon(30, 16, UP_BTN_ICON);
+        if (cursor == CV_MODE) {
+            gfxPos(1, 15);
+            graphics.printf("%s", probmelod::cv_modes[cv_mode].cv1_label);
+            gfxPos(32, 15);
+            graphics.printf("%5s", probmelod::cv_modes[cv_mode].cv2_label);
+            gfxCursor(1, 23, 62);
+        } else {
+            gfxIcon(0, 13, DOWN_BTN_ICON);
+            gfxIcon(30, 16, UP_BTN_ICON);
 
-        if (cursor == LOWER) {
-            gfxPrintOctDotSemi(8, 15, down);
-            gfxCursor(9, 23, 21);
-        } else {
-            gfxPrintOctDotSemi(8, 15, down_mod);
-        }
-        if (cursor == UPPER) {
-            gfxPrintOctDotSemi(38, 15, up);
-            gfxCursor(39, 23, 21);
-        } else {
-            gfxPrintOctDotSemi(38, 15, up_mod);
+            if (cursor == LOWER) {
+                gfxPrintOctDotSemi(8, 15, down);
+                gfxCursor(9, 23, 21);
+            } else {
+                gfxPrintOctDotSemi(8, 15, down_mod);
+            }
+            if (cursor == UPPER) {
+                gfxPrintOctDotSemi(38, 15, up);
+                gfxCursor(39, 23, 21);
+            } else {
+                gfxPrintOctDotSemi(38, 15, up_mod);
+            }
         }
 
         if (pulse_animation > 0) {
@@ -441,5 +471,12 @@ private:
         gfxPrint(x, y, ((semitone - 1) / 12) + 1);
         gfxPrint(x + 5, y, ".");
         gfxPrint(x + 9, y, ((semitone - 1) % 12) + 1);
+    }
+
+    int semitone_cv_in(uint8_t cv_mask) {
+        int out = 0;
+        if (cv_mask & probmelod::CV1) out += SemitoneIn(0);
+        if (cv_mask & probmelod::CV2) out += SemitoneIn(1);
+        return out;
     }
 };
