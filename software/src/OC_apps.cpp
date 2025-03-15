@@ -87,6 +87,13 @@ namespace menu = OC::menu;
 static constexpr OC::App available_apps[] = {
   DECLARE_APP('S','E', "Setup / About", Settings),
 
+#ifndef NO_HEMISPHERE
+  #ifdef ARDUINO_TEENSY41
+  DECLARE_APP('Q','S', "Quadrants", QUADRANTS),
+  #endif
+  DECLARE_APP('H','S', "Hemispheres", HEMISPHERE),
+#endif
+
   #ifdef ENABLE_APP_CALIBR8OR
   DECLARE_APP('C','8', "Calibr8or", Calibr8or),
   #endif
@@ -94,12 +101,6 @@ static constexpr OC::App available_apps[] = {
   DECLARE_APP('S','X', "Scenery", ScenesApp),
   #endif
 
-#ifndef NO_HEMISPHERE
-  #ifdef ARDUINO_TEENSY41
-  DECLARE_APP('Q','S', "Quadrants", QUADRANTS),
-  #endif
-  DECLARE_APP('H','S', "Hemisphere", HEMISPHERE),
-#endif
   #ifdef ENABLE_APP_ASR
   DECLARE_APP('A','S', "CopierMaschine", ASR),
   #endif
