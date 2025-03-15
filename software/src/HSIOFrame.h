@@ -50,6 +50,9 @@ struct MIDIFrame {
     uint8_t last_midi_channel = 0; // for MIDI In activity monitor
     uint16_t sustain_latch; // each bit is a MIDI channel's sustain state
 
+    uint8_t pc_channel = 0; // program change channel filter, used for preset selection
+    static constexpr uint8_t PC_OMNI = 16;
+
     PolyphonyData poly_buffer[DAC_CHANNEL_LAST]; // buffer for polyphonic data tracking
     uint8_t max_voice = 1;
     int poly_mode = 0;
@@ -185,9 +188,9 @@ struct MIDIFrame {
         }
     }
 
-    int GetNote(std::vector<MIDINoteData> &buffer, const int n) {
-        return buffer.at(buffer.size()-n).note;
-    }
+    // int GetNote(std::vector<MIDINoteData> &buffer, const int n) {
+    //     return buffer.at(buffer.size()-n).note;
+    // }
 
     int GetNoteFirst(std::vector<MIDINoteData> &buffer) {
         return buffer.front().note;
@@ -227,10 +230,6 @@ struct MIDIFrame {
             for (uint8_t c = 0; c < 16; ++c)
                 sustain_latch &= ~(1 << c);
         }
-    }
-
-    void SetSustainLatch(const uint8_t m_ch) {
-        sustain_latch |= (1 << m_ch);
     }
 
     bool CheckSustainLatch(const uint8_t m_ch) {
@@ -373,7 +372,7 @@ struct MIDIFrame {
             bool log_this = false;
 
             switch (message) {
-                case usbMIDI.NoteOn:
+                case usbMIDI.NoteOn: {
                     semitone_mask[ch] = semitone_mask[ch] | (1u << (data1 % 12));
 
                     // Should this message go out on this channel?
@@ -423,8 +422,8 @@ struct MIDIFrame {
 
                     if (!log_skip) log_this = 1; // Log all MIDI notes. Other stuff is conditional.
                     break;
-
-                case usbMIDI.NoteOff:
+                }
+                case usbMIDI.NoteOff: {
                     semitone_mask[ch] = semitone_mask[ch] & ~(1u << (data1 % 12));
 
                     if (note_buffer[m_ch].size() > 0) { // don't update output when last note is released
@@ -480,12 +479,12 @@ struct MIDIFrame {
 
                     if (!log_skip) log_this = 1;
                     break;
-
-                case usbMIDI.ControlChange: // Modulation wheel or other CC
+                }
+                case usbMIDI.ControlChange: { // Modulation wheel or other CC
                     // handle sustain pedal
                     if (data1 == 64) {
                         if (data2 > 63) {
-                            if (!CheckSustainLatch(m_ch)) SetSustainLatch(m_ch);
+                            if (!CheckSustainLatch(m_ch)) sustain_latch |= (1 << m_ch);
                         } else {
                             ClearSustainLatch(m_ch);
                             if (!(note_buffer[m_ch].size() > 0)) {
@@ -511,30 +510,30 @@ struct MIDIFrame {
                         }
                     }
                     break;
-
-                case usbMIDI.AfterTouchPoly:
+                }
+                case usbMIDI.AfterTouchPoly: {
                     if (function[ch] == HEM_MIDI_AT_KEY_POLY_OUT) {
                         if (FindPolyNoteIndex(data1) == dac_polyvoice[ch])
                             outputs[ch] = Proportion(data2, 127, HEMISPHERE_MAX_CV);
                         if (!log_skip) log_this = 1;
                     }
                     break;
-
-                case usbMIDI.AfterTouchChannel:
+                }
+                case usbMIDI.AfterTouchChannel: {
                     if (function[ch] == HEM_MIDI_AT_CHAN_OUT) {
                         outputs[ch] = Proportion(data1, 127, HEMISPHERE_MAX_CV);
                         if (!log_skip) log_this = 1;
                     }
                     break;
-
-                case usbMIDI.PitchBend:
+                }
+                case usbMIDI.PitchBend: {
                     if (function[ch] == HEM_MIDI_PB_OUT) {
                         int data = (data2 << 7) + data1 - 8192;
                         outputs[ch] = Proportion(data, 8192, HEMISPHERE_3V_CV);
                         if (!log_skip) log_this = 1;
                     }
                     break;
-
+                }
             }
             if (log_this) UpdateLog(message, data1, data2);
         }

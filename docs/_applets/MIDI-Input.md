@@ -15,6 +15,8 @@ If you switch to a different applet, the configured incoming MIDI messages are r
 
 MIDI _Clock_, _Start_, and _Stop_ messages are also handled automatically by the internal **[Clock Setup](https://github.com/djphazer/O_C-Phazerville/wiki/Clock-Setup)** applet. Incoming MIDI Clock is divided from 24 PPQN to 2 PPQN internally.
 
+MIDI _Program Change_ messages can be used to switch among saved HS presets, and the channel on which the O_C listens for PC messages can be selected on the Global tab of the MIDIIn applet. It may be set to a specific channel [1-16], Omni, or Off. When the preset is saved, the PC channel filter is saved globally, so it won't revert when switching presets.
+
 ### Channel Settings
 
 By default, all channels are set to "None". A pair of the MIDI In applets can be [saved as a Preset](https://github.com/djphazer/O_C-Phazerville/wiki/Hemisphere-Config) to quickly recall settings.

@@ -300,6 +300,9 @@ public:
 
         FILTERMASK1_KEY = 100,
         FILTERMASK2_KEY = 101,
+
+        PC_CHANNEL_KEY = 110,
+
         Q_ENGINE_KEY    = 200, // + slot number
     };
 
@@ -351,6 +354,8 @@ public:
         // applet filtering is actually just global
         PhzConfig::setValue(FILTERMASK1_KEY, HS::hidden_applets[0]);
         PhzConfig::setValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
+
+        PhzConfig::setValue(PC_CHANNEL_KEY, HS::frame.MIDIState.pc_channel);
 
         // Global quantizer settings
         for (size_t qslot = 0; qslot < QUANT_CHANNEL_COUNT; ++qslot) {
@@ -435,6 +440,8 @@ public:
         PhzConfig::getValue(FILTERMASK1_KEY, HS::hidden_applets[0]);
         PhzConfig::getValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
 
+        if (PhzConfig::getValue(PC_CHANNEL_KEY, data)) HS::frame.MIDIState.pc_channel = (uint8_t) data;
+
         // Global quantizer settings
         for (size_t qslot = 0; qslot < QUANT_CHANNEL_COUNT; ++qslot) {
           if (!PhzConfig::getValue(Q_ENGINE_KEY + qslot, data))
@@ -478,6 +485,8 @@ public:
 
     template <typename T1, typename T2, typename T3>
     void ProcessMIDI(T1 &device, T2 &next_device, T3 &dev3) {
+        HS::IOFrame &f = HS::frame;
+
         while (device.read()) {
             const uint8_t message = device.getType();
             const uint8_t data1 = device.getData1();
@@ -488,7 +497,8 @@ public:
                 continue;
             }
 
-            if (message == usbMIDI.ProgramChange) {
+            if (message == usbMIDI.ProgramChange
+            && (device.getChannel() == f.MIDIState.pc_channel+1 || f.MIDIState.pc_channel == f.MIDIState.PC_OMNI)) {
                 uint8_t slot = device.getData1();
                 if (slot < QUAD_PRESET_COUNT) {
                     QueuePresetLoad(slot);
@@ -496,7 +506,7 @@ public:
                 //continue;
             }
 
-            HS::frame.MIDIState.ProcessMIDIMsg(device.getChannel(), message, data1, data2);
+            f.MIDIState.ProcessMIDIMsg(device.getChannel(), message, data1, data2);
             next_device.send(message, data1, data2, device.getChannel(), 0);
             dev3.send((midi::MidiType)message, data1, data2, device.getChannel());
         }

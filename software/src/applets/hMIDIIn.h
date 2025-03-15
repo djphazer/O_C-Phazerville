@@ -45,10 +45,9 @@ public:
 
     enum hMIDIIn_Global_Cursor {
         POLY_MODE = 1,
-        // POLY_CHANNEL_FILTER,
+        PROG_CHANGE_CHANNEL,
 
-        // hMIDIIN_GLOB_LAST = POLY_CHANNEL_FILTER
-        hMIDIIN_GLOB_LAST = POLY_MODE
+        hMIDIIN_GLOB_LAST = PROG_CHANGE_CHANNEL
     };
 
     const char* applet_name() {
@@ -145,7 +144,7 @@ public:
                         frame.MIDIState.clock_count = 0;
                         break;
                     case POLY_VOICE:
-                        frame.MIDIState.dac_polyvoice[ch] = constrain(frame.MIDIState.dac_polyvoice[ch] + direction, 0, DAC_CHANNEL_LAST-1);
+                        frame.MIDIState.dac_polyvoice[ch] = constrain(frame.MIDIState.dac_polyvoice[ch] + direction, 0, DAC_CHANNEL_LAST - 1);
                         frame.MIDIState.UpdateMaxPolyphony();
                     default: break;
                 } break;
@@ -161,6 +160,8 @@ public:
                     case POLY_MODE:
                         frame.MIDIState.poly_mode = constrain(frame.MIDIState.poly_mode + direction, 0, POLY_LAST);
                         break;
+                    case PROG_CHANGE_CHANNEL:
+                        frame.MIDIState.pc_channel = constrain(frame.MIDIState.pc_channel + direction, 0, 17); // 16 = omni, 17 = off
                     default: break;
                 } break;
             case hMIDIIn_LOG_VIEW:
@@ -178,8 +179,8 @@ public:
 
     uint64_t OnDataRequest() {
         uint64_t data = 0;
-        Pack(data, PackLocation {0,4}, frame.MIDIState.channel[io_offset + 0]);
-        Pack(data, PackLocation {4,4}, frame.MIDIState.channel[io_offset + 1]);
+        Pack(data, PackLocation {0,5}, frame.MIDIState.channel[io_offset + 0]);
+        Pack(data, PackLocation {5,5}, frame.MIDIState.channel[io_offset + 1]);
         // 6 bits empty here
         Pack(data, PackLocation {14,7}, frame.MIDIState.function_cc[io_offset + 0] + 1);
         Pack(data, PackLocation {21,7}, frame.MIDIState.function_cc[io_offset + 1] + 1);
@@ -195,14 +196,14 @@ public:
     }
 
     void OnDataReceive(uint64_t data) {
-        frame.MIDIState.channel[io_offset + 0] = constrain(Unpack(data, PackLocation {0,4}), 0, 15);
-        frame.MIDIState.channel[io_offset + 1] = constrain(Unpack(data, PackLocation {4,4}), 0, 15);
+        frame.MIDIState.channel[io_offset + 0] = constrain(Unpack(data, PackLocation {0,5}), 0, 16);
+        frame.MIDIState.channel[io_offset + 1] = constrain(Unpack(data, PackLocation {5,5}), 0, 16);
         frame.MIDIState.function[io_offset + 0] = constrain(Unpack(data, PackLocation {28,5}), 0, HEM_MIDI_MAX_FUNCTION);
         frame.MIDIState.function[io_offset + 1] = constrain(Unpack(data, PackLocation {33,5}), 0, HEM_MIDI_MAX_FUNCTION);
         frame.MIDIState.function_cc[io_offset + 0] = constrain(Unpack(data, PackLocation {14,7}) - 1, -1, 127);
         frame.MIDIState.function_cc[io_offset + 1] = constrain(Unpack(data, PackLocation {21,7}) - 1, -1, 127);
-        frame.MIDIState.dac_polyvoice[io_offset + 0] = constrain(Unpack(data, PackLocation {38,3}), 0, DAC_CHANNEL_LAST-1);
-        frame.MIDIState.dac_polyvoice[io_offset + 1] = constrain(Unpack(data, PackLocation {41,3}), 0, DAC_CHANNEL_LAST-1);
+        frame.MIDIState.dac_polyvoice[io_offset + 0] = constrain(Unpack(data, PackLocation {38,3}), 0, DAC_CHANNEL_LAST - 1);
+        frame.MIDIState.dac_polyvoice[io_offset + 1] = constrain(Unpack(data, PackLocation {41,3}), 0, DAC_CHANNEL_LAST - 1);
         frame.MIDIState.poly_mode = constrain(Unpack(data, PackLocation {44,4}), 0, POLY_LAST);
         frame.MIDIState.UpdateMidiChannelFilter();
         frame.MIDIState.UpdateMaxPolyphony();
@@ -238,7 +239,7 @@ private:
         }
 
         if (OC::CORE::ticks - last_icon_ticks[page] < 4000) // Ch midi activity
-            gfxBitmap(54, 13, 8, MIDI_ICON);
+            gfxIcon(54, 13, MIDI_ICON);
     }
 
     void DrawChannelPage() {
@@ -246,15 +247,16 @@ private:
         gfxPrint(1, 13, out_label); gfxPrint(":");
         gfxLine(1, 22, 63, 22);
 
-        gfxPrint(1, 25, "MIDICh: ");
-        if (frame.MIDIState.channel[io_offset + page] > 15) gfxPrint("Om");
-        else gfxPrint(frame.MIDIState.channel[io_offset + page] + 1);
+        uint8_t m_ch = frame.MIDIState.channel[io_offset + page];
+        gfxPrint(1, 25, "MIDICh:");
+        if (m_ch > 15) graphics.printf("%3s", "Om");
+        else graphics.printf("%3d", m_ch + 1);
 
-        gfxBitmap(2, 34, 8, MIDI_ICON); gfxPrint(13, 35, midi_fn_name[frame.MIDIState.function[io_offset + page]]);
+        gfxIcon(2, 34, MIDI_ICON); gfxPrint(13, 35, midi_fn_name[frame.MIDIState.function[io_offset + page]]);
         if (frame.MIDIState.function[io_offset + page] == HEM_MIDI_CC_OUT)
             gfxPrint(frame.MIDIState.function_cc[io_offset + page]);
 
-        gfxPrint(1, 45, "Voice:  "); gfxPrint(frame.MIDIState.dac_polyvoice[io_offset + page] + 1);
+        gfxPrint(1, 45, "Voice:"); gfxPrint(55, 45, frame.MIDIState.dac_polyvoice[io_offset + page] + 1);
 
         // Cursor
         switch (cursor) {
@@ -262,11 +264,11 @@ private:
                 gfxCursor(1, 21, 52);
                 break;
             case OUTPUT_MODE:
-                gfxCursor(12, 23 + (cursor * 10), 51);
+                gfxCursor(12, 23 + cursor * 10, 51);
                 break;
             case MIDI_CHANNEL:
             case POLY_VOICE:
-                gfxCursor(49, 23 + (cursor * 10), 14);
+                gfxCursor(42, 23 + cursor * 10, 21);
             default: break;
         }
 
@@ -278,15 +280,23 @@ private:
     }
 
     void DrawGlobalPage() {
-        gfxPrint(1, 13, "Poly Cfg");
+        gfxPrint(1, 13, "Global");
         gfxLine(1, 22, 63, 22);
 
-        gfxPrint(1, 25, "Md: "); gfxPrint(midi_poly_mode_name[frame.MIDIState.poly_mode]);
+        gfxBitmap(2, 25, 16, PhzIcons::keyboard);
+        gfxPos(26, 25); graphics.printf("%6s", midi_poly_mode_name[frame.MIDIState.poly_mode]);
 
-        gfxPrint(1, 35, "ChFilt:");
-        for (int i = 0; i <= 16; ++i) {
-            if (frame.MIDIState.CheckMidiChannelFilter(i)) gfxRect(1 + (i*4), 45, 2, 7);
-            else gfxRect(1 + (i*4), 51, 2, 1);
+        const uint8_t pc_ch = frame.MIDIState.pc_channel;
+        gfxPrint(1, 35, "PC"); gfxIcon(14, 35, PhzIcons::filter);
+
+        gfxPos(43, 35);
+        if (pc_ch < 16) graphics.printf("%3d", pc_ch + 1);
+        else if (pc_ch == 16) graphics.printf("%3s", "Om");
+        else graphics.printf("%3s", "Off");
+
+        for (int i = 0; i < 16; ++i) {
+            if (frame.MIDIState.CheckMidiChannelFilter(i)) gfxRect(1 + i * 4, 45, 2, 7);
+            else gfxRect(1 + i * 4, 51, 2, 1);
         }
 
         // Cursor
@@ -295,8 +305,10 @@ private:
                 gfxCursor(1, 21, 52);
                 break;
             case POLY_MODE:
-                gfxCursor(19, 23 + (cursor * 10), 45);
+                gfxCursor(25, 23 + cursor * 10, 38);
                 break;
+            case PROG_CHANGE_CHANNEL:
+                gfxCursor(42, 23 + cursor * 10, 21);
             default: break;
         }
 
@@ -320,7 +332,7 @@ private:
 
         switch ( log_entry_.message ) {
         case HEM_MIDI_NOTE_ON:
-            gfxBitmap(1, y, 8, NOTE_ICON);
+            gfxIcon(1, y, NOTE_ICON);
             gfxPrint(10, y, midi_note_numbers[log_entry_.data1]);
             gfxPrint(40, y, log_entry_.data2);
             break;
@@ -331,23 +343,23 @@ private:
             break;
 
         case HEM_MIDI_CC:
-            gfxBitmap(1, y, 8, MOD_ICON);
+            gfxIcon(1, y, MOD_ICON);
             gfxPrint(10, y, log_entry_.data2);
             break;
 
         case HEM_MIDI_AFTERTOUCH_CHANNEL:
-            gfxBitmap(1, y, 8, AFTERTOUCH_ICON);
+            gfxIcon(1, y, AFTERTOUCH_ICON);
             gfxPrint(10, y, log_entry_.data1);
             break;
 
         case HEM_MIDI_AFTERTOUCH_POLY:
-            gfxBitmap(1, y, 8, AFTERTOUCH_ICON);
+            gfxIcon(1, y, AFTERTOUCH_ICON);
             gfxPrint(10, y, log_entry_.data2);
             break;
 
         case HEM_MIDI_PITCHBEND: {
             int data = (log_entry_.data2 << 7) + log_entry_.data1 - 8192;
-            gfxBitmap(1, y, 8, BEND_ICON);
+            gfxIcon(1, y, BEND_ICON);
             gfxPrint(10, y, data);
             break;
             }

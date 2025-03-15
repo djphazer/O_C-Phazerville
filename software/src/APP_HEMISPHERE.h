@@ -532,7 +532,8 @@ public:
                 continue;
             }
 
-            if (message == usbMIDI.ProgramChange) {
+            if (message == usbMIDI.ProgramChange
+            && (device.getChannel() == f.MIDIState.pc_channel+1 || f.MIDIState.pc_channel == f.MIDIState.PC_OMNI)) {
                 uint8_t slot = device.getData1();
                 if (slot < HEM_NR_OF_PRESETS) {
                   if (HS::clock_m.IsRunning()) {
