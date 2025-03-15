@@ -28,7 +28,7 @@ public:
   }
 
   void OnEncoderMove(int direction) override {
-    SetGain(constrain(gain + direction, -90, 90));
+    SetGain(gain + direction);
   }
 
   uint64_t OnDataRequest() override {
@@ -49,7 +49,7 @@ public:
   }
 
   void SetGain(int8_t new_gain) {
-    gain = new_gain;
+    gain = constrain(new_gain, -90, 90);
     float scalar = dbToScalar(gain);
     mixers[0].gain(0, scalar);
     mixers[0].gain(1, scalar);

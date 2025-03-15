@@ -36,7 +36,7 @@ public:
     ONE_POLE(lp, in, 0.001f);
 
     if (ac_couple) in -= lp;
-    interp_stream.Push(Clip16(dbToScalar(gain) * scalar * in));
+    interp_stream.Push(Clip16(gain_cv.InF(1.0f) * dbToScalar(gain) * scalar * in));
   }
 
   void View() override {
@@ -65,15 +65,18 @@ public:
     gfxStartCursor();
     gfxPrintDb(gain);
     gfxEndCursor(cursor == 2);
+    gfxStartCursor();
+    gfxPrintIcon(gain_cv.Icon());
+    gfxEndCursor(cursor == 3);
 
     gfxPrint(1, 45, "AC:    ");
     gfxStartCursor();
     gfxPrintIcon(ac_couple ? CHECK_ON_ICON : CHECK_OFF_ICON);
-    gfxEndCursor(cursor == 3);
+    gfxEndCursor(cursor == 4);
   }
 
   void OnButtonPress() override {
-    if (cursor == 3) {
+    if (cursor == 4) {
       ac_couple = !ac_couple;
     } else {
       CursorToggle();
@@ -82,7 +85,7 @@ public:
 
   void OnEncoderMove(int direction) override {
     if (!EditMode()) {
-      MoveCursor(cursor, direction, 3);
+      MoveCursor(cursor, direction, 4);
       return;
     }
 
@@ -98,16 +101,19 @@ public:
         gain += direction;
         CONSTRAIN(gain, LVL_MIN_DB, LVL_MAX_DB);
         break;
+      case 3:
+        gain_cv.ChangeSource(direction);
+        break;
     }
   }
   void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
     data[0] = PackPackables(pack(gain), pack<1>(ac_couple), pack<2>(method));
-    data[1] = PackPackables(input);
+    data[1] = PackPackables(input, gain_cv);
   }
 
   void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
     UnpackPackables(data[0], pack(gain), pack<1>(ac_couple), pack<2>(method));
-    UnpackPackables(data[1], input);
+    UnpackPackables(data[1], input, gain_cv);
     CONSTRAIN(gain, LVL_MIN_DB, LVL_MAX_DB);
     CONSTRAIN(method, 0, 2);
   }
@@ -137,6 +143,7 @@ private:
   int cursor = 0;
   CVInputMap input;
   int8_t gain = -1; // dB
+  CVInputMap gain_cv;
   uint8_t method = INTERPOLATION_HERMITE;
   boolean ac_couple = 0;
 };
