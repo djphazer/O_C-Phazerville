@@ -246,7 +246,7 @@ private:
     const char* n[12] = {"C", "C", "D", "D", "E", "F", "F", "G", "G", "A", "A", "B"};
 
     template <typename T>
-    uint32_t get_non_neg_mask(T* arr, int n) {
+    static uint32_t get_non_neg_mask(T* arr, int n) {
         uint32_t mask = 0;
         for (int i = 0; i < n; ++i) {
             if (arr[i] >= 0) {
@@ -256,7 +256,7 @@ private:
         return mask;
     }
 
-    int semitones_to_degrees(uint32_t scale_mask, int semitones) {
+    static int semitones_to_degrees(uint32_t scale_mask, int semitones) {
         semitones = ((semitones % 12) + 12) % 12;
         semitones -= __builtin_ctz(scale_mask);
         scale_mask >>= __builtin_ctz(scale_mask);
@@ -281,7 +281,7 @@ private:
      * doesn't really matter).
      */
     template <typename T>
-    void rotate_masked_left(T* arr, uint32_t mask, int n, int r) {
+    static void rotate_masked_left(T* arr, uint32_t mask, int n, int r) {
         // Clear any bits that are out of range cause they'll mess ctz and
         // popcounts
         if (n < 32) mask = mask & ~(~0u << n);
@@ -310,11 +310,12 @@ private:
         int8_t* src_weights, int8_t* rot_weights, int semitone_rot, int masked_rot
     ) {
       std::copy(src_weights, src_weights + 12, rot_weights);
-      rotate_masked_left(rot_weights, 0xffff, 12, -semitone_rot);
+      masked_rot -= semitone_rot;
       uint32_t scale_mask = get_non_neg_mask(rot_weights, 12);
       int degrees = semitones_to_degrees(scale_mask, masked_rot);
       // Serial.printf("degrees = %d, scale_mask = %x\n", degrees, scale_mask);
       rotate_masked_left(rot_weights, scale_mask, 12, -degrees);
+      rotate_masked_left(rot_weights, 0xffff, 12, -semitone_rot);
     }
 
     int GetNextWeightedPitch() {
