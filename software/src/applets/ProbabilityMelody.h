@@ -232,9 +232,9 @@ private:
     int8_t weights[12] = {10,-1,0,2,-1,0,-1,2,0,-1,4,-1}; // scale=Cmin, chord=Cmin7
     int8_t up, up_mod;
     int8_t down, down_mod;
-    int16_t pitch;
+    uint8_t pitch;
     bool isLooping = false;
-    int16_t seqloop[2][HEM_PROB_MEL_MAX_LOOP_LENGTH];
+    uint8_t seqloop[2][HEM_PROB_MEL_MAX_LOOP_LENGTH];
     int8_t rotation[2] = {0};
     int8_t cv_mode = 0;
 
@@ -242,9 +242,9 @@ private:
 
     int pulse_animation = 0;
     int value_animation = 0;
-    const uint8_t x[12] = {2, 7, 10, 15, 18, 26, 31, 34, 39, 42, 47, 50};
-    const uint8_t p[12] = {0, 1,  0,  1,  0,  0,  1,  0,  1,  0,  1,  0};
-    const char* n[12] = {"C", "C", "D", "D", "E", "F", "F", "G", "G", "A", "A", "B"};
+    static constexpr uint8_t x[12] = {2, 7, 10, 15, 18, 26, 31, 34, 39, 42, 47, 50};
+    static constexpr uint8_t p[12] = {0, 1,  0,  1,  0,  0,  1,  0,  1,  0,  1,  0};
+    static constexpr char n[12] = {'C', 'C', 'D', 'D', 'E', 'F', 'F', 'G', 'G', 'A', 'A', 'B'};
 
     template <typename T>
     static uint32_t get_non_neg_mask(T* arr, int n) {
@@ -319,7 +319,7 @@ private:
       rotate_masked_left(rot_weights, 0xffff, 12, -semitone_rot);
     }
 
-    int GetNextWeightedPitch() {
+    uint8_t GetNextWeightedPitch() {
         int total_weights = 0;
         int8_t rotated_weights[12];
         UpdateRotatedWeights(weights, rotated_weights, rotation[0], rotation[1]);
@@ -336,7 +336,7 @@ private:
             }
             rnd -= weight;
         }
-        return -1;
+        return 0;
     }
 
     void GenerateLoop() {
@@ -459,7 +459,8 @@ private:
             gfxRect(1, 15, 60, 10);
             gfxInvert(1, 15, 60, 10);
 
-            gfxPrint(18, 16, n[i]);
+            gfxPos(18, 16);
+            graphics.printf("%c", n[i]);
             if (p[i]) {
                 gfxPrint(24, 16, "#");
             }
