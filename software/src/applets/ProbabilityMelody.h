@@ -90,7 +90,8 @@ public:
     void Start() {
         down = 1;
         up = 12;
-        pitch = 0;
+        pitch[0] = 0;
+        pitch[1] = 0;
     }
 
     void Controller() {
@@ -126,21 +127,12 @@ public:
             if (Clock(ch)) StartADCLag(ch);
             if (loop_linker->TrigPop(ch) || EndOfADCLag(ch)) {
                 if (isLooping) {
-                    pitch = seqloop[ch][loop_linker->GetLoopStep()] + 60;
+                    pitch[ch] = seqloop[ch][loop_linker->GetLoopStep()] + 60;
                 } else {
-                    pitch = GetNextWeightedPitch() + 60;
+                    pitch[ch] = GetNextWeightedPitch() + 60;
                 }
-                if (pitch != -1) {
-                    Out(ch, MIDIQuantizer::CV(pitch));
-                    pulse_animation = HEMISPHERE_PULSE_ANIMATION_TIME_LONG;
-                } else {
-                    Out(ch, 0);
-                }
+                Out(ch, MIDIQuantizer::CV(pitch[ch]));
             }
-        }
-
-        if (pulse_animation > 0) {
-            pulse_animation--;
         }
 
         // animate value changes
@@ -232,7 +224,7 @@ private:
     int8_t weights[12] = {10,-1,0,2,-1,0,-1,2,0,-1,4,-1}; // scale=Cmin, chord=Cmin7
     int8_t up, up_mod;
     int8_t down, down_mod;
-    uint8_t pitch;
+    uint8_t pitch[2] = {0};
     bool isLooping = false;
     uint8_t seqloop[2][HEM_PROB_MEL_MAX_LOOP_LENGTH];
     int8_t rotation[2] = {0};
@@ -240,7 +232,6 @@ private:
 
     ProbLoopLinker *loop_linker = loop_linker->get();
 
-    int pulse_animation = 0;
     int value_animation = 0;
     static constexpr uint8_t x[12] = {2, 7, 10, 15, 18, 26, 31, 34, 39, 42, 47, 50};
     static constexpr uint8_t p[12] = {0, 1,  0,  1,  0,  0,  1,  0,  1,  0,  1,  0};
@@ -370,8 +361,6 @@ private:
     }
 
     void DrawParams() {
-        int note = pitch % 12;
-        int octave = (pitch - 60) / 12;
         int8_t ws[12];
         if (FIRST_NOTE <= cursor && cursor <= LAST_NOTE) {
             std::copy(weights, weights + 12, ws);
@@ -384,22 +373,23 @@ private:
             uint8_t yOffset = p[i] ? 31 : 45;
             bool unmasked = (ws[i] >= 0);
 
-            if (pulse_animation > 0 && note == i) {
-                gfxRect(xOffset - 1, yOffset, 3, 10);
-            } else {
-                if (EditMode() && i == (cursor - FIRST_NOTE)) {
-                    // blink line when editing
-                    if (CursorBlink()) {
-                        gfxLine(xOffset, yOffset, xOffset, yOffset + 10);
-                    } else {
-                        gfxDottedLine(xOffset, yOffset, xOffset, yOffset + 10);
-                    }
-                } else if (unmasked) {
+            if (EditMode() && i == (cursor - FIRST_NOTE)) {
+                // blink line when editing
+                if (CursorBlink()) {
+                    gfxLine(xOffset, yOffset, xOffset, yOffset + 10);
+                } else {
                     gfxDottedLine(xOffset, yOffset, xOffset, yOffset + 10);
                 }
-                if (unmasked)
-                  gfxLine(xOffset - 1, yOffset + 10 - ws[i], xOffset + 1, yOffset + 10 - ws[i]);
+            } else if (unmasked) {
+                gfxDottedLine(xOffset, yOffset, xOffset, yOffset + 10);
             }
+            if (unmasked)
+                gfxLine(xOffset - 1, yOffset + 10 - ws[i], xOffset + 1, yOffset + 10 - ws[i]);
+        }
+        ForEachChannel(ch) {
+            int note = pitch[ch] % 12;
+            uint8_t xOffset = x[note] + (p[note] ? 1 : 2) - 3;
+            gfxIcon(xOffset, 59, ch ? UP_TRI_R_HALF : UP_TRI_L_HALF);
         }
 
         // cursor for keys
@@ -445,12 +435,9 @@ private:
             }
         }
 
-        if (pulse_animation > 0) {
-            // int note = pitch % 12;
-            // int octave = (pitch - 60) / 12;
-
-            // gfxRect(x[note] + (p[note] ? 0 : 1), p[note] ? 29 : 54, 3, 2);
-            gfxRect(58, 54 - (octave * 6), 3, 3);
+        ForEachChannel(ch) {
+            int octave = (pitch[ch] - 60) / 12;
+            gfxRect(58 + ch, 54 - (octave * 6), 2, 3);
         }
 
         if (value_animation > 0 && cursor >= FIRST_NOTE) {
