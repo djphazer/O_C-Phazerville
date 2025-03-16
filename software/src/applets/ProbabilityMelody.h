@@ -123,7 +123,8 @@ public:
         }
 
         ForEachChannel(ch) {
-            if (loop_linker->TrigPop(ch) || Clock(ch)) {
+            if (Clock(ch)) StartADCLag(ch);
+            if (loop_linker->TrigPop(ch) || EndOfADCLag(ch)) {
                 if (isLooping) {
                     pitch = seqloop[ch][loop_linker->GetLoopStep()] + 60;
                 } else {
