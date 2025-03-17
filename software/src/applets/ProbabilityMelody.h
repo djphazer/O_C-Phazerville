@@ -39,11 +39,6 @@ enum CV_SOURCE : uint8_t {
 struct LabelledCvConfig {
     char cv1_label[6];
     char cv2_label[6];
-    // [semi source][mask source][down source][up source]
-    // 00 -> none
-    // 01 -> cv1
-    // 10 -> cv2
-    // 11 -> both
     uint8_t cv_config;
 };
 
@@ -66,7 +61,7 @@ static constexpr LabelledCvConfig cv_modes[] = {
     {"Semi",  "Mask+", cv_config(CV1,  CV2,  NONE, CV2)},
     {"Semi",  "Mask-", cv_config(CV1,  CV2,  CV2,  NONE)},
     {"Semi",  "Mask*", cv_config(CV1,  CV2,  CV2,  CV2)},
-    {"Semi*", "Mask*", cv_config(CV1,  CV2,  BOTH,  BOTH)},
+    {"Semi*", "Mask*", cv_config(CV1,  CV2,  BOTH, BOTH)},
 };
 }
 
@@ -305,7 +300,6 @@ private:
       masked_rot -= semitone_rot;
       uint32_t scale_mask = get_non_neg_mask(rot_weights, 12);
       int degrees = semitones_to_degrees(scale_mask, masked_rot);
-      // Serial.printf("degrees = %d, scale_mask = %x\n", degrees, scale_mask);
       rotate_masked_left(rot_weights, scale_mask, 12, -degrees);
       rotate_masked_left(rot_weights, 0xffff, 12, -semitone_rot);
     }
@@ -374,12 +368,7 @@ private:
             bool unmasked = (ws[i] >= 0);
 
             if (EditMode() && i == (cursor - FIRST_NOTE)) {
-                // blink line when editing
-                if (CursorBlink()) {
-                    gfxLine(xOffset, yOffset, xOffset, yOffset + 10);
-                } else {
-                    gfxDottedLine(xOffset, yOffset, xOffset, yOffset + 10);
-                }
+                gfxDottedLine(xOffset, yOffset, xOffset, yOffset + 10);
             } else if (unmasked) {
                 gfxDottedLine(xOffset, yOffset, xOffset, yOffset + 10);
             }
@@ -392,20 +381,20 @@ private:
             gfxIcon(xOffset, 59, ch ? UP_TRI_R_HALF : UP_TRI_L_HALF);
         }
 
-        // cursor for keys
-        if (!EditMode()) {
-            if (cursor == ROTATE) {
-                gfxCursor(56, 60, 7);
-                gfxCursor(56, 61, 7);
-            } else if (FIRST_NOTE <= cursor && cursor <= LAST_NOTE) {
-                int i = cursor - FIRST_NOTE;
-                gfxCursor(x[i] - 1, p[i] ? 24 : 60, p[i] ? 5 : 7);
-                gfxCursor(x[i] - 1, p[i] ? 25 : 61, p[i] ? 5 : 7);
-            }
-        } else {
-            if (cursor == ROTATE) {
+        if (cursor == ROTATE) {
+            if (EditMode()) {
                 gfxRect(56, 60, 7, 4);
                 gfxClear(57, 61, 5, 2);
+            } else {
+                gfxCursor(56, 60, 7);
+                gfxCursor(56, 61, 7);
+            }
+        } else if (FIRST_NOTE <= cursor && cursor <= LAST_NOTE) {
+            int i = cursor - FIRST_NOTE;
+            uint8_t xOffset = x[i] + (p[i] ? 1 : 2);
+            uint8_t yOffset = p[i] ? 31 : 45;
+            if (EditMode() || CursorBlink()) {
+                gfxLine(xOffset, yOffset, xOffset, yOffset + 10);
             }
         }
 
