@@ -76,6 +76,7 @@ void Ui::set_screensaver_timeout(uint32_t seconds) {
 }
 
 void FASTRUN Ui::_Poke() {
+  screensaver_ = false;
   event_queue_.Poke();
 }
 

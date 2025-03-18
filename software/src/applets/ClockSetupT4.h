@@ -77,16 +77,22 @@ public:
             frame.MIDIState.start_q = 0;
             HS::clock_m.DisableMIDIOut();
             HS::clock_m.Start();
+            OC::ui._Poke();
+            HS::PokePopup(HS::CLOCK_POPUP);
         }
         if (frame.MIDIState.stop_q) {
             frame.MIDIState.stop_q = 0;
             HS::clock_m.Stop();
             HS::clock_m.EnableMIDIOut();
+            HS::PokePopup(HS::CLOCK_POPUP);
         }
 
         // Paused means wait for clock-sync to start
-        if (HS::clock_m.IsPaused() && clock_sync)
+        if (HS::clock_m.IsPaused() && clock_sync) {
             HS::clock_m.Start();
+            OC::ui._Poke();
+            HS::PokePopup(HS::CLOCK_POPUP);
+        }
 
         // Advance internal clock, sync to external clock / reset
         if (HS::clock_m.IsRunning())
