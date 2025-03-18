@@ -45,7 +45,7 @@ public:
   void Controller() {
     clock_count++;
     if (clock_source.Clock()) {
-      clock_base_secs = clock_count / 16666.0f;
+      clock_base_secs = clock_count / float(OC_CORE_ISR_FREQ);
       clock_count = 0;
     }
 

@@ -9,7 +9,11 @@
 // 66us = 15.1515...kHz
 // 72us = 13.888...kHz
 // 100us = 10Khz
+#ifdef ARDUINO_TEENSY41
+static constexpr uint32_t OC_CORE_ISR_FREQ = 33333U;
+#else
 static constexpr uint32_t OC_CORE_ISR_FREQ = 16666U;
+#endif
 static constexpr uint32_t OC_CORE_TIMER_RATE = (1000000UL / OC_CORE_ISR_FREQ);
 static constexpr uint32_t OC_UI_TIMER_RATE   = 1000UL;
 

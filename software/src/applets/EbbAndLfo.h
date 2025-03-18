@@ -415,7 +415,7 @@ private:
 
   void gfxPrintFreq(int16_t pitch) {
     uint32_t num = ComputePhaseIncrement(pitch);
-    uint32_t denom = 0xffffffff / 16666;
+    uint32_t denom = 0xffffffff / OC_CORE_ISR_FREQ;
     bool swap = num < denom;
     if (swap) {
       uint32_t t = num;

@@ -88,9 +88,20 @@ void FASTRUN CORE_timer_ISR() {
   // a DMA transfer to the display things are fairly nicely interleaved. In the
   // next ISR, the display transfer is finalized (CS update).
 
-  display::Flush();
+#if defined(ARDUINO_TEENSY41)
+  // staggered execution for display w/ ISR freq == 33333 Hz
+  if (OC::CORE::ticks & 1) {
+#endif
+    display::Flush();
+#if !defined(ARDUINO_TEENSY41)
+    OC::DAC::Update();
+#endif
+    display::Update();
+#if defined(ARDUINO_TEENSY41)
+  }
+  // full speed for DAC on T4 with separate SPI bus
   OC::DAC::Update();
-  display::Update();
+#endif
 
   // see OC_ADC.h for details; empirically (with current parameters), Scan_DMA() picks up new samples @ 5.55kHz
   OC::ADC::Scan_DMA();
@@ -98,11 +109,6 @@ void FASTRUN CORE_timer_ISR() {
   // Pin changes are tracked in separate ISRs, so depending on prio it might
   // need extra precautions.
   OC::DigitalInputs::Scan();
-
-#ifndef OC_UI_SEPARATE_ISR
-  TODO needs a counter
-  UI_timer_ISR();
-#endif
 
   ++OC::CORE::ticks;
   if (OC::CORE::app_isr_enabled)

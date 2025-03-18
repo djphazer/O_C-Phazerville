@@ -31,10 +31,11 @@
 
 namespace HS {
 
+static constexpr uint32_t TICKS_PER_MINUTE = 60'000'000 / OC_CORE_TIMER_RATE;
 static constexpr uint16_t CLOCK_TEMPO_MIN = 1;
 static constexpr uint16_t CLOCK_TEMPO_MAX = 0xFFFF;
-static constexpr uint32_t CLOCK_TICKS_MIN = 1000000 / CLOCK_TEMPO_MAX;
-static constexpr uint32_t CLOCK_TICKS_MAX = 1000000 / CLOCK_TEMPO_MIN;
+static constexpr uint32_t CLOCK_TICKS_MIN = TICKS_PER_MINUTE / CLOCK_TEMPO_MAX;
+static constexpr uint32_t CLOCK_TICKS_MAX = TICKS_PER_MINUTE / CLOCK_TEMPO_MIN;
 
 constexpr int MIDI_OUT_PPQN = 24;
 constexpr int CLOCK_MAX_MULTIPLE = 24;
@@ -103,7 +104,7 @@ public:
      */
     void SetTempoBPM(uint16_t bpm) {
         bpm = constrain(bpm, CLOCK_TEMPO_MIN, CLOCK_TEMPO_MAX);
-        ticks_per_beat = 1000000 / bpm;
+        ticks_per_beat = TICKS_PER_MINUTE / bpm;
         tempo_setting = tempo = bpm;
     }
     
@@ -116,7 +117,7 @@ public:
         // update the tempo
         uint32_t clock_diff = total / count;
         ticks_per_beat = constrain(clock_diff, CLOCK_TICKS_MIN, CLOCK_TICKS_MAX); // time since last clock is new tempo
-        tempo_setting = tempo = 1000000 / ticks_per_beat; // imprecise, for display purposes
+        tempo_setting = tempo = TICKS_PER_MINUTE / ticks_per_beat; // imprecise, for display purposes
     }
 
     int8_t GetMultiply(int ch = 0) {return tocks_per_beat[ch];}
@@ -130,7 +131,7 @@ public:
      */
     uint16_t GetTempo() {return tempo_setting;}
     float GetTempoFloat() {
-      return 1000000.0f / ticks_per_beat;
+      return float(TICKS_PER_MINUTE) / ticks_per_beat;
     }
     uint32_t GetCycleTicks(int ch = 0) {
       if (tocks_per_beat[ch] > 0) return ticks_per_beat / tocks_per_beat[ch];
@@ -239,7 +240,7 @@ public:
 
                 // update the tempo
                 ticks_per_beat = constrain(clock_ppqn * avg_diff, CLOCK_TICKS_MIN, CLOCK_TICKS_MAX);
-                tempo_setting = tempo = 1000000 / ticks_per_beat; // imprecise, for display purposes
+                tempo_setting = tempo = TICKS_PER_MINUTE / ticks_per_beat; // imprecise, for display purposes
 
                 int ticks_per_clock = ticks_per_beat / clock_ppqn; // rounded down
 
@@ -304,7 +305,7 @@ public:
     void Modulate(int tempo_diff, int shuffle_diff) {
       shuffle = constrain(shuffle_setting + shuffle_diff, 0, 99);
       tempo = constrain(tempo_setting + tempo_diff, CLOCK_TEMPO_MIN, CLOCK_TEMPO_MAX);
-      ticks_per_beat = 1000000 / tempo;
+      ticks_per_beat = TICKS_PER_MINUTE / tempo;
     }
 
     bool IsRunning() {return (running && !paused);}

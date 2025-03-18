@@ -125,7 +125,7 @@ public:
         {
             if (Clock(ch)) {
                 uint32_t ticks = ClockCycleTicks(ch);
-                int new_freq = 1666666 / ticks;
+                int new_freq = OC_CORE_ISR_FREQ*1000 / ticks;
                 new_freq = constrain(new_freq, 3, 99900);
                 osc[ch].SetFrequency(new_freq);
                 freq[ch] = new_freq * 100;
