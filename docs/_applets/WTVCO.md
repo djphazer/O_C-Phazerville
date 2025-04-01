@@ -12,6 +12,7 @@ The visualizer shows the selected waveform. A, B, and C are the source waveforms
 As the core feature of the applet, CV modulation of the **Blend** parameter will change the shape of the output waveform. When Blend CV = 0V, the output will resemble waveform A, at +2.5V it will resemble waveform B, and at +5V, waveform C. Any CV in between will produce a proportional interpolation of the corresponding pair of source waves. Voltages beyond +5 and below 0 will result in "inverted-interpolation-overflow-wavefolding," which is rad. Try it!
 
 ### I/O:
+
 |        | 1/3                     | 2/4                                  |
 | ------ | :---------------------: | :----------------------------------: |
 | TRIG   | Oct-Shift Down          | Oct-Shift Up                         |
