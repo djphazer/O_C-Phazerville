@@ -1,11 +1,11 @@
 ---
 layout: default
 ---
-# Scenes
+# Scenery
 
 ![Screenshot 2024-06-13 15-57-06](https://github.com/djphazer/O_C-Phazerville/assets/109086194/c651ef29-79bc-45e5-9cf1-e9b115194a3b)
 
-**Scenes** is a macro CV Switcher/Crossfader inspired by [**Traffic**](https://www.youtube.com/watch?v=SR0HXqEbuaY) by Jasmine & Olive Trees. This app offers 4 "scenes" with 4 CV output values each; there are also 4 preset banks, using the same mechanism as [Calibr8or](Calibr8or) and **Hemisphere** (long-press DOWN button to access).
+**Scenery** is a macro CV Switcher/Crossfader inspired by [**Traffic**](https://www.youtube.com/watch?v=SR0HXqEbuaY) by Jasmine & Olive Trees. This app offers 4 "scenes" with 4 CV output values each; there are also 4 preset banks, using the same mechanism as [Calibr8or](Calibr8or) and **Hemisphere** (long-press DOWN button to access).
 
 As of v1.7, storing to a Preset automatically saves to EEPROM, and all Presets will auto-save.
 
