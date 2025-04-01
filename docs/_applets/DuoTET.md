@@ -38,6 +38,32 @@ the first quantizer should be considered. It would also be
 ideal to be able to modulate the parameters of the two quantizers
 using other applets.
 
+### I/O
+
+|        |                             1/3                             |                  2/4                  |
+| ------ | :---------------------------------------------------------: | :-----------------------------------: |
+| TRIG   | Unused   |  Unused
+| CV INs |                          Input Pitch A                          |               Input Pitch B (or offset)               |
+| OUTs   |                Quantized Pitch A                |     Quantized Pitch B     |
+
+
+### UI Parameters
+* TET: equal subdivisions of the octave
+* iA: first interval
+* iB: second interval
+* len: number of allowed intervals per octave (eg. 5 = pentatonic, 7 = diatonic)
+* off: offset of the allowed intervals
+* B+A: Toggle to set Pitch B relative to Pitch A (Y), or as an independent second channel (N)
+* B+: Interval offset for Pitch B
+* B^: Upper bound for Pitch B (in intervals)
+* Bv: Lower bound for Pitch B (in intervals)
+* A^: Upper bound for Pitch A (in intervals)
+* Av: Lower bound for Pitch A (in intervals)
+
+Note: All parameters with "()" may be additionally mapped to any of the CV inputs or internal output channels. Select a parameter, and press AuxButton to map a CV source.
+
+See https://en.xen.wiki/ for details on intervals for any given TET setting
+
 ### T3.2 Disclaimer
 
 This applet was developed on T4.1 hardware, and may exceed CPU and I/O limitations of Teensy 3.2 hardware.
