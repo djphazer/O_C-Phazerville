@@ -50,52 +50,24 @@ public:
         return ( *(int16_t*)a - *(int16_t*)b );
     }
 
-    static int wrap(int val, int max) {
+    static int wrap(int val, const int max) {
         while(val >= max) val -= max;
         while(val < 0) val += max;
         return val;   
     }
 
     void conditionParams() {
-        for(int i=0; i<DUOTET_PARAM_LAST; i++) {
-            switch(i) {
-                case DUOTET_PARAM_TET:
-                    params[i] = constrain(params[i], 1, 63);
-                    break;
-                case DUOTET_PARAM_INTERVALA:
-                    params[i] = constrain(params[i], 0, params[DUOTET_PARAM_TET]);
-                    break;
-                case DUOTET_PARAM_INTERVALB:
-                    params[i] = constrain(params[i], 0, params[DUOTET_PARAM_TET]);
-                    break;
-                case DUOTET_PARAM_OFFSET:
-                    params[i] = constrain(params[i], 0, params[DUOTET_PARAM_SCALELEN]);
-                    break;
-                case DUOTET_PARAM_SCALELEN:
-                    params[i] = constrain(params[i], 1, DUOTET_SCALE_MAX_LEN);
-                    break;
-                case DUOTET_PARAM_BpA:
-                    params[i] = constrain(params[i], 0, 1);
-                    break;
-                case DUOTET_PARAM_Bp:
-                    params[i] = constrain(params[i], -31, 31);
-                    break;
-                case DUOTET_PARAM_Bu:
-                    params[i] = constrain(params[i], -63, 63);
-                    break;
-                case DUOTET_PARAM_Bl:
-                    params[i] = constrain(params[i], -63, 63);
-                    break;
-                case DUOTET_PARAM_Au:
-                    params[i] = constrain(params[i], -63, 63);
-                    break;
-                case DUOTET_PARAM_Al:
-                    params[i] = constrain(params[i], -63, 63);
-                    break;
-                default:
-                    break;
-            }
-        }
+      CONSTRAIN(params[DUOTET_PARAM_TET], 1, 63);
+      CONSTRAIN(params[DUOTET_PARAM_INTERVALA], 0, params[DUOTET_PARAM_TET]);
+      CONSTRAIN(params[DUOTET_PARAM_INTERVALB], 0, params[DUOTET_PARAM_TET]);
+      CONSTRAIN(params[DUOTET_PARAM_OFFSET], 0, params[DUOTET_PARAM_SCALELEN]);
+      CONSTRAIN(params[DUOTET_PARAM_SCALELEN], 1, DUOTET_SCALE_MAX_LEN);
+      CONSTRAIN(params[DUOTET_PARAM_BpA], 0, 1);
+      CONSTRAIN(params[DUOTET_PARAM_Bp], -31, 31);
+      CONSTRAIN(params[DUOTET_PARAM_Bu], -63, 63);
+      CONSTRAIN(params[DUOTET_PARAM_Bl], -63, 63);
+      CONSTRAIN(params[DUOTET_PARAM_Au], -63, 63);
+      CONSTRAIN(params[DUOTET_PARAM_Al], -63, 63);
     }
 
     void genScale() {
@@ -156,17 +128,9 @@ public:
         params[DUOTET_PARAM_Al]         = -63;
         genScale();
     }
-
-    bool cv2note(int16_t& pitch, int cv=0, bool forceUpdate = false, int threshold=8) {
-        cv = cv+64;
-        int w = cv>>7;
-        int f = abs((cv & 0x7F)-64);
-        if(f < threshold || forceUpdate) {
-            pitch = w;
-            return true;
-        } else {
-            return false;
-        }
+    void Unload() {
+      continuous[0] = true;
+      continuous[1] = true;
     }
 
     int constrainOctave(int note, int l, int u, int o) {
@@ -179,7 +143,7 @@ public:
         int len = processedParams[DUOTET_PARAM_SCALELEN];
         int au = processedParams[DUOTET_PARAM_Au];
         int al = processedParams[DUOTET_PARAM_Al];
-        int note = noteA;
+        int note = last_note[0];
         note = constrainOctave(note, al, au, len);
         return note;
     }
@@ -190,18 +154,23 @@ public:
         int bp = processedParams[DUOTET_PARAM_Bp];
         int bu = processedParams[DUOTET_PARAM_Bu];
         int bl = processedParams[DUOTET_PARAM_Bl];
-        int note  = noteB + bp + (bpa > 0 ? noteA : 0);
+        int note  = last_note[1] + bp + (bpa > 0 ? last_note[0] : 0);
         note = constrainOctave(note, bl, bu, len);
         return note;
     }
 
     void Controller() {
         for(int i=0; i<DUOTET_PARAM_LAST; i++) {
-            cv2note(cvInValues[i], cv_inputs[i].In());
+            cvInValues[i] = cv_inputs[i].SemitoneIn();
             processedParams[i] = cvInValues[i] + params[i];
         }
-        cv2note(noteA, In(0), forceUpdate); cv2note(noteB, In(1), forceUpdate);
-        forceUpdate = false;
+        ForEachChannel(ch) {
+          bool clk = Clock(ch);
+          if (clk) continuous[ch] = false;
+          if (continuous[ch] || clk) {
+            last_note[ch] = SemitoneIn(ch);
+          }
+        }
         int outA = noteToVoltage(getScaleNote(getNoteA()));
         int outB = noteToVoltage(getScaleNote(getNoteB()));
         Out(0, outA); Out(1, outB);
@@ -268,7 +237,6 @@ public:
             params[cursor] += direction;
             if(direction != 0) conditionParams();
             genScale();
-            forceUpdate = true;
           }
         } else {
             MoveCursor(cursor, direction, DUOTET_PARAM_LAST-1);
@@ -310,7 +278,6 @@ public:
             offset += DUOTET_PARAM_BITS[i];
         }
         genScale();
-        forceUpdate = true;
     }
 
 protected:
@@ -383,8 +350,7 @@ private:
 
     int scale[DUOTET_SCALE_MAX_LEN];
 
-    int16_t noteA = 0;
-    int16_t noteB = 0;
+    int16_t last_note[2];
 
     int cursor = 0;
     int16_t params[DUOTET_PARAM_LAST];
@@ -395,5 +361,5 @@ private:
     CVInputMap cv_inputs[DUOTET_PARAM_LAST];
 
     bool aux_cursor = false;
-    bool forceUpdate = false;
+    bool continuous[2] = {true};
 };
