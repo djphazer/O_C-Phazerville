@@ -37,6 +37,8 @@
 extern uint_fast8_t MENU_REDRAW;
 
 #define NUM_ASR_CHANNELS 0x4
+// TODO:
+// #define NUM_ASR_CHANNELS DAC_CHANNEL_LAST
 #define ASR_MAX_ITEMS 256 // = ASR ring buffer size.
 #define ASR_HOLD_BUF_SIZE ASR_MAX_ITEMS / NUM_ASR_CHANNELS // max. delay size
 
@@ -475,7 +477,7 @@ public:
          int8_t _transpose = 0;
          int8_t _mult = get_mult();
          int32_t _pitch = ioframe->cv.pitch_values[CVInput1];
-         int32_t _asr_buffer[NUM_ASR_CHANNELS];
+         int32_t _asr_buffer[DAC_CHANNEL_LAST];
 
          bool forced_update = force_update_;
          force_update_ = false;

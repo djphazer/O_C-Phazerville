@@ -5,7 +5,7 @@
 #include "HemisphereAudioApplet.h"
 #include "OC_ui.h"
 #include "PhzConfig.h"
-#include "UI/ui_events.h"
+#include "src/UI/ui_events.h"
 #include "util/util_tuples.h"
 #include "dsputils_arm.h"
 #include "Audio/AudioMixer.h"

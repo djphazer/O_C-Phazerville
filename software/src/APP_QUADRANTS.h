@@ -30,7 +30,7 @@
 #include "OC_ui.h"
 
 #include "OC_patterns.h"
-#include "UI/ui_events.h"
+#include "src/UI/ui_events.h"
 #include "src/drivers/FreqMeasure/OC_FreqMeasure.h"
 
 #include "HemisphereApplet.h"

@@ -1195,7 +1195,7 @@ private:
     { 0, 0, ADC_CHANNEL_COUNT, "IntSeq mod CV", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
     { 0, 0, ADC_CHANNEL_COUNT, "IntSeq rng CV", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
     { 0, 0, ADC_CHANNEL_COUNT, "F. stride CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-    { 0, 0, 4, "IntSeq reset", OC::Strings::trigger_input_names_none, settings::STORAGE_TYPE_U4 }
+    { 0, 0, 4, "IntSeq reset", OC::Strings::trigger_input_names_none, settings::STORAGE_TYPE_U4 },
     { braids::OCTAVE_CONSTRAINT_OFF, braids::OCTAVE_CONSTRAINT_OFF, braids::OCTAVE_CONSTRAINT_LAST - 1, "Oct constraint", OC::Strings::octave_constraint, settings::STORAGE_TYPE_U4 },
     { 0, 0, 4, "Oct constraint len", NULL, settings::STORAGE_TYPE_U4 },
   }};

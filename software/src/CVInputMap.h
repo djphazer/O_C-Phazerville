@@ -7,7 +7,7 @@ const int NUM_CV_INPUTS = CVMAP_MAX + 1;
 //const int NUM_CV_INPUTS = ADC_CHANNEL_LAST * 2 + 1;
 // We *could* reuse HS::input_quant for inputs, but easier to just do it
 // independently, and semitone quantizers are lightwieght.
-inline std::array<OC::SemitoneQuantizer, NUM_CV_INPUTS> cv_semitone_quants;
+inline std::array<util::SemitoneQuantizer, NUM_CV_INPUTS> cv_semitone_quants;
 
 struct CVInputMap {
   // TODO: rework source into 3 bits for type, 5 bits for index
