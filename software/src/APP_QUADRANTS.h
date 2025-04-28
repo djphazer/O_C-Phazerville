@@ -53,8 +53,12 @@ using namespace HS;
 
 void QuadrantSysExHandler();
 
-class QuadAppletManager : public HSApplication {
+OC_APP_TRAITS(AppQuadrants, TWOCCS("QS"), "Quadrants", "4x Applets");
+class OC_APP_CLASS(AppQuadrants), public HSApplication {
 public:
+  OC_APP_INTERFACE_DECLARE(AppQuadrants);
+  OC_APP_STORAGE_SIZE(0);
+
     void Start() {
         audio_app.Init();
 
@@ -451,7 +455,7 @@ public:
         QueuePresetLoad(next_id);
     }
 
-    // does not modify the preset, only the quad_manager
+    // does not modify the preset, only the current state
     void SetApplet(HEM_SIDE hemisphere, int index) {
         if (active_applet[hemisphere])
           active_applet[hemisphere]->Unload();
@@ -611,7 +615,7 @@ public:
       }
     }
 
-    void View() {
+    void View() const {
         bool draw_applets = true;
 
         if (preset_cursor) {
@@ -663,8 +667,6 @@ public:
             audio_app.View();
             ClockSetup_instance.DrawIndicator();
 
-            // gfxHeader("Audio DSP Setup");
-            // OC::AudioDSP::DrawAudioSetup();
             draw_applets = false;
           }
         }
@@ -713,7 +715,6 @@ public:
           return;
         }
         if (view_state == AUDIO_SETUP) {
-          // OC::AudioDSP::AudioSetupButtonAction(h);
           // audio_app.HandleButtonEvent(event);
           return;
         }
@@ -844,7 +845,6 @@ public:
             return;
         }
         if (view_state == AUDIO_SETUP) {
-          // OC::AudioDSP::AudioMenuAdjust(h, event.value);
           audio_app.HandleEncoderEvent(event);
           return;
         }
@@ -964,156 +964,6 @@ public:
     }
     void ToggleFullScreen() {
       view_state = (view_state == APPLET_FULLSCREEN) ? APPLETS : APPLET_FULLSCREEN;
-    }
-
-    void HandleButtonEvent(const UI::Event &event) {
-        last_mask = mask;
-        mask = event.mask;
-        SERIAL_PRINTLN(
-          "mask=%d type=%d value=%d control=%d last_mask=%d",
-          event.mask,
-          event.type,
-          event.value,
-          event.control,
-          last_mask
-        );
-
-        if (AUDIO_SETUP == view_state) {
-          if (CheckButtonCombo(OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_B)) {
-            view_state = APPLETS;
-            return;
-          }
-          if ((event.control == OC::CONTROL_BUTTON_L
-               || event.control == OC::CONTROL_BUTTON_R)) {
-            audio_app.HandleEncoderButtonEvent(event);
-            return;
-          }
-          if (event.control == OC::CONTROL_BUTTON_X
-              || event.control == OC::CONTROL_BUTTON_Y
-              || event.control == OC::CONTROL_BUTTON_A
-              || event.control == OC::CONTROL_BUTTON_B) {
-            if (audio_app.HandleButtonEvent(event))
-              view_state = APPLETS;
-            return;
-          }
-        }
-
-        if (CheckButtonCombo(OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_Y) ||
-            CheckButtonCombo(OC::CONTROL_BUTTON_X | OC::CONTROL_BUTTON_B)) {
-          view_state = OVERVIEW;
-          return;
-        }
-
-        switch (event.type) {
-        case UI::EVENT_BUTTON_DOWN:
-
-          // Quantizer popup editor intercepts everything on-press
-          if (HS::q_edit) {
-            if (event.control == OC::CONTROL_BUTTON_UP)
-              HS::NudgeOctave(HS::qview, 1);
-            else if (event.control == OC::CONTROL_BUTTON_DOWN)
-              HS::NudgeOctave(HS::qview, -1);
-            else {
-              HS::q_edit = 0;
-              HS::popup_tick = 0;
-              select_mode = -1;
-            }
-
-            OC::ui.SetButtonIgnoreMask();
-            break;
-          }
-
-          if (HS::midi_edit) {
-            if (event.control == OC::CONTROL_BUTTON_A) {
-              mview = constrain(mview - 1, 0, MIDIMAP_MAX-1);
-              config_cursor = MIDIMAP1 + mview;
-            } else if (event.control == OC::CONTROL_BUTTON_B) {
-              mview = constrain(mview + 1, 0, MIDIMAP_MAX-1);
-              config_cursor = MIDIMAP1 + mview;
-            } else {
-              // TODO: auto-learn from Z button
-              HS::midi_edit = 0;
-              HS::popup_tick = 0;
-              select_mode = -1;
-            }
-            OC::ui.SetButtonIgnoreMask();
-            break;
-          }
-
-          if (event.control == OC::CONTROL_BUTTON_Z)
-          {
-              // Z-button - Zap the CLOCK!!
-              ToggleClockRun();
-              OC::ui.SetButtonIgnoreMask();
-          } else if (
-            event.control == OC::CONTROL_BUTTON_L ||
-            event.control == OC::CONTROL_BUTTON_R)
-          {
-              DelegateEncoderPush(event);
-              // ignore long-press to prevent Main Menu >:)
-              //OC::ui.SetButtonIgnoreMask();
-          } else if (
-            event.control == OC::CONTROL_BUTTON_A ||
-            event.control == OC::CONTROL_BUTTON_B ||
-            event.control == OC::CONTROL_BUTTON_X ||
-            event.control == OC::CONTROL_BUTTON_Y)
-          {
-              if (CheckButtonCombos(event)) {
-                select_mode = -1;
-                isEditing = false;
-                ClearEditInputMap();
-                OC::ui.SetButtonIgnoreMask(); // ignore release and long-press
-              } else {
-                HEM_SIDE slot = ButtonToSlot(event);
-                if (OC::CORE::ticks - click_tick < HEMISPHERE_DOUBLE_CLICK_TIME
-                    && (slot == first_click))
-                {
-                    // This is a double-click on one button.
-                    SetFullScreen(slot);
-                    click_tick = 0;
-                    OC::ui.SetButtonIgnoreMask(); // ignore button release
-                    return;
-                }
-
-                // -- Single click
-                // If a help screen is already selected, and the button is for
-                // the opposite one, go to the other help screen
-                if (view_state == APPLET_FULLSCREEN) {
-                    if (zoom_slot != slot) SetFullScreen(slot);
-                    else ExitFullScreen(); // Exit help screen if same button is clicked
-                    OC::ui.SetButtonIgnoreMask(); // ignore release
-                }
-
-                // mark this single click
-                click_tick = OC::CORE::ticks;
-                first_click = slot;
-              }
-          }
-
-          break;
-
-        case UI::EVENT_BUTTON_PRESS:
-          // A/B/X/Y switch to corresponding applet on release
-          if (event.control == OC::CONTROL_BUTTON_A ||
-              event.control == OC::CONTROL_BUTTON_B ||
-              event.control == OC::CONTROL_BUTTON_X ||
-              event.control == OC::CONTROL_BUTTON_Y)
-          {
-            HEM_SIDE slot = ButtonToSlot(event);
-            if (view_state == APPLET_FULLSCREEN && slot == zoom_slot)
-              view_state = APPLETS;
-
-            SwitchToSlot(slot);
-          }
-          // ignore all other button release events
-          break;
-
-        case UI::EVENT_BUTTON_LONG_PRESS:
-          if (event.control == OC::CONTROL_BUTTON_B) ToggleConfigMenu();
-          break;
-
-        default: break;
-        }
     }
 
 protected:
@@ -1739,8 +1589,6 @@ private:
     }
 };
 
-QuadAppletManager quad_manager;
-
 void QuadrantSysExHandler() {
   // TODO
 }
@@ -1750,53 +1598,72 @@ void QuadrantSysExHandler() {
 ////////////////////////////////////////////////////////////////////////////////
 
 // App stubs
-void QUADRANTS_init() {
-    quad_manager.BaseStart();
+void AppQuadrants::Init() {
+    BaseStart();
 }
 
-static constexpr size_t QUADRANTS_storageSize() {
-    return 0;
+size_t AppQuadrants::SaveAppData(util::StreamBufferWriter &stream_buffer) const {
+  return 0;
+}
+size_t AppQuadrants::RestoreAppData(util::StreamBufferReader &stream_buffer) {
+  return 0;
 }
 
-static size_t QUADRANTS_save(void *storage) {
-    size_t used = 0;
-    return used;
+void AppQuadrants::Process(OC::IOFrame *ioframe) {
+  BaseController(ioframe);
+}
+void AppQuadrants::GetIOConfig(OC::IOConfig &ioconfig) const
+{
+  using namespace OC;
+  ioconfig.digital_inputs[DIGITAL_INPUT_1].set("TR1");
+  ioconfig.digital_inputs[DIGITAL_INPUT_2].set("TR2");
+  ioconfig.digital_inputs[DIGITAL_INPUT_3].set("TR3");
+  ioconfig.digital_inputs[DIGITAL_INPUT_4].set("TR4");
+
+  ioconfig.cv[ADC_CHANNEL_1].set("CV1");
+  ioconfig.cv[ADC_CHANNEL_2].set("CV2");
+  ioconfig.cv[ADC_CHANNEL_3].set("CV3");
+  ioconfig.cv[ADC_CHANNEL_4].set("CV4");
+  ioconfig.cv[ADC_CHANNEL_5].set("CV5");
+  ioconfig.cv[ADC_CHANNEL_6].set("CV6");
+  ioconfig.cv[ADC_CHANNEL_7].set("CV7");
+  ioconfig.cv[ADC_CHANNEL_8].set("CV8");
+
+  ioconfig.outputs[DAC_CHANNEL_A].set("Out A", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[DAC_CHANNEL_B].set("Out B", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[DAC_CHANNEL_C].set("Out C", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[DAC_CHANNEL_D].set("Out D", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[DAC_CHANNEL_E].set("Out E", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[DAC_CHANNEL_F].set("Out F", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[DAC_CHANNEL_G].set("Out G", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[DAC_CHANNEL_H].set("Out H", OUTPUT_MODE_PITCH);
 }
 
-static size_t QUADRANTS_restore(const void *storage) {
-    size_t used = 0;
-    return used;
-}
-
-void FASTRUN QUADRANTS_process(OC::IOFrame *) {
-    quad_manager.BaseController();
-}
-
-void QUADRANTS_handleAppEvent(OC::AppEvent event) {
+void AppQuadrants::HandleAppEvent(OC::AppEvent event) {
     switch (event) {
     case OC::APP_EVENT_RESUME:
-        quad_manager.Resume();
+        Resume();
         break;
 
     case OC::APP_EVENT_SCREENSAVER_ON:
     case OC::APP_EVENT_SUSPEND:
-        quad_manager.Suspend();
+        Suspend();
         break;
 
     default: break;
     }
 }
 
-void QUADRANTS_loop() {
-  quad_manager.mainloop();
-  audio_app.mainloop();
-} // Essentially deprecated in favor of ISR
-
-void QUADRANTS_menu() {
-    quad_manager.View();
+void AppQuadrants::Loop() {
+    mainloop();
+    audio_app.mainloop();
 }
 
-void QUADRANTS_screensaver() {
+void AppQuadrants::DrawMenu() const {
+    View();
+}
+
+void AppQuadrants::DrawScreensaver() const {
     switch (HS::screensaver_mode) {
     case SCREEN_ZIPS:
     case SCREEN_STARS:
@@ -1806,8 +1673,8 @@ void QUADRANTS_screensaver() {
     case SCREEN_SCOPE: // output scope
         OC::scope_render();
         break;
-    case SCREEN_METERS: // Meters
-        quad_manager.BaseScreensaver(true); // show note names
+    case SCREEN_METERS:
+        BaseScreensaver(true); // show note names
         break;
     case SCREEN_BEATS:
         BeatCounterScreensaver();
@@ -1815,11 +1682,159 @@ void QUADRANTS_screensaver() {
     default: break; // blank screen
     }
 }
-
-void QUADRANTS_handleButtonEvent(const UI::Event &event) {
-    quad_manager.HandleButtonEvent(event);
+void AppQuadrants::DrawDebugInfo() const {
+  // TODO:
 }
 
-void QUADRANTS_handleEncoderEvent(const UI::Event &event) {
-    quad_manager.DelegateEncoderMovement(event);
+void AppQuadrants::HandleButtonEvent(const UI::Event &event) {
+    last_mask = mask;
+    mask = event.mask;
+    SERIAL_PRINTLN(
+      "mask=%d type=%d value=%d control=%d last_mask=%d",
+      event.mask,
+      event.type,
+      event.value,
+      event.control,
+      last_mask
+    );
+
+    if (AUDIO_SETUP == view_state) {
+      if (CheckButtonCombo(OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_B)) {
+        view_state = APPLETS;
+        return;
+      }
+      if ((event.control == OC::CONTROL_BUTTON_L
+           || event.control == OC::CONTROL_BUTTON_R)) {
+        audio_app.HandleEncoderButtonEvent(event);
+        return;
+      }
+      if (event.control == OC::CONTROL_BUTTON_X
+          || event.control == OC::CONTROL_BUTTON_Y
+          || event.control == OC::CONTROL_BUTTON_A
+          || event.control == OC::CONTROL_BUTTON_B) {
+        if (audio_app.HandleButtonEvent(event))
+          view_state = APPLETS;
+        return;
+      }
+    }
+
+    if (CheckButtonCombo(OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_Y) ||
+        CheckButtonCombo(OC::CONTROL_BUTTON_X | OC::CONTROL_BUTTON_B)) {
+      view_state = OVERVIEW;
+      return;
+    }
+
+    switch (event.type) {
+    case UI::EVENT_BUTTON_DOWN:
+
+      // Quantizer popup editor intercepts everything on-press
+      if (HS::q_edit) {
+        if (event.control == OC::CONTROL_BUTTON_UP)
+          HS::NudgeOctave(HS::qview, 1);
+        else if (event.control == OC::CONTROL_BUTTON_DOWN)
+          HS::NudgeOctave(HS::qview, -1);
+        else {
+          HS::q_edit = 0;
+          HS::popup_tick = 0;
+          select_mode = -1;
+        }
+
+        OC::ui.SetButtonIgnoreMask();
+        break;
+      }
+      if (HS::midi_edit) {
+        if (event.control == OC::CONTROL_BUTTON_A) {
+          mview = constrain(mview - 1, 0, MIDIMAP_MAX-1);
+          config_cursor = MIDIMAP1 + mview;
+        } else if (event.control == OC::CONTROL_BUTTON_B) {
+          mview = constrain(mview + 1, 0, MIDIMAP_MAX-1);
+          config_cursor = MIDIMAP1 + mview;
+        } else {
+          // TODO: auto-learn from Z button
+          HS::midi_edit = 0;
+          HS::popup_tick = 0;
+          select_mode = -1;
+        }
+        OC::ui.SetButtonIgnoreMask();
+        break;
+      }
+
+      if (event.control == OC::CONTROL_BUTTON_Z)
+      {
+          // Z-button - Zap the CLOCK!!
+          ToggleClockRun();
+          OC::ui.SetButtonIgnoreMask();
+      } else if (
+        event.control == OC::CONTROL_BUTTON_L ||
+        event.control == OC::CONTROL_BUTTON_R)
+      {
+          DelegateEncoderPush(event);
+          // ignore long-press to prevent Main Menu >:)
+          //OC::ui.SetButtonIgnoreMask();
+      } else if (
+        event.control == OC::CONTROL_BUTTON_A ||
+        event.control == OC::CONTROL_BUTTON_B ||
+        event.control == OC::CONTROL_BUTTON_X ||
+        event.control == OC::CONTROL_BUTTON_Y)
+      {
+          if (CheckButtonCombos(event)) {
+            select_mode = -1;
+            isEditing = false;
+            ClearEditInputMap();
+            OC::ui.SetButtonIgnoreMask(); // ignore release and long-press
+          } else {
+            HEM_SIDE slot = ButtonToSlot(event);
+            if (OC::CORE::ticks - click_tick < HEMISPHERE_DOUBLE_CLICK_TIME
+                && (slot == first_click))
+            {
+                // This is a double-click on one button.
+                SetFullScreen(slot);
+                click_tick = 0;
+                OC::ui.SetButtonIgnoreMask(); // ignore button release
+                return;
+            }
+
+            // -- Single click
+            // If a help screen is already selected, and the button is for
+            // the opposite one, go to the other help screen
+            if (view_state == APPLET_FULLSCREEN) {
+                if (zoom_slot != slot) SetFullScreen(slot);
+                else ExitFullScreen(); // Exit help screen if same button is clicked
+                OC::ui.SetButtonIgnoreMask(); // ignore release
+            }
+
+            // mark this single click
+            click_tick = OC::CORE::ticks;
+            first_click = slot;
+          }
+      }
+
+      break;
+
+    case UI::EVENT_BUTTON_PRESS:
+      // A/B/X/Y switch to corresponding applet on release
+      if (event.control == OC::CONTROL_BUTTON_A ||
+          event.control == OC::CONTROL_BUTTON_B ||
+          event.control == OC::CONTROL_BUTTON_X ||
+          event.control == OC::CONTROL_BUTTON_Y)
+      {
+        HEM_SIDE slot = ButtonToSlot(event);
+        if (view_state == APPLET_FULLSCREEN && slot == zoom_slot)
+          view_state = APPLETS;
+
+        SwitchToSlot(slot);
+      }
+      // ignore all other button release events
+      break;
+
+    case UI::EVENT_BUTTON_LONG_PRESS:
+      if (event.control == OC::CONTROL_BUTTON_B) ToggleConfigMenu();
+      break;
+
+    default: break;
+    }
+}
+
+void AppQuadrants::HandleEncoderEvent(const UI::Event &event) {
+    DelegateEncoderMovement(event);
 }
