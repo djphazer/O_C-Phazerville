@@ -208,6 +208,9 @@ enum GlobalSettingsDataKeys : uint16_t {
 // on the fugly .ino compilation method, don't @ me).
 static AppContainer<void // this space intentionally left blank
 #ifndef NO_HEMISPHERE
+  #ifdef ARDUINO_TEENSY41
+  , AppQuadrants
+  #endif
   , AppHemisphere
 #endif
 #ifdef ENABLE_APP_CALIBR8OR
