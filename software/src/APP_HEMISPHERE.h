@@ -277,7 +277,11 @@ OC_APP_TRAITS(AppHemisphere, TWOCCS("HS"), "Hemisphere", "Applets");
 class OC_APP_CLASS(AppHemisphere), public HSApplication {
 public:
   OC_APP_INTERFACE_DECLARE(AppHemisphere);
+#ifdef __IMXRT1062__
+  OC_APP_STORAGE_SIZE(0);
+#else
   OC_APP_STORAGE_SIZE( HemispherePreset::storageSize() * HEM_NR_OF_PRESETS + 1 );
+#endif
 
     void Start() {
         //select_mode = -1; // Not selecting

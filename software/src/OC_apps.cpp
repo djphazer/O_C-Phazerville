@@ -55,8 +55,12 @@ namespace menu = OC::menu;
 #include "APP_CALIBR8OR.h"
 #include "APP_SCENES.h"
 #include "APP_ASR.h"
+#ifdef ENABLE_APP_H1200
 #include "APP_H1200.h"
+#endif
+#ifdef ENABLE_APP_AUTOMATONNETZ
 #include "APP_AUTOMATONNETZ.h"
+#endif
 #include "APP_SEQ.h"
 #include "APP_QQ.h"
 #include "APP_DQ.h"
@@ -176,7 +180,9 @@ namespace OC {
 /*extern*/ GlobalSettings global_settings;
 /*extern*/ AppSwitcher app_switcher;
 static AppData app_data;
+#ifndef __IMXRT1062__
 static GlobalSettingsStorage global_settings_storage;
+#endif
 static AppDataStorage app_data_storage;
 
 #ifdef __IMXRT1062__
@@ -267,8 +273,6 @@ static void SaveGlobalSettings() {
   uint64_t data = 0;
   Pack(data, PackLocation{0, 16}, global_settings.current_app_id);
   Pack(data, PackLocation{16, 1}, global_settings.encoders_enable_acceleration);
-  // 15 bits empty...
-  Pack(data, PackLocation{32, 32}, global_settings.DAC_scaling);
   PhzConfig::setValue(METADATA_KEY, data);
 
   // User Scales
@@ -330,6 +334,7 @@ static void SaveGlobalSettings() {
   }
 
   // Auto Calibration Data
+  /*
   for (size_t i = 0; i < DAC_CHANNEL_LAST; ++i) {
     data = 0;
     PhzConfig::setValue(AUTOCAL_KEY | (0xff - i), auto_calibration_data[i].use_auto_calibration_);
@@ -342,6 +347,7 @@ static void SaveGlobalSettings() {
       }
     }
   }
+  */
 
   PhzConfig::save_config(); // save to default config file
 #else // --- Teensy 3.2
@@ -543,8 +549,6 @@ void AppSwitcher::Init(bool reset_settings) {
     if (PhzConfig::getValue(METADATA_KEY, data)) {
       global_settings.current_app_id = Unpack(data, PackLocation{0, 16});
       global_settings.encoders_enable_acceleration = Unpack(data, PackLocation{16, 1});
-      // 15 bits empty...
-      global_settings.DAC_scaling = Unpack(data, PackLocation{32, 32});
 
       // User Scales
       for (size_t i = 0; i < Scales::SCALE_USER_COUNT; ++i) {
@@ -612,6 +616,7 @@ void AppSwitcher::Init(bool reset_settings) {
       }
 
       // -- Auto Calibration Data
+      /*
       for (size_t i = 0; i < DAC_CHANNEL_LAST; ++i) {
         data = 0;
         if (!PhzConfig::getValue(AUTOCAL_KEY | (0xff - i), data))
@@ -626,6 +631,7 @@ void AppSwitcher::Init(bool reset_settings) {
           auto_calibration_data[i].auto_calibrated_octaves[oct] = Unpack(data, PackLocation{(oct & 0x3) * 16, 16});
         }
       }
+      */
     }
 
 #else // Teensy 3.2

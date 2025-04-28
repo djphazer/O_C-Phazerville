@@ -30,7 +30,7 @@ namespace OC {
 void GlobalSettings::Init()
 {
   Scales::Init();
-  Patterns::Init();
+  //Patterns::Init();
   Chords::Init();
 
   autotune_calibration_data.Reset();

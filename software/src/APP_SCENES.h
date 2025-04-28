@@ -702,11 +702,11 @@ void AppScenery::HandleButtonEvent(const UI::Event &event) {
     switch (event.type) {
     case UI::EVENT_BUTTON_DOWN:
         if (event.control == OC::CONTROL_BUTTON_Z)
-          ScenesApp_instance.ZapButton();
+          ZapButton();
         if (event.control == OC::CONTROL_BUTTON_X)
-          ScenesApp_instance.PreviousScene();
+          PreviousScene();
         if (event.control == OC::CONTROL_BUTTON_Y)
-          ScenesApp_instance.NextScene();
+          NextScene();
         break;
     case UI::EVENT_BUTTON_PRESS: {
         switch (event.control) {
