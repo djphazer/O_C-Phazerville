@@ -273,17 +273,11 @@ public:
   OC_APP_INTERFACE_DECLARE(AppCalibr8or);
   OC_APP_STORAGE_SIZE( Calibr8orPreset::storageSize() * NR_OF_PRESETS );
 
-  Calibr8or() {
-      for (int i = 0; i < DAC_CHANNEL_LAST; ++i) {
-          channel[i].chan_ = DAC_CHANNEL(i);
-      }
-  }
-
   // TODO: refactor Autotuner, again...
   //OC::Autotuner<Cal8ChannelConfig> autotuner;
 
-	void Start() {
-    for (int i = DAC_CHANNEL_A; i < DAC_CHANNEL_LAST; ++i) {
+  void Start() {
+    for (int i = 0; i < DAC_CHANNEL_LAST; ++i) {
       channel[i].chan_ = DAC_CHANNEL(i);
     }
 
@@ -295,8 +289,8 @@ public:
     ClearPreset();
 
     //autotuner.Init();
-	}
-	
+  }
+
     void ClearPreset() {
         for (int ch = 0; ch < QUANT_CHANNEL_COUNT; ++ch) {
             q_engine[ch].quantizer.Init();
