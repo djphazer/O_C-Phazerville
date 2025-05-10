@@ -492,6 +492,7 @@ struct MIDIFrame {
 struct IOFrame {
     // settings
     bool autoMIDIOut = false;
+    bool synctrig = false;
     uint8_t clockskip[DAC_CHANNEL_COUNT] = {0};
     int8_t output_slew[DAC_CHANNEL_COUNT] = {0};
     int8_t output_atten[DAC_CHANNEL_COUNT]; // -126 (-200%) to 126 (+200%), 63 is 100%
