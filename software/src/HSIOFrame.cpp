@@ -343,13 +343,18 @@ void HS::MIDIFrame::Send(const int *outvals) {
 void HS::IOFrame::Load(OC::IOFrame *ioframe) {
     auto triggers = ioframe->digital_inputs.triggered();
 
+    // TODO: configurable clock sync input
+    synctrig = triggers & DIGITAL_INPUT_MASK(0);
+
+    // hardcoded to the enum...
+    gate_high[0] = ioframe->digital_inputs.raised(OC::DIGITAL_INPUT_1);
+    gate_high[1] = ioframe->digital_inputs.raised(OC::DIGITAL_INPUT_2);
+    gate_high[2] = ioframe->digital_inputs.raised(OC::DIGITAL_INPUT_3);
+    gate_high[3] = ioframe->digital_inputs.raised(OC::DIGITAL_INPUT_4);
+
     for (int i = 0; i < ADC_CHANNEL_COUNT; ++i) {
         // Set CV inputs
         inputs[i] = ioframe->cv.pitch_values[i];
-
-        if (i < OC::DIGITAL_INPUT_LAST) {
-          gate_high[i] = ioframe->digital_inputs.raised(static_cast<OC::DigitalInput>(i));
-        }
 
         // calculate gates/clocks for all ADC inputs as well
         gate_high[OC::DIGITAL_INPUT_LAST + i] = inputs[i] > GATE_THRESHOLD;
@@ -375,7 +380,6 @@ void HS::IOFrame::Load(OC::IOFrame *ioframe) {
     }
 
     // pre-calculate clock triggers
-    static constexpr int offset = OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_COUNT;
     for (int ch = 0; ch < APPLET_SLOTS * 2; ++ch) {
       bool result = 0;
       const size_t virt_chan = (ch) % (APPLET_SLOTS * 2);

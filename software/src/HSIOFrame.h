@@ -492,6 +492,7 @@ struct MIDIFrame {
 struct IOFrame {
     // settings
     bool autoMIDIOut = false;
+    bool synctrig = false;
     uint8_t clockskip[DAC_CHANNEL_COUNT] = {0};
 
     // pre-calculated clocks, subject to trigger mapping
