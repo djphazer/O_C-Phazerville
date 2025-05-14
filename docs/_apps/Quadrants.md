@@ -43,11 +43,25 @@ The inputs, however, can be completely reassigned, allowing triggers to be deriv
 
 ### Audio DSP
 
-Using the dedicated onboard audio codec hardware, the new Audio subsystem provides customizable sound generation and effects processing chains in-the-box!
+![Audio Applet Overview](images/AudioAppletOverview.png)
 
-![Audio Applets Overview](images/AudioAppletOverview.png)
+Using the dedicated onboard audio codec hardware, the new Audio subsystem provides customizable sound generation and effects processing chains in-the-box!
+Audio DSP is applet-based, like CV applets, but with a few differences.
+The AudioDSP is divided into two channels of 5 slots each.
+The left channel goes to the left output, the right channel goes to the right output.
+Audio in each channel is processed from top to bottom, with each applet receiving the output of the previous one.
+Applet slots can either be dual mono, where you have two independent applets, or stereo, where you have a single applet that processes both channels.
+The first slot is a dedicated for sound sources, though you can also inject sound sources later on in the chain as well.
+The animated bars above and below the slots indicate audio level before and after that slot.
 
 Check the sidebar navigation for details about each Audio Applet.
+
+#### Controls
+
+* Rotate the **Left Encoder** to select an applet in the left channel or the **Right Encoder** to select an applet in the right channel.
+* Press the **Encoder** to highlight the selected applet in that channel. Once highlighted, rotate the encoder to change which applet is present in that slot. Press the encoder again to edit the applet's parameters.
+* Press **A/B** to close an applet's editor if open, or return to CV applet view if no applet's editor is open.
+* To switch a slot between dual mono and stereo, select that slot with both encoderes and press them simultaneously.
 
 ### Preset Storage
 
