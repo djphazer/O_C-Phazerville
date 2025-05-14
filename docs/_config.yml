@@ -21,7 +21,7 @@ aux_links:
   "Downloads":
     - "https://github.com/djphazer/O_C-Phazerville/releases"
   "Screen Capture":
-    - "https://github.com/PaulStoffregen/Phazerville-Screen-Capture"
+    - "https://github.com/PaulStoffregen/Phazerville-Screen-Capture/releases"
 nav_external_links:
   - title: Custom Firmware Builds
     url: https://github.com/djphazer/O_C-Phazerville/discussions/38
