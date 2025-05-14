@@ -6,7 +6,7 @@ layout: default
 ![Crosspan screenshot](images/Crosspan.png)
 
 A simple crosspanner.
-Crossfades the left output from the left input to the right input while crossfade the right output from the right input to the left input.
+Crossfades left input to right input for the left output and right input to left input for the right output.
 This results in the left input panning from left to right while the right input pans from right to left.
 
 ### Parameters

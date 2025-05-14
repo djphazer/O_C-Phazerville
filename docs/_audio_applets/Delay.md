@@ -6,8 +6,8 @@ layout: default
 ![Delay screenshot](images/Delay.png)
 
 A very flexible delay effect with up to 8 taps and almost 12 seconds of delay time.
-Delay time can be set directly in milliseconds, by a clock, or in Hz for karplus-string/comb filtering like usage.
-Time modulation can configured to either result in pitch shifts or no pitch shifts.
+Delay time can be set directly in milliseconds, by a clock, or in Hz for karplus-strong/comb filtering like usage.
+Time modulation can be configured to either result in pitch shifts or no pitch shifts.
 It can be used as a mono or stereo applet.
 In stereo mode, supports either normal feedback or ping-pong feedback.
 

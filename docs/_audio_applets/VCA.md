@@ -5,7 +5,7 @@ layout: default
 
 ![VCA screenshot](images/VCA.png)
 
-A flexible VCA with with level, offset, variable response, optional rectification, and inversion.
+A flexible VCA with level, offset, variable response, optional rectification, and inversion.
 In stereo, the VCA is applied to both channels.
 
 ### Parameters

@@ -61,7 +61,7 @@ Check the sidebar navigation for details about each Audio Applet.
 * Rotate the **Left Encoder** to select an applet in the left channel or the **Right Encoder** to select an applet in the right channel.
 * Press the **Encoder** to highlight the selected applet in that channel. Once highlighted, rotate the encoder to change which applet is present in that slot. Press the encoder again to edit the applet's parameters.
 * Press **A/B** to close an applet's editor if open, or return to CV applet view if no applet's editor is open.
-* To switch a slot between dual mono and stereo, select that slot with both encoderes and press them simultaneously.
+* To switch a slot between dual mono and stereo, select that slot with both encoders and press them simultaneously.
 
 ### Preset Storage
 
