@@ -45,7 +45,9 @@ The inputs, however, can be completely reassigned, allowing triggers to be deriv
 
 Using the dedicated onboard audio codec hardware, the new Audio subsystem provides customizable sound generation and effects processing chains in-the-box!
 
-(TODO: screenshots of all Audio Applets)
+![Audio Applets Overview](images/AudioAppletOverview.png)
+
+Check the sidebar navigation for details about each Audio Applet.
 
 ### Preset Storage
 

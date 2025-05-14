@@ -34,6 +34,9 @@ collections:
   applets:
     permalink: "/:title"
     output: true
+  audio_applets:
+    permalink: "/:title"
+    output: true
 
 just_the_docs:
   collections:
@@ -42,6 +45,9 @@ just_the_docs:
       nav_fold: true
     applets:
       name: Applets
+      nav_fold: true
+    audio_applets:
+      name: Audio Applets
       nav_fold: true
 
 footer_content: "This documentation is part of the <a href=\"https://github.com/djphazer/O_C-Phazerville\">Phazerville Suite O_C firmware project</a> (sometimes misspelled as Phaserville). A Google Analytics tag is being used to collect basic, anonymous traffic statistics data."
