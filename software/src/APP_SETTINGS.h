@@ -456,7 +456,7 @@ public:
         // dual-press UP+DOWN / A+B to flip screen
         if ( event.type == UI::EVENT_BUTTON_DOWN &&
             (event.mask == (OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_B)) ) {
-          OC::calibration_data.toggle_flipmode();
+          OC::calibration_data.cycle_flipmode();
           display::SetFlipMode(OC::calibration_data.flipscreen());
           cal_save_q = true;
         }
