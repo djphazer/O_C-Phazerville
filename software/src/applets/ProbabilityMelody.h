@@ -1,5 +1,5 @@
 // Copyright (c) 2022, Benjamin Rosenbach
-// Modified (M) 2025, Beau Sterling
+// Modified (M) 2025, Beau Sterling, Nicholas Michalek, Bryan Head
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -30,7 +30,7 @@
 namespace probmelod {
 enum CV_SOURCE : uint8_t {
     // yes these assignments are unnecessary: just making the bitmasking explicit
-    NONE = 0b00, 
+    NONE = 0b00,
     CV1 = 0b01,
     CV2 = 0b10,
     BOTH = 0b11
