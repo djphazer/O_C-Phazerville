@@ -16,7 +16,7 @@ There are a few ways of getting the firmware onto your module:
 * [Method B](#method-b): install the Arduino IDE and the Teensyduino add-on and compile the code yourself.
 * [Method C](#method-c): install PlatformIO and compile the code yourself.
 * Either way, you’ll need: a micro-usb cable (make sure this isn’t for charging only, but data transfer).
-* NB: the following steps assume that you have cut the usb trace. see here.
+* NB: the following steps assume that you have cut the usb trace. see [here](https://ornament-and-cri.me/build-it/#cut_trace) for an example of the Teensy 3.2.
 
 ## Method A
 uploading the HEX file
