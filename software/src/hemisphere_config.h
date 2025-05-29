@@ -25,6 +25,7 @@
 #include "applets/BugCrack.h"
 #include "applets/Burst.h"
 #include "applets/Button.h"
+#include "applets/BitBeat.h"
 #include "applets/Cumulus.h"
 #include "applets/CVRecV2.h"
 #include "applets/Calculate.h"
@@ -146,6 +147,7 @@ AppletRegistry reg{
     DeclareApplet<BugCrack>{51, 0x80},
     DeclareApplet<Burst>{31, 0x04},
     DeclareApplet<Button>{65, 0x10},
+    DeclareApplet<BitBeat>{79, 0x01},
     DeclareApplet<Calculate>{12, 0x10},
     DeclareApplet<Calibr8>{88, 0x10},
     DeclareApplet<Carpeggio>{32, 0x0a},
