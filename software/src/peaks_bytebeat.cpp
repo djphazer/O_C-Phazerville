@@ -51,8 +51,8 @@ void ByteBeat::Init() {
   loop_end_ = 255 << 24 ;
   phase_ = 0 ;
   t_ = 0 ;
-  p0_ = 126;
-  p1_ = 126;
+  p0_ = 127;
+  p1_ = 127;
   p2_ = 127;
   stepmode_ = false ;
   last_sample_ = 13 ;
