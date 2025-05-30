@@ -348,12 +348,12 @@ private:
             gfxIcon(1, y, icons[i]);
             
             if (i == 3) {
-                gfxPrint(13, y, stepmode ? "Yes" : "No");
+                gfxPrint(14, y, stepmode ? "Yes" : "No");
             } else {
-                gfxPrint(13, y, values[i]);
+                gfxPrint(14, y, values[i]);
             }
             
-            if (cursor == i) gfxCursor(13, y + 8, 19);
+            if (cursor == i) gfxCursor(14, y + 8, 19);
             
             // Show CV assignment indicators
             for (int cv_idx = 0; cv_idx < 2; cv_idx++) {
@@ -378,10 +378,10 @@ private:
                 gfxIcon(34, y, PARAM_MAP_ICONS + 8 * (i + 1));
                 
                 // Display parameter value
-                gfxPrint(43, y, param_values[i]);
+                gfxPrint(44, y, param_values[i]);
                 
                 // Draw cursor if this parameter is selected
-                if (cursor == param_idx) gfxCursor(43, y + 8, 19);
+                if (cursor == param_idx) gfxCursor(46, y + 8, 19);
                 
                 // Show CV assignment indicators
                 for (int cv_idx = 0; cv_idx < 2; cv_idx++) {
@@ -392,10 +392,10 @@ private:
             } else {
                 // Draw loop mode
                 gfxIcon(34, y, LOOP_ICON);
-                gfxPrint(43, y, loopmode ? "Yes" : "No");
+                gfxPrint(45, y, loopmode ? "Yes" : "No");
                 
                 // Draw cursor if loop mode is selected
-                if (cursor == LOOPMODE) gfxCursor(43, y + 8, 19);
+                if (cursor == LOOPMODE) gfxCursor(46, y + 8, 19);
                 
                 // Show CV assignment indicators
                 for (int cv_idx = 0; cv_idx < 2; cv_idx++) {
@@ -438,9 +438,6 @@ private:
                 // Regular start marker when blinking off
                 gfxLine(start_x, BAR_Y - 1, start_x, BAR_Y + BAR_HEIGHT);
             }
-            
-            // Draw cursor for loop start value
-            gfxCursor(12, BAR_Y - 2, 19);
         } else if (cursor == LOOPEND) {
             // Regular start marker
             gfxLine(start_x, BAR_Y - 1, start_x, BAR_Y + BAR_HEIGHT);
@@ -452,20 +449,20 @@ private:
                 // Regular end marker when blinking off
                 gfxLine(end_x, BAR_Y - 1, end_x, BAR_Y + BAR_HEIGHT);
             }
-            
-            // Draw cursor for loop end value
-            gfxCursor(43, BAR_Y - 2, 19);
         } else {
             // Regular markers for both
             gfxLine(start_x, BAR_Y - 1, start_x, BAR_Y + BAR_HEIGHT);
             gfxLine(end_x, BAR_Y - 1, end_x, BAR_Y + BAR_HEIGHT);
         }
         
-        // Always print loop start/end values
+        // Print loop start/end values and draw cursors
         gfxIcon(1, BAR_Y - 10, LEFT_ICON);
-        gfxPrint(12, BAR_Y - 10, loopstart);
+        gfxPrint(13, BAR_Y - 10, loopstart);
+        if (cursor == LOOPSTART) gfxCursor(13, BAR_Y - 10 + 8, 19);
+        
         gfxIcon(34, BAR_Y - 10, RIGHT_ICON);
-        gfxPrint(43, BAR_Y - 10, loopend);
+        gfxPrint(44, BAR_Y - 10, loopend);
+        if (cursor == LOOPEND) gfxCursor(44, BAR_Y - 10 + 8, 19);
         
         // CV assignment indicators for loop start/end
         for (int cv_idx = 0; cv_idx < 2; cv_idx++) {
