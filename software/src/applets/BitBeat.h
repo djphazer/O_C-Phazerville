@@ -39,7 +39,10 @@ public:
     };
 
     const char* applet_name() {
-        return "BitBeat";
+        static char name[8];
+        char suffix = (hemisphere & 1) ? ('C' + current_page) : ('A' + current_page);
+        sprintf(name, "BitBeat %c", suffix);
+        return name;
     }
 
     void Start() {
@@ -73,10 +76,10 @@ public:
         
         // Initialize CV assignments (all false)
         for (int i = 0; i <= CURSOR_LAST; i++) {
-            cv1_assignments[0][i] = false;
-            cv2_assignments[0][i] = false;
-            cv1_assignments[1][i] = false;
-            cv2_assignments[1][i] = false;
+            cv_assignments[0][i][0] = false;
+            cv_assignments[0][i][1] = false;
+            cv_assignments[1][i][0] = false;
+            cv_assignments[1][i][1] = false;
         }
         
         bytebeat[0].Init();
@@ -112,22 +115,22 @@ public:
         if (cursor > CURSOR_LAST) return;
         
         // Check current assignments for this parameter
-        bool is_cv1 = cv1_assignments[current_page][cursor];
-        bool is_cv2 = cv2_assignments[current_page][cursor];
+        bool is_cv1 = cv_assignments[current_page][cursor][0];
+        bool is_cv2 = cv_assignments[current_page][cursor][1];
         
         // Cycle through assignment states: None -> CV1 -> CV2 -> None
         if (!is_cv1 && !is_cv2) {
             // None -> CV1
-            cv1_assignments[current_page][cursor] = true;
-            cv2_assignments[current_page][cursor] = false;
+            cv_assignments[current_page][cursor][0] = true;
+            cv_assignments[current_page][cursor][1] = false;
         } else if (is_cv1 && !is_cv2) {
             // CV1 -> CV2
-            cv1_assignments[current_page][cursor] = false;
-            cv2_assignments[current_page][cursor] = true;
+            cv_assignments[current_page][cursor][0] = false;
+            cv_assignments[current_page][cursor][1] = true;
         } else {
             // CV2 (or Both) -> None
-            cv1_assignments[current_page][cursor] = false;
-            cv2_assignments[current_page][cursor] = false;
+            cv_assignments[current_page][cursor][0] = false;
+            cv_assignments[current_page][cursor][1] = false;
         }
         
         SetHelp();
@@ -158,6 +161,7 @@ public:
             } else {
                 cursor = new_cursor;
             }
+            ResetCursor();
             return;
         }
 
@@ -212,7 +216,7 @@ protected:
       int cv1_count = 0;
       int cv1_single_param = -1;
       for (int i = 0; i <= CURSOR_LAST; i++) {
-          if (cv1_assignments[0][i] || cv1_assignments[1][i]) {
+          if (cv_assignments[0][i][0] || cv_assignments[1][i][0]) {
               cv1_count++;
               if (cv1_count == 1) cv1_single_param = i;
           }
@@ -230,7 +234,7 @@ protected:
       int cv2_count = 0;
       int cv2_single_param = -1;
       for (int i = 0; i <= CURSOR_LAST; i++) {
-          if (cv2_assignments[0][i] || cv2_assignments[1][i]) {
+          if (cv_assignments[0][i][1] || cv_assignments[1][i][1]) {
               cv2_count++;
               if (cv2_count == 1) cv2_single_param = i;
           }
@@ -269,8 +273,7 @@ private:
     bool prev_gate;
     uint8_t frame_counter;
 
-    bool cv1_assignments[2][CURSOR_LAST + 1];
-    bool cv2_assignments[2][CURSOR_LAST + 1];
+    bool cv_assignments[2][CURSOR_LAST + 1][2]; // [page][param][cv]
 
     void ProcessAlgorithm(int alg_idx, uint8_t gate_state) {
         // Apply CV modulation to algorithm parameters
@@ -284,54 +287,54 @@ private:
         uint8_t mod_loopend = loopend[alg_idx];
         
         // Apply CV1 modulation
-        if (cv1_assignments[alg_idx][EQUATION]) {
+        if (cv_assignments[alg_idx][EQUATION][0]) {
             mod_equation = constrain(equation[alg_idx] + Proportion(In(0), HEMISPHERE_MAX_INPUT_CV, 15), 0, 15);
         }
-        if (cv1_assignments[alg_idx][SPEED]) {
+        if (cv_assignments[alg_idx][SPEED][0]) {
             mod_speed = constrain(speed[alg_idx] + Proportion(In(0), HEMISPHERE_MAX_INPUT_CV, 255), 0, 255);
         }
-        if (cv1_assignments[alg_idx][PITCH]) {
+        if (cv_assignments[alg_idx][PITCH][0]) {
             mod_pitch = constrain(pitch[alg_idx] + Proportion(In(0), HEMISPHERE_MAX_INPUT_CV, 255), 1, 255);
         }
-        if (cv1_assignments[alg_idx][PARAM0]) {
+        if (cv_assignments[alg_idx][PARAM0][0]) {
             mod_p0 = constrain(p0[alg_idx] + Proportion(In(0), HEMISPHERE_MAX_INPUT_CV, 255), 0, 255);
         }
-        if (cv1_assignments[alg_idx][PARAM1]) {
+        if (cv_assignments[alg_idx][PARAM1][0]) {
             mod_p1 = constrain(p1[alg_idx] + Proportion(In(0), HEMISPHERE_MAX_INPUT_CV, 255), 0, 255);
         }
-        if (cv1_assignments[alg_idx][PARAM2]) {
+        if (cv_assignments[alg_idx][PARAM2][0]) {
             mod_p2 = constrain(p2[alg_idx] + Proportion(In(0), HEMISPHERE_MAX_INPUT_CV, 255), 0, 255);
         }
-        if (cv1_assignments[alg_idx][LOOPSTART]) {
+        if (cv_assignments[alg_idx][LOOPSTART][0]) {
             mod_loopstart = constrain(loopstart[alg_idx] + Proportion(In(0), HEMISPHERE_MAX_INPUT_CV, 255), 0, 255);
         }
-        if (cv1_assignments[alg_idx][LOOPEND]) {
+        if (cv_assignments[alg_idx][LOOPEND][0]) {
             mod_loopend = constrain(loopend[alg_idx] + Proportion(In(0), HEMISPHERE_MAX_INPUT_CV, 255), 0, 255);
         }
         
         // Apply CV2 modulation
-        if (cv2_assignments[alg_idx][EQUATION]) {
+        if (cv_assignments[alg_idx][EQUATION][1]) {
             mod_equation = constrain(mod_equation + Proportion(In(1), HEMISPHERE_MAX_INPUT_CV, 15), 0, 15);
         }
-        if (cv2_assignments[alg_idx][SPEED]) {
+        if (cv_assignments[alg_idx][SPEED][1]) {
             mod_speed = constrain(mod_speed + Proportion(In(1), HEMISPHERE_MAX_INPUT_CV, 255), 0, 255);
         }
-        if (cv2_assignments[alg_idx][PITCH]) {
+        if (cv_assignments[alg_idx][PITCH][1]) {
             mod_pitch = constrain(mod_pitch + Proportion(In(1), HEMISPHERE_MAX_INPUT_CV, 255), 1, 255);
         }
-        if (cv2_assignments[alg_idx][PARAM0]) {
+        if (cv_assignments[alg_idx][PARAM0][1]) {
             mod_p0 = constrain(mod_p0 + Proportion(In(1), HEMISPHERE_MAX_INPUT_CV, 255), 0, 255);
         }
-        if (cv2_assignments[alg_idx][PARAM1]) {
+        if (cv_assignments[alg_idx][PARAM1][1]) {
             mod_p1 = constrain(mod_p1 + Proportion(In(1), HEMISPHERE_MAX_INPUT_CV, 255), 0, 255);
         }
-        if (cv2_assignments[alg_idx][PARAM2]) {
+        if (cv_assignments[alg_idx][PARAM2][1]) {
             mod_p2 = constrain(mod_p2 + Proportion(In(1), HEMISPHERE_MAX_INPUT_CV, 255), 0, 255);
         }
-        if (cv2_assignments[alg_idx][LOOPSTART]) {
+        if (cv_assignments[alg_idx][LOOPSTART][1]) {
             mod_loopstart = constrain(mod_loopstart + Proportion(In(1), HEMISPHERE_MAX_INPUT_CV, 255), 0, 255);
         }
-        if (cv2_assignments[alg_idx][LOOPEND]) {
+        if (cv_assignments[alg_idx][LOOPEND][1]) {
             mod_loopend = constrain(mod_loopend + Proportion(In(1), HEMISPHERE_MAX_INPUT_CV, 255), 0, 255);
         }
         
@@ -422,9 +425,6 @@ private:
     void DrawInterface() {
         frame_counter++;
         
-        // Draw page indicator
-        gfxPrint(48, 2, current_page == 0 ? "A" : "B");
-        
         // Icons for each parameter
         const uint8_t* icons[] = {
             PhzIcons::trending,     // Equation (cursor = 0)
@@ -455,10 +455,10 @@ private:
             if (cursor == i) gfxCursor(14, y + 8, 19);
             
             // Show CV assignment indicators
-            if (cv1_assignments[current_page][i]) {
+            if (cv_assignments[current_page][i][0]) {
                 gfxBitmap(10, y, 3, SUP_ONE);
             }
-            if (cv2_assignments[current_page][i]) {
+            if (cv_assignments[current_page][i][1]) {
                 gfxBitmap(10, y, 3, SUB_TWO);
             }
         }
@@ -481,13 +481,13 @@ private:
                 gfxPrint(44, y, param_values[i]);
                 
                 // Draw cursor if this parameter is selected
-                if (cursor == param_idx) gfxCursor(46, y + 8, 19);
+                if (cursor == param_idx) gfxCursor(46, y + 8, 18);
                 
                 // Show CV assignment indicators
-                if (cv1_assignments[current_page][param_idx]) {
+                if (cv_assignments[current_page][param_idx][0]) {
                     gfxBitmap(43, y, 3, SUP_ONE);
                 }
-                if (cv2_assignments[current_page][param_idx]) {
+                if (cv_assignments[current_page][param_idx][1]) {
                     gfxBitmap(43, y, 3, SUB_TWO);
                 }
             } else {
@@ -496,13 +496,13 @@ private:
                 gfxPrint(45, y, loopmode[current_page] ? "Yes" : "No");
                 
                 // Draw cursor if loop mode is selected
-                if (cursor == LOOPMODE) gfxCursor(46, y + 8, 19);
+                if (cursor == LOOPMODE) gfxCursor(46, y + 8, 18);
                 
                 // Show CV assignment indicators
-                if (cv1_assignments[current_page][LOOPMODE]) {
+                if (cv_assignments[current_page][LOOPMODE][0]) {
                     gfxBitmap(43, y, 3, SUP_ONE);
                 }
-                if (cv2_assignments[current_page][LOOPMODE]) {
+                if (cv_assignments[current_page][LOOPMODE][1]) {
                     gfxBitmap(43, y, 3, SUB_TWO);
                 }
             }
@@ -512,7 +512,7 @@ private:
         const int BAR_Y = 57;
         const int BAR_HEIGHT = 4;
         const int BAR_X = 1;
-        const int BAR_WIDTH = 62;
+        const int BAR_WIDTH = 61;
         
         // Draw background bar
         gfxFrame(BAR_X, BAR_Y, BAR_WIDTH, BAR_HEIGHT);
@@ -567,16 +567,16 @@ private:
         if (cursor == LOOPEND) gfxCursor(45, BAR_Y - 10 + 8, 19);
         
         // CV assignment indicators for loop start/end
-        if (cv1_assignments[current_page][LOOPSTART]) {
+        if (cv_assignments[current_page][LOOPSTART][0]) {
             gfxBitmap(10, BAR_Y - 10, 3, SUP_ONE);
         }
-        if (cv2_assignments[current_page][LOOPSTART]) {
+        if (cv_assignments[current_page][LOOPSTART][1]) {
             gfxBitmap(10, BAR_Y - 10, 3, SUB_TWO);
         }
-        if (cv1_assignments[current_page][LOOPEND]) {
+        if (cv_assignments[current_page][LOOPEND][0]) {
             gfxBitmap(42, BAR_Y - 10, 3, SUP_ONE);
         }
-        if (cv2_assignments[current_page][LOOPEND]) {
+        if (cv_assignments[current_page][LOOPEND][1]) {
             gfxBitmap(42, BAR_Y - 10, 3, SUB_TWO);
         }
     }   
