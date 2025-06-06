@@ -27,13 +27,15 @@
 #define print   USBHost::print_
 #define println USBHost::println_
 
-//#define DEBUG_JOYSTICK
+#define DEBUG_JOYSTICK
 #ifdef  DEBUG_JOYSTICK
 #define DBGPrintf USBHDBGSerial.printf
 #else
 #define DBGPrintf(...)
 #endif
 
+// this mod goes on line 1029 of USBHost_t36.h
+//    typedef enum { UNKNOWN = 0, PS3, PS4, XBOXONE, XBOX360, PS3_MOTION, SpaceNav, SWITCH, XBOX360_TEST} joytype_t;
 
 template<class T>
 const T& clamp(const T& x, const T& lower, const T& upper) {
@@ -55,6 +57,7 @@ bool JoystickController::queue_Data_Transfer_Debug(Pipe_t *pipe, void *buffer,
 }
 
 
+
 // PID/VID to joystick mapping - Only the XBOXOne is used to claim the USB interface directly,
 // The others are used after claim-hid code to know which one we have and to use it for
 // doing other features.
@@ -63,7 +66,7 @@ JoystickController::product_vendor_mapping_t JoystickController::pid_vid_mapping
     { 0x045e, 0x02ea, XBOXONE, false },  // Xbox One S Controller
     { 0x045e, 0x0b12, XBOXONE, false },  // Xbox Core Controller (Series S/X)
     { 0x045e, 0x0719, XBOX360, false},
-    { 0x045e, 0x028E, SWITCH, false},  // Switch?
+    { 0x045e, 0x028E, XBOX360_TEST, false},  // Xbox360 Wired Controller
     { 0x057E, 0x2009, SWITCH, true},   // Switch Pro controller.  // Let the swtich grab it, but...
     { 0x0079, 0x201C, SWITCH, false},
     { 0x054C, 0x0268, PS3, true},
@@ -252,6 +255,7 @@ bool JoystickController::setRumble(uint8_t lValue, uint8_t rValue, uint8_t timeo
         }
         return true;    //
     case XBOX360:
+    case XBOX360_TEST:
         txbuf_[0] = 0x00;
         txbuf_[1] = 0x01;
         txbuf_[2] = 0x0F;
@@ -376,6 +380,7 @@ bool JoystickController::setLEDs(uint8_t lr, uint8_t lg, uint8_t lb)
         case PS4:
             return transmitPS4UserFeedbackMsg();
         case XBOX360:
+        case XBOX360_TEST:
             // 0: off, 1: all blink then return to before
             // 2-5(TL, TR, BL, BR) - blink on then stay on
             // 6-9() - On
@@ -1027,6 +1032,9 @@ bool JoystickController::claim(Device_t *dev, int type, const uint8_t *descripto
     } else if (jtype == XBOX360) {
         queue_Data_Transfer_Debug(txpipe_, xbox360w_inquire_present, sizeof(xbox360w_inquire_present), this, __LINE__);
         connected_ = 0;     // remember that hardware is actually connected...
+    } else if (jtype == XBOX360_TEST) {
+        queue_Data_Transfer_Debug(txpipe_, switch_start_input, sizeof(switch_start_input), this, __LINE__);  // FOR SOME REASON THIS ONLY WORKS WITH switch_start_input
+        connected_ = true;     // remember that hardware is actually connected...
     } else if (jtype == SWITCH) {
         queue_Data_Transfer_Debug(txpipe_, switch_start_input, sizeof(switch_start_input), this, __LINE__);
         connected_ = true;      // remember that hardware is actually connected...
@@ -1100,6 +1108,17 @@ typedef struct {
     uint8_t rt;
     int16_t axis[4];
 } xbox360data_t;
+
+typedef struct { // https://www.partsnotincluded.com/understanding-the-xbox-360-wired-controllers-usb-data/
+    uint8_t msg_type;
+    uint8_t msg_length;
+    uint8_t buttons_h; // R3, L3, Sel, Start, D_R, D_L, D_Dn, D_Up
+    uint8_t buttons_l; // Y, X, B, A, ?, (X), RB, LB
+    uint8_t lt;
+    uint8_t rt;
+    int16_t axis[4]; // RY-, RY+, RX-, RX+, LY-, LY+, LX-, LX+
+    // bytes 14-19 unused
+} xbox360testdata_t;
 
 typedef struct {
     uint8_t state;
@@ -1205,6 +1224,41 @@ void JoystickController::rx_data(const Transfer_t *transfer)
 
             if (anychange) joystickEvent = true;
         }
+
+    } else if (joystickType_ == XBOX360_TEST) {
+        xbox360testdata_t  *x360testd = (xbox360testdata_t *)transfer->buffer;
+
+        uint16_t cur_buttons = (x360testd->buttons_h << 8) | x360testd->buttons_l;
+        if (buttons != cur_buttons) {
+            buttons = cur_buttons;
+            anychange = true;
+        }
+
+        axis_mask_ = 0x3f;
+        axis_changed_mask_ = 0; // assume none for now
+
+        // for (uint8_t i = 6; i < 8+6; i+=2) {
+        //     if (axis[i] != ((x360testd->axis[i+1] << 8) + x360testd->axis[i])) {
+        //         axis[i] = ((x360testd->axis[i+1] << 8) + x360testd->axis[i]);
+        //         axis_changed_mask_ |= (1 << i);
+        //         anychange = true;
+        //     }
+        // }
+
+        // the two triggers show up as 4 and 5
+        if (axis[4] != x360testd->lt) {
+            axis[4] = x360testd->lt;
+            axis_changed_mask_ |= (1 << 4);
+            anychange = true;
+        }
+        if (axis[5] != x360testd->rt) {
+            axis[5] = x360testd->rt;
+            axis_changed_mask_ |= (1 << 5);
+            anychange = true;
+        }
+
+        if (anychange) joystickEvent = true;
+
     } else if (joystickType_ == SWITCH) {
     	uint8_t packet[8];
 		if(initialPass_ == true) {
