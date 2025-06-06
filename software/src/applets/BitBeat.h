@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 #include "../peaks_bytebeat.h"
+#include "../util/util_history.h"
 
 class BitBeat : public HemisphereApplet {
 public:
@@ -38,8 +39,10 @@ public:
         CURSOR_LAST = LOOPEND
     };
 
+    static constexpr size_t kHistoryDepth = 64;
+
     const char* applet_name() {
-        static char name[8];
+        static char name[10];
         char suffix = (hemisphere & 1) ? ('C' + current_page) : ('A' + current_page);
         sprintf(name, "BitBeat %c", suffix);
         return name;
@@ -84,27 +87,31 @@ public:
         
         bytebeat[0].Init();
         bytebeat[1].Init();
+        history_[0].Init(0);
+        history_[1].Init(0);
         ConfigureBytebeat(0);
         ConfigureBytebeat(1);
     }
 
     void Controller() {
-        uint8_t gate_state = 0;
-        if (Gate(0)) gate_state |= peaks::CONTROL_GATE;
+        uint8_t gate_state[2] = {0, 0};
         
-        // Detect rising edge
-        if (Gate(0) && !prev_gate) gate_state |= peaks::CONTROL_GATE_RISING;
-        
-        // Detect falling edge
-        if (!Gate(0) && prev_gate) gate_state |= peaks::CONTROL_GATE_FALLING;
-        
-        prev_gate = Gate(0);
-        
-        // Process Algorithm 1 (always active, outputs to channel 1)
-        ProcessAlgorithm(0, gate_state);
-        
-        // Process Algorithm 2 (always active, outputs to channel 2)
-        ProcessAlgorithm(1, gate_state);
+        ForEachChannel(ch) {
+            // Track gate state transitions more comprehensively
+            bool gate_raised = Gate(ch);
+            if (Gate(ch) && !prev_gate[ch]) {
+                gate_state[ch] |= peaks::CONTROL_GATE_RISING;
+            }
+            if (gate_raised) {
+                gate_state[ch] |= peaks::CONTROL_GATE;
+            } else if (prev_gate[ch]) {
+                gate_state[ch] |= peaks::CONTROL_GATE_FALLING;
+            }
+            prev_gate[ch] = gate_raised;
+            
+            // Process Algorithm (outputs to corresponding channel)
+            ProcessAlgorithm(ch, gate_state[ch]);
+        }
     }
 
     void View() {
@@ -270,10 +277,13 @@ private:
     uint8_t loopstart[2];
     uint8_t loopend[2];
     
-    bool prev_gate;
+    bool prev_gate[2];
     uint8_t frame_counter;
+    uint8_t last_sample[2]; // Add history tracking
 
     bool cv_assignments[2][CURSOR_LAST + 1][2]; // [page][param][cv]
+
+    util::History<uint8_t, kHistoryDepth> history_[2]; // Add history buffers for both algorithms
 
     void ProcessAlgorithm(int alg_idx, uint8_t gate_state) {
         // Apply CV modulation to algorithm parameters
@@ -362,7 +372,14 @@ private:
         
         // Process single sample and output to corresponding channel
         uint16_t sample = bytebeat[alg_idx].ProcessSingleSample(gate_state);
-        Out(alg_idx, (sample - 32768) * HEMISPHERE_3V_CV / 32768); // Convert to bipolar output
+        
+        // Convert to bipolar output and apply history tracking
+        uint8_t processed_sample = sample >> 8;
+        if (processed_sample != last_sample[alg_idx]) {
+            last_sample[alg_idx] = processed_sample;
+            Out(alg_idx, (sample - 32768) * HEMISPHERE_3V_CV / 32768);
+            history_[alg_idx].Push(processed_sample); // Add to history when sample changes
+        }
     }
 
     void EditParameter(int page, int direction) {
@@ -580,4 +597,8 @@ private:
             gfxBitmap(42, BAR_Y - 10, 3, SUB_TWO);
         }
     }   
+
+    inline void ReadHistory(uint8_t *history, int alg_idx) const {
+        history_[alg_idx].Read(history);
+    }
 };
