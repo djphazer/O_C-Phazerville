@@ -17,6 +17,7 @@
 #include "OC_digital_inputs.h"
 #include "HSicons.h"
 #include "HSClockManager.h"
+#include "HSJoystick.h"
 
 namespace HS {
 
@@ -480,6 +481,15 @@ struct MIDIFrame {
     }
 };
 
+struct JoystickFrame {
+    uint32_t buttons_prev = 0;
+    int left_trigger_value = {0};
+    int right_trigger_value = {0};
+    uint64_t full_notify_mask = (uint64_t) - 1;
+    int psAxis[64];
+    bool ps3Paired = false;
+};
+
 // shared IO Frame, updated every tick
 // this will allow chaining applets together, multiple stages of processing
 struct IOFrame {
@@ -508,6 +518,8 @@ struct IOFrame {
 
     /* MIDI message queue/cache */
     MIDIFrame MIDIState;
+
+    JoystickFrame JSState;
 
     void Init() {
       MIDIState.Init();

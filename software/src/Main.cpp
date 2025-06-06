@@ -51,6 +51,9 @@ USBHost thisUSB;
 USBHub hub1(thisUSB);
 MIDIDevice usbHostMIDI(thisUSB);
 
+JoystickController joystick(thisUSB);
+USBHIDParser hid1(thisUSB);
+
 #if defined(ARDUINO_TEENSY41)
 MIDI_CREATE_INSTANCE(HardwareSerial, Serial8, MIDI1);
 #include "AudioIO.h"
@@ -210,7 +213,8 @@ void setup() {
   PhzConfig::setup();
 
   // USB Host support for both 4.0 and 4.1
-  usbHostMIDI.begin();
+//   usbHostMIDI.begin();
+  joystick.begin(); // do something to enable midi or js conditionally
 #endif
 
   // Display splash screen and optional calibration
