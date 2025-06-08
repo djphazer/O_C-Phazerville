@@ -596,7 +596,7 @@ public:
     }
 
 #if defined(ARDUINO_TEENSY41)
-      void ProcessJoystick(JoystickController device) { }
+      void ProcessJoystick(JoystickController &device) { }
 #endif
 
     void Controller() {
@@ -607,7 +607,7 @@ public:
         thisUSB.Task();
         ProcessMIDI(usbHostMIDI, usbMIDI, MIDI1);
         ProcessMIDI(MIDI1, usbMIDI, usbHostMIDI);
-        ProcessJoystick(joystick);
+        ProcessJoystick(gamepad);
   #else
         ProcessMIDI(usbMIDI, usbHostMIDI);
         thisUSB.Task();

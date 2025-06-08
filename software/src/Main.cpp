@@ -51,7 +51,7 @@ USBHost thisUSB;
 USBHub hub1(thisUSB);
 MIDIDevice usbHostMIDI(thisUSB);
 
-JoystickController joystick(thisUSB);
+JoystickController gamepad(thisUSB);
 USBHIDParser hid1(thisUSB);
 
 #if defined(ARDUINO_TEENSY41)
@@ -214,7 +214,7 @@ void setup() {
 
   // USB Host support for both 4.0 and 4.1
 //   usbHostMIDI.begin();
-  joystick.begin(); // do something to enable midi or js conditionally
+  gamepad.begin(); // do something to enable midi or js conditionally
 #endif
 
   // Display splash screen and optional calibration

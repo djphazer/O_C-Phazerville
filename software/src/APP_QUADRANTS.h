@@ -395,165 +395,138 @@ public:
         }
     }
 
-    USBDriver *drivers[3] = { &hub1, &joystick, &hid1 };
-    #define CNT_DEVICES (sizeof(drivers)/sizeof(drivers[0]))
-    const char * driver_names[CNT_DEVICES] = {"Hub1", "joystick[0D]", "HID1"};
-    bool driver_active[CNT_DEVICES] = {false, false, false};
-
-    USBHIDInput *hiddrivers[1] = { &joystick };
-    #define CNT_HIDDEVICES (sizeof(hiddrivers)/sizeof(hiddrivers[0]))
-    const char * hid_driver_names[CNT_DEVICES] = {"joystick[0H]"};
-    bool hid_driver_active[CNT_DEVICES] = {false};
-
-    void PrintDeviceListChanges() { // copied from framework-arduinoteensy\libraries\USBHost_t36\examples\Joystick\Joystick.ino
-        for (uint8_t i = 0; i < CNT_DEVICES; i++) {
-            if (*drivers[i] != driver_active[i]) {
-                Serial.println();
-                if (driver_active[i]) {
-                    Serial.printf("*** Device %s - disconnected ***\n", driver_names[i]);
-                    driver_active[i] = false;
-                } else {
-                    Serial.printf("*** Device %s %x:%x - connected ***\n", driver_names[i], drivers[i]->idVendor(), drivers[i]->idProduct());
-                    driver_active[i] = true;
-
-                    const uint8_t *psz = drivers[i]->manufacturer();
-                    if (psz && *psz) Serial.printf("  manufacturer: %s\n", psz);
-                    psz = drivers[i]->product();
-                    if (psz && *psz) Serial.printf("  product: %s\n", psz);
-                    psz = drivers[i]->serialNumber();
-                    if (psz && *psz) Serial.printf("  Serial: %s\n", psz);
-                }
-            }
-        }
-
-        for (uint8_t i = 0; i < CNT_HIDDEVICES; i++) {
-            if (*hiddrivers[i] != hid_driver_active[i]) {
-                Serial.println();
-                if (hid_driver_active[i]) {
-                    Serial.printf("*** HID Device %s - disconnected ***\n", hid_driver_names[i]);
-                    hid_driver_active[i] = false;
-                } else {
-                    Serial.printf("*** HID Device %s %x:%x - connected ***\n", hid_driver_names[i], hiddrivers[i]->idVendor(), hiddrivers[i]->idProduct());
-                    hid_driver_active[i] = true;
-
-                    const uint8_t *psz = hiddrivers[i]->manufacturer();
-                    if (psz && *psz) Serial.printf("  manufacturer: %s\n", psz);
-                    psz = hiddrivers[i]->product();
-                    if (psz && *psz) Serial.printf("  product: %s\n", psz);
-                    psz = hiddrivers[i]->serialNumber();
-                    if (psz && *psz) Serial.printf("  Serial: %s\n", psz);
-                }
-            }
-        }
-    }
-
-    // connect PS3 controller to a PC and use Sixaxis Pair Tool to set or determine this address
-    // changing address will break association to your PS3
-    // uint8_t ps3_address[6] = {0x1a, 0x2b, 0x3c, 0x01, 0x01, 0x01};
-
     void ProcessJoystick(JoystickController &device) {
+        HS::IOFrame &f = HS::frame;
 
-        // if (!frame.JSState.ps3Paired)
-        //     frame.JSState.ps3Paired = device.PS3Pair(ps3_address);
-
-        // PrintDeviceListChanges();
+        // if (device.joystickType() == JoystickController::XBOX360USB) && !f.GpState.ps3_paired)
+        //     f.GpState.ps3_paired = device.PS3Pair(ps3_address);
 
         if (device.available()) {
-            // if(device.joystickType() == device.XBOX360) device.setLEDs(2,0,0);
-            // uint64_t axis_mask = device.axisMask();
-            // uint64_t axis_changed_mask = device.axisChangedMask();
+            uint64_t axis_changed_mask = device.axisChangedMask();
             uint32_t buttons = device.getButtons();
 
-            // Serial.print(device.joystickType());
-            // Serial.print(" ");
-            // Serial.print(buttons);
-            // Serial.print(" ");
-            //
-            // Serial.printf("Joystick(%d): buttons = %x", 0, buttons);
-            // Serial.printf(" M: %lx %lx", axis_mask, joystick.axisChangedMask());
-            // Serial.print(axis_mask);
-            //
-            // if (show_changed_only) {
-            //     for (uint8_t i = 0; axis_changed_mask != 0; i++, axis_changed_mask >>= 1) {
-            //         if (axis_changed_mask & 1) {
-            //             Serial.printf(" %l:%l", i, device.getAxis(i));
-            //         }
-            //     }
-            // } else {
-            //     for (uint8_t i = 0; axis_mask != 0; i++, axis_mask >>= 1) {
-            //         if (axis_mask & 1) {
-            //             Serial.printf(" %l:%l", i, device.getAxis(i));
-            //         }
-            //     }
-            // }
+            if (axis_changed_mask) {
+                // for (uint8_t i = 0; i < JoystickController::TOTAL_AXIS_COUNT; i++) {
+                // // for (uint8_t i = 0; axis_changed_mask != 0; i++, axis_changed_mask >>= 1) {
+                // //     if (axis_changed_mask & 1) {
+                //         // f.GpState.axis[i] = device.getAxis(i);
+                //         // Serial.print(device.getAxis(i));
+                //         // Serial.print(" ");
+                //     // }
+                // }
+                // Serial.print("\n");
 
-            if (device.axisChangedMask()) {
-                for (int i = 0; i < JoystickController::TOTAL_AXIS_COUNT; i++) {
-                    // Serial.print(device.getAxis(i));
-                    // Serial.print(" ");
+                uint8_t ltv; // left trigger value
+                uint8_t rtv; // right trigger value
+                int16_t ljs_x; // left joy stick, x value
+                int16_t ljs_y; // left joy stick, y value
+                int16_t rjs_x; // right joy stick, x value
+                int16_t rjs_y; // right joy stick, y value
+
+                switch (device.joystickType()) {
+                    case JoystickController::PS4: {
+                        //   printAngles();
+                        ltv = device.getAxis(3);
+                        rtv = device.getAxis(4);
+                        if ((ltv != frame.GpState.left_trigger_value) || (rtv != frame.GpState.right_trigger_value)) {
+                            frame.GpState.left_trigger_value = ltv;
+                            frame.GpState.right_trigger_value = rtv;
+                            device.setRumble(ltv, rtv);
+                        }
+                        break;
+                    }
+                    case JoystickController::PS3: {
+                        ltv = device.getAxis(18);
+                        rtv = device.getAxis(19);
+                        if ((ltv != f.GpState.left_trigger_value) || (rtv != f.GpState.right_trigger_value)) {
+                            f.GpState.left_trigger_value = ltv;
+                            f.GpState.right_trigger_value = rtv;
+                            device.setRumble(ltv, rtv, 50);
+                        }
+                        break;
+                    }
+                    case JoystickController::XBOXONE:
+                    case JoystickController::XBOX360W:
+                    case JoystickController::XBOX360USB: {
+                        ltv = device.getAxis(4);
+                        if (ltv != f.GpState.left_trigger_value) {
+                            f.GpState.left_trigger_value = ltv;
+                            Serial.printf("ltv: %d \n", ltv);
+                            f.GpState.set_rumble = true;
+                        }
+                        rtv = device.getAxis(5);
+                        if (rtv != f.GpState.right_trigger_value) {
+                            f.GpState.right_trigger_value = rtv;
+                            Serial.printf("rtv: %d \n", rtv);
+                            f.GpState.set_rumble = true;
+                        }
+
+                        ljs_x = ((int16_t)device.getAxis(7) << 8) | device.getAxis(6);
+                        if (f.GpState.left_js_x_value != ljs_x) {
+                            f.GpState.left_js_x_value = ljs_x;
+                            Serial.printf("ljs_x: %d \n", ljs_x);
+                        }
+                        ljs_y = ((int16_t)device.getAxis(9) << 8) | device.getAxis(8);
+                        if (f.GpState.left_js_y_value != ljs_y) {
+                            f.GpState.left_js_y_value = ljs_y;
+                            Serial.printf("ljs_y: %d \n", ljs_y);
+                        }
+
+                        rjs_x = ((int16_t)device.getAxis(11) << 8) | device.getAxis(10);
+                        if (f.GpState.right_js_x_value != rjs_x) {
+                            f.GpState.right_js_x_value = rjs_x;
+                            Serial.printf("rjs_x: %d \n", rjs_x);
+                        }
+                        rjs_y = ((int16_t)device.getAxis(13) << 8) | device.getAxis(12);
+                        if (f.GpState.right_js_y_value != rjs_y) {
+                            f.GpState.right_js_y_value = rjs_y;
+                            Serial.printf("rjs_y: %d \n", rjs_y);
+                        }
+
+                        if (f.GpState.set_rumble) {
+                            device.setRumble(ltv, rtv);
+                            f.GpState.set_rumble = false;
+                        }
+                        break;
+                    }
+                    default: break;
                 }
             }
 
-            uint8_t ltv;
-            uint8_t rtv;
-
-            for (uint8_t i = 0; i<64; i++) {
-                frame.JSState.psAxis[i] = device.getAxis(i);
-            }
-
-            switch (device.joystickType()) {
-                case JoystickController::PS4:
-                    //   printAngles();
-                    ltv = device.getAxis(3);
-                    rtv = device.getAxis(4);
-                    if ((ltv != frame.JSState.left_trigger_value) || (rtv != frame.JSState.right_trigger_value)) {
-                        frame.JSState.left_trigger_value = ltv;
-                        frame.JSState.right_trigger_value = rtv;
-                        device.setRumble(ltv, rtv);
-                    }
-                    break;
-
-                case JoystickController::PS3:
-                    ltv = device.getAxis(18);
-                    rtv = device.getAxis(19);
-                    if ((ltv != frame.JSState.left_trigger_value) || (rtv != frame.JSState.right_trigger_value)) {
-                        frame.JSState.left_trigger_value = ltv;
-                        frame.JSState.right_trigger_value = rtv;
-                        device.setRumble(ltv, rtv, 50);
-                    }
-                    break;
-
-                case JoystickController::XBOXONE:
-                case JoystickController::XBOX360:
-                    ltv = device.getAxis(4);
-                    rtv = device.getAxis(5);
-                    if ((ltv != frame.JSState.left_trigger_value) || (rtv != frame.JSState.right_trigger_value)) {
-                        frame.JSState.left_trigger_value = ltv;
-                        frame.JSState.right_trigger_value = rtv;
-                        // device.setRumble(ltv, rtv, 50);
-                        // Serial.printf(" Set Rumble %d %d", ltv, rtv);
-                    }
-                    break;
-
-                default: break;
-            }
-
-            if (buttons != frame.JSState.buttons_prev) {
-                // if (device.joystickType() == JoystickController::PS3) {
-                //     //device.setLEDs((buttons >> 12) & 0xf); //  try to get to TRI/CIR/X/SQuare
-                //     uint8_t leds = 0;
-                //     if (buttons & 0x8000) leds = 1;   //Srq
-                //     if (buttons & 0x2000) leds = 2;   //Cir
-                //     if (buttons & 0x1000) leds = 4;   //Tri
-                //     if (buttons & 0x4000) leds = 8;   //X  //Tri
-                //     device.setLEDs(leds);
-                // } else {
-                //     uint8_t lr = (buttons & 1) ? 0xff : 0;
-                //     uint8_t lg = (buttons & 2) ? 0xff : 0;
-                //     uint8_t lb = (buttons & 4) ? 0xff : 0;
-                //     // device.setLEDs(lr, lg, lb);
-                // }
-                frame.JSState.buttons_prev = buttons;
+            if (f.GpState.button_mask != buttons) {
+                f.GpState.button_mask = buttons;
+                if (device.joystickType() == JoystickController::XBOX360USB) {
+                    if (buttons & (1 << GAMEPAD::XBOX360::button::LB))
+                        Serial.println("LB");
+                    if (buttons & (1 << GAMEPAD::XBOX360::button::RB))
+                        Serial.println("RB");
+                    if (buttons & (1 << GAMEPAD::XBOX360::button::GUIDE))
+                        Serial.println("GUIDE");
+                    if (buttons & (1 << GAMEPAD::XBOX360::button::A))
+                        Serial.println("A");
+                    if (buttons & (1 << GAMEPAD::XBOX360::button::B))
+                        Serial.println("B");
+                    if (buttons & (1 << GAMEPAD::XBOX360::button::X))
+                        Serial.println("X");
+                    if (buttons & (1 << GAMEPAD::XBOX360::button::Y))
+                        Serial.println("Y");
+                    if (buttons & (1 << GAMEPAD::XBOX360::button::D_UP))
+                        Serial.println("D_UP");
+                    if (buttons & (1 << GAMEPAD::XBOX360::button::D_DOWN))
+                        Serial.println("D_DOWN");
+                    if (buttons & (1 << GAMEPAD::XBOX360::button::D_LEFT))
+                        Serial.println("D_LEFT");
+                    if (buttons & (1 << GAMEPAD::XBOX360::button::D_RIGHT))
+                        Serial.println("D_RIGHT");
+                    if (buttons & (1 << GAMEPAD::XBOX360::button::START))
+                        Serial.println("START");
+                    if (buttons & (1 << GAMEPAD::XBOX360::button::BACK))
+                        Serial.println("BACK");
+                    if (buttons & (1 << GAMEPAD::XBOX360::button::JOY_LEFT))
+                        Serial.println("JOY_LEFT");
+                    if (buttons & (1 << GAMEPAD::XBOX360::button::JOY_RIGHT))
+                        Serial.println("JOY_RIGHT");
+                }
             }
 
             // Serial.println();
@@ -568,7 +541,7 @@ public:
         ProcessMIDI(usbHostMIDI, usbMIDI, MIDI1);
         ProcessMIDI(MIDI1, usbMIDI, usbHostMIDI);
 
-        ProcessJoystick(joystick);
+        ProcessJoystick(gamepad);
 
         // Clock Setup applet handles internal clock duties
         ClockSetup_instance.Controller();

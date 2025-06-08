@@ -481,13 +481,22 @@ struct MIDIFrame {
     }
 };
 
-struct JoystickFrame {
-    uint32_t buttons_prev = 0;
-    int left_trigger_value = {0};
-    int right_trigger_value = {0};
-    uint64_t full_notify_mask = (uint64_t) - 1;
-    int psAxis[64];
-    bool ps3Paired = false;
+struct GamepadFrame {
+    // connect PS3 controller to a PC and use Sixaxis Pair Tool to set or determine this address
+    // changing address will break association to your PS3
+    uint8_t ps3_address[6] = {0x1a, 0x2b, 0x3c, 0x01, 0x01, 0x01};
+    bool ps3_paired = false;
+
+    uint32_t button_mask = 0;
+    int left_trigger_value = 0;
+    int right_trigger_value = 0;
+    int left_js_x_value = 0;
+    int left_js_y_value = 0;
+    int right_js_x_value = 0;
+    int right_js_y_value = 0;
+
+    bool set_rumble = false;
+    bool set_leds = false;
 };
 
 // shared IO Frame, updated every tick
@@ -519,7 +528,7 @@ struct IOFrame {
     /* MIDI message queue/cache */
     MIDIFrame MIDIState;
 
-    JoystickFrame JSState;
+    GamepadFrame GpState;
 
     void Init() {
       MIDIState.Init();
