@@ -18,8 +18,15 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include "HSGamepad.h"
+
 class JoyStyx : public HemisphereApplet {
     public:
+
+        const char* applet_name() {
+            return "JoyStyx";
+        }
+        const uint8_t* applet_icon() { return PhzIcons::gamepad; }
 
         enum MyAppletCursor {
             PARAM1,
@@ -28,29 +35,64 @@ class JoyStyx : public HemisphereApplet {
             CURSOR_LAST = PARAM2
         };
 
-        const char* applet_name() {
-            return "JoyStyx";
-        }
-
         void Start() {
-          // Initialize default values
+          param[0] = GAMEPAD::XBOX360::axis::LT;
+          param[1] = GAMEPAD::XBOX360::axis::RT;
         }
 
-        void Controller()
-        {
-            /*
-             * basic example of checking triggers, reading inputs, quantizing, and setting outputs
-             *
-            ForEachChannel(ch)
-            {
-              if (Clock(ch))
-              {
-                int cv = In(ch);
-                cv = Quantize(ch, cv); // uses global quantizer settings
-                Out(ch, cv);
-              }
+        void Controller() {
+            ForEachChannel(ch) {
+                int cv = 0;
+                switch (param[ch]) {
+                    case GAMEPAD::XBOX360::axis::LT: {
+                        cv = Proportion(frame.GpState.left_trigger_value, 255, HEMISPHERE_MAX_CV);
+                        Out(ch, cv);
+                        break;
+                    }
+                    case GAMEPAD::XBOX360::axis::RT: {
+                        cv = Proportion(frame.GpState.right_trigger_value, 255, HEMISPHERE_MAX_CV);
+                        Out(ch, cv);
+                        break;
+                    }
+                    case GAMEPAD::XBOX360::axis::LX: {
+                        if (frame.GpState.left_js_x_value < 0) {
+                            cv = -Proportion(frame.GpState.left_js_x_value, 32767, HEMISPHERE_MIN_CV);
+                        } else {
+                            cv = Proportion(frame.GpState.left_js_x_value, 32767, HEMISPHERE_MAX_CV);
+                        }
+                        Out(ch, cv);
+                        break;
+                    }
+                    case GAMEPAD::XBOX360::axis::LY: {
+                        if (frame.GpState.left_js_y_value < 0) {
+                            cv = -Proportion(frame.GpState.left_js_y_value, 32767, HEMISPHERE_MIN_CV);
+                        } else {
+                            cv = Proportion(frame.GpState.left_js_y_value, 32767, HEMISPHERE_MAX_CV);
+                        }
+                        Out(ch, cv);
+                        break;
+                    }
+                    case GAMEPAD::XBOX360::axis::RX: {
+                        if (frame.GpState.right_js_x_value < 0) {
+                            cv = -Proportion(frame.GpState.right_js_x_value, 32767, HEMISPHERE_MIN_CV);
+                        } else {
+                            cv = Proportion(frame.GpState.right_js_x_value, 32767, HEMISPHERE_MAX_CV);
+                        }
+                        Out(ch, cv);
+                        break;
+                    }
+                    case GAMEPAD::XBOX360::axis::RY: {
+                        if (frame.GpState.right_js_y_value < 0) {
+                            cv = -Proportion(frame.GpState.right_js_y_value, 32767, HEMISPHERE_MIN_CV);
+                        } else {
+                            cv = Proportion(frame.GpState.right_js_y_value, 32767, HEMISPHERE_MAX_CV);
+                        }
+                        Out(ch, cv);
+                        break;
+                    }
+                    default: break;
+                }
             }
-             */
         }
 
         void View() {
@@ -73,8 +115,8 @@ class JoyStyx : public HemisphereApplet {
 
             // param LUT
             const struct { uint8_t &p; int min, max; } params[] = {
-                { param1, 0, 63 }, // PARAM1
-                { param2, 0, 63 }, // PARAM2
+                { param[0], 0, GAMEPAD::XBOX360::MAX_AXIS }, // PARAM1
+                { param[1], 0, GAMEPAD::XBOX360::MAX_AXIS }, // PARAM2
             };
 
             // adjust param
@@ -83,14 +125,14 @@ class JoyStyx : public HemisphereApplet {
 
         uint64_t OnDataRequest() {
             uint64_t data = 0;
-            Pack(data, PackLocation {0,8}, param1);
-            Pack(data, PackLocation {8,8}, param2);
+            Pack(data, PackLocation {0,8}, param[0]);
+            Pack(data, PackLocation {8,8}, param[1]);
             return data;
         }
 
         void OnDataReceive(uint64_t data) {
-            param1 = Unpack(data, PackLocation {0,8});
-            param2 = Unpack(data, PackLocation {8,8});
+            param[0] = constrain(Unpack(data, PackLocation {0,8}), 0, GAMEPAD::XBOX360::MAX_AXIS);
+            param[1] = constrain(Unpack(data, PackLocation {8,8}), 0, GAMEPAD::XBOX360::MAX_AXIS);
         }
 
     protected:
@@ -101,25 +143,19 @@ class JoyStyx : public HemisphereApplet {
     private:
         int cursor;
 
-        uint8_t param1;
-        uint8_t param2;
+        uint8_t param[2];
 
         void DrawInterface() {
 
             int y = 14;
             gfxPrint(1, y, "p1: ");
-            gfxPrint(param1);
+            gfxPrint(GAMEPAD::XBOX360::axis_name[param[0]]);
 
-            y += 11;
-            gfxLine(4, y, 60, y); // ---------------------------------- //
-
-            y += 3;
+            y += 14;
             gfxPrint(1, y, "p2: ");
-            gfxPrint(param2);
+            gfxPrint(GAMEPAD::XBOX360::axis_name[param[1]]);
 
-            y += 11;
-            gfxIcon(32, y, ZAP_ICON);
-
+            gfxCursor(12, 23 + cursor * 14, 37);
         }
 
     };

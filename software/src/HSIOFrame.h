@@ -489,6 +489,7 @@ struct GamepadFrame {
     bool ps3_paired = false;
 
     uint32_t button_mask = 0;
+    // int axis[6] = {0};
     int left_trigger_value = 0;
     int right_trigger_value = 0;
     int left_js_x_value = 0;

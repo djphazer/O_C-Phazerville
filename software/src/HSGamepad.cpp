@@ -1,7 +1,7 @@
 #include "HSGamepad.h"
 #include "HemisphereApplet.h"
 
-#define GAMEPAD_DEBUG
+// #define GAMEPAD_DEBUG
 
 // connect PS3 controller to a PC and use Sixaxis Pair Tool to set or determine this address
 // changing address will break association to your PS3
@@ -134,8 +134,8 @@ void ProcessGamepad(JoystickController &device) {
                     if (buttons & (1 << GAMEPAD::XBOX360::button::D_RIGHT)) Serial.println("D_RIGHT");
                     if (buttons & (1 << GAMEPAD::XBOX360::button::START)) Serial.println("START");
                     if (buttons & (1 << GAMEPAD::XBOX360::button::BACK)) Serial.println("BACK");
-                    if (buttons & (1 << GAMEPAD::XBOX360::button::JOY_LEFT)) Serial.println("JOY_LEFT");
-                    if (buttons & (1 << GAMEPAD::XBOX360::button::JOY_RIGHT)) Serial.println("JOY_RIGHT");
+                    if (buttons & (1 << GAMEPAD::XBOX360::button::L3)) Serial.println("L3");
+                    if (buttons & (1 << GAMEPAD::XBOX360::button::R3)) Serial.println("R3");
                 }
             #endif
         }
