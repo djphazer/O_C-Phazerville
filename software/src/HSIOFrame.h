@@ -32,6 +32,7 @@ static constexpr int MIDIMAP_MAX = 8;
 #endif
 static constexpr int TRIGMAP_MAX = OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_COUNT + DAC_CHANNEL_COUNT + MIDIMAP_MAX;
 static constexpr int CVMAP_MAX = ADC_CHANNEL_COUNT + DAC_CHANNEL_COUNT + MIDIMAP_MAX;
+static constexpr int GAMEPADMAP_MAX = 32;
 
 struct MIDIMessage {
   // values expected from MIDI library, so channel starts at 1 (one), not zero
@@ -485,17 +486,41 @@ struct MIDIFrame {
 };
 
 #ifdef ARDUINO_TEENSY41
+struct GamepadMapping {
+    // static constexpr size_t Size = 32; // Make this compatible with Packable
+    // uint32_t Pack() const {
+    //     return ( & 0xFF) | (function << 8) | (channel << 16) | (dac_polyvoice << 24);
+    // }
+    // void Unpack(uint32_t data) {
+    //     function_cc = data & 0xFF;
+    //     function = (data >> 8) & 0xFF;
+    //     if (function > HEM_MIDI_MAX_FUNCTION) function = 0;
+    //     channel = (data >> 16) & 0x1F;
+    //     dac_polyvoice = (data >> 24) & 0x0F;
+    // }
+};
+
+constexpr GamepadMapping& pack(GamepadMapping& input) {
+    return input;
+};
+
 struct GamepadFrame {
+    GamepadMapping mapping[GAMEPADMAP_MAX];
+
+    int gamepad_type = 0; // UNKNOWN = 0, PS3, PS4, XBOXONE, XBOX360W, XBOX360USB, PS3_MOTION, SpaceNav, SWITCH
     bool ps3_paired = false;
 
     uint32_t button_mask = 0;
-    // int axis[6] = {0};
-    int left_trigger_value = 0;
-    int right_trigger_value = 0;
-    int left_js_x_value = 0;
-    int left_js_y_value = 0;
-    int right_js_x_value = 0;
-    int right_js_y_value = 0;
+    int axis[8] = {
+        0, // left_trigger_value
+        0, // right_trigger_value
+        0, // left_js_x_value
+        0, // left_js_y_value
+        0, // right_js_x_value
+        0, // right_js_y_value
+        0, // FUTURE
+        0  // FUTURE
+    };
 
     bool set_rumble = false;
     bool set_leds = false;
@@ -532,7 +557,7 @@ struct IOFrame {
     MIDIFrame MIDIState;
 
 #ifdef ARDUINO_TEENSY41
-    GamepadFrame GpState;
+    GamepadFrame GamepadState;
 #endif
 
     void Init() {

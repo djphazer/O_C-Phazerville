@@ -36,61 +36,28 @@ class JoyStyx : public HemisphereApplet {
         };
 
         void Start() {
-          param[0] = GAMEPAD::XBOX360::axis::LT;
-          param[1] = GAMEPAD::XBOX360::axis::RT;
+            param[0] = GAMEPAD::XBOX360USB::axis::LT;
+            param[1] = GAMEPAD::XBOX360USB::axis::RT;
         }
 
         void Controller() {
             ForEachChannel(ch) {
-                int cv = 0;
-                switch (param[ch]) {
-                    case GAMEPAD::XBOX360::axis::LT: {
-                        cv = Proportion(frame.GpState.left_trigger_value, 255, HEMISPHERE_MAX_CV);
-                        Out(ch, cv);
-                        break;
-                    }
-                    case GAMEPAD::XBOX360::axis::RT: {
-                        cv = Proportion(frame.GpState.right_trigger_value, 255, HEMISPHERE_MAX_CV);
-                        Out(ch, cv);
-                        break;
-                    }
-                    case GAMEPAD::XBOX360::axis::LX: {
-                        if (frame.GpState.left_js_x_value < 0) {
-                            cv = -Proportion(frame.GpState.left_js_x_value, 32767, HEMISPHERE_MIN_CV);
+                if (param[ch] > GAMEPAD::XBOX360USB::MAX_BUTTON) {
+                    int p = param[ch] - GAMEPAD::XBOX360USB::MAX_BUTTON - 1;
+                    if (p > GAMEPAD::XBOX360USB::RT) {
+                        if (frame.GamepadState.axis[p] < 0) {
+                            cv[ch] = -Proportion(frame.GamepadState.axis[p], 32767, HEMISPHERE_MIN_CV);
                         } else {
-                            cv = Proportion(frame.GpState.left_js_x_value, 32767, HEMISPHERE_MAX_CV);
+                            cv[ch] = Proportion(frame.GamepadState.axis[p], 32767, HEMISPHERE_MAX_CV);
                         }
-                        Out(ch, cv);
-                        break;
+                        Out(ch, cv[ch]);
+                    } else {
+                        cv[ch] = Proportion(frame.GamepadState.axis[p], 255, HEMISPHERE_MAX_CV);
+                        Out(ch, cv[ch]);
                     }
-                    case GAMEPAD::XBOX360::axis::LY: {
-                        if (frame.GpState.left_js_y_value < 0) {
-                            cv = -Proportion(frame.GpState.left_js_y_value, 32767, HEMISPHERE_MIN_CV);
-                        } else {
-                            cv = Proportion(frame.GpState.left_js_y_value, 32767, HEMISPHERE_MAX_CV);
-                        }
-                        Out(ch, cv);
-                        break;
-                    }
-                    case GAMEPAD::XBOX360::axis::RX: {
-                        if (frame.GpState.right_js_x_value < 0) {
-                            cv = -Proportion(frame.GpState.right_js_x_value, 32767, HEMISPHERE_MIN_CV);
-                        } else {
-                            cv = Proportion(frame.GpState.right_js_x_value, 32767, HEMISPHERE_MAX_CV);
-                        }
-                        Out(ch, cv);
-                        break;
-                    }
-                    case GAMEPAD::XBOX360::axis::RY: {
-                        if (frame.GpState.right_js_y_value < 0) {
-                            cv = -Proportion(frame.GpState.right_js_y_value, 32767, HEMISPHERE_MIN_CV);
-                        } else {
-                            cv = Proportion(frame.GpState.right_js_y_value, 32767, HEMISPHERE_MAX_CV);
-                        }
-                        Out(ch, cv);
-                        break;
-                    }
-                    default: break;
+                } else {
+                    cv[ch] = (frame.GamepadState.button_mask & (1 << param[ch])) != 0;
+                    GateOut(ch, cv[ch]);
                 }
             }
         }
@@ -115,8 +82,8 @@ class JoyStyx : public HemisphereApplet {
 
             // param LUT
             const struct { uint8_t &p; int min, max; } params[] = {
-                { param[0], 0, GAMEPAD::XBOX360::MAX_AXIS }, // PARAM1
-                { param[1], 0, GAMEPAD::XBOX360::MAX_AXIS }, // PARAM2
+                { param[0], 0, GAMEPAD::XBOX360USB::MAX_BUTTON + GAMEPAD::XBOX360USB::MAX_AXIS + 1}, // PARAM1
+                { param[1], 0, GAMEPAD::XBOX360USB::MAX_BUTTON + GAMEPAD::XBOX360USB::MAX_AXIS + 1}, // PARAM2
             };
 
             // adjust param
@@ -131,8 +98,8 @@ class JoyStyx : public HemisphereApplet {
         }
 
         void OnDataReceive(uint64_t data) {
-            param[0] = constrain(Unpack(data, PackLocation {0,8}), 0, GAMEPAD::XBOX360::MAX_AXIS);
-            param[1] = constrain(Unpack(data, PackLocation {8,8}), 0, GAMEPAD::XBOX360::MAX_AXIS);
+            param[0] = constrain(Unpack(data, PackLocation {0,8}), 0, GAMEPAD::XBOX360USB::MAX_BUTTON + GAMEPAD::XBOX360USB::MAX_AXIS + 1);
+            param[1] = constrain(Unpack(data, PackLocation {8,8}), 0, GAMEPAD::XBOX360USB::MAX_BUTTON + GAMEPAD::XBOX360USB::MAX_AXIS + 1);
         }
 
     protected:
@@ -142,20 +109,24 @@ class JoyStyx : public HemisphereApplet {
 
     private:
         int cursor;
-
+        int cv[2] = {0, 0};
         uint8_t param[2];
 
         void DrawInterface() {
-
             int y = 14;
-            gfxPrint(1, y, "p1: ");
-            gfxPrint(GAMEPAD::XBOX360::axis_name[param[0]]);
-
+            ForEachChannel(ch) {
+                char out_label[] = {(char)('A' + io_offset + ch), '\0' };
+                gfxPrint(1, y, out_label); gfxPrint(": ");
+                gfxPrint((param[ch] > GAMEPAD::XBOX360USB::MAX_BUTTON) ?
+                    GAMEPAD::XBOX360USB::axis_name[param[ch] - GAMEPAD::XBOX360USB::MAX_BUTTON - 1] :
+                    GAMEPAD::XBOX360USB::button_name[param[ch]]
+                );
+                y += 14;
+            }
+            gfxPrint(1, y, cv[0]); gfxPrint(32, y, cv[1]);
             y += 14;
-            gfxPrint(1, y, "p2: ");
-            gfxPrint(GAMEPAD::XBOX360::axis_name[param[1]]);
-
-            gfxCursor(12, 23 + cursor * 14, 37);
+            gfxPrint(1, y, GAMEPAD::controller_type[frame.GamepadState.gamepad_type]);
+            gfxCursor(7*2, 23 + cursor * 14, 49);
         }
 
     };
