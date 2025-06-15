@@ -511,7 +511,7 @@ struct GamepadFrame {
     bool ps3_paired = false;
 
     uint32_t button_mask = 0;
-    int axis[8] = {
+    int16_t axis[8] = {
         0, // left_trigger_value
         0, // right_trigger_value
         0, // left_js_x_value
@@ -521,6 +521,7 @@ struct GamepadFrame {
         0, // FUTURE
         0  // FUTURE
     };
+    uint32_t last_changed = 3;
 
     bool set_rumble = false;
     bool set_leds = false;
