@@ -521,7 +521,7 @@ struct GamepadFrame {
         0, // FUTURE
         0  // FUTURE
     };
-    uint32_t last_changed = 3;
+    uint32_t last_changed = 0;
 
     bool set_rumble = false;
     bool set_leds = false;

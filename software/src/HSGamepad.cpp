@@ -57,7 +57,7 @@ void ProcessGamepad(JoystickController &device) {
                 case JoystickController::XBOXONE: {
                 // static const uint8_t xbox_axis_order_mapping[] = {3, 4, 0, 1, 2, 5}; // fix this in joystick.cpp:1205, or find out why it exists
                 // "LT"<-LY, "RT"<-RX, "LX"<-LT, "LY"<-RT, "RX"<-LX, "RY" should be fine lol
-                    ltv = device.getAxis(6);
+                    ltv = device.getAxis(3);
                     if (ltv != f.GamepadState.axis[0]) {
                         f.GamepadState.axis[0] = ltv;
                         f.GamepadState.last_changed = 16+0;
@@ -66,7 +66,7 @@ void ProcessGamepad(JoystickController &device) {
                             f.GamepadState.set_rumble = true;
                         #endif
                     }
-                    rtv = device.getAxis(8);
+                    rtv = device.getAxis(4);
                     if (rtv != f.GamepadState.axis[1]) {
                         f.GamepadState.axis[1] = rtv;
                         f.GamepadState.last_changed = 16+1;
@@ -77,7 +77,7 @@ void ProcessGamepad(JoystickController &device) {
                     }
 
                     // ljs_x = ((int16_t)device.getAxis(7) << 8) | device.getAxis(6);
-                    ljs_x = device.getAxis(10);
+                    ljs_x = device.getAxis(0);
                     if (f.GamepadState.axis[2] != ljs_x) {
                         if (abs(f.GamepadState.axis[2] - ljs_x) > axis_change_threshold)
                             f.GamepadState.last_changed = 16+2;
@@ -87,7 +87,7 @@ void ProcessGamepad(JoystickController &device) {
                         #endif
                     }
                     // ljs_y = ((int16_t)device.getAxis(9) << 8) | device.getAxis(8);
-                    ljs_y = device.getAxis(12);
+                    ljs_y = device.getAxis(1);
                     if (f.GamepadState.axis[3] != ljs_y) {
                         if (abs(f.GamepadState.axis[3] - ljs_y) > axis_change_threshold)
                             f.GamepadState.last_changed = 16+3;
@@ -98,7 +98,7 @@ void ProcessGamepad(JoystickController &device) {
                     }
 
                     // rjs_x = ((int16_t)device.getAxis(11) << 8) | device.getAxis(10);
-                    rjs_x = device.getAxis(14);
+                    rjs_x = device.getAxis(2);
                     if (f.GamepadState.axis[4] != rjs_x) {
                         if (abs(f.GamepadState.axis[4] - rjs_x) > axis_change_threshold)
                             f.GamepadState.last_changed = 16+4;
@@ -108,7 +108,7 @@ void ProcessGamepad(JoystickController &device) {
                         #endif
                     }
                     // rjs_y = ((int16_t)device.getAxis(13) << 8) | device.getAxis(12);
-                    rjs_y = device.getAxis(16);
+                    rjs_y = device.getAxis(5);
                     if (f.GamepadState.axis[5] != rjs_y) {
                         if (abs(f.GamepadState.axis[5] - rjs_y) > axis_change_threshold)
                             f.GamepadState.last_changed = 16+5;

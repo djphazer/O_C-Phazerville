@@ -62,6 +62,9 @@ class JoyStyx : public HemisphereApplet {
                     case (JoystickController::joytype_t::UNKNOWN):
                         gp = &UNKNOWN;
                         break;
+                    case (JoystickController::joytype_t::XBOXONE):
+                        gp = &XBOXONE;
+                        break;
                     case (JoystickController::joytype_t::XBOX360W):
                     case (JoystickController::joytype_t::XBOX360USB):
                         gp = &XBOX360;
