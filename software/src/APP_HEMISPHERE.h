@@ -603,12 +603,12 @@ public:
         thisUSB.Task();
         ProcessMIDI(usbHostMIDI, usbMIDI, MIDI1);
         ProcessMIDI(MIDI1, usbMIDI, usbHostMIDI);
-        ProcessGamepad(gamepad);
   #else
         ProcessMIDI(usbMIDI, usbHostMIDI);
         thisUSB.Task();
         ProcessMIDI(usbHostMIDI, usbMIDI);
   #endif
+    ProcessGamepad(gamepad);
 #else
         ProcessMIDI(usbMIDI);
 #endif

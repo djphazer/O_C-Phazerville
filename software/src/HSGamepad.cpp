@@ -1,6 +1,7 @@
 #include "HSGamepad.h"
 #include "HemisphereApplet.h"
 
+#ifdef __IMXRT1062__
 // #define GAMEPAD_DEBUG
 
 // connect PS3 controller to a PC and use Sixaxis Pair Tool to set or determine this address
@@ -328,3 +329,5 @@ GamePad XBOX360 {
 
 // const char* GAMEPAD::SWITCH::button_name[BUTTON_LAST+1] = {};
 // const char* GAMEPAD::SWITCH::axis_name[AXIS_LAST+1] = {};
+
+#endif

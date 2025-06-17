@@ -1,8 +1,9 @@
 #pragma once
 
+#ifdef __IMXRT1062__
+
 #include <USBHost_t36.h>
 
-#if defined(ARDUINO_TEENSY41)
     // namespace GAMEPAD {
     //     struct XBOXONE { // gamepad_type = 3
     //         enum Button { // bytes 4 & 5

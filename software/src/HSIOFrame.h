@@ -18,7 +18,7 @@
 #include "HSicons.h"
 #include "HSClockManager.h"
 
-#ifdef ARDUINO_TEENSY41
+#ifdef __IMXRT1062__
 #include "HSGamepad.h"
 #endif
 
@@ -485,7 +485,7 @@ struct MIDIFrame {
     }
 };
 
-#ifdef ARDUINO_TEENSY41
+#ifdef __IMXRT1062__
 struct GamepadMapping {
     // static constexpr size_t Size = 32; // Make this compatible with Packable
     // uint32_t Pack() const {
@@ -557,7 +557,7 @@ struct IOFrame {
     /* MIDI message queue/cache */
     MIDIFrame MIDIState;
 
-#ifdef ARDUINO_TEENSY41
+#ifdef __IMXRT1062__
     GamepadFrame GamepadState;
 #endif
 
