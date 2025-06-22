@@ -122,6 +122,7 @@
     extern GamePad PS3_MOTION; // gamepad_type = 6
     extern GamePad SpaceNav; // gamepad_type = 7
     extern GamePad SWITCH; // gamepad_type = 8
+    extern GamePad XBOX;
 
     extern USBHub hub1;
     extern JoystickController gamepad;
