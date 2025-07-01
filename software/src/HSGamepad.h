@@ -98,6 +98,10 @@
 
     // } // namespace GAMEPAD
 
+    extern USBHub hub1;
+    extern JoystickController gamepad;
+    extern USBHIDParser hid1;
+
     struct GamePad {
         const char* type_name;
 
@@ -116,17 +120,15 @@
 
     extern GamePad UNKNOWN; // gamepad_type = 0
     extern GamePad PS3; // gamepad_type = 1
+    extern GamePad PS3_MOTION; // gamepad_type = 6
     extern GamePad PS4; // gamepad_type = 2
+    extern GamePad XBOX;
     extern GamePad XBOXONE; // gamepad_type = 3
     extern GamePad XBOX360; // gamepad_type = 4 & 5
-    extern GamePad PS3_MOTION; // gamepad_type = 6
     extern GamePad SpaceNav; // gamepad_type = 7
     extern GamePad SWITCH; // gamepad_type = 8
-    extern GamePad XBOX;
-
-    extern USBHub hub1;
-    extern JoystickController gamepad;
-    extern USBHIDParser hid1;
+    extern GamePad SNES;
+    extern GamePad N64;
 
     void ProcessGamepad(JoystickController &device);
 #endif
