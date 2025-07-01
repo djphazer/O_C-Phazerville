@@ -119,6 +119,61 @@ namespace HS {
     SCREENSAVER_MODE_COUNT
   };
 
+  struct QuantEngine {
+    braids::Quantizer quantizer;
+    int16_t scale = OC::Scales::SCALE_SEMI;
+    int8_t root_note;
+    int8_t octave;
+    uint16_t mask = 0xffff;
+
+    void Reconfig() {
+      quantizer.Configure(OC::Scales::GetScale(scale), mask);
+    }
+    void Configure(int scale_, uint16_t mask_) {
+      CONSTRAIN(scale_, 0, OC::Scales::NUM_SCALES - 1);
+      scale = scale_;
+      if (mask_) mask = mask_;
+      Reconfig();
+    }
+    void EditMask(int idx, bool on) {
+      mask = on ? (mask | (1u << idx)) : (mask & ~(1u << idx));
+    }
+    void NudgeScale(int dir) {
+      const int max = OC::Scales::NUM_SCALES;
+      scale += dir;
+      if (scale >= max) scale = 0;
+      if (scale < 0) scale = max - 1;
+      Reconfig();
+    }
+    void RotateMask(int dir) {
+      const size_t scale_size = OC::Scales::GetScale( scale ).num_notes;
+      uint16_t used_bits = ~(0xffffU << scale_size);
+      mask &= used_bits;
+
+      if (dir < 0) {
+        dir = -dir;
+        mask = (mask >> dir) | (mask << (scale_size - dir));
+      } else {
+        mask = (mask << dir) | (mask >> (scale_size - dir));
+      }
+      mask |= ~used_bits; // fill upper bits
+
+      Reconfig();
+    }
+
+    int Process(int cv, int root, int transpose) {
+      if (root == 0) root = (root_note << 7);
+      return quantizer.Process(cv, root, transpose) + (octave * 12 << 7);
+    }
+    int Lookup(int note) {
+      return quantizer.Lookup(note) + (root_note << 7) + (octave * 12 << 7);
+    }
+
+    const int Size() {
+      return OC::Scales::GetScale( scale ).num_notes;
+    }
+  };
+
   extern uint32_t popup_tick; // for button feedback
   extern PopupType popup_type;
   extern uint8_t qview; // which quantizer's setting is shown in popup
@@ -128,11 +183,7 @@ namespace HS {
   // input quantizers, because sometimes we need hysteresis
   extern OC::SemitoneQuantizer input_quant[ADC_CHANNEL_LAST];
 
-  extern braids::Quantizer quantizer[QUANT_CHANNEL_COUNT]; // global shared quantizers
-  extern int16_t quant_scale[QUANT_CHANNEL_COUNT];
-  extern int8_t root_note[QUANT_CHANNEL_COUNT];
-  extern int8_t q_octave[QUANT_CHANNEL_COUNT];
-  extern uint16_t q_mask[QUANT_CHANNEL_COUNT];
+  extern QuantEngine q_engine[QUANT_CHANNEL_COUNT];
 
 #if defined(ARDUINO_TEENSY41) || defined(VOR)
   extern int octave_max;

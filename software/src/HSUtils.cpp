@@ -24,11 +24,8 @@ namespace HS {
 
   OC::SemitoneQuantizer input_quant[ADC_CHANNEL_LAST];
 
-  braids::Quantizer quantizer[QUANT_CHANNEL_COUNT]; // global shared quantizers
-  int16_t quant_scale[QUANT_CHANNEL_COUNT];
-  int8_t root_note[QUANT_CHANNEL_COUNT];
-  int8_t q_octave[QUANT_CHANNEL_COUNT];
-  uint16_t q_mask[QUANT_CHANNEL_COUNT];
+  // global shared quantizers
+  QuantEngine q_engine[QUANT_CHANNEL_COUNT];
 
   // for Beat Sync'd octave or key switching
   int next_ch = -1;
@@ -58,11 +55,11 @@ namespace HS {
   OC::menu::ScreenCursor<5> showhide_cursor;
 
   void Init() {
-    for (int i = 0; i < ADC_CHANNEL_LAST; ++i)
-      input_quant[i].Init();
+    for (auto &iq : input_quant)
+      iq.Init();
 
-    for (int i = 0; i < QUANT_CHANNEL_COUNT; ++i)
-      quantizer[i].Init();
+    for (auto &q : q_engine)
+      q.quantizer.Init();
 
     for (int i = 0; i < APPLET_SLOTS * 2; ++i) {
       trigger_mapping[i] = (i%4) + 1;
@@ -79,8 +76,8 @@ namespace HS {
 
   void ProcessBeatSync() {
     if (next_ch > -1) {
-      q_octave[next_ch] = next_octave;
-      root_note[next_ch] = next_root_note;
+      q_engine[next_ch].octave = next_octave;
+      q_engine[next_ch].root_note = next_root_note;
       next_ch = -1;
     }
   }
@@ -93,36 +90,32 @@ namespace HS {
 
   // --- Quantizer helpers
   int GetLatestNoteNumber(int ch) {
-    return quantizer[ch].GetLatestNoteNumber();
+    return q_engine[ch].quantizer.GetLatestNoteNumber();
   }
   int Quantize(int ch, int cv, int root, int transpose) {
-    if (root == 0) root = (root_note[ch] << 7);
-    return quantizer[ch].Process(cv, root, transpose) + (q_octave[ch] * 12 << 7);
+    return q_engine[ch].Process(cv, root, transpose);
   }
   int QuantizerLookup(int ch, int note) {
-    return quantizer[ch].Lookup(note) + (root_note[ch] << 7) + (q_octave[ch] * 12 << 7);
+    return q_engine[ch].Lookup(note);
   }
   void QuantizerConfigure(int ch, int scale, uint16_t mask) {
-    CONSTRAIN(scale, 0, OC::Scales::NUM_SCALES - 1);
-    quant_scale[ch] = scale;
-    q_mask[ch] = mask;
-    quantizer[ch].Configure(OC::Scales::GetScale(scale), mask);
+    q_engine[ch].Configure(scale, mask);
   }
   int GetScale(int ch) {
-    return quant_scale[ch];
+    return q_engine[ch].scale;
   }
   int GetRootNote(int ch) {
-    return root_note[ch];
+    return q_engine[ch].root_note;
   }
   int SetRootNote(int ch, int root) {
     CONSTRAIN(root, 0, 11);
-    return (root_note[ch] = root);
+    return (q_engine[ch].root_note = root);
   }
   void NudgeRootNote(int ch, int dir) {
     if (next_ch < 0) {
       next_ch = ch;
-      next_root_note = root_note[ch];
-      next_octave = q_octave[ch];
+      next_root_note = q_engine[ch].root_note;
+      next_octave = q_engine[ch].octave;
     }
     next_root_note += dir;
 
@@ -141,8 +134,8 @@ namespace HS {
   void NudgeOctave(int ch, int dir) {
     if (next_ch < 0) {
       next_ch = ch;
-      next_root_note = root_note[ch];
-      next_octave = q_octave[ch];
+      next_root_note = q_engine[ch].root_note;
+      next_octave = q_engine[ch].octave;
     }
     next_octave += dir;
     CONSTRAIN(next_octave, -octave_max, octave_max);
@@ -150,29 +143,10 @@ namespace HS {
     QueueBeatSync();
   }
   void NudgeScale(int ch, int dir) {
-    const int max = OC::Scales::NUM_SCALES;
-    int16_t &s = quant_scale[ch];
-
-    s+= dir;
-    if (s >= max) s = 0;
-    if (s < 0) s = max - 1;
-    QuantizerConfigure(ch, s, q_mask[ch]);
+    q_engine[ch].NudgeScale(dir);
   }
   void RotateMask(int ch, int dir) {
-    const size_t scale_size = OC::Scales::GetScale( quant_scale[ch] ).num_notes;
-    uint16_t &mask = q_mask[ch];
-    uint16_t used_bits = ~(0xffffU << scale_size);
-    mask &= used_bits;
-
-    if (dir < 0) {
-      dir = -dir;
-      mask = (mask >> dir) | (mask << (scale_size - dir));
-    } else {
-      mask = (mask << dir) | (mask >> (scale_size - dir));
-    }
-    mask |= ~used_bits; // fill upper bits
-
-    quantizer[ch].Configure(OC::Scales::GetScale(quant_scale[ch]), mask);
+    q_engine[ch].RotateMask(dir);
   }
   void QuantizerEdit(int ch) {
     qview = constrain(ch, 0, QUANT_CHANNEL_COUNT - 1);
@@ -181,7 +155,7 @@ namespace HS {
   void QEditEncoderMove(bool rightenc, int dir) {
     if (!rightenc) {
       // left encoder moves q_edit cursor
-      const int scale_size = OC::Scales::GetScale( quant_scale[qview] ).num_notes;
+      const int scale_size = q_engine[qview].Size();
       q_edit = constrain(q_edit + dir, 1, 3 + scale_size);
     } else {
       // right encoder is delegated
@@ -193,8 +167,7 @@ namespace HS {
         RotateMask(qview, dir);
       } else { // edit mask bits
         const int idx = q_edit - 4;
-        uint16_t mask = dir>0 ? (q_mask[qview] | (1u << idx)) : (q_mask[qview] & ~(1u << idx));
-        QuantizerConfigure(qview, quant_scale[qview], mask);
+        q_engine[qview].EditMask(idx, dir>1);
       }
     }
   }
@@ -286,23 +259,24 @@ namespace HS {
         break;
       case QUANTIZER_POPUP:
       {
-        const int root = (next_ch > -1) ? next_root_note : root_note[qview];
-        const int octave = (next_ch > -1) ? next_octave : q_octave[qview];
+        auto &q = q_engine[qview];
+        const int root = (next_ch > -1) ? next_root_note : q.root_note;
+        const int octave = (next_ch > -1) ? next_octave : q.octave;
         graphics.print("Q");
         graphics.print(qview + 1);
         graphics.print(":");
-        graphics.print(OC::scale_names_short[ quant_scale[qview] ]);
+        graphics.print(OC::scale_names_short[ q.scale ]);
         graphics.print(" ");
         graphics.print(OC::Strings::note_names[ root ]);
         if (octave >= 0) graphics.print("+");
         graphics.print(octave);
 
         // scale mask
-        const size_t scale_size = OC::Scales::GetScale( quant_scale[qview] ).num_notes;
+        const size_t scale_size = q.Size();
         for (size_t i = 0; i < scale_size; ++i) {
           const int x = 24 + i*5;
 
-          if (q_mask[qview] >> i & 1)
+          if (q.mask >> i & 1)
             gfxRect(x, 40, 4, 4);
           else
             gfxFrame(x, 40, 4, 4);

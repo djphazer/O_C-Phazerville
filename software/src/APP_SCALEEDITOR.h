@@ -41,7 +41,7 @@ public:
 	}
 
 	void Resume() {
-        HS::quantizer[0].Configure(OC::Scales::GetScale(current_scale), 0xffff);
+        HS::q_engine[0].quantizer.Configure(OC::Scales::GetScale(current_scale), 0xffff);
         QuantizeCurrent();
 	}
 
@@ -50,7 +50,7 @@ public:
 
         // Scale monitor
         int32_t pitch = In(0);
-        int32_t quantized = HS::quantizer[0].Process(pitch, 0, 0);
+        int32_t quantized = HS::q_engine[0].quantizer.Process(pitch, 0, 0);
         Out(0, quantized);
 
         // Current note monitor
@@ -118,7 +118,7 @@ public:
             current_note = 0;
             undo_value = OC::user_scales[current_scale].notes[current_note];
             // Configure and force requantize for real-time monitoring purposes
-            HS::quantizer[0].Configure(OC::Scales::GetScale(current_scale), 0xffff);
+            HS::q_engine[0].quantizer.Configure(OC::Scales::GetScale(current_scale), 0xffff);
             QuantizeCurrent();
         }
     }
@@ -236,7 +236,7 @@ private:
         current_scale = constrain(current_scale + direction, 0, OC::Scales::SCALE_USER_COUNT - 1);
 
         // Configure and force requantize for real-time monitoring purposes
-        HS::quantizer[0].Configure(OC::Scales::GetScale(current_scale), 0xffff);
+        HS::q_engine[0].quantizer.Configure(OC::Scales::GetScale(current_scale), 0xffff);
         QuantizeCurrent();
 
         uint8_t length = static_cast<uint8_t>(OC::user_scales[current_scale].num_notes);
@@ -294,7 +294,7 @@ private:
         }
 
         // Configure and force requantize for real-time monitoring purposes
-        HS::quantizer[0].Configure(OC::Scales::GetScale(current_scale), 0xffff);
+        HS::q_engine[0].quantizer.Configure(OC::Scales::GetScale(current_scale), 0xffff);
         QuantizeCurrent();
 
         ResetCursor();
@@ -316,14 +316,14 @@ private:
         OC::user_scales[current_scale].notes[current_note] = new_value;
 
         // Configure and force requantize for real-time monitoring purposes
-        HS::quantizer[0].Configure(OC::Scales::GetScale(current_scale), 0xffff);
+        HS::q_engine[0].quantizer.Configure(OC::Scales::GetScale(current_scale), 0xffff);
         QuantizeCurrent();
     }
 
     void ImportScale() {
         OC::Scale source = OC::Scales::GetScale(current_import_scale);
         memcpy(&OC::user_scales[current_scale], &source, sizeof(source));
-        HS::quantizer[0].Configure(OC::Scales::GetScale(current_scale), 0xffff);
+        HS::q_engine[0].quantizer.Configure(OC::Scales::GetScale(current_scale), 0xffff);
         QuantizeCurrent();
         import_mode = 0;
         undo_value = OC::user_scales[current_scale].notes[current_note];
@@ -336,9 +336,9 @@ private:
 
     void QuantizeCurrent() {
         int transpose = OC::user_scales[current_scale].span * octave;
-        HS::quantizer[0].Requantize();
-        current_quantized = HS::quantizer[0].Process(OC::user_scales[current_scale].notes[current_note] + transpose, 0, 0);
-        HS::quantizer[0].Requantize(); // This is for the next one in the Controller
+        HS::q_engine[0].quantizer.Requantize();
+        current_quantized = HS::q_engine[0].quantizer.Process(OC::user_scales[current_scale].notes[current_note] + transpose, 0, 0);
+        HS::q_engine[0].quantizer.Requantize(); // This is for the next one in the Controller
     }
 };
 

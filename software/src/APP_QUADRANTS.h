@@ -61,10 +61,8 @@ public:
         audio_app.Init();
 
         for (int i = 0; i < QUANT_CHANNEL_COUNT; ++i) {
-            quant_scale[i] = (i<4)? OC::Scales::SCALE_SEMI : i-4;
-            q_mask[i] = 0xffff;
-            quantizer[i].Init();
-            quantizer[i].Configure(OC::Scales::GetScale(quant_scale[i]), q_mask[i]);
+            q_engine[i].quantizer.Init();
+            q_engine[i].Configure( (i<4)? OC::Scales::SCALE_SEMI : i-4, 0xffff);
         }
 
         SetApplet(HEM_SIDE(0), HS::get_applet_index_by_id(18)); // DualTM
@@ -186,11 +184,13 @@ public:
             int16_t scale_factor; // precision of 0.01% as an offset from 100%
             int8_t transpose; // in semitones
           */
+          auto &q = q_engine[qslot];
           data = PackPackables(
-              HS::quant_scale[qslot],
-              HS::q_octave[qslot],
-              HS::root_note[qslot],
-              HS::q_mask[qslot]);
+              q.scale,
+              q.octave,
+              q.root_note,
+              q.mask
+              );
           PhzConfig::setValue(Q_ENGINE_KEY + qslot, data);
         }
 
@@ -279,12 +279,13 @@ public:
         for (size_t qslot = 0; qslot < QUANT_CHANNEL_COUNT; ++qslot) {
           if (!PhzConfig::getValue(Q_ENGINE_KEY + qslot, data))
               break;
+          auto &q = q_engine[qslot];
           UnpackPackables(data,
-              HS::quant_scale[qslot],
-              HS::q_octave[qslot],
-              HS::root_note[qslot],
-              HS::q_mask[qslot]);
-          QuantizerConfigure(qslot, quant_scale[qslot], q_mask[qslot]);
+              q.scale,
+              q.octave,
+              q.root_note,
+              q.mask);
+          q.Reconfig();
         }
 
         // User Patterns aka Sequences
@@ -1236,16 +1237,17 @@ private:
 
           const bool upper = config_cursor < QUANT5;
           const int ch_view = upper ? ch : ch + 4;
+          auto &q = q_engine[ch_view];
 
           gfxIcon(x + 3, upper? 25 : 45, upper? UP_BTN_ICON : DOWN_BTN_ICON);
 
           // Scale
-          gfxPrint(x - 3, 30, OC::scale_names_short[ HS::quant_scale[ch_view] ]);
+          gfxPrint(x - 3, 30, OC::scale_names_short[ q.scale ]);
 
           // Root Note + Octave
-          gfxPrint(x - 3, 40, OC::Strings::note_names[ HS::root_note[ch_view] ]);
-          if (HS::q_octave[ch_view] >= 0) gfxPrint("+");
-          gfxPrint(HS::q_octave[ch_view]);
+          gfxPrint(x - 3, 40, OC::Strings::note_names[ q.root_note ]);
+          if (q.octave >= 0) gfxPrint("+");
+          gfxPrint(q.octave);
 
           // (TODO: mask editor)
 

@@ -168,7 +168,7 @@ public:
             channel[ch].transpose = values_[ix++] - CAL8_MAX_TRANSPOSE;
             const int overflow = channel[ch].transpose / ssize_;
             if (overflow != 0) {
-              HS::q_octave[ch] = constrain(overflow, -octave_max, octave_max);
+              q_engine[ch].octave = constrain(overflow, -octave_max, octave_max);
               channel[ch].transpose %= ssize_;
             }
 
@@ -177,7 +177,7 @@ public:
             channel[ch].mode = ((root_and_mode >> 4) & 0x03) % NR_OF_CLOCKMODES;
             HS::SetRootNote(ch, int(root_and_mode & 0x0f) );
 
-            HS::q_mask[ch] = values_[ix++];
+            q_engine[ch].mask = values_[ix++];
         }
 
         return true;
@@ -192,11 +192,11 @@ public:
             values_[ix++] = scale;
             values_[ix++] = channel[ch].scale_factor + 500;
             values_[ix++] = channel[ch].offset + 63;
-            values_[ix++] = channel[ch].transpose + HS::q_octave[ch] * SCALE_SIZE(scale) + CAL8_MAX_TRANSPOSE;
+            values_[ix++] = channel[ch].transpose + q_engine[ch].octave * SCALE_SIZE(scale) + CAL8_MAX_TRANSPOSE;
             values_[ix++] = uint8_t(channel[ch].chained << 7)
                           | ((channel[ch].mode & 0x03) << 4)
                           | (HS::GetRootNote(ch) & 0x0f);
-            values_[ix++] = HS::q_mask[ch];
+            values_[ix++] = q_engine[ch].mask;
         }
     }
 
@@ -230,13 +230,13 @@ public:
 
     void ClearPreset() {
         for (int ch = 0; ch < QUANT_CHANNEL_COUNT; ++ch) {
-            HS::quantizer[ch].Init();
+            q_engine[ch].quantizer.Init();
 #ifdef ARDUINO_TEENSY41
-            HS::QuantizerConfigure(ch, OC::Scales::SCALE_SEMI, 0xffff);
+            q_engine[ch].Configure(OC::Scales::SCALE_SEMI, 0xffff);
 #else
             // Q1..Q4 default to Semitones
             // Q5..Q8 get initialized as USR1..USR4
-            HS::QuantizerConfigure(ch, (ch<4) ? OC::Scales::SCALE_SEMI : ch - 4, 0xffff);
+            q_engine[ch].Configure((ch<4) ? OC::Scales::SCALE_SEMI : ch - 4, 0xffff);
 #endif
         }
 
@@ -284,7 +284,7 @@ public:
     void Resume() {
         // restore quantizer settings
         for (int ch = 0; ch < DAC_CHANNEL_LAST; ++ch) {
-            HS::quantizer[ch].Requantize();
+            q_engine[ch].quantizer.Requantize();
         }
     }
 
@@ -347,15 +347,16 @@ public:
 
         if (dothething) {
           // reconfigure with MIDI-derived masks
+          // TODO: probably needs attention with new MIDI maps...
           for (int ch = 0; ch < DAC_CHANNEL_LAST; ++ch) {
             uint16_t mask_ = HS::frame.MIDIState.semitone_mask[ch];
 
             if (mask_) // manually override global config
-              HS::quantizer[ch].Configure(OC::Scales::GetScale(OC::Scales::SCALE_SEMI), mask_);
+              q_engine[ch].quantizer.Configure(OC::Scales::GetScale(OC::Scales::SCALE_SEMI), mask_);
             else // restore global config
-              HS::quantizer[ch].Configure(OC::Scales::GetScale(HS::quant_scale[ch]), 0xffff);
+              q_engine[ch].Reconfig();
 
-            HS::quantizer[ch].Requantize();
+            q_engine[ch].quantizer.Requantize();
           }
         }
     }
@@ -387,7 +388,7 @@ public:
 
                 if (HS::GetScale(ch) == OC::Scales::SCALE_NONE) {
                   // transpose raw value in semitones
-                  cfg.last_note = input_cv + (cfg.transpose_active << 7) + q_octave[ch] * (12 << 7);
+                  cfg.last_note = input_cv  + (cfg.transpose_active << 7) + q_engine[ch].octave * (12 << 7);
                 } else {
                   cfg.last_note = HS::Quantize(ch, input_cv, 0, cfg.transpose_active);
                 }
@@ -555,17 +556,18 @@ public:
             return;
         }
 
+        auto &q = q_engine[sel_chan];
         preset_modified = 1;
         if (HS::q_edit) {
             // Scale Select
             HS::NudgeScale(sel_chan, direction);
-            HS::quantizer[sel_chan].Requantize();
+            q.quantizer.Requantize();
             return;
         }
 
         if (!edit_mode) { // Octave jump
-          HS::q_octave[sel_chan] += direction;
-          CONSTRAIN(HS::q_octave[sel_chan], -octave_max, octave_max);
+          q.octave += direction;
+          CONSTRAIN(q.octave, -octave_max, octave_max);
         }
         else if ( OC::DAC::calibration_data_used( DAC_CHANNEL(sel_chan) ) != 0x01 ) // not autotuned
         {
@@ -589,7 +591,7 @@ public:
         if (HS::q_edit) {
             // Root Note
             HS::SetRootNote(sel_chan, HS::GetRootNote(sel_chan) + direction);
-            HS::quantizer[sel_chan].Requantize();
+            q_engine[sel_chan].quantizer.Requantize();
             return;
         }
 
@@ -606,8 +608,9 @@ public:
       CONSTRAIN(val, -CAL8_MAX_TRANSPOSE, CAL8_MAX_TRANSPOSE);
       const int overflow = val / ssize_;
       if (overflow != 0) {
-        HS::q_octave[chan] += overflow;
-        CONSTRAIN(HS::q_octave[chan], -octave_max, octave_max);
+        auto &q = q_engine[chan];
+        q.octave += overflow;
+        CONSTRAIN(q.octave, -octave_max, octave_max);
         val %= ssize_;
       }
       channel[chan].transpose = val;
@@ -687,7 +690,7 @@ public:
 
         // -- LCD Display Section --
         int s = SCALE_SIZE(HS::GetScale(sel_chan));
-        int degrees = channel[sel_chan].transpose + HS::q_octave[sel_chan] * s;
+        int degrees = channel[sel_chan].transpose + q_engine[sel_chan].octave * s;
         const bool positive = degrees >= 0;
         const int octave = degrees / s;
         degrees %= s;

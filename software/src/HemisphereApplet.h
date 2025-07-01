@@ -270,11 +270,8 @@ public:
     }
 
     // Quantizer helpers
-    braids::Quantizer* GetQuantizer(int ch) {
-      return &HS::quantizer[io_offset + ch];
-    }
     int GetLatestNoteNumber(int ch) {
-      return HS::quantizer[io_offset + ch].GetLatestNoteNumber();
+      return HS::GetLatestNoteNumber(ch);
     }
     int Quantize(int ch, int cv, int root = 0, int transpose = 0) {
       return HS::Quantize(ch + io_offset, cv, root, transpose);
@@ -282,21 +279,21 @@ public:
     int QuantizerLookup(int ch, int note) {
       return HS::QuantizerLookup(ch + io_offset, note);
     }
+    void QuantizerConfigure(int ch, int scale, uint16_t mask = 0xffff) {
+      q_engine[ch].Configure(scale, mask);
+    }
     void SetScale(int ch, int scale) {
       QuantizerConfigure(ch, scale);
     }
-    void QuantizerConfigure(int ch, int scale, uint16_t mask = 0xffff) {
-      HS::QuantizerConfigure(ch + io_offset, scale, mask);
-    }
     int GetScale(int ch) {
-      return HS::quant_scale[io_offset + ch];
+      return q_engine[io_offset + ch].scale;
     }
     int GetRootNote(int ch) {
-      return HS::root_note[io_offset + ch];
+      return q_engine[io_offset + ch].root_note;
     }
     int SetRootNote(int ch, int root) {
       CONSTRAIN(root, 0, 11);
-      return (HS::root_note[io_offset + ch] = root);
+      return (q_engine[io_offset + ch].root_note = root);
     }
     void NudgeScale(int ch, int dir) {
       HS::NudgeScale(ch + io_offset, dir);

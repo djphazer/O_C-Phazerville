@@ -46,11 +46,6 @@
 #include "hemisphere_audio_config.h"
 #endif
 
-#ifdef ENABLE_APP_CALIBR8OR
-// We depend on Calibr8or to save quantizer settings
-#include "APP_CALIBR8OR.h"
-#endif
-
 void HS::DrawAppletList(bool blink) {
   const size_t LineH = 12;
 
@@ -93,7 +88,7 @@ enum HEMISPHERE_SETTINGS {
     HEMISPHERE_TRIGMAP,
     HEMISPHERE_CVMAP,
     HEMISPHERE_GLOBALS,
-    HEMISPHERE_SETTING_LAST
+    HEMISPHERE_SETTINGS_COUNT
 };
 
 #ifdef __IMXRT1062__
@@ -114,7 +109,7 @@ static constexpr int HEM_NR_OF_PRESETS = 8;
 #ifdef __IMXRT1062__
 #else
 class HemispherePreset : public SystemExclusiveHandler,
-    public settings::SettingsBase<HemispherePreset, HEMISPHERE_SETTING_LAST> {
+    public settings::SettingsBase<HemispherePreset, HEMISPHERE_SETTINGS_COUNT> {
 public:
     int GetAppletId(int h) {
         return (h == LEFT_HEMISPHERE) ? values_[HEMISPHERE_SELECTED_LEFT_ID]
@@ -244,7 +239,10 @@ public:
 
 };
 
-HemispherePreset hem_presets[HEM_NR_OF_PRESETS + 1];
+// 4 extra presets for global data... it's a dirty hack for T32,
+// if you're willing to hoard most of the EEPROM space just for Hemisphere.
+// This pretty much kills Custom Builds.
+HemispherePreset hem_presets[HEM_NR_OF_PRESETS + 4];
 HemispherePreset *hem_active_preset = 0;
 #endif
 
@@ -269,10 +267,8 @@ public:
         // These are overwritten later by Calibr8or::Start(),
         // thus completing the hack of persistent quantizer settings on T32
         for (int i = 0; i < QUANT_CHANNEL_COUNT; ++i) {
-            quant_scale[i] = (i<4)? OC::Scales::SCALE_SEMI : i-4;
-            q_mask[i] = 0xffff;
-            quantizer[i].Init();
-            quantizer[i].Configure(OC::Scales::GetScale(quant_scale[i]), q_mask[i]);
+            q_engine[i].quantizer.Init();
+            q_engine[i].Configure( (i<4)? OC::Scales::SCALE_SEMI : i-4, 0xffff);
         }
 
         showhide_cursor.Init(0, HEMISPHERE_AVAILABLE_APPLETS - 1);
@@ -291,12 +287,22 @@ public:
 #else
         if (!hem_active_preset)
             LoadFromPreset(0);
-#endif
-        // restore quantizer settings
-        for (int i = 0; i < 4; ++i) {
-            quantizer[i].Init();
-            quantizer[i].Configure(OC::Scales::GetScale(quant_scale[i]), 0xffff);
+
+        // Restore global quantizer settings
+        for (size_t qslot = 0; qslot < QUANT_CHANNEL_COUNT; ++qslot) {
+          uint64_t data = hem_presets[HEM_NR_OF_PRESETS + 1 + (qslot/3)].GetData(HEM_SIDE(qslot));
+          if (data == 0) break; // don't load blanks
+          auto &q = q_engine[qslot];
+          UnpackPackables(data,
+              q.scale,
+              q.octave,
+              q.root_note,
+              q.mask
+              );
+          q.Reconfig();
         }
+
+#endif
     }
     void Suspend() {
 #ifdef __IMXRT1062__
@@ -341,11 +347,6 @@ public:
 
         // initiate actual EEPROM save - ONLY if necessary!
         if (doSave && !skip_eeprom) {
-#ifdef ENABLE_APP_CALIBR8OR
-          // call Calibr8or so it remembers quantizer settings
-          // this also takes care of the EEPROM save
-          Calibr8or_instance.SavePreset();
-#else
           // initiate actual EEPROM save
           OC::CORE::app_isr_enabled = false;
           //OC::draw_save_message(32);
@@ -354,7 +355,6 @@ public:
           OC::CORE::app_isr_enabled = true;
 
           PokePopup(HS::MESSAGE_POPUP, HS::PRESET_SAVED);
-#endif
         }
     }
 #endif
@@ -424,11 +424,13 @@ public:
             int16_t scale_factor; // precision of 0.01% as an offset from 100%
             int8_t transpose; // in semitones
           */
+          auto &q = q_engine[qslot];
           data = PackPackables(
-              HS::quant_scale[qslot],
-              HS::q_octave[qslot],
-              HS::root_note[qslot],
-              HS::q_mask[qslot]);
+              q.scale,
+              q.octave,
+              q.root_note,
+              q.mask
+              );
           PhzConfig::setValue(Q_ENGINE_KEY + qslot, data);
         }
 
@@ -492,12 +494,13 @@ public:
         for (size_t qslot = 0; qslot < QUANT_CHANNEL_COUNT; ++qslot) {
           if (!PhzConfig::getValue(Q_ENGINE_KEY + qslot, data))
               break;
+          auto &q = q_engine[qslot];
           UnpackPackables(data,
-              HS::quant_scale[qslot],
-              HS::q_octave[qslot],
-              HS::root_note[qslot],
-              HS::q_mask[qslot]);
-          QuantizerConfigure(qslot, quant_scale[qslot], q_mask[qslot]);
+              q.scale,
+              q.octave,
+              q.root_note,
+              q.mask);
+          q.Reconfig();
         }
 #else
         // T3.2 uses EEPROM interface
@@ -1353,16 +1356,17 @@ private:
 
           const bool upper = config_cursor < QUANT5;
           const int ch_view = upper ? ch : ch + 4;
+          auto &q = q_engine[ch_view];
 
           gfxIcon(x + 3, upper? 25 : 45, upper? UP_BTN_ICON : DOWN_BTN_ICON);
 
           // Scale
-          gfxPrint(x - 3, 30, OC::scale_names_short[ HS::quant_scale[ch_view] ]);
+          gfxPrint(x - 3, 30, OC::scale_names_short[ q.scale ]);
 
           // Root Note + Octave
-          gfxPrint(x - 3, 40, OC::Strings::note_names[ HS::root_note[ch_view] ]);
-          if (HS::q_octave[ch_view] >= 0) gfxPrint("+");
-          gfxPrint(HS::q_octave[ch_view]);
+          gfxPrint(x - 3, 40, OC::Strings::note_names[ q.root_note ]);
+          if (q.octave >= 0) gfxPrint("+");
+          gfxPrint(q.octave);
 
           // (TODO: mask editor)
 
@@ -1498,7 +1502,7 @@ private:
 #ifdef __IMXRT1062__
 #else
 // TOTAL EEPROM SIZE: 8 presets * 32 bytes
-SETTINGS_DECLARE(HemispherePreset, HEMISPHERE_SETTING_LAST) {
+SETTINGS_DECLARE(HemispherePreset, HEMISPHERE_SETTINGS_COUNT) {
     {0, 0, 255, "Applet ID L", NULL, settings::STORAGE_TYPE_U8},
     {0, 0, 255, "Applet ID R", NULL, settings::STORAGE_TYPE_U8},
     {0, 0, 65535, "Data L block 1", NULL, settings::STORAGE_TYPE_U16},
@@ -1546,7 +1550,7 @@ static constexpr size_t HEMISPHERE_storageSize() {
 #ifdef __IMXRT1062__
     return 0;
 #else
-    return HemispherePreset::storageSize() * (HEM_NR_OF_PRESETS + 1);
+    return HemispherePreset::storageSize() * (HEM_NR_OF_PRESETS + 4);
 #endif
 }
 
@@ -1560,8 +1564,20 @@ static size_t HEMISPHERE_save(void *storage) {
 
     hem_presets[HEM_NR_OF_PRESETS].SetGlobals(HS::frame.MIDIState.pc_channel);
 
+    // Global quantizer settings
+    for (size_t qslot = 0; qslot < QUANT_CHANNEL_COUNT; ++qslot) {
+      auto &q = q_engine[qslot];
+      uint64_t data = PackPackables(
+          q.scale,
+          q.octave,
+          q.root_note,
+          q.mask);
+      // dirty haxxx
+      hem_presets[HEM_NR_OF_PRESETS + 1 + (qslot/3)].SetData(HEM_SIDE(qslot), data);
+    }
+
     size_t used = 0;
-    for (int i = 0; i <= HEM_NR_OF_PRESETS; ++i) {
+    for (int i = 0; i < HEM_NR_OF_PRESETS + 4; ++i) {
         used += hem_presets[i].Save(static_cast<char*>(storage) + used);
     }
     return used;
@@ -1573,7 +1589,7 @@ static size_t HEMISPHERE_restore(const void *storage) {
     return 0;
 #else
     size_t used = 0;
-    for (int i = 0; i <= HEM_NR_OF_PRESETS; ++i) {
+    for (int i = 0; i < HEM_NR_OF_PRESETS + 4; ++i) {
         used += hem_presets[i].Restore(static_cast<const char*>(storage) + used);
     }
 
