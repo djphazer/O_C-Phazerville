@@ -213,8 +213,11 @@ void setup() {
   PhzConfig::setup();
 
   // USB Host support for both 4.0 and 4.1
-//   usbHostMIDI.begin();
-  gamepad.begin(); // do something to enable midi or js conditionally
+  #ifdef ENABLE_GAMEPAD
+  gamepad.begin();
+  #else
+  usbHostMIDI.begin();
+  #endif
 #endif
 
   // Display splash screen and optional calibration

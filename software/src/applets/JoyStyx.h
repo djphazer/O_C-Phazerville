@@ -38,8 +38,8 @@ class JoyStyx : public HemisphereApplet {
         void Start() {
             gamepad_type = gs.gamepad_type;
             switch (gamepad_type) {
-                case (JoystickController::joytype_t::UNKNOWN):
-                    gp = &UNKNOWN;
+                case (JoystickController::joytype_t::PS4):
+                    gp = &PS4;
                     break;
                 case (JoystickController::joytype_t::XBOXONE):
                     gp = &XBOXONE;
@@ -48,7 +48,9 @@ class JoyStyx : public HemisphereApplet {
                 case (JoystickController::joytype_t::XBOX360USB):
                     gp = &XBOX360;
                     break;
-                default: break;
+                default:
+                    gp = &UNKNOWN;
+                    break;
             }
 
             param[0] = 0;
@@ -59,8 +61,8 @@ class JoyStyx : public HemisphereApplet {
             if (gamepad_type != gs.gamepad_type) {
                 gamepad_type = gs.gamepad_type;
                 switch (gamepad_type) {
-                    case (JoystickController::joytype_t::UNKNOWN):
-                        gp = &UNKNOWN;
+                    case (JoystickController::joytype_t::PS4):
+                        gp = &PS4;
                         break;
                     case (JoystickController::joytype_t::XBOXONE):
                         gp = &XBOXONE;
@@ -69,7 +71,9 @@ class JoyStyx : public HemisphereApplet {
                     case (JoystickController::joytype_t::XBOX360USB):
                         gp = &XBOX360;
                         break;
-                    default: break;
+                    default:
+                        gp = &UNKNOWN;
+                        break;
                 }
                 ForEachChannel(ch) {
                     CONSTRAIN(param[ch], 0, gp->button_count-1 + gp->axis_count-1);
