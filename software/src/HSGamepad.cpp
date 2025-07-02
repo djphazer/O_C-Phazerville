@@ -2,7 +2,7 @@
 #include "HemisphereApplet.h"
 
 #ifdef __IMXRT1062__
-// #define GAMEPAD_DEBUG
+#define GAMEPAD_DEBUG
 
 GamePad UNKNOWN {
     .type_name = "UNKNOWN",
@@ -14,12 +14,7 @@ GamePad UNKNOWN {
     },
     .button_count = 16,
     .axis_name = (const char*[]){},
-    .axis_count = 0,
-    .trig_count = 0,
-    .trig_min = 0,
-    .trig_max = 0,
-    .axis_min = 0,
-    .axis_max = 0
+    .axis_count = 0
 };
 
 GamePad PS3 { // WIP
@@ -32,34 +27,28 @@ GamePad PS3 { // WIP
     },
     .button_count = 16,
     .axis_name = (const char*[]){},
-    .axis_count = 0,
-    .trig_count = 0,
-    .trig_min = 0,
-    .trig_max = 0,
-    .axis_min = 0,
-    .axis_max = 0
+    .axis_count = 0
 };
 
-GamePad PS4 {  // need to add D-Pad support
+GamePad PS4 {
     .type_name = "PS4",
     .button_name = (const char*[]){
-        "Sqr",  "Crs",  "Cir",  "Tri",
+        "SQR",  "CRS",  "CIR",  "TRI",
         "L1",   "R1",   "L2",   "R2",
-        "Shr",  "Opt",  "L3",   "R3",
-        "PS",   "TPad"
+        "SHR",  "OPT",  "L3",   "R3",
+        "PS",   "TPAD", "D_U",  "D_R",
+        "D_D",  "D_L"
     },
-    .button_count = 14,
+    .button_count = 18,
     .axis_name = (const char*[]){
         "LT", "RT",
         "LX", "LY",
-        "RX", "RY"
+        "RX", "RY",
+        // "GyroX", "GyroY", "GyroZ",
+        // "AcclX", "AcclY", "AcclZ",
+        // "PadX", "PadY"
     },
-    .axis_count = 6,
-    .trig_count = 2,
-    .trig_min = 0,
-    .trig_max = 255,
-    .axis_min = -128,
-    .axis_max = 127
+    .axis_count = 6
 };
 
 GamePad XBOX {  // WIP
@@ -74,19 +63,14 @@ GamePad XBOX {  // WIP
         "BLK",  "WHT",  "LT", "RT",
         "LX", "LY", "RX", "RY"
     },
-    .axis_count = 12,
-    .trig_count = 8,
-    .trig_min = 0,
-    .trig_max = 255,
-    .axis_min = -32768,
-    .axis_max = 32767
+    .axis_count = 12
 };
 
 GamePad XBOX360 {
     .type_name = "XBOX360",
     .button_name = (const char*[]){
         "D_U", "D_D", "D_L", "D_R",
-        ">",   "<",   "L3",  "R3",
+        "STRT",   "BACK",   "L3",  "R3",
         "LB",  "RB",  "(X)", "?",
         "A",   "B",   "X",   "Y"
     },
@@ -96,12 +80,7 @@ GamePad XBOX360 {
         "LX", "LY",
         "RX", "RY"
     },
-    .axis_count = 6,
-    .trig_count = 2,
-    .trig_min = 0,
-    .trig_max = 255,
-    .axis_min = -32768,
-    .axis_max = 32767
+    .axis_count = 6
 };
 
 GamePad XBOXONE {
@@ -118,35 +97,24 @@ GamePad XBOXONE {
         "LX", "LY",
         "RX", "RY"
     },
-    .axis_count = 6,
-    .trig_count = 2,
-    .trig_min = 0,
-    .trig_max = 1023,
-    .axis_min = -32768,
-    .axis_max = 32767
+    .axis_count = 6
 };
 
 GamePad SNES {
     .type_name = "SNES",
     .button_name = (const char*[]){
         "X",  "A",  "B",  "Y",
-        "L",  "R",  "-",  "-",
+        "L",  "R",  "...",  "...",
         "SEL",  "STRT"
     },
     .button_count = 10,
     .axis_name = (const char*[]){
         "D_X", "D_Y"
     },
-    .axis_count = 2,
-    .trig_count = 0,
-    .trig_min = 0,
-    .trig_max = 0,
-    .axis_min = -128,
-    .axis_max = 127
+    .axis_count = 2
 };
 
 // GamePad N64 {
-
 // };
 
 
@@ -154,9 +122,13 @@ GamePad SNES {
 // changing address will break association to your PS3
 uint8_t ps3_address[6] = {0x01, 0x01, 0x01, 0x3c, 0x2b , 0x1a}; // {0x1a, 0x2b, 0x3c, 0x01, 0x01, 0x01};
 
-static int axis_change_threshold;
+static int data;
+static int scaled_axis[GAMEPAD_AXIS_MAX];
+
+static constexpr int axis_change_threshold = (-HEMISPHERE_MIN_CV) / 8;
 
 static bool connected = false;
+
 
 void ProcessGamepad(JoystickController &device) {
     HS::IOFrame &f = HS::frame;
@@ -182,185 +154,342 @@ void ProcessGamepad(JoystickController &device) {
 #ifdef GAMEPAD_DEBUG
             Serial.printf("axis mask: %x\n", axis_changed_mask);
 #endif
-            int16_t ltv; // left trigger value (axis[0])
-            int16_t rtv; // right trigger value (axis[1])
-            int16_t ljs_x; // left joy stick, x value (axis[2])
-            int16_t ljs_y; // left joy stick, y value (axis[3])
-            int16_t rjs_x; // right joy stick, x value (axis[4])
-            int16_t rjs_y; // right joy stick, y value (axis[5])
-            // int tilt_x; // future
-            // int tily_y; // future
-
             switch (f.GamepadState.gamepad_type) {
                 // case JoystickController::PS3: {
-                //     ltv = device.getAxis(18);
-                //     rtv = device.getAxis(19);
-                //     if ((ltv != f.GamepadState.axis[0]) || (rtv != f.GamepadState.axis[1])) {
-                //         f.GamepadState.axis[0] = ltv;
-                //         f.GamepadState.axis[1] = rtv;
-                //         device.setRumble(ltv, rtv, 50);
+                //     scaled_axis[0] = device.getAxis(18);
+                //     scaled_axis[1] = device.getAxis(19);
+                //     if ((scaled_axis[0] != f.GamepadState.axis[0]) || (scaled_axis[1] != f.GamepadState.axis[1])) {
+                //         f.GamepadState.axis[0] = scaled_axis[0];
+                //         f.GamepadState.axis[1] = scaled_axis[1];
+                //         device.setRumble(scaled_axis[0], scaled_axis[1], 50);
                 //     }
                 //     break;
                 // }
+
                 case JoystickController::PS4: {
-                    axis_change_threshold = 256 / 8;
-                    /* triggers */
-                    ltv = device.getAxis(3);
-                    if (ltv != f.GamepadState.axis[0]) {
-                        f.GamepadState.axis[0] = ltv;
-                        f.GamepadState.last_changed = PS4.button_count + 0;
+                /* triggers */
+                    // left trigger
+                    if (axis_changed_mask & (1 << 3)) {
+                        data = device.getAxis(3);  // 8-bit data range
+                        scaled_axis[0] = Proportion(data,  (data < 0) ? 0 : 255,  (data < 0) ? HEMISPHERE_MIN_CV : HEMISPHERE_MAX_CV);
+                        if (scaled_axis[0] != f.GamepadState.axis[0]) {
+                            f.GamepadState.axis[0] = scaled_axis[0];
+                            f.GamepadState.last_changed = PS4.button_count + 0;
+                        }
                     }
-                    rtv = device.getAxis(4);
-                    if (rtv != f.GamepadState.axis[1]) {
-                        f.GamepadState.axis[1] = rtv;
-                        f.GamepadState.last_changed = PS4.button_count + 1;
+                    // right trigger
+                    if (axis_changed_mask & (1 << 4)) {
+                        data = device.getAxis(4);
+                        scaled_axis[1] = Proportion(data,  (data < 0) ? 0 : 255,  (data < 0) ? HEMISPHERE_MIN_CV : HEMISPHERE_MAX_CV);
+                        if (scaled_axis[1] != f.GamepadState.axis[1]) {
+                            f.GamepadState.axis[1] = scaled_axis[1];
+                            f.GamepadState.last_changed = PS4.button_count + 1;
+                        }
                     }
-                    /* axes */
-                    ljs_x = device.getAxis(0) - 128;
-                    if (f.GamepadState.axis[2] != ljs_x) {
-                        if (abs(f.GamepadState.axis[2] - ljs_x) > 0)
-                            f.GamepadState.last_changed = PS4.button_count + 2;
-                        f.GamepadState.axis[2] = ljs_x;
+
+                /* axes */
+                    // left joystick x-axis
+                    if (axis_changed_mask & (1 << 0)) {
+                        data = device.getAxis(0) - 128;  // 8-bit data range, center is 127
+                        scaled_axis[2] = Proportion(data,  (data < 0) ? -128 : 127,  (data < 0) ? HEMISPHERE_MIN_CV : HEMISPHERE_MAX_CV);
+                        if (f.GamepadState.axis[2] != scaled_axis[2]) {
+                            if (abs(f.GamepadState.axis[2] - scaled_axis[2]) > axis_change_threshold)
+                                f.GamepadState.last_changed = PS4.button_count + 2;
+                            f.GamepadState.axis[2] = scaled_axis[2];
+                        }
                     }
-                    ljs_y = 255 - device.getAxis(1) - 128;
-                    if (f.GamepadState.axis[3] != ljs_y) {
-                        if (abs(f.GamepadState.axis[3] - ljs_y) > 32)
-                            f.GamepadState.last_changed = PS4.button_count + 3;
-                        f.GamepadState.axis[3] = ljs_y;
+                    // left joystick y-axis
+                    if (axis_changed_mask & (1 << 1)) {
+                        data = 255 - device.getAxis(1) - 128;  // y-axis is inverted
+                        scaled_axis[3] = Proportion(data,  (data < 0) ? -128 : 127,  (data < 0) ? HEMISPHERE_MIN_CV : HEMISPHERE_MAX_CV);
+                        if (f.GamepadState.axis[3] != scaled_axis[3]) {
+                            if (abs(f.GamepadState.axis[3] - scaled_axis[3]) > axis_change_threshold)
+                                f.GamepadState.last_changed = PS4.button_count + 3;
+                            f.GamepadState.axis[3] = scaled_axis[3];
+                        }
                     }
-                    rjs_x = device.getAxis(2) - 128;
-                    if (f.GamepadState.axis[4] != rjs_x) {
-                        if (abs(f.GamepadState.axis[4] - rjs_x) > 0)
-                            f.GamepadState.last_changed = PS4.button_count + 4;
-                        f.GamepadState.axis[4] = rjs_x;
+                    // right joystick x-axis
+                    if (axis_changed_mask & (1 << 2)) {
+                        data = device.getAxis(2) - 128;
+                        scaled_axis[4] = Proportion(data,  (data < 0) ? -128 : 127,  (data < 0) ? HEMISPHERE_MIN_CV : HEMISPHERE_MAX_CV);
+                        if (f.GamepadState.axis[4] != scaled_axis[4]) {
+                            if (abs(f.GamepadState.axis[4] - scaled_axis[4]) > axis_change_threshold)
+                                f.GamepadState.last_changed = PS4.button_count + 4;
+                            f.GamepadState.axis[4] = scaled_axis[4];
+                        }
                     }
-                    rjs_y = 255 - device.getAxis(5) - 128;
-                    if (f.GamepadState.axis[5] != rjs_y) {
-                        if (abs(f.GamepadState.axis[5] - rjs_y) > 0)
-                            f.GamepadState.last_changed = PS4.button_count + 5;
-                        f.GamepadState.axis[5] = rjs_y;
+                    // right joystick y-axis
+                    if (axis_changed_mask & (1 << 5)) {
+                        data = 255 - device.getAxis(5) - 128;  // y-axis is inverted
+                        scaled_axis[5] = Proportion(data,  (data < 0) ? -128 : 127,  (data < 0) ? HEMISPHERE_MIN_CV : HEMISPHERE_MAX_CV);
+                        if (f.GamepadState.axis[5] != scaled_axis[5]) {
+                            if (abs(f.GamepadState.axis[5] - scaled_axis[5]) > axis_change_threshold)
+                                f.GamepadState.last_changed = PS4.button_count + 5;
+                            f.GamepadState.axis[5] = scaled_axis[5];
+                        }
                     }
-                    /* feedback */
+
+                /* d-pad */
+                    enum DPadShift {
+                        UP_SHIFT = 14,
+                        RIGHT_SHIFT = 15,
+                        DOWN_SHIFT = 16,
+                        LEFT_SHIFT = 17
+                    };
+                    enum HatSwitch {
+                        UP = 0,
+                        UP_RIGHT,
+                        RIGHT,
+                        RIGHT_DOWN,
+                        DOWN,
+                        DOWN_LEFT,
+                        LEFT,
+                        LEFT_UP,
+                        OFF = 8
+                    };
+                    data = device.getAxis(9);
+                    int dpad_state = 0;
+                    for (int d = UP_SHIFT; d <= LEFT_SHIFT; ++d) {
+                        switch (d) {
+                            case UP_SHIFT:
+                                    dpad_state = (data == HatSwitch::LEFT_UP)
+                                            || (data == HatSwitch::UP)
+                                            || (data == HatSwitch::UP_RIGHT);
+                                    break;
+                            case RIGHT_SHIFT:
+                                    dpad_state = (data == HatSwitch::UP_RIGHT)
+                                            || (data == HatSwitch::RIGHT)
+                                            || (data == HatSwitch::RIGHT_DOWN);
+                                    break;
+                            case DOWN_SHIFT:
+                                    dpad_state = (data == HatSwitch::RIGHT_DOWN)
+                                            || (data == HatSwitch::DOWN)
+                                            || (data == HatSwitch::DOWN_LEFT);
+                                    break;
+                            case LEFT_SHIFT:
+                                    dpad_state = (data == HatSwitch::DOWN_LEFT)
+                                            || (data == HatSwitch::LEFT)
+                                            || (data == HatSwitch::LEFT_UP);
+                                    break;
+                        }
+                        buttons = (buttons & ~(1 << d)) | ((dpad_state & 1) << d);
+                    }
+
+                /* test */
+                    // int mystery_axis;
+                    // for (int i = 6, j = 0; i < 16; ++i, j+=2) {
+                    //     mystery_axis = (int16_t)(device.getAxis(13+j) << 8) | (int8_t)device.getAxis(13+j+1);
+                    //     if (f.GamepadState.axis[i] != mystery_axis) {
+                    //         if (abs(f.GamepadState.axis[i] - mystery_axis) > 0)
+                    //             f.GamepadState.last_changed = PS4.button_count + i;
+                    //         f.GamepadState.axis[i] = mystery_axis;
+                    //     }
+                    // }
+
+                /* feedback */
                     if (f.GamepadState.set_rumble) {
                         f.GamepadState.set_rumble = false;
-                        device.setRumble(ltv, rtv);
+                        // int l, r;
+                        // device.setRumble(l, r);
                     }
+                    if (f.GamepadState.set_leds) {
+                        f.GamepadState.set_leds = false;
+                        // int r, g, b;
+                        // device.setLEDs(r, g, b);
+                    }
+
+                /* extra stuff */
                     // printAngles();
                     break;
                 }
+
                 // case JoystickController::XBOX: {
                 //     break;
                 // }
+
                 case JoystickController::XBOX360W:
                 case JoystickController::XBOX360USB: {
-                    axis_change_threshold = (-HEMISPHERE_MIN_CV) / 8;
-                    /* triggers */
-                    ltv = device.getAxis(4);
-                    if (ltv != f.GamepadState.axis[0]) {
-                        f.GamepadState.axis[0] = ltv;
-                        f.GamepadState.last_changed = XBOX360.button_count + 0;
+                /* triggers */
+                    // left trigger
+                    if (axis_changed_mask & (1 << 4)) {
+                        data = device.getAxis(4);  // 8-bit data range
+                        scaled_axis[0] = Proportion(data,  (data < 0) ? 0 : 255,  (data < 0) ? HEMISPHERE_MIN_CV : HEMISPHERE_MAX_CV);
+                        if (scaled_axis[0] != f.GamepadState.axis[0]) {
+                            f.GamepadState.axis[0] = scaled_axis[0];
+                            f.GamepadState.last_changed = XBOX360.button_count + 0;
+                        }
                     }
-                    rtv = device.getAxis(5);
-                    if (rtv != f.GamepadState.axis[1]) {
-                        f.GamepadState.axis[1] = rtv;
-                        f.GamepadState.last_changed = XBOX360.button_count + 1;
+                    // right trigger
+                    if (axis_changed_mask & (1 << 5)) {
+                        data = device.getAxis(5);
+                        scaled_axis[1] = Proportion(data,  (data < 0) ? 0 : 255,  (data < 0) ? HEMISPHERE_MIN_CV : HEMISPHERE_MAX_CV);
+                        if (scaled_axis[1] != f.GamepadState.axis[1]) {
+                            f.GamepadState.axis[1] = scaled_axis[1];
+                            f.GamepadState.last_changed = XBOX360.button_count + 1;
+                        }
                     }
-                    /* axes */
-                    ljs_x = device.getAxis(6);
-                    if (f.GamepadState.axis[2] != ljs_x) {
-                        if (abs(f.GamepadState.axis[2] - ljs_x) > axis_change_threshold)
-                            f.GamepadState.last_changed = XBOX360.button_count + 2;
-                        f.GamepadState.axis[2] = ljs_x;
+
+                /* axes */
+                    // left joystick x-axis
+                    if (axis_changed_mask & (1 << 6)) {
+                        data = device.getAxis(6); // signed 16-bit, little endian
+                        scaled_axis[2] = Proportion(data,  (data < 0) ? -32768 : 32767,  (data < 0) ? HEMISPHERE_MIN_CV : HEMISPHERE_MAX_CV);
+                        if (f.GamepadState.axis[2] != scaled_axis[2]) {
+                            if (abs(f.GamepadState.axis[2] - scaled_axis[2]) > axis_change_threshold)
+                                f.GamepadState.last_changed = XBOX360.button_count + 2;
+                            f.GamepadState.axis[2] = scaled_axis[2];
+                        }
                     }
-                    ljs_y = device.getAxis(8);
-                    if (f.GamepadState.axis[3] != ljs_y) {
-                        if (abs(f.GamepadState.axis[3] - ljs_y) > axis_change_threshold)
-                            f.GamepadState.last_changed = XBOX360.button_count + 3;
-                        f.GamepadState.axis[3] = ljs_y;
+                    // left joystick y-axis
+                    if (axis_changed_mask & (1 << 8)) {
+                        data = device.getAxis(8);
+                        scaled_axis[3] = Proportion(data,  (data < 0) ? -32768 : 32767,  (data < 0) ? HEMISPHERE_MIN_CV : HEMISPHERE_MAX_CV);
+                        if (f.GamepadState.axis[3] != scaled_axis[3]) {
+                            if (abs(f.GamepadState.axis[3] - scaled_axis[3]) > axis_change_threshold)
+                                f.GamepadState.last_changed = XBOX360.button_count + 3;
+                            f.GamepadState.axis[3] = scaled_axis[3];
+                        }
                     }
-                    rjs_x = device.getAxis(10);
-                    if (f.GamepadState.axis[4] != rjs_x) {
-                        if (abs(f.GamepadState.axis[4] - rjs_x) > axis_change_threshold)
-                            f.GamepadState.last_changed = XBOX360.button_count + 4;
-                        f.GamepadState.axis[4] = rjs_x;
+                    // right joystick x-axis
+                    if (axis_changed_mask & (1 << 10)) {
+                        data = device.getAxis(10);
+                        scaled_axis[4] = Proportion(data,  (data < 0) ? -32768 : 32767,  (data < 0) ? HEMISPHERE_MIN_CV : HEMISPHERE_MAX_CV);
+                        if (f.GamepadState.axis[4] != scaled_axis[4]) {
+                            if (abs(f.GamepadState.axis[4] - scaled_axis[4]) > axis_change_threshold)
+                                f.GamepadState.last_changed = XBOX360.button_count + 4;
+                            f.GamepadState.axis[4] = scaled_axis[4];
+                        }
                     }
-                    rjs_y = device.getAxis(12);
-                    if (f.GamepadState.axis[5] != rjs_y) {
-                        if (abs(f.GamepadState.axis[5] - rjs_y) > axis_change_threshold)
-                            f.GamepadState.last_changed = XBOX360.button_count + 5;
-                        f.GamepadState.axis[5] = rjs_y;
+                    // right joystick y-axis
+                    if (axis_changed_mask & (1 << 12)) {
+                        data = device.getAxis(12);
+                        scaled_axis[5] = Proportion(data,  (data < 0) ? -32768 : 32767,  (data < 0) ? HEMISPHERE_MIN_CV : HEMISPHERE_MAX_CV);
+                        if (f.GamepadState.axis[5] != scaled_axis[5]) {
+                            if (abs(f.GamepadState.axis[5] - scaled_axis[5]) > axis_change_threshold)
+                                f.GamepadState.last_changed = XBOX360.button_count + 5;
+                            f.GamepadState.axis[5] = scaled_axis[5];
+                        }
                     }
-                    /* feedback */
+
+                /* feedback */
                     if (f.GamepadState.set_rumble) {
                         f.GamepadState.set_rumble = false;
-                        device.setRumble(ltv, rtv);
+                        // int l, r;
+                        // device.setRumble(l, r);
+                    }
+                    if (f.GamepadState.set_leds) {
+                        f.GamepadState.set_leds = false;
+                        // int r, g, b;
+                        // device.setLEDs(r, g, b);
                     }
                     break;
                 }
+
                 case JoystickController::XBOXONE: {
-                    axis_change_threshold = (-HEMISPHERE_MIN_CV) / 8;
-                    /* triggers */
-                    ltv = device.getAxis(3);
-                    if (ltv != f.GamepadState.axis[0]) {
-                        f.GamepadState.axis[0] = ltv;
-                        f.GamepadState.last_changed = XBOXONE.button_count + 0;
+                /* triggers */
+                    // left trigger
+                    if (axis_changed_mask & (1 << 3)) {
+                        data = device.getAxis(3); // 10-bit data range
+                        scaled_axis[0] = Proportion(data,  (data < 0) ? 0 : 1023,  (data < 0) ? HEMISPHERE_MIN_CV : HEMISPHERE_MAX_CV);
+                        if (scaled_axis[0] != f.GamepadState.axis[0]) {
+                            f.GamepadState.axis[0] = scaled_axis[0];
+                            f.GamepadState.last_changed = XBOXONE.button_count + 0;
+                        }
                     }
-                    rtv = device.getAxis(4);
-                    if (rtv != f.GamepadState.axis[1]) {
-                        f.GamepadState.axis[1] = rtv;
-                        f.GamepadState.last_changed = XBOXONE.button_count + 1;
+                    // right trigger
+                    if (axis_changed_mask & (1 << 4)) {
+                        data = device.getAxis(4);
+                        scaled_axis[1] = Proportion(data,  (data < 0) ? 0 : 1023,  (data < 0) ? HEMISPHERE_MIN_CV : HEMISPHERE_MAX_CV);
+                        if (scaled_axis[1] != f.GamepadState.axis[1]) {
+                            f.GamepadState.axis[1] = scaled_axis[1];
+                            f.GamepadState.last_changed = XBOXONE.button_count + 1;
+                        }
                     }
-                    /* axes */
-                    ljs_x = device.getAxis(0);
-                    if (f.GamepadState.axis[2] != ljs_x) {
-                        if (abs(f.GamepadState.axis[2] - ljs_x) > axis_change_threshold)
-                            f.GamepadState.last_changed = XBOXONE.button_count + 2;
-                        f.GamepadState.axis[2] = ljs_x;
+
+                /* axes */
+                    // left joystick x-axis
+                    if (axis_changed_mask & (1 << 0)) {
+                        data = device.getAxis(0);  // signed 16-bit, little endian
+                        scaled_axis[2] = Proportion(data,  (data < 0) ? -32768 : 32767,  (data < 0) ? HEMISPHERE_MIN_CV : HEMISPHERE_MAX_CV);
+                        if (f.GamepadState.axis[2] != scaled_axis[2]) {
+                            if (abs(f.GamepadState.axis[2] - scaled_axis[2]) > axis_change_threshold)
+                                f.GamepadState.last_changed = XBOXONE.button_count + 2;
+                            f.GamepadState.axis[2] = scaled_axis[2];
+                        }
                     }
-                    ljs_y = device.getAxis(1);
-                    if (f.GamepadState.axis[3] != ljs_y) {
-                        if (abs(f.GamepadState.axis[3] - ljs_y) > axis_change_threshold)
-                            f.GamepadState.last_changed = XBOXONE.button_count + 3;
-                        f.GamepadState.axis[3] = ljs_y;
+                    // left joystick y-axis
+                    if (axis_changed_mask & (1 << 1)) {
+                        data = device.getAxis(1);
+                        scaled_axis[3] = Proportion(data,  (data < 0) ? -32768 : 32767,  (data < 0) ? HEMISPHERE_MIN_CV : HEMISPHERE_MAX_CV);
+                        if (f.GamepadState.axis[3] != scaled_axis[3]) {
+                            if (abs(f.GamepadState.axis[3] - scaled_axis[3]) > axis_change_threshold)
+                                f.GamepadState.last_changed = XBOXONE.button_count + 3;
+                            f.GamepadState.axis[3] = scaled_axis[3];
+                        }
                     }
-                    rjs_x = device.getAxis(2);
-                    if (f.GamepadState.axis[4] != rjs_x) {
-                        if (abs(f.GamepadState.axis[4] - rjs_x) > axis_change_threshold)
-                            f.GamepadState.last_changed = XBOXONE.button_count + 4;
-                        f.GamepadState.axis[4] = rjs_x;
+                    // right joystick x-axis
+                    if (axis_changed_mask & (1 << 2)) {
+                        data = device.getAxis(2);
+                        scaled_axis[4] = Proportion(data,  (data < 0) ? -32768 : 32767,  (data < 0) ? HEMISPHERE_MIN_CV : HEMISPHERE_MAX_CV);
+                        if (f.GamepadState.axis[4] != scaled_axis[4]) {
+                            if (abs(f.GamepadState.axis[4] - scaled_axis[4]) > axis_change_threshold)
+                                f.GamepadState.last_changed = XBOXONE.button_count + 4;
+                            f.GamepadState.axis[4] = scaled_axis[4];
+                        }
                     }
-                    rjs_y = device.getAxis(5);
-                    if (f.GamepadState.axis[5] != rjs_y) {
-                        if (abs(f.GamepadState.axis[5] - rjs_y) > axis_change_threshold)
-                            f.GamepadState.last_changed = XBOXONE.button_count + 5;
-                        f.GamepadState.axis[5] = rjs_y;
+                    // right joystick y-axis
+                    if (axis_changed_mask & (1 << 5)) {
+                        data = device.getAxis(5);
+                        scaled_axis[5] = Proportion(data,  (data < 0) ? -32768 : 32767,  (data < 0) ? HEMISPHERE_MIN_CV : HEMISPHERE_MAX_CV);
+                        if (f.GamepadState.axis[5] != scaled_axis[5]) {
+                            if (abs(f.GamepadState.axis[5] - scaled_axis[5]) > axis_change_threshold)
+                                f.GamepadState.last_changed = XBOXONE.button_count + 5;
+                            f.GamepadState.axis[5] = scaled_axis[5];
+                        }
                     }
-                    /* feedback */
+
+                /* feedback */
                     if (f.GamepadState.set_rumble) {
                         f.GamepadState.set_rumble = false;
-                        device.setRumble(ltv, rtv);
+                        // int l, r;
+                        // device.setRumble(l, r);
+                    }
+                    if (f.GamepadState.set_leds) {
+                        f.GamepadState.set_leds = false;
+                        // int r, g, b;
+                        // device.setLEDs(r, g, b);
                     }
                     break;
                 }
+
                 case JoystickController::SNES: {
-                    axis_change_threshold = 256 / 8;
-                    /* axes */
-                    ljs_x = device.getAxis(0) - 128;
-                    if (f.GamepadState.axis[0] != ljs_x) {
-                        if (abs(f.GamepadState.axis[0] - ljs_x) > 0)
-                            f.GamepadState.last_changed = SNES.button_count + 0;
-                        f.GamepadState.axis[0] = ljs_x;
+                /* axes */
+                    // d-pad x-axis
+                    if (axis_changed_mask & (1 << 0)) {  // scaled_axis[2]?
+                        data = device.getAxis(0) - 128; // 8-bit data range, center is 127
+                        scaled_axis[0] = Proportion(data,  (data < 0) ? -128 : 127,  (data < 0) ? HEMISPHERE_MIN_CV : HEMISPHERE_MAX_CV);
+                        if (f.GamepadState.axis[0] != scaled_axis[0]) {
+                            if (abs(f.GamepadState.axis[0] - scaled_axis[0]) > axis_change_threshold)
+                                f.GamepadState.last_changed = SNES.button_count + 0;
+                            f.GamepadState.axis[0] = scaled_axis[0];
+                        }
                     }
-                    ljs_y = 255 - device.getAxis(1) - 128;
-                    if (f.GamepadState.axis[1] != ljs_y) {
-                        if (abs(f.GamepadState.axis[0] - ljs_y) > 0)
-                            f.GamepadState.last_changed = SNES.button_count + 1;
-                        f.GamepadState.axis[1] = ljs_y;
+                    // d-pad y-axis
+                    if (axis_changed_mask & (1 << 1)) {  // scaled_axis[3]?
+                        data = 255 - device.getAxis(1) - 128;  // y-axis is inverted
+                        scaled_axis[1] = Proportion(data,  (data < 0) ? -128 : 127,  (data < 0) ? HEMISPHERE_MIN_CV : HEMISPHERE_MAX_CV);
+                        if (f.GamepadState.axis[1] != scaled_axis[1]) {
+                            if (abs(f.GamepadState.axis[1] - scaled_axis[1]) > axis_change_threshold)
+                                f.GamepadState.last_changed = SNES.button_count + 1;
+                            f.GamepadState.axis[1] = scaled_axis[1];
+                        }
                     }
                 }
+
                 // case JoystickController::N64: {
                 //     break:
                 // }
+
                 default: break;
             }
         }

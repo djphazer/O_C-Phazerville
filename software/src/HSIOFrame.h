@@ -507,15 +507,17 @@ constexpr GamepadMapping& pack(GamepadMapping& input) {
 struct GamepadFrame {
     GamepadMapping mapping[GAMEPADMAP_MAX];
 
-    int gamepad_type = 0; // UNKNOWN = 0, PS3, PS4, XBOXONE, XBOX360W, XBOX360USB, PS3_MOTION, SpaceNav, SWITCH
-    bool ps3_paired = false;
+    int gamepad_type = 0; // UNKNOWN = 0, PS3, PS3_MOTION, PS4, XBOX, XBOX360W, XBOX360USB, XBOXONE, SpaceNav, SWITCH, SNES, N64
 
     uint32_t button_mask = 0;
-    int16_t axis[16];
-    uint32_t last_changed = 0;
+    int16_t axis[GAMEPAD_AXIS_MAX];
+
+    uint32_t last_changed = 0; // used for param learning in JoyStyx
 
     bool set_rumble = false;
     bool set_leds = false;
+
+    bool ps3_paired = false;
 };
 #endif
 

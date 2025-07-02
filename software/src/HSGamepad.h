@@ -102,6 +102,9 @@
     extern JoystickController gamepad;
     extern USBHIDParser hid1;
 
+    #define GAMEPAD_AXIS_MAX 16
+    #define GAMEPAD_BUTTON_MAX 32
+
     struct GamePad {
         const char* type_name;
 
@@ -110,12 +113,6 @@
 
         const char* const* axis_name;
         const int axis_count;
-        const int trig_count;
-
-        const int trig_min;
-        const int trig_max;
-        const int axis_min;
-        const int axis_max;
     };
 
     extern GamePad UNKNOWN; // gamepad_type = 0

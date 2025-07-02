@@ -62,18 +62,8 @@ class JoyStyx : public HemisphereApplet {
             } else {
                 ForEachChannel(ch) {
                     if (param[ch] > gp->button_count-1) {
-                        int p = param[ch] - gp->button_count;
-                        if (p > gp->trig_count-1) {
-                            if (gs.axis[p] < 0) {
-                                cv[ch] = Proportion(gs.axis[p], gp->axis_min, HEMISPHERE_MIN_CV);
-                            } else {
-                                cv[ch] = Proportion(gs.axis[p], gp->axis_max, HEMISPHERE_MAX_CV);
-                            }
-                            Out(ch, cv[ch]);
-                        } else {
-                            cv[ch] = Proportion(gs.axis[p], gp->trig_max, HEMISPHERE_MAX_CV);
-                            Out(ch, cv[ch]);
-                        }
+                        cv[ch] = gs.axis[param[ch] - gp->button_count];
+                        Out(ch, cv[ch]);
                     } else {
                         cv[ch] = (gs.button_mask & (1 << param[ch])) != 0;
                         GateOut(ch, cv[ch]);
