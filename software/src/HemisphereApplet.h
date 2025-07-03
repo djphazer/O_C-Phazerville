@@ -220,8 +220,14 @@ public:
 
     // Apply small center detent to input, so it reads zero before a threshold
     int DetentedIn(int ch) {
-        return (In(ch) > (HEMISPHERE_CENTER_CV + HEMISPHERE_CENTER_DETENT) || In(ch) < (HEMISPHERE_CENTER_CV - HEMISPHERE_CENTER_DETENT))
-            ? In(ch) : HEMISPHERE_CENTER_CV;
+        if (NorthernLightModular && In(ch) < HEMISPHERE_CENTER_DETENT)
+          return 0;
+
+        if (In(ch) > (HEMISPHERE_CENTER_INPUT_CV + HEMISPHERE_CENTER_DETENT)
+          || In(ch) < (HEMISPHERE_CENTER_INPUT_CV - HEMISPHERE_CENTER_DETENT))
+          return In(ch);
+
+        return HEMISPHERE_CENTER_INPUT_CV;
     }
     int SmoothedIn(int ch) {
       const int x = cvmapping[ch + io_offset];
@@ -311,8 +317,8 @@ public:
 
     // Override HSUtils function to only return positive values
     // Not ideal, but too many applets rely on this.
-    constexpr int ProportionCV(const int cv_value, const int max_pixels) {
-        int prop = constrain(Proportion(cv_value, HEMISPHERE_MAX_INPUT_CV, max_pixels), 0, max_pixels);
+    const int ProportionCV(const int cv_value, const int max_pixels, const int max_cv = HEMISPHERE_MAX_CV) {
+        int prop = constrain(Proportion(cv_value, max_cv, max_pixels), 0, max_pixels);
         return prop;
     }
 

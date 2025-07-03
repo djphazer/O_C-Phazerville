@@ -60,8 +60,8 @@ public:
             // simply play current step and advance it. This way, the applet can be used as
             // a more conventional arpeggiator as well as a Cartesian one.
             if (DetentedIn(0) || DetentedIn(1)) {
-                int x = ProportionCV(In(0), 4);
-                int y = ProportionCV(In(1), 4);
+                int x = ProportionCV(In(0), 4, HEMISPHERE_MAX_INPUT_CV);
+                int y = ProportionCV(In(1), 4, HEMISPHERE_MAX_INPUT_CV);
                 if (x > 3) x = 3;
                 if (y > 3) y = 3;
                 step = (y * 4) + x;

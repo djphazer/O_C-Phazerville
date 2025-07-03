@@ -140,7 +140,14 @@ public:
 
     // Apply small center detent to input, so it reads zero before a threshold
     int DetentedIn(int ch) {
-        return (In(ch) > HEMISPHERE_CENTER_DETENT || In(ch) < -HEMISPHERE_CENTER_DETENT) ? In(ch) : 0;
+        if (NorthernLightModular && In(ch) < HEMISPHERE_CENTER_DETENT)
+          return 0;
+
+        if (In(ch) > (HEMISPHERE_CENTER_INPUT_CV + HEMISPHERE_CENTER_DETENT)
+          || In(ch) < (HEMISPHERE_CENTER_INPUT_CV - HEMISPHERE_CENTER_DETENT))
+          return In(ch);
+
+        return HEMISPHERE_CENTER_INPUT_CV;
     }
     int SemitoneIn(int ch) {
       return input_quant[ch].Process(In(ch));

@@ -56,7 +56,7 @@ public:
             // unless the cursor is on the length parameter
             if (!brush && cursor != 2) {
                 accent[step] += (HEMISPHERE_MAX_CV / HEM_PALIMPSEST_MAX_VALUE) * effective_compose;
-                accent[step] = constrain(accent[step], 0, HEMISPHERE_MAX_CV);
+                CONSTRAIN(accent[step], 0, HEMISPHERE_MAX_CV);
                 brush = 1;
             }
         }
@@ -66,7 +66,7 @@ public:
             // the cursor is on the length parameter
             if (!brush && cursor != 2) {
                 accent[step] -= (HEMISPHERE_MAX_CV / HEM_PALIMPSEST_MAX_VALUE) * effective_decompose;
-                accent[step] = constrain(accent[step], 0, HEMISPHERE_MAX_CV);
+                CONSTRAIN(accent[step], 0, HEMISPHERE_MAX_CV);
             }
 
             brush = 0;

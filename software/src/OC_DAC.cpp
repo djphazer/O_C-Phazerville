@@ -52,9 +52,7 @@ DAC_CHANNEL DAC_CHANNEL_E=4, DAC_CHANNEL_F=5, DAC_CHANNEL_G=6, DAC_CHANNEL_H=7;
 
 namespace OC {
 
-#ifdef NORTHERNLIGHT
-int DAC::kOctaveZero = 0;
-#else
+#if defined(ARDUINO_TEENSY41) || defined(VOR)
 int DAC::kOctaveZero = 3;
 #endif
 

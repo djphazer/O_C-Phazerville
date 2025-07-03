@@ -80,7 +80,7 @@ public:
             if (note_on) {
                 int velocity = 0x64;
                 if (function == HEM_MIDI_VEL_IN) {
-                    velocity = ProportionCV(In(1), 127);
+                    velocity = ProportionCV(In(1), 127, HEMISPHERE_MAX_INPUT_CV);
                 }
                 last_velocity = velocity;
 
@@ -108,7 +108,7 @@ public:
             if (Changed(1)) {
                 // Modulation wheel
                 if (function == HEM_MIDI_CC_IN) {
-                    int value = ProportionCV(In(1), 127);
+                    int value = ProportionCV(In(1), 127, HEMISPHERE_MAX_INPUT_CV);
                     if (value != last_cc) {
                         hMIDI.SendCC(channel, 1, value);
                         last_cc = value;
@@ -119,7 +119,7 @@ public:
 
                 // Aftertouch
                 if (function == HEM_MIDI_AT_IN) {
-                    int value = ProportionCV(In(1), 127);
+                    int value = ProportionCV(In(1), 127, HEMISPHERE_MAX_INPUT_CV);
                     if (value != last_at) {
                         hMIDI.SendAfterTouch(channel, value);
                         last_at = value;

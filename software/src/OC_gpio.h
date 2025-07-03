@@ -17,12 +17,18 @@ extern uint8_t OC_GPIO_DEBUG_PIN1, OC_GPIO_DEBUG_PIN2;
 extern bool ADC33131D_Uses_FlexIO;
 extern bool OLED_Uses_SPI1;
 extern bool DAC8568_Uses_SPI;
-extern bool NorthernLightModular;
 extern bool I2S2_Audio_ADC;
 extern bool I2S2_Audio_DAC;
 extern bool I2C_Expansion;
 extern bool MIDI_Uses_Serial8;
 extern bool SDcard_Ready;
+#ifdef NORTHERNLIGHT
+static constexpr bool NorthernLightModular = true;
+#elif !defined(ARDUINO_TEENSY41)
+static constexpr bool NorthernLightModular = false;
+#else
+extern bool NorthernLightModular;
+#endif
 
 // OLED CS is active low
 #define OLED_CS_ACTIVE LOW

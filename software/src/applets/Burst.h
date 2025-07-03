@@ -51,8 +51,7 @@ public:
     void Controller() {
         // Settings and modulation over CV
         if (DetentedIn(0) > 0) {
-            number = ProportionCV(In(0), HEM_BURST_NUMBER_MAX + 1);
-            number = constrain(number, 1, HEM_BURST_NUMBER_MAX);
+            number = constrain(Proportion(In(0), HEMISPHERE_MAX_INPUT_CV, HEM_BURST_NUMBER_MAX), 1, HEM_BURST_NUMBER_MAX);
             last_number_cv_tick = OC::CORE::ticks;
         }
         int spacing_mod = clocked ? 0 : Proportion(DetentedIn(1), HEMISPHERE_MAX_INPUT_CV, 500);

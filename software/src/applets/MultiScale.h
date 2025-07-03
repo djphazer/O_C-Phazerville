@@ -45,11 +45,12 @@ public:
     void Controller() {
 
         // user selected scale from input 2
-        int scale = DetentedIn(1);
-        if (scale < 0) scale = 0;        
-        if (scale > 0) {
-            scale = constrain(ProportionCV(scale, MS_QUANT_SCALES_COUNT + 1), 0, MS_QUANT_SCALES_COUNT - 1);
-        }
+        int scale = constrain(
+            Proportion( DetentedIn(1), HEMISPHERE_MAX_INPUT_CV, MS_QUANT_SCALES_COUNT),
+            0,
+            MS_QUANT_SCALES_COUNT - 1
+        );
+
         if (scale != current_scale) {
             current_scale = scale;
             SetMask(scale_mask[current_scale]);

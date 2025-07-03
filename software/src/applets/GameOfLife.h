@@ -24,8 +24,8 @@ public:
     }
 
     void Controller() {
-        tx = ProportionCV(In(0), 63);
-        ty = ProportionCV(In(1), 39);
+        tx = ProportionCV(In(0), 63, HEMISPHERE_MAX_INPUT_CV);
+        ty = ProportionCV(In(1), 39, HEMISPHERE_MAX_INPUT_CV);
 
         if (Clock(0)) {
             ProcessGameBoard(tx, ty);

@@ -16,9 +16,7 @@ uint8_t OC_GPIO_DEBUG_PIN1=24, OC_GPIO_DEBUG_PIN2=25;
 bool ADC33131D_Uses_FlexIO=false;
 bool OLED_Uses_SPI1=false;
 bool DAC8568_Uses_SPI=false;
-#ifdef NORTHERNLIGHT
-bool NorthernLightModular=true;
-#else
+#if !defined(NORTHERNLIGHT) && defined(ARDUINO_TEENSY41)
 bool NorthernLightModular=false;
 #endif
 bool I2S2_Audio_ADC=false;
@@ -127,6 +125,7 @@ void OC::SetFlipMode(bool flip_180) {
   }
 }
 
+#if defined(ARDUINO_TEENSY41)
 FLASHMEM
 void OC::Pinout_Detect() {
   id_voltage = OC::ADC::Read_ID_Voltage();
@@ -176,5 +175,5 @@ void OC::Pinout_Detect() {
     DAC::kOctaveZero = 0;
     HS::octave_max = 10;
   }
-
 }
+#endif

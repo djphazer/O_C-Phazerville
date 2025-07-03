@@ -36,6 +36,7 @@ public:
     ONE_POLE(lp, in, 0.001f);
 
     if (ac_couple) in -= lp;
+    const float scalar = -31267.0f / HEMISPHERE_MAX_CV;
     interp_stream.Push(Clip16(gain_cv.InF(1.0f) * dbToScalar(gain) * scalar * in));
   }
 
@@ -147,7 +148,6 @@ private:
   AudioConnection interp_conn[Channels];
   AudioConnection out_conn[Channels];
 
-  static constexpr float scalar = -31267.0f / HEMISPHERE_MAX_CV;
   float lp = 0.0f;
   int cursor = 0;
   CVInputMap input;

@@ -9,6 +9,11 @@
 #include "SD.h"
 #endif
 
+const int ProportionCV(const int cv_value, const int max_pixels, const int max_cv) {
+    int prop = constrain(Proportion(cv_value, max_cv, max_pixels), -max_pixels, max_pixels);
+    return prop;
+}
+
 namespace HS {
 
   uint32_t popup_tick; // for button feedback
@@ -29,9 +34,7 @@ namespace HS {
   int next_ch = -1;
   int8_t next_octave, next_root_note;
 
-#ifdef NORTHERNLIGHT
-  int octave_max = 10;
-#else
+#if defined(ARDUINO_TEENSY41) || defined(VOR)
   int octave_max = 6;
 #endif
 
