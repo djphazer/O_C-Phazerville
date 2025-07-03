@@ -42,6 +42,7 @@
 #include "applets/ClockSkip.h"
 #include "applets/Compare.h"
 #include "applets/DivSeq.h"
+#include "applets/DivSeq10.h"
 #include "applets/DrumMap.h"
 #include "applets/DualQuant.h"
 #include "applets/TwoRings.h"
@@ -159,6 +160,7 @@ AppletRegistry reg{
     DeclareApplet<Cumulus>{5, 0x40},
     DeclareApplet<CVRecV2>{24, 0x02},
     DeclareApplet<DivSeq>{68, 0x06},
+    DeclareApplet<DivSeq10>{80, 0x06},
     DeclareApplet<DrLoFi>{16, 0x80},
     DeclareApplet<DrumMap>{57, 0x02},
     DeclareApplet<DualQuant>{9, 0x08},
