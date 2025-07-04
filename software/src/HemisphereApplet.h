@@ -232,7 +232,7 @@ public:
       return 0;
     }
     int SemitoneIn(int ch) {
-      return input_quant[ch].Process(In(ch));
+      return input_quant[ch + io_offset].Process(In(ch));
     }
 
     // defined in HemisphereApplet.cpp

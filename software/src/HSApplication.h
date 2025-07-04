@@ -140,7 +140,10 @@ public:
 
     // Apply small center detent to input, so it reads zero before a threshold
     int DetentedIn(int ch) {
-        return (In(ch) > 64 || In(ch) < -64) ? In(ch) : 0;
+        return (In(ch) > HEMISPHERE_CENTER_DETENT || In(ch) < -HEMISPHERE_CENTER_DETENT) ? In(ch) : 0;
+    }
+    int SemitoneIn(int ch) {
+      return input_quant[ch].Process(In(ch));
     }
 
     // Standard bi-polar CV modulation scenario
