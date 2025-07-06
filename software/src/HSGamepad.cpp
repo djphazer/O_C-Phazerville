@@ -82,11 +82,11 @@ GamePad PS4 {
         "LT", "RT",
         "LX", "LY",
         "RX", "RY",
-        // "GyroX", "GyroY", "GyroZ",
-        // "AcclX", "AcclY", "AcclZ",
+        "AcclX", "AcclY", "AcclZ",
+        "GyroX", "GyroY", "GyroZ",
         // "PadX", "PadY"
     },
-    .axis_count = 6
+    .axis_count = 12
 };
 
 GamePad XBOX {  // WIP
@@ -326,16 +326,21 @@ void ProcessGamepad(JoystickController &device) {
                         buttons = (buttons & ~(1 << d)) | ((dpad_state & 1) << d);
                     }
 
-                /* test */
-                    // int mystery_axis;
-                    // for (int i = 6, j = 0; i < 16; ++i, j+=2) {
-                    //     mystery_axis = (int16_t)(device.getAxis(13+j) << 8) | (int8_t)device.getAxis(13+j+1);
-                    //     if (f.GamepadState.axis[i] != mystery_axis) {
-                    //         if (abs(f.GamepadState.axis[i] - mystery_axis) > 0)
-                    //             f.GamepadState.last_changed = PS4.button_count + i;
-                    //         f.GamepadState.axis[i] = mystery_axis;
-                    //     }
-                    // }
+                /* motion */
+                    for (int i = 6, j = 0; j < 12; ++i, j+=2) {
+                        if (axis_changed_mask & (3 << (13+j))) { // 16-bit, check if either byte has changed
+                            int motion_sensor_scale = (i > 8) ? 32767 : 8192;  // axes 6,7,8 are accel; axes 9,10,11 are gyro
+                            data = (int16_t)(device.getAxis(13+j+1) << 8) | device.getAxis(13+j);
+                            scaled_axis[i] = constrain(
+                                Proportion(data,  (data < 0) ? -(motion_sensor_scale+1) : motion_sensor_scale,  (data < 0) ? HEMISPHERE_MIN_CV : HEMISPHERE_MAX_CV),
+                                HEMISPHERE_MIN_CV, HEMISPHERE_MAX_CV);
+                            if (f.GamepadState.axis[i] != scaled_axis[i]) {
+                                if (abs(f.GamepadState.axis[i] - scaled_axis[i]) > axis_change_threshold)
+                                    f.GamepadState.last_changed = PS4.button_count + i;
+                                f.GamepadState.axis[i] = scaled_axis[i];
+                            }
+                        }
+                    }
 
                 /* feedback */
                     if (f.GamepadState.set_rumble) {
