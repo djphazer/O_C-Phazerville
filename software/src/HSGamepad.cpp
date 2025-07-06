@@ -1,3 +1,32 @@
+// Copyright (c) 2025, Beau Sterling
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+/*
+    TODO:
+    - handle gaps in button map, to avoid "..."
+    - dynamic map of HID controllers from Report Descriptor
+    - use loops over the button and axis ranges, but still need to handle scaling
+    - dynamic gamepad.end() to free up resources for usbHostMIDI in Main. user selectable mode?
+    - parseHatSwitch() function to reduce code duplication
+*/
+
 #include "HSGamepad.h"
 #include "HemisphereApplet.h"
 
@@ -7,23 +36,32 @@
 GamePad UNKNOWN {
     .type_name = "UNKNOWN",
     .button_name = (const char*[]){
-        "BTN1",  "BTN2",  "BTN3",  "BTN4",
-        "BTN5",  "BTN6",  "BTN7",  "BTN8",
-        "BTN9",  "BTN10", "BTN11", "BTN12",
-        "BTN13", "BTN14", "BTN15", "BTN16"
+        "B1",  "B2",  "B3",  "B4",
+        "B5",  "B6",  "B7",  "B8",
+        "B9",  "B10", "B11", "B12",
+        "B13", "B14", "B15", "B16",
+        "B17", "B18", "B19", "B20",
+        "B21", "B22", "B23", "B24",
+        "B25", "B26", "B27", "B28",
+        "B29", "B30", "B31", "B32"
     },
-    .button_count = 16,
-    .axis_name = (const char*[]){},
-    .axis_count = 0
+    .button_count = 32,
+    .axis_name = (const char*[]){
+        "X1",  "X2",  "X3",  "X4",
+        "X5",  "X6",  "X7",  "X8",
+        "X9",  "X10", "X11", "X12",
+        "X13", "X14", "X15", "X16"
+    },
+    .axis_count = 16
 };
 
 GamePad PS3 { // WIP
     .type_name = "PS3",
     .button_name = (const char*[]){
-        "BTN1",  "BTN2",  "BTN3",  "BTN4",
-        "BTN5",  "BTN6",  "BTN7",  "BTN8",
-        "BTN9",  "BTN10", "BTN11", "BTN12",
-        "BTN13", "BTN14", "BTN15", "BTN16"
+        "B1",  "B2",  "B3",  "B4",
+        "B5",  "B6",  "B7",  "B8",
+        "B9",  "B10", "B11", "B12",
+        "B13", "B14", "B15", "B16"
     },
     .button_count = 16,
     .axis_name = (const char*[]){},
@@ -114,8 +152,21 @@ GamePad SNES {
     .axis_count = 2
 };
 
-// GamePad N64 {
-// };
+GamePad N64 {
+    .type_name = "N64",
+    .button_name = (const char*[]){
+        "C_L",  "B",  "A",  "C_D",
+        "L",  "R",  "Z_L",  "Z_R",
+        "C_U",  "C_R", "...", "...",
+        "STRT", "D_U",  "D_R", "D_D",
+        "D_L"
+    },
+    .button_count = 17,
+    .axis_name = (const char*[]){
+        "J_X", "J_Y"
+    },
+    .axis_count = 2
+};
 
 
 // connect PS3 controller to a PC and use Sixaxis Pair Tool to set or determine this address
@@ -190,7 +241,7 @@ void ProcessGamepad(JoystickController &device) {
                 /* axes */
                     // left joystick x-axis
                     if (axis_changed_mask & (1 << 0)) {
-                        data = device.getAxis(0) - 128;  // 8-bit data range, center is 127
+                        data = device.getAxis(0) - 128;  // 8-bit data range, center is 128
                         scaled_axis[2] = Proportion(data,  (data < 0) ? -128 : 127,  (data < 0) ? HEMISPHERE_MIN_CV : HEMISPHERE_MAX_CV);
                         if (f.GamepadState.axis[2] != scaled_axis[2]) {
                             if (abs(f.GamepadState.axis[2] - scaled_axis[2]) > axis_change_threshold)
@@ -466,7 +517,7 @@ void ProcessGamepad(JoystickController &device) {
                 /* axes */
                     // d-pad x-axis
                     if (axis_changed_mask & (1 << 0)) {  // scaled_axis[2]?
-                        data = device.getAxis(0) - 128; // 8-bit data range, center is 127
+                        data = device.getAxis(0) - 128; // 8-bit data range, center is 128
                         scaled_axis[0] = Proportion(data,  (data < 0) ? -128 : 127,  (data < 0) ? HEMISPHERE_MIN_CV : HEMISPHERE_MAX_CV);
                         if (f.GamepadState.axis[0] != scaled_axis[0]) {
                             if (abs(f.GamepadState.axis[0] - scaled_axis[0]) > axis_change_threshold)
@@ -484,13 +535,95 @@ void ProcessGamepad(JoystickController &device) {
                             f.GamepadState.axis[1] = scaled_axis[1];
                         }
                     }
+                    break;
                 }
 
-                // case JoystickController::N64: {
-                //     break:
-                // }
+                case JoystickController::N64: {
+                /* axes */
+                    // joystick x-axis
+                    if (axis_changed_mask & (1 << 0)) {
+                        data = device.getAxis(0) - 128;  // 8-bit data range, center is 128
+                        scaled_axis[0] = Proportion(data,  (data < 0) ? -128 : 127,  (data < 0) ? HEMISPHERE_MIN_CV : HEMISPHERE_MAX_CV);
+                        if (f.GamepadState.axis[0] != scaled_axis[0]) {
+                            if (abs(f.GamepadState.axis[0] - scaled_axis[0]) > 0)
+                                f.GamepadState.last_changed = N64.button_count + 0;
+                            f.GamepadState.axis[0] = scaled_axis[0];
+                        }
+                    }
+                    // joystick y-axis
+                    if (axis_changed_mask & (1 << 1)) {
+                        data = 255 - device.getAxis(1) - 128; // y-axis is inverted
+                        scaled_axis[1] = Proportion(data,  (data < 0) ? -128 : 127,  (data < 0) ? HEMISPHERE_MIN_CV : HEMISPHERE_MAX_CV);
+                        if (f.GamepadState.axis[1] != scaled_axis[1]) {
+                            if (abs(f.GamepadState.axis[1] - scaled_axis[1]) > 0)
+                                f.GamepadState.last_changed = N64.button_count + 1;
+                            f.GamepadState.axis[1] = scaled_axis[1];
+                        }
+                    }
 
-                default: break;
+                /* d-pad */
+                    enum DPadShift {
+                        UP_SHIFT = 13,
+                        RIGHT_SHIFT = 14,
+                        DOWN_SHIFT = 15,
+                        LEFT_SHIFT = 16
+                    };
+                    enum HatSwitch {
+                        UP = 0,
+                        UP_RIGHT,
+                        RIGHT,
+                        RIGHT_DOWN,
+                        DOWN,
+                        DOWN_LEFT,
+                        LEFT,
+                        LEFT_UP,
+                        OFF = 15
+                    };
+                    data = device.getAxis(9);
+                    int dpad_state = 0;
+                    for (int d = UP_SHIFT; d <= LEFT_SHIFT; ++d) {
+                        switch (d) {
+                            case UP_SHIFT:
+                                    dpad_state = (data == HatSwitch::LEFT_UP)
+                                            || (data == HatSwitch::UP)
+                                            || (data == HatSwitch::UP_RIGHT);
+                                    break;
+                            case RIGHT_SHIFT:
+                                    dpad_state = (data == HatSwitch::UP_RIGHT)
+                                            || (data == HatSwitch::RIGHT)
+                                            || (data == HatSwitch::RIGHT_DOWN);
+                                    break;
+                            case DOWN_SHIFT:
+                                    dpad_state = (data == HatSwitch::RIGHT_DOWN)
+                                            || (data == HatSwitch::DOWN)
+                                            || (data == HatSwitch::DOWN_LEFT);
+                                    break;
+                            case LEFT_SHIFT:
+                                    dpad_state = (data == HatSwitch::DOWN_LEFT)
+                                            || (data == HatSwitch::LEFT)
+                                            || (data == HatSwitch::LEFT_UP);
+                                    break;
+                        }
+                        buttons = (buttons & ~(1 << d)) | ((dpad_state & 1) << d);
+                    }
+                    break;
+                }
+
+                case JoystickController::UNKNOWN:
+                default: {
+                    for (int i = 0; i < GAMEPAD_AXIS_MAX; ++i)
+                    {
+                        if (axis_changed_mask & (1 << i)) {
+                            data = device.getAxis(i);
+                            scaled_axis[i] = data;  // Proportion(data,  (data < 0) ? 0 : 255,  (data < 0) ? HEMISPHERE_MIN_CV : HEMISPHERE_MAX_CV);
+                            if (scaled_axis[i] != f.GamepadState.axis[i]) {
+                                f.GamepadState.axis[i] = scaled_axis[i];
+                                f.GamepadState.last_changed = UNKNOWN.button_count + i;
+                            }
+                        }
+                    }
+                    break;
+                }
             }
         }
 

@@ -18,6 +18,17 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+/*
+    TODO:
+    - update UI to handle mode selection
+    - selectable cv output meters or revert to raw counts
+    - selectable TR1 loopback for clock sync?
+    - new mode: raw (default, as is now)
+    - new mode: sample and hold (trig/clk clocked or button clocked?)
+    - new mode: slewed momentary modulation (2 input buttons drive output hi or low with adj slew rate. optional rtz upon release)
+    - show icons for axis/button input type
+*/
+
 #include "HSGamepad.h"
 
 class JoyStyx : public HemisphereApplet {
@@ -160,6 +171,9 @@ class JoyStyx : public HemisphereApplet {
                     break;
                 case (JoystickController::joytype_t::SNES):
                     gp = &SNES;
+                    break;
+                case (JoystickController::joytype_t::N64):
+                    gp = &N64;
                     break;
                 default:
                     gp = &UNKNOWN;
