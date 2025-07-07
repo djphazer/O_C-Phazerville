@@ -71,10 +71,10 @@ public:
             // send trigger on first step
             if (step == 0) ClockOut(1);
         }
-        
+
         // continuously compute the note
         int transpose = DetentedIn(0) / 128; // 128 ADC steps per semitone
-        int play_note = note[step] + 60 + transpose;
+        int play_note = note[step] + (OC::DAC::kOctaveZero * 12) - (OC::DAC::kOctaveZero == 0)*SEQX_MIN_VALUE + transpose;
         play_note = constrain(play_note, 0, 127);
         // set CV output
         Out(0, MIDIQuantizer::CV(play_note));
@@ -161,16 +161,17 @@ private:
     }
 
     void DrawPanel() {
+        const int y = 20;
+        const int h = 60 - y;
         // dotted middle line
-        gfxDottedLine(0, 40, 63, 40, 3);
+        const int zero_pos = 20 + ((OC::DAC::kOctaveZero == 0) + 1) * 20;
+        gfxDottedLine(0, zero_pos, 63, zero_pos, 3);
 
         // Sliders
         for (int s = 0; s < SEQX_STEPS; s++)
         {
             const int x = 3 + (8 * s);
-            const int y = 20;
-            const int h = 60 - y;
-            
+
             if (!step_is_muted(s)) {
                 gfxLine(x, y, x, 60, (s != cursor) ); // dotted line for unselected steps
 
@@ -183,7 +184,7 @@ private:
                 } else {
                     gfxFrame(x - 2, 58 - pos, 5, 3);
                 }
-                
+
                 // Arrow indicator for current step
                 if (s == step) {
                     gfxIcon(x - 3, 60, UP_BTN_ICON);
@@ -197,11 +198,12 @@ private:
               gfxIcon(x - 3, y - 8, step_is_muted(s) ? CHECK_OFF_ICON : CHECK_ON_ICON);
             if (s == cursor && EditMode()) {
                 gfxInvert(x - 2, y, 5, h + 1);
-                int w_ = 18 - pad(100, note[s]);
-                int x_ = constrain(x - 9 + pad(10, note[s]), 0, 63 - w_);
+                int8_t noteval = note[s] + 30*(OC::DAC::kOctaveZero == 0);
+                int w_ = 18 - pad(100, noteval);
+                int x_ = constrain(x - 9 + pad(10, noteval), 0, 63 - w_);
 
                 gfxLine(x_, y, x_ + w_, y);
-                gfxPrint(x_, y - 8, note[s]);
+                gfxPrint(x_, y - 8, noteval);
             }
         }
     }

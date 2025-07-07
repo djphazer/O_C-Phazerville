@@ -125,11 +125,11 @@ public:
             if (Clock(ch)) StartADCLag(ch);
             if (loop_linker.TrigPop(ch) || EndOfADCLag(ch)) {
                 if (isLooping) {
-                    pitch[ch] = seqloop[ch][loop_linker.GetLoopStep()] + 60;
+                    pitch[ch] = seqloop[ch][loop_linker.GetLoopStep()];
                 } else {
-                    pitch[ch] = GetNextWeightedPitch() + 60;
+                    pitch[ch] = GetNextWeightedPitch();
                 }
-                Out(ch, MIDIQuantizer::CV(pitch[ch]));
+                Out(ch, MIDIQuantizer::CV(pitch[ch] + (12*OC::DAC::kOctaveZero)));
             }
         }
 

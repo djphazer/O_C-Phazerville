@@ -160,7 +160,9 @@ public:
             case TRANSPOSE2:
             case BLEND_XFADE:
                 if (update_cv) // S&H style transpose
-                    trans_mod[cvmode[ch] - TRANSPOSE1] = MIDIQuantizer::NoteNumber(cv_data[ch], 0) - 60; // constrain to range_mod?
+                    trans_mod[cvmode[ch] - TRANSPOSE1] =
+                      MIDIQuantizer::NoteNumber(cv_data[ch], 0)
+                      - (12*OC::DAC::kOctaveZero); // make it bipolar
                 break;
 
             default: break;

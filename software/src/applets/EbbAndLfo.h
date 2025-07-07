@@ -121,14 +121,14 @@ public:
                     level_mod / 1000);
         break;
       case BIPOLAR:
-#ifdef VOR
-        Out(ch, Proportion(sample.bipolar, 32767, 7680) * level_mod /
-                    1000); // hardcoded at 5V for Plum Audio
-#else
-        Out(ch, Proportion(sample.bipolar, 32767, HEMISPHERE_MAX_CV) *
-                    level_mod / 1000);
-#endif
+      {
+        int outcv = Proportion(sample.bipolar, 32767, HEMISPHERE_MAX_CV) * level_mod / 1000;
+        if (OC::DAC::kOctaveZero == 0)
+            outcv = outcv / 2 + HEMISPHERE_CENTER_CV;
+        Out(ch, outcv);
+
         break;
+      }
       case EOA:
         GateOut(ch, eoa_reached);
         break;

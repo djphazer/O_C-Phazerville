@@ -95,11 +95,14 @@ public:
         last_view_tick = OC::CORE::ticks;
     }
 
-    // general screensaver view, visualizing inputs and outputs
+    // "Meters" screensaver view, visualizing inputs and outputs
     void BaseScreensaver(bool notenames = 0) {
-        gfxDottedLine(0, 32, 127, 32, 3); // horizontal baseline
-        const size_t w = 128 / DAC_CHANNEL_LAST;
-        for (int ch = 0; ch < DAC_CHANNEL_LAST; ++ch)
+        const size_t h = 32 + (OC::DAC::kOctaveZero == 0)*31;
+        const size_t w = 128 / DAC_CHANNEL_COUNT;
+
+        gfxDottedLine(0, h, 127, h, 3); // horizontal baseline
+
+        for (int ch = 0; ch < DAC_CHANNEL_COUNT; ++ch)
         {
             if (notenames) {
                 // approximate notes being output
@@ -111,14 +114,14 @@ public:
             if (trig) gfxIcon(4 + w*ch, 0, CLOCK_ICON);
 
             // input
-            int height = ProportionCV(HS::frame.inputs[ch], 32);
-            int y = constrain(32 - height, 0, 32);
+            int height = ProportionCV(HS::frame.inputs[ch], h);
+            int y = constrain(h - height, 0, h);
             const int w_ = (w - 4) / 2;
             gfxFrame(2 + (w * ch), y, w_, abs(height));
 
             // output
-            height = ProportionCV(HS::frame.outputs[ch], 32);
-            y = constrain(32 - height, 0, 32);
+            height = ProportionCV(HS::frame.outputs[ch], h);
+            y = constrain(h - height, 0, h);
             gfxInvert(3 + w_ + (w * ch), y, w_, abs(height));
 
             gfxDottedLine(w * ch, 0, w*ch, 63, 3); // vertical divider, left side
