@@ -86,7 +86,7 @@ public:
   UiMode Splashscreen(bool &reset_settings);
   bool ConfirmReset();
   void DebugStats();
-  void AppSettings();
+  bool AppSettings(bool drawmenu);
   UiMode DispatchEvents(const OC::App *app);
 
   void Poll();

@@ -246,16 +246,16 @@ void FASTRUN loop() {
   uint32_t menu_redraws = 0;
   while (true) {
 
-    // don't change current_app while it's running
-    if (OC::UI_MODE_APP_SETTINGS == ui_mode) {
-      OC::ui.AppSettings();
-      ui_mode = OC::UI_MODE_MENU;
-    }
-
     // Refresh display
     if (MENU_REDRAW && OC::CORE::display_update_enabled) {
       GRAPHICS_BEGIN_FRAME(false); // Don't busy wait
-        if (OC::UI_MODE_MENU == ui_mode) {
+
+        if (OC::UI_MODE_APP_SETTINGS == ui_mode) {
+          // Only draw the App menu here...
+          // Handle events and process state changes elsewhere.
+          OC::ui.AppSettings(true);
+
+        } else if (OC::UI_MODE_MENU == ui_mode) {
           OC_DEBUG_RESET_CYCLES(menu_redraws, 512, OC::DEBUG::MENU_draw_cycles);
           OC_DEBUG_PROFILE_SCOPE(OC::DEBUG::MENU_draw_cycles);
           OC::apps::current_app->DrawMenu();
@@ -280,15 +280,25 @@ void FASTRUN loop() {
       OC::apps::current_app->loop();
 
     // UI events
-    OC::UiMode mode = OC::ui.DispatchEvents(OC::apps::current_app);
+    if (OC::UI_MODE_APP_SETTINGS == ui_mode) {
+      if (!OC::ui.AppSettings(false)) {
+        // exit menu, resume app
+        ui_mode = OC::UI_MODE_MENU;
+      }
+    } else {
+      OC::UiMode mode = OC::ui.DispatchEvents(OC::apps::current_app);
 
-    // State transition for app
-    if (mode != ui_mode) {
-      if (OC::UI_MODE_SCREENSAVER == mode)
-        OC::apps::current_app->HandleAppEvent(OC::APP_EVENT_SCREENSAVER_ON);
-      else if (OC::UI_MODE_SCREENSAVER == ui_mode)
-        OC::apps::current_app->HandleAppEvent(OC::APP_EVENT_SCREENSAVER_OFF);
-      ui_mode = mode;
+      // State transition for app
+      if (mode != ui_mode) {
+        if (OC::UI_MODE_SCREENSAVER == mode)
+          OC::apps::current_app->HandleAppEvent(OC::APP_EVENT_SCREENSAVER_ON);
+        else if (OC::UI_MODE_SCREENSAVER == ui_mode)
+          OC::apps::current_app->HandleAppEvent(OC::APP_EVENT_SCREENSAVER_OFF);
+        else if (OC::UI_MODE_APP_SETTINGS == mode)
+          OC::apps::current_app->HandleAppEvent(OC::APP_EVENT_SUSPEND);
+
+        ui_mode = mode;
+      }
     }
 
     if (millis() - LAST_REDRAW_TIME > REDRAW_TIMEOUT_MS)

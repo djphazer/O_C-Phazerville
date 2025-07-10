@@ -673,37 +673,6 @@ void Init(bool reset_settings) {
 
 }; // namespace apps
 
-void draw_app_menu(const menu::ScreenCursor<5> &cursor) {
-  GRAPHICS_BEGIN_FRAME(true);
-
-  if (global_settings.encoders_enable_acceleration)
-    graphics.drawBitmap8(120, 1, 4, bitmap_indicator_4x8);
-
-  menu::SettingsListItem item;
-  item.x = menu::kIndentDx + 8;
-  item.y = (64 - (5 * menu::kMenuLineH)) / 2;
-
-  for (int current = cursor.first_visible();
-       current <= cursor.last_visible();
-       ++current, item.y += menu::kMenuLineH) {
-    item.selected = current == cursor.cursor_pos();
-    item.SetPrintPos();
-    graphics.movePrintPos(weegfx::kFixedFontW, 0);
-    graphics.print(available_apps[current].name);
-
-    if (global_settings.current_app_id == available_apps[current].id)
-      graphics.drawBitmap8(0, item.y + 1, 8, ZAP_ICON);
-
-    item.DrawCustom();
-  }
-
-#ifdef VOR
-  VBiasManager *vbias_m = vbias_m->get();
-  vbias_m->DrawPopupPerhaps();
-#endif
-
-  GRAPHICS_END_FRAME();
-}
 
 void draw_save_message(uint8_t c) {
   GRAPHICS_BEGIN_FRAME(true);
@@ -714,20 +683,53 @@ void draw_save_message(uint8_t c) {
   GRAPHICS_END_FRAME();
 }
 
-void Ui::AppSettings() {
+bool Ui::AppSettings(bool drawmenu) {
+  static menu::ScreenCursor<5> cursor;
+  static bool change_app = false;
+  static bool save = false;
+  static bool opened = false;
 
-  SetButtonIgnoreMask();
+  if (drawmenu) {
+    // assumes this is called from within a graphics frame context
+    if (global_settings.encoders_enable_acceleration)
+      graphics.drawBitmap8(120, 1, 4, bitmap_indicator_4x8);
 
-  apps::current_app->HandleAppEvent(APP_EVENT_SUSPEND);
+    menu::SettingsListItem item;
+    item.x = menu::kIndentDx + 8;
+    item.y = (64 - (5 * menu::kMenuLineH)) / 2;
 
-  menu::ScreenCursor<5> cursor;
-  cursor.Init(0, NUM_AVAILABLE_APPS - 1);
-  cursor.Scroll(apps::index_of(global_settings.current_app_id));
+    for (int current = cursor.first_visible();
+         current <= cursor.last_visible();
+         ++current, item.y += menu::kMenuLineH) {
+      item.selected = current == cursor.cursor_pos();
+      item.SetPrintPos();
+      graphics.movePrintPos(weegfx::kFixedFontW, 0);
+      graphics.print(available_apps[current].name);
 
-  bool change_app = false;
-  bool save = false;
-  while (!change_app && idle_time() < APP_SELECTION_TIMEOUT_MS) {
+      if (global_settings.current_app_id == available_apps[current].id)
+        graphics.drawBitmap8(0, item.y + 1, 8, ZAP_ICON);
 
+      item.DrawCustom();
+    }
+
+#ifdef VOR
+    VBiasManager *vbias_m = vbias_m->get();
+    vbias_m->DrawPopupPerhaps();
+#endif
+
+    return true;
+  }
+
+  // --- state change: entering App Menu
+  if (!opened) {
+    SetButtonIgnoreMask();
+    cursor.Init(0, NUM_AVAILABLE_APPS - 1);
+    cursor.Scroll(apps::index_of(global_settings.current_app_id));
+    opened = true;
+  }
+
+  // event handling
+  if (!change_app && idle_time() < APP_SELECTION_TIMEOUT_MS) {
     while (event_queue_.available()) {
       UI::Event event = event_queue_.PullEvent();
       if (IgnoreEvent(event))
@@ -769,13 +771,13 @@ void Ui::AppSettings() {
       }
     }
 
-    draw_app_menu(cursor);
-    delay(2); // VOR calibration hack
+    return true;
   }
-
+  // else... cleanup and exit
   event_queue_.Flush();
   event_queue_.Poke();
 
+  // --- state change: exiting App menu
   CORE::app_isr_enabled = false;
   delay(1);
 
@@ -789,7 +791,9 @@ void Ui::AppSettings() {
       int cnt = 0;
       while(idle_time() < SETTINGS_SAVE_TIMEOUT_MS)
         draw_save_message((cnt++) >> 4);
+      save = false;
     }
+    change_app = false;
   }
 
   OC::ui.encoders_enable_acceleration(global_settings.encoders_enable_acceleration);
@@ -797,6 +801,9 @@ void Ui::AppSettings() {
   // Restore state
   apps::current_app->HandleAppEvent(APP_EVENT_RESUME);
   CORE::app_isr_enabled = true;
+
+  opened = false;
+  return false; // close menu
 }
 
 bool Ui::ConfirmReset() {
