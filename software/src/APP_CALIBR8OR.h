@@ -53,11 +53,12 @@ static const int SCALE_SIZE(const int scale) {
 struct Cal8ChannelConfig {
     int last_note; // for S&H mode
 
-    uint8_t clocked_mode;
+    uint8_t mode;
     int8_t offset; // fine-tuning offset
     int16_t scale_factor; // precision of 0.01% as an offset from 100%
     int8_t transpose; // in semitones
     int8_t transpose_active; // held value while waiting for trigger
+    bool chained;
 
     DAC_CHANNEL chan_;
     DAC_CHANNEL get_channel() { return chan_; }
@@ -172,7 +173,8 @@ public:
             }
 
             uint32_t root_and_mode = uint32_t(values_[ix++]);
-            channel[ch].clocked_mode = ((root_and_mode >> 4) & 0x03) % NR_OF_CLOCKMODES;
+            channel[ch].chained = (root_and_mode >> 7) & 1;
+            channel[ch].mode = ((root_and_mode >> 4) & 0x03) % NR_OF_CLOCKMODES;
             HS::SetRootNote(ch, int(root_and_mode & 0x0f) );
 
             HS::q_mask[ch] = values_[ix++];
@@ -191,7 +193,9 @@ public:
             values_[ix++] = channel[ch].scale_factor + 500;
             values_[ix++] = channel[ch].offset + 63;
             values_[ix++] = channel[ch].transpose + HS::q_octave[ch] * SCALE_SIZE(scale) + CAL8_MAX_TRANSPOSE;
-            values_[ix++] = ((channel[ch].clocked_mode & 0x03) << 4) | (HS::GetRootNote(ch) & 0x0f);
+            values_[ix++] = uint8_t(channel[ch].chained << 7)
+                          | ((channel[ch].mode & 0x03) << 4)
+                          | (HS::GetRootNote(ch) & 0x0f);
             values_[ix++] = HS::q_mask[ch];
         }
     }
@@ -240,8 +244,9 @@ public:
             channel[ch].scale_factor = 0;
             channel[ch].offset = 0;
             channel[ch].transpose = 0;
-            channel[ch].clocked_mode = 0;
+            channel[ch].mode = 0;
             channel[ch].last_note = 0;
+            channel[ch].chained = 0;
         }
     }
     void LoadPreset() {
@@ -367,21 +372,26 @@ public:
             Cal8ChannelConfig &cfg = channel[ch];
 
             // clocked transpose
-            if (CONTINUOUS == cfg.clocked_mode || clocked) {
+            if (CONTINUOUS == cfg.mode || clocked) {
                 cfg.transpose_active = cfg.transpose;
             }
             if (HS::frame.MIDIState.semitone_mask[ch] != 0)
               cfg.transpose_active = 0;
 
             // respect S&H mode
-            if (cfg.clocked_mode != SAMPLE_AND_HOLD || clocked) {
-                // CV value
+            if (cfg.mode != SAMPLE_AND_HOLD || clocked) {
+                // process CV
+                int input_cv = In(ch);
+                if (cfg.chained && ch > 0)
+                  input_cv += channel[ch - 1].last_note;
+
                 if (HS::GetScale(ch) == OC::Scales::SCALE_NONE) {
                   // transpose raw value in semitones
-                  cfg.last_note = In(ch) + (cfg.transpose_active << 7) + q_octave[ch] * (12 << 7);
+                  cfg.last_note = input_cv + (cfg.transpose_active << 7) + q_octave[ch] * (12 << 7);
                 } else {
-                  cfg.last_note = HS::Quantize(ch, In(ch), 0, cfg.transpose_active);
+                  cfg.last_note = HS::Quantize(ch, input_cv, 0, cfg.transpose_active);
                 }
+
             }
 
             // apply scaling and offset, and send out to DAC
@@ -457,7 +467,10 @@ public:
         }
 
         // Toggle triggered transpose mode
-        ++channel[sel_chan].clocked_mode %= NR_OF_CLOCKMODES;
+        if (NR_OF_CLOCKMODES - 1 == channel[sel_chan].mode && sel_chan > 0) {
+          channel[sel_chan].chained ^= 1;
+        }
+        ++channel[sel_chan].mode %= NR_OF_CLOCKMODES;
         preset_modified = 1;
     }
 
@@ -638,14 +651,16 @@ public:
         // Draw channel tabs
         const size_t w = 128 / DAC_CHANNEL_LAST;
         const size_t y = 11;
-        for (int i = 0; i < DAC_CHANNEL_LAST; ++i) {
-          const size_t x = i * w;
+        for (int ch = 0; ch < DAC_CHANNEL_LAST; ++ch) {
+          const size_t x = ch * w;
             gfxLine(x, y, x, y+10); // vertical line on left
+            if (channel[ch].chained)
+              gfxIcon(x-3, y+2, RIGHT_BTN_ICON);
 
             const size_t center_x = x + w/2 - 3;
-            switch (channel[i].clocked_mode) {
+            switch (channel[ch].mode) {
               case CONTINUOUS:
-                gfxPrint(center_x, y+2, i+1);
+                gfxPrint(center_x, y+2, ch+1);
                 break;
               case TRIG_TRANS:
                 gfxIcon(center_x, y+2, CLOCK_ICON);
@@ -655,7 +670,7 @@ public:
                 break;
             }
 
-            if (i == sel_chan)
+            if (ch == sel_chan)
                 gfxInvert(1 + x, y, w - 1, 11);
         }
         gfxLine(127, y, 127, y+10); // vertical line
