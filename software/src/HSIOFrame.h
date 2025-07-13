@@ -32,6 +32,9 @@ static constexpr int MIDIMAP_MAX = 8;
 static constexpr int TRIGMAP_MAX = OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_COUNT + DAC_CHANNEL_COUNT + MIDIMAP_MAX;
 static constexpr int CVMAP_MAX = ADC_CHANNEL_COUNT + DAC_CHANNEL_COUNT + MIDIMAP_MAX;
 
+struct MIDIFrame;
+struct IOFrame;
+
 struct MIDIMessage {
   // values expected from MIDI library, so channel starts at 1 (one), not zero
   uint8_t channel, message, data1, data2;
@@ -55,6 +58,7 @@ struct MIDINoteData {
     uint8_t note; // data1
     uint8_t vel;  // data2
 };
+using NoteBuffer = std::vector<MIDINoteData>;
 
 struct PolyphonyData {
     uint8_t note;
@@ -151,6 +155,8 @@ struct MIDIMapping : public MIDIMapSettings {
     if (range_high < range_low) range_high = range_low;
   }
 
+  bool ProcessMsg(const MIDIMessage msg, MIDIFrame &state);
+
   DISALLOW_COPY_AND_ASSIGN(MIDIMapping);
 };
 
@@ -159,14 +165,12 @@ constexpr MIDIMapping& pack(MIDIMapping& input) {
   return input;
 }
 
-using NoteBuffer = std::vector<MIDINoteData>;
-
 struct MIDIFrame {
     MIDIMapping mapping[MIDIMAP_MAX];
     MIDIMapping outmap[ADC_CHANNEL_COUNT];
 
     // MIDI input stuff handled by MIDIIn applet
-    NoteBuffer note_buffer[16]; // note buffer to track all held notes on all channels
+    NoteBuffer note_buffer[16]; // array of buffers to track all held notes on all channels
     uint8_t last_midi_channel = 0; // for MIDI In activity monitor
     uint16_t sustain_latch; // each bit is a MIDI channel's sustain state
 
