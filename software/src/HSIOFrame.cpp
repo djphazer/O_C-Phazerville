@@ -1,4 +1,5 @@
 #include "HSClockManager.h"
+#include "HSMIDI.h"
 #include "HSIOFrame.h"
 
 // arguments are raw data from MIDI system, so channel starts at 1 (not 0)
@@ -9,8 +10,8 @@ void HS::MIDIFrame::ProcessMIDIMsg(const MIDIMessage msg) {
         case usbMIDI.Clock:
             clock_q = (clock_count % (24/MIDI_CLOCK_PPQN) == 0); // for internal sync @ 2ppqn
             ++clock_count;
-            for(int ch = 0; ch < MIDIMAP_MAX; ++ch) {
-                mapping[ch].ProcessClock(clock_count);
+            for (MIDIMapping& map : mapping) {
+              map.ProcessClock(clock_count);
             }
             if (clock_count == 24) clock_count = 0;
             return;
@@ -22,10 +23,10 @@ void HS::MIDIFrame::ProcessMIDIMsg(const MIDIMessage msg) {
             clock_count = 0;
             clock_run = true;
 
-            for(int ch = 0; ch < MIDIMAP_MAX; ++ch) {
-                if (mapping[ch].function == HEM_MIDI_START_OUT) {
-                    mapping[ch].ClockOut();
-                }
+            for (MIDIMapping& map : mapping) {
+              if (map.function == HEM_MIDI_START_OUT) {
+                map.ClockOut();
+              }
             }
 
             // UpdateLog(message, data1, data2);
@@ -40,9 +41,9 @@ void HS::MIDIFrame::ProcessMIDIMsg(const MIDIMessage msg) {
             ClearMonoBuffer();
             ClearSustainLatch();
             ClearPolyBuffer();
-            for (int ch = 0; ch < MIDIMAP_MAX; ++ch) {
-                mapping[ch].output = 0;
-                mapping[ch].trigout_countdown = 0;
+            for (MIDIMapping& map : mapping) {
+                map.output = 0;
+                map.trigout_countdown = 0;
             }
             return;
             break;
@@ -65,9 +66,8 @@ void HS::MIDIFrame::ProcessMIDIMsg(const MIDIMessage msg) {
     bool log_skip = false;
     uint8_t m_ch_prev = 255; // initialize to invalid channel
 
-    for(int ch = 0; ch < MIDIMAP_MAX; ++ch) {
-        MIDIMapping &map = mapping[ch];
-        if (map.function == HEM_MIDI_NOOP) continue;
+    for (MIDIMapping& map : mapping) {
+        if (!map.function) continue;
 
         // skip unwanted MIDI Channels
         if (map.channel != m_ch && map.channel != 16) continue;
@@ -79,198 +79,214 @@ void HS::MIDIFrame::ProcessMIDIMsg(const MIDIMessage msg) {
         else log_skip = false;
         m_ch_prev = m_ch;
 
-        bool log_this = false;
+        bool log_this = map.ProcessMsg(msg, *this) && !log_skip;
 
-        switch (msg.message) {
-            case usbMIDI.NoteOn: {
-                if (map.function == HEM_MIDI_LEARN) {
-                  //TODO: set range based on polyphony, or alternate learn modes
-                  //if (map.function_cc < 0)
-                    //map.range_low = map.range_high = msg.data1;
-                  map.function = HEM_MIDI_NOTE_OUT;
-                  map.function_cc = 0;
-                  map.channel = msg.channel - 1;
-                }
-                if (!map.InRange(msg.data1)) break;
-                map.semitone_mask = map.semitone_mask | (1u << (msg.data1 % 12));
-
-                // Should this message go out on this channel?
-                switch (map.function) { // note # output functions
-                    case HEM_MIDI_NOTE_OUT:
-                        map.output = MIDIQuantizer::CV(GetNoteLast(note_buffer[m_ch]));
-                        break;
-
-                    case HEM_MIDI_NOTE_POLY_OUT:
-                        if (CheckPolyVoice(map.dac_polyvoice)) map.output = MIDIQuantizer::CV(poly_buffer[map.dac_polyvoice].note);
-                        break;
-
-                    case HEM_MIDI_NOTE_MIN_OUT:
-                        map.output = MIDIQuantizer::CV(GetNoteMin(note_buffer[m_ch]));
-                        break;
-
-                    case HEM_MIDI_NOTE_MAX_OUT:
-                        map.output = MIDIQuantizer::CV(GetNoteMax(note_buffer[m_ch]));
-                        break;
-
-                    case HEM_MIDI_NOTE_PEDAL_OUT:
-                        map.output = MIDIQuantizer::CV(GetNoteFirst(note_buffer[m_ch]));
-                        break;
-
-                    case HEM_MIDI_NOTE_INV_OUT:
-                        map.output = MIDIQuantizer::CV(GetNoteLastInv(note_buffer[m_ch]));
-                        break;
-
-                    case HEM_MIDI_TRIG_1ST_OUT:
-                        if (note_buffer[m_ch].size() != 1) break;
-                    case HEM_MIDI_TRIG_OUT:
-                    case HEM_MIDI_TRIG_ALWAYS_OUT:
-                        map.ClockOut();
-                        break;
-
-                    case HEM_MIDI_GATE_OUT:
-                        map.output = PULSE_VOLTAGE * (12 << 7);
-                        break;
-                    case HEM_MIDI_GATE_INV_OUT:
-                        map.output = 0;
-                        break;
-                    case HEM_MIDI_GATE_POLY_OUT:
-                        if (CheckPolyVoice(map.dac_polyvoice)) map.output = PULSE_VOLTAGE * (12 << 7);
-                        break;
-
-                    case HEM_MIDI_VEL_OUT:
-                        map.output = (note_buffer[m_ch].size() > 0) ? Proportion(GetVel(note_buffer[m_ch], 1), 127, HEMISPHERE_MAX_CV) : 0;
-                        break;
-                    case HEM_MIDI_VEL_POLY_OUT:
-                        map.output = (CheckPolyVoice(map.dac_polyvoice)) ? Proportion(poly_buffer[map.dac_polyvoice].vel, 127, HEMISPHERE_MAX_CV) : 0;
-                        break;
-                }
-
-
-                if (!log_skip) log_this = 1; // Log all MIDI notes. Other stuff is conditional.
-                break;
-            }
-            case usbMIDI.NoteOff: {
-                if (!map.InRange(msg.data1)) break;
-                map.semitone_mask = map.semitone_mask & ~(1u << (msg.data1 % 12));
-
-                // don't update output when last note is released
-                // or if sustain is engaged
-                if (note_buffer[m_ch].size() > 0 && !CheckSustainLatch(m_ch)) {
-                    switch(map.function) { // note # output functions
-                        case HEM_MIDI_NOTE_OUT:
-                            map.output = MIDIQuantizer::CV(GetNoteLast(note_buffer[m_ch]));
-                            break;
-
-                        case HEM_MIDI_NOTE_POLY_OUT:
-                            if (CheckPolyVoice(map.dac_polyvoice)) map.output = MIDIQuantizer::CV(poly_buffer[map.dac_polyvoice].note);
-                            break;
-
-                        case HEM_MIDI_NOTE_MIN_OUT:
-                            map.output = MIDIQuantizer::CV(GetNoteMin(note_buffer[m_ch]));
-                            break;
-
-                        case HEM_MIDI_NOTE_MAX_OUT:
-                            map.output = MIDIQuantizer::CV(GetNoteMax(note_buffer[m_ch]));
-                            break;
-
-                        case HEM_MIDI_NOTE_PEDAL_OUT:
-                            map.output = MIDIQuantizer::CV(GetNoteFirst(note_buffer[m_ch]));
-                            break;
-
-                        case HEM_MIDI_NOTE_INV_OUT:
-                            map.output = MIDIQuantizer::CV(GetNoteLastInv(note_buffer[m_ch]));
-                            break;
-                    }
-                }
-
-                if (map.function == HEM_MIDI_TRIG_ALWAYS_OUT) map.ClockOut();
-
-                if (!CheckSustainLatch(m_ch)) {
-                    if (!(note_buffer[m_ch].size() > 0)) { // turn mono gate off, only when all notes are off
-                        if (map.function == HEM_MIDI_GATE_OUT) map.output = 0;
-                        if (map.function == HEM_MIDI_GATE_INV_OUT) map.output = PULSE_VOLTAGE * (12 << 7);
-                    }
-                    if (map.function == HEM_MIDI_GATE_POLY_OUT) {
-                        if (!CheckPolyVoice(map.dac_polyvoice)) map.output = 0;
-                    }
-                }
-
-                if (map.function == HEM_MIDI_VEL_OUT)
-                    map.output = (note_buffer[m_ch].size() > 0) ? Proportion(GetVel(note_buffer[m_ch], 1), 127, HEMISPHERE_MAX_CV) : 0;
-                if (map.function == HEM_MIDI_VEL_POLY_OUT)
-                    map.output = (CheckPolyVoice(map.dac_polyvoice)) ? Proportion(poly_buffer[map.dac_polyvoice].vel, 127, HEMISPHERE_MAX_CV) : 0;
-
-                if (!log_skip) log_this = 1;
-                break;
-            }
-            case usbMIDI.ControlChange: { // Modulation wheel or other CC
-                // handle sustain pedal
-                if (msg.data1 == 64) {
-                    if (msg.data2 > 63) {
-                        if (!CheckSustainLatch(m_ch)) sustain_latch |= (1 << m_ch);
-                    } else {
-                        ClearSustainLatch(m_ch);
-                        if (!(note_buffer[m_ch].size() > 0)) {
-                            switch (map.function) {
-                                case HEM_MIDI_GATE_OUT:
-                                case HEM_MIDI_GATE_POLY_OUT:
-                                    map.output = 0;
-                                    break;
-                                case HEM_MIDI_GATE_INV_OUT:
-                                    map.output = PULSE_VOLTAGE * (12 << 7);
-                                    break;
-                            }
-                        }
-                    }
-                }
-
-                if (map.function == HEM_MIDI_LEARN) {
-                  map.function = HEM_MIDI_CC_OUT;
-                  map.function_cc = msg.data1;
-                  map.channel = msg.channel - 1;
-                }
-
-                if (map.function == HEM_MIDI_CC_OUT) {
-                    if (map.function_cc < 0) { // auto-learn CC#
-                      map.function_cc = msg.data1;
-                    }
-                    if (map.function_cc == msg.data1) {
-                        map.output = Proportion(msg.data2, 127, HEMISPHERE_MAX_CV);
-                        if (!log_skip) log_this = 1;
-                    }
-                }
-                break;
-            }
-            case usbMIDI.AfterTouchPoly: {
-                if (map.function == HEM_MIDI_AT_KEY_POLY_OUT) {
-                    if (FindPolyNoteIndex(msg.data1) == map.dac_polyvoice)
-                        map.output = Proportion(msg.data2, 127, HEMISPHERE_MAX_CV);
-                    if (!log_skip) log_this = 1;
-                }
-                break;
-            }
-            case usbMIDI.AfterTouchChannel: {
-                if (map.function == HEM_MIDI_AT_CHAN_OUT) {
-                    map.output = Proportion(msg.data1, 127, HEMISPHERE_MAX_CV);
-                    if (!log_skip) log_this = 1;
-                }
-                break;
-            }
-            case usbMIDI.PitchBend: {
-                if (map.function == HEM_MIDI_LEARN) {
-                  map.function = HEM_MIDI_PB_OUT;
-                  map.channel = msg.channel - 1;
-                }
-                if (map.function == HEM_MIDI_PB_OUT) {
-                    int data = (msg.data2 << 7) + msg.data1 - 8192;
-                    map.output = Proportion(data, 8192, HEMISPHERE_3V_CV);
-                    if (!log_skip) log_this = 1;
-                }
-                break;
-            }
-        }
         if (log_this) UpdateLog(msg);
     }
+}
+
+bool HS::MIDIMapping::ProcessMsg(const MIDIMessage msg, HS::MIDIFrame &state) {
+  if (function == HEM_MIDI_NOOP) return false;
+
+  const uint8_t m_ch = msg.channel - 1;
+  NoteBuffer &buf = state.note_buffer[m_ch];
+
+  bool log_this = false;
+
+  if (function == HEM_MIDI_LEARN) {
+    switch (msg.message) {
+      case usbMIDI.NoteOn:
+        //TODO: set range based on polyphony, or alternate learn modes
+        //if (function_cc < 0)
+          //range_low = range_high = msg.data1;
+        function = HEM_MIDI_NOTE_OUT;
+        function_cc = 0;
+        channel = m_ch;
+        break;
+      case usbMIDI.ControlChange:
+        function = HEM_MIDI_CC_OUT;
+        function_cc = msg.data1;
+        channel = msg.channel - 1;
+        break;
+      case usbMIDI.PitchBend:
+        function = HEM_MIDI_PB_OUT;
+        channel = msg.channel - 1;
+        break;
+      default: break;
+    }
+  }
+
+  switch (msg.message) {
+    case usbMIDI.NoteOn: {
+        if (!InRange(msg.data1)) break;
+        semitone_mask = semitone_mask | (1u << (msg.data1 % 12));
+
+        // Should this message go out on this channel?
+        switch (function) {
+            // note # output functions
+            case HEM_MIDI_NOTE_OUT:
+                output = MIDIQuantizer::CV(state.GetNoteLast(buf));
+                break;
+
+            case HEM_MIDI_NOTE_POLY_OUT:
+                if (state.CheckPolyVoice(dac_polyvoice)) output = MIDIQuantizer::CV(state.poly_buffer[dac_polyvoice].note);
+                break;
+
+            case HEM_MIDI_NOTE_MIN_OUT:
+                output = MIDIQuantizer::CV(state.GetNoteMin(buf));
+                break;
+
+            case HEM_MIDI_NOTE_MAX_OUT:
+                output = MIDIQuantizer::CV(state.GetNoteMax(buf));
+                break;
+
+            case HEM_MIDI_NOTE_PEDAL_OUT:
+                output = MIDIQuantizer::CV(state.GetNoteFirst(buf));
+                break;
+
+            case HEM_MIDI_NOTE_INV_OUT:
+                output = MIDIQuantizer::CV(state.GetNoteLastInv(buf));
+                break;
+
+            case HEM_MIDI_TRIG_1ST_OUT:
+                if (buf.size() != 1) break;
+            case HEM_MIDI_TRIG_OUT:
+            case HEM_MIDI_TRIG_ALWAYS_OUT:
+                ClockOut();
+                break;
+
+            case HEM_MIDI_GATE_OUT:
+                output = PULSE_VOLTAGE * (12 << 7);
+                break;
+            case HEM_MIDI_GATE_INV_OUT:
+                output = 0;
+                break;
+            case HEM_MIDI_GATE_POLY_OUT:
+                if (state.CheckPolyVoice(dac_polyvoice)) output = PULSE_VOLTAGE * (12 << 7);
+                break;
+
+            case HEM_MIDI_VEL_OUT:
+                output = (buf.size() > 0) ? Proportion(state.GetVel(buf, 1), 127, HEMISPHERE_MAX_CV) : 0;
+                break;
+            case HEM_MIDI_VEL_POLY_OUT:
+                output = (state.CheckPolyVoice(dac_polyvoice)) ? Proportion(state.poly_buffer[dac_polyvoice].vel, 127, HEMISPHERE_MAX_CV) : 0;
+                break;
+        }
+
+        log_this = 1; // Log all MIDI notes. Other stuff is conditional.
+        break;
+    }
+    case usbMIDI.NoteOff: {
+        if (!InRange(msg.data1)) break;
+        semitone_mask = semitone_mask & ~(1u << (msg.data1 % 12));
+
+        // don't update output when last note is released
+        // or if sustain is engaged
+        if (buf.size() > 0 && !state.CheckSustainLatch(m_ch)) {
+            switch(function) { // note # output functions
+                case HEM_MIDI_NOTE_OUT:
+                    output = MIDIQuantizer::CV(state.GetNoteLast(buf));
+                    break;
+
+                case HEM_MIDI_NOTE_POLY_OUT:
+                    if (state.CheckPolyVoice(dac_polyvoice)) output = MIDIQuantizer::CV(state.poly_buffer[dac_polyvoice].note);
+                    break;
+
+                case HEM_MIDI_NOTE_MIN_OUT:
+                    output = MIDIQuantizer::CV(state.GetNoteMin(buf));
+                    break;
+
+                case HEM_MIDI_NOTE_MAX_OUT:
+                    output = MIDIQuantizer::CV(state.GetNoteMax(buf));
+                    break;
+
+                case HEM_MIDI_NOTE_PEDAL_OUT:
+                    output = MIDIQuantizer::CV(state.GetNoteFirst(buf));
+                    break;
+
+                case HEM_MIDI_NOTE_INV_OUT:
+                    output = MIDIQuantizer::CV(state.GetNoteLastInv(buf));
+                    break;
+            }
+        }
+
+        if (function == HEM_MIDI_TRIG_ALWAYS_OUT) ClockOut();
+
+        if (!state.CheckSustainLatch(m_ch)) {
+            if (buf.size() == 0) { // turn mono gate off, only when all notes are off
+                if (function == HEM_MIDI_GATE_OUT) output = 0;
+                if (function == HEM_MIDI_GATE_INV_OUT) output = PULSE_VOLTAGE * (12 << 7);
+            }
+            if (function == HEM_MIDI_GATE_POLY_OUT) {
+                if (!state.CheckPolyVoice(dac_polyvoice)) output = 0;
+            }
+        }
+
+        if (function == HEM_MIDI_VEL_OUT)
+            output = (buf.size() > 0) ? Proportion(state.GetVel(buf, 1), 127, HEMISPHERE_MAX_CV) : 0;
+        if (function == HEM_MIDI_VEL_POLY_OUT)
+            output = (state.CheckPolyVoice(dac_polyvoice)) ? Proportion(state.poly_buffer[dac_polyvoice].vel, 127, HEMISPHERE_MAX_CV) : 0;
+
+        log_this = 1;
+        break;
+    }
+    case usbMIDI.ControlChange: { // Modulation wheel or other CC
+        // handle sustain pedal
+        if (msg.data1 == 64) {
+            if (msg.data2 > 63) {
+                if (!state.CheckSustainLatch(m_ch)) state.sustain_latch |= (1 << m_ch);
+            } else {
+                state.ClearSustainLatch(m_ch);
+                if (!(buf.size() > 0)) {
+                    switch (function) {
+                        case HEM_MIDI_GATE_OUT:
+                        case HEM_MIDI_GATE_POLY_OUT:
+                            output = 0;
+                            break;
+                        case HEM_MIDI_GATE_INV_OUT:
+                            output = PULSE_VOLTAGE * (12 << 7);
+                            break;
+                    }
+                }
+            }
+        }
+
+        if (function == HEM_MIDI_CC_OUT) {
+            if (function_cc < 0) { // auto-learn CC#
+              function_cc = msg.data1;
+            }
+            if (function_cc == msg.data1) {
+                output = Proportion(msg.data2, 127, HEMISPHERE_MAX_CV);
+                log_this = 1;
+            }
+        }
+        break;
+    }
+    case usbMIDI.AfterTouchPoly: {
+        if (function == HEM_MIDI_AT_KEY_POLY_OUT) {
+            if (state.FindPolyNoteIndex(msg.data1) == dac_polyvoice)
+                output = Proportion(msg.data2, 127, HEMISPHERE_MAX_CV);
+            log_this = 1;
+        }
+        break;
+    }
+    case usbMIDI.AfterTouchChannel: {
+        if (function == HEM_MIDI_AT_CHAN_OUT) {
+            output = Proportion(msg.data1, 127, HEMISPHERE_MAX_CV);
+            log_this = 1;
+        }
+        break;
+    }
+    case usbMIDI.PitchBend: {
+        if (function == HEM_MIDI_PB_OUT) {
+            int data = (msg.data2 << 7) + msg.data1 - 8192;
+            output = Proportion(data, 8192, HEMISPHERE_3V_CV);
+            log_this = 1;
+        }
+        break;
+    }
+  } // switch
+  return log_this;
 }
 
 void HS::MIDIFrame::Send(const int *outvals) {
