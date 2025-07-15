@@ -875,9 +875,6 @@ public:
             event.control == OC::CONTROL_BUTTON_L ||
             event.control == OC::CONTROL_BUTTON_R)
           {
-              if (event.mask == (OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_R)) {
-                // TODO: how to go to app menu?
-              }
               DelegateEncoderPush(event);
               // ignore long-press to prevent Main Menu >:)
               //OC::ui.SetButtonIgnoreMask();

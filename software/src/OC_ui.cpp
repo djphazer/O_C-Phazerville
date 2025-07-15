@@ -51,6 +51,7 @@ void Ui::Init() {
   button_ignore_mask_ = 0;
   screensaver_ = false;
   preempt_screensaver_ = false;
+  jump_to_menu_ = false;
 
   encoder_right_.Init(OC_GPIO_ENC_PINMODE);
   encoder_left_.Init(OC_GPIO_ENC_PINMODE);
@@ -162,17 +163,23 @@ UiMode Ui::DispatchEvents(const App *app) {
             app->HandleButtonEvent(event);
         break;
       case UI::EVENT_BUTTON_LONG_PRESS:
-        if (OC::CONTROL_BUTTON_UP == event.control) {
-          if (!preempt_screensaver_) screensaver_ = true;
+        if (OC::CONTROL_BUTTON_UP == event.control && !preempt_screensaver_) {
           SetButtonIgnoreMask(); // ignore release
+          screensaver_ = true;
         }
-        else if (OC::CONTROL_BUTTON_R == event.control)
-          return UI_MODE_APP_SETTINGS;
+        //else if (event.control == OC::CONTROL_BUTTON_R) {
+          // only if holding both encoders...
+          //if (event.mask == (OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_R))
+          //jump_to_menu_ = true;
+        //}
         else
           app->HandleButtonEvent(event);
         break;
       case UI::EVENT_BUTTON_LONG_RELEASE:
-        app->HandleButtonEvent(event);
+        if (event.control == OC::CONTROL_BUTTON_R)
+          jump_to_menu_ = true;
+        else
+          app->HandleButtonEvent(event);
         break;
       case UI::EVENT_ENCODER:
         app->HandleEncoderEvent(event);
@@ -189,7 +196,11 @@ UiMode Ui::DispatchEvents(const App *app) {
 
   if (screensaver_)
     return UI_MODE_SCREENSAVER;
-  else
+  else if (jump_to_menu_) {
+    SetButtonIgnoreMask(); // ignore release
+    jump_to_menu_ = false;
+    return UI_MODE_APP_SETTINGS;
+  } else
     return UI_MODE_MENU;
 }
 

@@ -689,6 +689,14 @@ bool Ui::AppSettings(bool drawmenu) {
   static bool save = false;
   static bool opened = false;
 
+  // --- state change: entering App Menu
+  if (!opened) {
+    cursor.Init(0, NUM_AVAILABLE_APPS - 1);
+    cursor.Scroll(apps::index_of(global_settings.current_app_id));
+    opened = true;
+  }
+
+  // View - graphics
   if (drawmenu) {
     // assumes this is called from within a graphics frame context
     if (global_settings.encoders_enable_acceleration)
@@ -720,15 +728,7 @@ bool Ui::AppSettings(bool drawmenu) {
     return true;
   }
 
-  // --- state change: entering App Menu
-  if (!opened) {
-    SetButtonIgnoreMask();
-    cursor.Init(0, NUM_AVAILABLE_APPS - 1);
-    cursor.Scroll(apps::index_of(global_settings.current_app_id));
-    opened = true;
-  }
-
-  // event handling
+  // UI - event handling
   if (!change_app && idle_time() < APP_SELECTION_TIMEOUT_MS) {
     while (event_queue_.available()) {
       UI::Event event = event_queue_.PullEvent();
@@ -773,7 +773,8 @@ bool Ui::AppSettings(bool drawmenu) {
 
     return true;
   }
-  // else... cleanup and exit
+  // else... idle time expired, or an app was selected via UI
+  // cleanup and exit
   event_queue_.Flush();
   event_queue_.Poke();
 
