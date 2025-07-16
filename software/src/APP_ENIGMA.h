@@ -20,18 +20,9 @@
 
 #ifdef ENABLE_APP_ENIGMA
 
-#include <Arduino.h>
-#include <EEPROM.h>
-#include <stdint.h>
-#include <stdint.h>
-#include "OC_config.h"
-#include "OC_apps.h"
-#include "OC_ui.h"
-#include "src/drivers/display.h"
-#include "OC_strings.h"
 #include "HSApplication.h"
 
-#include "HSMIDI.h"
+#include "OC_strings.h"
 #include "enigma/TuringMachine.h"
 #include "enigma/TuringMachineState.h"
 #include "enigma/EnigmaStep.h"
@@ -39,11 +30,13 @@
 #include "enigma/EnigmaTrack.h"
 
 // Modes
-#define ENIGMA_MODE_LIBRARY 0  // Create, edit, save, favorite, sysex dump Turing Machines
-#define ENIGMA_MODE_ASSIGN 1   // Assign CV and MIDI output
-#define ENIGMA_MODE_SONG 2     // Assemble compositions by chaining Turing Machines
-#define ENIGMA_MODE_PLAY 3     // Play information and transport controls
-#define ENIGMA_CONFIRM_RESET 4 // Special page for confirming song reset
+enum EnigmaMode {
+  ENIGMA_MODE_LIBRARY = 0,  // Create, edit, save, favorite, sysex dump Turing Machines
+  ENIGMA_MODE_ASSIGN  = 1,   // Assign CV and MIDI output
+  ENIGMA_MODE_SONG    = 2,     // Assemble compositions by chaining Turing Machines
+  ENIGMA_MODE_PLAY    = 3,     // Play information and transport controls
+  ENIGMA_CONFIRM_RESET= 4, // Special page for confirming song reset
+};
 
 // Parameters for Manaage mode (per Turing Machine)
 #define ENIGMA_TM_LENGTH 0
@@ -76,12 +69,12 @@ class EnigmaTMWS : public HSApplication, public SystemExclusiveHandler,
     public settings::SettingsBase<EnigmaTMWS, ENIGMA_SETTING_LAST> {
 public:
 	void Start() {
-	    for (byte ix = 0; ix < HS::TURING_MACHINE_COUNT; ix++) state_prob[ix] = 0;
+	    for (int ix = 0; ix < HS::TURING_MACHINE_COUNT; ix++) state_prob[ix] = 0;
 	    tm_cursor = 0;
 	    SwitchTuringMachine(0);
 
 	    // Configure outputs and tracks
-	    for (byte o = 0; o < 4; o++)
+	    for (int o = 0; o < 4; o++)
 	    {
 	        output[o].InitAs(o);
 	        track[o].InitAs(o);
@@ -131,7 +124,7 @@ public:
     }
 
     void OnReceiveSysEx() {
-        byte V[48];
+        uint8_t V[48];
         if (ExtractSysExData(V, 'T')) {
             char type = V[0]; // Type of Enigma data:r=Register, s=Song step, c=Song Config, 1=single TM
             if (type == 'r') ReceiveTuringMachine(V);
@@ -289,12 +282,12 @@ public:
 private:
     //////// OPERATING STATES
     TuringMachineState tm_state; // The currently-selected state in Library mode
-    byte state_prob[HS::TURING_MACHINE_COUNT]; // Remember the last probability
+    uint8_t state_prob[HS::TURING_MACHINE_COUNT]; // Remember the last probability
     bool assign_audition = 0; // Which area does Assign monitor? 0=Library, 1=Song
     bool last_assign_audition; // Temporarily save the old audition state during playback
     uint16_t track_step[100]; // List of steps in the current track
     uint16_t total_steps = 0; // Total number of song_step[] entries used; index of the next step
-    byte last_track_step_index = 0; // For adding the next step
+    uint8_t last_track_step_index = 0; // For adding the next step
     uint16_t help_countdown = 0; // Display help screen for this many more ticks
     uint16_t help_time = ENIGMA_INITIAL_HELP_TIME; // Starting time for help, per mode
 
@@ -302,9 +295,9 @@ private:
     bool play = 0; // Playback mode
     uint32_t clock_counter; // Counts clocks for clock division
     uint16_t playback_step_index[4]; // Index within song_step[]
-    byte playback_step_number[4]; // Step for each track, ordinal
-    byte playback_step_repeat[4]; // Which repeat
-    byte playback_step_beat[4]; // Which beat number
+    uint8_t playback_step_number[4]; // Step for each track, ordinal
+    uint8_t playback_step_repeat[4]; // Which repeat
+    uint8_t playback_step_beat[4]; // Which beat number
     bool playback_end[4]; // End non-looping playback until reset
     TuringMachineState track_tm[4]; // Turing Machine states for each track
 
@@ -314,8 +307,8 @@ private:
     EnigmaTrack track[4];
 
     //////// NAVIGATION
-    byte mode = 0; // 0=Library 1=Assign 2=Song
-    byte last_mode = 0; // Stores previous mode for special screen(s)
+    uint8_t mode = 0; // 0=Library 1=Assign 2=Song
+    uint8_t last_mode = 0; // Stores previous mode for special screen(s)
     int16_t edit_index = 0; // Current Song Mode step within track_step[]
 
     // Primary object cursors, one for each mode
@@ -330,12 +323,11 @@ private:
     int8_t track_param = 0; // 0=Clock Divide, 1=Loop
 
     void DrawHeader() {
+        const char * const mode_names[] = {
+          "Library", "Assign", "Song", "Play", "New Song",
+        };
         gfxHeader("Enigma - ");
-        if (mode == ENIGMA_CONFIRM_RESET) gfxPrint("New Song");
-        if (mode == ENIGMA_MODE_LIBRARY) gfxPrint("Library");
-        if (mode == ENIGMA_MODE_ASSIGN) gfxPrint("Assign");
-        if (mode == ENIGMA_MODE_SONG) gfxPrint("Song");
-        if (mode == ENIGMA_MODE_PLAY) gfxPrint("Play");
+        gfxPrint(mode_names[mode]);
     }
 
     // DrawInterface()'s job is to delegate to the various mode screens.
@@ -368,10 +360,10 @@ private:
 
     void DrawLibraryInterface() {
         // Draw the left side, the selector
-        for (byte line = 0; line < 4; line++)
+        for (int line = 0; line < 4; line++)
         {
-            byte y = 24 + (line * 10);
-            byte ix = (tm_cursor + line) % HS::TURING_MACHINE_COUNT;
+            uint8_t y = 24 + (line * 10);
+            uint8_t ix = (tm_cursor + line) % HS::TURING_MACHINE_COUNT;
             char name[4];
             HS::TuringMachine::SetName(name, ix);
             gfxPrint(3, y, name);
@@ -383,12 +375,12 @@ private:
         else {
             // The right side is for editing
             // Length
-            byte length = tm_state.GetLength();
+            uint8_t length = tm_state.GetLength();
             gfxIcon(64, 14, NOTE_ICON);
             gfxPrint(76 + pad(10, length), 15, length);
 
             // Probability
-            byte p = state_prob[tm_cursor];
+            uint8_t p = state_prob[tm_cursor];
             gfxPrint(96, 15, "p=");
             if (tm_state.IsFavorite()) gfxIcon(116, 15, FAVORITE_ICON);
             else gfxPrint(pad(100, p), p);
@@ -414,10 +406,10 @@ private:
         else gfxIcon(118, 0, PAUSE_ICON);
 
         // Draw the left side, the selector
-        for (byte line = 0; line < 4; line++)
+        for (int line = 0; line < 4; line++)
         {
-            byte y = 24 + (line * 10);
-            byte ix = (output_cursor + line) % 4;
+            uint8_t y = 24 + (line * 10);
+            uint8_t ix = (output_cursor + line) % 4;
             char out_name[2] = {static_cast<char>(ix + 'A'), '\0'};
             gfxPrint(3, y, out_name);
             gfxPrint(": Tk");
@@ -465,10 +457,10 @@ private:
         if (total_steps > 32) gfxInvert(110, 0, 18, 9);
 
         // Draw the left side, the selector
-        for (byte line = 0; line < 4; line++)
+        for (int line = 0; line < 4; line++)
         {
-            byte y = 24 + (line * 10);
-            byte t = (track_cursor + line) % 4;
+            uint8_t y = 24 + (line * 10);
+            uint8_t t = (track_cursor + line) % 4;
             gfxPrint(3, y, "Track");
             gfxPrint(39, y, t + 1);
         }
@@ -491,7 +483,7 @@ private:
                 if (step_param == ENIGMA_STEP_TM) {
                     // If the Turing Machine is being selected, display the length and favorite
                     // status instead of the probability
-                    byte length = HS::user_turing_machines[song_step[ssi].tm()].len;
+                    uint8_t length = HS::user_turing_machines[song_step[ssi].tm()].len;
                     bool favorite = HS::user_turing_machines[song_step[ssi].tm()].favorite;
 
                     if (length > 0) gfxPrint(pad(10, length), length);
@@ -520,11 +512,11 @@ private:
             // Draw the next three steps
             if (last_track_step_index > 0) {
                 bool stop = 0; // Show the Stop/Loop step only once
-                for (byte n = 0; n < 3; n++)
+                for (int n = 0; n < 3; n++)
                 {
                     if (edit_index + n + 1 < 99) {
                         uint16_t ssi = track_step[edit_index + n + 1];
-                        byte y = 35 + (10 * n);
+                        uint8_t y = 35 + (10 * n);
                         if (ssi < ENIGMA_NO_STEP_AVAILABLE) {
                             gfxPrint(56 + pad(10, edit_index + n + 2), y, edit_index + n + 2); // Step number (1-99)
                             gfxPrint(": ");
@@ -565,7 +557,7 @@ private:
             for (int t = 0; t < 4; t++)
             {
                 uint16_t ssi = playback_step_index[t]; // playback_step_index is the index of the song_step
-                byte y = 25 + (t * 10);
+                uint8_t y = 25 + (t * 10);
                 gfxPrint(0, y, t + 1);
                 if (playback_step_number[t] == 0) {
                     gfxIcon(30, y, RESET_ICON);
@@ -642,12 +634,12 @@ private:
     void DrawSelectorBox(const char* object) {
         gfxPrint(0, 15, object);
         gfxFrame(0, 23, 48, 40); // Selector window
-        for (byte line = 0; line < 3; line++) gfxLine(0, 32 + (10 * line),  47, 32 + (10 * line));
+        for (int line = 0; line < 3; line++) gfxLine(0, 32 + (10 * line),  47, 32 + (10 * line));
         gfxInvert(1, 24, 46, 9);
     }
 
     // When a new TM is selected, load it here
-    void SwitchTuringMachine(byte ix) {
+    void SwitchTuringMachine(uint8_t ix) {
         tm_state.Init(ix);
         tm_state.SetWriteMode(1); // This method is called from the Library, so set write access
         if (tm_state.IsFavorite()) tm_param = ENIGMA_TM_ROTATE;
@@ -732,7 +724,7 @@ private:
         if (Clock(0)) {
             uint16_t reg = tm_state.GetRegister();
             int deferred_note = -1;
-            for (byte o = 0; o < 4; o++)
+            for (int o = 0; o < 4; o++)
             {
                 output[o].SendToDAC<EnigmaTMWS>(this, reg);
 
@@ -764,7 +756,7 @@ private:
         if (play && Clock(0)) {
             clock_counter++;
             int deferred_note = -1;
-            for (byte t = 0; t < 4; t++)
+            ForAllChannels(t)
             {
                 if (!playback_end[t] && clock_counter % track[t].divide() == 0) {
                     uint16_t ssi = playback_step_index[t]; // song_step index
@@ -813,7 +805,7 @@ private:
                         }
 
                         // Send the track to the appopriate outputs
-                        for (byte o = 0; o < 4; o++)
+                        for (int o = 0; o < 4; o++)
                         {
                             if (output[o].track() == t) {
                                 uint16_t reg = track_tm[t].GetRegister();
@@ -843,9 +835,9 @@ private:
             //     End the song only if ALL tracks are non-looping
             bool keep_going = 0;
             if (In(0) > HSAPPLICATION_3V || In(1) > HSAPPLICATION_3V) {
-                for (byte t = 0; t < 4; t++) if (!track[t].loop() && !playback_end[t]) keep_going = 1;
+                for (int t = 0; t < 4; t++) if (!track[t].loop() && !playback_end[t]) keep_going = 1;
             } else {
-                for (byte t = 0; t < 4; t++) if (track[t].loop() || !playback_end[t]) keep_going = 1;
+                for (int t = 0; t < 4; t++) if (track[t].loop() || !playback_end[t]) keep_going = 1;
             }
             if (!keep_going) {
                 if (In(1) > HSAPPLICATION_3V) ResetSong();
@@ -856,8 +848,8 @@ private:
     }
 
     //////// Data Collection
-    void BuildTrackStepList(byte track) {
-        byte ts_ix = 0;
+    void BuildTrackStepList(uint8_t track) {
+        uint8_t ts_ix = 0;
         for (uint16_t ix = 0; ix < total_steps; ix++)
         {
             if (song_step[ix].track() == track) {
@@ -918,7 +910,7 @@ private:
 
     void ResetSong() {
         clock_counter = 0;
-        for (byte t = 0; t < 4; t++)
+        for (int t = 0; t < 4; t++)
         {
             playback_step_index[t] = GetFirstStep(t);
             playback_step_number[t] = 0;
@@ -930,7 +922,7 @@ private:
         }
     }
 
-    uint16_t GetFirstStep(byte track) {
+    uint16_t GetFirstStep(uint8_t track) {
         uint16_t step = ENIGMA_NO_STEP_AVAILABLE;
         for (uint16_t s = 0; s < total_steps; s++)
         {
@@ -951,18 +943,18 @@ private:
 
     //////// SysEx
     void SendTuringMachineLibrary() {
-        for (byte tm = 0; tm < HS::TURING_MACHINE_COUNT; tm++)
+        for (int tm = 0; tm < HS::TURING_MACHINE_COUNT; tm++)
         {
             uint16_t reg = HS::user_turing_machines[tm].reg;
-            byte len = HS::user_turing_machines[tm].len;
-            byte favorite = HS::user_turing_machines[tm].favorite;
+            uint8_t len = HS::user_turing_machines[tm].len;
+            uint8_t favorite = HS::user_turing_machines[tm].favorite;
 
-            byte V[6];
-            byte ix = 0;
+            uint8_t V[6];
+            uint8_t ix = 0;
             V[ix++] = 'r'; // Indicates a register is being sent
             V[ix++] = tm; // Register index in Library
-            V[ix++] = static_cast<byte>(reg & 0xff);  // Low Byte
-            V[ix++] = static_cast<byte>((reg >> 8) & 0xfff);  // High Byte
+            V[ix++] = static_cast<uint8_t>(reg & 0xff);  // Low Byte
+            V[ix++] = static_cast<uint8_t>((reg >> 8) & 0xfff);  // High Byte
             V[ix++] = len;
             V[ix++] = favorite;
             UnpackedData unpacked;
@@ -972,17 +964,17 @@ private:
         }
     }
 
-    void SendSingleTuringMachine(byte tm) {
+    void SendSingleTuringMachine(uint8_t tm) {
         uint16_t reg = HS::user_turing_machines[tm].reg;
-        byte len = HS::user_turing_machines[tm].len;
-        byte favorite = HS::user_turing_machines[tm].favorite;
+        uint8_t len = HS::user_turing_machines[tm].len;
+        uint8_t favorite = HS::user_turing_machines[tm].favorite;
 
-        byte V[6];
-        byte ix = 0;
+        uint8_t V[6];
+        uint8_t ix = 0;
         V[ix++] = '1'; // Indicates a single register is being sent
         V[ix++] = tm; // Register index in Library (origin, but unused on receive)
-        V[ix++] = static_cast<byte>(reg & 0xff);  // Low Byte
-        V[ix++] = static_cast<byte>((reg >> 8) & 0xfff);  // High Byte
+        V[ix++] = static_cast<uint8_t>(reg & 0xff);  // Low Byte
+        V[ix++] = static_cast<uint8_t>((reg >> 8) & 0xfff);  // High Byte
         V[ix++] = len;
         V[ix++] = favorite;
         UnpackedData unpacked;
@@ -992,21 +984,21 @@ private:
     }
 
     void SendSong() {
-        byte V[48];
-        byte ix;
+        uint8_t V[48];
+        uint8_t ix;
 
         // Send song data
         ix = 0;
-        byte pages = (total_steps / 8) + 1;
-        for (byte p = 0; p < pages; p++)
+        uint8_t pages = (total_steps / 8) + 1;
+        for (int p = 0; p < pages; p++)
         {
             V[ix++] = 's'; // Indicates a song step page is being sent
             V[ix++] = p; // Page number
-            V[ix++] = static_cast<byte>(total_steps & 0xff); // Total steps, low byte
-            V[ix++] = static_cast<byte>((total_steps >> 8) & 0xff); // Total steps, high byte
-            for (byte s = 0; s < 10; s++)
+            V[ix++] = static_cast<uint8_t>(total_steps & 0xff); // Total steps, low byte
+            V[ix++] = static_cast<uint8_t>((total_steps >> 8) & 0xff); // Total steps, high byte
+            for (int s = 0; s < 10; s++)
             {
-                byte ssi = (p * 8) + s;
+                uint8_t ssi = (p * 8) + s;
                 V[ix++] = song_step[ssi].tk;
                 V[ix++] = song_step[ssi].pr;
                 V[ix++] = song_step[ssi].re;
@@ -1030,10 +1022,10 @@ private:
     }
 
     void SendOutputAssignments() {
-        byte V[48];
-        byte ix = 0;
+        uint8_t V[48];
+        uint8_t ix = 0;
         V[ix++] = 'o'; // Indicates a set of output assignments
-        for (byte o = 0; o < 4; o++)
+        for (int o = 0; o < 4; o++)
         {
             V[ix++] = output[o].tk;
             V[ix++] = output[o].ty;
@@ -1047,14 +1039,14 @@ private:
     }
 
     void ReceiveTuringMachine(uint8_t *V) {
-        byte ix = 1; // index 0 was already handled
-        byte tm = V[ix++];
+        uint8_t ix = 1; // index 0 was already handled
+        uint8_t tm = V[ix++];
         if (tm < HS::TURING_MACHINE_COUNT) {
             uint8_t low = V[ix++];
             uint8_t high = V[ix++];
             uint16_t reg = static_cast<uint16_t>((high << 8) | low);
-            byte len = V[ix++];
-            byte favorite = V[ix++];
+            uint8_t len = V[ix++];
+            uint8_t favorite = V[ix++];
             HS::user_turing_machines[tm].reg = reg;
             HS::user_turing_machines[tm].len  = len;
             HS::user_turing_machines[tm].favorite = favorite;
@@ -1062,14 +1054,14 @@ private:
     }
 
     void ReceiveSongSteps(uint8_t *V) {
-        byte ix = 1;
-        byte page = V[ix++];
-        byte low = V[ix++];
-        byte high = V[ix++];
+        uint8_t ix = 1;
+        uint8_t page = V[ix++];
+        uint8_t low = V[ix++];
+        uint8_t high = V[ix++];
         total_steps = static_cast<uint16_t>((high << 8) | low);
-        for (byte s = 0; s < 8; s++)
+        for (int s = 0; s < 8; s++)
         {
-            byte ssi = (page * 8) + s;
+            uint8_t ssi = (page * 8) + s;
             song_step[ssi].tk = V[ix++];
             song_step[ssi].pr = V[ix++];
             song_step[ssi].re = V[ix++];
@@ -1081,13 +1073,13 @@ private:
     }
 
     void ReceiveTrackSettings(uint8_t *V) {
-        byte ix = 1;
-        for (byte t = 0; t < 4; t++) track[t].data = V[ix++];
+        uint8_t ix = 1;
+        for (int t = 0; t < 4; t++) track[t].data = V[ix++];
     }
 
     void ReceiveOutputAssignments(uint8_t *V) {
-        byte ix = 1;
-        for (byte o = 0; o < 4; o++)
+        uint8_t ix = 1;
+        for (int o = 0; o < 4; o++)
         {
             output[o].tk = V[ix++];
             output[o].ty = V[ix++];
@@ -1098,10 +1090,10 @@ private:
 
     //////// Data Storage
     void SaveToEEPROMStage() {
-        byte ix = 0;
+        uint8_t ix = 0;
 
         // Outputs
-        for (byte o = 0; o < 4; o++)
+        for (int o = 0; o < 4; o++)
         {
             values_[ix++] = output[o].tk;
             values_[ix++] = output[o].ty;
@@ -1110,10 +1102,10 @@ private:
         }
 
         int song_steps = constrain(total_steps, 0, 32);
-        values_[ix++] = static_cast<byte>(song_steps);
+        values_[ix++] = static_cast<uint8_t>(song_steps);
 
         // First 32 song steps
-        for (byte s = 0; s < 32; s++)
+        for (int s = 0; s < 32; s++)
         {
             values_[ix++] = song_step[s].tk;
             values_[ix++] = song_step[s].pr;
@@ -1122,14 +1114,14 @@ private:
         }
 
         // Track settings
-        for (byte t = 0; t < 4; t++) values_[ix++] = track[t].data;
+        for (int t = 0; t < 4; t++) values_[ix++] = track[t].data;
     }
 
     void LoadFromEEPROMStage() {
-        byte ix = 0;
+        uint8_t ix = 0;
 
         // Outputs
-        for (byte o = 0; o < 4; o++)
+        for (int o = 0; o < 4; o++)
         {
             output[o].tk = values_[ix++];
             output[o].ty = values_[ix++];
@@ -1138,11 +1130,11 @@ private:
         }
 
         // Song length
-        byte song_steps = values_[ix++];
+        uint8_t song_steps = values_[ix++];
         if (song_steps > total_steps) total_steps = song_steps;
 
         // Song Steps
-        for (byte s = 0; s < 32; s++)
+        for (int s = 0; s < 32; s++)
         {
             song_step[s].tk = values_[ix++];
             song_step[s].pr = values_[ix++];
@@ -1151,7 +1143,7 @@ private:
         }
 
         // Track settings
-        for (byte t = 0; t < 4; t++) track[t].data = values_[ix++];
+        for (int t = 0; t < 4; t++) track[t].data = values_[ix++];
 
         // Reset everything if there's no data (meaning, song steps is 0)
         if (song_steps == 0) Start();
@@ -1166,8 +1158,8 @@ private:
 // Setting declarations for EEPROM storage, which consists of the following:
 //     Four output assignments @ 4 bytes each =  16 bytes
 //     The first 32 song steps @ 4 bytes each = 128 bytes
-//     Four track settings @ 1 byte each      =   4 bytes
-//     Song length                            =   1 byte
+//     Four track settings @ 1 uint8_t each      =   4 bytes
+//     Song length                            =   1 uint8_t
 // TOTAL EEPROM SIZE: 150 bytes
 #define ENIGMA_EEPROM_DATA {0,0,255,"St",NULL,settings::STORAGE_TYPE_U8},
 #define ENIGMA_DO_THIRTY_TIMES(A) A A A A A A A A A A A A A A A A A A A A A A A A A A A A A A
