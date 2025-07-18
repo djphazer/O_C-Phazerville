@@ -182,6 +182,9 @@ UiMode Ui::DispatchEvents(const App *app) {
           app->HandleButtonEvent(event);
         break;
       case UI::EVENT_ENCODER:
+        // if either encoder is turned while held down, ignore release/long-press
+        if (event.mask & (OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_R))
+          SetButtonIgnoreMask();
         app->HandleEncoderEvent(event);
         break;
       default:
