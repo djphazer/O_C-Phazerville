@@ -239,6 +239,8 @@ public:
         }
         Pack(data, PackLocation { 40, 5 }, clock_m.GetClockPPQN());
 
+        Pack(data, PackLocation { 45, 4 }, HS::screensaver_mode);
+
         return data;
     }
 
@@ -250,6 +252,8 @@ public:
             clock_m.SetMultiply(Unpack(data, PackLocation { 16+i*6, 6 })-32, i);
         }
         clock_m.SetClockPPQN(Unpack(data, PackLocation { 40, 5 }));
+
+        HS::screensaver_mode = Unpack(data, PackLocation { 45, 4 });
     }
 
     uint64_t GetGlobals() {
@@ -257,7 +261,7 @@ public:
         // only the first 16 bits are actually stored on T3.2
         Pack(data, PackLocation { 0, 1 }, HS::auto_save_enabled);
         Pack(data, PackLocation { 1, 1 }, HS::cursor_wrap);
-        Pack(data, PackLocation { 2, 2 }, HS::screensaver_mode);
+        //Pack(data, PackLocation { 2, 2 }, HS::screensaver_mode);
         Pack(data, PackLocation { 4, 7 }, HS::trig_length);
 
 #ifdef VOR
@@ -272,7 +276,7 @@ public:
     void SetGlobals(const uint64_t &data) {
         HS::auto_save_enabled = Unpack(data, PackLocation { 0, 1 });
         HS::cursor_wrap = Unpack(data, PackLocation { 1, 1 });
-        HS::screensaver_mode = Unpack(data, PackLocation { 2, 2 });
+        //HS::screensaver_mode = Unpack(data, PackLocation { 2, 2 });
         HS::trig_length = constrain( Unpack(data, PackLocation { 4, 7 }), 1, 127);
 
 #ifdef VOR

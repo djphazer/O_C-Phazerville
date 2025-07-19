@@ -48,7 +48,12 @@ namespace HS {
   int cvmapping[APPLET_SLOTS * 2] = { 1, 2, 3, 4 };
 #endif
   uint8_t trig_length = 10; // in ms, multiplier for HEMISPHERE_CLOCK_TICKS
-  uint8_t screensaver_mode = 3; // 0 = blank, 1 = Meters, 2 = Scope/Zaps, 3 = Zips/Stars
+  uint8_t screensaver_mode = SCREEN_STARS; // ScreensaverMode
+  const char * const ssmodes[SCREENSAVER_MODE_COUNT] = {
+    "[blank]",
+    "Meters", "Scope",
+    "Zaps", "Stars", "Zips",
+  };
 
   OC::menu::ScreenCursor<5> showhide_cursor;
 

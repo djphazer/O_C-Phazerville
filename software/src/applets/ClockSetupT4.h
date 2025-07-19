@@ -278,7 +278,8 @@ public:
         Pack(data, PackLocation { 4, 7 }, HS::trig_length);
         Pack(data, PackLocation { 11, 5 }, HS::clock_m.GetClockPPQN());
         Pack(data, PackLocation { 16, 1 }, (HS::clock_m.IsRunning() || HS::clock_m.IsPaused()));
-        Pack(data, PackLocation { 17, 3 }, HS::screensaver_mode);
+        //Pack(data, PackLocation { 17, 3 }, HS::screensaver_mode); // old spot
+        Pack(data, PackLocation { 20, 4 }, HS::screensaver_mode);
         // 45 bits free
         return data;
     }
@@ -290,7 +291,8 @@ public:
         HS::clock_m.SetClockPPQN(Unpack(data, PackLocation { 11, 5 }));
         if (Unpack(data, PackLocation{16, 1}) && !HS::clock_m.IsRunning())
           HS::clock_m.Start(true);
-        HS::screensaver_mode = Unpack(data, PackLocation { 17, 3 });
+        HS::screensaver_mode = Unpack(data, PackLocation { 17, 3 }) // backward compat
+                             + Unpack(data, PackLocation { 20, 4 });
     }
 
 protected:

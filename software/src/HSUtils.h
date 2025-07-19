@@ -108,6 +108,17 @@ namespace HS {
     QUANT_CHANNEL_COUNT
   };
 
+  enum ScreensaverMode {
+    SCREEN_BLANK,
+    SCREEN_METERS,
+    SCREEN_SCOPE,
+    SCREEN_ZAPS,
+    SCREEN_STARS,
+    SCREEN_ZIPS,
+
+    SCREENSAVER_MODE_COUNT
+  };
+
   extern uint32_t popup_tick; // for button feedback
   extern PopupType popup_type;
   extern uint8_t qview; // which quantizer's setting is shown in popup
@@ -139,6 +150,7 @@ namespace HS {
   extern int cvmapping[ADC_CHANNEL_LAST];
   extern uint8_t trig_length;
   extern uint8_t screensaver_mode;
+  extern const char * const ssmodes[];
 
   extern OC::menu::ScreenCursor<5> showhide_cursor;
 

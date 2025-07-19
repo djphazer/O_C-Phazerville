@@ -298,17 +298,16 @@ struct Zap {
 };
 static constexpr int HOW_MANY_ZAPS = 30;
 static Zap zaps[HOW_MANY_ZAPS];
-static void ZapScreensaver(const bool stars = false) {
+static void ZapScreensaver(const uint8_t stars = 0) {
   static int frame_delay = 0;
   for (int i = 0; i < (stars ? HOW_MANY_ZAPS : 5); i++) {
     if (frame_delay & 0x1) {
-        #if defined(__IMXRT1062__)
-        zaps[i].Move(stars); // centered starfield
-        #else
+      if (stars > 1) {
         // Zips respawn from their previous sibling
         if (0 == i) zaps[0].Move();
         else zaps[i].Move(zaps[i-1].x, zaps[i-1].y);
-        #endif
+      } else
+        zaps[i].Move(stars == 1); // centered starfield
     }
 
     if (stars && frame_delay == 0) {
