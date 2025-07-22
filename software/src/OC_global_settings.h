@@ -74,7 +74,11 @@ public:
   // copies in memory.
   DAC::AutotuneCalibrationData autotune_calibration_data;
 
+  // I'll allow this on T32, to make life easier.
+  // Gotta sharpen my swords and figure out how much space it might save.
+#ifdef __IMXRT1062__
   DISALLOW_COPY_AND_ASSIGN(GlobalSettings);
+#endif
 };
 
 extern GlobalSettings global_settings;
