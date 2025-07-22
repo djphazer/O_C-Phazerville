@@ -176,7 +176,7 @@ uint8_t ps3_address[6] = {0x01, 0x01, 0x01, 0x3c, 0x2b , 0x1a}; // {0x1a, 0x2b, 
 static int data;
 static int scaled_axis[GAMEPAD_AXIS_MAX];
 
-static constexpr int axis_change_threshold = (-HEMISPHERE_MIN_CV) / 8;
+static const int axis_change_threshold = (-HEMISPHERE_MIN_CV) / 8;
 
 static bool connected = false;
 
