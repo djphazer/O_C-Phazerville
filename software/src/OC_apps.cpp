@@ -658,7 +658,6 @@ void Init(bool reset_settings) {
   int current_app_index = apps::index_of(global_settings.current_app_id);
   if (current_app_index < 0 || current_app_index >= NUM_AVAILABLE_APPS) {
     SERIAL_PRINTLN("App id %02x not found, using default!", global_settings.current_app_id);
-    global_settings.current_app_id = DEFAULT_APP_INDEX;
     current_app_index = DEFAULT_APP_INDEX;
   }
 
