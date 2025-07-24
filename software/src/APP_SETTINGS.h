@@ -78,7 +78,10 @@ public:
   }
 
   void Resume() {
-    if (calibration_mode && !calibration_complete) {
+    if (OC::calibration_data.get_calstart()) {
+      StartCalibration();
+      OC::calibration_data.set_calstart(false);
+    } else if (calibration_mode && !calibration_complete) {
       // restart calibration if you exit and come back
       StartCalibration();
     }
