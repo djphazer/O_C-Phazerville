@@ -184,12 +184,12 @@ UiMode IOSettingsMenu::DispatchEvent(const UI::Event &event)
   if (UI::EVENT_BUTTON_PRESS == event.type) {
     switch (event.control) {
       case CONTROL_BUTTON_UP:
-        Close(); // this is debatable
         ui_mode = UI_MODE_SCREENSAVER;
-      break;
-      case CONTROL_BUTTON_DOWN:
+        // fall thru to Close
+      default:
         Close();
-      break;
+      case CONTROL_BUTTON_L: // ignore
+        break;
 
       case CONTROL_BUTTON_R: {
         bool toggle_editing = false;
