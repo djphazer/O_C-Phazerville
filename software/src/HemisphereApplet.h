@@ -21,6 +21,8 @@
 // Thanks to Mike Thomas, for tons of help with the Buchla stuff
 //
 
+/* HEAVILY modified by djphazer for Phazerville Suite */
+
 ////////////////////////////////////////////////////////////////////////////////
 //// Hemisphere Applet Base Class
 ////////////////////////////////////////////////////////////////////////////////
@@ -29,7 +31,6 @@
 #ifndef _HEM_APPLET_H_
 #define _HEM_APPLET_H_
 
-#include <Arduino.h>
 #include "OC_core.h"
 
 #include "OC_digital_inputs.h"
@@ -39,17 +40,16 @@
 #include "util/util_math.h"
 #include "src/extern/bjorklund.h"
 #include "HSicons.h"
-#include "PhzIcons.h"
 #include "HSClockManager.h"
 
 #include "HSUtils.h"
 #include "HSIOFrame.h"
-#include <cstdint>
 #include <variant>
 
-class HemisphereApplet;
 
 namespace HS {
+
+class HemisphereApplet;
 
 struct Applet {
   const int id;
@@ -62,32 +62,21 @@ struct EncoderEditor {
 };
 
 static constexpr bool ALWAYS_SHOW_ICONS = false;
-} // namespace HS
-
-using namespace HS;
 
 class HemisphereApplet {
 public:
+
     static int cursor_countdown[APPLET_SLOTS + 1];
     static int16_t cursor_start_x;
     static int16_t cursor_start_y;
     static const char* help[HELP_LABEL_COUNT];
     static EncoderEditor enc_edit[APPLET_SLOTS + 1];
 
-    static void ProcessCursors() {
-      // Cursor countdowns. See CursorBlink(), ResetCursor(), gfxCursor()
-      for (int i = 0; i < APPLET_SLOTS + 1; ++i) {
-        if (--cursor_countdown[i] < -HEMISPHERE_CURSOR_TICKS)
-          cursor_countdown[i] = HEMISPHERE_CURSOR_TICKS;
-      }
-    }
-
+    // Virtual Method signatures
+    // - These need to be defined by an actual Applet implementation
+    // - Some have default implementations here.
     virtual const char* applet_name() = 0; // Maximum of 9 characters
     virtual const uint8_t* applet_icon() { return ZAP_ICON; }
-    const char* const OutputLabel(int ch) {
-      return OC::Strings::capital_letters[ch + io_offset];
-    }
-
     virtual void Start() = 0;
     virtual void Reset() { };
     virtual void Controller() = 0;
@@ -100,11 +89,24 @@ public:
     virtual void DrawFullScreen() { View(); }
     virtual void AuxButton() { CancelEdit(); }
 
+    // standard entry points
     void BaseView(bool full_screen = false, bool parked = true);
     void BaseStart(const HEM_SIDE hemisphere_);
+    void SetDisplaySide(HEM_SIDE side) {
+        hemisphere = side;
+    }
 
     /* Formerly Help Screen */
     void DrawConfigHelp();
+
+    // --- Cursor stuff
+    static void ProcessCursors() {
+      // Cursor countdowns. See CursorBlink(), ResetCursor(), gfxCursor()
+      for (int i = 0; i < APPLET_SLOTS + 1; ++i) {
+        if (--cursor_countdown[i] < -HEMISPHERE_CURSOR_TICKS)
+          cursor_countdown[i] = HEMISPHERE_CURSOR_TICKS;
+      }
+    }
 
     /* Check cursor blink cycle. */
     bool CursorBlink() { return (cursor_countdown[hemisphere] > 0); }
@@ -116,6 +118,9 @@ public:
     }
     void CancelEdit() {
       enc_edit[hemisphere].isEditing = false;
+    }
+    inline bool EditMode() {
+      return (enc_edit[hemisphere].isEditing);
     }
 
     template<typename T>
@@ -130,6 +135,11 @@ public:
         ResetCursor();
     }
 
+    // DAC label helper
+    const char* const OutputLabel(int ch) {
+      return OC::Strings::capital_letters[ch + io_offset];
+    }
+
     // Buffered I/O functions
     int ViewIn(int ch) {return frame.inputs[io_offset + ch];}
     int ViewOut(int ch) {return frame.outputs[io_offset + ch];}
@@ -138,92 +148,31 @@ public:
           return clock_m.GetCycleTicks(io_offset + ch);
       return frame.cycle_ticks[io_offset + ch];
     }
+    // XXX: does NOT use mappings! This should be deprecated.
+    [[deprecated("Apps/Applets should keep track of CV deviation")]]
     bool Changed(int ch) {return frame.changed_cv[io_offset + ch];}
 
-    // --- CV Input Methods
-    int In(const int ch) {
-      return cvmap[ch + io_offset].In();
-    }
+    // ----------------------
+    // --- CV I/O Methods ---
+    // ----------------------
 
-#ifdef __IMXRT1062__
-    float InF(int ch) {
-        return static_cast<float>(In(ch)) / HEMISPHERE_MAX_INPUT_CV;
-    }
-#endif
-
+    // ***** Inputs *****
+    int In(const int ch);
+    float InF(int ch);
     // Apply small center detent to input, so it reads zero before a threshold
-    int DetentedIn(int ch) {
-        if (NorthernLightModular && In(ch) < HEMISPHERE_CENTER_DETENT)
-          return 0;
-
-        if (In(ch) > (HEMISPHERE_CENTER_INPUT_CV + HEMISPHERE_CENTER_DETENT)
-          || In(ch) < (HEMISPHERE_CENTER_INPUT_CV - HEMISPHERE_CENTER_DETENT))
-          return In(ch);
-
-        return HEMISPHERE_CENTER_INPUT_CV;
-    }
-    int SemitoneIn(int ch) {
-      return input_quant[ch + io_offset].Process(In(ch));
-    }
-
+    int DetentedIn(int ch);
+    int SemitoneIn(int ch);
     /* Has the specified Digital input been clocked this cycle? (rising edge of a gate)
      * This is pre-calculated in HS::IOFrame::Load() according to input mappings and internal clock settings
      */
-    bool Clock(int ch, bool physical = 0) {
-        return frame.clocked[ch + io_offset];
-    }
-    bool Gate(int ch) {
-        return trigmap[ch + io_offset].Gate();
-    }
+    bool Clock(int ch, bool physical = 0);
+    bool Gate(int ch);
 
-    // --- CV Output methods
-    void Out(int ch, int value, int octave = 0) {
-        frame.Out( (DAC_CHANNEL)(ch + io_offset), value + (octave * (12 << 7)));
-    }
-
-    void SmoothedOut(int ch, int value, int kSmoothing) {
-      if (OC::CORE::ticks % kSmoothing == 0) {
-        DAC_CHANNEL channel = (DAC_CHANNEL)(ch + io_offset);
-        value = (frame.outputs_smooth[channel] * (kSmoothing - 1) + value) / kSmoothing;
-        frame.outputs[channel] = frame.outputs_smooth[channel] = value;
-      }
-    }
-    void ClockOut(const int ch, const int ticks = HEMISPHERE_CLOCK_TICKS * trig_length) {
-        frame.ClockOut( (DAC_CHANNEL)(io_offset + ch), ticks);
-    }
-    void GateOut(int ch, bool high) {
-        Out(ch, 0, (high ? PULSE_VOLTAGE : 0));
-    }
-
-    // Quantizer helpers
-    int GetLatestNoteNumber(int ch) {
-      return HS::GetLatestNoteNumber(ch);
-    }
-    int Quantize(int ch, int cv, int root = 0, int transpose = 0) {
-      return HS::Quantize(ch + io_offset, cv, root, transpose);
-    }
-    int QuantizerLookup(int ch, int note) {
-      return HS::QuantizerLookup(ch + io_offset, note);
-    }
-    void QuantizerConfigure(int ch, int scale, uint16_t mask = 0xffff) {
-      q_engine[io_offset + ch].Configure(scale, mask);
-    }
-    void SetScale(int ch, int scale) {
-      QuantizerConfigure(ch, scale);
-    }
-    int GetScale(int ch) {
-      return q_engine[io_offset + ch].scale;
-    }
-    int GetRootNote(int ch) {
-      return q_engine[io_offset + ch].root_note;
-    }
-    int SetRootNote(int ch, int root) {
-      CONSTRAIN(root, 0, 11);
-      return (q_engine[io_offset + ch].root_note = root);
-    }
-    void NudgeScale(int ch, int dir) {
-      HS::NudgeScale(ch + io_offset, dir);
-    }
+    // outputs
+    void Out(int ch, int value, int octave = 0);
+    void SmoothedOut(int ch, int value, int kSmoothing);
+    void ClockOut(const int ch, const int ticks = HEMISPHERE_CLOCK_TICKS * trig_length);
+    void GateOut(int ch, bool high);
 
     // Standard bi-polar CV modulation scenario
     template <typename T>
@@ -234,10 +183,6 @@ public:
         param = constrain(param + increment, min, max);
     }
 
-    inline bool EditMode() {
-        return (enc_edit[hemisphere].isEditing);
-    }
-
     // Override HSUtils function to only return positive values
     // Not ideal, but too many applets rely on this.
     const int ProportionCV(const int cv_value, const int max_pixels, const int max_cv = HEMISPHERE_MAX_CV) {
@@ -245,122 +190,47 @@ public:
         return prop;
     }
 
-    //////////////// Offset graphics methods
-    ////////////////////////////////////////////////////////////////////////////////
-    void gfxCursor(int x, int y, int w, int h = 9) { // assumes standard text height for highlighting
-      if (EditMode()) {
-        gfxInvert(x, y - h, w, h);
-      } else if (CursorBlink()) {
-        gfxLine(x, y, x + w - 1, y);
-        gfxPixel(x, y-1);
-        gfxPixel(x + w - 1, y-1);
-      }
-    }
-    void gfxSpicyCursor(int x, int y, int w, int h = 9) {
-      if (EditMode()) {
-        if (CursorBlink())
-          gfxFrame(x, y - h, w, h, true);
-        gfxInvert(x, y - h, w, h);
-      } else {
-        gfxLine(x - CursorBlink(), y, x + w - 1, y, 2);
-        gfxPixel(x, y-1);
-        gfxPixel(x + w - 1, y-1);
-      }
-    }
+    // -------------------------------
+    // --- Offset graphics methods ---
+    // -------------------------------
+    void gfxCursor(int x, int y, int w, int h = 9);
+    void gfxSpicyCursor(int x, int y, int w, int h = 9);
+    void gfxPos(int x, int y);
+    void gfxPrint(int x, int y, const char *str);
+    void gfxPrint(int x, int y, int num);
+    void gfxPrint(const char *str);
+    void gfxPrint(int num);
+    void gfxPrint(int x, int y, float num, int digits);
+    void gfxPrint(float num, int digits);
+    void gfxPrint(CVInputMap &map);
+    void gfxPrint(DigitalInputMap &map);
+    void gfxPrint(int x_adv, int num); // Print number with character padding
 
-    void gfxPos(int x, int y) {
-        graphics.setPrintPos(x + gfx_offset, y);
-    }
+    void gfxStartCursor(int x, int y);
+    void gfxStartCursor();
+    void gfxEndCursor(bool selected, bool spicy = false, const char *str = nullptr);
 
-    inline int gfxGetPrintPosX() {
-        return graphics.getPrintPosX() - gfx_offset;
-    }
+    void gfxPixel(int x, int y);
+    void gfxFrame(int x, int y, int w, int h, bool dotted = false);
+    void gfxRect(int x, int y, int w, int h);
+    void gfxInvert(int x, int y, int w, int h);
+    void gfxClear(int x, int y, int w, int h);
+    void gfxLine(int x, int y, int x2, int y2);
+    void gfxLine(int x, int y, int x2, int y2, bool dotted);
+    void gfxDottedLine(int x, int y, int x2, int y2, uint8_t p = 2);
+    void gfxCircle(int x, int y, int r);
+    void gfxBitmap(int x, int y, int w, const uint8_t *data);
+    void gfxBitmapBlink(int x, int y, int w, const uint8_t *data);
+    void gfxIcon(int x, int y, const uint8_t *data);
+    void gfxPrintIcon(const uint8_t *data, int16_t w = 8);
 
-    inline int gfxGetPrintPosY() {
-        return graphics.getPrintPosY();
-    }
+    void gfxSkyline();
+    void gfxHeader(const char *str, const uint8_t *icon = nullptr, int y = 2, bool underline = true);
+    void gfxHeader(int y = 2);
+    void DrawSlider(uint8_t x, uint8_t y, uint8_t len, uint8_t value, uint8_t max_val, bool is_cursor);
 
-    void gfxPrint(int x, int y, const char *str) {
-        graphics.setPrintPos(x + gfx_offset, y);
-        graphics.print(str);
-    }
-    void gfxPrint(int x, int y, int num) {
-        graphics.setPrintPos(x + gfx_offset, y);
-        graphics.print(num);
-    }
-    void gfxPrint(const char *str) {
-        graphics.print(str);
-    }
-    void gfxPrint(int num) {
-        graphics.print(num);
-    }
-
-    void gfxPrint(int x, int y, float num, int digits) {
-        graphics.setPrintPos(x + gfx_offset, y);
-        gfxPrint(num, digits);
-    }
-
-    void gfxPrint(float num, int digits) {
-        int i = static_cast<int>(num);
-        float dec = num - i;
-        gfxPrint(i);
-        if (digits > 0) {
-            gfxPrint(".");
-            while (digits--) {
-                dec *= 10;
-                i = static_cast<int>(dec);
-                gfxPrint(i);
-                dec -= i;
-            }
-        }
-    }
-
-    void gfxPrint(DigitalInputMap &map) {
-      gfxPrintIcon(map.Icon());
-      if (map.Gate()) gfxInvert(gfxGetPrintPosX()-8, gfxGetPrintPosY(), 8, 8);
-    }
-    void gfxPrint(CVInputMap &map) {
-      gfxPrintIcon(map.Icon());
-      const int xpos = gfxGetPrintPosX() - 1;
-      const int ypos = gfxGetPrintPosY() + 4;
-      const int height = map.InRescaled(24);
-      gfxLine(xpos, ypos, xpos, ypos - height);
-    }
-
-    void gfxStartCursor(int x, int y) {
-        gfxPos(x, y);
-        gfxStartCursor();
-    }
-
-    void gfxStartCursor() {
-        cursor_start_x = gfxGetPrintPosX();
-        cursor_start_y = gfxGetPrintPosY();
-    }
-
-    void gfxEndCursor(bool selected, bool spicy = false, const char *str = nullptr) {
-        if (selected) {
-          if (str) {
-            gfxClear(cursor_start_x - 14, cursor_start_y-1, 24, 10);
-            gfxFrame(cursor_start_x - 13, cursor_start_y-1, 22, 10, spicy);
-            gfxPrint(cursor_start_x - 11, cursor_start_y+1, str);
-            if (EditMode())
-              gfxInvert(cursor_start_x - 14, cursor_start_y-1, 24, 10);
-          } else {
-            int16_t w = gfxGetPrintPosX() - cursor_start_x;
-            int16_t y = gfxGetPrintPosY() + 8;
-            int h = y - cursor_start_y;
-            if (spicy)
-              gfxSpicyCursor(cursor_start_x, y, w, h);
-            else
-              gfxCursor(cursor_start_x, y, w, h);
-          }
-        }
-    }
-
-    void gfxPrint(int x_adv, int num) { // Print number with character padding
-        for (int c = 0; c < (x_adv / 6); c++) gfxPrint(" ");
-        gfxPrint(num);
-    }
+    inline int gfxGetPrintPosX() { return graphics.getPrintPosX() - gfx_offset; }
+    inline int gfxGetPrintPosY() { return graphics.getPrintPosY(); }
 
     template<typename... Args>
     void gfxPrintfn(int x, int y, int n, const char *format,  Args ...args) {
@@ -368,110 +238,8 @@ public:
         graphics.printf(format, args...);
     }
 
-    /* Convert CV value to voltage level and print  to two decimal places */
-    void gfxPixel(int x, int y) {
-        graphics.setPixel(x + gfx_offset, y);
-    }
-
-    void gfxFrame(int x, int y, int w, int h, bool dotted = false) {
-      if (dotted) {
-        gfxLine(x, y, x + w - 1, y, 2); // top
-        gfxLine(x, y + 1, x, y + h - 1, 2); // vert left
-        gfxLine(x + w - 1, y + 1, x + w - 1, y + h - 1, 2); // vert rigth
-        gfxLine(x, y + h - 1, x + w - 1, y + h - 1, 2); // bottom
-      } else
-        graphics.drawFrame(x + gfx_offset, y, w, h);
-    }
-
-    void gfxRect(int x, int y, int w, int h) {
-        graphics.drawRect(x + gfx_offset, y, w, h);
-    }
-
-    void gfxInvert(int x, int y, int w, int h) {
-        graphics.invertRect(x + gfx_offset, y, w, h);
-    }
-
-    void gfxClear(int x, int y, int w, int h) {
-        graphics.clearRect(x + gfx_offset, y, w, h);
-    }
-
-    void gfxLine(int x, int y, int x2, int y2) {
-        graphics.drawLine(x + gfx_offset, y, x2 + gfx_offset, y2);
-    }
-
-    void gfxLine(int x, int y, int x2, int y2, bool dotted) {
-        graphics.drawLine(x + gfx_offset, y, x2 + gfx_offset, y2, dotted ? 2 : 1);
-    }
-
-    void gfxDottedLine(int x, int y, int x2, int y2, uint8_t p = 2) {
-        graphics.drawLine(x + gfx_offset, y, x2 + gfx_offset, y2, p);
-    }
-
-    void gfxCircle(int x, int y, int r) {
-        graphics.drawCircle(x + gfx_offset, y, r);
-    }
-
-    void gfxBitmap(int x, int y, int w, const uint8_t *data) {
-        graphics.drawBitmap8(x + gfx_offset, y, w, data);
-    }
-
-    void gfxBitmapBlink(int x, int y, int w, const uint8_t *data) {
-        if (CursorBlink()) gfxBitmap(x, y, w, data);
-    }
-
-    void gfxIcon(int x, int y, const uint8_t *data) {
-        gfxBitmap(x, y, 8, data);
-    }
-
-    void gfxPrintIcon(const uint8_t *data, int16_t w = 8) {
-        gfxIcon(gfxGetPrintPosX(), gfxGetPrintPosY(), data);
-        gfxPos(gfxGetPrintPosX() + w, gfxGetPrintPosY());
-    }
-
-    //////////////// Hemisphere-specific graphics methods
-    ////////////////////////////////////////////////////////////////////////////////
-
-    /* Show channel-grouped bi-lateral display */
-    void gfxSkyline() {
-        ForEachChannel(ch)
-        {
-            int height = ProportionCV(In(ch), 32);
-            gfxFrame(23 + (10 * ch), BottomAlign(height), 6, 63);
-
-            height = ProportionCV(ViewOut(ch), 32);
-            gfxInvert(3 + (46 * ch), BottomAlign(height), 12, 63);
-        }
-    }
-
-    void gfxHeader(int y = 2) {
-      gfxHeader(applet_name(), applet_icon(), y, false);
-    }
-
-    void gfxHeader(const char *str, const uint8_t *icon = nullptr, int y = 2,
-        bool underline = true) {
-      int x = 1;
-      if (icon) {
-        gfxIcon(x, y, icon);
-        x += 9;
-      }
-      if (hemisphere & 1) // right side
-        x = 62 - strlen(str) * 6;
-      gfxPrint(x, y, str);
-      if (underline)
-        gfxDottedLine(0, y + 8, 62, y + 8);
-    }
-
-    void DrawSlider(uint8_t x, uint8_t y, uint8_t len, uint8_t value, uint8_t max_val, bool is_cursor) {
-        uint8_t p = is_cursor ? 1 : 3;
-        uint8_t w = Proportion(value, max_val, len-1);
-        gfxDottedLine(x, y + 4, x + len, y + 4, p);
-        gfxRect(x + w, y, 2, 8);
-        if (EditMode() && is_cursor) gfxInvert(x-1, y, len+3, 8);
-    }
-
-    void SetDisplaySide(HEM_SIDE side) {
-        hemisphere = side;
-    }
+    // ------- Implementations below ------
+    // (TODO: move to .cpp file
 
     bool EditInputMap(CVInputMap& input_map) {
       if (!IsEditingInputMap()) {
@@ -602,8 +370,39 @@ protected:
         return (--frame.adc_lag_countdown[io_offset + ch] == 0);
     }
 
+    // --- Quantizer helpers
+    int GetLatestNoteNumber(int ch) {
+      return HS::GetLatestNoteNumber(ch);
+    }
+    int Quantize(int ch, int cv, int root = 0, int transpose = 0) {
+      return HS::Quantize(ch + io_offset, cv, root, transpose);
+    }
+    int QuantizerLookup(int ch, int note) {
+      return HS::QuantizerLookup(ch + io_offset, note);
+    }
+    void QuantizerConfigure(int ch, int scale, uint16_t mask = 0xffff) {
+      q_engine[io_offset + ch].Configure(scale, mask);
+    }
+    void SetScale(int ch, int scale) {
+      QuantizerConfigure(ch, scale);
+    }
+    int GetScale(int ch) {
+      return q_engine[io_offset + ch].scale;
+    }
+    int GetRootNote(int ch) {
+      return q_engine[io_offset + ch].root_note;
+    }
+    int SetRootNote(int ch, int root) {
+      CONSTRAIN(root, 0, 11);
+      return (q_engine[io_offset + ch].root_note = root);
+    }
+    void NudgeScale(int ch, int dir) {
+      HS::NudgeScale(ch + io_offset, dir);
+    }
+
 private:
     bool applet_started; // Allow the app to maintain state during switching
 };
 
+} // namespace HS
 #endif // _HEM_APPLET_H_
