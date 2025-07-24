@@ -299,7 +299,7 @@ void FASTRUN loop() {
         // Handle events and process state changes elsewhere.
         ui.AppSettings(true);
 
-      } else if (UI_MODE_MENU == ui_mode) {
+      } else { // if (UI_MODE_MENU == ui_mode) {
         OC_DEBUG_RESET_CYCLES(menu_draw_count, 512, DEBUG::MENU_draw_cycles);
         OC_DEBUG_PROFILE_SCOPE(DEBUG::MENU_draw_cycles);
         app_switcher.current_app()->Draw(ui_mode);

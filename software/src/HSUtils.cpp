@@ -676,8 +676,8 @@ struct Zap {
     }
 };
 static constexpr int HOW_MANY_ZAPS = 30;
-Zap zaps[HOW_MANY_ZAPS];
 void ZapScreensaver(const uint8_t stars) {
+  static Zap zaps[HOW_MANY_ZAPS];
   static int frame_delay = 0;
   static elapsedMillis timer = 0;
   const uint8_t* flake_icon[] = {
