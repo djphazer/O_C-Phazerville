@@ -195,10 +195,14 @@ UiMode Ui::DispatchEvents(AppBase *app) {
     MENU_REDRAW = 1;
 
     // Handle global hotkeys
-    if (UI::EVENT_BUTTON_LONG_PRESS == event.type) {
+    if (UI::EVENT_BUTTON_LONG_RELEASE == event.type) {
       if (CONTROL_BUTTON_R == event.control) {
-        return UI_MODE_APP_SETTINGS;
-      } else if (CONTROL_BUTTON_UP == event.control) {
+        jump_to_menu_ = true;
+        break;
+      }
+    }
+    if (UI::EVENT_BUTTON_LONG_PRESS == event.type) {
+      if (CONTROL_BUTTON_UP == event.control) {
         app->EditIOSettings();
         continue;
       }
@@ -207,7 +211,7 @@ UiMode Ui::DispatchEvents(AppBase *app) {
     if (UI_MODE_SCREENSAVER == app->DispatchEvent(event)) {
       screensaver_ = true;
       // Break to handle screensaver; queued events will be handled next call
-      return UI_MODE_SCREENSAVER;
+      break;
     }
   }
 

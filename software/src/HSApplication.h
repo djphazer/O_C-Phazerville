@@ -85,17 +85,6 @@ public:
     }
 
     void BaseStart() {
-        /* not the right place to do this!
-        // Initialize some things for startup
-        for (uint8_t ch = 0; ch < DAC_CHANNEL_LAST; ch++)
-        {
-            frame.clock_countdown[ch]  = 0;
-            frame.inputs[ch] = 0;
-            frame.outputs[ch] = 0;
-            frame.outputs_smooth[ch] = 0;
-            frame.adc_lag_countdown[ch] = 0;
-        }
-        */
         cursor_countdown = HSAPPLICATION_CURSOR_TICKS;
 
         Start();
@@ -374,8 +363,8 @@ struct Zap {
     }
 };
 static constexpr int HOW_MANY_ZAPS = 30;
-static Zap zaps[HOW_MANY_ZAPS];
 static void ZapScreensaver(const uint8_t stars = 0) {
+  static Zap zaps[HOW_MANY_ZAPS];
   static int frame_delay = 0;
   for (int i = 0; i < (stars ? HOW_MANY_ZAPS : 5); i++) {
     if (frame_delay & 0x1) {
