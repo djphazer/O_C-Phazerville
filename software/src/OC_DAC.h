@@ -203,8 +203,7 @@ public:
   // otherwise use the default values (which are assumed to be sane).
   //
   // @return DAC output value
-  template <DAC_CHANNEL &channel>
-  static int32_t PitchToScaledDAC(int32_t pitch, OutputVoltageScaling scaling, bool autotune_enabled)
+  static int32_t PitchToScaledDAC(DAC_CHANNEL channel, int32_t pitch, OutputVoltageScaling scaling, bool autotune_enabled)
   {
     pitch = Scale(pitch, scaling);
     pitch += kOctaveZero * 12 << 7;
@@ -259,8 +258,7 @@ public:
     return pitch;
   }
 
-  template <DAC_CHANNEL &channel>
-  static int32_t GateToDAC(int32_t value)
+  static int32_t GateToDAC(DAC_CHANNEL &channel, int32_t value)
   {
     return calibration_data_->calibrated_octaves[channel][value ? kOctaveGateHigh : kOctaveZero];
   }
