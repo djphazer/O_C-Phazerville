@@ -762,7 +762,7 @@ void AppSwitcher::Init(bool reset_settings) {
     HS::user_turing_machines[i].Validate();
   }
 
-  auto current_app_index = app_container.IndexOfAppByID(global_settings.current_app_id);
+  size_t current_app_index = app_container.IndexOfAppByID(global_settings.current_app_id);
   if (current_app_index >= app_container.num_apps()) {
     APPS_SERIAL_PRINTLN("App id %02x not found, using default!", global_settings.current_app_id);
     current_app_index = DEFAULT_APP_INDEX;
