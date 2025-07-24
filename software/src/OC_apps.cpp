@@ -772,7 +772,6 @@ void AppSwitcher::Init(bool reset_settings) {
   ui.encoders_enable_acceleration(global_settings.encoders_enable_acceleration);
 
   set_current_app(current_app_index);
-  current_app_->DispatchAppEvent(APP_EVENT_RESUME);
 
   delay(100);
 }
@@ -962,10 +961,8 @@ bool Ui::ConfirmReset() {
 
 FLASHMEM
 void start_calibration() {
-/* TODO:
-  OC::apps::set_current_app(0); // switch to Settings app
-  Settings_instance.StartCalibration(); // Set up calibration mode in Settings app
-*/
+  OC::calibration_data.set_calstart();
+  OC::app_switcher.set_current_app(0);
 }
 
 }; // namespace OC

@@ -121,11 +121,15 @@ enum EncoderConfig : uint32_t {
   ENCODER_CONFIG_LAST
 };
 
+// bitmasks
 enum CalibrationFlags : uint32_t {
-  CALIBRATION_FLAG_ENCODER_MASK = 0x3, // mask for the first two bits
-  CALIBRATION_FLAG_FLIP_MASK    = 0xc, // mask
-  CALIBRATION_FLAG_FLIPSCREEN   = 2, // bit index
-  CALIBRATION_FLAG_FLIPCONTROLS = 3, // bit index
+  CALIBRATION_FLAG_ENCODER_MASK = 0b0011,
+  CALIBRATION_FLAG_FLIP_MASK    = 0b1100,
+
+  CALIBRATION_FLAG_FLIPSCREEN   = 1u << 2,
+  CALIBRATION_FLAG_FLIPCONTROLS = 1u << 3,
+  // a signal for the wizard
+  CALIBRATION_FLAG_START        = 1u << 31,
 };
 
 struct CalibrationData {
@@ -145,14 +149,20 @@ struct CalibrationData {
   uint32_t reserved1;
 #endif
 
+  void set_calstart(bool start = true) {
+    if (start)
+      flags |= CALIBRATION_FLAG_START;
+    else
+      flags &= ~CALIBRATION_FLAG_START;
+  }
+  bool get_calstart() const {
+    return (flags & CALIBRATION_FLAG_START);
+  }
   bool flipcontrols() const {
-    return (flags >> CALIBRATION_FLAG_FLIPCONTROLS) & 1;
+    return (flags & CALIBRATION_FLAG_FLIPCONTROLS);
   }
   bool flipscreen() const {
-    return (flags >> CALIBRATION_FLAG_FLIPSCREEN) & 1;
-  }
-  uint32_t flipmode() const {
-    return (flags & CALIBRATION_FLAG_FLIP_MASK) >> CALIBRATION_FLAG_FLIPSCREEN;
+    return (flags & CALIBRATION_FLAG_FLIPSCREEN);
   }
   // default behavior - flip both screen and I/O
   void toggle_flipmode() {

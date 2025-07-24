@@ -272,6 +272,8 @@ void setup() {
   if (start_cal)
     OC::start_calibration();
 
+  OC::app_switcher.current_app()->DispatchAppEvent(OC::APP_EVENT_RESUME);
+
   SERIAL_PRINTLN("[End of setup()]");
 }
 
