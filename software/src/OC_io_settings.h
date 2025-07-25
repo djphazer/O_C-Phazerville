@@ -45,6 +45,12 @@ enum IO_SETTING {
   IO_SETTING_CV2_GAIN, IO_SETTING_CV2_FILTER, IO_SETTING_TR2, IO_SETTING_B_SCALING, IO_SETTING_B_TUNING,
   IO_SETTING_CV3_GAIN, IO_SETTING_CV3_FILTER, IO_SETTING_TR3, IO_SETTING_C_SCALING, IO_SETTING_C_TUNING,
   IO_SETTING_CV4_GAIN, IO_SETTING_CV4_FILTER, IO_SETTING_TR4, IO_SETTING_D_SCALING, IO_SETTING_D_TUNING,
+#ifdef ARDUINO_TEENSY41
+  IO_SETTING_CV5_GAIN, IO_SETTING_CV5_FILTER, IO_SETTING_TR5, IO_SETTING_E_SCALING, IO_SETTING_E_TUNING,
+  IO_SETTING_CV6_GAIN, IO_SETTING_CV6_FILTER, IO_SETTING_TR6, IO_SETTING_F_SCALING, IO_SETTING_F_TUNING,
+  IO_SETTING_CV7_GAIN, IO_SETTING_CV7_FILTER, IO_SETTING_TR7, IO_SETTING_G_SCALING, IO_SETTING_G_TUNING,
+  IO_SETTING_CV8_GAIN, IO_SETTING_CV8_FILTER, IO_SETTING_TR8, IO_SETTING_H_SCALING, IO_SETTING_H_TUNING,
+#endif
   IO_SETTING_LAST
 };
 
@@ -122,6 +128,31 @@ public:
     { 0, 0, 1, "", nullptr, settings::STORAGE_TYPE_NOP },
     { VOLTAGE_SCALING_1V_PER_OCT, VOLTAGE_SCALING_1V_PER_OCT, VOLTAGE_SCALING_LAST - 1, "", OC::voltage_scalings, settings::STORAGE_TYPE_U4 },
     { 0, 0, 1, "DAC calibr.", OC::autotune_enable_strings, settings::STORAGE_TYPE_U4 },
+#ifdef ARDUINO_TEENSY41
+    { OC::CVUtils::kMultOne, 0, OC::CVUtils::kMultSteps - 1, "", OC::Strings::mult, settings::STORAGE_TYPE_U8 },
+    { 0, 0, 1, "CV5 filter", OC::Strings::off_on, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 1, "", nullptr, settings::STORAGE_TYPE_NOP },
+    { VOLTAGE_SCALING_1V_PER_OCT, VOLTAGE_SCALING_1V_PER_OCT, VOLTAGE_SCALING_LAST - 1, "", OC::voltage_scalings, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 1, "DAC calibr.", OC::autotune_enable_strings, settings::STORAGE_TYPE_U4 },
+
+    { OC::CVUtils::kMultOne, 0, OC::CVUtils::kMultSteps - 1, "", OC::Strings::mult, settings::STORAGE_TYPE_U8 },
+    { 0, 0, 1, "CV6 filter", OC::Strings::off_on, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 1, "", nullptr, settings::STORAGE_TYPE_NOP },
+    { VOLTAGE_SCALING_1V_PER_OCT, VOLTAGE_SCALING_1V_PER_OCT, VOLTAGE_SCALING_LAST - 1, "", OC::voltage_scalings, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 1, "DAC calibr.", OC::autotune_enable_strings, settings::STORAGE_TYPE_U4 },
+
+    { OC::CVUtils::kMultOne, 0, OC::CVUtils::kMultSteps - 1, "", OC::Strings::mult, settings::STORAGE_TYPE_U8 },
+    { 0, 0, 1, "CV7 filter", OC::Strings::off_on, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 1, "", nullptr, settings::STORAGE_TYPE_NOP },
+    { VOLTAGE_SCALING_1V_PER_OCT, VOLTAGE_SCALING_1V_PER_OCT, VOLTAGE_SCALING_LAST - 1, "", OC::voltage_scalings, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 1, "DAC calibr.", OC::autotune_enable_strings, settings::STORAGE_TYPE_U4 },
+
+    { OC::CVUtils::kMultOne, 0, OC::CVUtils::kMultSteps - 1, "", OC::Strings::mult, settings::STORAGE_TYPE_U8 },
+    { 0, 0, 1, "CV8 filter", OC::Strings::off_on, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 1, "", nullptr, settings::STORAGE_TYPE_NOP },
+    { VOLTAGE_SCALING_1V_PER_OCT, VOLTAGE_SCALING_1V_PER_OCT, VOLTAGE_SCALING_LAST - 1, "", OC::voltage_scalings, settings::STORAGE_TYPE_U4 },
+    { 0, 0, 1, "DAC calibr.", OC::autotune_enable_strings, settings::STORAGE_TYPE_U4 },
+#endif
   }};
 };
 
