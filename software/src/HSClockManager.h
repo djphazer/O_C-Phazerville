@@ -28,6 +28,8 @@
 
 #include "OC_core.h"
 #include "HSMIDI.h"
+#include <functional>
+#include <vector>
 
 namespace HS {
 
@@ -79,7 +81,7 @@ public:
 
     bool boop[8] = {0,0,0,0,0,0,0,0}; // Manual triggers
 
-    void (*sync_func)(); // callback function
+    std::vector<std::function<void()>> syncfn_queue;
 
     ClockManager() {
         SetTempoBPM(120);
@@ -139,17 +141,16 @@ public:
       return 0;
     }
 
-    void BeatSync(void (*func)()) {
-      sync_func = func;
+    void BeatSync(std::function<void()> func) {
+      syncfn_queue.push_back(func);
     }
     void ProcessBeatSync() {
       // Things that should only happen on the downbeat
       // such as: preset load, multiplier change, etc...
-      // TODO: form a queue
-      if (sync_func != nullptr) {
-        sync_func();
-        sync_func = nullptr;
+      for (auto &&func : syncfn_queue) {
+        func();
       }
+      syncfn_queue.clear();
     }
 
     // Reset - Resync multipliers, optionally skipping the first tock

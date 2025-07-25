@@ -50,7 +50,6 @@ static constexpr int PRESET_FILE_REVISION = 0;
 using namespace HS;
 
 void QuadrantSysExHandler();
-void QuadrantBeatSync();
 
 OC_APP_TRAITS(AppQuadrants, TWOCCS("QS"), "Quadrants", "4x Applets");
 class OC_APP_CLASS(AppQuadrants), public HSApplication {
@@ -359,14 +358,10 @@ public:
         audio_app.LoadPreset(id);
         PokePopup(PRESET_POPUP);
     }
-    static void ProcessQueue() {
-      // TODO:
-        //LoadFromPreset(queued_preset);
-    }
+
     void QueuePresetLoad(int id) {
       if (HS::clock_m.IsRunning()) {
-        queued_preset = id;
-        HS::clock_m.BeatSync( &QuadrantBeatSync );
+        HS::clock_m.BeatSync( [this, id]() { LoadFromPreset(id); } );
       }
       else
         LoadFromPreset(id);
@@ -841,7 +836,6 @@ private:
     char bank_filename[16] = "BANK_000.DAT";
     uint8_t bank_num = 0;
     int preset_id = -1;
-    int queued_preset = 0;
     int preset_cursor = 0;
     HemisphereApplet *active_applet[4]; // Pointers to actual applets
     int active_applet_index[4]; // Indexes to available_applets
@@ -1291,9 +1285,6 @@ private:
 
 void QuadrantSysExHandler() {
   // TODO
-}
-void QuadrantBeatSync() {
-    AppQuadrants::ProcessQueue();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
