@@ -75,11 +75,15 @@ void IOSettingsMenu::Update()
 
 void IOSettingsMenu::Draw() const
 {
+#ifdef ARDUINO_TEENSY41
+  using TitleBar = menu::TitleBar<menu::kDefaultMenuStartX, 8, 2>;
+#else
   using TitleBar = menu::QuadTitleBar;
+#endif
   auto channel = selected_channel_;
 
   TitleBar::Draw(io_settings_->status_mask());
-  for (int i = 0; i < 4; ++i) {
+  for (int i = 0; i < DAC_CHANNEL_COUNT; ++i) {
     TitleBar::SetColumn(i);
     graphics.print((char)('A' + i));
 //    graphics.movePrintPos(8, 0);
@@ -151,25 +155,31 @@ bool IOSettingsMenu::autotune_available() const
 
 void IOSettingsMenu::SetChannel(int channel)
 {
+  static_assert(ADC_CHANNEL_COUNT == DAC_CHANNEL_COUNT, "different number of DAC and ADC channels, OH NO!!!");
+
   if (channel != selected_channel_) {
     selected_channel_ = channel;
     cursor_.set_editing(false);
 
     const auto &input = io_config_.cv[channel];
     sprintf(labels_[IO_SETTING_CV1_GAIN], "%s %.32s",
-             Strings::cv_input_names[channel],
+             Strings::cv_input_names_none[1 + channel],
              input.label[0] ? input.label : "--");
 
     // IO_SETTING_CV1_FILTER = default
 
-    const auto &di = io_config_.digital_inputs[channel];
-    sprintf(labels_[IO_SETTING_TR1], "%s %.32s",
-             Strings::trigger_input_names[channel],
-             di.label[0] ? di.label : "--");
+    if (channel < DIGITAL_INPUT_COUNT) {
+      const auto &di = io_config_.digital_inputs[channel];
+      sprintf(labels_[IO_SETTING_TR1], "%s %.32s",
+               Strings::trigger_input_names_none[1 + channel],
+               di.label[0] ? di.label : "--");
+    } else {
+      sprintf(labels_[IO_SETTING_TR1], "%s", "----");
+    }
 
     const auto &output = io_config_.outputs[channel];
-    sprintf(labels_[IO_SETTING_A_SCALING], "%s  %.10s",
-             Strings::channel_id[channel],
+    sprintf(labels_[IO_SETTING_A_SCALING], "#%s  %.10s",
+             Strings::capital_letters[channel],
              output.label);
 
     // IO_SETTING_A_TUNING = handled in Draw
@@ -218,7 +228,7 @@ UiMode IOSettingsMenu::DispatchEvent(const UI::Event &event)
     switch(event.control) {
     case CONTROL_ENCODER_L: {
       int selected_channel = selected_channel_ + event.value;
-      CONSTRAIN(selected_channel, 0, 3);
+      CONSTRAIN(selected_channel, 0, DAC_CHANNEL_COUNT - 1);
       SetChannel(selected_channel);
     }
     break;
