@@ -717,7 +717,7 @@ private:
     { 128, 0, 255, "S2", NULL, settings::STORAGE_TYPE_U16 },
     { 128, 0, 255, "S3", NULL, settings::STORAGE_TYPE_U16 },
     { 128, 0, 255, "S4", NULL, settings::STORAGE_TYPE_U16 },
-    { OC::DIGITAL_INPUT_1, OC::DIGITAL_INPUT_1, OC::DIGITAL_INPUT_4 + 3 * INT_TRIGGER_LAST, "Trigger input", OC::Strings::trigger_input_names, settings::STORAGE_TYPE_U4 },
+    { OC::DIGITAL_INPUT_1, OC::DIGITAL_INPUT_1, OC::DIGITAL_INPUT_4 + 3 * INT_TRIGGER_LAST, "Trigger input", OC::Strings::trigger_input_names_none + 1, settings::STORAGE_TYPE_U4 },
     { TRIGGER_DELAY_OFF, TRIGGER_DELAY_OFF, TRIGGER_DELAY_LAST - 1, "Tr delay mode", trigger_delay_modes, settings::STORAGE_TYPE_U4 },
     { 1, 1, EnvelopeGenerator::kMaxDelayedTriggers, "Tr delay count", NULL, settings::STORAGE_TYPE_U8 },
     { 0, 0, 999, "Tr delay msecs", NULL, settings::STORAGE_TYPE_U16 },

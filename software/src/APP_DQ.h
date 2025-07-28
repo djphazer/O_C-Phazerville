@@ -1036,7 +1036,7 @@ private:
     { 65535, 1, 65535, "--> edit", NULL, settings::STORAGE_TYPE_U16 },
     { 65535, 1, 65535, "--> edit", NULL, settings::STORAGE_TYPE_U16 },
     { 0, 0, 3, "seq_mode", dq_seq_modes, settings::STORAGE_TYPE_U4 },
-    { DQ_CHANNEL_SOURCE_CV1, DQ_CHANNEL_SOURCE_CV1, 4, "CV source", OC::Strings::cv_input_names, settings::STORAGE_TYPE_U4 }, /// to do ..
+    { DQ_CHANNEL_SOURCE_CV1, DQ_CHANNEL_SOURCE_CV1, 4, "CV source", OC::Strings::cv_input_names_none + 1, settings::STORAGE_TYPE_U4 }, /// to do ..
     { DQ_CHANNEL_TRIGGER_CONTINUOUS_DOWN, 0, DQ_CHANNEL_TRIGGER_LAST - 1, "trigger source", OC::Strings::channel_trigger_sources, settings::STORAGE_TYPE_U8 },
     { 0, 0, OC::kNumDelayTimes - 1, "--> latency", OC::Strings::trigger_delay_times, settings::STORAGE_TYPE_U8 },
     { 0, -5, 7, "transpose #1", NULL, settings::STORAGE_TYPE_I8 },
