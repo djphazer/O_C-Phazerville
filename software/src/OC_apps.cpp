@@ -46,41 +46,41 @@ namespace menu = OC::menu;
 #ifndef NO_HEMISPHERE
 
 #ifdef ARDUINO_TEENSY41
-#include "APP_QUADRANTS.h"
+#include "apps/Quadrants.h"
 #endif
-#include "APP_HEMISPHERE.h"
+#include "apps/Hemisphere.h"
 
 #endif
 
-#include "APP_CALIBR8OR.h"
-#include "APP_SCENES.h"
-#include "APP_ASR.h"
+#include "apps/Calibr8or.h"
+#include "apps/Scenery.h"
+#include "apps/ASR.h"
 #ifdef ENABLE_APP_H1200
-#include "APP_H1200.h"
+#include "apps/H1200.h"
 #endif
 #ifdef ENABLE_APP_AUTOMATONNETZ
-#include "APP_AUTOMATONNETZ.h"
+#include "apps/Automatonnetz.h"
 #endif
-#include "APP_SEQ.h"
-#include "APP_QQ.h"
-#include "APP_DQ.h"
-#include "APP_POLYLFO.h"
-#include "APP_LORENZ.h"
-#include "APP_ENVGEN.h"
-#include "APP_BBGEN.h"
-#include "APP_BYTEBEATGEN.h"
-#include "APP_CHORDS.h"
-#include "APP_REFS.h"
-// #include "APP_PASSENCORE.h"
-// #include "APP_MIDI.h"
-// #include "APP_THEDARKESTTIMELINE.h"
-// #include "APP_ENIGMA.h"
-// #include "APP_NeuralNetwork.h"
-// #include "APP_SCALEEDITOR.h"
-// #include "APP_WAVEFORMEDITOR.h"
-// #include "APP_PONGGAME.h"
-// #include "APP_Backup.h"
-#include "APP_SETTINGS.h"
+#include "apps/Sequins.h"
+#include "apps/QQ.h"
+#include "apps/DQ.h"
+#include "apps/Quadraturia.h"
+#include "apps/Lorenz.h"
+#include "apps/Piqued.h"
+#include "apps/BBGEN.h"
+#include "apps/Viznutcracker.h"
+#include "apps/Chords.h"
+#include "apps/References.h"
+// #include "apps/Passencore.h"
+// #include "apps/CaptainMIDI.h"
+// #include "apps/TheDarkestTimeline.h"
+// #include "apps/Enigma.h"
+// #include "apps/NeuralNetwork.h"
+// #include "apps/ScaleEditor.h"
+// #include "apps/WaveformEditor.h"
+// #include "apps/PongGame.h"
+// #include "apps/Backup.h"
+#include "apps/SETTINGS.h"
 
 /*
 // The order here is not inconsequential.
