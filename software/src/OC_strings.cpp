@@ -70,8 +70,6 @@ namespace OC {
 
   const char * const VOR_offsets[3] = { "-5V", "-3V", "0V"};
 
-  const char * const trigger_input_names[4] = { "TR1", "TR2", "TR3", "TR4" };
-
   const char * const trigger_input_names_none[] = { " - ", "TR1", "TR2", "TR3", "TR4",
     "CV1", "CV2", "CV3", "CV4",
 #ifdef ARDUINO_TEENSY41
@@ -82,8 +80,6 @@ namespace OC {
     "E", "F", "G", "H",
 #endif
   };
-
-  const char * const cv_input_names[4] = { "CV1", "CV2", "CV3", "CV4" };
 
   const char * const cv_input_names_none[] = { " - ", "CV1", "CV2", "CV3", "CV4",
 #ifdef ARDUINO_TEENSY41
@@ -104,6 +100,7 @@ namespace OC {
     "M29","M30","M31","M32"
   };
 
+  // deprecated - use capital_letters[] instead
   const char * const channel_id[4] = { "#A", "#B", "#C", "#D" };
 
   const char * const capital_letters[52] = {

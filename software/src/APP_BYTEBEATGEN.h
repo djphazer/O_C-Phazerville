@@ -358,7 +358,7 @@ private:
     { 0, 0, 255, "Loop end ++", NULL, settings::STORAGE_TYPE_U8 },
     { 1, 0, 255, "Loop end +", NULL, settings::STORAGE_TYPE_U8 },
     { 255, 0, 255, "Loop end", NULL, settings::STORAGE_TYPE_U8 },
-    { OC::DIGITAL_INPUT_1, OC::DIGITAL_INPUT_1, OC::DIGITAL_INPUT_4, "Trigger input", OC::Strings::trigger_input_names, settings::STORAGE_TYPE_U4 },
+    { OC::DIGITAL_INPUT_1, OC::DIGITAL_INPUT_1, OC::DIGITAL_INPUT_4, "Trigger input", OC::Strings::trigger_input_names_none + 1, settings::STORAGE_TYPE_U4 },
     { 0, 0, 1, "Step mode", OC::Strings::no_yes, settings::STORAGE_TYPE_U4 },
 #ifdef ARDUINO_TEENSY41
     { BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_LAST - 1, "CV5 -> ", bytebeat_cv_mapping_names, settings::STORAGE_TYPE_U4 },

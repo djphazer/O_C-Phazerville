@@ -989,7 +989,7 @@ private:
     { 0, 0, 11, "root", OC::Strings::note_names_unpadded, settings::STORAGE_TYPE_U8 },
     { 0, 0, OC::Chords::NUM_CHORD_PROGRESSIONS - 1, "progression", chords_slots, settings::STORAGE_TYPE_U8 },
     { 65535, 1, 65535, "scale  -->", NULL, settings::STORAGE_TYPE_U16 }, // mask
-    { 0, 0, CHORDS_CV_SOURCE_LAST - 1, "CV source", OC::Strings::cv_input_names, settings::STORAGE_TYPE_U8 }, /// to do ..
+    { 0, 0, CHORDS_CV_SOURCE_LAST - 1, "CV source", OC::Strings::cv_input_names_none + 1, settings::STORAGE_TYPE_U8 }, /// to do ..
     { CHORDS_ADVANCE_TRIGGER_SOURCE_TR2, 0, CHORDS_ADVANCE_TRIGGER_SOURCE_LAST - 1, "chords trg src", chords_advance_trigger_sources, settings::STORAGE_TYPE_U8 },
     { 0, 0, CHORDS_PLAYMODES_LAST - 1, "playmode", chord_playmodes, settings::STORAGE_TYPE_U8 },
     { 0, 0, CHORDS_DIRECTIONS_LAST - 1, "direction", OC::Strings::seq_directions, settings::STORAGE_TYPE_U8 },
