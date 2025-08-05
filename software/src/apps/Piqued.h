@@ -25,6 +25,7 @@
 
 #include "OC_apps.h"
 #include "OC_bitmaps.h"
+#include "OC_config.h"
 #include "OC_digital_inputs.h"
 #include "OC_menus.h"
 #include "OC_strings.h"
@@ -34,7 +35,7 @@
 #include "src/extern/bjorklund.h"
 #include "OC_euclidean_mask_draw.h"
 
-static constexpr int ENVGEN_CHANNEL_COUNT = 4;
+static constexpr int ENVGEN_CHANNEL_COUNT = DAC_CHANNEL_COUNT;
 
 // peaks::MultistageEnvelope allow setting of more parameters per stage, but
 // that will involve more editing code, so keeping things simple for now
@@ -43,7 +44,7 @@ static constexpr int ENVGEN_CHANNEL_COUNT = 4;
 // MultistageEnvelope maps times to lut_env_increments directly, so only 256 discrete values (no interpolation)
 // Levels are 0-32767 to be positive on Peaks' bipolar output
 
-enum EnvelopeSettings {
+enum EnvelopeSettings : uint8_t {
   ENV_SETTING_TYPE,
   ENV_SETTING_SEG1_VALUE,
   ENV_SETTING_SEG2_VALUE,
@@ -63,6 +64,12 @@ enum EnvelopeSettings {
   ENV_SETTING_CV2,
   ENV_SETTING_CV3,
   ENV_SETTING_CV4,
+#ifdef ARDUINO_TEENSY41
+  ENV_SETTING_CV5,
+  ENV_SETTING_CV6,
+  ENV_SETTING_CV7,
+  ENV_SETTING_CV8,
+#endif
   ENV_SETTING_ATTACK_RESET_BEHAVIOUR,
   ENV_SETTING_ATTACK_FALLING_GATE_BEHAVIOUR,
   ENV_SETTING_DECAY_RELEASE_RESET_BEHAVIOUR,
@@ -80,7 +87,7 @@ enum EnvelopeSettings {
   ENV_SETTING_LAST
 };
 
-enum CVMapping {
+enum CVMapping : uint8_t {
   CV_MAPPING_NONE,
   CV_MAPPING_SEG1,
   CV_MAPPING_SEG2,
@@ -93,10 +100,12 @@ enum CVMapping {
   CV_MAPPING_DELAY_MSEC,
   CV_MAPPING_AMPLITUDE,
   CV_MAPPING_MAX_LOOPS,
-  CV_MAPPING_LAST
+
+  CV_MAPPING_COUNT,
+  CV_MAPPING_LAST = CV_MAPPING_MAX_LOOPS
 };
 
-enum EnvelopeType {
+enum EnvelopeType : uint8_t {
   ENV_TYPE_AD,
   ENV_TYPE_ADSR,
   ENV_TYPE_ADR,
@@ -111,7 +120,7 @@ enum EnvelopeType {
   ENV_TYPE_LAST, ENV_TYPE_FIRST = ENV_TYPE_AD
 };
 
-enum TriggerDelayMode {
+enum TriggerDelayMode : uint8_t {
   TRIGGER_DELAY_OFF,
   TRIGGER_DELAY_QUEUE, // Queue up to kMaxDelayedTriggers delays, additional triggers ignored
   TRIGGER_DELAY_RING,  // Queue up to kMaxDelayedTriggers delays, additional triggers overwrite oldest
@@ -123,7 +132,7 @@ enum TriggerDelayMode {
 // Ordering here ideally maps to peaks::EnvStateBitMask shifts
 enum IntTriggerType {
   INT_TRIGGER_EOC,
-  INT_TRIGGER_LAST
+  INT_TRIGGER_COUNT
 };
 
 const char* const envelope_types[ENV_TYPE_LAST] = {
@@ -134,7 +143,7 @@ const char* const segment_names[] = {
   "Attack", "Decay", "Sustain/Level", "Release"
 };
 
-const char* const cv_mapping_names[CV_MAPPING_LAST] = {
+const char* const cv_mapping_names[CV_MAPPING_COUNT] = {
   "None", "Att", "Dec", "Sus", "Rel", "ADR", "Eleng", "Efill", "Eoffs", "Delay", "Ampl", "Loops"
 };
 
@@ -153,18 +162,18 @@ const char* const time_multipliers[] = {
   "1", "  2", "  4", "  8", "  16", "  32", "  64", " 128", " 256", " 512", "1024", "2048", "4096", "8192"
 };
 
-const char* const internal_trigger_types[INT_TRIGGER_LAST] = {
+const char* const internal_trigger_types[INT_TRIGGER_COUNT] = {
   "EOC", // Keep length == 3
 };
 
 inline int TriggerSettingToChannel(int setting_value) __attribute__((always_inline));
 inline int TriggerSettingToChannel(int setting_value) {
-  return (setting_value - OC::DIGITAL_INPUT_LAST) / INT_TRIGGER_LAST;
+  return (setting_value - DIGITAL_INPUT_COUNT) / INT_TRIGGER_COUNT;
 }
 
 static inline IntTriggerType TriggerSettingToType(int setting_value, int channel) __attribute__((always_inline));
 static inline IntTriggerType TriggerSettingToType(int setting_value, int channel) {
-  return static_cast<IntTriggerType>((setting_value - OC::DIGITAL_INPUT_LAST) - channel * INT_TRIGGER_LAST);
+  return static_cast<IntTriggerType>((setting_value - OC::DIGITAL_INPUT_LAST) - channel * INT_TRIGGER_COUNT);
 }
 
 class EnvelopeGenerator : public settings::SettingsBase<EnvelopeGenerator, ENV_SETTING_LAST> {
@@ -189,7 +198,7 @@ public:
     }
   };
 
-  void Init(OC::DigitalInput default_trigger);
+  EnvelopeGenerator(OC::DigitalInput default_trigger);
 
   EnvelopeType get_type() const {
     return static_cast<EnvelopeType>(values_[ENV_SETTING_TYPE]);
@@ -348,7 +357,7 @@ public:
     return 0;
   }
 
-  inline void apply_cv_mapping(EnvelopeSettings cv_setting, const int32_t cvs[ENVGEN_CHANNEL_COUNT], int32_t segments[CV_MAPPING_LAST]) {
+  inline void apply_cv_mapping(EnvelopeSettings cv_setting, const int32_t cvs[ENVGEN_CHANNEL_COUNT], int32_t segments[CV_MAPPING_COUNT]) {
     // segments is indexed directly with CVMapping enum values
     int mapping = values_[cv_setting];
     switch (mapping) {
@@ -422,6 +431,12 @@ public:
     *settings++ = ENV_SETTING_CV2;
     *settings++ = ENV_SETTING_CV3;
     *settings++ = ENV_SETTING_CV4;
+#ifdef ARDUINO_TEENSY41
+    *settings++ = ENV_SETTING_CV5;
+    *settings++ = ENV_SETTING_CV6;
+    *settings++ = ENV_SETTING_CV7;
+    *settings++ = ENV_SETTING_CV8;
+#endif
     *settings++ = ENV_SETTING_ATTACK_RESET_BEHAVIOUR;
     *settings++ = ENV_SETTING_ATTACK_FALLING_GATE_BEHAVIOUR;
     *settings++ = ENV_SETTING_DECAY_RELEASE_RESET_BEHAVIOUR;
@@ -450,8 +465,8 @@ public:
     return false;
   }
 
-  void Update(OC::IOFrame *ioframe, uint32_t triggers, uint32_t internal_trigger_mask, const int32_t cvs[ENVGEN_CHANNEL_COUNT], DAC_CHANNEL dac_channel) {
-    int32_t s[CV_MAPPING_LAST];
+  void Update(OC::IOFrame *ioframe, uint32_t triggers, uint64_t internal_trigger_mask, const int32_t cvs[ENVGEN_CHANNEL_COUNT], DAC_CHANNEL dac_channel) {
+    int32_t s[CV_MAPPING_COUNT];
     s[CV_MAPPING_NONE] = 0; // unused, but needs a placeholder to align with enum CVMapping
     s[CV_MAPPING_SEG1] = SCALE8_16(static_cast<int32_t>(get_segment_value(0)));
     s[CV_MAPPING_SEG2] = SCALE8_16(static_cast<int32_t>(get_segment_value(1)));
@@ -469,6 +484,12 @@ public:
     apply_cv_mapping(ENV_SETTING_CV2, cvs, s);
     apply_cv_mapping(ENV_SETTING_CV3, cvs, s);
     apply_cv_mapping(ENV_SETTING_CV4, cvs, s);
+#ifdef ARDUINO_TEENSY41
+    apply_cv_mapping(ENV_SETTING_CV5, cvs, s);
+    apply_cv_mapping(ENV_SETTING_CV6, cvs, s);
+    apply_cv_mapping(ENV_SETTING_CV7, cvs, s);
+    apply_cv_mapping(ENV_SETTING_CV8, cvs, s);
+#endif
 
     s[CV_MAPPING_SEG1] = USAT16(s[CV_MAPPING_SEG1]);
     s[CV_MAPPING_SEG2] = USAT16(s[CV_MAPPING_SEG2]);
@@ -599,19 +620,11 @@ public:
 
     uint32_t value = env_.ProcessSingleSample(gate_state); // 0 to 32767
     if (is_inverted()) value = 32767 - value;
-    const int max_val = OC::DAC::MAX_VALUE;
 
-    // Scale range and offset
-#ifdef VOR
-    // Full range for Plum Audio
-    const uint32_t offset = OC::DAC::get_octave_offset(dac_channel, -OC::DAC::kOctaveZero);
-#else
-    // Regular O_C settles to 0V
-    const uint32_t offset = OC::DAC::get_zero_offset(dac_channel);
-#endif
-
-    // scale value
-    value = offset + (value * (max_val - offset) / 32767);
+    // scale value to max
+    //const int max_val = OC::DAC::MAX_VALUE;
+    //value = (value * max_val / 32767);
+    value <<= 1;
 
     ioframe->outputs.set_unipolar_value(dac_channel, value);
   }
@@ -650,7 +663,7 @@ public:
     return s < channel_index_ ? s : s + 1;
   }
 
-  uint32_t internal_trigger_mask() const {
+  uint64_t internal_trigger_mask() const {
     return env_.get_state_mask();
   }
 
@@ -717,7 +730,7 @@ private:
     { 128, 0, 255, "S2", NULL, settings::STORAGE_TYPE_U16 },
     { 128, 0, 255, "S3", NULL, settings::STORAGE_TYPE_U16 },
     { 128, 0, 255, "S4", NULL, settings::STORAGE_TYPE_U16 },
-    { OC::DIGITAL_INPUT_1, OC::DIGITAL_INPUT_1, OC::DIGITAL_INPUT_4 + 3 * INT_TRIGGER_LAST, "Trigger input", OC::Strings::trigger_input_names_none + 1, settings::STORAGE_TYPE_U4 },
+    { OC::DIGITAL_INPUT_1, OC::DIGITAL_INPUT_1, OC::DIGITAL_INPUT_4 + (ENVGEN_CHANNEL_COUNT-1) * INT_TRIGGER_COUNT, "Trigger input", OC::Strings::trigger_input_names_none + 1, settings::STORAGE_TYPE_U4 },
     { TRIGGER_DELAY_OFF, TRIGGER_DELAY_OFF, TRIGGER_DELAY_LAST - 1, "Tr delay mode", trigger_delay_modes, settings::STORAGE_TYPE_U4 },
     { 1, 1, EnvelopeGenerator::kMaxDelayedTriggers, "Tr delay count", NULL, settings::STORAGE_TYPE_U8 },
     { 0, 0, 999, "Tr delay msecs", NULL, settings::STORAGE_TYPE_U16 },
@@ -727,16 +740,15 @@ private:
     { 0, 0, 32, "Offset", NULL, settings::STORAGE_TYPE_U8 },
     { 0, 0, 4, "Eucl reset", OC::Strings::trigger_input_names_none, settings::STORAGE_TYPE_U8 },
     { 1, 1, 255, "Eucl reset div", NULL, settings::STORAGE_TYPE_U8 },
+    { CV_MAPPING_NONE, CV_MAPPING_NONE, CV_MAPPING_LAST, "CV1 -> ", cv_mapping_names, settings::STORAGE_TYPE_U4 },
+    { CV_MAPPING_NONE, CV_MAPPING_NONE, CV_MAPPING_LAST, "CV2 -> ", cv_mapping_names, settings::STORAGE_TYPE_U4 },
+    { CV_MAPPING_NONE, CV_MAPPING_NONE, CV_MAPPING_LAST, "CV3 -> ", cv_mapping_names, settings::STORAGE_TYPE_U4 },
+    { CV_MAPPING_NONE, CV_MAPPING_NONE, CV_MAPPING_LAST, "CV4 -> ", cv_mapping_names, settings::STORAGE_TYPE_U4 },
 #ifdef ARDUINO_TEENSY41
-    { CV_MAPPING_NONE, CV_MAPPING_NONE, CV_MAPPING_LAST - 1, "CV5 -> ", cv_mapping_names, settings::STORAGE_TYPE_U4 },
-    { CV_MAPPING_NONE, CV_MAPPING_NONE, CV_MAPPING_LAST - 1, "CV6 -> ", cv_mapping_names, settings::STORAGE_TYPE_U4 },
-    { CV_MAPPING_NONE, CV_MAPPING_NONE, CV_MAPPING_LAST - 1, "CV7 -> ", cv_mapping_names, settings::STORAGE_TYPE_U4 },
-    { CV_MAPPING_NONE, CV_MAPPING_NONE, CV_MAPPING_LAST - 1, "CV8 -> ", cv_mapping_names, settings::STORAGE_TYPE_U4 },
-#else
-    { CV_MAPPING_NONE, CV_MAPPING_NONE, CV_MAPPING_LAST - 1, "CV1 -> ", cv_mapping_names, settings::STORAGE_TYPE_U4 },
-    { CV_MAPPING_NONE, CV_MAPPING_NONE, CV_MAPPING_LAST - 1, "CV2 -> ", cv_mapping_names, settings::STORAGE_TYPE_U4 },
-    { CV_MAPPING_NONE, CV_MAPPING_NONE, CV_MAPPING_LAST - 1, "CV3 -> ", cv_mapping_names, settings::STORAGE_TYPE_U4 },
-    { CV_MAPPING_NONE, CV_MAPPING_NONE, CV_MAPPING_LAST - 1, "CV4 -> ", cv_mapping_names, settings::STORAGE_TYPE_U4 },
+    { CV_MAPPING_NONE, CV_MAPPING_NONE, CV_MAPPING_LAST, "CV5 -> ", cv_mapping_names, settings::STORAGE_TYPE_U4 },
+    { CV_MAPPING_NONE, CV_MAPPING_NONE, CV_MAPPING_LAST, "CV6 -> ", cv_mapping_names, settings::STORAGE_TYPE_U4 },
+    { CV_MAPPING_NONE, CV_MAPPING_NONE, CV_MAPPING_LAST, "CV7 -> ", cv_mapping_names, settings::STORAGE_TYPE_U4 },
+    { CV_MAPPING_NONE, CV_MAPPING_NONE, CV_MAPPING_LAST, "CV8 -> ", cv_mapping_names, settings::STORAGE_TYPE_U4 },
 #endif
     { peaks::RESET_BEHAVIOUR_NULL, peaks::RESET_BEHAVIOUR_NULL, peaks::RESET_BEHAVIOUR_LAST - 1, "Attack reset", OC::Strings::reset_behaviours, settings::STORAGE_TYPE_U4 },
     { peaks::FALLING_GATE_BEHAVIOUR_IGNORE, peaks::FALLING_GATE_BEHAVIOUR_IGNORE, peaks::FALLING_GATE_BEHAVIOUR_LAST - 1, "Att fall gt", OC::Strings::falling_gate_behaviours, settings::STORAGE_TYPE_U8 },
@@ -756,11 +768,13 @@ private:
 };
 SETTINGS_ARRAY_DEFINE(EnvelopeGenerator);
 
-void EnvelopeGenerator::Init(OC::DigitalInput default_trigger) {
+EnvelopeGenerator::EnvelopeGenerator(OC::DigitalInput default_trigger) {
+  static int idx = 0;
+
   InitDefaults();
   apply_value(ENV_SETTING_TRIGGER_INPUT, default_trigger);
   env_.Init();
-  channel_index_ = default_trigger;
+  channel_index_ = idx++;
   last_type_ = ENV_TYPE_LAST;
   gate_raised_ = false;
   euclidean_counter_ = 0;
@@ -809,19 +823,18 @@ private:
   } ui;
 
   EnvelopeGenerator &selected() {
-    return envelopes_[ui.selected_channel];
+    return get_env(ui.selected_channel);
   }
 
-  const EnvelopeGenerator &selected() const {
-    return envelopes_[ui.selected_channel];
+  EnvelopeGenerator &get_env(int ch) {
+    if (!envelopes_[ch]) envelopes_[ch] = new EnvelopeGenerator(OC::DIGITAL_INPUT_1); // you are late sir, you get what you get
+    return *envelopes_[ch];
   }
 
-  EnvelopeGenerator envelopes_[ENVGEN_CHANNEL_COUNT];
+  EnvelopeGenerator* envelopes_[ENVGEN_CHANNEL_COUNT] = {nullptr};
 
-  SmoothedValue<int32_t, kCvSmoothing> cv1;
-  SmoothedValue<int32_t, kCvSmoothing> cv2;
-  SmoothedValue<int32_t, kCvSmoothing> cv3;
-  SmoothedValue<int32_t, kCvSmoothing> cv4;
+  using CVArray = std::array<SmoothedValue<int32_t, kCvSmoothing>, ADC_CHANNEL_COUNT>;
+  CVArray cv_smooth;
 
   void HandleTopButton();
   void HandleLowerButton();
@@ -834,62 +847,100 @@ private:
 
 void AppQuadEnvelopeGenerator::Init() {
   int input = OC::DIGITAL_INPUT_1;
-  for (auto &env : envelopes_) {
-    env.Init(static_cast<OC::DigitalInput>(input));
-    ++input;
+  for (int i = 0; i < ENVGEN_CHANNEL_COUNT; ++i) {
+    if (nullptr == envelopes_[i])
+      envelopes_[i] = new EnvelopeGenerator(static_cast<OC::DigitalInput>(input));
+    ++input %= OC::DIGITAL_INPUT_LAST;
   }
 
   ui.edit_mode = MODE_EDIT_SEGMENTS;
   ui.selected_channel = 0;
   ui.selected_segment = 0;
   ui.segment_editing = false;
-  ui.cursor.Init(0, envelopes_[0].num_enabled_settings() - 1);
+  ui.cursor.Init(0, envelopes_[0]->num_enabled_settings() - 1);
   ui.euclidean_edit_length = false;
 }
 
 void AppQuadEnvelopeGenerator::Process(OC::IOFrame *ioframe) {
-  // TODO[PLD] Do we need the excessive smoothing?
+  const ADC_CHANNEL adc_chan[] = {
+    ADC_CHANNEL_1,
+    ADC_CHANNEL_2,
+    ADC_CHANNEL_3,
+    ADC_CHANNEL_4,
 #ifdef ARDUINO_TEENSY41
-  cv1.push(ioframe->cv.values[ADC_CHANNEL_5]);
-  cv2.push(ioframe->cv.values[ADC_CHANNEL_6]);
-  cv3.push(ioframe->cv.values[ADC_CHANNEL_7]);
-  cv4.push(ioframe->cv.values[ADC_CHANNEL_8]);
-#else
-  cv1.push(ioframe->cv.values[ADC_CHANNEL_1]);
-  cv2.push(ioframe->cv.values[ADC_CHANNEL_2]);
-  cv3.push(ioframe->cv.values[ADC_CHANNEL_3]);
-  cv4.push(ioframe->cv.values[ADC_CHANNEL_4]);
+    ADC_CHANNEL_5,
+    ADC_CHANNEL_6,
+    ADC_CHANNEL_7,
+    ADC_CHANNEL_8,
 #endif
+  };
+  const DAC_CHANNEL dac_chan[] = {
+    DAC_CHANNEL_A,
+    DAC_CHANNEL_B,
+    DAC_CHANNEL_C,
+    DAC_CHANNEL_D,
+#ifdef ARDUINO_TEENSY41
+    DAC_CHANNEL_E,
+    DAC_CHANNEL_F,
+    DAC_CHANNEL_G,
+    DAC_CHANNEL_H,
+#endif
+  };
 
-  const int32_t cvs[ENVGEN_CHANNEL_COUNT] = { cv1.value(), cv2.value(), cv3.value(), cv4.value() };
+  // TODO[PLD] Do we need the excessive smoothing?
+  //     [NJM] probably not... but T4.x can handle it.
+  int i = 0;
+  for (auto& cv : cv_smooth) {
+    cv.push(ioframe->cv.values[adc_chan[i++]]);
+  }
+
+  const int32_t cvs[ENVGEN_CHANNEL_COUNT] = {
+    cv_smooth[0].value(),
+    cv_smooth[1].value(),
+    cv_smooth[2].value(),
+    cv_smooth[3].value(),
+#ifdef ARDUINO_TEENSY41
+    cv_smooth[4].value(),
+    cv_smooth[5].value(),
+    cv_smooth[6].value(),
+    cv_smooth[7].value(),
+#endif
+  };
   uint32_t triggers = ioframe->digital_inputs.triggered();
 
-  uint32_t internal_trigger_mask =
-      envelopes_[0].internal_trigger_mask() |
-      envelopes_[1].internal_trigger_mask() << 8 |
-      envelopes_[2].internal_trigger_mask() << 16 |
-      envelopes_[3].internal_trigger_mask() << 24;
+  uint64_t internal_trigger_mask =
+      envelopes_[0]->internal_trigger_mask()
+    | envelopes_[1]->internal_trigger_mask() << 8
+    | envelopes_[2]->internal_trigger_mask() << 16
+    | envelopes_[3]->internal_trigger_mask() << 24
+#ifdef ARDUINO_TEENSY41
+    | envelopes_[4]->internal_trigger_mask() << 32
+    | envelopes_[5]->internal_trigger_mask() << 40
+    | envelopes_[6]->internal_trigger_mask() << 48
+    | envelopes_[7]->internal_trigger_mask() << 56
+#endif
+    ;
 
-  envelopes_[0].Update(ioframe, triggers, internal_trigger_mask, cvs, DAC_CHANNEL_A);
-  envelopes_[1].Update(ioframe, triggers, internal_trigger_mask, cvs, DAC_CHANNEL_B);
-  envelopes_[2].Update(ioframe, triggers, internal_trigger_mask, cvs, DAC_CHANNEL_C);
-  envelopes_[3].Update(ioframe, triggers, internal_trigger_mask, cvs, DAC_CHANNEL_D);
+  i = 0;
+  for (auto& env : envelopes_) {
+    env->Update(ioframe, triggers, internal_trigger_mask, cvs, dac_chan[i++]);
+  }
 }
 
 size_t AppQuadEnvelopeGenerator::SaveAppData(util::StreamBufferWriter &stream_buffer) const {
   for (auto &env : envelopes_)
-    env.Save(stream_buffer);
+    env->Save(stream_buffer);
 
   return stream_buffer.written();
 }
 
 size_t AppQuadEnvelopeGenerator::RestoreAppData(util::StreamBufferReader &stream_buffer) {
   for (auto &env : envelopes_) {
-    env.Restore(stream_buffer);
-    env.update_enabled_settings();
+    env->Restore(stream_buffer);
+    env->update_enabled_settings();
   }
 
-  ui.cursor.AdjustEnd(envelopes_[0].num_enabled_settings() - 1);
+  ui.cursor.AdjustEnd(envelopes_[0]->num_enabled_settings() - 1);
   return stream_buffer.read();
 }
 
@@ -1077,23 +1128,24 @@ void AppQuadEnvelopeGenerator::DrawMenuSettings() const {
 }
 
 void AppQuadEnvelopeGenerator::DrawMenu() const {
+  using OctaTitleBar = menu::TitleBar<menu::kDefaultMenuStartX, DAC_CHANNEL_COUNT, 6>;
 
-  menu::QuadTitleBar::Draw();
+  OctaTitleBar::Draw();
   for (uint_fast8_t i = 0; i < ENVGEN_CHANNEL_COUNT; ++i) {
-    menu::QuadTitleBar::SetColumn(i);
+    OctaTitleBar::SetColumn(i);
     graphics.print((char)('A' + i));
-    menu::QuadTitleBar::DrawGateIndicator(i, envelopes_[i].getTriggerState());
+    OctaTitleBar::DrawGateIndicator(i, envelopes_[i]->getTriggerState());
 
     EnvelopeGenerator::DelayedTrigger trigger;
-    envelopes_[i].get_next_trigger(trigger);
+    envelopes_[i]->get_next_trigger(trigger);
     if (trigger.delay) {
-      weegfx::coord_t x = menu::QuadTitleBar::ColumnStartX(i) + 28;
+      weegfx::coord_t x = OctaTitleBar::ColumnStartX(i) + 28;
       weegfx::coord_t h = (trigger.time_left * 8) / trigger.delay;
-      graphics.drawRect(x, menu::QuadTitleBar::kTextY + 7 - h, 2, 1 + h);
+      graphics.drawRect(x, OctaTitleBar::kTextY + 7 - h, 2, 1 + h);
     }
   }
   // If settings mode, draw level in title bar?
-  menu::QuadTitleBar::Selected(ui.selected_channel);
+  OctaTitleBar::Selected(ui.selected_channel);
 
   if (AppQuadEnvelopeGenerator::MODE_EDIT_SEGMENTS == ui.edit_mode)
     DrawMenuPreview();
@@ -1178,7 +1230,7 @@ void AppQuadEnvelopeGenerator::HandleEncoderEvent(const UI::Event &event) {
       }
     } else {
       int left_value = ui.selected_channel + event.value;
-      CONSTRAIN(left_value, 0, 3);
+      CONSTRAIN(left_value, 0, ENVGEN_CHANNEL_COUNT - 1);
       ui.selected_channel = left_value;
       auto &selected_env = selected();
       CONSTRAIN(ui.selected_segment, 0, selected_env.num_editable_segments() - 1);
@@ -1240,17 +1292,22 @@ void AppQuadEnvelopeGenerator::DrawScreensaver() const {
   debug::CycleMeasurement render_cycles;
 #endif
 
-  #ifdef NORTHERNLIGHT
-    RenderFastPreview<0, 32>(envelopes_[0]);
-    RenderFastPreview<64, 32>(envelopes_[1]);
-    RenderFastPreview<0, 0>(envelopes_[2]);
-    RenderFastPreview<64, 0>(envelopes_[3]);
-  #else
-    RenderFastPreview<0, 0>(envelopes_[0]);
-    RenderFastPreview<64, 0>(envelopes_[1]);
-    RenderFastPreview<0, 32>(envelopes_[2]);
-    RenderFastPreview<64, 32>(envelopes_[3]);
-  #endif
+#ifdef ARDUINO_TEENSY41
+  RenderFastPreview<0, 0>(*envelopes_[0]);
+  RenderFastPreview<32, 0>(*envelopes_[1]);
+  RenderFastPreview<64, 0>(*envelopes_[2]);
+  RenderFastPreview<96, 0>(*envelopes_[3]);
+  RenderFastPreview<0, 32>(*envelopes_[4]);
+  RenderFastPreview<32, 32>(*envelopes_[5]);
+  RenderFastPreview<64, 32>(*envelopes_[6]);
+  RenderFastPreview<96, 32>(*envelopes_[7]);
+#else
+  RenderFastPreview<0, 0>(*envelopes_[0]);
+  RenderFastPreview<64, 0>(*envelopes_[1]);
+  RenderFastPreview<0, 32>(*envelopes_[2]);
+  RenderFastPreview<64, 32>(*envelopes_[3]);
+#endif
+
   OC::scope_render();
 
 #ifdef ENVGEN_DEBUG_SCREENSAVER
@@ -1265,11 +1322,11 @@ void AppQuadEnvelopeGenerator::DrawDebugInfo() const {
   for (int i = 0; i < 4; ++i) {
     uint8_t ypos = 10*(i + 1) + 2 ;
     graphics.setPrintPos(2, ypos);
-    graphics.print(envelopes_[i].get_amplitude_value()) ;
+    graphics.print(envelopes_[i]->get_amplitude_value()) ;
     graphics.setPrintPos(50, ypos);
-    graphics.print(envelopes_[i].get_sampled_amplitude_value()) ;
+    graphics.print(envelopes_[i]->get_sampled_amplitude_value()) ;
     graphics.setPrintPos(100, ypos);
-    graphics.print(envelopes_[i].get_is_amplitude_sampled()) ;
+    graphics.print(envelopes_[i]->get_is_amplitude_sampled()) ;
   }
 #endif // ENVGEN_DEBUG
 }
