@@ -67,9 +67,9 @@ struct InputDesc {
 // would be a way of defining a function + description instead of handling all
 // the moving parts individually.
 struct IOConfig {
-  InputDesc digital_inputs[DIGITAL_INPUT_LAST];
-  InputDesc cv[ADC_CHANNEL_LAST];
-  OutputDesc outputs[DAC_CHANNEL_LAST];
+  InputDesc digital_inputs[DIGITAL_INPUT_COUNT];
+  InputDesc cv[ADC_CHANNEL_COUNT];
+  OutputDesc outputs[DAC_CHANNEL_COUNT];
 
   void Reset() {
     memset(this, 0, sizeof(IOConfig));
@@ -115,8 +115,8 @@ struct IOFrame {
   } digital_inputs;
 
   struct {
-    std::array<int32_t, ADC_CHANNEL_LAST> values;       // 10V = 2^12
-    std::array<int32_t, ADC_CHANNEL_LAST> pitch_values; // 1V = 12 << 7 = 1536
+    std::array<int32_t, ADC_CHANNEL_COUNT> values;       // 10V = 2^12
+    std::array<int32_t, ADC_CHANNEL_COUNT> pitch_values; // 1V = 12 << 7 = 1536
 
     // Get CV value mapped for a given number of steps across the range
     // Round up/offset to move window and avoid "busy" toggling around 0
@@ -133,13 +133,13 @@ struct IOFrame {
   } cv;
 
   struct {
-    std::array<int32_t, DAC_CHANNEL_LAST> values;
-    std::array<OutputMode, DAC_CHANNEL_LAST> modes;
+    std::array<int32_t, DAC_CHANNEL_COUNT> values;
+    std::array<OutputMode, DAC_CHANNEL_COUNT> modes;
 
     template <typename T>
     void set_pitch_values(const T& src)
     {
-      std::copy(src, src + DAC_CHANNEL_LAST, std::begin(values));
+      std::copy(src, src + DAC_CHANNEL_COUNT, std::begin(values));
       std::fill(std::begin(modes), std::end(modes), OUTPUT_MODE_PITCH);  
     }
 
