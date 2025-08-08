@@ -9,6 +9,7 @@
 #include "OC_menus.h"
 #include "OC_ui.h"
 #include "OC_strings.h"
+#include "util/util_math.h"
 #include "util/util_misc.h"
 #include "extern/dspinst.h"
 
@@ -181,13 +182,13 @@ static void debug_menu_adc_value() {
 }
 
 static void debug_menu_audio() {
-  float whole = AudioProcessorUsage();
-  int part = int(whole * 100) % 100;
+  static SmoothedValue<int, 64> smooth_cpu;
+  smooth_cpu.push(AudioProcessorUsage() * 100);
   graphics.setPrintPos(2, 12);
-  graphics.printf("Total CPU %2d.%02d%%", int(whole), part);
+  graphics.printf("Total CPU %2d.%02d%%", smooth_cpu.value()/100, smooth_cpu.value()%100);
 
-  whole = AudioProcessorUsageMax();
-  part = int(whole * 100) % 100;
+  float whole = AudioProcessorUsageMax();
+  int part = int(whole * 100) % 100;
   graphics.setPrintPos(2, 22);
   graphics.printf("Max CPU %2d.%02d%%", int(whole), part);
 
@@ -272,6 +273,7 @@ void Ui::DebugStats() {
       }
     }
     CONSTRAIN(current_menu_index, 0, (int)ARRAY_SIZE(debug_menus) - 1);
+    delay(1);
   }
 
   event_queue_.Flush();
