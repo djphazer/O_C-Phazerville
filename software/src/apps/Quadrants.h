@@ -653,6 +653,13 @@ public:
     bool CheckButtonCombos(const UI::Event &event) {
         HEM_SIDE slot = ButtonToSlot(event);
 
+        // hold Left Enc + (A or B) to toggle view
+        if (CheckButtonCombo(OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_A) ||
+            CheckButtonCombo(OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_B)) {
+            SwapViewSlot(slot);
+            return true;
+        }
+
         // dual press A+B for Clock Setup
         if (CheckButtonCombo(OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_B)) {
             view_state = CLOCK_SETUP;
