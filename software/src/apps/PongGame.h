@@ -20,52 +20,40 @@
 //
 // CV-controllable Pong game
 
-#include <Arduino.h>
-#include "OC_config.h"
-#include "OC_apps.h"
-#include "OC_ui.h"
 #include "HSApplication.h"
-
-/* Define the screen boundaries. There's a frame around the screen, so these numbers need to
- * take that into account.
- */
-#define BOUNDARY_TOP 11
-#define BOUNDARY_BOTTOM 61
-#define BOUNDARY_RIGHT 116
-#define BOUNDARY_LEFT 2
-
-/* Define player properties. INITIAL_BALL_DELAY is how many ISR cycles the ball takes to move. It
- * gets faster as the game goes on. PADDLE_DELAY is how many ISR cycles the player must wait before moving
- * again. This is to keep the game interesting at higher levels. PADDLE_WIDTH is the chunkiness of the paddle,
- * in pixels.
- *
- * Note: Each ISR cycle is about 60 microseconds.
- */
-#define INITIAL_BALL_DELAY 200
-#define PADDLE_DELAY 200
-#define PADDLE_WIDTH 3
-
-/* TRIGGER_CYCLE_LENGTH specifies how many loop cycles a triggered event (like a hit) lasts. */
-#define TRIGGER_CYCLE_LENGTH 400
-
-/* This value is used for converting a ball's or paddle's Y position into a pitch value. This number was determined
- * experimentally, since I wasn't sure what the total range for pitch values is.
- */
-#define Y_POSITION_COEFF 128
-
-/*
- * When checking the ADC, if I just look for whether the value is positive or negative, then the value can't be
- * zeroed, and the player can't move the paddle with the onboard controls. This is probably because there's a little
- * noise that randomly swirls around 0. So this value simulates a center detent. This is another experimentally-
- * determined value.
- */
-#define CENTER_DETENT 640
 
 OC_APP_TRAITS(AppPong, TWOCCS("PO"), "Pong", "Pong");
 class OC_APP_CLASS(AppPong), public HSApplication {
 public:
   OC_APP_INTERFACE_DECLARE(AppPong);
   OC_APP_STORAGE_SIZE(0);
+
+  /* Define the screen boundaries. There's a frame around the screen, so these numbers need to
+   * take that into account.
+   */
+  static constexpr int BOUNDARY_TOP = 11;
+  static constexpr int BOUNDARY_BOTTOM = 61;
+  static constexpr int BOUNDARY_RIGHT = 116;
+  static constexpr int BOUNDARY_LEFT = 2;
+
+  /* Define player properties. INITIAL_BALL_DELAY is how many ISR cycles the ball takes to move. It
+   * gets faster as the game goes on. PADDLE_DELAY is how many ISR cycles the player must wait before moving
+   * again. This is to keep the game interesting at higher levels. PADDLE_WIDTH is the chunkiness of the paddle,
+   * in pixels.
+   *
+   * Note: Each ISR cycle is about 60 microseconds.
+   */
+  static constexpr int INITIAL_BALL_DELAY = 200;
+  static constexpr int PADDLE_DELAY = 200;
+  static constexpr int PADDLE_WIDTH = 3;
+
+  /* TRIGGER_CYCLE_LENGTH specifies how many loop cycles a triggered event (like a hit) lasts. */
+  static constexpr int TRIGGER_CYCLE_LENGTH = 400;
+
+  /* This value is used for converting a ball's or paddle's Y position into a pitch value. This number was determined
+   * experimentally, since I wasn't sure what the total range for pitch values is.
+   */
+  static constexpr int Y_POSITION_COEFF = 128;
 
     /* There are two types of game state properties: Those that should be initialized only once (like high score), and
      * those that need to be initialized after each game. Init() sets the first kind, and then calls StartNewGame()
@@ -145,9 +133,6 @@ public:
         Out(3, out_D);
     }
 
-    int get_score() {return score;}
-    int get_hi_score() {return hi_score;}
-
     void MoveBall() {
         /* MoveBall() is called with each loop cycle. Moving the ball with each loop would make the
          * game unplayable, so movements are delayed with countdowns. ISR() is responsible for decrementing
@@ -219,19 +204,19 @@ public:
     /*
      * The ball is just a little 2x2 square, with ball_x and ball_y describing the upper-left corner.
      */
-    void DrawBall() {
-      graphics.drawFrame(ball_x >> 1, ball_y >> 1, 2, 2);
+    void DrawBall() const {
+        graphics.drawFrame(ball_x >> 1, ball_y >> 1, 2, 2);
     }
 
     /* The player paddle is a filled rectangle of fixed width and adjustable height. */
-    void DrawPlayerPaddle() {
+    void DrawPlayerPaddle() const {
         graphics.drawRect(paddle_x, paddle_y, PADDLE_WIDTH, paddle_h);
     }
 
     /* I'm also drawing a paddle for Ornament and Crime, just as visual effect. It's really quite
      * an unfair farce, as it's totally unbeatable.
      */
-    void DrawOCPaddle() {
+    void DrawOCPaddle() const {
         int oc_x = BOUNDARY_RIGHT + 2;
         int oc_y = (ball_y>>1) - 8;
         if (oc_y < BOUNDARY_TOP) oc_y = BOUNDARY_TOP;
@@ -272,14 +257,12 @@ public:
         twoplayermode ^= 1;
     }
 
-    void View() {
+    void View() const {
         // Frame
         gfxFrame(0, 9, 128, 55);
 
         // Header
         gfxPos(1,1);
-        int score = get_score();
-        int hi_score = get_hi_score();
         if (score == 0 && hi_score > 0) {
             gfxPrint("Pong High : ");
             gfxPrint(hi_score);
@@ -291,7 +274,7 @@ public:
         DrawGame();
     }
 
-    void DrawGame() {
+    void DrawGame() const {
         // Game pieces
         DrawBall();
         DrawPlayerPaddle();
@@ -340,10 +323,10 @@ void AppPong::Loop() {
 
 void AppPong::GetIOConfig(OC::IOConfig &ioconfig) const
 {
-  ioconfig.outputs[DAC_CHANNEL_A].set("CH1", OC::OUTPUT_MODE_UNI);
-  ioconfig.outputs[DAC_CHANNEL_B].set("CH2", OC::OUTPUT_MODE_UNI);
-  ioconfig.outputs[DAC_CHANNEL_C].set("CH3", OC::OUTPUT_MODE_UNI);
-  ioconfig.outputs[DAC_CHANNEL_D].set("CH4", OC::OUTPUT_MODE_UNI);
+  ioconfig.outputs[0].set("Paddle Trig", OC::OUTPUT_MODE_UNI);
+  ioconfig.outputs[1].set("Wall Trig", OC::OUTPUT_MODE_UNI);
+  ioconfig.outputs[2].set("Ball Y", OC::OUTPUT_MODE_UNI);
+  ioconfig.outputs[3].set("Paddle Y", OC::OUTPUT_MODE_UNI);
 }
 void AppPong::DrawDebugInfo() const { }
 
