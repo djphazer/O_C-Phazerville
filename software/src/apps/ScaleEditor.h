@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 #include <Arduino.h>
+#include "HSUtils.h"
 #include "OC_apps.h"
 #include "OC_ui.h"
 #include "OC_scales.h"
@@ -26,20 +27,25 @@
 #include "HSMIDI.h"
 #include "SegmentDisplay.h"
 
-class ScaleEditor : public HSApplication, public SystemExclusiveHandler {
+OC_APP_TRAITS(AppScaleEditor, TWOCCS("SC"), "ScaleEdit", "Scale Editor");
+
+class OC_APP_CLASS(AppScaleEditor), public HSApplication, public SystemExclusiveHandler {
 public:
-	void Start() {
-	    current_scale = 0;
-	    current_note = 0;
+  OC_APP_INTERFACE_DECLARE(AppScaleEditor);
+  OC_APP_STORAGE_SIZE(0);
+
+    void Start() {
+        current_scale = 0;
+        current_note = 0;
         current_import_scale = 5;
         undo_value = OC::user_scales[current_scale].notes[0];
         octave = 1;
-	}
+    }
 
-	void Resume() {
+    void Resume() {
         HS::q_engine[0].quantizer.Configure(OC::Scales::GetScale(current_scale), 0xffff);
         QuantizeCurrent();
-	}
+    }
 
     void Controller() {
         ListenForSysEx();
@@ -53,7 +59,7 @@ public:
         Out(1, current_quantized);
     }
 
-    void View() {
+    void View() const {
         gfxHeader("Scale Editor    ");
         gfxPrint(OC::scale_names_short[current_scale]);
         if (import_mode) DrawImportScreen();
@@ -173,7 +179,7 @@ private:
     SegmentDisplay segment{SegmentSize::BIG_SEGMENTS};
     SegmentDisplay tinynumbers{SegmentSize::TINY_SEGMENTS};
 
-    void DrawInterface() {
+    void DrawInterface() const {
         // The interface is a spreadsheet-like 4x4 grid, with each
         // cell being 32x9 pixels. At the bottom of grid is an editing
         // area with larger number with the current value, or the
@@ -216,7 +222,7 @@ private:
         }
     }
 
-    void DrawImportScreen() {
+    void DrawImportScreen() const {
         gfxPrint(0, 15, "Import");
         gfxPrint(0, 35, OC::scale_names[current_import_scale]);
         gfxCursor(0, 43, 127);
@@ -338,63 +344,69 @@ private:
     }
 };
 
-ScaleEditor scale_editor_instance;
-
-// App stubs
-void SCALEEDITOR_init() {
-    scale_editor_instance.BaseStart();
+void AppScaleEditor::Init() {
+    BaseStart();
 }
 
 // Not using O_C Storage
-static constexpr size_t SCALEEDITOR_storageSize() {return 0;}
-static size_t SCALEEDITOR_save(void *storage) {return 0;}
-static size_t SCALEEDITOR_restore(const void *storage) {return 0;}
+size_t AppScaleEditor::SaveAppData(util::StreamBufferWriter &) const { return 0; }
+size_t AppScaleEditor::RestoreAppData(util::StreamBufferReader &) { return 0; }
 
-void SCALEEDITOR_process(OC::IOFrame *) {
-	return scale_editor_instance.BaseController();
+void AppScaleEditor::Process(OC::IOFrame *ioframe) {
+    BaseController(ioframe);
 }
 
-void SCALEEDITOR_handleAppEvent(OC::AppEvent event) {
+void AppScaleEditor::GetIOConfig(OC::IOConfig &ioconfig) const {
+  ioconfig.cv[0].set("Input CV");
+
+  ioconfig.outputs[0].set("Quantized CV", OC::OUTPUT_MODE_PITCH);
+  ioconfig.outputs[1].set("Current Note", OC::OUTPUT_MODE_PITCH);
+}
+void AppScaleEditor::DrawDebugInfo() const {
+  gfxPrint("TODO");
+}
+
+void AppScaleEditor::HandleAppEvent(OC::AppEvent event) {
     if (event == OC::APP_EVENT_SUSPEND) {
-        scale_editor_instance.OnSendSysEx();
+        OnSendSysEx();
     }
     if (event == OC::APP_EVENT_RESUME) {
-        scale_editor_instance.Resume();
+        Resume();
     }
 }
 
-void SCALEEDITOR_loop() {}
+void AppScaleEditor::Loop() {}
 
-void SCALEEDITOR_menu() {
-    scale_editor_instance.BaseView();
+void AppScaleEditor::DrawMenu() const {
+    BaseView();
 }
 
-void SCALEEDITOR_screensaver() {}
+void AppScaleEditor::DrawScreensaver() const {}
 
-void SCALEEDITOR_handleButtonEvent(const UI::Event &event) {
+void AppScaleEditor::HandleButtonEvent(const UI::Event &event) {
     // For left encoder, handle press and long press
     if (event.control == OC::CONTROL_BUTTON_L) {
-        if (event.type == UI::EVENT_BUTTON_PRESS) scale_editor_instance.OnLeftButtonPress();
-        if (event.type == UI::EVENT_BUTTON_LONG_PRESS) scale_editor_instance.OnLeftButtonLongPress();
+        if (event.type == UI::EVENT_BUTTON_PRESS) OnLeftButtonPress();
+        if (event.type == UI::EVENT_BUTTON_LONG_PRESS) OnLeftButtonLongPress();
     }
 
     // For right encoder, only handle press (long press is reserved)
-    if (event.control == OC::CONTROL_BUTTON_R && event.type == UI::EVENT_BUTTON_PRESS) scale_editor_instance.OnRightButtonPress();
+    if (event.control == OC::CONTROL_BUTTON_R && event.type == UI::EVENT_BUTTON_PRESS) OnRightButtonPress();
 
     // For up button, handle only press (long press is reserved)
-    if (event.control == OC::CONTROL_BUTTON_UP && event.type == UI::EVENT_BUTTON_PRESS) scale_editor_instance.OnUpButtonPress();
+    if (event.control == OC::CONTROL_BUTTON_UP && event.type == UI::EVENT_BUTTON_PRESS) OnUpButtonPress();
 
     // For down button, handle press and long press
     if (event.control == OC::CONTROL_BUTTON_DOWN) {
-        if (event.type == UI::EVENT_BUTTON_PRESS) scale_editor_instance.OnDownButtonPress();
-        if (event.type == UI::EVENT_BUTTON_LONG_PRESS) scale_editor_instance.OnDownButtonLongPress();
+        if (event.type == UI::EVENT_BUTTON_PRESS) OnDownButtonPress();
+        if (event.type == UI::EVENT_BUTTON_LONG_PRESS) OnDownButtonLongPress();
     }
 }
 
-void SCALEEDITOR_handleEncoderEvent(const UI::Event &event) {
+void AppScaleEditor::HandleEncoderEvent(const UI::Event &event) {
     // Left encoder turned
-    if (event.control == OC::CONTROL_ENCODER_L) scale_editor_instance.OnLeftEncoderMove(event.value);
+    if (event.control == OC::CONTROL_ENCODER_L) OnLeftEncoderMove(event.value);
 
     // Right encoder turned
-    if (event.control == OC::CONTROL_ENCODER_R) scale_editor_instance.OnRightEncoderMove(event.value);
+    if (event.control == OC::CONTROL_ENCODER_R) OnRightEncoderMove(event.value);
 }

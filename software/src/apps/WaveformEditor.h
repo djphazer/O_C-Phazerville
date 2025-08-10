@@ -28,8 +28,12 @@
 #include "vector_osc/HSVectorOscillator.h"
 #include "vector_osc/WaveformManager.h"
 
-class WaveformEditor : public HSApplication, public SystemExclusiveHandler {
+OC_APP_TRAITS(AppWaveformEditor, TWOCCS("WA"), "Wave-Edit", "Waveform Editor");
+class OC_APP_CLASS(AppWaveformEditor), public HSApplication, public SystemExclusiveHandler {
 public:
+  OC_APP_INTERFACE_DECLARE(AppWaveformEditor);
+  OC_APP_STORAGE_SIZE(0);
+
     void Start() {
         WaveformManager::Validate();
         test_freq[0] = 100;    // Test 0: LFO
@@ -60,8 +64,8 @@ public:
         for (int ch = 0; ch < 4; ch++)
         {
             if (DetentedIn(ch) && Changed(ch)) {
-            		int cv = In(ch);
-            		cv = constrain(cv, 0, HSAPPLICATION_5V);
+                int cv = In(ch);
+                cv = constrain(cv, 0, HSAPPLICATION_5V);
                 int freq = Proportion(In(ch), HSAPPLICATION_5V, mod_range_high[ch] - mod_range_low[ch]) + mod_range_low[ch];
                 freq = constrain(freq, mod_range_low[ch], mod_range_high[ch]);
                 test[ch].SetFrequency(freq);
@@ -69,24 +73,24 @@ public:
             }
         }
 
-		// Handle triggered one-shot start
+        // Handle triggered one-shot start
         if (Clock(2)) test[2].Start();
-        
+
         // Handle gated EG
-		if (Gate(3)) {
-			// Gate wasn't on last time, so start the waveform
-			if (!gated) test[3].Start();
-		} else {
-			// Gate isn't on now, but was on last time, so release
-			if (gated) test[3].Release();
-		}
-		gated = Gate(3);
-		
-		// Output for all test oscillators
-		for (int ch = 0; ch < 4; ch++) Out(ch, test[ch].Next());
+        if (Gate(3)) {
+            // Gate wasn't on last time, so start the waveform
+            if (!gated) test[3].Start();
+        } else {
+            // Gate isn't on now, but was on last time, so release
+            if (gated) test[3].Release();
+        }
+        gated = Gate(3);
+
+        // Output for all test oscillators
+        for (int ch = 0; ch < 4; ch++) Out(ch, test[ch].Next());
     }
 
-    void View() {
+    void View() const {
         gfxHeader("Waveform Editor");
         if (add_delete_confirm) DrawAddDelete();
         else DrawInterface();
@@ -227,7 +231,7 @@ private:
     bool gated = 0;
     uint32_t test_freq[4];
 
-    void DrawInterface() {
+    void DrawInterface() const {
         // Header
         gfxIcon(106, 0, SEGMENT_ICON);
         gfxPrint(116 + pad(10, segments_remaining), 1, segments_remaining);
@@ -250,7 +254,7 @@ private:
         DrawWaveform();
     }
 
-    void DrawWaveform() {
+    void DrawWaveform() const {
         uint16_t total_time = osc.TotalTime();
         VOSegment seg = osc.GetSegment(osc.SegmentCount() - 1);
         uint8_t prev_x = 0; // Starting coordinates
@@ -273,7 +277,7 @@ private:
         gfxDottedLine(0, 43, 127, 43, 8);
     }
 
-    void DrawAddDelete() {
+    void DrawAddDelete() const {
         if (segments_remaining > 2) {
             gfxPrint(12, 15, "Add Waveform ");
             gfxPrint(waveform_count + 1);
@@ -363,63 +367,77 @@ private:
     }
 };
 
-WaveformEditor WaveformEditor_instance;
-
 // App stubs
-void WaveformEditor_init() {
-    WaveformEditor_instance.BaseStart();
+void AppWaveformEditor::Init() {
+    BaseStart();
 }
 
 // Not using O_C Storage
-static constexpr size_t WaveformEditor_storageSize() {return 0;}
-static size_t WaveformEditor_save(void *storage) {return 0;}
-static size_t WaveformEditor_restore(const void *storage) {return 0;}
+size_t AppWaveformEditor::SaveAppData(util::StreamBufferWriter &) const { return 0; }
+size_t AppWaveformEditor::RestoreAppData(util::StreamBufferReader &) { return 0; }
 
-void WaveformEditor_process(OC::IOFrame *) {
-    return WaveformEditor_instance.BaseController();
+void AppWaveformEditor::Process(OC::IOFrame *ioframe) {
+    BaseController(ioframe);
 }
 
-void WaveformEditor_handleAppEvent(OC::AppEvent event) {
+void AppWaveformEditor::GetIOConfig(OC::IOConfig &ioconfig) const {
+  ioconfig.digital_inputs[2].set("EG Trigger");
+  ioconfig.digital_inputs[3].set("EG Gate");
+
+  ioconfig.cv[0].set("Freq Mod");
+  ioconfig.cv[1].set("Freq Mod");
+  ioconfig.cv[2].set("Freq Mod");
+  ioconfig.cv[3].set("Freq Mod");
+
+  ioconfig.outputs[0].set("LFO", OC::OUTPUT_MODE_RAW);
+  ioconfig.outputs[1].set("Audio Osc", OC::OUTPUT_MODE_RAW);
+  ioconfig.outputs[2].set("Oneshot EG", OC::OUTPUT_MODE_RAW);
+  ioconfig.outputs[3].set("Gated EG", OC::OUTPUT_MODE_RAW);
+}
+void AppWaveformEditor::DrawDebugInfo() const {
+  gfxPrint("TODO");
+}
+void AppWaveformEditor::HandleAppEvent(OC::AppEvent event) {
     if (event ==  OC::APP_EVENT_RESUME) {
-        WaveformEditor_instance.Resume();
+        Resume();
     }
     if (event == OC::APP_EVENT_SUSPEND) {
-        WaveformEditor_instance.OnSendSysEx();
+        OnSendSysEx();
     }
 }
 
-void WaveformEditor_loop() {} // Deprecated
+void AppWaveformEditor::Loop() {} // Deprecated
 
-void WaveformEditor_menu() {
-    WaveformEditor_instance.BaseView();
+void AppWaveformEditor::DrawMenu() const {
+    BaseView();
 }
 
-void WaveformEditor_screensaver() {} // Deprecated
+void AppWaveformEditor::DrawScreensaver() const {} // Deprecated
 
-void WaveformEditor_handleButtonEvent(const UI::Event &event) {
+void AppWaveformEditor::HandleButtonEvent(const UI::Event &event) {
     // For left encoder, handle press and long press
     if (event.control == OC::CONTROL_BUTTON_L) {
-        if (event.type == UI::EVENT_BUTTON_LONG_PRESS) WaveformEditor_instance.OnLeftButtonLongPress();
-        if (event.type == UI::EVENT_BUTTON_PRESS) WaveformEditor_instance.OnLeftButtonPress();
+        if (event.type == UI::EVENT_BUTTON_LONG_PRESS) OnLeftButtonLongPress();
+        if (event.type == UI::EVENT_BUTTON_PRESS) OnLeftButtonPress();
     }
 
     // For right encoder, only handle press (long press is reserved)
-    if (event.control == OC::CONTROL_BUTTON_R && event.type == UI::EVENT_BUTTON_PRESS) WaveformEditor_instance.OnRightButtonPress();
+    if (event.control == OC::CONTROL_BUTTON_R && event.type == UI::EVENT_BUTTON_PRESS) OnRightButtonPress();
 
     // For up button, handle only press (long press is reserved)
-    if (event.control == OC::CONTROL_BUTTON_UP && event.type == UI::EVENT_BUTTON_PRESS) WaveformEditor_instance.OnUpButtonPress();
+    if (event.control == OC::CONTROL_BUTTON_UP && event.type == UI::EVENT_BUTTON_PRESS) OnUpButtonPress();
 
     // For down button, handle press and long press
     if (event.control == OC::CONTROL_BUTTON_DOWN) {
-        if (event.type == UI::EVENT_BUTTON_PRESS) WaveformEditor_instance.OnDownButtonPress();
-        if (event.type == UI::EVENT_BUTTON_LONG_PRESS) WaveformEditor_instance.OnDownButtonLongPress();
+        if (event.type == UI::EVENT_BUTTON_PRESS) OnDownButtonPress();
+        if (event.type == UI::EVENT_BUTTON_LONG_PRESS) OnDownButtonLongPress();
     }
 }
 
-void WaveformEditor_handleEncoderEvent(const UI::Event &event) {
+void AppWaveformEditor::HandleEncoderEvent(const UI::Event &event) {
     // Left encoder turned
-    if (event.control == OC::CONTROL_ENCODER_L) WaveformEditor_instance.OnLeftEncoderMove(event.value);
+    if (event.control == OC::CONTROL_ENCODER_L) OnLeftEncoderMove(event.value);
 
     // Right encoder turned
-    if (event.control == OC::CONTROL_ENCODER_R) WaveformEditor_instance.OnRightEncoderMove(event.value);
+    if (event.control == OC::CONTROL_ENCODER_R) OnRightEncoderMove(event.value);
 }

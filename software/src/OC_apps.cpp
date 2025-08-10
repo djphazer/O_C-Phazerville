@@ -80,11 +80,11 @@ namespace menu = OC::menu;
 // #include "apps/TheDarkestTimeline.h"
 // #include "apps/Enigma.h"
 // #include "apps/NeuralNetwork.h"
-// #include "apps/ScaleEditor.h"
+#include "apps/ScaleEditor.h"
 #ifndef NO_HEMISPHERE
-// #include "apps/WaveformEditor.h"
+#include "apps/WaveformEditor.h"
 #endif
-// #include "apps/PongGame.h"
+#include "apps/PongGame.h"
 // #include "apps/Backup.h"
 #include "apps/SETTINGS.h"
 
@@ -93,60 +93,12 @@ namespace menu = OC::menu;
 // Each app's Start() method is called in sequence.
 // For example, the default quantizer settings from Hemisphere
 // are overwritten when Calibr8or loads its settings
+*/
+
+/* 
+ * TODO
+ * These are the apps that HAVE NOT been adapted yet...
 static constexpr OC::App app_container[] = {
-  DECLARE_APP("SE", "Setup / About", Settings),
-
-#ifndef NO_HEMISPHERE
-  #ifdef ARDUINO_TEENSY41
-  DECLARE_APP("QS", "Quadrants", QUADRANTS),
-  #else
-  DECLARE_APP("HS", "Hemisphere", HEMISPHERE),
-  #endif
-#endif
-
-  #ifdef ENABLE_APP_CALIBR8OR
-  DECLARE_APP("C8", "Calibr8or", Calibr8or),
-  #endif
-  #ifdef ENABLE_APP_SCENES
-  DECLARE_APP("SX", "Scenes", ScenesApp),
-  #endif
-
-  #ifdef ENABLE_APP_ASR
-  DECLARE_APP("AS", "CopierMaschine", ASR),
-  #endif
-  #ifdef ENABLE_APP_H1200
-  DECLARE_APP("HA", "Harrington 1200", H1200),
-  #endif
-  #ifdef ENABLE_APP_AUTOMATONNETZ
-  DECLARE_APP("AT", "Automatonnetz", Automatonnetz),
-  #endif
-  #ifdef ENABLE_APP_QUANTERMAIN
-  DECLARE_APP("QQ", "Quantermain", QQ),
-  #endif
-  #ifdef ENABLE_APP_METAQ
-  DECLARE_APP("DQ", "Meta-Q", DQ),
-  #endif
-  #ifdef ENABLE_APP_POLYLFO
-  DECLARE_APP("PL", "Quadraturia", POLYLFO),
-  #endif
-  #ifdef ENABLE_APP_LORENZ
-  DECLARE_APP("LR", "Low-rents", LORENZ),
-  #endif
-  #ifdef ENABLE_APP_PIQUED
-  DECLARE_APP("EG", "Piqued", ENVGEN),
-  #endif
-  #ifdef ENABLE_APP_SEQUINS
-  DECLARE_APP("SQ", "Sequins", SEQ),
-  #endif
-  #ifdef ENABLE_APP_BBGEN
-  DECLARE_APP("BB", "Dialectic Pong", BBGEN),
-  #endif
-  #ifdef ENABLE_APP_BYTEBEATGEN
-  DECLARE_APP("BY", "Viznutcracker", BYTEBEATGEN),
-  #endif
-  #ifdef ENABLE_APP_CHORDS
-  DECLARE_APP("AC", "Acid Curds", CHORDS),
-  #endif
   #ifdef ENABLE_APP_FPART
   DECLARE_APP("FP", "4 Parts", FPART),
   #endif
@@ -166,13 +118,6 @@ static constexpr OC::App app_container[] = {
   #endif
   #ifdef ENABLE_APP_NEURAL_NETWORK
   DECLARE_APP("NN", "Neural Net", NeuralNetwork),
-  #endif
-  DECLARE_APP("SC", "Scale Editor", SCALEEDITOR),
-#ifndef NO_HEMISPHERE
-  DECLARE_APP("WA", "Waveform Editor", WaveformEditor),
-#endif
-  #ifdef ENABLE_APP_PONG
-  DECLARE_APP("PO", "Pong", PONGGAME),
   #endif
   #ifdef ENABLE_APP_REFERENCES
   DECLARE_APP("RF", "References", REFS),
@@ -213,15 +158,15 @@ enum GlobalSettingsDataKeys : uint16_t {
 
 // Instantiate the available apps.
 // Any type not listed here should not exist, i.e. the linker should be able to
-// triage all code (minus any dangling static parts). (Yeah, this still relies
-// on the fugly .ino compilation method, don't @ me).
+// triage all code (minus any dangling static parts).
 static AppContainer<void // this space intentionally left blank
   , AppSettings
 #ifndef NO_HEMISPHERE
   #ifdef ARDUINO_TEENSY41
   , AppQuadrants
-  #endif
+  #else
   , AppHemisphere
+  #endif
 #endif
 #ifdef ENABLE_APP_CALIBR8OR
   , AppCalibr8or
@@ -267,6 +212,13 @@ static AppContainer<void // this space intentionally left blank
 #endif
 #ifdef ENABLE_APP_REFERENCES
   , AppReferences
+#endif
+  , AppScaleEditor
+#ifndef NO_HEMISPHERE
+  , AppWaveformEditor
+#endif
+#ifdef ENABLE_APP_PONG
+  , AppPong
 #endif
 > app_container;
 static_assert(decltype(app_container)::TotalAppDataStorageSize() < AppData::kAppDataSize,
