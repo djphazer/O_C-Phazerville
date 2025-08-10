@@ -174,6 +174,7 @@ public:
       }
       if (cursor >= NOTES) {
         seq.ToggleMute(cursor - NOTES);
+        CancelEdit();
         return;
       }
       if (cursor == ACCENT_MODE) {
