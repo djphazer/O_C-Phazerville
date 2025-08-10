@@ -39,8 +39,8 @@ static constexpr size_t kMaxIOLabelLength = 32;
 
 // Structs to hold information about IO ports
 struct OutputDesc {
-  char label[kMaxIOLabelLength + 1] = "";
-  OutputMode mode = OUTPUT_MODE_RAW;
+  char label[kMaxIOLabelLength + 1];
+  OutputMode mode;
 
   void set(const char *l, OutputMode m) {
     strncpy(label, l, sizeof(label));
@@ -51,7 +51,7 @@ struct OutputDesc {
 };
 
 struct InputDesc {
-  char label[kMaxIOLabelLength + 1] = "";
+  char label[kMaxIOLabelLength + 1];
 
   void set_printf(const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 
