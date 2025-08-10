@@ -632,8 +632,6 @@ size_t AppSettings::SaveAppData(util::StreamBufferWriter &) const { return 0; }
 size_t AppSettings::RestoreAppData(util::StreamBufferReader &) { return 0; }
 
 void AppSettings::Process(OC::IOFrame *ioframe) {
-  // Usually you would call BaseController, but Calibration is a special case.
-  // We don't want the automatic frame Load() and Send() calls from this App. - or do we?!
   BaseController(ioframe);
 }
 
