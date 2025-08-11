@@ -91,15 +91,15 @@ public:
 
     /* Update an existing segment */
     void SetSegment(uint8_t ix, HS::VOSegment segment) {
-        ix = constrain(ix, 0, segment_count - 1);
+        CONSTRAIN(ix, 0, segment_count - 1);
         change_total_time(-segments[ix].time); // subtract
         memcpy(&segments[ix], &segment, sizeof(segments[ix]));
         change_total_time(segments[ix].time); // add
         if (ix == segment_count) segment_count++;
     }
 
-    HS::VOSegment GetSegment(uint8_t ix) {
-        ix = constrain(ix, 0, segment_count - 1);
+    HS::VOSegment GetSegment(uint8_t ix) const {
+        CONSTRAIN(ix, 0, segment_count - 1);
         return segments[ix];
     }
 
@@ -114,11 +114,11 @@ public:
         phase_increment = phase_inc;
     }
 
-    bool GetEOC() {return eoc;}
+    bool GetEOC() const {return eoc;}
 
-    uint8_t TotalTime() {return total_time;}
+    uint8_t TotalTime() const {return total_time;}
 
-    uint8_t SegmentCount() {return segment_count;}
+    uint8_t SegmentCount() const {return segment_count;}
 
     void Start() {
         Reset();
@@ -155,7 +155,7 @@ public:
     }
 
     /* Get the value of the waveform at a specific phase. Degrees are expressed in tenths of a degree */
-    int32_t Phase(int degrees) {
+    int32_t Phase(int degrees) const {
         uint32_t phase = 0xffffffff / 3600 * degrees;
         uint8_t segment = 0;
         uint8_t segment_start = 0;
@@ -167,7 +167,7 @@ public:
         return Phase32(segment, static_cast<uint32_t>(segment_phase) << 16);
     }
 
-    int32_t Phase32(uint8_t segment, uint32_t segment_phase) {
+    int32_t Phase32(uint8_t segment, uint32_t segment_phase) const {
         // Start and end point of the total segment
         int start = segments[segment == 0 ? segment_count - 1 : segment - 1].level - 128;
         int end = segments[segment].level - 128;
@@ -207,7 +207,7 @@ private:
         return valid;
     }
 
-    int32_t Proportion(int numerator, int denominator, int max_value) {
+    constexpr int32_t Proportion(int numerator, int denominator, int max_value) {
         vosignal_t proportion = int2signal((int32_t)numerator) / (int32_t)denominator;
         int32_t scaled = signal2int(proportion * max_value);
         return scaled;
@@ -251,7 +251,7 @@ private:
     }
 
     // Rescales full 16 bit signed valued based on scale and offset
-    int16_t rescale(int16_t unscaled) {
+    int16_t rescale(int16_t unscaled) const {
         int32_t mult = unscaled * scale;
         return mult / 32768 + offset;
     }

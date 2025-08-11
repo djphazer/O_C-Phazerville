@@ -15,11 +15,11 @@ struct CVInputMap {
   static constexpr size_t Size = 16; // Make this compatible with Packable
 
   // increments of 0.1%
-  int Atten() {
+  int Atten() const {
     // exponential curve; 60 becomes 100.0%
     return 10 * attenuversion * abs(attenuversion) / 36;
   }
-  int RawIn() {
+  int RawIn() const {
     return source <= ADC_CHANNEL_LAST
       ? frame.inputs[source - 1]
       : (source - ADC_CHANNEL_LAST <= DAC_CHANNEL_LAST)
@@ -27,12 +27,12 @@ struct CVInputMap {
         : frame.MIDIState.mapping[source - ADC_CHANNEL_LAST - DAC_CHANNEL_LAST - 1].output;
   }
 
-  int In(int default_value = 0) {
+  int In(int default_value = 0) const {
     if (!source) return default_value;
     return RawIn() * Atten() / 1000;
   }
 
-  float InF(float default_value = 0.0f) {
+  float InF(float default_value = 0.0f) const {
     if (!source) return default_value;
     return 0.001f * Atten() * static_cast<float>(RawIn())
       / static_cast<float>(HEMISPHERE_MAX_INPUT_CV);
@@ -42,7 +42,7 @@ struct CVInputMap {
     return cv_semitone_quants[source].Process(In(default_value));
   }
 
-  int InRescaled(int max_value) {
+  int InRescaled(int max_value) const {
     return Proportion(In(), HEMISPHERE_MAX_INPUT_CV, max_value);
   }
 
@@ -105,7 +105,7 @@ struct DigitalInputMap {
     source = constrain(source + dir, -1, num_sources);
   }
 
-  bool Gate() {
+  bool Gate() const {
     switch (source_type()) {
       case CLOCK: {
         if (!clock_m.IsRunning()) return false;
