@@ -85,7 +85,7 @@ namespace menu = OC::menu;
 #include "apps/WaveformEditor.h"
 #endif
 #include "apps/PongGame.h"
-// #include "apps/Backup.h"
+#include "apps/Backup.h"
 #include "apps/SETTINGS.h"
 
 /*
@@ -220,6 +220,7 @@ static AppContainer<void // this space intentionally left blank
 #ifdef ENABLE_APP_PONG
   , AppPong
 #endif
+  , AppBackup
 > app_container;
 static_assert(decltype(app_container)::TotalAppDataStorageSize() < AppData::kAppDataSize,
               "Apps use too much EEPROM space!");
