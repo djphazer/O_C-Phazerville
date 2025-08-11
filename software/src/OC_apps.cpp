@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 #include "OC_core.h"
+#include "OC_gpio.h"
 #include "OC_ui.h"
 #include "OC_apps.h"
 #include "OC_menus.h"
@@ -749,11 +750,10 @@ bool Ui::AppSettings(bool drawmenu) {
       item.selected = current == cursor.cursor_pos();
       item.SetPrintPos();
       graphics.movePrintPos(weegfx::Graphics::kFixedFontW, 0);
-#ifdef BORING_APP_NAMES
-      graphics.print(app_container[current]->boring_name());
-#else
-      graphics.print(app_container[current]->name());
-#endif
+      if (NorthernLightModular)
+        graphics.print(app_container[current]->boring_name());
+      else
+        graphics.print(app_container[current]->name());
       if (global_settings.current_app_id == app_container[current]->id())
         graphics.drawBitmap8(0, item.y + 1, 8, ZAP_ICON);
 

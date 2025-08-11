@@ -73,6 +73,7 @@ public:
   
   inline uint16_t id() const { return id_; }
   inline const char *name() const { return name_; }
+  inline const char *boring_name() const { return boring_name_; }
 
   IOSettings &mutable_io_settings() { return io_settings_; }
   const IOSettings &io_settings() const { return io_settings_; }
