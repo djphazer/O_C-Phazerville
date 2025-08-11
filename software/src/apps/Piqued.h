@@ -822,13 +822,11 @@ private:
     bool euclidean_edit_length;
   } ui;
 
-  EnvelopeGenerator &selected() {
-    return get_env(ui.selected_channel);
+  const EnvelopeGenerator &selected() const {
+    return *envelopes_[ui.selected_channel];
   }
-
-  EnvelopeGenerator &get_env(int ch) {
-    if (!envelopes_[ch]) envelopes_[ch] = new EnvelopeGenerator(OC::DIGITAL_INPUT_1); // you are late sir, you get what you get
-    return *envelopes_[ch];
+  EnvelopeGenerator &selected() {
+    return *envelopes_[ui.selected_channel];
   }
 
   EnvelopeGenerator* envelopes_[ENVGEN_CHANNEL_COUNT] = {nullptr};
