@@ -77,6 +77,8 @@ public:
         bool midi_sync = false;
         bool clock_sync = HS::frame.synctrig;
 
+        hemisphere = HS::GLOBAL_CURSOR;
+
         // MIDI Clock is filtered to 2 PPQN
         if (frame.MIDIState.clock_q) {
             frame.MIDIState.clock_q = 0;
@@ -130,7 +132,7 @@ public:
         if (slide_anim) --slide_anim;
     }
 
-    void DrawIndicator(const bool centered = false) {
+    void DrawIndicator(const bool centered = false) const {
       const int x = centered? 27 : 4;
       // Clock indicator icons overlay
       if (HS::clock_m.IsRunning() || HS::clock_m.IsPaused()) {
@@ -145,7 +147,6 @@ public:
       }
     }
     void View() {
-      hemisphere = HS::GLOBAL_CURSOR;
       if (OC::CORE::ticks - view_tick > 1000) {
         slide_anim = SLIDEOUT_TIME;
       }
@@ -344,7 +345,7 @@ private:
 
     // This applet is an overlay, drawn on top of the applet view.
     // Space must be cleared first, depending on the cursor position.
-    void DrawInterface() {
+    void DrawInterface() const {
       if (slide_anim) {
         if (cursor < OUTSKIP1) {
           const int height = 23 - (slide_anim * 23 / SLIDEOUT_TIME);

@@ -91,14 +91,14 @@ public:
     virtual void AuxButton() { CancelEdit(); }
 
     // standard entry points
-    void BaseView(bool full_screen = false, bool parked = true);
+    void BaseView(bool full_screen = false, bool parked = true) const;
     void BaseStart(const HEM_SIDE hemisphere_);
     void SetDisplaySide(HEM_SIDE side) {
         hemisphere = side;
     }
 
     /* Formerly Help Screen */
-    void DrawConfigHelp();
+    void DrawConfigHelp() const;
 
     // --- Cursor stuff
     static void ProcessCursors() {
@@ -110,7 +110,7 @@ public:
     }
 
     /* Check cursor blink cycle. */
-    bool CursorBlink() { return (cursor_countdown[hemisphere] > 0); }
+    bool CursorBlink() const { return (cursor_countdown[hemisphere] > 0); }
     void ResetCursor() { cursor_countdown[hemisphere] = HEMISPHERE_CURSOR_TICKS; }
 
     void CursorToggle() {
@@ -121,7 +121,7 @@ public:
       enc_edit[hemisphere].isEditing = false;
       ClearEditInputMap();
     }
-    inline bool EditMode() {
+    inline bool EditMode() const {
       return (enc_edit[hemisphere].isEditing);
     }
     void SetLabel(const char *str) { enc_edit[hemisphere].label = str; }
@@ -140,14 +140,14 @@ public:
     }
 
     // DAC label helper
-    const char* const OutputLabel(int ch) {
+    const char* const OutputLabel(int ch) const {
       return OC::Strings::capital_letters[ch + io_offset];
     }
 
     // Buffered I/O functions
     int ViewIn(int ch) const {return frame.inputs[io_offset + ch];}
     int ViewOut(int ch) const {return frame.ViewOut(io_offset + ch);}
-    uint32_t ClockCycleTicks(int ch) {
+    uint32_t ClockCycleTicks(int ch) const {
       if (clock_m.IsRunning() && clock_m.GetMultiply(io_offset + ch) != 0)
           return clock_m.GetCycleTicks(io_offset + ch);
       return frame.cycle_ticks[io_offset + ch];
@@ -161,24 +161,24 @@ public:
     // ----------------------
 
     // ***** Inputs *****
-    int In(const int ch);
-    float InF(int ch, int max = HEMISPHERE_MAX_INPUT_CV);
+    int In(const int ch) const;
+    float InF(int ch, int max = HEMISPHERE_MAX_INPUT_CV) const;
     // Apply small center detent to input, so it reads zero before a threshold
-    int DetentedIn(int ch);
-    int SemitoneIn(int ch);
+    int DetentedIn(int ch) const;
+    int SemitoneIn(int ch) const;
     /* Has the specified Digital input been clocked this cycle? (rising edge of a gate)
      * This is pre-calculated in HS::IOFrame::Load() according to input mappings and internal clock settings
      */
-    bool Clock(int ch, bool physical = 0);
-    bool Gate(int ch);
+    bool Clock(int ch, bool physical = 0) const;
+    bool Gate(int ch) const;
 
     // outputs
-    void Out(int ch, int value);
+    void Out(int ch, int value) const;
     // TODO: rework or delete
     [[deprecated("SmoothedOut() was a bad idea")]]
-    void SmoothedOut(int ch, int value, int kSmoothing);
-    void ClockOut(const int ch, const int ticks = HEMISPHERE_CLOCK_TICKS * trig_length);
-    void GateOut(int ch, bool high);
+    void SmoothedOut(int ch, int value, int kSmoothing) const;
+    void ClockOut(const int ch, const int ticks = HEMISPHERE_CLOCK_TICKS * trig_length) const;
+    void GateOut(int ch, bool high) const;
 
     // Standard bi-polar CV modulation scenario
     template <typename T>
@@ -199,54 +199,53 @@ public:
     // -------------------------------
     // --- Offset graphics methods ---
     // -------------------------------
-    void gfxCursor(int x, int y, int w, int h = 9, const char *str = nullptr, const char *extra_str = nullptr);
-    void gfxCursor(int x, int y, int w, const char *str, const char *extra_str = nullptr) {
+    void gfxCursor(int x, int y, int w, int h = 9, const char *str = nullptr, const char *extra_str = nullptr) const;
+    void gfxCursor(int x, int y, int w, const char *str, const char *extra_str = nullptr) const {
       gfxCursor(x, y, w, 9, str, extra_str);
     }
-
-    void gfxSpicyCursor(int x, int y, int w, int h = 9, const char *str = nullptr, const char *extra_str = nullptr);
-    void gfxSpicyCursor(int x, int y, int w, const char *str) { gfxSpicyCursor(x, y, w, 9, str); }
-    void gfxPos(int x, int y);
-    void gfxPrint(int x, int y, const char *str);
-    void gfxPrint(int x, int y, int num);
-    void gfxPrint(const char *str);
-    void gfxPrint(int num);
-    void gfxPrint(int x, int y, float num, int digits);
-    void gfxPrint(float num, int digits);
-    void gfxPrint(CVInputMap &map);
-    void gfxPrint(DigitalInputMap &map);
-    void gfxPrint(int x, int y, HS::QuantEngine &q_eng, bool overlay = true);
-    void gfxPrint(int x_adv, int num); // Print number with character padding
+    void gfxSpicyCursor(int x, int y, int w, int h = 9, const char *str = nullptr, const char *extra_str = nullptr) const;
+    void gfxSpicyCursor(int x, int y, int w, const char *str) const { gfxSpicyCursor(x, y, w, 9, str); }
+    void gfxPos(int x, int y) const;
+    void gfxPrint(int x, int y, const char *str) const;
+    void gfxPrint(int x, int y, int num) const;
+    void gfxPrint(const char *str) const;
+    void gfxPrint(int num) const;
+    void gfxPrint(int x, int y, float num, int digits) const;
+    void gfxPrint(float num, int digits) const;
+    void gfxPrint(CVInputMap &map) const;
+    void gfxPrint(DigitalInputMap &map) const;
+    void gfxPrint(int x, int y, HS::QuantEngine &q_eng, bool overlay = true) const;
+    void gfxPrint(int x_adv, int num) const; // Print number with character padding
 
     void gfxStartCursor(int x, int y);
     void gfxStartCursor();
-    void gfxEndCursor(bool selected, bool spicy = false, const char *str = nullptr, const char *extra_str = nullptr);
-    void gfxEndCursor(bool selected, const char *extra_str) {
+    void gfxEndCursor(bool selected, bool spicy = false, const char *str = nullptr, const char *extra_str = nullptr) const;
+    void gfxEndCursor(bool selected, const char *extra_str) const {
       gfxEndCursor(selected, false, nullptr, extra_str);
     }
 
-    void gfxPixel(int x, int y);
-    void gfxFrame(int x, int y, int w, int h, bool dotted = false);
-    void gfxRect(int x, int y, int w, int h);
-    void gfxInvert(int x, int y, int w, int h);
-    void gfxClear(int x, int y, int w, int h);
-    void gfxLine(int x, int y, int x2, int y2);
-    void gfxLine(int x, int y, int x2, int y2, bool dotted);
-    void gfxDottedLine(int x, int y, int x2, int y2, uint8_t p = 2);
-    void gfxCircle(int x, int y, int r);
-    void gfxBitmap(int x, int y, int w, const uint8_t *data);
-    void gfxBitmapBlink(int x, int y, int w, const uint8_t *data);
-    void gfxIcon(int x, int y, const uint8_t *data, bool clearfirst = false);
-    void gfxPrintIcon(const uint8_t *data, int16_t w = 8);
+    void gfxPixel(int x, int y) const;
+    void gfxFrame(int x, int y, int w, int h, bool dotted = false) const;
+    void gfxRect(int x, int y, int w, int h) const;
+    void gfxInvert(int x, int y, int w, int h) const;
+    void gfxClear(int x, int y, int w, int h) const;
+    void gfxLine(int x, int y, int x2, int y2) const;
+    void gfxLine(int x, int y, int x2, int y2, bool dotted) const;
+    void gfxDottedLine(int x, int y, int x2, int y2, uint8_t p = 2) const;
+    void gfxCircle(int x, int y, int r) const;
+    void gfxBitmap(int x, int y, int w, const uint8_t *data) const;
+    void gfxBitmapBlink(int x, int y, int w, const uint8_t *data) const;
+    void gfxIcon(int x, int y, const uint8_t *data, bool clearfirst = false) const;
+    void gfxPrintIcon(const uint8_t *data, int16_t w = 8) const;
 
-    void gfxSkyline();
-    void gfxHeader(const char *str, const uint8_t *icon = nullptr, int y = 2, bool underline = true);
-    void gfxHeader(int y = 2);
-    void gfxParamHeader();
-    void DrawSlider(uint8_t x, uint8_t y, uint8_t len, uint8_t value, uint8_t max_val, bool is_cursor);
+    void gfxSkyline() const;
+    void gfxHeader(const char *str, const uint8_t *icon = nullptr, int y = 2, bool underline = true) const;
+    void gfxHeader(int y = 2) const;
+    void gfxParamHeader() const;
+    void DrawSlider(uint8_t x, uint8_t y, uint8_t len, uint8_t value, uint8_t max_val, bool is_cursor) const;
 
-    inline int gfxGetPrintPosX() { return graphics.getPrintPosX() - gfx_offset; }
-    inline int gfxGetPrintPosY() { return graphics.getPrintPosY(); }
+    inline int gfxGetPrintPosX() const { return graphics.getPrintPosX() - gfx_offset; }
+    inline int gfxGetPrintPosY() const { return graphics.getPrintPosY(); }
 
     template<typename... Args>
     void gfxPrintfn(int x, int y, int n, const char *format,  Args ...args) {
@@ -299,7 +298,7 @@ public:
       return false;
     }
 
-    void gfxDisplayInputMapEditor() {
+    void gfxDisplayInputMapEditor() const {
       if (selected_input_map.index()) {
         gfxClear(0, 0, 63, 11);
         switch (selected_input_map.index()) {

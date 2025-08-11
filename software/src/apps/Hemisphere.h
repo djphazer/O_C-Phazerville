@@ -1455,7 +1455,7 @@ private:
         }
     }
 
-    void DrawInputMappings() {
+    void DrawInputMappings() const {
         gfxHeader("<  Input Mapping  >");
         gfxIcon(25, 19, TR_ICON);
         gfxIcon(89, 19, TR_ICON);
@@ -1490,7 +1490,7 @@ private:
         gfxDisplayInputMapEditor();
     }
 
-    void DrawQuantizerConfig() {
+    void DrawQuantizerConfig() const {
         gfxHeader("< Quantizer Setup >");
 
         for (int ch=0; ch<4; ++ch) {
@@ -1539,7 +1539,7 @@ private:
         }
     }
 
-    void DrawConfigMenu() {
+    void DrawConfigMenu() const {
         // --- Config Selection
         gfxHeader("< General Settings >");
 
@@ -1620,7 +1620,7 @@ private:
 #endif
     }
 
-    HemisphereApplet* GetApplet(int id, size_t h) {
+    HemisphereApplet* GetApplet(int id, size_t h) const {
 #ifdef __IMXRT1062__
         uint64_t data = 0;
         PhzConfig::getValue(id << 9 | APPLET_METADATA_KEY, data);
@@ -1630,7 +1630,7 @@ private:
         return hem_presets[id].GetApplet(h);
 #endif
     }
-    void DrawPresetSelector() {
+    void DrawPresetSelector() const {
         const char * const hdrtxt[] = { "DEL!", "Load", "Save", "???" };
         gfxHeader(hdrtxt[config_cursor]);
         gfxPrint(30, 1, "Preset");

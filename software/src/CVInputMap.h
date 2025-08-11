@@ -26,7 +26,7 @@ struct CVInputMap {
     }
   }
 
-  int RawIn() {
+  int RawIn() const {
     return source <= ADC_CHANNEL_LAST
       ? frame.inputs[source - 1]
       : (source - ADC_CHANNEL_LAST <= DAC_CHANNEL_LAST)
@@ -34,12 +34,12 @@ struct CVInputMap {
         : frame.MIDIState.mapping[source - ADC_CHANNEL_LAST - DAC_CHANNEL_LAST - 1].output;
   }
 
-  int In(int default_value = 0) {
+  int In(int default_value = 0) const {
     if (!source) return default_value;
     return RawIn() * Atten(attenuversion) / 1000;
   }
 
-  float InF(float default_value = 0.0f) {
+  float InF(float default_value = 0.0f) const {
     if (!source) return default_value;
     return 0.001f * Atten(attenuversion) * static_cast<float>(RawIn())
       / static_cast<float>((source <= ADC_CHANNEL_LAST)?HEMISPHERE_MAX_INPUT_CV:HEMISPHERE_MAX_CV);
@@ -49,7 +49,7 @@ struct CVInputMap {
     return cv_semitone_quants[source].Process(In(default_value));
   }
 
-  int InRescaled(int max_value) {
+  int InRescaled(int max_value) const {
     return Proportion(In(), (source <= ADC_CHANNEL_LAST)?HEMISPHERE_MAX_INPUT_CV:HEMISPHERE_MAX_CV, max_value);
   }
 
@@ -129,7 +129,7 @@ struct DigitalInputMap {
     clkcount = 0;
   }
 
-  bool Gate() {
+  bool Gate() const {
     switch (source_type()) {
       case CLOCK: {
         if (!clock_m.IsRunning()) return false;

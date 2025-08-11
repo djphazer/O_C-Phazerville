@@ -535,7 +535,7 @@ public:
         HS::clock_m.auto_reset = false;
     }
 
-    void DrawFullScreen() {
+    void DrawFullScreen() const {
       if (select_mode == zoom_slot) {
         showhide_cursor.Scroll(next_applet_index[zoom_slot] - showhide_cursor.cursor_pos());
         DrawAppletList(CursorBlink());
@@ -582,7 +582,7 @@ public:
       }
     }
 
-    void DrawOverview() {
+    void DrawOverview() const {
       active_applet[0]->gfxHeader(0);
       active_applet[1]->gfxHeader(0);
       active_applet[2]->gfxHeader(54);
@@ -1372,7 +1372,7 @@ private:
         }
     }
 
-    void DrawMidiMaps() {
+    void DrawMidiMaps() const {
       const int w = 16;
       const int h = 13;
       CVInputMap cv_;
@@ -1390,7 +1390,7 @@ private:
       int cury = 12 + ((config_cursor - MIDIMAP1)/8)*h;
       gfxIcon(curx, cury, LEFT_ICON);
     }
-    void DrawInputMappings() {
+    void DrawInputMappings() const {
         gfxHeader("<  Input Mapping    >");
         gfxIcon(25, 13, TR_ICON); gfxIcon(89, 13, TR_ICON);
         gfxIcon(25, 26, CV_ICON); gfxIcon(89, 26, CV_ICON);
@@ -1420,7 +1420,7 @@ private:
 
         gfxDisplayInputMapEditor();
     }
-    void DrawQuantizerConfig() {
+    void DrawQuantizerConfig() const {
         gfxHeader("<  Quantizer Setup  >");
 
         for (int ch=0; ch<4; ++ch) {
@@ -1469,7 +1469,7 @@ private:
         }
     }
 
-    void DrawConfigMenu() {
+    void DrawConfigMenu() const {
         // --- Config Selection
         gfxHeader("< General Settings  >");
 
@@ -1555,7 +1555,7 @@ private:
         int idx = HS::get_applet_index_by_id( Unpack(data, PackLocation{h*8, 8}) );
         return HS::available_applets[idx].instance[h];
     }
-    void DrawPresetSelector() {
+    void DrawPresetSelector() const {
         const char * const hdrtxt[] = { "DEL!", "Load", "Save", "???" };
         gfxHeader(hdrtxt[config_cursor]);
         gfxPrint(30, 1, "Preset: Bank# ");

@@ -55,7 +55,7 @@ class HSApplication {
 public:
     bool isEditing = false;
 
-    inline bool EditMode() {
+    inline bool EditMode() const {
         return isEditing;
     }
     void CursorToggle() {
@@ -134,7 +134,7 @@ public:
         frame.Out( (DAC_CHANNEL)(ch), value + (octave * (12 << 7)));
     }
 
-    int In(int ch) {
+    int In(int ch) const {
       return cvmap[ch].In();
     }
 
@@ -160,11 +160,11 @@ public:
         param = constrain(param + Proportion(cv, HEMISPHERE_MAX_INPUT_CV, max), min, max);
     }
 
-    bool Changed(int ch) {
+    bool Changed(int ch) const {
         return frame.changed_cv[ch];
     }
 
-    bool Gate(int ch) {
+    bool Gate(int ch) const {
         return trigmap[ch].Gate();
     }
 
@@ -172,7 +172,7 @@ public:
         Out(ch, 0, (high ? HSAPP_PULSE_VOLTAGE : 0));
     }
 
-    bool Clock(int ch) {
+    bool Clock(int ch) const {
         return frame.clocked[ch];
     }
 
@@ -183,7 +183,7 @@ public:
     // Buffered I/O functions for use in Views
     int ViewIn(int ch) const {return frame.inputs[ch];}
     int ViewOut(int ch) const {return frame.ViewOut(ch);}
-    uint32_t ClockCycleTicks(int ch) {return frame.cycle_ticks[ch];}
+    uint32_t ClockCycleTicks(int ch) const {return frame.cycle_ticks[ch];}
 
     /* ADC Lag: There is a small delay between when a digital input can be read and when an ADC can be
      * read. The ADC value lags behind a bit in time. So StartADCLag() and EndADCLag() are used to
@@ -199,7 +199,7 @@ public:
     void StartADCLag(int ch) {frame.adc_lag_countdown[ch] = 96;}
     bool EndOfADCLag(int ch) {return (--frame.adc_lag_countdown[ch] == 0);}
 
-    void gfxCursor(int x, int y, int w, int h = 9) {
+    void gfxCursor(int x, int y, int w, int h = 9) const {
       if (isEditing) {
         gfxInvert(x, y - h, w, h);
       } else if (CursorBlink()) {
@@ -208,7 +208,7 @@ public:
         gfxPixel(x + w - 1, y-1);
       }
     }
-    void gfxSpicyCursor(int x, int y, int w, int h = 9) {
+    void gfxSpicyCursor(int x, int y, int w, int h = 9) const {
       if (isEditing) {
         if (CursorBlink())
           gfxFrame(x, y - h, w, h, true);
@@ -262,7 +262,7 @@ public:
       return false;
     }
 
-    void gfxDisplayInputMapEditor(weegfx::coord_t x_off = 0) {
+    void gfxDisplayInputMapEditor(weegfx::coord_t x_off = 0) const {
       if (selected_input_map.index()) {
         graphics.clearRect(x_off, 0, 63, 11);
         switch (selected_input_map.index()) {
@@ -319,7 +319,7 @@ protected:
       selected_input_map;
 
     // Check cursor blink cycle
-    bool CursorBlink() {
+    bool CursorBlink() const {
         return (cursor_countdown > 0);
     }
     void ResetCursor() {
