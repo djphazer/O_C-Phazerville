@@ -186,10 +186,10 @@ public:
         for (size_t h = 0; h < APPLET_SLOTS; h++)
         {
             int index = active_applet_index[h];
-            Pack(data, PackLocation{h*8,8}, HS::available_applets[index].id);
+            Pack(data, PackLocation{h*8,8}, HS::appletIds[index]);
 
             // applet data
-            applet_data[h] = HS::available_applets[index].instance[h]->OnDataRequest();
+            applet_data[h] = HS::get_applet(index, h)->OnDataRequest();
             PhzConfig::setValue(preset_key | (APPLET_L1_DATA_KEY + h), applet_data[h]);
         }
 
@@ -268,7 +268,7 @@ public:
             // applet data
             PhzConfig::getValue(preset_key | (APPLET_L1_DATA_KEY + h), applet_data[h]);
             SetApplet(HEM_SIDE(h), index);
-            HS::available_applets[index].instance[h]->OnDataReceive(applet_data[h]);
+            HS::get_applet(index, h)->OnDataReceive(applet_data[h]);
         }
 
         // clock data
@@ -373,7 +373,7 @@ public:
           active_applet[hemisphere]->Unload();
 
         next_applet_index[hemisphere] = active_applet_index[hemisphere] = index;
-        active_applet[hemisphere] = HS::available_applets[index].instance[hemisphere];
+        active_applet[hemisphere] = HS::get_applet(index, hemisphere);
         active_applet[hemisphere]->BaseStart(hemisphere);
     }
     void ChangeApplet(HEM_SIDE h, int dir) {
@@ -845,7 +845,7 @@ private:
     int preset_id = -1;
     int preset_cursor = 0;
     HemisphereApplet *active_applet[4]; // Pointers to actual applets
-    int active_applet_index[4]; // Indexes to available_applets
+    int active_applet_index[4]; // Indexes to applets
                       // Left side: 0,2
                       // Right side: 1,3
     int next_applet_index[4]; // queued from UI thread, handled by Controller
@@ -1032,7 +1032,7 @@ private:
 #ifdef PEWPEWPEW
               // load random data !!!
               // this will expose critical bugs in data validation ;)
-              HS::available_applets[index].instance[ch]->OnDataReceive(uint64_t(random()) << 32 | (uint64_t)random());
+              HS::get_applet(index, ch)->OnDataReceive(uint64_t(random()) << 32 | (uint64_t)random());
 #endif
             }
             break;
@@ -1248,7 +1248,7 @@ private:
         uint64_t data = 0;
         PhzConfig::getValue(id << 11 | APPLET_METADATA_KEY, data);
         int idx = HS::get_applet_index_by_id( Unpack(data, PackLocation{h*8, 8}) );
-        return HS::available_applets[idx].instance[h];
+        return HS::get_applet(idx, h);
     }
     void DrawPresetSelector() const {
         gfxHeader((config_cursor == SAVE_PRESET) ? "Save" : "Load");

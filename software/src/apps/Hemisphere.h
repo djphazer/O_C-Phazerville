@@ -55,8 +55,8 @@ void HS::DrawAppletList(bool blink) {
        ++current, y += LineH) {
 
     if (!HS::applet_is_hidden(current))
-      gfxIcon(  12, y + 1, HS::available_applets[current].instance[0]->applet_icon());
-    gfxPrint( 23, y + 2, HS::available_applets[current].instance[0]->applet_name());
+      gfxIcon(  12, y + 1, HS::get_applet_icon(current));
+    gfxPrint( 23, y + 2, HS::get_applet_name(current));
 
     if (current == showhide_cursor.cursor_pos()) {
       gfxIcon(1, y + 1, RIGHT_ICON);
@@ -116,7 +116,7 @@ public:
     }
     HemisphereApplet* GetApplet(int h) {
       int idx = HS::get_applet_index_by_id( GetAppletId(h) );
-      return HS::available_applets[idx].instance[h];
+      return HS::get_applet(idx, h);
     }
     void SetAppletId(int h, int id) {
         apply_value(h, id);
@@ -337,11 +337,11 @@ public:
         for (int h = 0; h < 2; h++)
         {
             int index = my_applet[h];
-            if (hem_active_preset->GetAppletId(HEM_SIDE(h)) != HS::available_applets[index].id)
+            if (hem_active_preset->GetAppletId(HEM_SIDE(h)) != appletIds[index])
                 doSave = 1;
-            hem_active_preset->SetAppletId(HEM_SIDE(h), HS::available_applets[index].id);
+            hem_active_preset->SetAppletId(HEM_SIDE(h), appletIds[index]);
 
-            uint64_t data = HS::available_applets[index].instance[h]->OnDataRequest();
+            uint64_t data = HS::get_applet(index, h)->OnDataRequest();
             if (data != applet_data[h]) doSave = 1;
             applet_data[h] = data;
             hem_active_preset->SetData(HEM_SIDE(h), data);
@@ -432,10 +432,10 @@ public:
         for (size_t h = 0; h < 2; h++)
         {
             int index = my_applet[h];
-            Pack(data, PackLocation{h*8,8}, HS::available_applets[index].id);
+            Pack(data, PackLocation{h*8,8}, appletIds[index]);
 
             // applet data
-            applet_data[h] = HS::available_applets[index].instance[h]->OnDataRequest();
+            applet_data[h] = HS::get_applet(index, h)->OnDataRequest();
             PhzConfig::setValue(preset_key | (APPLET_L_DATA_KEY + h), applet_data[h]);
         }
 
@@ -508,7 +508,7 @@ public:
             // applet data
             PhzConfig::getValue(preset_key | (APPLET_L_DATA_KEY + h), applet_data[h]);
             SetApplet(HEM_SIDE(h), index);
-            HS::available_applets[index].instance[h]->OnDataReceive(applet_data[h]);
+            HS::get_applet(index, h)->OnDataReceive(applet_data[h]);
         }
 
         // clock data
@@ -604,7 +604,7 @@ public:
                 int index = HS::get_applet_index_by_id( hem_active_preset->GetAppletId(h) );
                 applet_data[h] = hem_active_preset->GetData(HEM_SIDE(h));
                 SetApplet(HEM_SIDE(h), index);
-                HS::available_applets[index].instance[h]->OnDataReceive(applet_data[h]);
+                HS::get_applet(index, h)->OnDataReceive(applet_data[h]);
             }
         }
 #endif
@@ -617,9 +617,9 @@ public:
     // does not modify the preset, only the manager
     void SetApplet(HEM_SIDE hemisphere, int index) {
         //if (my_applet[hemisphere]) // TODO: special case for first load?
-        HS::available_applets[my_applet[hemisphere]].instance[hemisphere]->Unload();
+        HS::get_applet(my_applet[hemisphere], hemisphere)->Unload();
         next_applet[hemisphere] = my_applet[hemisphere] = index;
-        HS::available_applets[index].instance[hemisphere]->BaseStart(hemisphere);
+        HS::get_applet(index, hemisphere)->BaseStart(hemisphere);
     }
     void ChangeApplet(HEM_SIDE h, int dir) {
         int index = HS::get_next_applet_index(next_applet[h], dir);
@@ -700,9 +700,9 @@ public:
             int index = my_applet[h];
 
             if (HS::clock_m.auto_reset)
-                HS::available_applets[index].instance[h]->Reset();
+                HS::get_applet(index, h)->Reset();
 
-            HS::available_applets[index].instance[h]->Controller();
+            HS::get_applet(index, h)->Controller();
         }
         HS::clock_m.auto_reset = false;
 
@@ -779,7 +779,7 @@ public:
               gfxFrame(0, 0, 128, 64, true);
             }
             else {
-              HS::available_applets[index].instance[zoom_slot]->BaseView(true, zoom_cursor < 0);
+              HS::get_applet(index, zoom_slot)->BaseView(true, zoom_cursor < 0);
               gfxDisplayInputMapEditor();
             }
 
@@ -807,7 +807,7 @@ public:
             for (int h = 0; h < 2; h++)
             {
                 int index = my_applet[h];
-                HS::available_applets[index].instance[h]->BaseView();
+                HS::get_applet(index, h)->BaseView();
             }
 
             if (select_mode == LEFT_HEMISPHERE) graphics.drawFrame(0, 0, 64, 64);
@@ -861,7 +861,7 @@ public:
             case -1:
             {
               int index = my_applet[zoom_slot];
-              HS::available_applets[index].instance[zoom_slot]->OnButtonPress();
+              HS::get_applet(index, zoom_slot)->OnButtonPress();
               break;
             }
 
@@ -896,7 +896,7 @@ public:
         } else if (!clock_setup) {
             // regular applets get button release
             int index = my_applet[h];
-            HS::available_applets[index].instance[h]->OnButtonPress();
+            HS::get_applet(index, h)->OnButtonPress();
         }
     }
 
@@ -999,7 +999,7 @@ public:
         // -- button release
         if (!clock_setup) {
           const int index = my_applet[hemisphere];
-          HemisphereApplet* applet = HS::available_applets[index].instance[hemisphere];
+          HemisphereApplet* applet = HS::get_applet(index, hemisphere);
 
           if (applet->EditMode()) {
             // select button becomes aux button while editing a param
@@ -1046,7 +1046,7 @@ public:
             zoom_cursor = (event.value > 0)? 0 : -1;
           else if (zoom_cursor < 0) { // right enc is normal applet behavior
             int index = my_applet[zoom_slot];
-            HS::available_applets[index].instance[zoom_slot]->OnEncoderMove(event.value);
+            HS::get_applet(index, zoom_slot)->OnEncoderMove(event.value);
           } else if (isEditing) { // either enc changes config value
             switch (zoom_cursor)
             {
@@ -1082,7 +1082,7 @@ public:
           SetApplet(h, next_applet[h]);
         } else {
             int index = my_applet[h];
-            HS::available_applets[index].instance[h]->OnEncoderMove(event.value);
+            HS::get_applet(index, h)->OnEncoderMove(event.value);
         }
     }
 
@@ -1110,7 +1110,7 @@ private:
     int preset_id = -1;
     int queued_preset = 0;
     int preset_cursor = 0;
-    int my_applet[2]; // Indexes to available_applets
+    int my_applet[2]; // Indexes to applets
     int next_applet[2]; // queued from UI thread, handled by Controller
     uint64_t clock_data, global_data, applet_data[2]; // cache of applet data
     bool clock_setup;
@@ -1474,11 +1474,14 @@ private:
     }
 
     HemisphereApplet* GetApplet(int id, size_t h) const {
+        // TODO: names and icons should be static... then again,
+        //       using get_applet() will make sure applets are available
+        //       as soon as presets are enumerated
 #ifdef __IMXRT1062__
         uint64_t data = 0;
         PhzConfig::getValue(id << 9 | APPLET_METADATA_KEY, data);
         int idx = HS::get_applet_index_by_id( Unpack(data, PackLocation{h*8, 8}) );
-        return HS::available_applets[idx].instance[h];
+        return HS::get_applet(idx, h);
 #else
         return hem_presets[id].GetApplet(h);
 #endif

@@ -10,8 +10,7 @@
 // 0x40 = Logic
 // 0x80 = Other
 //
-// * Category filtering is deprecated at 1.8, but I'm leaving the per-applet categorization
-// alone to avoid breaking forked codebases by other developers.
+// *currently unused, but may be useful again someday
 
 #include "applets/ADSREG.h"
 #include "applets/ADEG.h"
@@ -105,129 +104,100 @@
 #include "applets/hMIDIIn.h"
 #include "applets/hMIDIOut.h"
 
-template<class A>
-struct DeclareApplet {
-  const int id;
-  const uint8_t categories;
-};
+#include "AppletRegistry.h"
 
-template <class... AppletClasses> struct AppletRegistry {
-  // Must be static or template specialization stick around. Must be inline or
-  // you get linker errors.
-  inline static std::tuple<AppletClasses...> pool[APPLET_SLOTS];
-  std::array<Applet, sizeof...(AppletClasses)> applets;
-
-  // Constructor *must* be constexpr or all the template specializations will
-  // cause code and memory size to increase
-  constexpr AppletRegistry(DeclareApplet<AppletClasses>... applets)
-      : applets{Applet{applets.id, applets.categories,
-                       PtrArray<AppletClasses, APPLET_SLOTS>()}...} {}
-
-private:
-  template <class C, size_t N, size_t... Is>
-  static constexpr std::array<HemisphereApplet *, sizeof...(Is)>
-  PtrArray(std::index_sequence<Is...>) {
-    return std::array<HemisphereApplet *, sizeof...(Is)>{&std::get<C>(pool[Is])...};
-  }
-
-  template <class C, size_t N>
-  static constexpr std::array<HemisphereApplet *, N> PtrArray() {
-    return PtrArray<C, N>(std::make_index_sequence<N>());
-  }
-};
-
-AppletRegistry reg{
-    DeclareApplet<ADSREG>{8, 0x01},
-    DeclareApplet<ADEG>{34, 0x01},
-    DeclareApplet<MiniASR>{47, 0x09},
-    DeclareApplet<AttenuateOffset>{56, 0x10},
-    DeclareApplet<Binary>{41, 0x41},
-    DeclareApplet<BitBeat>{79, 0x01},
+constexpr AppletRegistry reg = AppletRegistry< 200 // max ID
+    , DeclareApplet<ADSREG, 8, 0x01>
+    , DeclareApplet<ADEG, 34, 0x01>
+    , DeclareApplet<MiniASR, 47, 0x09>
+    , DeclareApplet<AttenuateOffset, 56, 0x10>
+    , DeclareApplet<Binary, 41, 0x41>
+    , DeclareApplet<BitBeat, 79, 0x01>
 #ifdef PEWPEWPEW
-    DeclareApplet<BootsNCat>{55, 0x80},
+    , DeclareApplet<BootsNCat, 55, 0x80>
 #endif
-    DeclareApplet<Brancher>{4, 0x14},
-    DeclareApplet<BugCrack>{51, 0x80},
-    DeclareApplet<Burst>{31, 0x04},
-    DeclareApplet<Button>{65, 0x10},
-    DeclareApplet<Calculate>{12, 0x10},
-    DeclareApplet<Calibr8>{88, 0x10},
-    DeclareApplet<Carpeggio>{32, 0x0a},
-    DeclareApplet<Chordinator>{64, 0x08},
-    DeclareApplet<ClockDivider>{6, 0x04},
-    DeclareApplet<ClkToGate>{78, 0x04},
-    DeclareApplet<ClockSkip>{28, 0x04},
-    DeclareApplet<Compare>{30, 0x10},
-    DeclareApplet<Cumulus>{5, 0x40},
-    DeclareApplet<CVRecV2>{24, 0x02},
-    DeclareApplet<DivSeq>{68, 0x06},
-    DeclareApplet<DivSeq10>{80, 0x06},
-    DeclareApplet<DrLoFi>{16, 0x80},
-    DeclareApplet<DrumMap>{57, 0x02},
-    DeclareApplet<DualQuant>{9, 0x08},
+    , DeclareApplet<Brancher, 4, 0x14>
+    , DeclareApplet<BugCrack, 51, 0x80>
+    , DeclareApplet<Burst, 31, 0x04>
+    , DeclareApplet<Button, 65, 0x10>
+    , DeclareApplet<Calculate, 12, 0x10>
+    , DeclareApplet<Calibr8, 88, 0x10>
+    , DeclareApplet<Carpeggio, 32, 0x0a>
+    , DeclareApplet<Chordinator, 64, 0x08>
+    , DeclareApplet<ClockDivider, 6, 0x04>
+    , DeclareApplet<ClkToGate, 78, 0x04>
+    , DeclareApplet<ClockSkip, 28, 0x04>
+    , DeclareApplet<Compare, 30, 0x10>
+    , DeclareApplet<Cumulus, 5, 0x40>
+    , DeclareApplet<CVRecV2, 24, 0x02>
+    , DeclareApplet<DivSeq, 68, 0x06>
+    , DeclareApplet<DivSeq10, 80, 0x06>
+    , DeclareApplet<DrLoFi, 16, 0x80>
+    , DeclareApplet<DrumMap, 57, 0x02>
+    , DeclareApplet<DualQuant, 9, 0x08>
 #if !defined(CUSTOM_BUILD) || defined(PEWPEWPEW)
-    DeclareApplet<DuoTET>{63, 0x08},
+    , DeclareApplet<DuoTET, 63, 0x08>
 #endif
-    DeclareApplet<EbbAndLfo>{7, 0x01},
-    DeclareApplet<EnigmaJr>{45, 0x02},
-    DeclareApplet<EnvFollow>{42, 0x11},
-    DeclareApplet<EuclidX>{15, 0x02},
-    DeclareApplet<GameOfLife>{22, 0x01},
-    DeclareApplet<GateDelay>{29, 0x04},
-    DeclareApplet<GatedVCA>{17, 0x50},
-    DeclareApplet<Logic>{10, 0x44},
-    DeclareApplet<LowerRenz>{21, 0x01},
-    DeclareApplet<Metronome>{50, 0x04},
-    DeclareApplet<MidiLoop>{81, 0x20},
-    DeclareApplet<hMIDIIn>{150, 0x20},
-    DeclareApplet<hMIDIOut>{27, 0x20},
-    DeclareApplet<MixerBal>{33, 0x10},
-    DeclareApplet<MultiScale>{73, 0x08},
-    DeclareApplet<Palimpsest>{20, 0x02},
-    DeclareApplet<Pigeons>{71, 0x02},
-    DeclareApplet<PolyDiv>{72, 0x06},
-    DeclareApplet<ProbabilityDivider>{59, 0x04},
-    DeclareApplet<ProbabilityMelody>{62, 0x04},
-    DeclareApplet<ResetClock>{70, 0x14},
-    DeclareApplet<RndWalk>{69, 0x01},
-    DeclareApplet<RunglBook>{44, 0x01},
-    DeclareApplet<ScaleDuet>{26, 0x08},
-    DeclareApplet<Schmitt>{40, 0x40},
-    DeclareApplet<Scope>{23, 0x80},
-    DeclareApplet<Seq32>{75, 0x02},
-    DeclareApplet<SeqPlay7>{76, 0x02},
-    DeclareApplet<SequenceX>{14, 0x02},
-    DeclareApplet<ShiftGate>{48, 0x45},
-    DeclareApplet<ShiftReg>{77, 0x45},
-    DeclareApplet<Shredder>{58, 0x01},
-    DeclareApplet<Shuffle>{36, 0x04},
-    DeclareApplet<Slew>{19, 0x01},
-    DeclareApplet<Squanch>{46, 0x08},
-    DeclareApplet<Stairs>{61, 0x01},
-    DeclareApplet<Strum>{74, 0x08},
-    DeclareApplet<Switch>{3, 0x10},
-    DeclareApplet<SwitchSeq>{38, 0x10},
-    DeclareApplet<TB_3PO>{60, 0x02},
-    DeclareApplet<TLNeuron>{13, 0x40},
-    DeclareApplet<Trending>{37, 0x40},
-    DeclareApplet<TrigSeq>{11, 0x06},
-    DeclareApplet<TrigSeq16>{25, 0x06},
-    DeclareApplet<Tuner>{39, 0x80},
-    DeclareApplet<TwoRings>{18, 0x02},
-    DeclareApplet<VectorEG>{52, 0x01},
-    DeclareApplet<VectorLFO>{49, 0x01},
-    DeclareApplet<VectorMod>{53, 0x01},
-    DeclareApplet<VectorMorph>{54, 0x01},
-    DeclareApplet<Voltage>{43, 0x10},
+    , DeclareApplet<EbbAndLfo, 7, 0x01>
+    , DeclareApplet<EnigmaJr, 45, 0x02>
+    , DeclareApplet<EnvFollow, 42, 0x11>
+    , DeclareApplet<EuclidX, 15, 0x02>
+    , DeclareApplet<GameOfLife, 22, 0x01>
+    , DeclareApplet<GateDelay, 29, 0x04>
+    , DeclareApplet<GatedVCA, 17, 0x50>
+    , DeclareApplet<Logic, 10, 0x44>
+    , DeclareApplet<LowerRenz, 21, 0x01>
+    , DeclareApplet<Metronome, 50, 0x04>
+    , DeclareApplet<MidiLoop, 81, 0x20>
+    , DeclareApplet<hMIDIIn, 150, 0x20>
+    , DeclareApplet<hMIDIOut, 27, 0x20>
+    , DeclareApplet<MixerBal, 33, 0x10>
+    , DeclareApplet<MultiScale, 73, 0x08>
+    , DeclareApplet<Palimpsest, 20, 0x02>
+    , DeclareApplet<Pigeons, 71, 0x02>
+    , DeclareApplet<PolyDiv, 72, 0x06>
+    , DeclareApplet<ProbabilityDivider, 59, 0x04>
+    , DeclareApplet<ProbabilityMelody, 62, 0x04>
+    , DeclareApplet<ResetClock, 70, 0x14>
+    , DeclareApplet<RndWalk, 69, 0x01>
+    , DeclareApplet<RunglBook, 44, 0x01>
+    , DeclareApplet<ScaleDuet, 26, 0x08>
+    , DeclareApplet<Schmitt, 40, 0x40>
+    , DeclareApplet<Scope, 23, 0x80>
+    , DeclareApplet<Seq32, 75, 0x02>
+    , DeclareApplet<SeqPlay7, 76, 0x02>
+    , DeclareApplet<SequenceX, 14, 0x02>
+    , DeclareApplet<ShiftGate, 48, 0x45>
+    , DeclareApplet<ShiftReg, 77, 0x45>
+    , DeclareApplet<Shredder, 58, 0x01>
+    , DeclareApplet<Shuffle, 36, 0x04>
+    , DeclareApplet<Slew, 19, 0x01>
+    , DeclareApplet<Squanch, 46, 0x08>
+    , DeclareApplet<Stairs, 61, 0x01>
+    , DeclareApplet<Strum, 74, 0x08>
+    , DeclareApplet<Switch, 3, 0x10>
+    , DeclareApplet<SwitchSeq, 38, 0x10>
+    , DeclareApplet<TB_3PO, 60, 0x02>
+    , DeclareApplet<TLNeuron, 13, 0x40>
+    , DeclareApplet<Trending, 37, 0x40>
+    , DeclareApplet<TrigSeq, 11, 0x06>
+    , DeclareApplet<TrigSeq16, 25, 0x06>
+    , DeclareApplet<Tuner, 39, 0x80>
+    , DeclareApplet<TwoRings, 18, 0x02>
+    , DeclareApplet<VectorEG, 52, 0x01>
+    , DeclareApplet<VectorLFO, 49, 0x01>
+    , DeclareApplet<VectorMod, 53, 0x01>
+    , DeclareApplet<VectorMorph, 54, 0x01>
+    , DeclareApplet<Voltage, 43, 0x10>
 #ifdef PEWPEWPEW
-    DeclareApplet<WTVCO>{67, 0x80},
+    , DeclareApplet<WTVCO, 67, 0x80>
 #endif
-};
+>{};
 
 
 namespace HS {
-  static constexpr auto & available_applets = reg.applets;
-  constexpr int HEMISPHERE_AVAILABLE_APPLETS = ARRAY_SIZE(available_applets);
+  static constexpr auto appletIds = reg.getIds();
+  constexpr int HEMISPHERE_AVAILABLE_APPLETS = appletIds.size();
 
   uint64_t hidden_applets[2] = { 0, 0 };
   bool applet_is_hidden(const int& index) {
@@ -238,11 +208,23 @@ namespace HS {
     hidden_applets[seg] = hidden_applets[seg] ^ (uint64_t(1) << (index%64));
   }
 
+  HemisphereApplet * get_applet(const int index, HEM_SIDE slot = 0) {
+    return reg.get(appletIds[index], slot);
+  }
+
+  const char * get_applet_name(const int index) {
+    return reg.getName(appletIds[index]);
+  }
+
+  const uint8_t * get_applet_icon(const int index) {
+    return reg.getIcon(appletIds[index]);
+  }
+
   constexpr int get_applet_index_by_id(const int& id) {
     int index = 0;
     for (int i = 0; i < HEMISPHERE_AVAILABLE_APPLETS; i++)
     {
-        if (available_applets[i].id == id) index = i;
+        if (appletIds[i] == id) index = i;
     }
     return index;
   }
