@@ -281,9 +281,10 @@ public:
         graphics.clearRect(x_off, 0, 63, 11);
         switch (selected_input_map.index()) {
           case CV_INPUT_MAP: {
-            gfxPos(32 - 7 * 6 / 2, 2);
             int tenths = std::get<CVInputMap*>(selected_input_map)->Atten();
-            graphics.printf("%4d.%d%%", tenths / 10, abs(tenths) % 10);
+            gfxPos(32 - 7 * 6 / 2 + pad(10000, tenths) - 6*(abs(tenths)<10), 2);
+            if (tenths < 0) gfxPrint("-");
+            graphics.printf("%d.%d%%", abs(tenths) / 10, abs(tenths) % 10);
             break;
           }
           case DIGITAL_INPUT_MAP: {
