@@ -126,7 +126,7 @@ const char* const midi_fn_name[HEM_MIDI_FN_COUNT] = {
     "ChnAft", "KeyAft",
     "Bend",
     "Run", "Start",
-    "Clk-4", "Clk-8", "Clk16", "Clk24",
+    "Clk-2", "Clk-4", "Clk-8", "Clk24",
     "(learn)",
 };
 

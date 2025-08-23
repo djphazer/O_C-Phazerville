@@ -93,9 +93,9 @@ struct MIDIMapping : public MIDIMapSettings {
   }
   constexpr int clock_mod() const {
     uint8_t mod = 1;
-    if (function == HEM_MIDI_CLOCK_OUT) mod = 24;
-    if (function == HEM_MIDI_CLOCK_8_OUT) mod = 12;
-    if (function == HEM_MIDI_CLOCK_16_OUT) mod = 6;
+    if (function == HEM_MIDI_CLOCK_OUT) mod = 12;
+    if (function == HEM_MIDI_CLOCK_8_OUT) mod = 6;
+    if (function == HEM_MIDI_CLOCK_16_OUT) mod = 3;
     return mod;
   }
   void ClockOut() {
