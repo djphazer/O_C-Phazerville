@@ -7,7 +7,7 @@ void HS::MIDIFrame::ProcessMIDIMsg(const MIDIMessage msg) {
 
     switch (msg.message) { // System Real Time messages
         case usbMIDI.Clock:
-            clock_q = 1;
+            clock_q = (clock_count % (24/MIDI_CLOCK_PPQN) == 0); // for internal sync @ 2ppqn
             ++clock_count;
             for(int ch = 0; ch < MIDIMAP_MAX; ++ch) {
                 mapping[ch].ProcessClock(clock_count);
