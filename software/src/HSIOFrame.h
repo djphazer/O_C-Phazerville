@@ -103,7 +103,7 @@ struct MIDIMapping : public MIDIMapSettings {
     output = HEMISPHERE_MAX_CV;
   }
   void ProcessClock(int count) {
-    if (IsClock() && ((count % clock_mod() == 1) || ((function == HEM_MIDI_CLOCK_24_OUT) && (clock_mod() == 1))))
+    if ( IsClock() && ((count-1) % clock_mod() == 0) )
       ClockOut();
   }
   const bool InRange(uint8_t note) const {
@@ -125,7 +125,7 @@ struct MIDIMapping : public MIDIMapSettings {
   void Unpack(uint64_t data) {
     UnpackPackables(data, function_cc, function, channel, dac_polyvoice, transpose, range_low, range_high);
     // validation for safety
-    if (function > HEM_MIDI_MAX_FUNCTION) function = 0;
+    if (function > HEM_MIDI_MAX_FUNCTION) function = HEM_MIDI_NOOP;
     channel &= 0x1F;
     dac_polyvoice &= 0x0F;
     if (range_low == 0 && range_high == 0) range_high = 127;
@@ -156,8 +156,8 @@ struct MIDIFrame {
     uint8_t max_voice = 1;
     int poly_mode = 0;
     int8_t poly_rotate_index = -1;
-    uint16_t midi_channel_filter = 1; // each bit state represents a channel. 1 means enabled. all 0's means Omni (no channel filter)
-    bool any_channel_omni = (midi_channel_filter < 1);
+    uint16_t midi_channel_filter = 0; // each bit state represents a channel. 1 means enabled. all 0's means Omni (no channel filter)
+    bool any_channel_omni = false;
 
     // Clock/Start/Stop are handled by ClockSetup applet
     bool clock_run = 0;
@@ -168,8 +168,9 @@ struct MIDIFrame {
     uint32_t last_msg_tick; // Tick of last received message
 
     void Init() {
+      // TODO: populate with some sensible defaults
       for (int ch = 0; ch < MIDIMAP_MAX; ++ch) {
-        mapping[ch].function = 0;
+        mapping[ch].function = HEM_MIDI_NOOP;
         mapping[ch].transpose = 0;
         mapping[ch].output = 0;
         mapping[ch].dac_polyvoice = ch / 2 % DAC_CHANNEL_COUNT; // each quad is a unique voice
@@ -177,7 +178,7 @@ struct MIDIFrame {
         mapping[ch].range_high = 127;
       }
       for (int ch = 0; ch < ADC_CHANNEL_COUNT; ++ch) {
-        outmap[ch].function = 0;
+        outmap[ch].function = HEM_MIDI_NOOP;
         outmap[ch].transpose = 0;
         outmap[ch].output = 0;
         outmap[ch].range_low = 0;
@@ -217,7 +218,7 @@ struct MIDIFrame {
         uint16_t filter = 0;
         bool omni = false;
         for (auto &map : mapping) {
-            // if (!map.function) continue;
+            if (map.function == HEM_MIDI_NOOP) continue;
             if (map.channel < 16) filter |= (1 << map.channel);
             else omni = true;
         }
@@ -232,7 +233,7 @@ struct MIDIFrame {
     void UpdateMaxPolyphony() { // find max voice number to determine how much to buffer
         int voice = 0;
         for (auto &map : mapping) {
-            if (!map.function) continue;
+            if (map.function == HEM_MIDI_NOOP) continue;
             if (map.dac_polyvoice > voice) voice = map.dac_polyvoice;
         }
         if (max_voice != voice+1) {
