@@ -243,6 +243,13 @@ namespace HS {
     hidden_applets[seg] = hidden_applets[seg] ^ (uint64_t(1) << (index%64));
   }
 
+  const char * get_applet_name(const int index) {
+    return available_applets[index].instance[0]->applet_name();
+  }
+  const uint8_t * get_applet_icon(const int index) {
+    return available_applets[index].instance[0]->applet_icon();
+  }
+
   constexpr int get_applet_index_by_id(const int& id) {
     int index = 0;
     for (int i = 0; i < HEMISPHERE_AVAILABLE_APPLETS; i++)

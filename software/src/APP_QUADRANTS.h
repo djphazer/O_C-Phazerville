@@ -58,12 +58,6 @@ public:
     void Start() {
         audio_app.Init();
 
-        /* Hemisphere already does this...
-         * assuming Hemisphere is always included next to Quadrants...
-        for (int i = 0; i < QUANT_CHANNEL_COUNT; ++i) {
-            q_engine[i].Configure( (i<4)? OC::Scales::SCALE_SEMI : i-4, 0xffff);
-        }
-        */
         //bank_filename[16] = "BANK_000.DAT";
         bank_num = 0;
         preset_id = -1;

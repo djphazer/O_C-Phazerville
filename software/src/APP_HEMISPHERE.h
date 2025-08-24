@@ -46,26 +46,6 @@
 #include "hemisphere_audio_config.h"
 #endif
 
-void HS::DrawAppletList(bool blink) {
-  const size_t LineH = 12;
-
-  int y = (64 - (5 * LineH)) / 2;
-
-  for (int current = showhide_cursor.first_visible();
-       current <= showhide_cursor.last_visible();
-       ++current, y += LineH) {
-
-    if (!HS::applet_is_hidden(current))
-      gfxIcon(  12, y + 1, HS::available_applets[current].instance[0]->applet_icon());
-    gfxPrint( 23, y + 2, HS::available_applets[current].instance[0]->applet_name());
-
-    if (current == showhide_cursor.cursor_pos()) {
-      gfxIcon(1, y + 1, RIGHT_ICON);
-      if (blink) gfxInvert(0, y, 10, 10);
-    }
-  }
-}
-
 // The settings specify the selected applets, and 64 bits of data for each applet,
 // plus 64 bits of data for the ClockSetup applet (which includes some misc config).
 // TRIGMAP and CVMAP are packed nibbles.
@@ -272,15 +252,6 @@ public:
 
         zoom_slot = -1;
         clock_setup = 0;
-
-        // Defaults for Q-engine settings.
-        // These are overwritten later when global settings are loaded.
-        for (int i = 0; i < QUANT_CHANNEL_COUNT; ++i) {
-            q_engine[i].Configure( (i<4)? OC::Scales::SCALE_SEMI : i-4, 0xffff);
-        }
-
-        showhide_cursor.Init(0, HEMISPHERE_AVAILABLE_APPLETS - 1);
-        showhide_cursor.Scroll(0);
 
         SetApplet(LEFT_HEMISPHERE, HS::get_applet_index_by_id(18)); // DualTM
         SetApplet(RIGHT_HEMISPHERE, HS::get_applet_index_by_id(15)); // EuclidX
@@ -1416,7 +1387,7 @@ private:
         case CONFIG_DUMMY:
             ++dummy_count;
             // reset input mappings to defaults
-            HS::Init();
+            HS::ResetMappings();
             // randomize both applets
             for (int ch = 0; ch < 2; ++ch) {
               SetApplet(HEM_SIDE(ch), random(HEMISPHERE_AVAILABLE_APPLETS));
