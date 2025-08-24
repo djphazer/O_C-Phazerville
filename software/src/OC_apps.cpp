@@ -46,8 +46,9 @@ namespace menu = OC::menu;
 
 #ifdef ARDUINO_TEENSY41
 #include "APP_QUADRANTS.h"
-#endif
+#else
 #include "APP_HEMISPHERE.h"
+#endif
 
 #endif
 
@@ -99,8 +100,9 @@ static constexpr OC::App available_apps[] = {
 #ifndef NO_HEMISPHERE
   #ifdef ARDUINO_TEENSY41
   DECLARE_APP('Q','S', "Quadrants", QUADRANTS),
-  #endif
+  #else
   DECLARE_APP('H','S', "Hemispheres", HEMISPHERE),
+  #endif
 #endif
 
   #ifdef ENABLE_APP_CALIBR8OR
@@ -541,6 +543,7 @@ void Init(bool reset_settings) {
     app.Init();
   }
 
+  HS::showhide_cursor.Init(0, HEMISPHERE_AVAILABLE_APPLETS - 1);
   HS::frame.Init();
 
   global_settings.current_app_id = DEFAULT_APP_ID;

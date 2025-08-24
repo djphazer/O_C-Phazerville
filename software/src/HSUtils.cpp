@@ -61,9 +61,14 @@ namespace HS {
     for (auto &iq : input_quant)
       iq.Init();
 
-    for (auto &q : q_engine)
-      q.quantizer.Init();
+    for (int i = 0; i < QUANT_CHANNEL_COUNT; ++i) {
+      q_engine[i].quantizer.Init();
+      q_engine[i].Configure( (i<4)? OC::Scales::SCALE_SEMI : i-4, 0xffff);
+    }
 
+    ResetMappings();
+  }
+  void ResetMappings() {
     for (int i = 0; i < APPLET_SLOTS * 2; ++i) {
       trigmap[i].source = (i%4) + 1;
       cvmap[i].source = i + 1;
@@ -390,6 +395,30 @@ namespace HS {
       clock_m.Start( !p );
     }
     PokePopup(CLOCK_POPUP);
+  }
+
+  bool applet_is_hidden(const int& index);
+  const char * get_applet_name(const int index);
+  const uint8_t * get_applet_icon(const int index);
+
+  void DrawAppletList(bool blink) {
+    const size_t LineH = 12;
+
+    int y = (64 - (5 * LineH)) / 2;
+
+    for (int current = showhide_cursor.first_visible();
+         current <= showhide_cursor.last_visible();
+         ++current, y += LineH) {
+
+      if (!applet_is_hidden(current))
+        gfxIcon(  12, y + 1, get_applet_icon(current));
+      gfxPrint( 23, y + 2, get_applet_name(current));
+
+      if (current == showhide_cursor.cursor_pos()) {
+        gfxIcon(1, y + 1, RIGHT_ICON);
+        if (blink) gfxInvert(0, y, 10, 10);
+      }
+    }
   }
 
 } // namespace HS
