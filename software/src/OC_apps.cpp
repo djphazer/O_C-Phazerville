@@ -336,6 +336,7 @@ void AppSwitcher::Init(bool reset_settings) {
 
   Scales::Init();
   HS::Init();
+  HS::showhide_cursor.Init(0, HEMISPHERE_AVAILABLE_APPLETS - 1);
   HS::frame.Init();
 
   global_settings.Init();

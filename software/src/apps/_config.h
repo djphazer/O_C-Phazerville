@@ -5,7 +5,6 @@ namespace menu = OC::menu;
 
 #ifdef ARDUINO_TEENSY41
 #include "apps/Quadrants.h"
-#include "apps/Hemisphere.h"
 #else
 #include "apps/Hemisphere.h"
 #endif
@@ -92,8 +91,9 @@ static AppContainer<void // this space intentionally left blank
 #ifndef NO_HEMISPHERE
   #ifdef ARDUINO_TEENSY41
   , AppQuadrants
-  #endif
+  #else
   , AppHemisphere
+  #endif
 #endif
 #ifdef ENABLE_APP_CALIBR8OR
   , AppCalibr8or

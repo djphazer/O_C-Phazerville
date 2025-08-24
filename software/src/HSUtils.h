@@ -229,6 +229,7 @@ namespace HS {
   extern OC::menu::ScreenCursor<5> showhide_cursor;
 
   void Init();
+  void ResetMappings();
   void DrawAppletList(bool blink = false);
 
   // --- Quantizer helpers
