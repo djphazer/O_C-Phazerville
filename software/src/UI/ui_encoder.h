@@ -38,7 +38,8 @@ public:
 
   // For debouncing of pins, use 0x0f (b00001111) and 0x0c (b00001100) etc.
   static const uint8_t kPinMask = 0x03;
-  static const uint8_t kPinEdge = 0x02;
+  static const uint8_t kPinRisingEdge = 0x02;
+  static const uint8_t kPinFallingEdge = 0x01;
 
   Encoder() { }
   ~Encoder() { }
@@ -79,18 +80,44 @@ public:
         acceleration = 0;
     }
 
+    int32_t i = 0;
+#ifdef TINRS_ENCODERS
+    // Modified for TiNRS Criminally Ornamental encoders.
+    const uint8_t a = pin_state_[0] & kPinMask;
+    const uint8_t b = pin_state_[1] & 1;
+    if (a == kPinRisingEdge)
+    {
+      if (b == 0x00) {
+        i = 1;
+      } else {
+        i = -1;
+      }
+    }
+    else{
+      if (a == kPinFallingEdge)
+      {
+        if (b == 0x00) {
+          i = -1;
+        } else {
+          i = 1;
+        }
+
+      }
+    }
+    // end modification 
+#else
     // Find direction by detecting state change and evaluating the other pin.
     // 0x02 == b10 == rising edge on pin
     // Should also work just checking for falling edge on PINA and checking
     // PINB state.
-    int32_t i = 0;
     const uint8_t a = pin_state_[0] & kPinMask;
     const uint8_t b = pin_state_[1] & kPinMask;
-    if (a == kPinEdge && b == 0x00) {
+    if (a == kPinRisingEdge && b == 0x00) {
       i = 1;
-    } else if (b == kPinEdge && a == 0x00) {
+    } else if (b == kPinRisingEdge && a == 0x00) {
       i = -1;
     }
+#endif
 
     if (i) {
       if (reversed_)
