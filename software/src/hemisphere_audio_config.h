@@ -13,10 +13,11 @@
 #include "audio_applets/UpsampledApplet.h"
 #include "audio_applets/VCAApplet.h"
 #include "audio_applets/WAVPlayerApplet.h"
+#include "audio_applets/HandSawApplet.h"
 
 const size_t NUM_SLOTS = 5;
 
-DMAMEM std::tuple<InputApplet<MONO>, UpsampledApplet<MONO>, OscApplet, WavPlayerApplet<MONO>>
+DMAMEM std::tuple<InputApplet<MONO>, UpsampledApplet<MONO>, OscApplet, HandSawApplet, WavPlayerApplet<MONO>>
   mono_input_pool[2];
 DMAMEM std::
   tuple<InputApplet<STEREO>, WavPlayerApplet<STEREO>, UpsampledApplet<STEREO>>
@@ -26,6 +27,7 @@ DMAMEM std::tuple<
   DynamicsApplet<MONO>,
   InputApplet<MONO>,
   OscApplet,
+  HandSawApplet,
   DelayApplet<MONO>,
   LadderApplet<MONO>,
   FilterFolderApplet<MONO>,
