@@ -6,10 +6,9 @@
 #include "Audio/InterpolatingStream.h"
 #include <Audio.h>
 
-// ---- Replace with your actual VA writer (index: 0-based) ----
+
+// index being which virtual audio input (1-8), value being the CV
 inline void WriteVA(uint8_t index, float value01) {
-  // Example (uncomment & adapt for your tree):
-  // HS::VAWrite(index, value01);
   (void)index; (void)value01; // placeholder
 }
 
