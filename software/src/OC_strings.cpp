@@ -92,6 +92,9 @@ namespace OC {
     "A", "B", "C", "D",
 #ifdef ARDUINO_TEENSY41
     "E", "F", "G", "H",
+    // Virtual Audio to CV routing
+    "VA1", "VA2", "VA3", "VA4",
+    "VA5", "VA6", "VA7", "VA8",
 #endif
     // Midi Maps in MIDIFrame::mapping[]
     "M 1","M 2","M 3","M 4",
