@@ -23,10 +23,20 @@ public:
     cv_stream.Method(INTERPOLATION_LINEAR);
     cv_stream.Acquire();
     // Connect input to pitch analyzer (assuming mono input for pitch tracking)
-    in_conn = new AudioConnection(passthru, 0, note_freq, 0);
+    for (int i = 0; i < Channels; ++i) {
+        // Dynamically allocate each AudioConnection
+        in_conns[i] = new AudioConnection(passthru, i, note_freqs[i], 0);
+    }
   }
   void Controller() override {
     // pitch tracking of audio input goes here
+    if (note_freqs[0].available()) {
+      float freq = note_freqs[0].read();
+      last_freq = freq;
+      freq_available = freq > 0.0f;
+    } else {
+    freq_available = false;
+    }
   }
   void View() override {
     // GUI here
@@ -41,6 +51,18 @@ public:
     gfxStartCursor();
     gfxPrint(pitch_env_selection);
     gfxEndCursor(cursor == PITCH_ENV_OUT);
+
+    gfxPrint(label_x, 35, "P(Hz):");
+    gfxStartCursor();
+    //graphics.printf("%4.2fHz", last_freq);
+    gfxPrint((int)last_freq);
+    gfxPrint("Hz");
+    gfxEndCursor(false);
+
+    gfxPrint(label_x, 45, "F:");
+    gfxStartCursor();
+    gfxPrint(freq_available ? "True" : "False");
+    gfxEndCursor(false);
    }
   uint64_t OnDataRequest() override {
     return 0;
@@ -74,6 +96,7 @@ private:
   enum TuneTrackerCursor {
     PITCH_CV_OUT,
     PITCH_ENV_OUT,
+    FREQ_DISPLAY,
 
     CURSOR_MAX = PITCH_ENV_OUT
   };
@@ -84,11 +107,12 @@ private:
   int8_t pitch_env_selection = 2; //VA2
 
   InterpolatingStream<> cv_stream;
-  AudioPassthrough<Channels> input;
-  AudioPassthrough<Channels> output;
   AudioPassthrough<Channels> passthru;
 
-  AudioAnalyzeNoteFrequency note_freq;
-  AudioConnection* in_conn = nullptr;
+  std::array<AudioAnalyzeNoteFrequency, Channels> note_freqs;
+  std::array<AudioConnection*, Channels> in_conns; // Use pointers
+
+  float last_freq = 0.0f;
+  bool freq_available = false;
 
 };
