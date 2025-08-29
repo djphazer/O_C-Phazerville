@@ -22,15 +22,8 @@ public:
   void Start() override {
     cv_stream.Method(INTERPOLATION_LINEAR);
     cv_stream.Acquire();
-    for (int i = 0; i < Channels; i++) {
-      in_conns[i].connect(input, i, vcas[i], 0);
-      cv_conns[i].connect(cv_stream, 0, vcas[i], 1);
-      out_conns[i].connect(vcas[i], 0, output, i);
-    }
-  }
-  void Unload() {
-    cv_stream.Release();
-    AllowRestart();
+    // Connect input to pitch analyzer (assuming mono input for pitch tracking)
+    in_conn = new AudioConnection(passthru, 0, note_freq, 0);
   }
   void Controller() override {
     // pitch tracking of audio input goes here
@@ -48,9 +41,11 @@ public:
     gfxStartCursor();
     gfxPrint(pitch_env_selection);
     gfxEndCursor(cursor == PITCH_ENV_OUT);
-  }
-  void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {}
-  void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {}
+   }
+  uint64_t OnDataRequest() override {
+    return 0;
+    }
+  void OnDataReceive(uint64_t data) override {}
   void OnEncoderMove(int direction) override {
     if (!EditMode()) {
       MoveCursor(cursor, direction, CURSOR_MAX);
@@ -66,10 +61,10 @@ public:
   }
 
   AudioStream* InputStream() override {
-    return &input;
+    return &passthru;
   }
   AudioStream* OutputStream() override {
-    return &output;
+    return &passthru;
   };
 
 protected:
@@ -91,11 +86,9 @@ private:
   InterpolatingStream<> cv_stream;
   AudioPassthrough<Channels> input;
   AudioPassthrough<Channels> output;
-  
-  std::array<AudioVCA, Channels> vcas;
+  AudioPassthrough<Channels> passthru;
 
-  std::array<AudioConnection, Channels> in_conns;
-  std::array<AudioConnection, Channels> cv_conns;
-  std::array<AudioConnection, Channels> out_conns;
+  AudioAnalyzeNoteFrequency note_freq;
+  AudioConnection* in_conn = nullptr;
 
 };
