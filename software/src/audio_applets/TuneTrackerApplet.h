@@ -23,44 +23,64 @@ public:
     cv_stream.Acquire();
     // Connect input to pitch analyzer (assuming mono input for pitch tracking)
     for (int i = 0; i < Channels; ++i) {
-        // Dynamically allocate each AudioConnection
-        in_conns[i].connect(passthru, i, note_freqs[i], 0);
-        note_freqs[i].begin(0.1); // threshold (try 0.1–0.2)
+        // using the passthru as our input
+        if (!in_conns[i]) {
+          in_conns[i] = new AudioConnection(passthru, i, note_freqs[i], 0);
+        }
+        note_freqs[i].begin(0.1); // initializes the pitch tracking algo. threshold 0.1-0.2 for optimal error rates
     }
   }
-  void Controller() override {
-    // pitch tracking of audio input goes here
-    if (note_freqs[0].available()) {
-      float freq = note_freqs[0].read();
-      last_freq = freq;
-      freq_available = freq > 0.0f;
-      // convert frequency to CV
-      float volts = log2f(last_freq / 32.7032f); // -3V to +6V
-      volts = constrain(volts, -3.0f, 6.0f);     // Clamp to O&C range
-      float norm = (volts + 3.0f) / 9.0f;        // Normalize -3V..+6V to 0.0..1.0
-      WriteVirtualAudioCV(pitch_cv_selection, norm);
-
-    // should we do anything when a pitch is not being read?
-    } else { freq_available = false; }
+  void Unload() override {
+    // Unloading, then reloading TuneTracker seems to leave additional buffers in memory that add up everytime you do so.
+    // TODO: find a way to pause note_freq[] pitch tracking when not needed.
+    //
+    // Disconnect and delete all connections to fully free any audio-graph nodes
+    for (int i = 0; i < Channels; ++i) {
+      if (in_conns[i]) {
+        in_conns[i]->disconnect(); // remove from audio graph
+        delete in_conns[i];
+        in_conns[i] = nullptr;
+      }
+    }
+    cv_stream.Release();
+    AllowRestart();
   }
+  void Controller() override {
+    // CPU usage is tied to the instantiation of YIN pitch tracking rather than how many times we call read().
+    // Attempts to limit calls of read() by analyzing signal RMS only (via AudioAnalyzeRMS) increased memory from addiitonal objects, 
+    // and did not reduce CPU usage.
+    // It appears that YIN will continue to read in the background after calling .begin(), keeping CPU usage up even when not needed.
+    // TODO: find a way to pause note_freq[] pitch tracking when not needed.
+    //
+    // we're going to assume mono input (channel 0 only) for now, and to keep CPU usage down
+    float freq = note_freqs[0].read();
+    if (freq && last_freq != freq) {
+        last_freq = freq;
+        int_part = (int)last_freq;
+        frac_part = (int)((last_freq - int_part) * 100);
+        // convert frequency to CV
+        float volts = log2f(last_freq / 32.7032f); // -3V to +6V
+        volts = constrain(volts, -3.0f, 6.0f);     // Clamp to O&C range
+        float norm = (volts + 3.0f) / 9.0f;        // Normalize -3V..+6V to 0.0..1.0
+        freq_available = freq > 0.0f;
+        WriteVirtualAudioCV(pitch_cv_selection, norm);        
+      }
+      
+      // should we do anything when a pitch is not being read?
+      else { freq_available = false; 
+    }
+  } 
   void View() override {
     // GUI here
     const int label_x = 1;
 
-    // // Print the detected pitch at the top
-    // gfxPrint(label_x, 2, (int)last_freq);
-    // gfxPrint("Hz");
+    // Print the detected pitch at the top
     // Lazy implementation of printing float value, as it is likely unreliable to do so
-    int int_part = (int)last_freq;
-    int frac_part = (int)((last_freq - int_part) * 100);
-    if (frac_part < 0) frac_part = -frac_part; // handle negative frequencies, just in case
-
     gfxPrint(label_x, 15, int_part);
     gfxPrint(".");
     if (frac_part < 10) gfxPrint("0"); // leading zero for single-digit decimals
     gfxPrint(frac_part);
     gfxPrint(" Hz");
-
 
     gfxPrint(label_x, 25, "PitchCV:");
     gfxStartCursor();
@@ -119,9 +139,14 @@ private:
   AudioPassthrough<Channels> passthru;
 
   std::array<AudioAnalyzeNoteFrequency, Channels> note_freqs;
-  std::array<AudioConnection, Channels> in_conns; 
+  // change connections to pointers we control
+  std::array<AudioConnection*, Channels> in_conns = {};
 
   float last_freq = 0.0f;
   bool freq_available = false;
+
+  // For displaying frequency as text
+  int int_part = 0;
+  int frac_part = 0;
 
 };
