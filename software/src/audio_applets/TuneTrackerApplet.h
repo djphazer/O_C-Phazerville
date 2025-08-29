@@ -24,7 +24,9 @@ public:
     // Connect input to pitch analyzer (assuming mono input for pitch tracking)
     for (int i = 0; i < Channels; ++i) {
         // Dynamically allocate each AudioConnection
-        in_conns[i] = new AudioConnection(passthru, i, note_freqs[i], 0);
+        in_conns[i].connect(passthru, i, note_freqs[i], 0);
+        peak_conns[i].connect(passthru, i, peak_analyzers[i], 0);
+        note_freqs[i].begin(0.1); // threshold (try 0.1–0.2)
     }
   }
   void Controller() override {
@@ -35,6 +37,11 @@ public:
       freq_available = freq > 0.0f;
     } else {
     freq_available = false;
+    }
+
+    // Volume measurement
+    if (peak_analyzers[0].available()) {
+        last_peak = peak_analyzers[0].read();
     }
   }
   void View() override {
@@ -62,6 +69,12 @@ public:
     gfxStartCursor();
     gfxPrint(freq_available ? "True" : "False");
     gfxEndCursor(false);
+
+    gfxPrint(label_x, 55, "Vol:");
+    gfxStartCursor();
+    gfxPrint((int)(last_peak * 100)); // as percentage
+    gfxEndCursor(false);
+
    }
   uint64_t OnDataRequest() override {
     return 0;
@@ -109,8 +122,12 @@ private:
   AudioPassthrough<Channels> passthru;
 
   std::array<AudioAnalyzeNoteFrequency, Channels> note_freqs;
-  std::array<AudioConnection*, Channels> in_conns; // Use pointers
+  std::array<AudioConnection, Channels> in_conns; 
 
+  std::array<AudioAnalyzePeak, Channels> peak_analyzers;
+  std::array<AudioConnection, Channels> peak_conns;
+
+  int last_peak = 0;
   float last_freq = 0.0f;
   bool freq_available = false;
 
