@@ -15,19 +15,25 @@
 #include "OC_DAC.h"
 #include "OC_ADC.h"
 #include "OC_digital_inputs.h"
+#include "Audio/VirtualAudioCV.h"
 #include "HSicons.h"
 #include "HSClockManager.h"
 
 namespace HS {
 
 static constexpr int GATE_THRESHOLD = 15 << 7; // 1.25 volts
+#ifdef ARDUINO_TEENSY41
+static constexpr int VACV_CHANNEL_COUNT = 8;
+#else
+static constexpr int VACV_CHANNEL_COUNT = 0;
+#endif
 #if defined(__IMXRT1062__)
 static constexpr int MIDIMAP_MAX = 32;
 #else
 static constexpr int MIDIMAP_MAX = 8;
 #endif
-static constexpr int TRIGMAP_MAX = OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_COUNT + DAC_CHANNEL_COUNT + MIDIMAP_MAX;
-static constexpr int CVMAP_MAX = ADC_CHANNEL_COUNT + DAC_CHANNEL_COUNT + MIDIMAP_MAX;
+static constexpr int TRIGMAP_MAX = OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_COUNT + DAC_CHANNEL_COUNT + VACV_CHANNEL_COUNT + MIDIMAP_MAX;
+static constexpr int CVMAP_MAX = ADC_CHANNEL_COUNT + DAC_CHANNEL_COUNT + VACV_CHANNEL_COUNT + MIDIMAP_MAX;
 
 struct MIDIMessage {
   // values expected from MIDI library, so channel starts at 1 (one), not zero

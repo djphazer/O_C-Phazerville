@@ -20,11 +20,22 @@ struct CVInputMap {
     return 10 * attenuversion * abs(attenuversion) / 36;
   }
   int RawIn() {
-    return source <= ADC_CHANNEL_LAST
+    // return source <= ADC_CHANNEL_LAST
+    //   ? frame.inputs[source - 1]
+    //   : (source - ADC_CHANNEL_LAST <= DAC_CHANNEL_LAST)
+    //     ? frame.outputs[source - 1 - ADC_CHANNEL_LAST]
+    //     : frame.MIDIState.mapping[source - ADC_CHANNEL_LAST - DAC_CHANNEL_LAST - 1].output;
+
+    // I think this is probably the wrong way to implement RawIn() for VACV channels... need to figure this out ASAP
+      return source <= ADC_CHANNEL_LAST
       ? frame.inputs[source - 1]
       : (source - ADC_CHANNEL_LAST <= DAC_CHANNEL_LAST)
         ? frame.outputs[source - 1 - ADC_CHANNEL_LAST]
-        : frame.MIDIState.mapping[source - ADC_CHANNEL_LAST - DAC_CHANNEL_LAST - 1].output;
+        : ((source - ADC_CHANNEL_LAST - DAC_CHANNEL_LAST) >= 1
+            && (source - ADC_CHANNEL_LAST - DAC_CHANNEL_LAST) <= VACV_NUM_CHANNELS)
+            ? static_cast<int>(VirtualAudioCV::read(source - ADC_CHANNEL_LAST - DAC_CHANNEL_LAST - 1)
+                               * static_cast<float>(HEMISPHERE_MAX_INPUT_CV))
+            : frame.MIDIState.mapping[source - ADC_CHANNEL_LAST - DAC_CHANNEL_LAST - VACV_NUM_CHANNELS - 1].output;
   }
 
   int In(int default_value = 0) {
@@ -89,6 +100,7 @@ struct DigitalInputMap {
     DIGITAL_INPUT,
     CV_INPUT,
     CV_OUTPUT,
+    VIRTUAL_AUDIO_CV,
     MIDI_MAP,
   };
 
@@ -124,6 +136,8 @@ struct DigitalInputMap {
         //return frame.inputs[cv_input_index()] > GATE_THRESHOLD;
       case CV_OUTPUT:
         return frame.outputs[cv_output_index()] > GATE_THRESHOLD;
+      case VIRTUAL_AUDIO_CV:
+        return 0;
       case MIDI_MAP:
         return frame.MIDIState.mapping[midi_map_index()].output > GATE_THRESHOLD;
       case NONE:
@@ -207,8 +221,12 @@ private:
   inline int8_t cv_output_index() const {
     return source - 1 - OC::DIGITAL_INPUT_LAST - ADC_CHANNEL_LAST;
   }
-  inline int8_t midi_map_index() const {
+  inline int8_t virtual_audio_cv_index() const{
     return source - 1 - OC::DIGITAL_INPUT_LAST - ADC_CHANNEL_LAST - DAC_CHANNEL_LAST;
+  }
+  // VACV channel count will be static so we can use that here
+  inline int8_t midi_map_index() const {
+    return source - 1 - OC::DIGITAL_INPUT_LAST - ADC_CHANNEL_LAST - DAC_CHANNEL_LAST - VACV_CHANNEL_COUNT;
   }
 };
 

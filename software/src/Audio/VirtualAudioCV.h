@@ -1,9 +1,8 @@
 #pragma once
 #include <stdint.h>
+#include <HSIOFrame.h>
 
-// Tune this count to your needs; 8 is a good starting point.
-#ifndef VCV_NUM_CHANNELS
-#define VCV_NUM_CHANNELS 8
+// number of VACV channels is defined in HSIOFrame.h
 #endif
 
 namespace VirtualAudioCV {
