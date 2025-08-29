@@ -1,9 +1,5 @@
 #pragma once
 #include <stdint.h>
-#include <HSIOFrame.h>
-
-// number of VACV channels is defined in HSIOFrame.h
-#endif
 
 namespace VirtualAudioCV {
 
@@ -17,12 +13,12 @@ struct Channel {
 void init();
 
 // Audio-rate publish (callable from audio ISR / update())
-inline void publish(int ch, float v);
+void publish(int ch, float v);
 
 // Non-blocking read (safe from CV/control loop). Returns a stable snapshot.
-inline float read(int ch);
+float read(int ch);
 
 // Read with simple one-pole smoothing (alpha in 0..1; higher = snappier).
-float read_smooth(int ch, float alpha);
+float read_smooth(int ch, float alpha = 0.1f);
 
 } // namespace VirtualAudioCV

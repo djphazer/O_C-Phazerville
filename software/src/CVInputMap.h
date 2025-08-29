@@ -32,10 +32,10 @@ struct CVInputMap {
       : (source - ADC_CHANNEL_LAST <= DAC_CHANNEL_LAST)
         ? frame.outputs[source - 1 - ADC_CHANNEL_LAST]
         : ((source - ADC_CHANNEL_LAST - DAC_CHANNEL_LAST) >= 1
-            && (source - ADC_CHANNEL_LAST - DAC_CHANNEL_LAST) <= VACV_NUM_CHANNELS)
+            && (source - ADC_CHANNEL_LAST - DAC_CHANNEL_LAST) <= VACV_CHANNEL_COUNT)
             ? static_cast<int>(VirtualAudioCV::read(source - ADC_CHANNEL_LAST - DAC_CHANNEL_LAST - 1)
                                * static_cast<float>(HEMISPHERE_MAX_INPUT_CV))
-            : frame.MIDIState.mapping[source - ADC_CHANNEL_LAST - DAC_CHANNEL_LAST - VACV_NUM_CHANNELS - 1].output;
+            : frame.MIDIState.mapping[source - ADC_CHANNEL_LAST - DAC_CHANNEL_LAST - VACV_CHANNEL_COUNT - 1].output;
   }
 
   int In(int default_value = 0) {
