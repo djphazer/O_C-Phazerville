@@ -8,7 +8,7 @@
 
 
 // index being which virtual audio input (1-8), value being the CV
-inline void WriteVA(uint8_t index, float value01) {
+inline void WriteVirtualAudioCV(uint8_t index, float value01) {
   (void)index; (void)value01; // placeholder
 }
 
@@ -25,7 +25,6 @@ public:
     for (int i = 0; i < Channels; ++i) {
         // Dynamically allocate each AudioConnection
         in_conns[i].connect(passthru, i, note_freqs[i], 0);
-        peak_conns[i].connect(passthru, i, peak_analyzers[i], 0);
         note_freqs[i].begin(0.1); // threshold (try 0.1–0.2)
     }
   }
@@ -35,45 +34,43 @@ public:
       float freq = note_freqs[0].read();
       last_freq = freq;
       freq_available = freq > 0.0f;
-    } else {
-    freq_available = false;
-    }
+      // convert frequency to CV
+      float volts = log2f(last_freq / 32.7032f); // -3V to +6V
+      volts = constrain(volts, -3.0f, 6.0f);     // Clamp to O&C range
+      float norm = (volts + 3.0f) / 9.0f;        // Normalize -3V..+6V to 0.0..1.0
+      WriteVirtualAudioCV(pitch_cv_selection, norm);
 
-    // Volume measurement
-    if (peak_analyzers[0].available()) {
-        last_peak = peak_analyzers[0].read();
-    }
+    // should we do anything when a pitch is not being read?
+    } else { freq_available = false; }
   }
   void View() override {
     // GUI here
     const int label_x = 1;
 
-    gfxPrint(label_x, 15, "PitchCV:");
+    // // Print the detected pitch at the top
+    // gfxPrint(label_x, 2, (int)last_freq);
+    // gfxPrint("Hz");
+    // Lazy implementation of printing float value, as it is likely unreliable to do so
+    int int_part = (int)last_freq;
+    int frac_part = (int)((last_freq - int_part) * 100);
+    if (frac_part < 0) frac_part = -frac_part; // handle negative frequencies, just in case
+
+    gfxPrint(label_x, 15, int_part);
+    gfxPrint(".");
+    if (frac_part < 10) gfxPrint("0"); // leading zero for single-digit decimals
+    gfxPrint(frac_part);
+    gfxPrint(" Hz");
+
+
+    gfxPrint(label_x, 25, "PitchCV:");
     gfxStartCursor();
     gfxPrint(pitch_cv_selection);
     gfxEndCursor(cursor == PITCH_CV_OUT);
 
-    gfxPrint(label_x, 25, "PitchEnv:");
+    gfxPrint(label_x, 35, "PitchEnv:");
     gfxStartCursor();
     gfxPrint(pitch_env_selection);
     gfxEndCursor(cursor == PITCH_ENV_OUT);
-
-    gfxPrint(label_x, 35, "P(Hz):");
-    gfxStartCursor();
-    //graphics.printf("%4.2fHz", last_freq);
-    gfxPrint((int)last_freq);
-    gfxPrint("Hz");
-    gfxEndCursor(false);
-
-    gfxPrint(label_x, 45, "F:");
-    gfxStartCursor();
-    gfxPrint(freq_available ? "True" : "False");
-    gfxEndCursor(false);
-
-    gfxPrint(label_x, 55, "Vol:");
-    gfxStartCursor();
-    gfxPrint((int)(last_peak * 100)); // as percentage
-    gfxEndCursor(false);
 
    }
   uint64_t OnDataRequest() override {
@@ -124,10 +121,6 @@ private:
   std::array<AudioAnalyzeNoteFrequency, Channels> note_freqs;
   std::array<AudioConnection, Channels> in_conns; 
 
-  std::array<AudioAnalyzePeak, Channels> peak_analyzers;
-  std::array<AudioConnection, Channels> peak_conns;
-
-  int last_peak = 0;
   float last_freq = 0.0f;
   bool freq_available = false;
 
