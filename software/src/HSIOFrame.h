@@ -10,14 +10,14 @@
 #pragma once
 
 #include <vector>
-#include "HSMIDI.h"
-#include "HSUtils.h"
 #include "OC_DAC.h"
 #include "OC_ADC.h"
 #include "OC_digital_inputs.h"
-#include "Audio/VirtualAudioCV.h"
+#include "HSMIDI.h"
+#include "HSUtils.h"
 #include "HSicons.h"
 #include "HSClockManager.h"
+#include "Audio/VirtualAudioCV.h"
 
 namespace HS {
 
