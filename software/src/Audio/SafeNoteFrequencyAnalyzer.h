@@ -58,7 +58,11 @@ public:
      *  @return none
      */
     SafeNoteFrequencyAnalyzer( void ) : AudioStream( 1, inputQueueArray ), enabled( false ), new_output(false) {
-        
+        inputQueueArray[0] = nullptr;
+        for (int i = 0; i < AUDIO_GUITARTUNER_BLOCKS; ++i) {
+            blocklist1[i] = nullptr;
+            blocklist2[i] = nullptr;
+        }
     }
     
     /**
@@ -137,9 +141,12 @@ private:
     uint16_t tau_global;
     uint64_t  yin_buffer[5];
     uint64_t  rs_buffer[5];
-    int16_t  AudioBuffer[AUDIO_GUITARTUNER_BLOCKS*128] __attribute__ ( ( aligned ( 4 ) ) );
+    // comment out old definition for now to test new way
+    //    int16_t  AudioBuffer[AUDIO_GUITARTUNER_BLOCKS*128] __attribute__ ( ( aligned ( 4 ) ) );
+    // heap-managed buffer so it can be freed on end()/Unload()
+    int16_t *AudioBuffer = nullptr;
     uint8_t  yin_idx, state;
-    float    periodicity, yin_threshold, cpu_usage_max, data;
+    float    periodicity, yin_threshold, data;
     bool     enabled, next_buffer, first_run;
     volatile bool new_output, process_buffer;
     audio_block_t *blocklist1[AUDIO_GUITARTUNER_BLOCKS];

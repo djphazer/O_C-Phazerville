@@ -1,41 +1,3 @@
-// // 1) Temporarily turn 'private' into 'protected' JUST FOR THIS FILE:
-// #define private protected
-// #include "Audio/analyze_notefreq.h" // << narrow include (not <Audio.h>)
-// #undef private
-
-// #include "Audio/SafeNoteFrequencyAnalyzer.h"
-
-//  // Gracefully stop analyzer and free any partially held blocks
-// void SafeNoteFrequencyAnalyzer::end() {
-//     __disable_irq();
-//     enabled = false;
-
-//     // release partially held blocks from the active list
-//     audio_block_t** list = next_buffer ? blocklist1 : blocklist2;
-//     for (int i = 0; i < state; ++i) {
-//         if (list[i]) {
-//             release(list[i]);
-//             list[i] = nullptr;
-//         }
-//     }
-
-//     // reset state so next begin() starts clean
-//     state          = 0;
-//     process_buffer = false;
-//     first_run      = true;
-//     running_sum    = 0;
-//     yin_idx        = 1;
-//     tau_global     = 1;
-//     new_output     = false;
-//     __enable_irq();
-// }
-
-// void SafeNoteFrequencyAnalyzer::pause(bool p) {
-//   __disable_irq();
-//   enabled = !p;
-//   __enable_irq();
-// }
-
 /* Audio Library Note Frequency Detection & Guitar/Bass Tuner
  * Copyright (c) 2015, Colin Duffy
  *
@@ -101,15 +63,36 @@ void SafeNoteFrequencyAnalyzer::update( void ) {
     }
     
     if ( state >= AUDIO_GUITARTUNER_BLOCKS ) {
+        // if ( next_buffer ) {
+        //     if ( !first_run && process_buffer ) process( );
+        //     for ( int i = 0; i < AUDIO_GUITARTUNER_BLOCKS; i++ ) copy_buffer( AudioBuffer+( i * 0x80 ), blocklist1[i]->data );
+        //     for ( int i = 0; i < AUDIO_GUITARTUNER_BLOCKS; i++ ) release( blocklist1[i] );
+        //     next_buffer = false;
+        // } else {
+        //     if ( !first_run && process_buffer ) process( );
+        //     for ( int i = 0; i < AUDIO_GUITARTUNER_BLOCKS; i++ ) copy_buffer( AudioBuffer+( i * 0x80 ), blocklist2[i]->data );
+        //     for ( int i = 0; i < AUDIO_GUITARTUNER_BLOCKS; i++ ) release( blocklist2[i] );
+        //     next_buffer = true;
+        // }
         if ( next_buffer ) {
             if ( !first_run && process_buffer ) process( );
-            for ( int i = 0; i < AUDIO_GUITARTUNER_BLOCKS; i++ ) copy_buffer( AudioBuffer+( i * 0x80 ), blocklist1[i]->data );
-            for ( int i = 0; i < AUDIO_GUITARTUNER_BLOCKS; i++ ) release( blocklist1[i] );
+            for ( int i = 0; i < AUDIO_GUITARTUNER_BLOCKS; i++ ) {
+                copy_buffer( AudioBuffer + ( i * AUDIO_BLOCK_SAMPLES ), blocklist1[i]->data );
+            }
+            for ( int i = 0; i < AUDIO_GUITARTUNER_BLOCKS; i++ ) {
+                release( blocklist1[i] );
+                blocklist1[i] = nullptr;    // <<< important: avoid double-release later
+            }
             next_buffer = false;
         } else {
             if ( !first_run && process_buffer ) process( );
-            for ( int i = 0; i < AUDIO_GUITARTUNER_BLOCKS; i++ ) copy_buffer( AudioBuffer+( i * 0x80 ), blocklist2[i]->data );
-            for ( int i = 0; i < AUDIO_GUITARTUNER_BLOCKS; i++ ) release( blocklist2[i] );
+            for ( int i = 0; i < AUDIO_GUITARTUNER_BLOCKS; i++ ) {
+                copy_buffer( AudioBuffer + ( i * AUDIO_BLOCK_SAMPLES ), blocklist2[i]->data );
+            }
+            for ( int i = 0; i < AUDIO_GUITARTUNER_BLOCKS; i++ ) {
+                release( blocklist2[i] );
+                blocklist2[i] = nullptr;    // <<< important: avoid double-release later    
+            }
             next_buffer = true;
         }
         process_buffer = true;
@@ -241,6 +224,11 @@ uint16_t SafeNoteFrequencyAnalyzer::estimate( uint64_t *yin, uint64_t *rs, uint1
  *  @param threshold Allowed uncertainty
  */
 void SafeNoteFrequencyAnalyzer::begin( float threshold ) {
+
+    size_t n = AUDIO_GUITARTUNER_BLOCKS * 128;
+    AudioBuffer = reinterpret_cast<int16_t*>(
+        ::operator new[](n * sizeof(int16_t), std::align_val_t(4)));
+
     __disable_irq( );
     process_buffer = false;
     yin_threshold  = threshold;
@@ -305,19 +293,39 @@ void SafeNoteFrequencyAnalyzer::threshold( float p ) {
 }
 
 void SafeNoteFrequencyAnalyzer::end() {
-    #ifdef blocklist1
-        audio_block_t** list = next_buffer ? blocklist1 : blocklist2;
-        for (int i = 0; i < state; ++i) {
-            if (list[i]) { release(list[i]); list[i] = nullptr; }
-        }
-    #endif
+    
+    // Prevent update() from accepting/queuing new blocks while we clean up
+    enabled = false;
+
+    __disable_irq();
+
+    // drain any queued input blocks (non-owning pointers returned by receiveReadOnly)
+    audio_block_t *b;
+    while ((b = receiveReadOnly()) != nullptr) {
+        release(b);   // return block to audio pool
+    }
+
+    // Release any queued blocks while IRQs are still disabled to avoid races/double-free.
+    for (int i = 0; i < AUDIO_GUITARTUNER_BLOCKS; ++i) {
+        if (blocklist1[i]) { release(blocklist1[i]); blocklist1[i] = nullptr; }
+        if (blocklist2[i]) { release(blocklist2[i]); blocklist2[i] = nullptr; }
+    }
+
+    state = 0;
     process_buffer = false;
     first_run = true;
     new_output = false;
     yin_idx = 1;
     running_sum = 0;
     tau_global = 1;
-    state = 0;
+
+    int16_t *buf_to_free = AudioBuffer;
+    AudioBuffer = nullptr;
+    __enable_irq();
+
+    // Free heap memory outside IRQ-disabled region
+    if (buf_to_free) ::operator delete[](buf_to_free, std::align_val_t(4));
+
 } // flush and disable to save CPU usage
 void SafeNoteFrequencyAnalyzer::pause_switch(bool p) {} // quick on/off switch without teardown (like for audio being unplugged)
 bool SafeNoteFrequencyAnalyzer::isEnabled() { return enabled; } // get enabled state for TuneTracker functionality
