@@ -708,15 +708,22 @@ public:
     }
 
     void DelegateEncoderMovement(const UI::Event &event) {
+        int increment = event.value;
+        if (event.mask & (OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_R)) {
+          // push-and-turn for coarse adjustments
+          // XXX: hopefully nothing breaks if event.value is larger than 1 or -1...
+          OC::ui.SetButtonIgnoreMask();
+          increment *= 10;
+        }
         int h = (event.control == OC::CONTROL_ENCODER_L) ? LEFT_HEMISPHERE : RIGHT_HEMISPHERE;
         HEM_SIDE slot = HEM_SIDE(view_slot[h]*2 + h);
         if (HS::q_edit) {
-          HS::QEditEncoderMove(h, event.value);
+          HS::QEditEncoderMove(h, increment);
           return;
         }
 
         if (config_page > HIDE_CONFIG || preset_cursor) {
-            ConfigEncoderAction(h, event.value);
+            ConfigEncoderAction(h, increment);
             return;
         }
         if (view_state == AUDIO_SETUP) {
@@ -726,19 +733,19 @@ public:
 
         if (view_state == CLOCK_SETUP) {
           if (h == LEFT_HEMISPHERE)
-            ClockSetup_instance.OnLeftEncoderMove(event.value);
+            ClockSetup_instance.OnLeftEncoderMove(increment);
           else
-            ClockSetup_instance.OnEncoderMove(event.value);
+            ClockSetup_instance.OnEncoderMove(increment);
           return;
         }
 
         if (view_state == APPLET_FULLSCREEN) {
             if (select_mode == zoom_slot)
-              ChangeApplet(zoom_slot, event.value);
+              ChangeApplet(zoom_slot, increment);
             else if (h == LEFT_HEMISPHERE && !isEditing)
               zoom_cursor = (event.value > 0)? 0 : -1;
             else if (zoom_cursor < 0)
-              active_applet[zoom_slot]->OnEncoderMove(event.value);
+              active_applet[zoom_slot]->OnEncoderMove(increment);
             else if (isEditing) { // enc changes value
               switch (zoom_cursor)
               {
@@ -748,15 +755,15 @@ public:
                   const int chan = zoom_slot*2 + zoom_cursor - 1;
                   if (clock_m.IsRunning()) // && clock_m.GetMultiply(chan))
                   {
-                    clock_m.SetMultiply(clock_m.GetMultiply(chan) + event.value, chan);
+                    clock_m.SetMultiply(clock_m.GetMultiply(chan) + increment, chan);
                   } else
-                    HS::trigmap[chan].ChangeSource(event.value);
+                    HS::trigmap[chan].ChangeSource(increment);
                   break;
                 }
                 case 3:
                 case 4:
-                  if (!EditSelectedInputMap(event.value))
-                    HS::cvmap[zoom_slot*2 + zoom_cursor - 3].ChangeSource(event.value);
+                  if (!EditSelectedInputMap(increment))
+                    HS::cvmap[zoom_slot*2 + zoom_cursor - 3].ChangeSource(increment);
                   break;
                 case 5:
                 case 6:
@@ -766,15 +773,15 @@ public:
                   break;
               }
             } else { // enc moves cursor
-              zoom_cursor = constrain(zoom_cursor + event.value, 0, 4);
+              zoom_cursor = constrain(zoom_cursor + increment, 0, 4);
               ResetCursor();
             }
         } else if (event.mask & (OC::CONTROL_BUTTON_X | OC::CONTROL_BUTTON_Y)) {
             // hold down X or Y to change applet with encoder
-            ChangeApplet(slot, event.value);
+            ChangeApplet(slot, increment);
             SetApplet(slot, next_applet_index[slot]);
         } else {
-            active_applet[slot]->OnEncoderMove(event.value);
+            active_applet[slot]->OnEncoderMove(increment);
         }
     }
 
