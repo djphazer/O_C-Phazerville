@@ -34,6 +34,7 @@ public:
     // TODO: find a way to pause note_freq[] pitch tracking when not needed.
     //
     AudioNoInterrupts(); // ensure audio doesn't flow in while we are stopping YIN
+    delay(5);
     for (int i = 0; i < Channels; ++i) {
       note_freqs[i].end(); // call this before so we can flush audio blocks. failure to do so results in leaks
     }
