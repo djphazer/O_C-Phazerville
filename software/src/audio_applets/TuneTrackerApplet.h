@@ -4,6 +4,7 @@
 #include "HemisphereAudioApplet.h"
 #include "Audio/AudioPassthrough.h"
 #include "Audio/InterpolatingStream.h"
+#include "Audio/SafeNoteFrequencyAnalyzer.h"
 #include <Audio.h>
 
 
@@ -24,9 +25,7 @@ public:
     // Connect input to pitch analyzer (assuming mono input for pitch tracking)
     for (int i = 0; i < Channels; ++i) {
         // using the passthru as our input
-        if (!in_conns[i]) {
-          in_conns[i] = new AudioConnection(passthru, i, note_freqs[i], 0);
-        }
+        in_conns[i].connect(passthru, i, note_freqs[i], 0);
         note_freqs[i].begin(0.1); // initializes the pitch tracking algo. threshold 0.1-0.2 for optimal error rates
     }
   }
@@ -34,14 +33,11 @@ public:
     // Unloading, then reloading TuneTracker seems to leave additional buffers in memory that add up everytime you do so.
     // TODO: find a way to pause note_freq[] pitch tracking when not needed.
     //
-    // Disconnect and delete all connections to fully free any audio-graph nodes
+    AudioNoInterrupts(); // ensure audio doesn't flow in while we are stopping YIN
     for (int i = 0; i < Channels; ++i) {
-      if (in_conns[i]) {
-        in_conns[i]->disconnect(); // remove from audio graph
-        delete in_conns[i];
-        in_conns[i] = nullptr;
-      }
+      note_freqs[i].end(); // call this before so we can flush audio blocks. failure to do so results in leaks
     }
+    AudioInterrupts();
     cv_stream.Release();
     AllowRestart();
   }
@@ -54,6 +50,7 @@ public:
     //
     // we're going to assume mono input (channel 0 only) for now, and to keep CPU usage down
     float freq = note_freqs[0].read();
+      // if we have a new frequency, convert to CV and write to Virtual Audio CV output
     if (freq && last_freq != freq) {
         last_freq = freq;
         int_part = (int)last_freq;
@@ -67,7 +64,7 @@ public:
       }
       
       // should we do anything when a pitch is not being read?
-      else { freq_available = false; 
+      else { freq_available = false;
     }
   } 
   void View() override {
@@ -138,9 +135,9 @@ private:
   InterpolatingStream<> cv_stream;
   AudioPassthrough<Channels> passthru;
 
-  std::array<AudioAnalyzeNoteFrequency, Channels> note_freqs;
+  std::array<SafeNoteFrequencyAnalyzer, Channels> note_freqs;
   // change connections to pointers we control
-  std::array<AudioConnection*, Channels> in_conns = {};
+  std::array<AudioConnection, Channels> in_conns;
 
   float last_freq = 0.0f;
   bool freq_available = false;
