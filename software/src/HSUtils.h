@@ -275,6 +275,7 @@ void gfxCircle(int x, int y, int r);
 void gfxBitmap(int x, int y, int w, const uint8_t *data);
 void gfxIcon(int x, int y, const uint8_t *data, bool clearfirst = false);
 void gfxHeader(const char *str, const uint8_t *icon = nullptr);
+void gfxFooter(const char *str, const uint8_t *icon = nullptr);
 
 static constexpr uint8_t pad(int range, int number) {
     uint8_t padding = 0;
