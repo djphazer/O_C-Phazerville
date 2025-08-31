@@ -10,6 +10,8 @@ for item in flags:
     f = item.strip().upper()
     if f.startswith('NOHEMI') or f.startswith('NO_HEM'):
         custom_defines += " -DNO_HEMISPHERE"
+    if f.startswith('TINRS'):
+        custom_defines += " -DTINRS_ENCODERS"
     if f.startswith('VOR'):
         custom_defines += " -DVOR"
     if f.startswith('BUCHLA') or f.startswith('NLM') or f.startswith('NORTHERN'):
