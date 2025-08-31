@@ -2,14 +2,10 @@ TODO (Roadmap)
 ===
 
 # v1.10
-* T4.1 - expand to 8 channels: Piqued, Quadraturia, Captain MIDI
-* Audio Applets for T4.1
-  - add VCF+VCA to Osc
-  - 3-band EQ / multi-band dynamics
-  - WAVPlay: rework looping/caching; support more metadata tags (tempo, cue points)
 * Config option for LFS vs. SD for preset storage
 
 # v2.0
+* T4.1 - expand to 8 channels: Quantermain, Piqued, Quadraturia, Captain MIDI
 * **Fully merge "abandoned/refactoring" branch from pld**
   - this is mostly done on the dev/2.0 branch
 * Auto-tuner with floor/ceiling detection (fail gracefully)
@@ -17,8 +13,13 @@ TODO (Roadmap)
 * Pop-up MIDI Map editor
 * Integrate Calibr8or with DAC for global tracking adjustments
 * USB Gamepad support
+* MTP_Teensy lib for file management over USB
 
 # ???
+* Audio Applets for T4.1
+  - add VCF+VCA to Osc
+  - 3-band EQ / multi-band dynamics
+  - WAVPlay: rework looping/caching; support more metadata tags (tempo, cue points)
 * Update Boilerplates - I just assume this needs attention
 * MORE MIDI STUFF:
     - MIDI looper applet!
