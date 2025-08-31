@@ -29,13 +29,14 @@ void init() {
   for (int i = 0; i < VACV_CHANNEL_COUNT; ++i) {
     g_ch[i].value = 0.0f;
     g_ch[i].seq   = 0u;    // even => stable
+    snapshot[i] = 0;
     g_smooth[i]   = 0.0f;
   }
 }
 
 // --- Audio-rate writer ---
 // seqlock pattern: bump seq to odd, write value, bump seq to even.
-void publish(int ch, float v) {
+void update(int ch, float v) {
   if ((unsigned)ch >= VACV_CHANNEL_COUNT) return;
 
   // (Optional) quickly clamp to a sane range to avoid NaNs/Inf
@@ -48,19 +49,13 @@ void publish(int ch, float v) {
 }
 
 // --- Control-rate reader ---
-float read(int ch) {
-  if ((unsigned)ch >= VACV_CHANNEL_COUNT) return 0.0f;
-
-  for (;;) {
-    uint32_t s1 = g_ch[ch].seq;
-    float v     = g_ch[ch].value;
-    uint32_t s2 = g_ch[ch].seq;
-    if ((s1 == s2) && ((s2 & 1u) == 0u)) {
-      return v; // consistent, even seq => stable read
-    }
-    // else: writer raced us; spin a tiny bit (usually 0–1 iterations)
+  // returns -1..+1 full-scale
+  float read(size_t vacv_index) {
+    // produce a normalized value here from the correct VACV channel.
+    // e.g. if you compute sample -> value in -1..1, return it directly.
+    // Avoid heavy locking; if you must access audio buffers, use a lock-free snapshot.
+    return current_vacv_value[vacv_index]; // float in [-1, 1]
   }
-}
 
 float read_smooth(int ch, float alpha) {
   if ((unsigned)ch >= VACV_CHANNEL_COUNT) return 0.0f;
@@ -73,5 +68,8 @@ float read_smooth(int ch, float alpha) {
   g_smooth[ch] = v;
   return v;
 }
+
+// convenience accessor
+inline constexpr int channel_count() { return VACV_CHANNEL_COUNT; }
 
 } // namespace VirtualAudioCV

@@ -137,7 +137,7 @@ struct DigitalInputMap {
       case CV_OUTPUT:
         return frame.outputs[cv_output_index()] > GATE_THRESHOLD;
       case VIRTUAL_AUDIO_CV:
-        return 0;
+        return frame.outputs[virtual_audio_cv_index()] > GATE_THRESHOLD;
       case MIDI_MAP:
         return frame.MIDIState.mapping[midi_map_index()].output > GATE_THRESHOLD;
       case NONE:
@@ -167,6 +167,8 @@ struct DigitalInputMap {
         return PARAM_MAP_ICONS + (1 + cv_input_index()) * 8;
       case CV_OUTPUT:
         return PARAM_MAP_ICONS + (1 + ADC_CHANNEL_LAST + cv_output_index()) * 8;
+      case VIRTUAL_AUDIO_CV:
+        return PARAM_MAP_ICONS + (1 + ADC_CHANNEL_LAST + DAC_CHANNEL_LAST + virtual_audio_cv_index()) * 8;
       case MIDI_MAP:
         return PhzIcons::midiIn;
       case NONE:
@@ -206,6 +208,9 @@ private:
 
         if (source < 1 + OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_LAST + DAC_CHANNEL_LAST)
           return CV_OUTPUT;
+
+        if (source < 1 + OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_LAST + DAC_CHANNEL_LAST + VACV_CHANNEL_COUNT)
+          return VIRTUAL_AUDIO_CV;
 
         return MIDI_MAP;
       }
