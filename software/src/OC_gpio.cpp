@@ -52,7 +52,7 @@ void OC::SetFlipMode(bool flip_180) {
       TR1 = 22;
     } else {
       // old hardware
-#ifdef NLM_hOC
+#if defined(NLM_hOC) || defined(TINRS_ENCODERS)
       but_top = 5;
       but_bot = 4;
 #else
@@ -98,7 +98,7 @@ void OC::SetFlipMode(bool flip_180) {
       TR4 = 22;
     } else {
       // old hardware
-#ifdef NLM_hOC
+#if defined(NLM_hOC) || defined(TINRS_ENCODERS)
       but_top = 4;
       but_bot = 5;
 #else
