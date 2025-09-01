@@ -5,6 +5,7 @@
 #include "Audio/AudioPassthrough.h"
 #include "Audio/InterpolatingStream.h"
 #include "Audio/SafeNoteFrequencyAnalyzer.h"
+#include "Audio/VACVMap.h"
 #include <Audio.h>
 
 
@@ -19,9 +20,19 @@ public:
   const char* applet_name() override {
     return "TuneTrackr";
   }
+  
   void Start() override {
     cv_stream.Method(INTERPOLATION_LINEAR);
     cv_stream.Acquire();
+
+    //handle VACV assignment and ownership
+    if (!vacv_owner) vacv_owner = VACVRegistry::I().registerOwner();
+    pitch_cv_selection.AttachOwner(vacv_owner);
+    pitch_env_selection.AttachOwner(vacv_owner);
+    // Ensure initial selections are actually claimed (if you want defaults)
+    if (!pitch_cv_selection.IsNone()) pitch_cv_selection.Claim(pitch_cv_selection.Channel01());
+    if (!pitch_env_selection.IsNone()) pitch_env_selection.Claim(pitch_env_selection.Channel01());
+
     // Connect input to pitch analyzer (assuming mono input for pitch tracking)
     for (int i = 0; i < Channels; i++) {
         // using the passthru as our input
@@ -39,6 +50,12 @@ public:
       note_freqs[i].end(); // call this before so we can flush audio blocks. failure to do so results in leaks
     }
     AudioInterrupts();
+
+    // Release VA claims and ID so future applets can reuse channels
+    pitch_cv_selection.DetachOwner();
+    pitch_env_selection.DetachOwner();
+    if (vacv_owner) { VACVRegistry::I().unregisterOwner(vacv_owner); vacv_owner = 0; }
+
     cv_stream.Release();
     AllowRestart();
   }
@@ -56,14 +73,10 @@ public:
         last_freq = freq;
         int_part = (int)last_freq;
         frac_part = (int)((last_freq - int_part) * 100);
-        // convert frequency to CV
-        float volts = log2f(last_freq / 32.7032f); // -3V to 6V
-        volts = constrain(volts, -3.0f, 6.0f);  // Clamp to O&C range
-        float norm = (volts + 3.0f) / 9.0f; // Normalize -3V..6V to 0.0..1.0
+        // convert frequency to CV. O_C C0 starts at 0 volts, so 0-6V should be expected for V/OCT.
+        volts = constrain(log2f(freq / 32.7032f), -3.0f, 6.0f);  // convert last freq to O_C CV range
         freq_available = freq > 0.0f;
-        // if (pitch_cv_selection) {
-        //   //WriteVirtualAudioCV(pitch_cv_selection, norm);} // only write if pitch_cv_selection is not 0    
-        // }
+        pitch_cv_selection.WriteVolts(volts, -3.0f, 6.0f);
       }
       
       // should we do anything when a pitch is not being read?
@@ -83,15 +96,41 @@ public:
     gfxPrint(" Hz");
     //gfxPrintPitchHz(freq);
 
-    gfxPrint(label_x, 25, "CVOut:  ");
-    gfxStartCursor();
-    gfxPrint(pitch_cv_selection);
-    gfxEndCursor(cursor == PITCH_CV_OUT, false, pitch_cv_selection.InputName());
+    float v = volts;
+    bool neg = v < 0.0f;
+    float av = neg ? -v : v;
+    int vi = (int)av;
+    int vf = (int)((av - vi) * 100.0f + 0.5f);
+    if (vf == 100) { vi += 1; vf = 0; }
+    if (neg) { gfxPrint(label_x, 25, "-"); gfxPrint(vi); }
+    else { gfxPrint(label_x, 25, vi); }
+    gfxPrint(".");
+    if (vf < 10) gfxPrint("0");
+    gfxPrint(vf);
 
-    gfxPrint(label_x, 35, "EnvOut:  ");
+    gfxPrint(label_x, 35, "CVOut:  ");
     gfxStartCursor();
-    gfxPrint(pitch_env_selection);
-    gfxEndCursor(cursor == PITCH_ENV_OUT, false, pitch_env_selection.InputName());
+    gfxPrint(pitch_cv_selection.Name());
+    gfxEndCursor(cursor == PITCH_CV_OUT, false, pitch_cv_selection.Name());
+
+    // gfxPrint(label_x, 35, "EnvOut:  ");
+    // gfxStartCursor();
+    // gfxPrint(pitch_env_selection.Name());
+    // gfxEndCursor(cursor == PITCH_ENV_OUT, false, pitch_env_selection.Name());
+
+    gfxPrint(label_x, 45, "PitchVolt:");
+    // gfxPrint(label_x, 55, pitch_cv_selection.ReadVolts());
+    float rv = pitch_cv_selection.ReadVolts();
+    bool rneg = rv < 0.0f;
+    float arv = rneg ? -rv : rv;
+    int rvi = (int)arv;
+    int rvf = (int)((arv - rvi) * 100.0f + 0.5f);
+    if (rvf == 100) { rvi += 1; rvf = 0; }
+    if (rneg) { gfxPrint(label_x, 55, "-"); gfxPrint(rvi); }
+    else { gfxPrint(label_x, 55, rvi); }
+    gfxPrint(".");
+    if (rvf < 10) gfxPrint("0");
+    gfxPrint(rvf);
 
     gfxDisplayInputMapEditor(); // this bookends any GUI with editable CV inputs
 
@@ -117,41 +156,13 @@ public:
     if (EditSelectedInputMap(direction)) return;
     switch (cursor) {
       case PITCH_CV_OUT:
-        //step_vacv(pitch_cv_selection, pitch_env_selection, direction);
-        pitch_cv_selection.ChangeSource(direction);
+        pitch_cv_selection.ChangeSource(direction); 
         break;
       case PITCH_ENV_OUT:
-        //step_vacv(pitch_env_selection, pitch_cv_selection, direction);
-        pitch_env_selection.ChangeSource(direction);
+        pitch_env_selection.ChangeSource(direction); 
         break;
     }
   }
-
-  // step virtual CV selection by ±1, bounds [0..8], avoid collisions with the other selection
-  // sharing is allowed only when both end up at 0.
-  void step_vacv(int &self, int other, int dir){
-    if (dir == 0) return;
-    const int MIN_V = 0;
-    const int MAX_V = 8;
-    int s = (dir > 0) ? 1 : -1;
-    int cand = self + s;
-    if (cand < MIN_V || cand > MAX_V) return;
-    // if candidate collides with the other selection
-    if (cand == other) {
-      // allow collision only if both would be 0
-      if (cand == 0) {
-        self = cand;
-        return;
-      }
-      // otherwise try to jump over
-      int cand2 = cand + s;
-      if (cand2 < MIN_V || cand2 > MAX_V) return;
-      if (cand2 == other) return; // still collides -> don't move
-      self = cand2;
-    } else {
-      self = cand;
-    }
-  };
 
   AudioStream* InputStream() override {
     return &passthru;
@@ -174,10 +185,8 @@ private:
 
   int cursor = 0;
   // correct this later to reflect some enum or list of available Virtual Audio CV ins
-  CVInputMap pitch_cv_selection; //VA1 
-  CVInputMap pitch_env_selection; //VA2
-  //int pitch_cv_selection;
-  //int pitch_env_selection;
+  VACVMap pitch_cv_selection{1}; //VA1 
+  VACVMap pitch_env_selection{2}; //VA2
 
   InterpolatingStream<> cv_stream;
   AudioPassthrough<Channels> passthru;
@@ -192,5 +201,8 @@ private:
   // For displaying frequency as text
   int int_part = 0;
   int frac_part = 0;
+
+  uint16_t vacv_owner = 0;
+  float volts = 0.0f;
 
 };

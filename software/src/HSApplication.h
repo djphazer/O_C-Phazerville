@@ -324,9 +324,10 @@ protected:
       NONE,
       CV_INPUT_MAP,
       DIGITAL_INPUT_MAP,
+      VACV_INPUT_MAP
     };
 
-    std::variant<std::monostate, CVInputMap*, DigitalInputMap*>
+    std::variant<std::monostate, CVInputMap*, DigitalInputMap*, VACVMap*>
       selected_input_map;
 
     // Check cursor blink cycle

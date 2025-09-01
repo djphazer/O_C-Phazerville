@@ -41,6 +41,7 @@
 #include "HSicons.h"
 #include "PhzIcons.h"
 #include "HSClockManager.h"
+#include "Audio/VACVMap.h"
 
 #include "HSUtils.h"
 #include "HSIOFrame.h"
@@ -327,6 +328,15 @@ public:
       gfxLine(xpos, ypos, xpos, ypos - height);
     }
 
+    // Unused: may implement later.
+    // void gfxPrint(VACVMap &map) {
+    //   gfxPrintIcon(map.Icon());
+    //   const int xpos = gfxGetPrintPosX() - 1;
+    //   const int ypos = gfxGetPrintPosY() + 4;
+    //   const int height = map.InRescaled(24);
+    //   gfxLine(xpos, ypos, xpos, ypos - height);
+    // }
+
     void gfxStartCursor(int x, int y) {
         gfxPos(x, y);
         gfxStartCursor();
@@ -489,6 +499,14 @@ public:
       return false;
     }
 
+    bool EditInputMap(VACVMap& input_map) {
+      if (!IsEditingInputMap()) {
+        selected_input_map = &input_map;
+        return true;
+      }
+      return false;
+    }
+
     void ClearEditInputMap() {
       selected_input_map = std::monostate{};
       if (EditMode()) CursorToggle();
@@ -565,9 +583,10 @@ protected:
       NONE,
       CV_INPUT_MAP,
       DIGITAL_INPUT_MAP,
+      VACV_INPUT_MAP
     };
 
-    std::variant<std::monostate, CVInputMap*, DigitalInputMap*>
+    std::variant<std::monostate, CVInputMap*, DigitalInputMap*, VACVMap*>
       selected_input_map;
 
     HEM_SIDE hemisphere; // Which hemisphere (0, 1, ...) this applet uses
