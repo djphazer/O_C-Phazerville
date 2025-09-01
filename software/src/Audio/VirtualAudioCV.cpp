@@ -33,15 +33,15 @@ float read(uint8_t ch) {
   return q15_to_f(q);
 }
 
-// O&C uses -3V..+6V on inputs; map that linearly to 0..1 to keep RawIn() scaling identical.
-void setVolts(uint8_t ch, float volts) {
-  // Clamp -3..+6 V, then map to 0..1
-  if (ch >= kChannels) return;
-  float v = volts;
-  if (v < -3.0f) v = -3.0f;
-  if (v >  6.0f) v =  6.0f;
-  set(ch, (v + 3.0f) / 9.0f);
-}
+// // O&C uses -3V..+6V on inputs; map that linearly to 0..1 to keep RawIn() scaling identical.
+// void setVolts(uint8_t ch, float volts) {
+//   // Clamp -3..+6 V, then map to 0..1
+//   if (ch >= kChannels) return;
+//   float v = volts;
+//   if (v < -3.0f) v = -3.0f;
+//   if (v >  6.0f) v =  6.0f;
+//   set(ch, (v + 3.0f) / 9.0f);
+// }
 
 void clear(uint8_t ch) {
   if (ch >= kChannels) return;
