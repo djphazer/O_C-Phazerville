@@ -10,7 +10,7 @@
 
 // index being which virtual audio input (1-8), value being the CV
 inline void WriteVirtualAudioCV(uint8_t index, float value01) {
-  (void)index; (void)value01; // placeholder
+  VirtualAudioCV::set(index, value01);
 }
 
 template <AudioChannels Channels>
@@ -23,7 +23,7 @@ public:
     cv_stream.Method(INTERPOLATION_LINEAR);
     cv_stream.Acquire();
     // Connect input to pitch analyzer (assuming mono input for pitch tracking)
-    for (int i = 0; i < Channels; ++i) {
+    for (int i = 0; i < Channels; i++) {
         // using the passthru as our input
         in_conns[i].connect(passthru, i, note_freqs[i], 0);
         note_freqs[i].begin(0.1); // initializes the pitch tracking algo. threshold 0.1-0.2 for optimal error rates
@@ -35,7 +35,7 @@ public:
     //
     AudioNoInterrupts(); // ensure audio doesn't flow in while we are stopping YIN
     delay(5);
-    for (int i = 0; i < Channels; ++i) {
+    for (int i = 0; i < Channels; i++) {
       note_freqs[i].end(); // call this before so we can flush audio blocks. failure to do so results in leaks
     }
     AudioInterrupts();
@@ -57,11 +57,13 @@ public:
         int_part = (int)last_freq;
         frac_part = (int)((last_freq - int_part) * 100);
         // convert frequency to CV
-        float volts = log2f(last_freq / 32.7032f); // -3V to +6V
-        volts = constrain(volts, -3.0f, 6.0f);     // Clamp to O&C range
-        float norm = (volts + 3.0f) / 9.0f;        // Normalize -3V..+6V to 0.0..1.0
+        float volts = log2f(last_freq / 32.7032f); // -3V to 6V
+        volts = constrain(volts, -3.0f, 6.0f);  // Clamp to O&C range
+        float norm = (volts + 3.0f) / 9.0f; // Normalize -3V..6V to 0.0..1.0
         freq_available = freq > 0.0f;
-        WriteVirtualAudioCV(pitch_cv_selection, norm);        
+        // if (pitch_cv_selection) {
+        //   //WriteVirtualAudioCV(pitch_cv_selection, norm);} // only write if pitch_cv_selection is not 0    
+        // }
       }
       
       // should we do anything when a pitch is not being read?
@@ -79,22 +81,34 @@ public:
     if (frac_part < 10) gfxPrint("0"); // leading zero for single-digit decimals
     gfxPrint(frac_part);
     gfxPrint(" Hz");
+    //gfxPrintPitchHz(freq);
 
-    gfxPrint(label_x, 25, "PitchCV:");
+    gfxPrint(label_x, 25, "CVOut:  ");
     gfxStartCursor();
     gfxPrint(pitch_cv_selection);
-    gfxEndCursor(cursor == PITCH_CV_OUT);
+    gfxEndCursor(cursor == PITCH_CV_OUT, false, pitch_cv_selection.InputName());
 
-    gfxPrint(label_x, 35, "PitchEnv:");
+    gfxPrint(label_x, 35, "EnvOut:  ");
     gfxStartCursor();
     gfxPrint(pitch_env_selection);
-    gfxEndCursor(cursor == PITCH_ENV_OUT);
+    gfxEndCursor(cursor == PITCH_ENV_OUT, false, pitch_env_selection.InputName());
+
+    gfxDisplayInputMapEditor(); // this bookends any GUI with editable CV inputs
 
    }
   uint64_t OnDataRequest() override {
     return 0;
     }
   void OnDataReceive(uint64_t data) override {}
+  void OnButtonPress() override {
+    if (CheckEditInputMapPress(
+          cursor,
+          IndexedInput(PITCH_CV_OUT, pitch_cv_selection),
+          IndexedInput(PITCH_ENV_OUT, pitch_env_selection)
+        ))
+      return;
+    CursorToggle();
+  }
   void OnEncoderMove(int direction) override {
     if (!EditMode()) {
       MoveCursor(cursor, direction, CURSOR_MAX);
@@ -103,11 +117,41 @@ public:
     if (EditSelectedInputMap(direction)) return;
     switch (cursor) {
       case PITCH_CV_OUT:
+        //step_vacv(pitch_cv_selection, pitch_env_selection, direction);
+        pitch_cv_selection.ChangeSource(direction);
         break;
       case PITCH_ENV_OUT:
+        //step_vacv(pitch_env_selection, pitch_cv_selection, direction);
+        pitch_env_selection.ChangeSource(direction);
         break;
     }
   }
+
+  // step virtual CV selection by ±1, bounds [0..8], avoid collisions with the other selection
+  // sharing is allowed only when both end up at 0.
+  void step_vacv(int &self, int other, int dir){
+    if (dir == 0) return;
+    const int MIN_V = 0;
+    const int MAX_V = 8;
+    int s = (dir > 0) ? 1 : -1;
+    int cand = self + s;
+    if (cand < MIN_V || cand > MAX_V) return;
+    // if candidate collides with the other selection
+    if (cand == other) {
+      // allow collision only if both would be 0
+      if (cand == 0) {
+        self = cand;
+        return;
+      }
+      // otherwise try to jump over
+      int cand2 = cand + s;
+      if (cand2 < MIN_V || cand2 > MAX_V) return;
+      if (cand2 == other) return; // still collides -> don't move
+      self = cand2;
+    } else {
+      self = cand;
+    }
+  };
 
   AudioStream* InputStream() override {
     return &passthru;
@@ -130,8 +174,10 @@ private:
 
   int cursor = 0;
   // correct this later to reflect some enum or list of available Virtual Audio CV ins
-  int8_t pitch_cv_selection = 1; //VA1 
-  int8_t pitch_env_selection = 2; //VA2
+  CVInputMap pitch_cv_selection; //VA1 
+  CVInputMap pitch_env_selection; //VA2
+  //int pitch_cv_selection;
+  //int pitch_env_selection;
 
   InterpolatingStream<> cv_stream;
   AudioPassthrough<Channels> passthru;

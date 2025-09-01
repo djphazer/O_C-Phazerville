@@ -1,75 +1,59 @@
-#include <stdint.h>
+// src/Audio/VirtualAudioCV.cpp
+#include "Audio/VirtualAudioCV.h"
 
-// Provide fallback multiply helper if not available to avoid editing util_profiling.h.
-// util_profiling.h calls multiply_u32xu32_rshift32(...) — define it here so the
-// header can compile when included below.
-#ifndef multiply_u32xu32_rshift32
-static inline uint32_t multiply_u32xu32_rshift32(uint32_t a, uint32_t b) {
-  return (uint32_t)(((uint64_t)a * (uint64_t)b) >> 32);
-}
-#endif
-
-#include <Audio.h>
-#include <math.h> // optional clamp
-#include "HSIOFrame.h" 
-#include "VirtualAudioCV.h"
-
-//I WILL LIKELY EITHER DEPRECATE OR CHANGE THIS FILE'S FUNCTIONALITY
-//VIRTUAL AUDIO CV INPUTS ARE DEFINED WITHIN HSIOFrame.h
-//THEY WILL ALSO BE STORED SOMEHOW THROUGH THE IO-FRAME. STILL FIGURING THAT OUT
-static constexpr int VACV_CHANNEL_COUNT = HS::VACV_CHANNEL_COUNT;
+// We store values as Q15 (0..65535). No heap, no audio blocks.
+static volatile uint16_t s_q15[VirtualAudioCV::kChannels] = {0};
 
 namespace VirtualAudioCV {
 
-static Channel g_ch[VACV_CHANNEL_COUNT];
-// Optional: a tiny per-channel smoother state for read_smooth()
-static float g_smooth[VACV_CHANNEL_COUNT];
-
-void init() {
-  for (int i = 0; i < VACV_CHANNEL_COUNT; ++i) {
-    g_ch[i].value = 0.0f;
-    g_ch[i].seq   = 0u;    // even => stable
-    snapshot[i] = 0;
-    g_smooth[i]   = 0.0f;
-  }
+// Voltage/float conversion
+static inline uint16_t f_to_q15(float v01) {
+  if (v01 <= 0.0f) return 0;
+  if (v01 >= 1.0f) return 65535u;
+  return static_cast<uint16_t>(v01 * 65535.0f + 0.5f);
+}
+static inline float q15_to_f(uint16_t q) {
+  return static_cast<float>(q) / 65535.0f;
 }
 
-// --- Audio-rate writer ---
-// seqlock pattern: bump seq to odd, write value, bump seq to even.
-void update(int ch, float v) {
-  if ((unsigned)ch >= VACV_CHANNEL_COUNT) return;
-
-  // (Optional) quickly clamp to a sane range to avoid NaNs/Inf
-  if (v != v) v = 0.0f; // NaN guard
-
-  uint32_t s = g_ch[ch].seq;
-  g_ch[ch].seq = s + 1u;     // mark "dirty" (odd)
-  g_ch[ch].value = v;
-  g_ch[ch].seq = s + 2u;     // mark "stable" (even)
+void set(uint8_t ch, float v01) {
+  if (ch >= kChannels) return;
+  uint16_t q = f_to_q15(v01);
+  __disable_irq();
+  s_q15[ch] = q;
+  __enable_irq();
 }
 
-// --- Control-rate reader ---
-  // returns -1..+1 full-scale
-  float read(size_t vacv_index) {
-    // produce a normalized value here from the correct VACV channel.
-    // e.g. if you compute sample -> value in -1..1, return it directly.
-    // Avoid heavy locking; if you must access audio buffers, use a lock-free snapshot.
-    return current_vacv_value[vacv_index]; // float in [-1, 1]
-  }
-
-float read_smooth(int ch, float alpha) {
-  if ((unsigned)ch >= VACV_CHANNEL_COUNT) return 0.0f;
-  if (alpha < 0.0f) alpha = 0.0f;
-  if (alpha > 1.0f) alpha = 1.0f;
-
-  float target = read(ch);
-  float prev   = g_smooth[ch];
-  float v      = prev + alpha * (target - prev);
-  g_smooth[ch] = v;
-  return v;
+float read(uint8_t ch) {
+  if (ch >= kChannels) return 0.0f;
+  uint16_t q;
+  __disable_irq();
+  q = s_q15[ch];
+  __enable_irq();
+  return q15_to_f(q);
 }
 
-// convenience accessor
-inline constexpr int channel_count() { return VACV_CHANNEL_COUNT; }
+// O&C uses -3V..+6V on inputs; map that linearly to 0..1 to keep RawIn() scaling identical.
+void setVolts(uint8_t ch, float volts) {
+  // Clamp -3..+6 V, then map to 0..1
+  if (ch >= kChannels) return;
+  float v = volts;
+  if (v < -3.0f) v = -3.0f;
+  if (v >  6.0f) v =  6.0f;
+  set(ch, (v + 3.0f) / 9.0f);
+}
+
+void clear(uint8_t ch) {
+  if (ch >= kChannels) return;
+  __disable_irq();
+  s_q15[ch] = 0;
+  __enable_irq();
+}
+
+void clearAll() {
+  __disable_irq();
+  for (uint8_t i = 0; i < kChannels; ++i) s_q15[i] = 0;
+  __enable_irq();
+}
 
 } // namespace VirtualAudioCV
