@@ -17,7 +17,6 @@ void set(uint8_t ch, float v01);
 float read(uint8_t ch);
 
 // Optional helpers (no-ops if ch out of range)
-void setVolts(uint8_t ch, float volts);  // -3..+6 V mapped to 0..1 like CVInputMap does
 void clear(uint8_t ch);
 void clearAll();
 

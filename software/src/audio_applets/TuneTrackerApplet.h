@@ -73,8 +73,8 @@ public:
         last_freq = freq;
         int_part = (int)last_freq;
         frac_part = (int)((last_freq - int_part) * 100);
-        // convert frequency to CV. O_C C0 starts at 0 volts, so 0-6V should be expected for V/OCT.
-        volts = constrain(log2f(freq / 32.7032f), -3.0f, 6.0f);  // convert last freq to O_C CV range
+        // convert frequency to CV. O_C C0 starts at -2 volts, so -2-6V should be expected for TuneTracker V/Oct range.
+        volts = constrain(-2.0f + log2f(freq / 16.35159783f), -3.0f, 6.0f);  // C0 freq is 16.35159783f
         freq_available = freq > 0.0f;
         pitch_cv_selection.WriteVolts(volts, -3.0f, 6.0f);
       }

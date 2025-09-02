@@ -9,6 +9,12 @@ struct VACVMap {
   int8_t   ch01   = 0;
   uint16_t owner  = 0;
 
+  // ---- scaling constants/helpers --------------------------------------------
+  static constexpr float VACV_VMIN  = -3.0f;
+  static constexpr float VACV_VMAX  =  6.0f;
+  static constexpr float VACV_VSPAN = (VACV_VMAX - VACV_VMIN); // 9.0
+  static constexpr int   HEM_UNITS_PER_V = (12 << 7);          // 1536
+
   // Keep the caller’s initial channel in constructor; claim later when we have an owner.
   VACVMap(int8_t init_ch01 = 0, uint16_t init_owner = 0)
     : ch01(init_ch01), owner(0) {
@@ -79,40 +85,62 @@ struct VACVMap {
     Claim(free0 < 0 ? 0 : (free0 + 1));
   }
 
-  // Write helpers (CVInputMap::RawIn() already scales VA 0..1 -> raw)
-  void WriteNorm(float n01) const {
-    if (IsNone()) return;
-    if (n01 < 0.f) n01 = 0.f; else if (n01 > 1.f) n01 = 1.f;
-    VirtualAudioCV::set(Channel0(), n01);
+  // Scaling Helpers -------------------
+  int round_to_int(float x) {
+    return (x >= 0.f) ? (int)(x + 0.5f) : (int)(x - 0.5f);
+  }
+  float volts_from_norm(float n01) {
+    return VACV_VMIN + n01 * VACV_VSPAN;                       // [-3..+6]
+  }
+  float norm_from_volts(float v) {
+    return (v - VACV_VMIN) / VACV_VSPAN;                       // [0..1]
+  }
+  int raw_from_volts(float v) {
+    return round_to_int(v * (float)HEM_UNITS_PER_V);           // signed raw
+  }
+  float volts_from_raw(int raw) {
+    return (float)raw / (float)HEM_UNITS_PER_V;                // volts
   }
 
-  // expects a constrained voltage input for range of the O_C
-  void WriteVolts(float v, float vmin=-3.f, float vmax=6.f) const { 
-    if (IsNone() || vmax <= vmin) return;
-    WriteNorm((v - vmin) / (vmax - vmin));
+  // Write helpers ----------------------
+  // Writes the raw (it's a control value, so -3V really represents 0 here)
+  void WriteRaw(float n01) const {
+    if (IsNone()) return;
+    if (n01 < 0.f) n01 = 0.f; else if (n01 > 1.f) n01 = 1.f;
+    VirtualAudioCV::set(Channel0(), n01);                      // store 0..1
   }
-  void WriteRawInScale(int raw) const { // 0..HEMISPHERE_MAX_INPUT_CV
-    WriteNorm((float)raw / (float)HEMISPHERE_MAX_INPUT_CV);
+
+  void WriteRawInScale(int raw) const {                        // signed raw (−4608..+9216)
+    float v   = volts_from_raw(raw);                           // → volts (−3..+6 typical)
+    float n01 = norm_from_volts(v);                            // → 0..1
+    if (n01 < 0.f) n01 = 0.f; else if (n01 > 1.f) n01 = 1.f;
+    WriteRaw(n01);
+  }
+
+  void WriteVolts(float v, float vmin = VACV_VMIN, float vmax = VACV_VMAX) const {
+    if (IsNone() || vmax <= vmin) return;
+    // Clamp to stated range, then map to 0..1 and store
+    if (v < vmin) v = vmin; else if (v > vmax) v = vmax;
+    WriteRaw((v - vmin) / (vmax - vmin));
   }
 
   //Read Helpers
   // Return the current VACV value as a normalized 0..1 float. Returns 0 if None.
   float ReadNorm() const {
     if (IsNone()) return 0.0f;
-    return VirtualAudioCV::read(Channel0());
+    return VirtualAudioCV::read(Channel0());                   // 0..1
   }
 
-  // Return the current VACV value scaled to volts in [vmin..vmax].
-  float ReadVolts(float vmin = -3.0f, float vmax = 6.0f) const {
-    if (vmax <= vmin) return vmin;
-    return vmin + ReadNorm() * (vmax - vmin);
+  int ReadRaw() const {                                        // signed raw domain
+    float v = volts_from_norm(ReadNorm());                     // −3..+6
+    return raw_from_volts(v);                                  // −4608..+9216
   }
 
-  // Return the current VACV value scaled to the integer raw-in domain
-  // (0 .. HEMISPHERE_MAX_INPUT_CV). Rounds to nearest int. Returns 0 if None.
-  int ReadRaw() const {
-    if (IsNone()) return 0;
-    return (int) (ReadNorm() * (float)HEMISPHERE_MAX_INPUT_CV + 0.5f);
+  float ReadVolts(float vmin = VACV_VMIN, float vmax = VACV_VMAX) const {
+    float v = volts_from_norm(ReadNorm());                     // −3..+6
+    // honor the caller’s display range, but don’t warp the storage
+    if (v < vmin) v = vmin; else if (v > vmax) v = vmax;
+    return v;
   }
 
   const char* Name() const {

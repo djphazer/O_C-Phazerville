@@ -33,8 +33,7 @@ struct CVInputMap {
         ? frame.outputs[source - 1 - ADC_CHANNEL_LAST]
         : ((source - ADC_CHANNEL_LAST - DAC_CHANNEL_LAST) >= 1
             && (source - ADC_CHANNEL_LAST - DAC_CHANNEL_LAST) <= VACV_CHANNEL_COUNT)
-            ? static_cast<int>(VirtualAudioCV::read(source - ADC_CHANNEL_LAST - DAC_CHANNEL_LAST - 1)
-                               * static_cast<float>(HEMISPHERE_MAX_INPUT_CV))
+            ? VACVToRaw(source - ADC_CHANNEL_LAST - DAC_CHANNEL_LAST - 1)
             : frame.MIDIState.mapping[source - ADC_CHANNEL_LAST - DAC_CHANNEL_LAST - VACV_CHANNEL_COUNT - 1].output;
   }
 
@@ -45,8 +44,22 @@ struct CVInputMap {
 
   float InF(float default_value = 0.0f) {
     if (!source) return default_value;
+  //   if (prefer_vacv_direct && IsVACVSource(source)) {
+  //     const int ch0 = VACVIndex0FromSource(source);
+  //     float n01 = VirtualAudioCV::read(ch0);             // 0..1
+  //   return 0.001f * Atten() * n01;                     // apply attenuverting here
+  // }
     return 0.001f * Atten() * static_cast<float>(RawIn())
       / static_cast<float>(HEMISPHERE_MAX_INPUT_CV);
+  }
+
+  int VACVToRaw(int index) {
+    float n   = VirtualAudioCV::read(index);           // 0..1
+    float v   = -3.0f + n * 9.0f;                    // volts
+    int   raw = (v >= 0.f)
+                ? (int)(v * 1536.f + 0.5f)
+                : (int)(v * 1536.f - 0.5f);          // signed rounding
+    return raw;
   }
 
   int SemitoneIn(int default_value = 0) {
@@ -68,6 +81,14 @@ struct CVInputMap {
     source = x;
   }
 
+  // VACV helper function to achieve correct scaling. Checks for and returns VACV source if it exists
+  int GetVACVSource(int source) {
+    if (source >= (ADC_CHANNEL_LAST + DAC_CHANNEL_LAST + 1) && source <= (ADC_CHANNEL_LAST + DAC_CHANNEL_LAST + VACV_CHANNEL_COUNT)) {
+      return source - (ADC_CHANNEL_LAST + DAC_CHANNEL_LAST + 1);
+    }
+    return 0;
+  }
+
   char const* InputName() const {
     return OC::Strings::cv_input_names_none[source];
   }
@@ -86,6 +107,7 @@ struct CVInputMap {
     source = data & 0xFF;
     attenuversion = extract_value<int8_t>(data >> 8);
   }
+
 };
 
 // Let's PackingUtils know this is Packable as is.
@@ -137,7 +159,7 @@ struct DigitalInputMap {
       case CV_OUTPUT:
         return frame.outputs[cv_output_index()] > GATE_THRESHOLD;
       case VIRTUAL_AUDIO_CV:
-        return frame.outputs[virtual_audio_cv_index()] > GATE_THRESHOLD;
+        return static_cast<int>(VirtualAudioCV::read(virtual_audio_cv_index()) * static_cast<float>(HEMISPHERE_MAX_INPUT_CV) + 0.5f) > GATE_THRESHOLD;
       case MIDI_MAP:
         return frame.MIDIState.mapping[midi_map_index()].output > GATE_THRESHOLD;
       case NONE:
