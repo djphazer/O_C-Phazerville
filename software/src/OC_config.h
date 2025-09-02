@@ -5,6 +5,17 @@
 #error "Please compile O&C firmware for Teensy 3.2 with CPU speed 120MHz"
 #endif
 
+// --- Hardware details --- //
+static constexpr int DIGITAL_INPUT_COUNT = 4;
+#if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
+static constexpr int DAC_CHANNEL_COUNT = 8;
+static constexpr int ADC_CHANNEL_COUNT = 8;
+#else
+static constexpr int DAC_CHANNEL_COUNT = 4;
+static constexpr int ADC_CHANNEL_COUNT = 4;
+#endif
+
+// --- Timing --- //
 // 60us = 16.666...kHz : Works, SPI transfer ends 2uS before next ISR
 // 66us = 15.1515...kHz
 // 72us = 13.888...kHz
@@ -37,12 +48,18 @@ static constexpr unsigned long SETTINGS_SAVE_TIMEOUT_MS = 1000;
 
 #define EEPROM_CALIBRATIONDATA_START 0
 
-#ifndef ARDUINO_TEENSY41
-#define EEPROM_CALIBRATIONDATA_END 128
-#define EEPROM_GLOBALSETTINGS_END 960
-#else
+#if defined(ARDUINO_TEENSY41)
+// T4.1 - 8 channels, 11 octaves
 #define EEPROM_CALIBRATIONDATA_END 224
-#define EEPROM_GLOBALSETTINGS_END 1280
+#define EEPROM_GLOBALSETTINGS_END 224
+#elif defined(__IMXRT1062__)
+// T4.0 - 4 channels, 11 octaves
+#define EEPROM_CALIBRATIONDATA_END 128
+#define EEPROM_GLOBALSETTINGS_END 128
+#else
+// T3.2 - 4 channels, 11 octaves
+#define EEPROM_CALIBRATIONDATA_END 128
+#define EEPROM_GLOBALSETTINGS_END 1060
 #endif
 
 #define EEPROM_GLOBALSETTINGS_START EEPROM_CALIBRATIONDATA_END
@@ -64,6 +81,9 @@ static constexpr unsigned long SETTINGS_SAVE_TIMEOUT_MS = 1000;
 #define OC_UI_SEPARATE_ISR
 
 #define OC_ENCODERS_ENABLE_ACCELERATION_DEFAULT true
+
+// Alternate encoder handling - processes both rising and falling edge on pins
+//#define TINRS_ENCODERS
 
 #define OC_CALIBRATION_DEFAULT_FLAGS (0)
 

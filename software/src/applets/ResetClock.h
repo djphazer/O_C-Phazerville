@@ -27,6 +27,7 @@ public:
     const char* applet_name() {
         return "ResetClk";
     }
+    const uint8_t* applet_icon() { return PhzIcons::resetClk; }
 
     void Start() {
         cursor = 0;

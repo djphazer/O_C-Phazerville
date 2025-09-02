@@ -32,6 +32,7 @@ public:
     const char* applet_name() {
         return "Enigma Jr";
     }
+    const uint8_t* applet_icon() { return PhzIcons::enigmaJr; }
 
     void Start() {
         ForEachChannel(ch)

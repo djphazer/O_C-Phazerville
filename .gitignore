@@ -7,17 +7,10 @@ sloeber.ino.cpp
 bin
 software/test/build
 .project
-software/o_c_REV/.cproject
-software/o_c_REV/.project
-software/o_c_REV/.settings/
-software/o_c_REV/HEM_SH.ino
-software/o_c_REV/sloeber.ino.cpp
-software/.DS_Store
-software/o_c_REV/*.hex
-software/o_c_REV/.DS_Store
 .DS_Store
 shelved/
-Hemisphere\ Suite.cpp
 builds
 .pio
 .vscode
+.cache/
+compile_commands.json

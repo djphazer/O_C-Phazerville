@@ -21,6 +21,7 @@
 class Strum : public HemisphereApplet {
 public:
   const char *applet_name() { return "Strum"; }
+  const uint8_t *applet_icon() { return PhzIcons::strum; }
 
   void Start() { 
     qselect = io_offset;
@@ -162,9 +163,8 @@ public:
     }
   }
 
-  void OnButtonPress() {
-    isEditing = !isEditing;
-  }
+  //void OnButtonPress() { }
+
   void AuxButton() {
     if (cursor == QUANT)
       HS::QuantizerEdit(qselect);
@@ -176,11 +176,11 @@ public:
       stepmode = !stepmode;
     }
 
-    isEditing = false;
+    CancelEdit();
   }
 
   void OnEncoderMove(int direction) {
-    if (!isEditing) {
+    if (!EditMode()) {
       MoveCursor(cursor, direction, INTERVAL_START + length - 1);
       return;
     }

@@ -3,7 +3,6 @@
 
 #include "OC_bitmaps.h"
 #include "OC_patterns.h"
-#include "OC_patterns_presets.h"
 #include "OC_options.h"
 
 namespace OC {
@@ -31,9 +30,6 @@ public:
   }
 
   void Edit(Owner *owner, int pattern) {
-    if (OC::Patterns::PATTERN_NONE == pattern)
-      return;
-
     pattern_ = mutable_pattern_ = &OC::user_patterns[pattern];
     pattern_name_ = OC::pattern_names_short[pattern];
     // Serial.print("Editing user pattern ");
@@ -323,7 +319,7 @@ void PatternEditor<Owner>::handleButtonUp(const UI::Event &event) {
 
     // next pattern / edit 'offline':
     edit_this_sequence_++;
-    if (edit_this_sequence_ > OC::Patterns::PATTERN_USER_LAST-1)
+    if (edit_this_sequence_ > OC::Patterns::NUM_PATTERNS_PER_CHAN-1)
       edit_this_sequence_ = 0;
 
     cursor_pos_ = 0;
@@ -337,7 +333,7 @@ void PatternEditor<Owner>::handleButtonDown(const UI::Event &event) {
     // next pattern / edit 'offline':
     edit_this_sequence_--;
     if (edit_this_sequence_ < 0)
-      edit_this_sequence_ = OC::Patterns::PATTERN_USER_LAST-1;
+      edit_this_sequence_ = OC::Patterns::NUM_PATTERNS_PER_CHAN-1;
 
     cursor_pos_ = 0;
     num_slots_ = owner_->get_sequence_length(edit_this_sequence_);

@@ -26,13 +26,18 @@ public:
     const char* applet_name() {
         return "ScaleDuet";
     }
+    const uint8_t* applet_icon() { return PhzIcons::scaleDuet; }
 
+    void SetMask(uint16_t &mask) {
+        quant.Configure(OC::Scales::GetScale(OC::Scales::SCALE_SEMI), mask);
+    }
     void Start() {
         ForEachChannel(scale)
         {
             mask[scale] = 0xffff;
         }
-        QuantizerConfigure(0, OC::Scales::SCALE_SEMI, mask[0]);
+        quant.Init();
+        SetMask(mask[0]);
         last_scale = 0;
     }
 
@@ -52,11 +57,11 @@ public:
         if (continuous || EndOfADCLag()) {
             uint8_t scale = Gate(1);
             if (scale != last_scale) {
-                QuantizerConfigure(0, OC::Scales::SCALE_SEMI, mask[scale]);
+                SetMask(mask[scale]);
                 last_scale = scale;
             }
 
-            int new_pitch = Quantize(0, In(0), 0, 0);
+            int new_pitch = quant.Process(In(0), 0, 0);
             if (q_pitch != new_pitch)
                 ClockOut(1);
             q_pitch = new_pitch;
@@ -78,7 +83,7 @@ public:
         // Toggle the mask bit at the cursor position
         mask[scale] ^= (0x01 << bit);
         if (scale == last_scale)
-            QuantizerConfigure(0, OC::Scales::SCALE_SEMI, mask[scale]);
+            SetMask(mask[scale]);
     }
 
     void OnEncoderMove(int direction) {
@@ -99,7 +104,7 @@ public:
         mask[1] = Unpack(data, PackLocation {12,12});
 
         last_scale = 0;
-        QuantizerConfigure(0, OC::Scales::SCALE_SEMI, mask[last_scale]);
+        SetMask(mask[last_scale]);
     }
 
 protected:
@@ -122,6 +127,8 @@ private:
     uint8_t last_scale; // The most-recently-used scale (used to set the mask when necessary)
     int q_pitch;
     bool continuous = 1;
+
+    braids::Quantizer quant;
 
     void DrawKeyboard() {
         // Border

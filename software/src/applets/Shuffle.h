@@ -26,6 +26,7 @@ public:
     const char* applet_name() {
         return "Shuffle";
     }
+    const uint8_t* applet_icon() { return PhzIcons::shuffle; }
 
     void Start() {
         delay[0] = 0;

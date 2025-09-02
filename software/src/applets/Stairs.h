@@ -41,6 +41,7 @@ public:
     const char* applet_name() {
         return "Stairs";
     }
+    const uint8_t* applet_icon() { return PhzIcons::stairs; }
 
     void Start() {
         steps = 1;

@@ -21,7 +21,6 @@
 
 /* Used ProbDiv applet from benirose as a template */
 
-#include "../HSProbLoopLinker.h" // singleton for linking ProbDiv and ProbMelo
 #include "../util/clkdivmult.h"
 
 class DivSeq : public HemisphereApplet {
@@ -35,82 +34,30 @@ public:
         STEP1B, STEP2B, STEP3B, STEP4B, STEP5B,
         MUTE1A, MUTE2A, MUTE3A, MUTE4A, MUTE5A,
         MUTE1B, MUTE2B, MUTE3B, MUTE4B, MUTE5B,
-        LAST_SETTING = MUTE5B
+        RE_ZAP,
+        LAST_SETTING = RE_ZAP
     };
 
-    struct DivSequence {
-      int step_index = -1;
-      int clock_count = 0;
-      ClkDivMult divmult[NUM_STEPS]; // separate DividerMultiplier for each step
-      uint8_t muted = 0x0; // bitmask
-      uint32_t last_clock = 0;
-
-      void Set(int s, int div) {
-        divmult[s].Set(div);
-      }
-      void ToggleStep(int idx) {
-        muted ^= (0x01 << idx);
-      }
-      void SetMute(int idx, bool set = true) {
-        muted = (muted & ~(0x01 << idx)) | ((set & 0x01) << idx);
-      }
-      bool Muted(int idx) {
-        return (muted >> idx) & 0x01;
-      }
-      bool StepActive(int idx) {
-        return divmult[idx].steps != 0 && !Muted(idx);
-      }
-      bool Poke(bool clocked = 0) {
-        bool trigout = false;
-        // reset case
-        if (clocked && step_index < 0) {
-            step_index = 0;
-            divmult[step_index].last_clock = last_clock;
-            last_clock = OC::CORE::ticks;
-            return divmult[step_index].Tick(true) && StepActive(step_index);
-        }
-
-        trigout = divmult[step_index].Tick(clocked);
-
-        if (clocked)
-        {
-          if (divmult[step_index].steps < 0 || ++clock_count >= divmult[step_index].steps)
-          {
-            // special case to proceed to next step
-            clock_count = 0;
-
-            int i = 0;
-            do {
-                ++step_index %= NUM_STEPS;
-                ++i;
-            } while (!StepActive(step_index) && i < NUM_STEPS);
-
-            if (StepActive(step_index)) {
-              divmult[step_index].Reset();
-              divmult[step_index].last_clock = last_clock;
-              trigout = divmult[step_index].Tick(true);
-            }
-          }
-
-          last_clock = OC::CORE::ticks;
-        }
-
-
-        return trigout;
-      }
-      void Reset() {
-        step_index = -1;
-        clock_count = 0;
-        for (auto &d : divmult) d.Reset();
-      }
-
-    } div_seq[2];
+    DivSequence<NUM_STEPS> div_seq[2];
 
     const char* applet_name() {
         return "DivSeq";
     }
+    const uint8_t* applet_icon() { return PhzIcons::divSeq; }
 
     void Start() {
+      ForEachChannel(ch) {
+        int total = 16 + ch*16;
+        for (int i = 0; i < NUM_STEPS - 1; ++i) {
+          int val = random(total);
+          if (1 == val)
+            div_seq[ch].Set(i, -random(7)-1);
+          else
+            div_seq[ch].Set(i, val);
+          total -= val;
+        }
+        div_seq[ch].Set(NUM_STEPS - 1, total);
+      }
       Reset();
     }
 
@@ -121,13 +68,10 @@ public:
     }
     void TrigOut(int ch) {
         ClockOut(ch);
-        loop_linker->Trigger(ch);
         pulse_animation[ch] = HEMISPHERE_PULSE_ANIMATION_TIME;
     }
 
     void Controller() {
-        loop_linker->RegisterDiv(hemisphere);
-
         // reset
         if (Clock(1)) {
             Reset();
@@ -166,6 +110,12 @@ public:
     }
 
     void OnButtonPress() {
+        if (RE_ZAP == cursor) {
+          Start();
+          cursor = 0;
+          return;
+        }
+
         if (cursor >= MUTE1A && !EditMode()) {
             const int ch = (cursor - MUTE1A) / NUM_STEPS;
             const int s = (cursor - MUTE1A) % NUM_STEPS;
@@ -177,7 +127,7 @@ public:
       const int ch = (cursor) / NUM_STEPS;
       const int s = (cursor) % NUM_STEPS;
       div_seq[ch].ToggleStep(s);
-      isEditing = false;
+      CancelEdit();
     }
 
     void OnEncoderMove(int direction) {
@@ -191,7 +141,7 @@ public:
         if (ch > 1) // mutes
             div_seq[ch-2].ToggleStep(s);
         else {
-            const int div = div_seq[ch].divmult[s].steps + direction;
+            const int div = div_seq[ch].Get(s) + direction;
             div_seq[ch].Set(s, div);
         }
     }
@@ -223,7 +173,7 @@ public:
             int offset = Unpack(data, PackLocation { size_t(60 + ch*2), 1 }) ? 16 : 0;
             for (size_t i = 0; i < NUM_STEPS; i++) {
                 div_seq[ch].divmult[i].steps = Unpack(data, PackLocation {ch*NUM_STEPS*b + i*b, b}) - offset;
-                div_seq[ch].divmult[i].steps = constrain(div_seq[ch].divmult[i].steps, -MAX_DIV, MAX_DIV);
+                CONSTRAIN(div_seq[ch].divmult[i].steps, -MAX_DIV, MAX_DIV);
             }
             // step 1 cannot be zero
             if (div_seq[ch].divmult[0].steps == 0) ++div_seq[ch].divmult[0].steps;
@@ -249,13 +199,20 @@ protected:
   }
 
 private:
-    int cursor; // DivSeqCursor 
+    int cursor; // DivSeqCursor
 
     int pulse_animation[2] = {0,0};
 
-    ProbLoopLinker *loop_linker = loop_linker->get();
-
     void DrawInterface() {
+      if (RE_ZAP == cursor) {
+        gfxIcon(28, 22, DOWN_ICON);
+        gfxIcon(18, 32, RIGHT_ICON);
+        gfxIcon(28, 32, ZAP_ICON);
+        gfxIcon(38, 32, LEFT_ICON);
+        gfxIcon(28, 42, UP_ICON);
+        return;
+      }
+
       // divisions
       ForEachChannel(ch) {
         const size_t x = 31*ch;

@@ -77,6 +77,7 @@ public:
     const char* applet_name() { // Maximum 10 characters
         return "SeqPlay7";
     }
+    const uint8_t* applet_icon() { return PhzIcons::seqPlay7; }
 
     void Start() {
       seq_player[0].repeats = 1;

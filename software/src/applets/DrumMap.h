@@ -38,6 +38,7 @@ public:
     const char* applet_name() {
         return "DrumMap";
     }
+    const uint8_t* applet_icon() { return PhzIcons::drumMap; }
 
     void Start() {
         step = 0;
@@ -125,7 +126,7 @@ public:
         if (OC::CORE::ticks - last_clock > HEM_DRUMMAP_AUTO_RESET_TICKS && step != 0) {
             Reset();
         }
-        
+
     }
 
     void View() {
@@ -192,13 +193,13 @@ public:
           value_animation = HEM_DRUMMAP_VALUE_ANIMATION_TICKS;
         }
     }
-        
+
     uint64_t OnDataRequest() {
         uint64_t data = 0;
-        Pack(data, PackLocation {0,8}, fill[0]); 
-        Pack(data, PackLocation {8,8}, fill[1]); 
-        Pack(data, PackLocation {16,8}, x); 
-        Pack(data, PackLocation {24,8}, y); 
+        Pack(data, PackLocation {0,8}, fill[0]);
+        Pack(data, PackLocation {8,8}, fill[1]);
+        Pack(data, PackLocation {16,8}, x);
+        Pack(data, PackLocation {24,8}, y);
         Pack(data, PackLocation {32,8}, chaos);
         Pack(data, PackLocation {40,8}, mode[0]);
         Pack(data, PackLocation {48,8}, mode[1]);
@@ -212,9 +213,10 @@ public:
         x = Unpack(data, PackLocation {16,8});
         y = Unpack(data, PackLocation {24,8});
         chaos = Unpack(data, PackLocation {32,8});
-        mode[0] = Unpack(data, PackLocation {40,8});
-        mode[1] = Unpack(data, PackLocation {48,8});
-        cv_mode = Unpack(data, PackLocation {56,8});
+
+        mode[0] = constrain(Unpack(data, PackLocation {40,8}), 0, 2);
+        mode[1] = constrain(Unpack(data, PackLocation {48,8}), 0, 3);
+        cv_mode = constrain(Unpack(data, PackLocation {56,8}), 0, 2);
         Reset();
     }
 
@@ -245,10 +247,10 @@ private:
     int value_animation = 0;
     int knob_accel = 256;
     uint32_t last_clock;
-    
+
     // settings
     int8_t mode[2] = {0, 1};
-    int fill[2] = {128, 128}; 
+    int fill[2] = {128, 128};
     int _fill[2] = {128, 128};
     int x = 0;
     int _x = 0;
@@ -273,12 +275,12 @@ private:
       uint8_t quad_x = x << 2;
       uint8_t quad_y = y << 2;
       // return U8Mix(U8Mix(a, b, x << 2), U8Mix(c, d, x << 2), y << 2);
-      // U8Mix returns b * x + a * (255 - x) >> 8 
+      // U8Mix returns b * x + a * (255 - x) >> 8
       uint8_t ab_fade = (b * quad_x + a * (255 - quad_x)) >> 8;
       uint8_t cd_fade = (d * quad_x + c * (255 - quad_x)) >> 8;
       return (cd_fade * quad_y + ab_fade * (255 - quad_y)) >> 8;
     }
-    
+
     void DrawInterface() {
         // output selection
         char outlabel[] = { (char)('A' + io_offset), ':', '\0' };
@@ -312,44 +314,57 @@ private:
             gfxPrint(32,25,"F");
             DrawSlider(40,25,20,_fill[1], MAX_VAL, cursor == 3);
         }
-        
+
         // x & y
         gfxPrint(1,35,"X");
         DrawSlider(9,35,20,_x, MAX_VAL, cursor == 4);
         gfxPrint(32,35,"Y");
         DrawSlider(40,35,20,_y, MAX_VAL, cursor == 5);
-        
+
         // chaos
         gfxPrint(1,45,"CHAOS");
         DrawSlider(32,45,28,_chaos, MAX_VAL, cursor == 6);
-        
-        // step count in header
-        gfxPrint((step < 9 ? 49 : 43),2,step+1);
+
+        // step count as progress bar
+        gfxFrame(0, 10, (step+1)*2, 3);
 
         // cursor for non-knobs
         if (cursor <= 1)
             gfxCursor(14+cursor*31,23,16); // Part A / B
-        
+
         // display value for knobs
-        if (value_animation > 0 && cursor >= 2 && cursor <= 6) {
-          int val = *VALUE_MAP[cursor-2];
-          int xPos = 27;
-          if (val > 99) {
-            xPos = 21;
-          } else if (val > 9) {
-            xPos = 24;
-          }
-          gfxPrint(xPos, 55, val);
-          gfxInvert(1, 54, 63, 10);
-        } else {
+        if (cursor == 7) {
           // cv input assignment
           gfxIcon(1,57,CV_ICON);
           gfxPrint(10,55,CV_MODE_NAMES[cv_mode]);
-          if (cursor == 7) gfxCursor(10,63,50); // CV Assign
+          gfxCursor(10,63,50); // CV Assign
+        } else {
+            ForEachChannel(ch) {
+                DrawTracks(55 + 5 * ch, ch);
+            }
         }
-
+        if (value_animation > 0 && cursor >= 2 && cursor <= 6) {
+          int val = *VALUE_MAP[cursor-2];
+          int xPos = 23;
+          int yPos = 4 + 10 * (cursor/2);
+          int w = 3 * 6 + 1;
+          int h = 10;
+          gfxClear(xPos, yPos, w, h);
+          gfxPos(xPos, yPos+1);
+          graphics.printf("%3d", val);
+          gfxInvert(xPos, yPos, w, h);
+        }
     }
 
+    void DrawTracks(int y, int ch) {
+        uint8_t part = (ch == 1 && mode[ch] == 3) ? mode[0] : mode[ch];
+        for (int i=0; i < 32; i++) {
+            int level = ReadDrumMap((step + i) % 32, part, _x, _y);
+            int h = level >> 6;
+            if (level > 0) h++;
+            gfxRect(2 * i, y + 4 - h, 2, h);
+        }
+    }
     void Reset() {
         step = 0;
     }

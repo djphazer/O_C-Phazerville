@@ -22,8 +22,9 @@ class TrigSeq : public HemisphereApplet {
 public:
 
     const char* applet_name() { // Maximum 10 characters
-        return "TrigSeq";
+        return "Trig8x2";
     }
+    const uint8_t* applet_icon() { return PhzIcons::trigseq; }
 
     void Start() {
         ForEachChannel(ch)

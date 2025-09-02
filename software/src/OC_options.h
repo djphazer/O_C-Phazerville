@@ -11,12 +11,14 @@
 
 /* ------------ uncomment for use with all Northernlight 4U modules - cOC, 2OC, hOC ---------- */
 //#define NORTHERNLIGHT
-/* ------------ uncomment for the Northernlight hOC (to correct button mappings) ----- */
-//#define NLM_hOC
-/* ------------ uncomment for older hardware revisions of the Northernlight 2OC ----- */
-//#define NLM_DIY
 /* ------------ uncomment for use with Northernlight 2OC on the left side: --------------------------  */
 //#define NORTHERNLIGHT_2OC_LEFTSIDE
+/* ------------ uncomment for the Northernlight hOC (to correct button mappings) ----- */
+//#define NLM_hOC
+/* ------------ uncomment for the Northernlight cardOC (to correct button mappings) ----- */
+//#define NLM_cardOC
+/* ------------ uncomment for older hardware revisions of the Northernlight 2OC ----- */
+//#define NLM_DIY
 
 /* ------------ print debug messages to USB serial --------------------------------------------------  */
 //#define PRINT_DEBUG

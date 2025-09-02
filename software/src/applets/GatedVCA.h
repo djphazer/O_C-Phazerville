@@ -24,6 +24,7 @@ public:
     const char* applet_name() { // Maximum 10 characters
         return "Gated VCA";
     }
+    const uint8_t* applet_icon() { return PhzIcons::gateVca; }
 
     void Start() {
         amp_offset_pct = 0;

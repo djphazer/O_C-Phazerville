@@ -26,6 +26,7 @@ public:
     const char* applet_name() {
         return "Mixer:Bal";
     }
+    const uint8_t* applet_icon() { return PhzIcons::mixerBal; }
 
     void Start() {
         balance = 127;

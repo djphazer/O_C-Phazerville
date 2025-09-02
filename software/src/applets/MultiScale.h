@@ -28,26 +28,32 @@ public:
     const char* applet_name() {
         return "MultiScale";
     }
+    const uint8_t* applet_icon() { return PhzIcons::multiscale; }
 
+    void SetMask(uint16_t &mask) {
+        quant.Configure(OC::Scales::GetScale(OC::Scales::SCALE_SEMI), mask);
+    }
     void Start() {
         // init all scales no all notes
         for (uint8_t i = 0; i < MS_QUANT_SCALES_COUNT; i++) {
             scale_mask[i] = 0x0001;
         }
-        QuantizerConfigure(0, 5, scale_mask[0]);
+        quant.Init();
+        SetMask(scale_mask[0]);
     }
 
     void Controller() {
 
         // user selected scale from input 2
-        int scale = DetentedIn(1);
-        if (scale < 0) scale = 0;        
-        if (scale > 0) {
-            scale = constrain(ProportionCV(scale, MS_QUANT_SCALES_COUNT + 1), 0, MS_QUANT_SCALES_COUNT - 1);
-        }
+        int scale = constrain(
+            Proportion( DetentedIn(1), HEMISPHERE_MAX_INPUT_CV, MS_QUANT_SCALES_COUNT),
+            0,
+            MS_QUANT_SCALES_COUNT - 1
+        );
+
         if (scale != current_scale) {
             current_scale = scale;
-            QuantizerConfigure(0, 5, scale_mask[current_scale]);
+            SetMask(scale_mask[current_scale]);
             ClockOut(1); // send clock at second output
         }
 
@@ -63,7 +69,7 @@ public:
         }
 
         if (continuous || EndOfADCLag(0)) {
-            int32_t quantized = Quantize(0, In(0), 0, 0);
+            int32_t quantized = quant.Process(In(0), 0, 0);
             Out(0, quantized);
         }
     }
@@ -76,7 +82,7 @@ public:
     void ToggleBit(const uint8_t bit) {
         scale_mask[scale_page] ^= (0x01 << bit); // togle bit at position
         if (scale_page == current_scale) {
-            QuantizerConfigure(0, 5, scale_mask[current_scale]);
+            SetMask(scale_mask[current_scale]);
         }
     }
     void OnButtonPress() {
@@ -114,7 +120,7 @@ public:
         scale_mask[1] = Unpack(data, PackLocation {12, 12});
         scale_mask[2] = Unpack(data, PackLocation {24, 12});
         scale_mask[3] = Unpack(data, PackLocation {36, 12});
-        QuantizerConfigure(0, 5, scale_mask[0]);
+        SetMask(scale_mask[0]);
     }
 
 protected:
@@ -134,6 +140,7 @@ protected:
 private:
     int cursor = 0;
     bool continuous = true;
+    braids::Quantizer quant;
     uint16_t scale_mask[MS_QUANT_SCALES_COUNT];
 
     int8_t current_scale = 0;

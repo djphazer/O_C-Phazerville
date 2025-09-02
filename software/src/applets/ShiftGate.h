@@ -4,6 +4,7 @@ public:
     const char* applet_name() {
         return "ShiftGate";
     }
+    const uint8_t* applet_icon() { return PhzIcons::shiftGate; }
 
     void Start() {
         ForEachChannel(ch)

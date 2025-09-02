@@ -1,0 +1,60 @@
+title: Phazerville Suite
+description: An open-source firmware project for Teensy-based Eurorack hardware.
+remote_theme: just-the-docs/just-the-docs@v0.10.1
+color_scheme: dark
+permalink: "/:name"
+ga_tracking: "G-L37BVS8SCE"
+ga_tracking_anonymize_ip: true # Use GDPR compliant Google Analytics settings (true/nil by default)
+
+titles_from_headings:
+  enabled:     true
+  strip_title: false
+  collections: true
+
+defaults:
+  scope:
+    path: ""
+  values:
+    layout: default
+
+aux_links:
+  "Downloads":
+    - "https://github.com/djphazer/O_C-Phazerville/releases"
+  "Screen Capture":
+    - "https://github.com/PaulStoffregen/Phazerville-Screen-Capture/releases"
+nav_external_links:
+  - title: Custom Firmware Builds
+    url: https://github.com/djphazer/O_C-Phazerville/discussions/38
+    opens_in_new_tab: true
+
+collections:
+  apps:
+    permalink: "/:title"
+    output: true
+  applets:
+    permalink: "/:title"
+    output: true
+  audio_applets:
+    permalink: "/:title"
+    output: true
+
+just_the_docs:
+  collections:
+    apps:
+      name: Apps
+      nav_fold: true
+    applets:
+      name: Applets
+      nav_fold: true
+    audio_applets:
+      name: Audio Applets
+      nav_fold: true
+
+footer_content: "This documentation is part of the <a href=\"https://github.com/djphazer/O_C-Phazerville\">Phazerville Suite O_C firmware project</a> (sometimes misspelled as Phaserville). A Google Analytics tag is being used to collect basic, anonymous traffic statistics data."
+
+gh_edit_link: true
+gh_edit_link_text: "Edit this page on GitHub"
+gh_edit_repository: "https://github.com/djphazer/O_C-Phazerville" # the github URL for your repo
+gh_edit_branch: "wiki-docs" # the branch that your docs is served from
+gh_edit_source: docs
+gh_edit_view_mode: "tree"

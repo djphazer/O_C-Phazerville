@@ -34,6 +34,7 @@ public:
     const char* applet_name() {
         return "Burst";
     }
+    const uint8_t* applet_icon() { return PhzIcons::burst; }
 
     void Start() {
         cursor = 0;
@@ -50,8 +51,7 @@ public:
     void Controller() {
         // Settings and modulation over CV
         if (DetentedIn(0) > 0) {
-            number = ProportionCV(In(0), HEM_BURST_NUMBER_MAX + 1);
-            number = constrain(number, 1, HEM_BURST_NUMBER_MAX);
+            number = constrain(Proportion(In(0), HEMISPHERE_MAX_INPUT_CV, HEM_BURST_NUMBER_MAX), 1, HEM_BURST_NUMBER_MAX);
             last_number_cv_tick = OC::CORE::ticks;
         }
         int spacing_mod = clocked ? 0 : Proportion(DetentedIn(1), HEMISPHERE_MAX_INPUT_CV, 500);
@@ -149,14 +149,11 @@ public:
 
         case 4:
             div += direction;
-            if (div > HEM_BURST_CLOCKDIV_MAX) div = HEM_BURST_CLOCKDIV_MAX;
-            if (div < -HEM_BURST_CLOCKDIV_MAX) div = -HEM_BURST_CLOCKDIV_MAX;
-            if (div == 0) div = direction > 0 ? 1 : -2; // No such thing as 1/1 Multiple
-            if (div == -1) div = 1; // Must be moving up to hit -1 (see previous line)
+            div_constrain(direction);
             break;
         }
     }
-        
+
     uint64_t OnDataRequest() {
         uint64_t data = 0;
         Pack(data, PackLocation {0,8}, number);
@@ -168,11 +165,11 @@ public:
     }
 
     void OnDataReceive(uint64_t data) {
-        number = Unpack(data, PackLocation {0,8});
-        spacing = Unpack(data, PackLocation {8,8});
-        div = Unpack(data, PackLocation {16,8}) - 8;
-        jitter = Unpack(data, PackLocation {24,8});
-        accel = Unpack(data, PackLocation {32,8});
+        number = constrain(Unpack(data, PackLocation {0,8}), 1, HEM_BURST_NUMBER_MAX);
+        spacing = constrain(Unpack(data, PackLocation {8,8}), HEM_BURST_SPACING_MIN, HEM_BURST_SPACING_MAX);
+        div = Unpack(data, PackLocation {16,8}) - 8; div_constrain(); // special constrain for div
+        jitter = constrain(Unpack(data, PackLocation {24,8}), 0, HEM_BURST_JITTER_MAX);
+        accel = constrain(Unpack(data, PackLocation {32,8}), -HEM_BURST_ACCEL_MAX, HEM_BURST_ACCEL_MAX);
     }
 
 protected:
@@ -239,7 +236,7 @@ private:
         if (cursor == 4) gfxCursor(1, 53, 62);
     }
 
-    void DrawIndicator() {        
+    void DrawIndicator() {
         for (int i = 0; i < bursts_to_go; i++)
         {
 //            gfxLine(0 + (i * 5), 11, 4 + (i * 5), 11);
@@ -257,4 +254,10 @@ private:
         return effective_spacing;
     }
 
+    void div_constrain(int dir = 1) { // moved special contrain procedure to function for reuse when constraining unpack.
+        if (div > HEM_BURST_CLOCKDIV_MAX) div = HEM_BURST_CLOCKDIV_MAX;
+        if (div < -HEM_BURST_CLOCKDIV_MAX) div = -HEM_BURST_CLOCKDIV_MAX;
+        if (div == 0) div = dir > 0 ? 1 : -2; // No such thing as 1/1 Multiple
+        if (div == -1) div = 1; // Must be moving up to hit -1 (see previous line)
+    }
 };

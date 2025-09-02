@@ -20,22 +20,32 @@
 
 #include <Arduino.h>
 #include <EEPROM.h>
+#include "HSUtils.h"
 #include "OC_apps.h"
+#include "OC_calibration.h"
+#include "OC_core.h"
 #include "OC_ui.h"
 #include "HSApplication.h"
 #include "OC_strings.h"
+#include "src/drivers/display.h"
+#ifdef PEWPEWPEW
+#include "util/pewpewsplash.h"
+#endif
 
 extern "C" void _reboot_Teensyduino_();
+using namespace OC;
 
 class Settings : public HSApplication {
 public:
   bool reflash = false;
   bool calibration_mode = false;
   bool calibration_complete = true;
+  bool cal_save_q = false;
+  int current_octave = 0; // for fine-tuning DAC points
   OC::DigitalInputDisplay digital_input_displays[4];
   OC::TickCount tick_count;
 
-  OC::CalibrationState calibration_state = {
+  OC::CalibrationState calstate = {
     OC::HELLO,
     &OC::calibration_steps[OC::HELLO],
     0, // "use defaults: no"
@@ -45,45 +55,57 @@ public:
   void Resume() {
     if (calibration_mode && !calibration_complete) {
       // restart calibration if you exit and come back
-      Calibration();
+      StartCalibration();
+    }
+  }
+  void Suspend() {
+    if (cal_save_q) {
+      OC::calibration_save();
+      cal_save_q = false;
     }
   }
 
-  void Controller()
-  {
-    using namespace OC;
-    if (calibration_mode && !calibration_complete)
-    {
-      uint32_t ticks = tick_count.Update();
-      digital_input_displays[0].Update(ticks, DigitalInputs::read_immediate<DIGITAL_INPUT_1>());
-      digital_input_displays[1].Update(ticks, DigitalInputs::read_immediate<DIGITAL_INPUT_2>());
-      digital_input_displays[2].Update(ticks, DigitalInputs::read_immediate<DIGITAL_INPUT_3>());
-      digital_input_displays[3].Update(ticks, DigitalInputs::read_immediate<DIGITAL_INPUT_4>());
+  void SwitchToStep(int direction) {
 
-      const CalibrationStep *next_step = &calibration_steps[calibration_state.step];
-      if (next_step != calibration_state.current_step) {
-        #ifdef PRINT_DEBUG
-          SERIAL_PRINTLN("%s (%d)", next_step->title, step_to_channel(next_step->step));
-        #else
-          step_to_channel(next_step->step);
-        #endif
+      if (calstate.current_step->calibration_type == CALIBRATE_OCTAVE && !calstate.used_defaults) {
+        // fine-tuning for CALIBRATE_DAC
+        int octave = current_octave + direction;
+        if ( !(octave < 0 || octave > min(OCTAVES, calstate.current_step->index + 7)) ) {
+          current_octave = octave;
+          calstate.encoder_value =
+              OC::calibration_data.dac.calibrated_octaves[step_to_channel(calstate.step)][current_octave];
+          return;
+        }
+      }
+
+      CALIBRATION_STEP index = static_cast<CALIBRATION_STEP>(calstate.step + direction);
+      CONSTRAIN(index, CENTER_DISPLAY, CALIBRATION_EXIT);
+      const CalibrationStep *next_step = &calibration_steps[index];
+      if (next_step != calstate.current_step)
+      {
+        calstate.step = index;
+        const DAC_CHANNEL chan = step_to_channel(next_step->step);
+        SERIAL_PRINTLN("%s (%d)", next_step->title, chan);
+
         // Special cases on exit current step
-        switch (calibration_state.current_step->step) {
+        if (calstate.used_defaults
+          && CALIBRATE_OCTAVE == calstate.current_step->calibration_type
+          && calstate.current_step->index > 5) {
+          // always apply interpolation when leaving a high DAC point
+          InterpolateChannel(step_to_channel(calstate.current_step->step));
+        }
+        switch (calstate.current_step->step) {
           case HELLO:
-            if (calibration_state.encoder_value) {
+            if (calstate.encoder_value) {
               SERIAL_PRINTLN("Reset to defaults...");
               uint32_t flags = OC::calibration_data.flags & CALIBRATION_FLAG_ENCODER_MASK;
               OC::calibration_reset();
               OC::calibration_data.flags |= flags; // preserve encoder config
-              calibration_state.used_defaults = true;
+              calstate.used_defaults = true;
             }
             break;
-#ifdef VOR
-          case DAC_A_VOLT_7:
-#else
-          case DAC_A_VOLT_6:
-#endif
-            if (calibration_state.used_defaults) {
+          case DAC_A_VOLT_HIGH:
+            if (calstate.used_defaults) {
               // copy DAC A to the rest of them, to make life easier
               for (int ch = 1; ch < DAC_CHANNEL_LAST; ++ch) {
                 for (int i = 0; i < OCTAVES; ++i) {
@@ -93,10 +115,10 @@ public:
             }
             break;
           case ADC_PITCH_C4:
-            if (calibration_state.adc_1v && calibration_state.adc_3v) {
-              OC::ADC::CalibratePitch(calibration_state.adc_1v, calibration_state.adc_3v);
+            if (calstate.adc_1v && calstate.adc_3v) {
+              OC::ADC::CalibratePitch(calstate.adc_1v, calstate.adc_3v);
               SERIAL_PRINTLN("ADC SCALE 1V=%d, 3V=%d -> %d",
-                             calibration_state.adc_1v, calibration_state.adc_3v,
+                             calstate.adc_1v, calstate.adc_3v,
                              OC::calibration_data.adc.pitch_cv_scale);
             }
             break;
@@ -107,8 +129,9 @@ public:
         // Setup next step
         switch (next_step->calibration_type) {
         case CALIBRATE_OCTAVE:
-          calibration_state.encoder_value =
-              OC::calibration_data.dac.calibrated_octaves[step_to_channel(next_step->step)][next_step->index + DAC::kOctaveZero];
+          current_octave = next_step->index;
+          calstate.encoder_value =
+              OC::calibration_data.dac.calibrated_octaves[chan][current_octave];
             #ifdef VOR
             /* set 0V @ unipolar range */
             DAC::set_Vbias(DAC::VBiasUnipolar);
@@ -117,21 +140,25 @@ public:
 
         #ifdef VOR
         case CALIBRATE_VBIAS_BIPOLAR:
-          calibration_state.encoder_value = (0xFFFF & OC::calibration_data.v_bias); // bipolar = lower 2 bytes
+          calstate.encoder_value = (0xFFFF & OC::calibration_data.v_bias); // bipolar = lower 2 bytes
         break;
         case CALIBRATE_VBIAS_ASYMMETRIC:
-          calibration_state.encoder_value = (OC::calibration_data.v_bias >> 16);  // asymmetric = upper 2 bytes
+          calstate.encoder_value = (OC::calibration_data.v_bias >> 16);  // asymmetric = upper 2 bytes
         break;
         #endif
-        
-        case CALIBRATE_ADC_OFFSET:
-          calibration_state.encoder_value = OC::calibration_data.adc.offset[next_step->index];
-            #ifdef VOR
-            DAC::set_Vbias(DAC::VBiasUnipolar);
-            #endif
+
+        case CALIBRATE_ADC_OFFSET: // set ADC zero-point offset
+          if (calstate.used_defaults) // start fresh? auto-cal
+            calstate.encoder_value = OC::ADC::smoothed_raw_value(static_cast<ADC_CHANNEL>(next_step->index));
+          else
+            calstate.encoder_value = OC::calibration_data.adc.offset[next_step->index];
+
+          #ifdef VOR
+          DAC::set_Vbias(DAC::VBiasUnipolar);
+          #endif
           break;
         case CALIBRATE_DISPLAY:
-          calibration_state.encoder_value = OC::calibration_data.display_offset;
+          calstate.encoder_value = OC::calibration_data.display_offset;
           break;
 
         case CALIBRATE_ADC_1V:
@@ -140,78 +167,275 @@ public:
           break;
 
         case CALIBRATE_SCREENSAVER:
-          calibration_state.encoder_value = OC::calibration_data.screensaver_timeout;
-          SERIAL_PRINTLN("timeout=%d", calibration_state.encoder_value);
+          calstate.encoder_value = OC::calibration_data.screensaver_timeout;
+          SERIAL_PRINTLN("timeout=%d", calstate.encoder_value);
           break;
 
         case CALIBRATE_NONE:
         default:
           if (CALIBRATION_EXIT != next_step->step) {
-            calibration_state.encoder_value = 0;
+            calstate.encoder_value = 0;
           } else {
             // Make the default "Save: no" if the calibration data was reset
             // manually, but only if calibration data was actually loaded from
             // EEPROM
-            if (calibration_state.used_defaults && OC::calibration_data_loaded)
-              calibration_state.encoder_value = 0;
+            if (calstate.used_defaults && OC::calibration_data_loaded)
+              calstate.encoder_value = 0;
             else
-              calibration_state.encoder_value = 1;
+              calstate.encoder_value = 1;
           }
         }
-        calibration_state.current_step = next_step;
+        calstate.current_step = next_step;
+      }
+  }
+
+  void InterpolateChannel(int ch) {
+    const int idxlow = 0;
+    const int idxhigh = current_octave;
+    uint32_t value = OC::calibration_data.dac.calibrated_octaves[ch][idxlow];
+    const uint16_t second = OC::calibration_data.dac.calibrated_octaves[ch][idxhigh];
+    int interval = (second - value) / (idxhigh - idxlow);
+
+    for (int i = idxlow+1; i < OCTAVES + 1; ++i) {
+      value += interval;
+      if (value > 0xFFFF) value = 0xFFFF;
+      OC::calibration_data.dac.calibrated_octaves[ch][i] = value;
+    }
+
+    calstate.auto_scale_set[ch] = true;
+  }
+
+  void Controller()
+  {
+    if (calibration_mode && !calibration_complete)
+    {
+      uint32_t ticks = tick_count.Update();
+      digital_input_displays[0].Update(ticks, DigitalInputs::read_immediate<DIGITAL_INPUT_1>());
+      digital_input_displays[1].Update(ticks, DigitalInputs::read_immediate<DIGITAL_INPUT_2>());
+      digital_input_displays[2].Update(ticks, DigitalInputs::read_immediate<DIGITAL_INPUT_3>());
+      digital_input_displays[3].Update(ticks, DigitalInputs::read_immediate<DIGITAL_INPUT_4>());
+
+      // moved from calibration_update()
+      const CalibrationStep *step = calstate.current_step;
+
+      switch (step->calibration_type) {
+        case CALIBRATE_NONE:
+          DAC::set_all_octave(0);
+          break;
+        case CALIBRATE_OCTAVE:
+          OC::calibration_data.dac.calibrated_octaves[step_to_channel(step->step)][current_octave] =
+            calstate.encoder_value;
+          DAC::set_all_octave(current_octave - DAC::kOctaveZero);
+          break;
+        #ifdef VOR
+        case CALIBRATE_VBIAS_BIPOLAR:
+          /* set 0V @ bipolar range */
+          DAC::set_all_octave(5);
+          OC::calibration_data.v_bias = (OC::calibration_data.v_bias & 0xFFFF0000) | calstate.encoder_value;
+          DAC::set_Vbias(0xFFFF & OC::calibration_data.v_bias);
+          break;
+        case CALIBRATE_VBIAS_ASYMMETRIC:
+          /* set 0V @ asym. range */
+          DAC::set_all_octave(3);
+          OC::calibration_data.v_bias = (OC::calibration_data.v_bias & 0xFFFF) | (calstate.encoder_value << 16);
+          DAC::set_Vbias(OC::calibration_data.v_bias >> 16);
+        break;
+        #endif
+        case CALIBRATE_ADC_OFFSET:
+          OC::calibration_data.adc.offset[step->index] = calstate.encoder_value;
+          DAC::set_all_octave(0);
+          break;
+        case CALIBRATE_ADC_1V:
+          DAC::set_all_octave(1);
+          break;
+        case CALIBRATE_ADC_3V:
+          DAC::set_all_octave(3);
+          break;
+        case CALIBRATE_DISPLAY:
+          OC::calibration_data.display_offset = calstate.encoder_value;
+          display::AdjustOffset(OC::calibration_data.display_offset);
+          break;
+        case CALIBRATE_SCREENSAVER:
+          DAC::set_all_octave(0);
+          OC::calibration_data.screensaver_timeout = calstate.encoder_value;
+          break;
       }
 
-      OC::calibration_update(calibration_state);
       return;
     }
 
-    #ifdef PEWPEWPEW
-        HS::frame.Load();PewPewTime.PEWPEW(Clock(3)<<1|Clock(0));}
-        struct{bool go=0;int idx=0;struct{uint8_t x,y;int x_v,y_v;}pewpews[8];
-        void PEWPEW(uint8_t mask){uint32_t t=OC::CORE::ticks;for(int i=0;i<8;++i){auto &p=pewpews[i];
-          if(mask>>i&0x01){auto &pp=pewpews[idx++];pp.x=0+120*i;pp.y=55;pp.x_v=(6+random(3))*(i?-1:1);pp.y_v=-9;idx%=8;}
-          if(t%500==0){p.x+=p.x_v;p.y+=p.y_v;if(p.y>=55&&p.y_v>0)p.y_v=-p.y_v;else ++p.y_v;}
-          if(t%10000==0){p.x_v=p.x_v*100/101;p.y_v=p.y_v*10/11;}}}}PewPewTime;
-        void PEWPEW(){for(int i=0;i<8;++i){auto &p=PewPewTime.pewpews[i];gfxIcon(p.x%128,p.y%64,ZAP_ICON);}
-    #endif
+    if (CORE::ticks % 3200 == 0) {
+      pick_left = random(8);
+      pick_right = random(8);
+    }
+
   }
 
-    void View() {
+  const uint8_t *iconography[8] = {
+    PhzIcons::voltage, ZAP_ICON,
+    PhzIcons::pigeons, PhzIcons::camels,
+    PhzIcons::legoFace, PhzIcons::tb3P0,
+    PhzIcons::drLoFi, PhzIcons::umbrella,
+  };
+  int pick_left = 0, pick_right = 0;
+
+  void View() {
       if (calibration_mode) {
-        OC::calibration_draw(calibration_state);
+        DrawCalibration();
         return;
       }
 
-        gfxHeader("Setup / About");
+      gfxHeader("Setup/About");
+      gfxIcon(80, 0, OC::calibration_data.flipscreen() ? DOWN_ICON : UP_ICON);
+      gfxIcon(90, 0, OC::calibration_data.flipcontrols() ? LEFT_ICON : RIGHT_ICON);
 
-        #if defined(ARDUINO_TEENSY40)
-        gfxPrint(100, 0, "T4.0");
-        //gfxPrint(0, 45, "E2END="); gfxPrint(E2END);
-        #elif defined(ARDUINO_TEENSY41)
-        gfxPrint(100, 0, "T4.1");
-        #else
-        gfxPrint(100, 0, "T3.2");
-        #endif
+      #if defined(ARDUINO_TEENSY40)
+      gfxPrint(100, 0, "T4.0");
+      //gfxPrint(0, 45, "E2END="); gfxPrint(E2END);
+      #elif defined(ARDUINO_TEENSY41)
+      gfxPrint(100, 0, "T4.1");
+      #else
+      gfxPrint(100, 0, "T3.2");
+      #endif
 
-        gfxIcon(0, 15, ZAP_ICON);
-        gfxIcon(120, 15, ZAP_ICON);
-        #ifdef PEWPEWPEW
-        gfxPrint(21, 15, "PEW! PEW! PEW!");
-        #else
-        gfxPrint(12, 15, "Phazerville Suite");
-        #endif
-        gfxPrint(0, 25, OC::Strings::VERSION);
-        gfxPrint(0, 35, "github.com/djphazer");
-        gfxPrint(0, 55, reflash ? "[Reflash]" : "[CALIBRATE]   [RESET]");
+      gfxIcon(0, 15, iconography[pick_left]);
+      gfxIcon(120, 15, iconography[pick_right]);
+      #ifdef PEWPEWPEW
+      gfxPrint(21, 15, "PEW! PEW! PEW!");
+      #else
+      gfxPrint(12, 15, OC::Strings::RELEASE_NAME);
+      #endif
+      gfxIcon(0, 25, PhzIcons::full_book);
+      gfxPrint(10, 25, OC::Strings::VERSION);
+      gfxIcon(0, 35, PhzIcons::runglBook);
+      gfxPrint(10, 35, OC::Strings::BUILD_TAG);
+      gfxIcon(0, 45, PhzIcons::frontBack);
+      gfxPrint(10, 45, "github.com/djphazer");
+      gfxPrint(0, 55, reflash ? "[Reflash]" : "[CALIBRATE]   [RESET]");
+  }
+
+  void DrawCalibration() {
+    const OC::CalibrationStep *step = calstate.current_step;
+
+    menu::DefaultTitleBar::Draw();
+    graphics.print(step->title);
+
+    weegfx::coord_t y = menu::CalcLineY(0);
+
+    static constexpr weegfx::coord_t kValueX = menu::kDisplayWidth - 30;
+
+    gfxPos(menu::kIndentDx, y + 2);
+    switch (step->calibration_type) {
+      case CALIBRATE_OCTAVE:
+      {
+        if (calstate.auto_scale_set[step_to_channel(step->step)]) {
+          graphics.drawBitmap8(menu::kDisplayWidth - 10, y + 13, 8, CHECK_ICON);
+          gfxPos(menu::kIndentDx, y + 2);
+        }
+        int voltage = (current_octave - DAC::kOctaveZero) * (NorthernLightModular? 12: 10);
+        graphics.printf("-> %d.%d00V", voltage / 10, voltage % 10);
+        gfxPos(kValueX, y + 2);
+        graphics.print((int)calstate.encoder_value, 5);
+        menu::DrawEditIcon(kValueX, y, calstate.encoder_value, step->min, step->max);
+        break;
+      }
+
+      case CALIBRATE_SCREENSAVER:
+      #ifdef VOR
+      case CALIBRATE_VBIAS_BIPOLAR:
+      case CALIBRATE_VBIAS_ASYMMETRIC:
+      #endif
+        graphics.print(step->message);
+        gfxPos(kValueX, y + 2);
+        graphics.print((int)calstate.encoder_value, 5);
+        menu::DrawEditIcon(kValueX, y, calstate.encoder_value, step->min, step->max);
+        break;
+
+      case CALIBRATE_ADC_OFFSET:
+        graphics.print(step->message);
+        gfxPos(kValueX, y + 2);
+        graphics.print((int)OC::ADC::value(static_cast<ADC_CHANNEL>(step->index)), 5);
+        menu::DrawEditIcon(kValueX, y, calstate.encoder_value, step->min, step->max);
+        break;
+
+      case CALIBRATE_DISPLAY:
+        graphics.print(step->message);
+        gfxPos(kValueX, y + 2);
+        graphics.pretty_print((int)calstate.encoder_value, 2);
+        menu::DrawEditIcon(kValueX, y, calstate.encoder_value, step->min, step->max);
+        graphics.drawFrame(0, 0, 128, 64);
+        break;
+
+      case CALIBRATE_ADC_1V:
+      case CALIBRATE_ADC_3V:
+        gfxPos(menu::kIndentDx, y + 2);
+        graphics.printf(step->message, (NorthernLightModular*2*step->index));
+        y += menu::kMenuLineH;
+        gfxPos(menu::kIndentDx, y + 2);
+        graphics.print((int)OC::ADC::value(ADC_CHANNEL_1), 2);
+        if ( (calstate.adc_1v && step->calibration_type == CALIBRATE_ADC_1V) ||
+             (calstate.adc_3v && step->calibration_type == CALIBRATE_ADC_3V) )
+        {
+          graphics.print("  (set)");
+        }
+        break;
+
+      case CALIBRATE_NONE:
+      default:
+        if (CALIBRATION_EXIT != step->step) {
+          gfxPos(menu::kIndentDx, y + 2);
+          graphics.print(step->message);
+          if (step->value_str)
+            graphics.print(step->value_str[calstate.encoder_value]);
+        } else {
+          gfxPos(menu::kIndentDx, y + 2);
+
+          if (calibration_data_loaded && calstate.used_defaults)
+            graphics.print("Overwrite? ");
+          else
+            graphics.print("Save? ");
+
+          if (step->value_str)
+            graphics.print(step->value_str[calstate.encoder_value]);
+
+        }
+        break;
     }
+
+    y += menu::kMenuLineH;
+    gfxPos(menu::kIndentDx, y + 2);
+    if (step->help)
+      graphics.print(step->help);
+
+    // NJM: display encoder direction config on first and last screens
+    if (step->step == HELLO || step->step == CALIBRATION_EXIT) {
+        y += menu::kMenuLineH;
+        gfxPos(menu::kIndentDx, y + 2);
+        graphics.print("Encoders: ");
+        graphics.print(OC::Strings::encoder_config_strings[ OC::calibration_data.encoder_config() ]);
+    }
+
+    weegfx::coord_t x = menu::kDisplayWidth - 22;
+    y = 2;
+    for (int input = OC::DIGITAL_INPUT_1; input < OC::DIGITAL_INPUT_LAST; ++input) {
+      uint8_t state = (digital_input_displays[input].getState() + 3) >> 2;
+      if (state)
+        graphics.drawBitmap8(x, y, 4, OC::bitmap_gate_indicators_8 + (state << 2));
+      x += 5;
+    }
+
+    graphics.drawStr(1, menu::kDisplayHeight - menu::kFontHeight - 3, step->footer);
+
+    static constexpr uint16_t step_width = (menu::kDisplayWidth << 8 ) / (CALIBRATION_STEP_LAST - 1);
+    graphics.drawRect(0, menu::kDisplayHeight - 2, (calstate.step * step_width) >> 8, 2);
+
+  }
 
     /////////////////////////////////////////////////////////////////
     // Control handlers
     /////////////////////////////////////////////////////////////////
 
     void HandleUiEvent(const UI::Event &event) {
-      using namespace OC;
-
       if (!calibration_mode) {
         if (event.control == OC::CONTROL_ENCODER_L) {
           reflash = (event.value > 0);
@@ -220,9 +444,18 @@ public:
           if (reflash)
             Reflash();
           else
-            Calibration();
+            StartCalibration();
         }
         if (event.control == OC::CONTROL_BUTTON_R && event.type == UI::EVENT_BUTTON_PRESS) FactoryReset();
+
+        // dual-press UP+DOWN / A+B to flip screen
+        if ( event.type == UI::EVENT_BUTTON_DOWN &&
+            (event.mask == (OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_B)) ) {
+          OC::calibration_data.toggle_flipmode();
+          display::SetFlipMode(OC::calibration_data.flipscreen());
+          cal_save_q = true;
+        }
+
         return;
       }
 
@@ -230,10 +463,9 @@ public:
       if (event.type == UI::EVENT_BUTTON_DOWN) {
         // act-on-press for right encoder
         if (event.control == CONTROL_BUTTON_R) {
-          // Special case these values to read, before moving to next step
-          if (calibration_state.step < CALIBRATION_EXIT)
-            calibration_state.step = static_cast<CALIBRATION_STEP>(calibration_state.step + 1);
-          else
+          if (calstate.step < CALIBRATION_EXIT) {
+            SwitchToStep(1); // step forward
+          } else
             calibration_complete = true;
 
           // ignore release and long-press during calibration
@@ -243,62 +475,57 @@ public:
         // press, long-press, or encoder movements
         switch (event.control) {
           case CONTROL_BUTTON_L:
-            if (calibration_state.step == HELLO) calibration_complete = 1; // Way out --jj
-            if (calibration_state.step > CENTER_DISPLAY)
-              calibration_state.step = static_cast<CALIBRATION_STEP>(calibration_state.step - 1);
+            if (calstate.step == HELLO) calibration_complete = 1; // Way out --jj
+            if (calstate.step > CENTER_DISPLAY)
+              SwitchToStep(-1); // step backward
             break;
           case CONTROL_BUTTON_R:
             break;
 
           case CONTROL_ENCODER_L:
-            if (calibration_state.step > HELLO) {
-              calibration_state.step = static_cast<CALIBRATION_STEP>(calibration_state.step + event.value);
-              CONSTRAIN(calibration_state.step, CENTER_DISPLAY, CALIBRATION_EXIT);
+            if (calstate.step > HELLO) {
+              SwitchToStep(event.value);
             }
             break;
           case CONTROL_ENCODER_R:
-            calibration_state.encoder_value += event.value;
+            calstate.encoder_value = constrain(calstate.encoder_value + event.value,
+                calstate.current_step->min, calstate.current_step->max);
             break;
 
           case CONTROL_BUTTON_UP:
           case CONTROL_BUTTON_DOWN:
             if (UI::EVENT_BUTTON_LONG_PRESS == event.type) {
-              const CalibrationStep *step = calibration_state.current_step;
+              const CalibrationStep *step = calstate.current_step;
 
-              // long-press DOWN to measure ADC points
+              // long-press B/DOWN to measure ADC points
               switch (step->step) {
                 case ADC_PITCH_C2:
-                  calibration_state.adc_1v = OC::ADC::value(ADC_CHANNEL_1);
+                  calstate.adc_1v = OC::ADC::value(ADC_CHANNEL_1);
                   break;
                 case ADC_PITCH_C4:
-                  calibration_state.adc_3v = OC::ADC::value(ADC_CHANNEL_1);
+                  calstate.adc_3v = OC::ADC::value(ADC_CHANNEL_1);
                   break;
                 default: break;
               }
 
-              // long-press DOWN to auto-scale DAC values on current channel
-              int volts = step->index + DAC::kOctaveZero;
-              if (step->calibration_type == CALIBRATE_OCTAVE && volts > 0) {
-                int ch = step_to_channel(step->step);
-                uint16_t first = OC::calibration_data.dac.calibrated_octaves[ch][0];
-                uint16_t second = OC::calibration_data.dac.calibrated_octaves[ch][volts];
-                int interval = (second - first) / volts;
+              // long-press to set ADC zero-point offset
+              if (CALIBRATE_ADC_OFFSET == step->calibration_type) {
+                calstate.encoder_value = OC::ADC::smoothed_raw_value(static_cast<ADC_CHANNEL>(step->index));
+              }
 
-                for (int i = 1; i < OCTAVES; ++i) {
-                  first += interval;
-                  OC::calibration_data.dac.calibrated_octaves[ch][i] = first;
-                }
+              // long-press DOWN to auto-scale DAC values on current channel
+              if (step->calibration_type == CALIBRATE_OCTAVE && current_octave > 0) {
+                InterpolateChannel(step_to_channel(step->step));
               }
               break;
             }
 
             // regular press cycles thru encoder orientations on first/last screen
-            if (calibration_state.step == HELLO || calibration_state.step == CALIBRATION_EXIT)
+            if (calstate.step == HELLO || calstate.step == CALIBRATION_EXIT)
+            {
               OC::ui.configure_encoders(calibration_data.next_encoder_config());
-            /* shortcut for jumping DAC values quicker...
-            else if (calibration_state.step > CENTER_DISPLAY)
-              calibration_state.encoder_value += (event.control == CONTROL_BUTTON_UP ? 128 : -128);
-            */
+              cal_save_q = true;
+            }
 
             break;
           default:
@@ -307,9 +534,10 @@ public:
       }
 
       if (calibration_complete) {
-        if (calibration_state.encoder_value) {
+        if (calstate.encoder_value) {
           SERIAL_PRINTLN("Calibration complete");
           OC::calibration_save();
+          cal_save_q = false;
         } else {
           SERIAL_PRINTLN("Calibration complete (but don't save)");
         }
@@ -318,16 +546,15 @@ public:
         calibration_mode = false;
       }
     }
-    void Calibration() {
+    void StartCalibration() {
         // migrated from OC::ui.Calibrate();
 
-        calibration_state = {
+        calstate = {
           OC::HELLO,
           &OC::calibration_steps[OC::HELLO],
           OC::calibration_data_loaded ? 0 : 1, // "use defaults: no" if data loaded
         };
-        calibration_state.adc_sum.set(OC::_ADC_OFFSET);
-        calibration_state.used_defaults = false;
+        calstate.used_defaults = false;
 
         for (auto &did : digital_input_displays)
           did.Init();
@@ -349,9 +576,9 @@ public:
       uint32_t start = millis();
       while(millis() < start + SETTINGS_SAVE_TIMEOUT_MS) {
         GRAPHICS_BEGIN_FRAME(true);
-        graphics.setPrintPos(5, 10);
+        gfxPos(5, 10);
         graphics.print("Flash Upgrade Mode");
-        graphics.setPrintPos(5, 19);
+        gfxPos(5, 19);
         graphics.print("(use Teensy Loader)");
         GRAPHICS_END_FRAME();
       }
@@ -386,12 +613,16 @@ void Settings_isr() {
 }
 
 void Settings_handleAppEvent(OC::AppEvent event) {
-    if (event ==  OC::APP_EVENT_RESUME) {
-        Settings_instance.Resume();
-    }
+  if (event == OC::APP_EVENT_RESUME) {
+    Settings_instance.Resume();
+  }
+  if (event == OC::APP_EVENT_SUSPEND) {
+    Settings_instance.Suspend();
+  }
 }
 
-void Settings_loop() {} // Deprecated
+void Settings_loop() {
+} // Deprecated
 
 void Settings_menu() {
     Settings_instance.BaseView();
@@ -399,7 +630,11 @@ void Settings_menu() {
 
 void Settings_screensaver() {
 #ifdef PEWPEWPEW
-    Settings_instance.PEWPEW();
+    for (int i = 0; i < (pewpew_width * pewpew_height / 64); ++i) {
+      // TODO: the problem here is that one byte in XBM is a row of 8 pixels,
+      //       while one byte in the framebuffer is a column of 8 pixels
+      gfxBitmap((i & 0x1)*64, (i>>1)*8, 64, pewpew_bits + i*64);
+    }
 #endif
 }
 

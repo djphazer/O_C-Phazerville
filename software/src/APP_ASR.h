@@ -25,6 +25,7 @@
 #include "util/util_turing.h"
 #include "util/util_ringbuffer.h"
 #include "util/util_integer_sequences.h"
+#include "OC_ADC.h"
 #include "OC_DAC.h"
 #include "OC_menus.h"
 #include "OC_scales.h"
@@ -99,22 +100,22 @@ enum ASR_CV4_DEST {
   ASR_DEST_LAST
 };
 
-typedef int16_t ASR_pitch;
+using ASR_pitch = int16_t;
 
 class ASRApp : public settings::SettingsBase<ASRApp, ASR_SETTING_LAST> {
 public:
   static constexpr size_t kHistoryDepth = 5;
 
 #ifdef ARDUINO_TEENSY41
-  static constexpr ADC_CHANNEL CVInput1 = ADC_CHANNEL_5;
-  static constexpr ADC_CHANNEL CVInput2 = ADC_CHANNEL_6;
-  static constexpr ADC_CHANNEL CVInput3 = ADC_CHANNEL_7;
-  static constexpr ADC_CHANNEL CVInput4 = ADC_CHANNEL_8;
+  static constexpr ADC_CHANNEL &CVInput1 = ADC_CHANNEL_5;
+  static constexpr ADC_CHANNEL &CVInput2 = ADC_CHANNEL_6;
+  static constexpr ADC_CHANNEL &CVInput3 = ADC_CHANNEL_7;
+  static constexpr ADC_CHANNEL &CVInput4 = ADC_CHANNEL_8;
 #else
-  static constexpr ADC_CHANNEL CVInput1 = ADC_CHANNEL_1;
-  static constexpr ADC_CHANNEL CVInput2 = ADC_CHANNEL_2;
-  static constexpr ADC_CHANNEL CVInput3 = ADC_CHANNEL_3;
-  static constexpr ADC_CHANNEL CVInput4 = ADC_CHANNEL_4;
+  static constexpr ADC_CHANNEL &CVInput1 = ADC_CHANNEL_1;
+  static constexpr ADC_CHANNEL &CVInput2 = ADC_CHANNEL_2;
+  static constexpr ADC_CHANNEL &CVInput3 = ADC_CHANNEL_3;
+  static constexpr ADC_CHANNEL &CVInput4 = ADC_CHANNEL_4;
 #endif
 
   int get_scale(uint8_t dummy) const {

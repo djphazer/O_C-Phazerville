@@ -23,11 +23,13 @@
 
 #include "waveform_library.h"
 
-class WaveformManager {
-public:
+namespace WaveformManager {
+    // forward decl
+    static VectorOscillator VectorOscillatorFromLibrary(uint8_t waveform_number);
+
     /*
-     * The segment at user_waveforms[0] should have a level byte of 0xfc, and the time
-     * byte should have a value of 0xe2. This indicates that the memory is set up for
+     * The segment at user_waveforms[0] should have a level of 0xfc, and the time
+     * should have a value of 0xe2. This indicates that the memory is set up for
      * segment storage. If Validate() is false, then Setup() should be executed.
      */
     bool static Validate() {
@@ -43,12 +45,12 @@ public:
         HS::user_waveforms[4] = VOSegment {0x02, 0xff}; // TOC entry: 2 steps
         HS::user_waveforms[5] = VOSegment {0xff, 0x00}; // First segment of sawtooth
         HS::user_waveforms[6] = VOSegment {0x00, 0x01}; // Second segment of sawtooth
-        for (byte i = 7; i < 64; i++) HS::user_waveforms[i] = VOSegment {0x00, 0xff};
+        for (uint8_t i = 7; i < 64; i++) HS::user_waveforms[i] = VOSegment {0x00, 0xff};
     }
 
-    byte static WaveformCount() {
-        byte count = 0;
-        for (byte i = 0; i < HS::VO_SEGMENT_COUNT; i++)
+    uint8_t static WaveformCount() {
+        uint8_t count = 0;
+        for (uint8_t i = 0; i < HS::VO_SEGMENT_COUNT; i++)
         {
             if (HS::user_waveforms[i].IsTOC()) count++;
         }
@@ -61,9 +63,9 @@ public:
      * waveform_number is the starting waveform, and direction is -1 or 1, which way you want to move
      * in the list.
      */
-    byte static GetNextWaveform(byte waveform_number, int direction) {
+    uint8_t static GetNextWaveform(uint8_t waveform_number, int direction) {
         int new_number = waveform_number + direction;
-        byte count = WaveformCount();
+        uint8_t count = WaveformCount();
         if (new_number < 0) new_number = 0;
         if (new_number == count) new_number = 32; // Move from last user waveform to first library waveform
         if (new_number <= 31 && new_number >= count) new_number = count - 1; // Move from first library waveform to last user waveform
@@ -71,9 +73,9 @@ public:
         return new_number;
     }
 
-    byte static SegmentsRemaining() {
-        byte segment_count = 1; // Include validation segment
-        for (byte i = 0; i < HS::VO_SEGMENT_COUNT; i++)
+    uint8_t static SegmentsRemaining() {
+        uint8_t segment_count = 1; // Include validation segment
+        for (uint8_t i = 0; i < HS::VO_SEGMENT_COUNT; i++)
         {
             if (HS::user_waveforms[i].IsTOC()) {
                 segment_count += HS::user_waveforms[i].Segments();
@@ -82,13 +84,13 @@ public:
         return (64 - segment_count);
     }
 
-    VectorOscillator static VectorOscillatorFromWaveform(byte waveform_number) {
+    VectorOscillator static VectorOscillatorFromWaveform(uint8_t waveform_number) {
         VectorOscillator osc;
         if (waveform_number >= 32) { // Library waveforms start at 32
             osc = VectorOscillatorFromLibrary(waveform_number);
         } else {
-            byte count = 0;
-            for (byte i = 0; i < HS::VO_SEGMENT_COUNT; i++)
+            uint8_t count = 0;
+            for (uint8_t i = 0; i < HS::VO_SEGMENT_COUNT; i++)
             {
                 if (HS::user_waveforms[i].IsTOC()) {
                     if (count == waveform_number) {
@@ -105,12 +107,12 @@ public:
         return osc;
     }
 
-    VectorOscillator static VectorOscillatorFromLibrary(byte waveform_number) {
+    VectorOscillator static VectorOscillatorFromLibrary(uint8_t waveform_number) {
         waveform_number = waveform_number - 32; // Library waveforms start at 32
         if (waveform_number >= HS::WAVEFORM_LIBRARY_COUNT) waveform_number = HS::WAVEFORM_LIBRARY_COUNT - 1;
         VectorOscillator osc;
-        byte count = 0;
-        for (byte i = 0; i < ARRAY_SIZE(HS::library_waveforms); i++)
+        uint8_t count = 0;
+        for (uint8_t i = 0; i < ARRAY_SIZE(HS::library_waveforms); i++)
         {
             if (HS::library_waveforms[i].IsTOC()) {
                 if (count == waveform_number) {
@@ -126,12 +128,12 @@ public:
         return osc;
     }
 
-    byte static GetSegmentIndex(byte waveform_number, byte segment_number, int8_t direction = 0) {
-        byte count = 0;
-        byte segment_index = 0; // Index from which to copy
+    uint8_t static GetSegmentIndex(uint8_t waveform_number, uint8_t segment_number, int8_t direction = 0) {
+        uint8_t count = 0;
+        uint8_t segment_index = 0; // Index from which to copy
 
         // Find the waveform that's the target of the add operation
-        for (byte i = 0; i < HS::VO_SEGMENT_COUNT; i++)
+        for (uint8_t i = 0; i < HS::VO_SEGMENT_COUNT; i++)
         {
             if (HS::user_waveforms[i].IsTOC() && count++ == waveform_number) {
                 segment_index = i + segment_number + 1;
@@ -143,8 +145,8 @@ public:
         return segment_index;
     }
 
-    void static AddSegmentToWaveformAtSegmentIndex(byte waveform_number, byte segment_number) {
-        byte insert_point = GetSegmentIndex(waveform_number, segment_number, 1);
+    void static AddSegmentToWaveformAtSegmentIndex(uint8_t waveform_number, uint8_t segment_number) {
+        uint8_t insert_point = GetSegmentIndex(waveform_number, segment_number, 1);
 
         // If the waveform was found, move the remaining steps to insert a new segment. The
         // newly-inserted step should be a copy of the insert point.
@@ -157,8 +159,8 @@ public:
         }
     }
 
-    void static DeleteSegmentFromWaveformAtSegmentIndex(byte waveform_number, byte segment_number) {
-        byte delete_point = GetSegmentIndex(waveform_number, segment_number, -1);
+    void static DeleteSegmentFromWaveformAtSegmentIndex(uint8_t waveform_number, uint8_t segment_number) {
+        uint8_t delete_point = GetSegmentIndex(waveform_number, segment_number, -1);
 
         // If the waveform was found, move the remaining steps to overwrite the deleted segment.
         if (delete_point) {
@@ -169,8 +171,8 @@ public:
         }
     }
 
-    void static Update(byte waveform_number, byte segment_number, VOSegment *segment) {
-        byte ix = GetSegmentIndex(waveform_number, segment_number);
+    void static Update(uint8_t waveform_number, uint8_t segment_number, VOSegment *segment) {
+        uint8_t ix = GetSegmentIndex(waveform_number, segment_number);
         if (ix) {
             HS::user_waveforms[ix].level = segment->level;
             HS::user_waveforms[ix].time = segment->time;
@@ -178,8 +180,8 @@ public:
     }
 
     void static AddWaveform() {
-        byte ix = 1;
-        for (byte i = 0; i < HS::VO_SEGMENT_COUNT; i++)
+        uint8_t ix = 1;
+        for (uint8_t i = 0; i < HS::VO_SEGMENT_COUNT; i++)
         {
             if (HS::user_waveforms[i].IsTOC()) {
                 ix = i + HS::user_waveforms[i].Segments() + 1;
@@ -194,20 +196,20 @@ public:
         }
     }
 
-    void static DeleteWaveform(byte waveform_number) {
+    void static DeleteWaveform(uint8_t waveform_number) {
         // Index of first segment minus one is the TOC record
-        byte ix = GetSegmentIndex(waveform_number, 0) - 1;
+        uint8_t ix = GetSegmentIndex(waveform_number, 0) - 1;
         if (ix) {
-            byte offset = HS::user_waveforms[ix].Segments() + 1;
+            uint8_t offset = HS::user_waveforms[ix].Segments() + 1;
 
             // Move the data downward to delete
-            for (byte i = ix; i < HS::VO_SEGMENT_COUNT - offset; i++)
+            for (uint8_t i = ix; i < HS::VO_SEGMENT_COUNT - offset; i++)
             {
                 memcpy(&HS::user_waveforms[i], &HS::user_waveforms[i + offset], sizeof(HS::user_waveforms[i + offset]));
             }
 
             // Fill in freed memory with empty segments
-            for (byte i = HS::VO_SEGMENT_COUNT - offset; i < HS::VO_SEGMENT_COUNT; i++)
+            for (uint8_t i = HS::VO_SEGMENT_COUNT - offset; i < HS::VO_SEGMENT_COUNT; i++)
             {
                 HS::user_waveforms[i] = VOSegment {0x00, 0xff};
             }

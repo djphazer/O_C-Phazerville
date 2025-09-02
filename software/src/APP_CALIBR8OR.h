@@ -46,17 +46,19 @@ static constexpr int CAL8_MAX_TRANSPOSE = 60;
 static constexpr int CAL8OR_PRECISION = 10000;
 
 static const int SCALE_SIZE(const int scale) {
-  return OC::Scales::GetScale(scale).num_notes;
+  const int s = OC::Scales::GetScale(scale).num_notes;
+  return (s == 0) ? 12 : s; // OFF behaves like SEMI
 }
 // channel configs
 struct Cal8ChannelConfig {
     int last_note; // for S&H mode
 
-    uint8_t clocked_mode;
+    uint8_t mode;
     int8_t offset; // fine-tuning offset
     int16_t scale_factor; // precision of 0.01% as an offset from 100%
     int8_t transpose; // in semitones
     int8_t transpose_active; // held value while waiting for trigger
+    bool chained;
 
     DAC_CHANNEL chan_;
     DAC_CHANNEL get_channel() { return chan_; }
@@ -166,15 +168,16 @@ public:
             channel[ch].transpose = values_[ix++] - CAL8_MAX_TRANSPOSE;
             const int overflow = channel[ch].transpose / ssize_;
             if (overflow != 0) {
-              HS::q_octave[ch] = constrain(overflow, -5, 5);
+              q_engine[ch].octave = constrain(overflow, -octave_max, octave_max);
               channel[ch].transpose %= ssize_;
             }
 
             uint32_t root_and_mode = uint32_t(values_[ix++]);
-            channel[ch].clocked_mode = ((root_and_mode >> 4) & 0x03) % NR_OF_CLOCKMODES;
+            channel[ch].chained = (root_and_mode >> 7) & 1;
+            channel[ch].mode = ((root_and_mode >> 4) & 0x03) % NR_OF_CLOCKMODES;
             HS::SetRootNote(ch, int(root_and_mode & 0x0f) );
 
-            HS::q_mask[ch] = values_[ix++];
+            q_engine[ch].mask = values_[ix++];
         }
 
         return true;
@@ -189,9 +192,13 @@ public:
             values_[ix++] = scale;
             values_[ix++] = channel[ch].scale_factor + 500;
             values_[ix++] = channel[ch].offset + 63;
-            values_[ix++] = channel[ch].transpose + HS::q_octave[ch] * SCALE_SIZE(scale) + CAL8_MAX_TRANSPOSE;
-            values_[ix++] = ((channel[ch].clocked_mode & 0x03) << 4) | (HS::GetRootNote(ch) & 0x0f);
-            values_[ix++] = HS::q_mask[ch];
+            values_[ix++] = channel[ch].transpose
+                          + q_engine[ch].octave * SCALE_SIZE(scale)
+                          + CAL8_MAX_TRANSPOSE;
+            values_[ix++] = uint8_t(channel[ch].chained << 7)
+                          | ((channel[ch].mode & 0x03) << 4)
+                          | (HS::GetRootNote(ch) & 0x0f);
+            values_[ix++] = q_engine[ch].mask;
         }
     }
 
@@ -202,7 +209,7 @@ Calibr8orPreset cal8_presets[NR_OF_PRESETS];
 class Calibr8or : public HSApplication {
 public:
     Calibr8or() {
-        for (int i = DAC_CHANNEL_A; i < DAC_CHANNEL_LAST; ++i) {
+        for (int i = 0; i < DAC_CHANNEL_LAST; ++i) {
             channel[i].chan_ = DAC_CHANNEL(i);
         }
     }
@@ -222,16 +229,16 @@ public:
 
         autotuner.Init();
     }
-	
+
     void ClearPreset() {
         for (int ch = 0; ch < QUANT_CHANNEL_COUNT; ++ch) {
-            HS::quantizer[ch].Init();
+            q_engine[ch].quantizer.Init();
 #ifdef ARDUINO_TEENSY41
-            HS::QuantizerConfigure(ch, OC::Scales::SCALE_SEMI, 0xffff);
+            q_engine[ch].Configure(OC::Scales::SCALE_SEMI, 0xffff);
 #else
             // Q1..Q4 default to Semitones
             // Q5..Q8 get initialized as USR1..USR4
-            HS::QuantizerConfigure(ch, (ch<4) ? OC::Scales::SCALE_SEMI : ch - 4, 0xffff);
+            q_engine[ch].Configure((ch<4) ? OC::Scales::SCALE_SEMI : ch - 4, 0xffff);
 #endif
         }
 
@@ -239,8 +246,9 @@ public:
             channel[ch].scale_factor = 0;
             channel[ch].offset = 0;
             channel[ch].transpose = 0;
-            channel[ch].clocked_mode = 0;
+            channel[ch].mode = 0;
             channel[ch].last_note = 0;
+            channel[ch].chained = 0;
         }
     }
     void LoadPreset() {
@@ -258,30 +266,27 @@ public:
 
         // initiate actual EEPROM save
         OC::CORE::app_isr_enabled = false;
-        OC::draw_save_message(16);
-        delay(1);
         OC::draw_save_message(32);
         OC::save_app_data();
         OC::draw_save_message(64);
+        OC::CORE::app_isr_enabled = true;
 
-        const uint32_t timeout = 100;
-        uint32_t start = millis();
-        while(millis() < start + timeout) {
+        //const uint32_t timeout = 100;
+        //uint32_t start = millis();
+        //while(millis() < start + timeout) {
           GRAPHICS_BEGIN_FRAME(true);
           graphics.setPrintPos(13, 18);
           graphics.print("Settings saved");
           graphics.setPrintPos(31, 27);
           graphics.print("to EEPROM!");
           GRAPHICS_END_FRAME();
-        }
-
-        OC::CORE::app_isr_enabled = true;
+        //}
     }
 
     void Resume() {
         // restore quantizer settings
         for (int ch = 0; ch < DAC_CHANNEL_LAST; ++ch) {
-            HS::quantizer[ch].Requantize();
+            q_engine[ch].quantizer.Requantize();
         }
     }
 
@@ -290,16 +295,16 @@ public:
         bool dothething = false;
 
         while (usbMIDI.read()) {
-            const int message = usbMIDI.getType();
-            const int data1 = usbMIDI.getData1();
-            const int data2 = usbMIDI.getData2();
+            const uint8_t message = usbMIDI.getType();
+            const uint8_t data1 = usbMIDI.getData1();
+            const uint8_t data2 = usbMIDI.getData2();
 
             if (message == usbMIDI.SystemExclusive) {
                 // TODO: consider implementing SysEx import/export for Calibr8or
                 continue;
             }
 
-            f.MIDIState.ProcessMIDIMsg(usbMIDI.getChannel(), message, data1, data2);
+            f.MIDIState.ProcessMIDIMsg({usbMIDI.getChannel(), message, data1, data2});
 
             if (message == usbMIDI.NoteOn || message == usbMIDI.NoteOff) {
               dothething = true;
@@ -309,32 +314,32 @@ public:
 #if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
         thisUSB.Task();
         while (usbHostMIDI.read()) {
-            const int message = usbHostMIDI.getType();
-            const int data1 = usbHostMIDI.getData1();
-            const int data2 = usbHostMIDI.getData2();
+            const uint8_t message = usbHostMIDI.getType();
+            const uint8_t data1 = usbHostMIDI.getData1();
+            const uint8_t data2 = usbHostMIDI.getData2();
 
             if (message == usbMIDI.SystemExclusive) {
                 // TODO: consider implementing SysEx import/export for Calibr8or
                 continue;
             }
 
-            f.MIDIState.ProcessMIDIMsg(usbHostMIDI.getChannel(), message, data1, data2);
+            f.MIDIState.ProcessMIDIMsg({usbHostMIDI.getChannel(), message, data1, data2});
 
             if (message == usbMIDI.NoteOn || message == usbMIDI.NoteOff) {
               dothething = true;
             }
         }
         while (MIDI1.read()) {
-            const int message = MIDI1.getType();
-            const int data1 = MIDI1.getData1();
-            const int data2 = MIDI1.getData2();
+            const uint8_t message = MIDI1.getType();
+            const uint8_t data1 = MIDI1.getData1();
+            const uint8_t data2 = MIDI1.getData2();
 
             if (message == usbMIDI.SystemExclusive) {
                 // TODO: consider implementing SysEx import/export for Calibr8or
                 continue;
             }
 
-            f.MIDIState.ProcessMIDIMsg(MIDI1.getChannel(), message, data1, data2);
+            f.MIDIState.ProcessMIDIMsg({MIDI1.getChannel(), message, data1, data2});
 
             if (message == usbMIDI.NoteOn || message == usbMIDI.NoteOff) {
               dothething = true;
@@ -344,15 +349,16 @@ public:
 
         if (dothething) {
           // reconfigure with MIDI-derived masks
+          // TODO: probably needs attention with new MIDI maps...
           for (int ch = 0; ch < DAC_CHANNEL_LAST; ++ch) {
-            uint16_t mask_ = HS::frame.MIDIState.semitone_mask[ch];
+            uint16_t mask_ = HS::frame.MIDIState.mapping[ch].semitone_mask;
 
             if (mask_) // manually override global config
-              HS::quantizer[ch].Configure(OC::Scales::GetScale(OC::Scales::SCALE_SEMI), mask_);
+              q_engine[ch].quantizer.Configure(OC::Scales::GetScale(OC::Scales::SCALE_SEMI), mask_);
             else // restore global config
-              HS::quantizer[ch].Configure(OC::Scales::GetScale(HS::quant_scale[ch]), 0xffff);
+              q_engine[ch].Reconfig();
 
-            HS::quantizer[ch].Requantize();
+            q_engine[ch].quantizer.Requantize();
           }
         }
     }
@@ -369,25 +375,33 @@ public:
             Cal8ChannelConfig &cfg = channel[ch];
 
             // clocked transpose
-            if (CONTINUOUS == cfg.clocked_mode || clocked) {
+            if (CONTINUOUS == cfg.mode || clocked) {
                 cfg.transpose_active = cfg.transpose;
             }
-            if (HS::frame.MIDIState.semitone_mask[ch] != 0)
+            if (HS::frame.MIDIState.mapping[ch].semitone_mask != 0)
               cfg.transpose_active = 0;
 
             // respect S&H mode
-            if (cfg.clocked_mode != SAMPLE_AND_HOLD || clocked) {
-                // CV value
-                int pitch = In(ch);
-                int quantized = HS::Quantize(ch, pitch, 0, cfg.transpose_active);
-                cfg.last_note = quantized;
+            if (cfg.mode != SAMPLE_AND_HOLD || clocked) {
+                // process CV
+                int input_cv = In(ch);
+                if (cfg.chained && ch > 0)
+                  input_cv += channel[ch - 1].last_note;
+
+                if (HS::GetScale(ch) == OC::Scales::SCALE_NONE) {
+                  // transpose raw value in semitones
+                  cfg.last_note = input_cv + (cfg.transpose_active << 7) + q_engine[ch].octave * (12 << 7);
+                } else {
+                  cfg.last_note = HS::Quantize(ch, input_cv, 0, cfg.transpose_active);
+                }
+
             }
 
+            // apply scaling and offset, and send out to DAC
             int output_cv = cfg.last_note;
             if ( OC::DAC::calibration_data_used( DAC_CHANNEL(sel_chan) ) != 0x01 ) // not autotuned
                 output_cv = output_cv * (CAL8OR_PRECISION + cfg.scale_factor) / CAL8OR_PRECISION;
             output_cv += cfg.offset;
-
             Out(ch, output_cv);
 
             // for UI flashers
@@ -397,24 +411,12 @@ public:
     }
 
     void View() {
-        if (clock_setup) {
-            ClockSetup_instance.View();
-            return;
-        }
-
         if (autotuner.active()) {
             autotuner.Draw();
             return;
         }
 
         gfxHeader("Calibr8or");
-
-        // Metronome icon
-        if (HS::clock_m.IsRunning()) {
-            gfxIcon(56, 1, HS::clock_m.Cycle() ? METRO_L_ICON : METRO_R_ICON);
-        } else if (HS::clock_m.IsPaused()) {
-            gfxIcon(56, 1, PAUSE_ICON);
-        }
 
         if (preset_select) {
             gfxPrint(70, 1, "- Presets");
@@ -429,6 +431,13 @@ public:
 
         if (HS::q_edit)
           PokePopup(QUANTIZER_POPUP);
+
+        // Clock screen is an overlay
+        if (clock_setup) {
+            ClockSetup_instance.View();
+        } else {
+            ClockSetup_instance.DrawIndicator();
+        }
 
         // Overlay popup window last
         if (OC::CORE::ticks - HS::popup_tick < HEMISPHERE_CURSOR_TICKS) {
@@ -461,7 +470,10 @@ public:
         }
 
         // Toggle triggered transpose mode
-        ++channel[sel_chan].clocked_mode %= NR_OF_CLOCKMODES;
+        if (NR_OF_CLOCKMODES - 1 == channel[sel_chan].mode && sel_chan > 0) {
+          channel[sel_chan].chained ^= 1;
+        }
+        ++channel[sel_chan].mode %= NR_OF_CLOCKMODES;
         preset_modified = 1;
     }
 
@@ -546,17 +558,18 @@ public:
             return;
         }
 
+        auto &q = q_engine[sel_chan];
         preset_modified = 1;
         if (HS::q_edit) {
             // Scale Select
             HS::NudgeScale(sel_chan, direction);
-            HS::quantizer[sel_chan].Requantize();
+            q.quantizer.Requantize();
             return;
         }
 
         if (!edit_mode) { // Octave jump
-          HS::q_octave[sel_chan] += direction;
-          CONSTRAIN(HS::q_octave[sel_chan], -5, 5);
+          q.octave += direction;
+          CONSTRAIN(q.octave, -octave_max, octave_max);
         }
         else if ( OC::DAC::calibration_data_used( DAC_CHANNEL(sel_chan) ) != 0x01 ) // not autotuned
         {
@@ -580,7 +593,7 @@ public:
         if (HS::q_edit) {
             // Root Note
             HS::SetRootNote(sel_chan, HS::GetRootNote(sel_chan) + direction);
-            HS::quantizer[sel_chan].Requantize();
+            q_engine[sel_chan].quantizer.Requantize();
             return;
         }
 
@@ -597,8 +610,9 @@ public:
       CONSTRAIN(val, -CAL8_MAX_TRANSPOSE, CAL8_MAX_TRANSPOSE);
       const int overflow = val / ssize_;
       if (overflow != 0) {
-        HS::q_octave[chan] += overflow;
-        CONSTRAIN(HS::q_octave[chan], -5, 5);
+        auto &q = q_engine[chan];
+        q.octave += overflow;
+        CONSTRAIN(q.octave, -octave_max, octave_max);
         val %= ssize_;
       }
       channel[chan].transpose = val;
@@ -641,28 +655,31 @@ public:
     void DrawTabs() {
         // Draw channel tabs
         const size_t w = 128 / DAC_CHANNEL_LAST;
-        for (int i = 0; i < DAC_CHANNEL_LAST; ++i) {
-          const size_t x = i * w;
-            gfxLine(x, 12, x, 22); // vertical line on left
+        const size_t y = 11;
+        for (int ch = 0; ch < DAC_CHANNEL_LAST; ++ch) {
+          const size_t x = ch * w;
+            gfxLine(x, y, x, y+10); // vertical line on left
+            if (channel[ch].chained)
+              gfxIcon(x-3, y+2, RIGHT_BTN_ICON);
 
             const size_t center_x = x + w/2 - 3;
-            switch (channel[i].clocked_mode) {
+            switch (channel[ch].mode) {
               case CONTINUOUS:
-                gfxPrint(center_x, 14, i+1);
+                gfxPrint(center_x, y+2, ch+1);
                 break;
               case TRIG_TRANS:
-                gfxIcon(center_x, 14, CLOCK_ICON);
+                gfxIcon(center_x, y+2, CLOCK_ICON);
                 break;
               case SAMPLE_AND_HOLD:
-                gfxIcon(center_x, 14, STAIRS_ICON);
+                gfxIcon(center_x, y+2, STAIRS_ICON);
                 break;
             }
 
-            if (i == sel_chan)
-                gfxInvert(1 + x, 12, w - 1, 11);
+            if (ch == sel_chan)
+                gfxInvert(1 + x, y, w - 1, 11);
         }
-        gfxLine(127, 12, 127, 22); // vertical line
-        gfxLine(0, 23, 127, 23);
+        gfxLine(127, y, 127, y+10); // vertical line
+        gfxLine(0, y+11, 127, y+11);
     }
     void DrawInterface() {
         DrawTabs();
@@ -674,8 +691,8 @@ public:
         gfxIcon(9, y, BEND_ICON);
 
         // -- LCD Display Section --
-        const int s = SCALE_SIZE(HS::GetScale(sel_chan));
-        int degrees = channel[sel_chan].transpose + HS::q_octave[sel_chan] * s;
+        int s = SCALE_SIZE(HS::GetScale(sel_chan));
+        int degrees = channel[sel_chan].transpose + q_engine[sel_chan].octave * s;
         const bool positive = degrees >= 0;
         const int octave = degrees / s;
         degrees %= s;
@@ -715,7 +732,7 @@ public:
         if (channel[sel_chan].offset >= 0) gfxPrint("+");
         gfxPrint(channel[sel_chan].offset);
 
-        if (HS::frame.MIDIState.semitone_mask[sel_chan] != 0)
+        if (HS::frame.MIDIState.mapping[sel_chan].semitone_mask != 0)
           gfxIcon(100, y, MIDI_ICON);
 
         // mode indicator
@@ -850,7 +867,7 @@ void Calibr8or_handleButtonEvent(const UI::Event &event) {
     Calibr8or_instance.autotuner.HandleButtonEvent(event);
     return;
   }
-  
+
     // For left encoder, handle press and long press
     // For right encoder, only handle press (long press is reserved)
     // For up button, handle only press (long press is reserved)

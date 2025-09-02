@@ -25,10 +25,19 @@
 
 class Shredder : public HemisphereApplet {
 public:
+    enum ShredCursor {
+      CHAN1_RANGE, CHAN2_RANGE,
+      QUANT_CHAN,
+      QUANT_EDIT,
+      RESETSHRED1, RESETSHRED2,
+
+      MAX_CURSOR = RESETSHRED2
+    };
 
     const char* applet_name() {
         return "Shredder";
     }
+    const uint8_t* applet_icon() { return PhzIcons::shredder; }
 
     void Start() {
         step = 0;
@@ -45,6 +54,10 @@ public:
         step = 0; // Reset
         reset = true;
         VoltageOut();
+        ForEachChannel(ch) {
+          if (shred_on_reset[ch])
+            Shred(ch);
+        }
     }
 
     void Controller() {
@@ -57,8 +70,8 @@ public:
             // simply play current step and advance it. This way, the applet can be used as
             // a more conventional arpeggiator as well as a Cartesian one.
             if (DetentedIn(0) || DetentedIn(1)) {
-                int x = ProportionCV(In(0), 4);
-                int y = ProportionCV(In(1), 4);
+                int x = ProportionCV(In(0), 4, HEMISPHERE_MAX_INPUT_CV);
+                int y = ProportionCV(In(1), 4, HEMISPHERE_MAX_INPUT_CV);
                 if (x > 3) x = 3;
                 if (y > 3) y = 3;
                 step = (y * 4) + x;
@@ -95,19 +108,35 @@ public:
         Shred(cursor);
       }
       else
-        isEditing = false;
+        CancelEdit();
     }
 
     void OnButtonPress() {
-      if (cursor == 3)
-        HS::QuantizerEdit(io_offset);
-      else
-        CursorToggle();
+      switch (cursor) {
+        case CHAN1_RANGE:
+        case CHAN2_RANGE:
+          if (OC::CORE::ticks - click_tick < HS::HEMISPHERE_DOUBLE_CLICK_TIME)
+            Shred(cursor);
+          else
+            click_tick = OC::CORE::ticks;
+        default:
+          CursorToggle();
+          break;
+
+        case QUANT_EDIT:
+          HS::QuantizerEdit(io_offset);
+          break;
+
+        case RESETSHRED1:
+        case RESETSHRED2:
+          shred_on_reset[cursor - RESETSHRED1] = !shred_on_reset[cursor - RESETSHRED1];
+          break;
+      }
     }
 
     void OnEncoderMove(int direction) {
         if (!EditMode()) {
-            MoveCursor(cursor, direction, 3);
+            MoveCursor(cursor, direction, MAX_CURSOR);
             return;
         }
 
@@ -131,19 +160,19 @@ public:
                 }
             }
         }
-        if (cursor == 2) quant_channels = constrain(quant_channels + direction, 0, 2);
-        if (cursor == 3) {
-          NudgeScale(0, direction);
-        }
+        if (QUANT_CHAN == cursor)
+          quant_channels = constrain(quant_channels + direction, 0, 2);
     }
-        
+
     uint64_t OnDataRequest() {
         uint64_t data = 0;
         // Not enough room to save the sequences, so we'll just have to save settings
         Pack(data, PackLocation {0,4}, range[0]); // range will never be more than 4 bits
         Pack(data, PackLocation {4,1}, int(bipolar[0]));
+        Pack(data, PackLocation {5,1}, shred_on_reset[0]);
         Pack(data, PackLocation {8,4}, range[1]);
         Pack(data, PackLocation {12,1}, int(bipolar[1]));
+        Pack(data, PackLocation {13,1}, shred_on_reset[1]);
         Pack(data, PackLocation {16,8}, quant_channels);
         Pack(data, PackLocation {24,8}, GetScale(0));
         return data;
@@ -152,8 +181,10 @@ public:
     void OnDataReceive(uint64_t data) {
         range[0] = Unpack(data, PackLocation {0,4}); // only 4 bits used for range
         bipolar[0] = Unpack(data, PackLocation {4,1}); 
+        shred_on_reset[0] = Unpack(data, PackLocation {5,1});
         range[1] = Unpack(data, PackLocation {8,4});
         bipolar[1] = Unpack(data, PackLocation {12,1}); 
+        shred_on_reset[1] = Unpack(data, PackLocation {13,1});
         quant_channels = Unpack(data, PackLocation {16,8});
         SetScale(0, Unpack(data, PackLocation {24,8}));
         ForEachChannel(ch) {
@@ -178,6 +209,7 @@ protected:
 
 private:
     int cursor;
+    uint32_t click_tick = 0;
 
     // Sequencer state
     uint8_t step; // Current step number
@@ -189,6 +221,7 @@ private:
     // settings
     int range[2] = {1,0};
     bool bipolar[2] = {false, false};
+    bool shred_on_reset[2] = {false, false};
     int8_t quant_channels;
 
     // Variables to handle imprint confirmation animation
@@ -199,20 +232,26 @@ private:
         // Channel 1 voltage
         char outlabel[] = { (char)('A' + io_offset), ':', '+', '\0' };
         gfxPrint(1, 15, outlabel);
+        if (shred_on_reset[0]) gfxInvert(1, 15, 12, 8);
         gfxPrint(19, 15, (char) (range[0]));
         if (bipolar[0]) {
           gfxPrint(13, 18, "-");
         }
-        if (cursor == 0) gfxSpicyCursor(13, 23, 12);
+        if (CHAN1_RANGE == cursor) gfxSpicyCursor(13, 23, 12);
 
         // Channel 2 voltage
         ++outlabel[0];
-        gfxPrint(32, 15, outlabel);
-        gfxPrint(50, 15, (char) (range[1]));
+        gfxPrint(33, 15, outlabel);
+        if (shred_on_reset[1]) gfxInvert(33, 15, 12, 8);
+        gfxPrint(51, 15, (char) (range[1]));
         if (bipolar[1]) {
-          gfxPrint(44, 18, "-");
+          gfxPrint(45, 18, "-");
         }
-        if (cursor == 1) gfxSpicyCursor(44, 23, 12);
+        if (CHAN2_RANGE == cursor) gfxSpicyCursor(45, 23, 12);
+
+        if (cursor >= RESETSHRED1) {
+          gfxIcon(1 + 32*(cursor-RESETSHRED1), 8, DOWN_BTN_ICON);
+        }
 
         // quantize channel selection
         gfxIcon(32, 25, SCALE_ICON);
@@ -224,11 +263,11 @@ private:
         } else {
           gfxPrint(48, 25, OutputLabel(quant_channels - 1));
         }
-        if (cursor == 2) gfxCursor(42, 33, 20);
+        if (QUANT_CHAN == cursor) gfxCursor(42, 33, 20);
 
         // quantize scale selection
         gfxPrint(32, 35, OC::scale_names_short[GetScale(0)]);
-        if (cursor == 3) gfxCursor(32, 43, 30);
+        if (QUANT_EDIT == cursor) gfxCursor(32, 43, 30);
 
     }
 

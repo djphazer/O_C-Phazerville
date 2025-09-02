@@ -24,6 +24,7 @@ public:
     const char* applet_name() { // Maximum 10 characters
         return "Button2";
     }
+    const uint8_t* applet_icon() { return PhzIcons::button2; }
 
 	/* Run when the Applet is selected */
     void Start() {

@@ -32,21 +32,15 @@
 #include "../src/drivers/FreqMeasure/OC_FreqMeasure.h"
 
 #if defined(ARDUINO_TEENSY41)
+
 #define TUNER_ENABLED 1
 // TR2 on left, TR4 on right
 #define TUNER_PIN (hemisphere == 0 ? 1 : 22)
 
 #elif defined(ARDUINO_TEENSY40)
-# ifdef FLIP_180
-#define TUNER_ENABLED (hemisphere == 1)
-# else
-#define TUNER_ENABLED (hemisphere == 0)
-# endif
-
-#elif defined(FLIP_180)
-#define TUNER_ENABLED (hemisphere == 0)
+#define TUNER_ENABLED (hemisphere == OC::calibration_data.flipcontrols())
 #else
-#define TUNER_ENABLED (hemisphere == 1)
+#define TUNER_ENABLED (hemisphere == 1 - OC::calibration_data.flipcontrols())
 #endif
 
 static constexpr double HEM_TUNER_AaboveMidCtoC0 = 0.03716272234383494188492;
@@ -57,6 +51,7 @@ public:
     const char* applet_name() {
         return "Tuner";
     }
+    const uint8_t* applet_icon() { return PhzIcons::tuner; }
 
     void Start() {
         A4_Hz = 440;
@@ -70,8 +65,10 @@ public:
         AllowRestart();
     }
     void Unload() {
+      if (TUNER_ENABLED) {
         freq_measure.end();
         OC::DigitalInputs::reInit();
+      }
     }
 
     void Controller() {
@@ -123,13 +120,17 @@ protected:
       help[HELP_OUT2]     = "";
       if (TUNER_ENABLED) {
         //                    "-------" <-- Label size guide
-#if (defined(FLIP_180) && !defined(ARDUINO_TEENSY40)) || (defined(ARDUINO_TEENSY40) && !defined(FLIP_180))
-        help[HELP_DIGITAL1] = "Input";
-        help[HELP_DIGITAL2] = "";
+#ifdef ARDUINO_TEENSY40
+        if (!OC::calibration_data.flipcontrols()) {
 #else
-        help[HELP_DIGITAL1] = "";
-        help[HELP_DIGITAL2] = "Input";
+        if (OC::calibration_data.flipcontrols()) {
 #endif
+          help[HELP_DIGITAL1] = "Input";
+          help[HELP_DIGITAL2] = "";
+        } else {
+          help[HELP_DIGITAL1] = "";
+          help[HELP_DIGITAL2] = "Input";
+        }
         help[HELP_EXTRA1] = "Enc: Adjust A4 Hz,";
         help[HELP_EXTRA2] = "     Push to Reset";
       } else {
@@ -207,22 +208,24 @@ private:
         gfxPrint(" Hz");
         gfxCursor(25, 23, 36);
     }
-    
-#if (defined(FLIP_180) && !defined(ARDUINO_TEENSY40)) || (defined(ARDUINO_TEENSY40) && !defined(FLIP_180))
+
     void DrawWarning() {
+#ifdef ARDUINO_TEENSY40
+      if (!OC::calibration_data.flipcontrols()) {
+#else
+      if (OC::calibration_data.flipcontrols()) {
+#endif
         gfxPrint(1, 15, "Tuner goes");
         gfxPrint(1, 25, "in left");
         gfxPrint(1, 35, "hemisphere");
         gfxPrint(1, 45, "<--");
-    }
-#else
-    void DrawWarning() {
+      } else {
         gfxPrint(1, 15, "Tuner goes");
         gfxPrint(1, 25, "in right");
         gfxPrint(1, 35, "hemisphere");
         gfxPrint(1, 45, "       -->");
+      }
     }
-#endif
 
     float get_frequency() {return frequency_;}
     

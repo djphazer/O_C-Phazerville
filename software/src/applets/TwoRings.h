@@ -27,12 +27,13 @@
  * Thanks to Tom Whitwell for creating the concept, and for clarifying some things
  * Thanks to Jon Wheeler for the CV length and probability updates
  *
- * Heavily adapted as DualTM from ShiftReg/TM by djphazer (Nicholas J. Michalek)
+ * Heavily adapted as TwoRings (previously DualTM, ShiftReg, TM) by djphazer (Nicholas J. Michalek)
+ * with bits from benirose, and probably others!
  */
 
-class DualTM : public HemisphereApplet {
+class TwoRings : public HemisphereApplet {
 public:
-    
+
     static constexpr int MAX_SCALE = OC::Scales::NUM_SCALES;
     static constexpr int MIN_LENGTH = 2;
     static constexpr int MAX_LENGTH = 32;
@@ -89,7 +90,10 @@ public:
     };
 
     const char* applet_name() {
-        return "DualTM";
+        return "TwoRings";
+    }
+    const uint8_t* applet_icon() {
+        return PhzIcons::DualTM;
     }
 
     void Start() {
@@ -156,7 +160,9 @@ public:
             case TRANSPOSE2:
             case BLEND_XFADE:
                 if (update_cv) // S&H style transpose
-                    trans_mod[cvmode[ch] - TRANSPOSE1] = MIDIQuantizer::NoteNumber(cv_data[ch], 0) - 60; // constrain to range_mod?
+                    trans_mod[cvmode[ch] - TRANSPOSE1] =
+                      MIDIQuantizer::NoteNumber(cv_data[ch], 0)
+                      - (12*OC::DAC::kOctaveZero); // make it bipolar
                 break;
 
             default: break;
@@ -178,7 +184,7 @@ public:
           else
             ShiftLeft(prob);
         }
- 
+
         // Send 8-bit scaled and quantized CV
         const int32_t note[2] = {
           Proportion(reg[0] & 0xff, 0xff, range_mod) + 64,
@@ -202,11 +208,14 @@ public:
               slew(Output[ch], HS::QuantizerLookup(qselect_mod[ch], note[1] + note_trans[1]));
               break;
             case MOD1: // 8-bit bi-polar proportioned CV
-              slew(Output[ch], Proportion( int(reg[0] & 0xff)-0x7f, 0x80, HEMISPHERE_MAX_CV) );
+            case MOD2: {
+              const int rnum = outmode[ch] - MOD1;
+              const uint32_t mask = (1u << min(len_mod, 8)) - 1;
+              slew(Output[ch],
+                  Proportion( int(reg[rnum] & mask) - (mask>>1), (mask>>1)+1, HEMISPHERE_MAX_CV)
+              );
               break;
-            case MOD2:
-              slew(Output[ch], Proportion( int(reg[1] & 0xff)-0x7f, 0x80, HEMISPHERE_MAX_CV) );
-              break;
+            }
             case TRIGPITCH1:
             case TRIGPITCH2: {
               const int rnum = outmode[ch] - TRIGPITCH1;
@@ -258,13 +267,7 @@ public:
         DrawIndicator();
     }
 
-    void DrawFullScreen() {
-      HemisphereApplet::DrawFullScreen();
-      if (cursor >= CVMODE1 && cursor <= OUT_B) {
-        // this is an ugly hack, but it'll work lol
-        gfxCursor(19 - gfx_offset + 64*((cursor-CVMODE1)%2), 32 + 10*((cursor-CVMODE1)/2), 44);
-      }
-    }
+    // void DrawFullScreen() { }
     // void OnButtonPress() { }
 
     void AuxButton() {
@@ -273,7 +276,7 @@ public:
       case QUANT_B:
         HS::QuantizerEdit(qselect[cursor - QUANT_A]);
       default:
-        isEditing = false;
+        CancelEdit();
         break;
 
       case PROB:
@@ -331,7 +334,7 @@ public:
         default: break;
         }
     }
-        
+
     uint64_t OnDataRequest() {
         uint64_t data = 0;
         Pack(data, PackLocation {0,7}, p);
@@ -387,7 +390,7 @@ protected:
     help[HELP_EXTRA2]  = "AuxBtn: Reverse/Lock";
     //                   "---------------------" <-- Extra text size guide
   }
-    
+
 private:
     int cursor; // TM2Cursor
 
@@ -594,14 +597,24 @@ private:
     void DrawIndicator() {
         gfxLine(0, 45, 63, 45);
         gfxLine(0, 62, 63, 62);
-        for (int b = 0; b < 32; ++b)
+
+        const int ii = (len_mod <= 16) ? 16 : 32;
+        for (int b = 0; b < ii; ++b)
         {
             int v = (reg[0] >> b) & 0x01;
             int v2 = (reg[1] >> b) & 0x01;
-            if (v) gfxRect(62 - (2 * b), 47, 1, 7);
-            if (v2) gfxRect(62 - (2 * b), 54, 1, 7);
+            if (v) gfxRect(62 - (64/ii * b) - 16/ii, 47, 32/ii, 7);
+            if (v2) gfxRect(62 - (64/ii * b) - 16/ii, 54, 32/ii, 7);
+        }
+
+        // I'm sure these two can be combined with more math.
+        if (len_mod < 16) {
+          const int x_ = 4 * (16 - len_mod);
+          gfxDottedLine(x_, 45, x_, 62);
+        } else if (len_mod > 16 && len_mod < 32) {
+          const int x_ = 2 * (32 - len_mod) - 1;
+          gfxDottedLine(x_, 45, x_, 62);
         }
     }
 
 };
-

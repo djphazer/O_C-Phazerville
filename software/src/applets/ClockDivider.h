@@ -35,8 +35,9 @@ public:
     ClkDivMult divmult[4];
 
     const char* applet_name() {
-        return "Clock Div";
+        return "Clk Div";
     }
+    const uint8_t* applet_icon() { return PhzIcons::clockDivider; }
 
     void Start() {
       divmult[0].steps = 2;
@@ -98,8 +99,8 @@ public:
 
     void OnDataReceive(uint64_t data) {
         for (size_t i = 0; i < 2; ++i) {
-          div[i] = Unpack(data, PackLocation {0 + i*8,8}) - 32;
-          divmult[1+i*2].Set( Unpack(data, PackLocation {16 + i*8,8}) - 32 );
+          div[i] = constrain((Unpack(data, PackLocation {0 + i*8,8}) - 32), -CLOCKDIV_MAX, CLOCKDIV_MAX);
+          divmult[1+i*2].Set( Unpack(data, PackLocation {16 + i*8,8}) - 32 ); // constrained via Set()
         }
     }
 

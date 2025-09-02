@@ -24,6 +24,7 @@ public:
     const char* applet_name() {
         return "GateDelay";
     }
+    const uint8_t* applet_icon() { return PhzIcons::gateDelay; }
 
     void Start() {
         ForEachChannel(ch)

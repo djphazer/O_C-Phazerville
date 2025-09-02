@@ -27,6 +27,7 @@ public:
     const char* applet_name() { // Maximum 10 characters
         return "TL Neuron";
     }
+    const uint8_t* applet_icon() { return PhzIcons::thresholdLogicNeuron; }
 
     void Start() {
         selected = 0;

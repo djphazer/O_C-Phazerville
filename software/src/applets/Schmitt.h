@@ -26,6 +26,7 @@ public:
     const char* applet_name() { // Maximum 10 characters
         return "SchmittTr";
     }
+    const uint8_t* applet_icon() { return PhzIcons::schmitt; }
 
     void Start() {
         low = 3200; // ~2.1V

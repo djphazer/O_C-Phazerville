@@ -334,6 +334,7 @@ void Graphics::drawLine(coord_t x0, coord_t y0, coord_t x1, coord_t y1, const ui
     dx = x0 - x1;
   else
     dx = x1 - x0;
+  if (y1 < 0) y1 = 0;
   if (y0 > y1)
     dy = y0 - y1;
   else

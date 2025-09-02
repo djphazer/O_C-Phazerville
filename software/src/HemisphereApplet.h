@@ -39,32 +39,51 @@
 #include "util/util_math.h"
 #include "bjorklund.h"
 #include "HSicons.h"
+#include "PhzIcons.h"
 #include "HSClockManager.h"
 
 #include "HSUtils.h"
 #include "HSIOFrame.h"
+#include <cstdint>
+#include <variant>
 
 class HemisphereApplet;
 
 namespace HS {
 
-typedef struct Applet {
+struct Applet {
   const int id;
   const uint8_t categories;
   std::array<HemisphereApplet *, APPLET_SLOTS> instance;
-} Applet;
+};
 
-extern IOFrame frame;
+struct EncoderEditor {
+  bool isEditing;
+};
+
+static constexpr bool ALWAYS_SHOW_ICONS = false;
 } // namespace HS
 
 using namespace HS;
 
 class HemisphereApplet {
 public:
-    static int cursor_countdown[APPLET_SLOTS];
+    static int cursor_countdown[APPLET_SLOTS + 1];
+    static int16_t cursor_start_x;
+    static int16_t cursor_start_y;
     static const char* help[HELP_LABEL_COUNT];
+    static EncoderEditor enc_edit[APPLET_SLOTS + 1];
+
+    static void ProcessCursors() {
+      // Cursor countdowns. See CursorBlink(), ResetCursor(), gfxCursor()
+      for (int i = 0; i < APPLET_SLOTS + 1; ++i) {
+        if (--cursor_countdown[i] < -HEMISPHERE_CURSOR_TICKS)
+          cursor_countdown[i] = HEMISPHERE_CURSOR_TICKS;
+      }
+    }
 
     virtual const char* applet_name() = 0; // Maximum of 9 characters
+    virtual const uint8_t* applet_icon() { return ZAP_ICON; }
     const char* const OutputLabel(int ch) {
       return OC::Strings::capital_letters[ch + io_offset];
     }
@@ -77,96 +96,30 @@ public:
     virtual void OnDataReceive(uint64_t data) = 0;
     virtual void OnButtonPress() { CursorToggle(); };
     virtual void OnEncoderMove(int direction) = 0;
-
-    //void BaseStart(const HEM_SIDE hemisphere_);
-    void BaseController();
-    void BaseView(bool full_screen = false);
-
-    void BaseStart(const HEM_SIDE hemisphere_) {
-        hemisphere = hemisphere_;
-
-        // Initialize some things for startup
-        cursor_countdown[hemisphere] = HEMISPHERE_CURSOR_TICKS;
-
-        // Maintain previous app state by skipping Start
-        if (!applet_started) {
-            applet_started = true;
-            Start();
-            ForEachChannel(ch) {
-                Out(ch, 0); // reset outputs
-            }
-        }
-    }
     virtual void Unload() { }
+    virtual void DrawFullScreen() { View(); }
+    virtual void AuxButton() { CancelEdit(); }
 
-    // Screensavers are deprecated in favor of screen blanking, but the BaseScreensaverView() remains
-    // to avoid breaking applets based on the old boilerplate
-    void BaseScreensaverView() {}
+    void BaseView(bool full_screen = false, bool parked = true);
+    void BaseStart(const HEM_SIDE hemisphere_);
 
     /* Formerly Help Screen */
-    virtual void DrawFullScreen() {
-        for (int i=0; i<HELP_LABEL_COUNT; ++i) help[i] = "";
-        SetHelp();
-        const bool clockrun = HS::clock_m.IsRunning();
-
-        for (int ch = 0; ch < 2; ++ch) {
-          int y = 14;
-          const int mult = clockrun ? HS::clock_m.GetMultiply(ch + io_offset) : 0;
-
-          graphics.setPrintPos(ch*64, y);
-          if (mult != 0) { // Multipliers
-            graphics.print( (mult > 0) ? "x" : "/" );
-            graphics.print( (mult > 0) ? mult : 1 - mult );
-          } else { // Trigger mapping
-            graphics.print( OC::Strings::trigger_input_names_none[ HS::trigger_mapping[ch + io_offset] ] );
-          }
-          graphics.invertRect(ch*64, y - 1, 19, 9);
-
-          graphics.setPrintPos(ch*64 + 20, y);
-          graphics.print( help[HELP_DIGITAL1 + ch] );
-
-          y += 10;
-
-          graphics.setPrintPos(ch*64, y);
-          graphics.print( OC::Strings::cv_input_names_none[ HS::cvmapping[ch + io_offset] ] );
-          graphics.invertRect(ch*64, y - 1, 19, 9);
-
-          graphics.setPrintPos(ch*64 + 20, y);
-          graphics.print( help[HELP_CV1 + ch] );
-
-          y += 10;
-
-          graphics.setPrintPos(6 + ch*64, y);
-          graphics.print( OC::Strings::capital_letters[ ch + io_offset ] );
-          graphics.invertRect(ch*64, y - 1, 19, 9);
-
-          graphics.setPrintPos(ch*64 + 20, y);
-          graphics.print( help[HELP_OUT1 + ch] );
-        }
-
-        graphics.setPrintPos(0, 45);
-        graphics.print( help[HELP_EXTRA1] );
-        graphics.setPrintPos(0, 55);
-        graphics.print( help[HELP_EXTRA2] );
-    }
-    virtual void AuxButton() {
-      isEditing = false;
-    }
+    void DrawConfigHelp();
 
     /* Check cursor blink cycle. */
     bool CursorBlink() { return (cursor_countdown[hemisphere] > 0); }
     void ResetCursor() { cursor_countdown[hemisphere] = HEMISPHERE_CURSOR_TICKS; }
 
-    // legacy cursor mode has been removed
-    [[deprecated("Use CursorToggle() instead")]] void CursorAction(int &cursor, int max) {
-      CursorToggle();
-    }
-
     void CursorToggle() {
-      isEditing = !isEditing;
+      enc_edit[hemisphere].isEditing ^= 1;
       ResetCursor();
     }
-    void MoveCursor(int &cursor, int direction, int max) {
+    void CancelEdit() {
+      enc_edit[hemisphere].isEditing = false;
+    }
+
+    template<typename T>
+    void MoveCursor(T &cursor, int direction, int max) {
         cursor += direction;
         if (cursor_wrap) {
             if (cursor < 0) cursor = max;
@@ -180,43 +133,50 @@ public:
     // Buffered I/O functions
     int ViewIn(int ch) {return frame.inputs[io_offset + ch];}
     int ViewOut(int ch) {return frame.outputs[io_offset + ch];}
-    int ClockCycleTicks(int ch) {return frame.cycle_ticks[io_offset + ch];}
+    uint32_t ClockCycleTicks(int ch) {
+      if (clock_m.IsRunning() && clock_m.GetMultiply(io_offset + ch) != 0)
+          return clock_m.GetCycleTicks(io_offset + ch);
+      return frame.cycle_ticks[io_offset + ch];
+    }
     bool Changed(int ch) {return frame.changed_cv[io_offset + ch];}
 
-    //////////////// Offset I/O methods
-    ////////////////////////////////////////////////////////////////////////////////
+    // --- CV Input Methods
     int In(const int ch) {
-        const int c = cvmapping[ch + io_offset];
-        if (!c) return 0;
-        return (c <= ADC_CHANNEL_LAST) ? frame.inputs[c - 1] : frame.outputs[c - 1 - ADC_CHANNEL_LAST];
+      return cvmap[ch + io_offset].In();
     }
+
+#ifdef __IMXRT1062__
+    float InF(int ch) {
+        return static_cast<float>(In(ch)) / HEMISPHERE_MAX_INPUT_CV;
+    }
+#endif
 
     // Apply small center detent to input, so it reads zero before a threshold
     int DetentedIn(int ch) {
-        return (In(ch) > (HEMISPHERE_CENTER_CV + HEMISPHERE_CENTER_DETENT) || In(ch) < (HEMISPHERE_CENTER_CV - HEMISPHERE_CENTER_DETENT))
-            ? In(ch) : HEMISPHERE_CENTER_CV;
-    }
-    int SmoothedIn(int ch) {
-      const int x = cvmapping[ch + io_offset];
-      if (x && x <= ADC_CHANNEL_LAST) {
-        ADC_CHANNEL channel = (ADC_CHANNEL)( x - 1 );
-        return OC::ADC::value(channel);
-      }
-      return 0;
+        if (NorthernLightModular && In(ch) < HEMISPHERE_CENTER_DETENT)
+          return 0;
+
+        if (In(ch) > (HEMISPHERE_CENTER_INPUT_CV + HEMISPHERE_CENTER_DETENT)
+          || In(ch) < (HEMISPHERE_CENTER_INPUT_CV - HEMISPHERE_CENTER_DETENT))
+          return In(ch);
+
+        return HEMISPHERE_CENTER_INPUT_CV;
     }
     int SemitoneIn(int ch) {
-      return input_quant[ch].Process(In(ch));
+      return input_quant[ch + io_offset].Process(In(ch));
     }
 
-    // defined in HemisphereApplet.cpp
-    bool Clock(int ch, bool physical = 0);
-
+    /* Has the specified Digital input been clocked this cycle? (rising edge of a gate)
+     * This is pre-calculated in HS::IOFrame::Load() according to input mappings and internal clock settings
+     */
+    bool Clock(int ch, bool physical = 0) {
+        return frame.clocked[ch + io_offset];
+    }
     bool Gate(int ch) {
-        const int t = trigger_mapping[ch + io_offset];
-        const int offset = OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_LAST;
-        if (!t) return false;
-        return (t <= offset) ? frame.gate_high[t - 1] : (frame.outputs[t - 1 - offset] > GATE_THRESHOLD);
+        return trigmap[ch + io_offset].Gate();
     }
+
+    // --- CV Output methods
     void Out(int ch, int value, int octave = 0) {
         frame.Out( (DAC_CHANNEL)(ch + io_offset), value + (octave * (12 << 7)));
     }
@@ -231,17 +191,13 @@ public:
     void ClockOut(const int ch, const int ticks = HEMISPHERE_CLOCK_TICKS * trig_length) {
         frame.ClockOut( (DAC_CHANNEL)(io_offset + ch), ticks);
     }
-
     void GateOut(int ch, bool high) {
         Out(ch, 0, (high ? PULSE_VOLTAGE : 0));
     }
 
     // Quantizer helpers
-    braids::Quantizer* GetQuantizer(int ch) {
-      return &HS::quantizer[io_offset + ch];
-    }
     int GetLatestNoteNumber(int ch) {
-      return HS::quantizer[io_offset + ch].GetLatestNoteNumber();
+      return HS::GetLatestNoteNumber(ch);
     }
     int Quantize(int ch, int cv, int root = 0, int transpose = 0) {
       return HS::Quantize(ch + io_offset, cv, root, transpose);
@@ -249,21 +205,21 @@ public:
     int QuantizerLookup(int ch, int note) {
       return HS::QuantizerLookup(ch + io_offset, note);
     }
+    void QuantizerConfigure(int ch, int scale, uint16_t mask = 0xffff) {
+      q_engine[io_offset + ch].Configure(scale, mask);
+    }
     void SetScale(int ch, int scale) {
       QuantizerConfigure(ch, scale);
     }
-    void QuantizerConfigure(int ch, int scale, uint16_t mask = 0xffff) {
-      HS::QuantizerConfigure(ch + io_offset, scale, mask);
-    }
     int GetScale(int ch) {
-      return HS::quant_scale[io_offset + ch];
+      return q_engine[io_offset + ch].scale;
     }
     int GetRootNote(int ch) {
-      return HS::root_note[io_offset + ch];
+      return q_engine[io_offset + ch].root_note;
     }
     int SetRootNote(int ch, int root) {
       CONSTRAIN(root, 0, 11);
-      return (HS::root_note[io_offset + ch] = root);
+      return (q_engine[io_offset + ch].root_note = root);
     }
     void NudgeScale(int ch, int dir) {
       HS::NudgeScale(ch + io_offset, dir);
@@ -279,20 +235,20 @@ public:
     }
 
     inline bool EditMode() {
-        return (isEditing);
+        return (enc_edit[hemisphere].isEditing);
     }
 
     // Override HSUtils function to only return positive values
     // Not ideal, but too many applets rely on this.
-    constexpr int ProportionCV(const int cv_value, const int max_pixels) {
-        int prop = constrain(Proportion(cv_value, HEMISPHERE_MAX_INPUT_CV, max_pixels), 0, max_pixels);
+    const int ProportionCV(const int cv_value, const int max_pixels, const int max_cv = HEMISPHERE_MAX_CV) {
+        int prop = constrain(Proportion(cv_value, max_cv, max_pixels), 0, max_pixels);
         return prop;
     }
 
     //////////////// Offset graphics methods
     ////////////////////////////////////////////////////////////////////////////////
     void gfxCursor(int x, int y, int w, int h = 9) { // assumes standard text height for highlighting
-      if (isEditing) {
+      if (EditMode()) {
         gfxInvert(x, y - h, w, h);
       } else if (CursorBlink()) {
         gfxLine(x, y, x + w - 1, y);
@@ -301,7 +257,7 @@ public:
       }
     }
     void gfxSpicyCursor(int x, int y, int w, int h = 9) {
-      if (isEditing) {
+      if (EditMode()) {
         if (CursorBlink())
           gfxFrame(x, y - h, w, h, true);
         gfxInvert(x, y - h, w, h);
@@ -339,6 +295,38 @@ public:
         graphics.print(num);
     }
 
+    void gfxPrint(int x, int y, float num, int digits) {
+        graphics.setPrintPos(x + gfx_offset, y);
+        gfxPrint(num, digits);
+    }
+
+    void gfxPrint(float num, int digits) {
+        int i = static_cast<int>(num);
+        float dec = num - i;
+        gfxPrint(i);
+        if (digits > 0) {
+            gfxPrint(".");
+            while (digits--) {
+                dec *= 10;
+                i = static_cast<int>(dec);
+                gfxPrint(i);
+                dec -= i;
+            }
+        }
+    }
+
+    void gfxPrint(DigitalInputMap &map) {
+      gfxPrintIcon(map.Icon());
+      if (map.Gate()) gfxInvert(gfxGetPrintPosX()-8, gfxGetPrintPosY(), 8, 8);
+    }
+    void gfxPrint(CVInputMap &map) {
+      gfxPrintIcon(map.Icon());
+      const int xpos = gfxGetPrintPosX() - 1;
+      const int ypos = gfxGetPrintPosY() + 4;
+      const int height = map.InRescaled(24);
+      gfxLine(xpos, ypos, xpos, ypos - height);
+    }
+
     void gfxStartCursor(int x, int y) {
         gfxPos(x, y);
         gfxStartCursor();
@@ -349,12 +337,23 @@ public:
         cursor_start_y = gfxGetPrintPosY();
     }
 
-    void gfxEndCursor(bool selected) {
+    void gfxEndCursor(bool selected, bool spicy = false, const char *str = nullptr) {
         if (selected) {
+          if (str) {
+            gfxClear(cursor_start_x - 14, cursor_start_y-1, 24, 10);
+            gfxFrame(cursor_start_x - 13, cursor_start_y-1, 22, 10, spicy);
+            gfxPrint(cursor_start_x - 11, cursor_start_y+1, str);
+            if (EditMode())
+              gfxInvert(cursor_start_x - 14, cursor_start_y-1, 24, 10);
+          } else {
             int16_t w = gfxGetPrintPosX() - cursor_start_x;
             int16_t y = gfxGetPrintPosY() + 8;
             int h = y - cursor_start_y;
-            gfxCursor(cursor_start_x, y, w, h);
+            if (spicy)
+              gfxSpicyCursor(cursor_start_x, y, w, h);
+            else
+              gfxCursor(cursor_start_x, y, w, h);
+          }
         }
     }
 
@@ -392,6 +391,10 @@ public:
         graphics.invertRect(x + gfx_offset, y, w, h);
     }
 
+    void gfxClear(int x, int y, int w, int h) {
+        graphics.clearRect(x + gfx_offset, y, w, h);
+    }
+
     void gfxLine(int x, int y, int x2, int y2) {
         graphics.drawLine(x + gfx_offset, y, x2 + gfx_offset, y2);
     }
@@ -421,7 +424,7 @@ public:
     }
 
     void gfxPrintIcon(const uint8_t *data, int16_t w = 8) {
-        gfxIcon(gfxGetPrintPosY(), gfxGetPrintPosX(), data);
+        gfxIcon(gfxGetPrintPosX(), gfxGetPrintPosY(), data);
         gfxPos(gfxGetPrintPosX() + w, gfxGetPrintPosY());
     }
 
@@ -440,10 +443,22 @@ public:
         }
     }
 
-    void gfxHeader(const char *str) {
-        gfxPrint(1, 2, str);
-        gfxDottedLine(0, 10, 62, 10);
-        //gfxLine(0, 11, 62, 11);
+    void gfxHeader(int y = 2) {
+      gfxHeader(applet_name(), applet_icon(), y, false);
+    }
+
+    void gfxHeader(const char *str, const uint8_t *icon = nullptr, int y = 2,
+        bool underline = true) {
+      int x = 1;
+      if (icon) {
+        gfxIcon(x, y, icon);
+        x += 9;
+      }
+      if (hemisphere & 1) // right side
+        x = 62 - strlen(str) * 6;
+      gfxPrint(x, y, str);
+      if (underline)
+        gfxDottedLine(0, y + 8, 62, y + 8);
     }
 
     void DrawSlider(uint8_t x, uint8_t y, uint8_t len, uint8_t value, uint8_t max_val, bool is_cursor) {
@@ -454,9 +469,108 @@ public:
         if (EditMode() && is_cursor) gfxInvert(x-1, y, len+3, 8);
     }
 
+    void SetDisplaySide(HEM_SIDE side) {
+        hemisphere = side;
+    }
+
+    bool EditInputMap(CVInputMap& input_map) {
+      if (!IsEditingInputMap()) {
+        selected_input_map = &input_map;
+        return true;
+      }
+      return false;
+    }
+
+    bool EditInputMap(DigitalInputMap& input_map) {
+      if (!IsEditingInputMap()) {
+        selected_input_map = &input_map;
+        return true;
+      }
+      return false;
+    }
+
+    void ClearEditInputMap() {
+      selected_input_map = std::monostate{};
+      if (EditMode()) CursorToggle();
+    }
+
+    bool EditSelectedInputMap(int direction) {
+      if (IsEditingInputMap()) {
+        switch (selected_input_map.index()) {
+          case CV_INPUT_MAP: {
+            int8_t& att
+              = std::get<CVInputMap*>(selected_input_map)->attenuversion;
+            att = constrain(att + direction, -127, 127); // 448% range
+            break;
+          }
+          case DIGITAL_INPUT_MAP: {
+            int8_t& div
+              = std::get<DigitalInputMap*>(selected_input_map)->division;
+            div = constrain(div + direction, -64, 64);
+            break;
+          }
+          default:
+            break;
+        }
+        return true;
+      }
+      return false;
+    }
+
+    void gfxDisplayInputMapEditor() {
+      if (selected_input_map.index()) {
+        gfxClear(0, 0, 63, 11);
+        switch (selected_input_map.index()) {
+          case CV_INPUT_MAP: {
+            gfxPos(32 - 7 * 6 / 2, 2);
+            int tenths = std::get<CVInputMap*>(selected_input_map)->Atten();
+            graphics.printf("%4d.%d%%", tenths / 10, abs(tenths) % 10);
+            break;
+          }
+          case DIGITAL_INPUT_MAP: {
+            gfxPos(32 - 4 * 6 / 2, 2);
+            int8_t div = std::get<DigitalInputMap*>(selected_input_map)->division;
+            if (div < 0) graphics.printf("/%3d", -div + 1);
+            else graphics.printf("X%3d", div + 1);
+            break;
+          }
+          default:
+            break;
+        }
+        gfxInvert(0, 0, 63, 11);
+      }
+    }
+
+    bool IsEditingInputMap() const {
+      return selected_input_map.index() > 0;
+    }
+
+    template <typename... Pairs>
+    bool CheckEditInputMapPress(int cursor, Pairs&&... indexed_input_maps) {
+      if (IsEditingInputMap()) {
+        ClearEditInputMap();
+        return !EditMode();
+      } else if (!EditMode()) {
+        return false;
+      }
+
+      return (
+        ...
+        || (cursor == indexed_input_maps.first ? EditInputMap(indexed_input_maps.second) : false)
+      );
+    }
+
 protected:
+    enum SelectedInputMapType {
+      NONE,
+      CV_INPUT_MAP,
+      DIGITAL_INPUT_MAP,
+    };
+
+    std::variant<std::monostate, CVInputMap*, DigitalInputMap*>
+      selected_input_map;
+
     HEM_SIDE hemisphere; // Which hemisphere (0, 1, ...) this applet uses
-    bool isEditing = false; // modal editing toggle
     virtual void SetHelp() = 0;
 
     /* Forces applet's Start() method to run the next time the applet is selected. This
@@ -478,8 +592,8 @@ protected:
      *     // etc...
      * }
      */
-    void StartADCLag(size_t ch = 0) {
-        frame.adc_lag_countdown[io_offset + ch] = HEMISPHERE_ADC_LAG;
+    void StartADCLag(size_t ch = 0, int lag_ticks = HEMISPHERE_ADC_LAG) {
+        frame.adc_lag_countdown[io_offset + ch] = lag_ticks;
     }
 
     bool EndOfADCLag(size_t ch = 0) {
@@ -489,8 +603,6 @@ protected:
 
 private:
     bool applet_started; // Allow the app to maintain state during switching
-    int16_t cursor_start_x;
-    int16_t cursor_start_y;
 };
 
 #endif // _HEM_APPLET_H_

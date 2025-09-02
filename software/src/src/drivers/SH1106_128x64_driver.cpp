@@ -28,9 +28,11 @@
 #include "../../OC_gpio.h"
 #include "../../OC_options.h"
 #include "../../util/util_debugpins.h"
+#include "../../util/util_misc.h"
 #if defined(__IMXRT1062__)
 #include <SPI.h>
 #endif
+#include "../../util/util_SPIFIFO.h"
 
 // NOTE: Don't disable DMA unless you absolutely know what you're doing. It will hurt you.
 #if defined(__MK20DX256__)
@@ -56,7 +58,7 @@ static uint8_t SH1106_data_start_seq[] = {
 // u8g_dev_ssd1306_128x64_data_start
   0x10, /* set upper 4 bit of the col adr to 0 */
   0x02, /* set lower 4 bit of the col adr to 0 */
-  0x00  /* 0xb0 | page */  
+  0x00  /* 0xb0 | page */
 };
 
 static uint8_t SH1106_init_seq[] = {
@@ -68,6 +70,7 @@ static uint8_t SH1106_init_seq[] = {
   0x0d3, 0x000,   /* set display offset */
   0x040,          /* start line */
 
+  // Charge pump setting - for SSD1306
   0x08d, 0x014,   /* [2] charge pump setting (p62): 0x014 enable, 0x010 disable */
 
   0x020, 0x000,   /* 2012-05-27: page addressing mode */ // PLD: Seems to work in conjuction with lower 4 bits of column data?
@@ -82,8 +85,8 @@ static uint8_t SH1106_init_seq[] = {
   0x081, 0x0cf,   /* [2] set contrast control */
   0x0d9, 0x0f1,   /* [2] pre-charge period 0x022/f1*/
   0x0db, 0x040,   /* vcomh deselect level */
-  
-  0x02e,        /* 2012-05-27: Deactivate scroll */ 
+
+  0x02e,        /* 2012-05-27: Deactivate scroll */
   0x0a4,        /* output ram to display */
 #ifdef INVERT_DISPLAY
   0x0a7,        /* inverted display mode */
@@ -92,6 +95,11 @@ static uint8_t SH1106_init_seq[] = {
 #endif
   //0x0af,      /* display on */
 };
+
+// indexes to above sequence
+static constexpr int CONTRAST_VALUE = 17;
+static constexpr int FLIP_CMD_A = 12;
+static constexpr int FLIP_CMD_B = 13;
 
 static uint8_t SH1106_display_on_seq[] = {
   0xaf
@@ -102,7 +110,7 @@ void SH1106_128x64_Driver::Init() {
   OC::pinMode(OLED_CS, OUTPUT);
   OC::pinMode(OLED_RST, OUTPUT);
   OC::pinMode(OLED_DC, OUTPUT);
-  //SPI_init(); 
+  //SPI_init();
 
   // u8g_teensy::U8G_COM_MSG_INIT
   digitalWriteFast(OLED_RST, HIGH);
@@ -122,10 +130,7 @@ void SH1106_128x64_Driver::Init() {
 
   digitalWriteFast(OLED_CS, OLED_CS_ACTIVE); // U8G_ESC_CS(1),             /* enable chip */
 
-  // assumes OC::DAC:Init already initialized SPI, called SPI.begin() if Teensy 4.x
-  #if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
-  if (OLED_Uses_SPI1) SPI1.begin();
-  #endif
+  // assumes SPI bus is already initialized !!
   SPI_send(SH1106_init_seq, sizeof(SH1106_init_seq));
 
   digitalWriteFast(OLED_CS, OLED_CS_INACTIVE); // U8G_ESC_CS(0),             /* disable chip */
@@ -144,7 +149,6 @@ void SH1106_128x64_Driver::Init() {
 #elif defined(__IMXRT1062__)
   #if defined(ARDUINO_TEENSY41)
     if (OLED_Uses_SPI1) {
-      SPI1.begin();
       LPSPI3_IER = 0;
       LPSPI3_SR = 0x3F00; // clear any prior pending interrupt flags
       LPSPI3_FCR = LPSPI_FCR_RXWATER(0) | LPSPI_FCR_TXWATER(3);
@@ -200,7 +204,9 @@ void SH1106_128x64_Driver::Flush() {
 #endif // __MK20DX256__
 #elif defined(__IMXRT1062__)
   // The same scenario as above can occur with the ISR-driven transfer
-  while (sendpage_state) { }
+  if (sendpage_state) { 
+    SERIAL_PRINTLN("display wait / frame drop");
+  }
 #endif
 }
 
@@ -229,7 +235,7 @@ void SH1106_128x64_Driver::Clear() {
 
 #if defined(__MK20DX256__)
 /*static*/
-void SH1106_128x64_Driver::SendPage(uint_fast8_t index, const uint8_t *data) {
+bool SH1106_128x64_Driver::SendPage(uint_fast8_t index, const uint8_t *data) {
   SH1106_data_start_seq[2] = 0xb0 | index;
 
   digitalWriteFast(OLED_DC, LOW); // U8G_ESC_ADR(0),           /* instruction mode */
@@ -249,11 +255,14 @@ void SH1106_128x64_Driver::SendPage(uint_fast8_t index, const uint8_t *data) {
   SPI_send(data, kPageSize);
   digitalWriteFast(OLED_CS, OLED_CS_INACTIVE); // U8G_ESC_CS(0)
 #endif
+  return true;
 }
 
 #elif defined(__IMXRT1062__)
 /*static*/
-void SH1106_128x64_Driver::SendPage(uint_fast8_t index, const uint8_t *data) {
+bool SH1106_128x64_Driver::SendPage(uint_fast8_t index, const uint8_t *data) {
+  if (sendpage_state) return false; // don't interrupt others
+                                    //
   SH1106_data_start_seq[2] = 0xb0 | index;
   sendpage_state = 1;
   sendpage_src = (const uint32_t *)data; // frame buffer is 32 bit aligned
@@ -269,6 +278,8 @@ void SH1106_128x64_Driver::SendPage(uint_fast8_t index, const uint8_t *data) {
   #if defined(ARDUINO_TEENSY41)
   }
   #endif
+
+  return true;
 }
 
 static void spi_sendpage_isr() {
@@ -301,6 +312,7 @@ static void spi_sendpage_isr() {
     lpspi->TCR = (lpspi->TCR & 0xF8000000) | LPSPI_TCR_FRAMESZ(nbits-1)
       | LPSPI_TCR_PCS(3) | LPSPI_TCR_RXMSK | LPSPI_TCR_BYSW;
     sendpage_state = 3;
+    return;
   }
   if (sendpage_state == 3) {
     // feed display data into the FIFO
@@ -382,7 +394,9 @@ void SH1106_128x64_Driver::SPI_send(void *bufr, size_t n) {
 void SH1106_128x64_Driver::SPI_send(void *bufr, size_t n) {
   #if defined(ARDUINO_TEENSY41)
     if (OLED_Uses_SPI1) {
-      SPI1.beginTransaction(SPISettings(24000000, MSBFIRST, SPI_MODE0));
+      SPI1.beginTransaction(
+        SPISettings(NorthernLightModular? 8000000 : 24000000, MSBFIRST, SPI_MODE0)
+      );
       SPI1.transfer(bufr, NULL, n);
       SPI1.endTransaction();
       return;
@@ -399,3 +413,25 @@ void SH1106_128x64_Driver::SPI_send(void *bufr, size_t n) {
 void SH1106_128x64_Driver::AdjustOffset(uint8_t offset) {
   SH1106_data_start_seq[1] = offset; // lower 4 bits of col adr
 }
+
+/*static*/
+void SH1106_128x64_Driver::SetFlipMode(bool flip180) {
+  // TODO: swap bytes for flip screen
+  SH1106_init_seq[FLIP_CMD_A] = flip180 ? 0xa0 : 0xa1;
+  SH1106_init_seq[FLIP_CMD_B] = flip180 ? 0xc0 : 0xc8;
+}
+/*static*/
+void SH1106_128x64_Driver::SetContrast(uint8_t contrast) {
+  SH1106_init_seq[CONTRAST_VALUE] = contrast;
+}
+
+#if defined(__MK20DX256__)
+/*static*/
+void SH1106_128x64_Driver::ChangeSpeed(uint32_t speed) {
+	uint32_t ctar = speed;
+	ctar = speed;
+	ctar |= (ctar & 0x0F) << 12;
+	KINETISK_SPI0.CTAR0 = ctar | SPI_CTAR_FMSZ(7);
+	KINETISK_SPI0.CTAR1 = ctar | SPI_CTAR_FMSZ(15);
+}
+#endif

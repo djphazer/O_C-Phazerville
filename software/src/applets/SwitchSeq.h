@@ -45,10 +45,8 @@
 class SwitchSeq : public HemisphereApplet
 {
 public:
-    const char *applet_name()
-    {
-        return "SwitchSeq";
-    }
+    const char *applet_name() { return "SwitchSeq"; }
+    const uint8_t* applet_icon() { return PhzIcons::switchSeq; }
 
     void Start()
     {
@@ -96,7 +94,6 @@ public:
 
     void View()
     {
-        gfxHeader(applet_name());
         DrawMode();
         DrawIndicator();
     }

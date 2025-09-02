@@ -37,6 +37,7 @@ public:
     const char* applet_name() {
         return "Carpeggio";
     }
+    const uint8_t* applet_icon() { return PhzIcons::carpeggio; }
 
     void Start() {
         step = 0;
@@ -49,7 +50,7 @@ public:
 
     void Controller() {
         if (Clock(1)) { // Reset
-            step = 0; 
+            step = 0;
             reset = true;
             pitch_out_for_step();
         }
@@ -59,8 +60,8 @@ public:
             // simply play current step and advance it. This way, the applet can be used as
             // a more conventional arpeggiator as well as a Cartesian one.
             if (DetentedIn(0) || DetentedIn(1)) {
-                int x = ProportionCV(In(0), 4);
-                int y = ProportionCV(In(1), 4);
+                int x = ProportionCV(In(0), 4, HEMISPHERE_MAX_INPUT_CV);
+                int y = ProportionCV(In(1), 4, HEMISPHERE_MAX_INPUT_CV);
                 if (x > 3) x = 3;
                 if (y > 3) y = 3;
                 step = (y * 4) + x;
@@ -137,7 +138,7 @@ public:
 
         if (cursor != CHORD) replay = 1;
     }
-        
+
     uint64_t OnDataRequest() {
         uint64_t data = 0;
         Pack(data, PackLocation {0,8}, sel_chord);
@@ -146,8 +147,8 @@ public:
     }
 
     void OnDataReceive(uint64_t data) {
-        ImprintChord(Unpack(data, PackLocation {0,8}));
-        transpose = Unpack(data, PackLocation {8,8}) - 24;
+        ImprintChord(constrain(Unpack(data, PackLocation {0,8}), 0, Nr_of_arp_chords -1));
+        transpose = constrain((Unpack(data, PackLocation {8,8}) - 24), -24, 24);
     }
 
 protected:

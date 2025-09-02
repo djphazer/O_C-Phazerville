@@ -28,6 +28,7 @@
 #include "OC_ui.h"
 
 #include "OC_patterns.h"
+#include "UI/ui_events.h"
 #include "src/drivers/FreqMeasure/OC_FreqMeasure.h"
 
 #include "HemisphereApplet.h"
@@ -35,206 +36,16 @@
 #include "HSicons.h"
 #include "HSMIDI.h"
 #include "HSClockManager.h"
-#include "AudioSetup.h"
 
+#include "PackingUtils.h"
 #include "hemisphere_config.h"
+#include "hemisphere_audio_config.h"
 
-// We depend on Calibr8or now
-#include "APP_CALIBR8OR.h"
+#include "PhzConfig.h"
 
-// The settings specify the selected applets, and 64 bits of data for each applet,
-// plus 64 bits of data for the ClockSetup applet (which includes some misc config).
-// This is the structure of a QuadrantsPreset in eeprom.
-enum QUADRANTS_SETTINGS {
-    QUADRANTS_SELECTED_LEFT_ID = 0,
-    QUADRANTS_SELECTED_RIGHT_ID = 1,
-    QUADRANTS_SELECTED_LEFT2_ID = 2,
-    QUADRANTS_SELECTED_RIGHT2_ID = 3,
-    QUADRANTS_LEFT_DATA_B1,
-    QUADRANTS_LEFT_DATA_B2,
-    QUADRANTS_LEFT_DATA_B3,
-    QUADRANTS_LEFT_DATA_B4,
-    QUADRANTS_RIGHT_DATA_B1,
-    QUADRANTS_RIGHT_DATA_B2,
-    QUADRANTS_RIGHT_DATA_B3,
-    QUADRANTS_RIGHT_DATA_B4,
-    QUADRANTS_LEFT2_DATA_B1,
-    QUADRANTS_LEFT2_DATA_B2,
-    QUADRANTS_LEFT2_DATA_B3,
-    QUADRANTS_LEFT2_DATA_B4,
-    QUADRANTS_RIGHT2_DATA_B1,
-    QUADRANTS_RIGHT2_DATA_B2,
-    QUADRANTS_RIGHT2_DATA_B3,
-    QUADRANTS_RIGHT2_DATA_B4,
-    QUADRANTS_CLOCK_DATA1,
-    QUADRANTS_CLOCK_DATA2,
-    QUADRANTS_CLOCK_DATA3,
-    QUADRANTS_CLOCK_DATA4,
-    QUADRANTS_TRIGMAP1, // 3 x 5-bit values
-    QUADRANTS_TRIGMAP2,
-    QUADRANTS_TRIGMAP3,
-    QUADRANTS_CVMAP1, // 3 x 5-bit values
-    QUADRANTS_CVMAP2,
-    QUADRANTS_CVMAP3,
-    QUADRANTS_GLOBALS1, // for globals like trig_length
-    QUADRANTS_GLOBALS2,
-    QUADRANTS_SETTING_LAST
-};
-
-static constexpr int QUAD_PRESET_COUNT = 4;
-
-/* Preset
- * - conveniently store/recall multiple applet configurations
- */
-class QuadrantsPreset : public SystemExclusiveHandler,
-    public settings::SettingsBase<QuadrantsPreset, QUADRANTS_SETTING_LAST> {
-public:
-    int GetAppletId(HEM_SIDE h) {
-        return values_[QUADRANTS_SELECTED_LEFT_ID + h];
-    }
-    HemisphereApplet* GetApplet(HEM_SIDE h) {
-      int idx = HS::get_applet_index_by_id( GetAppletId(h) );
-      return HS::available_applets[idx].instance[h];
-    }
-    void SetAppletId(HEM_SIDE h, int id) {
-        apply_value(h, id);
-    }
-    bool is_valid() {
-        return values_[QUADRANTS_SELECTED_LEFT_ID] != 0;
-    }
-
-    uint64_t GetClockData() {
-        return ( (uint64_t(values_[QUADRANTS_CLOCK_DATA4]) << 48) |
-                 (uint64_t(values_[QUADRANTS_CLOCK_DATA3]) << 32) |
-                 (uint64_t(values_[QUADRANTS_CLOCK_DATA2]) << 16) |
-                  uint64_t(values_[QUADRANTS_CLOCK_DATA1]) );
-    }
-    void SetClockData(const uint64_t data) {
-        apply_value(QUADRANTS_CLOCK_DATA1, data & 0xffff);
-        apply_value(QUADRANTS_CLOCK_DATA2, (data >> 16) & 0xffff);
-        apply_value(QUADRANTS_CLOCK_DATA3, (data >> 32) & 0xffff);
-        apply_value(QUADRANTS_CLOCK_DATA4, (data >> 48) & 0xffff);
-    }
-
-    // returns true if changed
-    bool StoreInputMap() {
-      // TODO: cvmap
-      uint64_t trigmap = 0;
-      uint64_t cvmap = 0;
-      for (size_t i = 0; i < 8; ++i) {
-        trigmap |= (uint64_t(HS::trigger_mapping[i] + 1) & 0x1F) << (i*5 + i/3);
-        cvmap |= (uint64_t(HS::cvmapping[i] + 1) & 0x1F) << (i*5 + i/3);
-      }
-
-      bool changed = (
-          trigmap != ( uint64_t(values_[QUADRANTS_TRIGMAP1])
-                    | (uint64_t(values_[QUADRANTS_TRIGMAP2]) << 16)
-                    | (uint64_t(values_[QUADRANTS_TRIGMAP3]) << 32) )
-          ) || (
-          cvmap   != ( uint64_t(values_[QUADRANTS_CVMAP1])
-                    | (uint64_t(values_[QUADRANTS_CVMAP2]) << 16)
-                    | (uint64_t(values_[QUADRANTS_CVMAP3]) << 32) )
-          );
-      values_[QUADRANTS_TRIGMAP1] = trigmap & 0xFFFF;
-      values_[QUADRANTS_TRIGMAP2] = (trigmap >> 16) & 0xFFFF;
-      values_[QUADRANTS_TRIGMAP3] = (trigmap >> 32) & 0xFFFF;
-      values_[QUADRANTS_CVMAP1] = cvmap & 0xFFFF;
-      values_[QUADRANTS_CVMAP2] = (cvmap >> 16) & 0xFFFF;
-      values_[QUADRANTS_CVMAP3] = (cvmap >> 32) & 0xFFFF;
-      return changed;
-    }
-    void LoadInputMap() {
-      int val;
-      for (size_t i = 0; i < 8; ++i) {
-        val = (uint32_t(values_[QUADRANTS_TRIGMAP1 + i/3]) >> (i%3 * 5)) & 0x1F;
-        if (val != 0) HS::trigger_mapping[i] = constrain(val - 1, 0, TRIGMAP_MAX);
-
-        val = (uint32_t(values_[QUADRANTS_CVMAP1 + i/3]) >> (i%3 * 5)) & 0x1F;
-        if (val != 0) HS::cvmapping[i] = constrain(val - 1, 0, CVMAP_MAX);
-      }
-    }
-
-    uint64_t GetGlobals() {
-      return ( (uint64_t(values_[QUADRANTS_GLOBALS2]) << 16) |
-                uint64_t(values_[QUADRANTS_GLOBALS1]) );
-    }
-    void SetGlobals(uint64_t &data) {
-        apply_value(QUADRANTS_GLOBALS1, data & 0xffff);
-        apply_value(QUADRANTS_GLOBALS2, (data >> 16) & 0xffff);
-    }
-
-    // Manually get data for one side
-    uint64_t GetData(const HEM_SIDE h) {
-        const size_t offset = h*4;
-        return (uint64_t(values_[7 + offset]) << 48) |
-               (uint64_t(values_[6 + offset]) << 32) |
-               (uint64_t(values_[5 + offset]) << 16) |
-               (uint64_t(values_[4 + offset]));
-    }
-
-    /* Manually store state data for one side */
-    void SetData(const HEM_SIDE h, uint64_t &data) {
-        apply_value(4 + h*4, data & 0xffff);
-        apply_value(5 + h*4, (data >> 16) & 0xffff);
-        apply_value(6 + h*4, (data >> 32) & 0xffff);
-        apply_value(7 + h*4, (data >> 48) & 0xffff);
-    }
-
-    // TODO: I haven't updated the SysEx data structure here because I don't use it.
-    // Clock data would probably be useful if it's not too big. -NJM
-    void OnSendSysEx() {
-        // Describe the data structure for the audience
-        uint8_t V[18];
-        V[0] = (uint8_t)values_[QUADRANTS_SELECTED_LEFT_ID];
-        V[1] = (uint8_t)values_[QUADRANTS_SELECTED_RIGHT_ID];
-        V[2] = (uint8_t)(values_[QUADRANTS_LEFT_DATA_B1] & 0xff);
-        V[3] = (uint8_t)((values_[QUADRANTS_LEFT_DATA_B1] >> 8) & 0xff);
-        V[4] = (uint8_t)(values_[QUADRANTS_RIGHT_DATA_B1] & 0xff);
-        V[5] = (uint8_t)((values_[QUADRANTS_RIGHT_DATA_B1] >> 8) & 0xff);
-        V[6] = (uint8_t)(values_[QUADRANTS_LEFT_DATA_B2] & 0xff);
-        V[7] = (uint8_t)((values_[QUADRANTS_LEFT_DATA_B2] >> 8) & 0xff);
-        V[8] = (uint8_t)(values_[QUADRANTS_RIGHT_DATA_B2] & 0xff);
-        V[9] = (uint8_t)((values_[QUADRANTS_RIGHT_DATA_B2] >> 8) & 0xff);
-        V[10] = (uint8_t)(values_[QUADRANTS_LEFT_DATA_B3] & 0xff);
-        V[11] = (uint8_t)((values_[QUADRANTS_LEFT_DATA_B3] >> 8) & 0xff);
-        V[12] = (uint8_t)(values_[QUADRANTS_RIGHT_DATA_B3] & 0xff);
-        V[13] = (uint8_t)((values_[QUADRANTS_RIGHT_DATA_B3] >> 8) & 0xff);
-        V[14] = (uint8_t)(values_[QUADRANTS_LEFT_DATA_B4] & 0xff);
-        V[15] = (uint8_t)((values_[QUADRANTS_LEFT_DATA_B4] >> 8) & 0xff);
-        V[16] = (uint8_t)(values_[QUADRANTS_RIGHT_DATA_B4] & 0xff);
-        V[17] = (uint8_t)((values_[QUADRANTS_RIGHT_DATA_B4] >> 8) & 0xff);
-
-        // Pack it up, ship it out
-        UnpackedData unpacked;
-        unpacked.set_data(18, V);
-        PackedData packed = unpacked.pack();
-        SendSysEx(packed, 'H');
-    }
-
-    void OnReceiveSysEx() {
-        uint8_t V[18];
-        if (ExtractSysExData(V, 'H')) {
-            values_[QUADRANTS_SELECTED_LEFT_ID] = V[0];
-            values_[QUADRANTS_SELECTED_RIGHT_ID] = V[1];
-            values_[QUADRANTS_LEFT_DATA_B1] = ((uint16_t)V[3] << 8) + V[2];
-            values_[QUADRANTS_RIGHT_DATA_B1] = ((uint16_t)V[5] << 8) + V[4];
-            values_[QUADRANTS_LEFT_DATA_B2] = ((uint16_t)V[7] << 8) + V[6];
-            values_[QUADRANTS_RIGHT_DATA_B2] = ((uint16_t)V[9] << 8) + V[8];
-            values_[QUADRANTS_LEFT_DATA_B3] = ((uint16_t)V[11] << 8) + V[10];
-            values_[QUADRANTS_RIGHT_DATA_B3] = ((uint16_t)V[13] << 8) + V[12];
-            values_[QUADRANTS_LEFT_DATA_B4] = ((uint16_t)V[15] << 8) + V[14];
-            values_[QUADRANTS_RIGHT_DATA_B4] = ((uint16_t)V[17] << 8) + V[16];
-        }
-    }
-
-};
-
-QuadrantsPreset quad_presets[QUAD_PRESET_COUNT];
-QuadrantsPreset *quad_active_preset = 0;
-
-////////////////////////////////////////////////////////////////////////////////
-//// Hemisphere Manager
-////////////////////////////////////////////////////////////////////////////////
+// per bank file
+static constexpr int QUAD_PRESET_COUNT = 32;
+static constexpr int PRESET_FILE_REVISION = 0;
 
 using namespace HS;
 
@@ -244,12 +55,14 @@ void QuadrantBeatSync();
 class QuadAppletManager : public HSApplication {
 public:
     void Start() {
+        audio_app.Init();
 
-        for (int i = 0; i < 4; ++i) {
-            quant_scale[i] = OC::Scales::SCALE_SEMI;
-            quantizer[i].Init();
-            quantizer[i].Configure(OC::Scales::GetScale(quant_scale[i]), 0xffff);
+        /* Hemisphere already does this...
+         * assuming Hemisphere is always included next to Quadrants...
+        for (int i = 0; i < QUANT_CHANNEL_COUNT; ++i) {
+            q_engine[i].Configure( (i<4)? OC::Scales::SCALE_SEMI : i-4, 0xffff);
         }
+        */
 
         SetApplet(HEM_SIDE(0), HS::get_applet_index_by_id(18)); // DualTM
         SetApplet(HEM_SIDE(1), HS::get_applet_index_by_id(15)); // EuclidX
@@ -258,75 +71,288 @@ public:
     }
 
     void Resume() {
-        if (!quad_active_preset)
-            LoadFromPreset(0);
-        // TODO: restore quantizer settings...
+        SetBank(bank_num);
+
+        if (preset_id < 0)
+          LoadFromPreset(0);
     }
     void Suspend() {
-        if (quad_active_preset) {
-            if (HS::auto_save_enabled || 0 == preset_id) StoreToPreset(preset_id, !HS::auto_save_enabled);
-            quad_active_preset->OnSendSysEx();
+        if (preset_id >= 0) {
+            if (HS::auto_save_enabled)
+              StoreToPreset(preset_id);
+            // TODO
+            //OnSendSysEx();
         }
     }
+    void SetBank(uint8_t id) {
+      bank_filename[5] = '0' + char(id / 100);
+      bank_filename[6] = '0' + char(id / 10 % 10);
+      bank_filename[7] = '0' + char(id % 10);
 
-    void StoreToPreset(QuadrantsPreset* preset, bool skip_eeprom = false) {
-        bool doSave = (preset != quad_active_preset);
+      bool success = false;
+      if (SDcard_Ready) // load from SD card
+        success = PhzConfig::load_config(bank_filename, SD);
 
-        quad_active_preset = preset;
-        for (int h = 0; h < APPLET_SLOTS; h++)
+      if (!success) // fallback load from LFS
+        PhzConfig::load_config(bank_filename);
+
+      // Version flag - for future reconfigurations...
+      //  - This can be used to migrate old data after breaking changes to the schema
+      //  - Right now, its existence indicates v1.10.1+
+      uint64_t data = 0;
+      bool version_key_present = PhzConfig::getValue(VERSION_KEY, data);
+      //int preset_file_revision = version_key_present? data : 0;
+
+      // Data migration to protect against a bug in v1.10
+      // This can be removed later, when we're sure no one is still using broken preset files...
+      if (!version_key_present) {
+        for (size_t i = 0; i < QUAD_PRESET_COUNT; ++i) {
+          PhzConfig::deleteKey((i << 11) | (CVMAP_KEY + 1));
+          PhzConfig::deleteKey((i << 11) | (TRIGMAP_KEY + 1));
+        }
+      }
+
+      // update version key after all data migrations
+      PhzConfig::setValue(VERSION_KEY, PRESET_FILE_REVISION);
+    }
+
+    // lower 11 bits of PhzConfig KEY
+    enum PresetDataKeys : uint16_t {
+        APPLET_METADATA_KEY = 0, // applet ids
+        CLOCK_DATA_KEY = 1,
+        GLOBALS_KEY = 2,
+        OLD_TRIGMAP_KEY = 3, // from v1.9
+        OLD_CVMAP_KEY = 4, // from v1.9
+        OUTSKIP_KEY = 5,
+
+        APPLET_L1_DATA_KEY = 10,
+        APPLET_R1_DATA_KEY = 11,
+        APPLET_L2_DATA_KEY = 12,
+        APPLET_R2_DATA_KEY = 13,
+
+        CVMAP_KEY = 20, // 16-bit CVInputMap, multiple pages
+
+        TRIGMAP_KEY = 30, // 16-bit DigitalInputMap
+
+        // 100s = Globals
+        FILTERMASK1_KEY = 100,
+        FILTERMASK2_KEY = 101,
+
+        PC_CHANNEL_KEY  = 110,
+
+        MIDI_MAPS_KEY   = 150, // + 0..32
+
+        // 200s = Quantizers
+        Q_ENGINE_KEY    = 200, // + slot number
+
+        // 300-500 = Sequences (aka Patterns)
+        SEQUENCES_KEY   = 300, // + blob index
+
+        VERSION_KEY = 0xFFFF
+    };
+
+    void StoreToPreset(int id) {
+        // preset id is upper 5 bits - 32 presets per bank
+        uint16_t preset_key = id << 11;
+
+        // clock data
+        clock_data = ClockSetup_instance.OnDataRequest();
+        PhzConfig::setValue(preset_key | CLOCK_DATA_KEY, clock_data);
+
+        // vague globals
+        global_data = ClockSetup_instance.GetGlobals();
+        PhzConfig::setValue(preset_key | GLOBALS_KEY, global_data);
+
+        uint64_t data = 0;
+        // Input Mappings
+        for (size_t i = 0; i < ADC_CHANNEL_LAST/4; ++i) {
+          data = PackPackables(HS::trigmap[i*4], HS::trigmap[i*4+1], HS::trigmap[i*4+2], HS::trigmap[i*4+3]);
+          PhzConfig::setValue(preset_key | (TRIGMAP_KEY + i), data);
+
+          data = PackPackables(HS::cvmap[i*4], HS::cvmap[i*4+1], HS::cvmap[i*4+2], HS::cvmap[i*4+3]);
+          PhzConfig::setValue(preset_key | (CVMAP_KEY + i), data);
+        }
+
+        data = 0;
+        for (size_t i = 0; i < 8; ++i) {
+          Pack(data, PackLocation{i*8, 8}, HS::frame.clockskip[i]);
+        }
+        PhzConfig::setValue(preset_key | OUTSKIP_KEY, data);
+
+        data = 0;
+        for (size_t h = 0; h < APPLET_SLOTS; h++)
         {
             int index = active_applet_index[h];
-            if (quad_active_preset->GetAppletId(HEM_SIDE(h)) != HS::available_applets[index].id)
-                doSave = 1;
-            quad_active_preset->SetAppletId(HEM_SIDE(h), HS::available_applets[index].id);
+            Pack(data, PackLocation{h*8,8}, HS::available_applets[index].id);
 
-            uint64_t data = HS::available_applets[index].instance[h]->OnDataRequest();
-            if (data != applet_data[h]) doSave = 1;
-            applet_data[h] = data;
-            quad_active_preset->SetData(HEM_SIDE(h), data);
-        }
-        uint64_t data = ClockSetup_instance.OnDataRequest();
-        if (data != clock_data) doSave = 1;
-        clock_data = data;
-        quad_active_preset->SetClockData(data);
-
-        data = ClockSetup_instance.GetGlobals();
-        if (data != global_data) doSave = 1;
-        global_data = data;
-        quad_active_preset->SetGlobals(data);
-
-        if (quad_active_preset->StoreInputMap()) doSave = 1;
-
-        // initiate actual EEPROM save - ONLY if necessary!
-        if (doSave && !skip_eeprom) {
-          Calibr8or_instance.SavePreset();
+            // applet data
+            applet_data[h] = HS::available_applets[index].instance[h]->OnDataRequest();
+            PhzConfig::setValue(preset_key | (APPLET_L1_DATA_KEY + h), applet_data[h]);
         }
 
-    }
-    void StoreToPreset(int id, bool skip_eeprom = false) {
-        StoreToPreset( (QuadrantsPreset*)(quad_presets + id), skip_eeprom );
+        // applet ids, and maybe some other stuff?
+        PhzConfig::setValue(preset_key | APPLET_METADATA_KEY, data);
+
+        // applet filtering is actually just global
+        PhzConfig::setValue(FILTERMASK1_KEY, HS::hidden_applets[0]);
+        PhzConfig::setValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
+
+        PhzConfig::setValue(PC_CHANNEL_KEY, HS::frame.MIDIState.pc_channel);
+
+        // Global quantizer settings
+        for (size_t qslot = 0; qslot < QUANT_CHANNEL_COUNT; ++qslot) {
+          /*
+            // XXX: fine-tuning stuff from Calibr8or that should also be global
+            int8_t offset;
+            int16_t scale_factor; // precision of 0.01% as an offset from 100%
+            int8_t transpose; // in semitones
+          */
+          auto &q = q_engine[qslot];
+          data = PackPackables(
+              q.scale,
+              q.octave,
+              q.root_note,
+              q.mask
+              );
+          PhzConfig::setValue(Q_ENGINE_KEY + qslot, data);
+        }
+
+        // Global MIDI Maps
+        for (size_t midx = 0; midx < MIDIMAP_MAX; ++midx) {
+          data = PackPackables(frame.MIDIState.mapping[midx]);
+          PhzConfig::setValue(MIDI_MAPS_KEY + midx, data);
+        }
+
+        // User Patterns aka Sequences
+        for (size_t i = 0; i < OC::Patterns::PATTERN_USER_COUNT; ++i) {
+          data = 0;
+          for (size_t step = 0; step < ARRAY_SIZE(OC::Pattern::notes); ++step) {
+            Pack(data, PackLocation{(step & 0x3)*16, 16}, (uint16_t)OC::user_patterns[i].notes[step]);
+            if ((step & 0x3) == 0x3) {
+              PhzConfig::setValue(SEQUENCES_KEY + ((i << 2) | (step >> 2)), data);
+              data = 0;
+            }
+          }
+        }
+
+        audio_app.SavePreset(id);
+
+        bool success = false;
+        if (SDcard_Ready)
+          success = PhzConfig::save_config(bank_filename, SD);
+        else
+          success = PhzConfig::save_config(bank_filename);
+
+        if (success)
+          PokePopup(HS::MESSAGE_POPUP, HS::PRESET_SAVED);
+
         preset_id = id;
     }
     void LoadFromPreset(int id) {
-        quad_active_preset = (QuadrantsPreset*)(quad_presets + id);
-        if (quad_active_preset->is_valid()) {
-            clock_data = quad_active_preset->GetClockData();
-            ClockSetup_instance.OnDataReceive(clock_data);
-
-            global_data = quad_active_preset->GetGlobals();
-            ClockSetup_instance.SetGlobals(global_data);
-
-            quad_active_preset->LoadInputMap();
-
-            for (int h = 0; h < APPLET_SLOTS; h++)
-            {
-                int index = HS::get_applet_index_by_id( quad_active_preset->GetAppletId(HEM_SIDE(h)) );
-                applet_data[h] = quad_active_preset->GetData(HEM_SIDE(h));
-                SetApplet(HEM_SIDE(h), index);
-                HS::available_applets[index].instance[h]->OnDataReceive(applet_data[h]);
-            }
-        }
         preset_id = id;
+
+        uint16_t preset_key = id << 11;
+        uint64_t data;
+
+        // applet ids + misc
+        if (!PhzConfig::getValue(preset_key | APPLET_METADATA_KEY, data)) return;
+        if (!data) return;
+
+        for (size_t h = 0; h < APPLET_SLOTS; h++)
+        {
+            int index = HS::get_applet_index_by_id( Unpack(data, PackLocation{h*8, 8}) );
+
+            // applet data
+            PhzConfig::getValue(preset_key | (APPLET_L1_DATA_KEY + h), applet_data[h]);
+            SetApplet(HEM_SIDE(h), index);
+            HS::available_applets[index].instance[h]->OnDataReceive(applet_data[h]);
+        }
+
+        // clock data
+        if (!PhzConfig::getValue(preset_key | CLOCK_DATA_KEY, clock_data)) return;
+        ClockSetup_instance.OnDataReceive(clock_data);
+        // if the first key exists, we are assuming the rest are present...
+
+        // vague globals
+        PhzConfig::getValue(preset_key | GLOBALS_KEY, global_data);
+        ClockSetup_instance.SetGlobals(global_data);
+
+        // Input Mappings
+        if (!PhzConfig::getValue(preset_key | TRIGMAP_KEY, data)) {
+          PhzConfig::getValue(preset_key | OLD_TRIGMAP_KEY, data);
+          const size_t bitsize = 5;
+          for (size_t i = 0; i < 8; ++i) {
+            const int val = Unpack(data, PackLocation{i*bitsize, bitsize});
+            if (val != 0) HS::trigmap[i].source = constrain(val - 1, 0, TRIGMAP_MAX);
+          }
+        } else {
+          for (size_t i = 0; i < ADC_CHANNEL_LAST/4; ++i) {
+            UnpackPackables(data, HS::trigmap[i*4], HS::trigmap[i*4+1], HS::trigmap[i*4+2], HS::trigmap[i*4+3]);
+            if (!PhzConfig::getValue(preset_key | (TRIGMAP_KEY + i+1), data)) break;
+          }
+        }
+
+        if (!PhzConfig::getValue(preset_key | CVMAP_KEY, data)) {
+          PhzConfig::getValue(preset_key | OLD_CVMAP_KEY, data);
+          const size_t bitsize = 5;
+          for (size_t i = 0; i < 8; ++i) {
+            const int val = Unpack(data, PackLocation{i*bitsize, bitsize});
+            if (val != 0) HS::cvmap[i].source = constrain(val - 1, 0, CVMAP_MAX);
+          }
+        } else {
+          for (size_t i = 0; i < ADC_CHANNEL_LAST/4; ++i) {
+            UnpackPackables(data, HS::cvmap[i*4], HS::cvmap[i*4+1], HS::cvmap[i*4+2], HS::cvmap[i*4+3]);
+            if (!PhzConfig::getValue(preset_key | (CVMAP_KEY + i+1), data)) break;
+          }
+        }
+
+        PhzConfig::getValue(preset_key | OUTSKIP_KEY, data);
+        for (size_t i = 0; i < 8; ++i)
+        {
+          HS::frame.clockskip[i] = Unpack(data, PackLocation{i*8, 8});
+        }
+
+        // applet filtering is actually just global
+        PhzConfig::getValue(FILTERMASK1_KEY, HS::hidden_applets[0]);
+        PhzConfig::getValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
+
+        if (PhzConfig::getValue(PC_CHANNEL_KEY, data)) HS::frame.MIDIState.pc_channel = (uint8_t) data;
+
+        // Global quantizer settings
+        for (size_t qslot = 0; qslot < QUANT_CHANNEL_COUNT; ++qslot) {
+          if (!PhzConfig::getValue(Q_ENGINE_KEY + qslot, data))
+              break;
+          auto &q = q_engine[qslot];
+          UnpackPackables(data,
+              q.scale,
+              q.octave,
+              q.root_note,
+              q.mask);
+          q.Reconfig();
+        }
+
+        // Global MIDI Maps
+        for (size_t midx = 0; midx < MIDIMAP_MAX; ++midx) {
+          if (!PhzConfig::getValue(MIDI_MAPS_KEY + midx, data))
+              break;
+          UnpackPackables(data, frame.MIDIState.mapping[midx]);
+        }
+        frame.MIDIState.UpdateMidiChannelFilter();
+        frame.MIDIState.UpdateMaxPolyphony();
+
+        // User Patterns aka Sequences
+        for (size_t i = 0; i < OC::Patterns::PATTERN_USER_COUNT; ++i) {
+          for (size_t step = 0; step < ARRAY_SIZE(OC::Pattern::notes); ++step) {
+            if ((step & 0x3) == 0x0) {
+              data = 0;
+              if (!PhzConfig::getValue(SEQUENCES_KEY + ((i << 2) | (step >> 2)), data))
+                break;
+            }
+            OC::user_patterns[i].notes[step] = Unpack(data, PackLocation{(step & 0x3)*16, 16});
+          }
+        }
+
+        audio_app.LoadPreset(id);
         PokePopup(PRESET_POPUP);
     }
     void ProcessQueue() {
@@ -357,25 +383,28 @@ public:
 
     template <typename T1, typename T2, typename T3>
     void ProcessMIDI(T1 &device, T2 &next_device, T3 &dev3) {
+        HS::IOFrame &f = HS::frame;
+
         while (device.read()) {
-            const int message = device.getType();
-            const int data1 = device.getData1();
-            const int data2 = device.getData2();
+            const uint8_t message = device.getType();
+            const uint8_t data1 = device.getData1();
+            const uint8_t data2 = device.getData2();
 
             if (message == usbMIDI.SystemExclusive) {
                 QuadrantSysExHandler();
                 continue;
             }
 
-            if (message == usbMIDI.ProgramChange) {
-                int slot = device.getData1();
+            if (message == usbMIDI.ProgramChange
+            && (device.getChannel() == f.MIDIState.pc_channel || f.MIDIState.pc_channel == f.MIDIState.PC_OMNI)) {
+                uint8_t slot = device.getData1();
                 if (slot < QUAD_PRESET_COUNT) {
-                  QueuePresetLoad(slot);
+                    QueuePresetLoad(slot);
                 }
-                continue;
+                //continue;
             }
 
-            HS::frame.MIDIState.ProcessMIDIMsg(device.getChannel(), message, data1, data2);
+            f.MIDIState.ProcessMIDIMsg({device.getChannel(), message, data1, data2});
             next_device.send(message, data1, data2, device.getChannel(), 0);
             dev3.send((midi::MidiType)message, data1, data2, device.getChannel());
         }
@@ -394,42 +423,81 @@ public:
         // execute Applets
         for (int h = 0; h < APPLET_SLOTS; h++)
         {
-            if (active_applet_index[h] != next_applet_index[h]) {
-              SetApplet(HEM_SIDE(h), next_applet_index[h]);
-            }
-
-            // MIDI signals mixed with inputs to applets
-            if (HS::available_applets[ active_applet_index[h] ].id != 150) // not MIDI In
-            {
-                ForEachChannel(ch) {
-                    int chan = h*2 + ch;
-                    // mix CV inputs with applicable MIDI signals
-                    switch (HS::frame.MIDIState.function[chan]) {
-                    case HEM_MIDI_CC_OUT:
-                    case HEM_MIDI_NOTE_OUT:
-                    case HEM_MIDI_VEL_OUT:
-                    case HEM_MIDI_AT_OUT:
-                    case HEM_MIDI_PB_OUT:
-                        HS::frame.inputs[chan] += HS::frame.MIDIState.outputs[chan];
-                        break;
-                    case HEM_MIDI_GATE_OUT:
-                        HS::frame.gate_high[chan] |= (HS::frame.MIDIState.outputs[chan] > (12 << 7));
-                        break;
-                    case HEM_MIDI_TRIG_OUT:
-                    case HEM_MIDI_CLOCK_OUT:
-                    case HEM_MIDI_START_OUT:
-                        HS::frame.clocked[chan] |= HS::frame.MIDIState.trigout_q[chan];
-                        HS::frame.MIDIState.trigout_q[chan] = 0;
-                        break;
-                    }
-                }
-            }
             if (HS::clock_m.auto_reset)
                 active_applet[h]->Reset();
 
-            active_applet[h]->BaseController();
+            active_applet[h]->Controller();
         }
         HS::clock_m.auto_reset = false;
+        audio_app.Controller();
+        HemisphereApplet::ProcessCursors();
+    }
+
+    void DrawFullScreen() {
+      if (select_mode == zoom_slot) {
+        showhide_cursor.Scroll(next_applet_index[zoom_slot] - showhide_cursor.cursor_pos());
+        DrawAppletList(CursorBlink());
+        // dotted screen border during applet select
+        gfxFrame(0, 0, 128, 64, true);
+      } else {
+        active_applet[zoom_slot]->BaseView(true, zoom_cursor < 0);
+        // Applets 3 and 4 get inverted titles
+        if (zoom_slot > 1) gfxInvert(1 + (zoom_slot%2)*64, 1, 63, 10);
+
+        gfxDisplayInputMapEditor();
+      }
+
+      // draw cursor for editing applet select and input maps
+      if (zoom_cursor < 0) {
+        gfxIcon(64 - 8*(zoom_slot & 1), 1, DOWN_ICON, true);
+      } else if (0 == zoom_cursor) {
+        if (select_mode != zoom_slot && CursorBlink())
+          gfxIcon(64 - 8*(zoom_slot & 1), 1, (zoom_slot & 1)? RIGHT_ICON : LEFT_ICON, true);
+      } else if (isEditing) {
+        const int x = ((zoom_cursor-1)%2)*64;
+        const int y = 13 + 10*((zoom_cursor-1)/2);
+        gfxInvert(x, y, 19, 9);
+        gfxFrame(x, y, 19, 9, true);
+      } else {
+        if (CursorBlink()) {
+          const int x = 18 + 64*((zoom_cursor-1)%2);
+          const int y = 14 + 10*((zoom_cursor-1)/2);
+          gfxIcon(x, y, LEFT_ICON, true);
+        }
+      }
+    }
+
+    void DrawOverview() {
+      active_applet[0]->gfxHeader(0);
+      active_applet[1]->gfxHeader(0);
+      active_applet[2]->gfxHeader(54);
+      active_applet[3]->gfxHeader(54);
+
+      gfxDottedLine(63, 0, 63, 63); // vert
+      gfxDottedLine(0, 32, 127, 32); // horiz
+
+      ForAllChannels(applet) {
+        ForEachChannel(ch) {
+            int length;
+            int max_length = 62;
+            int in_bar_y = 13 + (applet>>1)*22 + (ch * 10);
+            int out_bar_y = 17 + (applet>>1)*22 + (ch * 10);
+
+            // positive values extend bars from left side of screen to the right
+            // negative values go from right side to left
+            length = ProportionCV(abs(DetentedIn(applet*2 + ch)), max_length);
+            if (DetentedIn(applet*2 + ch) < 0)
+                active_applet[applet]->gfxFrame(max_length - length, in_bar_y, length, 3);
+            else
+                active_applet[applet]->gfxFrame(0, in_bar_y, length, 3);
+
+            length = ProportionCV(abs(ViewOut(applet*2 + ch)), max_length);
+            if (ViewOut(applet*2 + ch) < 0)
+                active_applet[applet]->gfxRect(max_length - length, out_bar_y, length, 3);
+            else
+                active_applet[applet]->gfxRect(0, out_bar_y, length, 3);
+        }
+      }
     }
 
     void View() {
@@ -463,6 +531,10 @@ public:
             draw_applets = false;
             break;
 
+          case SHOWHIDE_APPLETS:
+            DrawAppletList();
+            draw_applets = false;
+            break;
           }
         }
         if (HS::q_edit)
@@ -470,21 +542,20 @@ public:
 
         if (draw_applets) {
           if (view_state == AUDIO_SETUP) {
-            gfxHeader("Audio DSP Setup");
-            OC::AudioDSP::DrawAudioSetup();
-            draw_applets = false;
-          }
-          else if (view_state == CLOCK_SETUP) {
-            ClockSetup_instance.View();
+            audio_app.View();
+            ClockSetup_instance.DrawIndicator();
+
+            // gfxHeader("Audio DSP Setup");
+            // OC::AudioDSP::DrawAudioSetup();
             draw_applets = false;
           }
         }
 
         if (draw_applets) {
           if (view_state == APPLET_FULLSCREEN) {
-            active_applet[zoom_slot]->BaseView(true);
-            // Applets 3 and 4 get inverted titles
-            if (zoom_slot > 1) gfxInvert(1 + (zoom_slot%2)*64, 1, 54, 10);
+            DrawFullScreen();
+          } else if (view_state == OVERVIEW) {
+            DrawOverview();
           } else {
             // only two applets visible at a time
             for (int h = 0; h < 2; h++)
@@ -493,28 +564,23 @@ public:
                 active_applet[slot]->BaseView();
 
                 // Applets 3 and 4 get inverted titles
-                if (slot > 1) gfxInvert(1 + h*64, 1, 54, 10);
+                if (slot > 1) gfxInvert(1 + h*64, 1, 63, 10);
             }
 
             // vertical separator
             graphics.drawLine(63, 0, 63, 63, 2);
           }
 
-          if (select_mode) {
-            // screen border while X or Y is held, so they feel powerful (because they are)
-            graphics.drawFrame(0, 0, 128, 64);
-          }
-
-          // Clock indicator icons in header
-          if (HS::clock_m.IsRunning()) {
-              gfxIcon(56, 1, HS::clock_m.Cycle() ? METRO_L_ICON : METRO_R_ICON);
-          } else if (HS::clock_m.IsPaused()) {
-              gfxIcon(56, 1, PAUSE_ICON);
+          // Clock setup is an overlay
+          if (view_state == CLOCK_SETUP) {
+            ClockSetup_instance.View();
+          } else {
+            ClockSetup_instance.DrawIndicator(view_state == OVERVIEW);
           }
         }
 
         // Overlay popup window last
-        if (OC::CORE::ticks - HS::popup_tick < HEMISPHERE_CURSOR_TICKS * 2) {
+        if (OC::CORE::ticks - HS::popup_tick < HEMISPHERE_CURSOR_TICKS * 4) {
           HS::DrawPopup(config_cursor, preset_id, CursorBlink());
         }
     }
@@ -529,7 +595,40 @@ public:
           return;
         }
         if (view_state == AUDIO_SETUP) {
-          OC::AudioDSP::AudioSetupButtonAction(h);
+          // OC::AudioDSP::AudioSetupButtonAction(h);
+          // audio_app.HandleButtonEvent(event);
+          return;
+        }
+        if (view_state == APPLET_FULLSCREEN) {
+          switch (zoom_cursor) {
+            case -1:
+              active_applet[zoom_slot]->OnButtonPress();
+              break;
+
+            case 0:
+              if (zoom_slot == select_mode) {
+                SetApplet(zoom_slot, next_applet_index[zoom_slot]);
+                ExitFullScreen();
+              } else
+                select_mode = zoom_slot;
+              break;
+            //// 0=select; 1,2=trigmap; 3,4=cvmap; 5,6=outmode
+            case 3:
+            case 4:
+              if (CheckEditInputMapPress(
+                    zoom_cursor,
+                    IndexedInput(3, cvmap[zoom_slot*2]),
+                    IndexedInput(4, cvmap[zoom_slot*2+1])
+                  ))
+                break;
+            case 1:
+            case 2:
+            case 5:
+            case 6:
+            default:
+              isEditing = !isEditing;
+              break;
+          }
           return;
         }
 
@@ -542,21 +641,15 @@ public:
     }
 
     const HEM_SIDE ButtonToSlot(const UI::Event &event) {
-        switch (event.control) {
-        default:
-        case OC::CONTROL_BUTTON_A:
-          return LEFT_HEMISPHERE;
-          break;
-        case OC::CONTROL_BUTTON_X:
-          return LEFT2_HEMISPHERE;
-          break;
-        case OC::CONTROL_BUTTON_B:
-          return RIGHT_HEMISPHERE;
-          break;
-        case OC::CONTROL_BUTTON_Y:
-          return RIGHT2_HEMISPHERE;
-          break;
-        }
+      if (event.control == OC::CONTROL_BUTTON_X)
+        return LEFT2_HEMISPHERE;
+      if (event.control == OC::CONTROL_BUTTON_B)
+        return RIGHT_HEMISPHERE;
+      if (event.control == OC::CONTROL_BUTTON_Y)
+        return RIGHT2_HEMISPHERE;
+
+      //if (event.control == OC::CONTROL_BUTTON_A)
+      return LEFT_HEMISPHERE; // default
     }
 
     // returns true if combo detected and button release should be ignored
@@ -564,23 +657,23 @@ public:
         HEM_SIDE slot = ButtonToSlot(event);
 
         // dual press A+B for Clock Setup
-        if (event.mask == (OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_B)) {
+        if (CheckButtonCombo(OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_B)) {
             view_state = CLOCK_SETUP;
             return true;
         }
         // dual press X+Y for Audio Setup
-        if (event.mask == (OC::CONTROL_BUTTON_X | OC::CONTROL_BUTTON_Y)) {
+        if (CheckButtonCombo(OC::CONTROL_BUTTON_X | OC::CONTROL_BUTTON_Y)) {
             view_state = AUDIO_SETUP;
             return true;
         }
         // dual press A+X for Load Preset
-        if (event.mask == (OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_X)) {
+        if (CheckButtonCombo(OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_X)) {
             ShowPresetSelector();
             return true;
         }
 
         // dual press B+Y for Input Mapping
-        if (event.mask == (OC::CONTROL_BUTTON_B | OC::CONTROL_BUTTON_Y)) {
+        if (CheckButtonCombo(OC::CONTROL_BUTTON_B | OC::CONTROL_BUTTON_Y)) {
             config_page = INPUT_SETTINGS;
             config_cursor = TRIGMAP1;
             return true;
@@ -588,6 +681,7 @@ public:
 
         // cancel preset select or config screens
         if (config_page || preset_cursor) {
+          if (isEditing && config_cursor == PRESET_BANK_NUM) SetBank(bank_num);
           preset_cursor = 0;
           config_page = HIDE_CONFIG;
           HS::popup_tick = 0;
@@ -622,7 +716,8 @@ public:
             return;
         }
         if (view_state == AUDIO_SETUP) {
-          OC::AudioDSP::AudioMenuAdjust(h, event.value);
+          // OC::AudioDSP::AudioMenuAdjust(h, event.value);
+          audio_app.HandleEncoderEvent(event);
           return;
         }
 
@@ -631,20 +726,61 @@ public:
             ClockSetup_instance.OnLeftEncoderMove(event.value);
           else
             ClockSetup_instance.OnEncoderMove(event.value);
+          return;
+        }
+
+        if (view_state == APPLET_FULLSCREEN) {
+            if (select_mode == zoom_slot)
+              ChangeApplet(zoom_slot, event.value);
+            else if (h == LEFT_HEMISPHERE && !isEditing)
+              zoom_cursor = (event.value > 0)? 0 : -1;
+            else if (zoom_cursor < 0)
+              active_applet[zoom_slot]->OnEncoderMove(event.value);
+            else if (isEditing) { // enc changes value
+              switch (zoom_cursor)
+              {
+                case 1:
+                case 2:
+                {
+                  const int chan = zoom_slot*2 + zoom_cursor - 1;
+                  if (clock_m.IsRunning()) // && clock_m.GetMultiply(chan))
+                  {
+                    clock_m.SetMultiply(clock_m.GetMultiply(chan) + event.value, chan);
+                  } else
+                    HS::trigmap[chan].ChangeSource(event.value);
+                  break;
+                }
+                case 3:
+                case 4:
+                  if (!EditSelectedInputMap(event.value))
+                    HS::cvmap[zoom_slot*2 + zoom_cursor - 3].ChangeSource(event.value);
+                  break;
+                case 5:
+                case 6:
+                  // TODO: per applet?
+                default:
+                  isEditing = false;
+                  break;
+              }
+            } else { // enc moves cursor
+              zoom_cursor = constrain(zoom_cursor + event.value, 0, 4);
+              ResetCursor();
+            }
         } else if (event.mask & (OC::CONTROL_BUTTON_X | OC::CONTROL_BUTTON_Y)) {
             // hold down X or Y to change applet with encoder
-            if (view_state == APPLET_FULLSCREEN) slot = zoom_slot;
             ChangeApplet(slot, event.value);
+            SetApplet(slot, next_applet_index[slot]);
         } else {
             active_applet[slot]->OnEncoderMove(event.value);
         }
     }
 
     void SetConfigPageFromCursor() {
-      if (config_cursor < CONFIG_DUMMY) config_page = LOADSAVE_POPUP;
+      if (config_cursor <= CONFIG_DUMMY) config_page = LOADSAVE_POPUP;
       else if (config_cursor < TRIGMAP1) config_page = CONFIG_SETTINGS;
       else if (config_cursor < QUANT1) config_page = INPUT_SETTINGS;
       else if (config_cursor < SHOWHIDELIST) config_page = QUANTIZER_SETTINGS;
+      else config_page = LAST_PAGE;
     }
     void ToggleConfigMenu() {
       if (config_page) {
@@ -676,23 +812,62 @@ public:
     }
     // this brings a specific applet into view on the appropriate side
     void SwitchToSlot(HEM_SIDE h) {
-      if (view_slot[h % 2] != h / 2) {
-        view_slot[h % 2] = h / 2;
-      }
+      view_slot[h % 2] = h / 2;
       zoom_slot = h;
     }
 
+    void ExitFullScreen() {
+      view_state = APPLETS;
+      isEditing = false;
+      select_mode = -1;
+    }
     void SetFullScreen(HEM_SIDE hemisphere) {
-      zoom_slot = hemisphere;
+      SwitchToSlot(hemisphere);
       view_state = APPLET_FULLSCREEN;
+      isEditing = false;
+      select_mode = -1;
     }
     void ToggleFullScreen() {
       view_state = (view_state == APPLET_FULLSCREEN) ? APPLETS : APPLET_FULLSCREEN;
     }
 
     void HandleButtonEvent(const UI::Event &event) {
-        // tracks whether X or Y are being held down
-        select_mode = (event.mask & (OC::CONTROL_BUTTON_X | OC::CONTROL_BUTTON_Y));
+        last_mask = mask;
+        mask = event.mask;
+        SERIAL_PRINTLN(
+          "mask=%d type=%d value=%d control=%d last_mask=%d",
+          event.mask,
+          event.type,
+          event.value,
+          event.control,
+          last_mask
+        );
+
+        if (AUDIO_SETUP == view_state) {
+          if (CheckButtonCombo(OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_B)) {
+            view_state = APPLETS;
+            return;
+          }
+          if ((event.control == OC::CONTROL_BUTTON_L
+               || event.control == OC::CONTROL_BUTTON_R)) {
+            audio_app.HandleEncoderButtonEvent(event);
+            return;
+          }
+          if (event.control == OC::CONTROL_BUTTON_X
+              || event.control == OC::CONTROL_BUTTON_Y
+              || event.control == OC::CONTROL_BUTTON_A
+              || event.control == OC::CONTROL_BUTTON_B) {
+            if (audio_app.HandleButtonEvent(event))
+              view_state = APPLETS;
+            return;
+          }
+        }
+
+        if (CheckButtonCombo(OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_Y) ||
+            CheckButtonCombo(OC::CONTROL_BUTTON_X | OC::CONTROL_BUTTON_B)) {
+          view_state = OVERVIEW;
+          return;
+        }
 
         switch (event.type) {
         case UI::EVENT_BUTTON_DOWN:
@@ -705,75 +880,78 @@ public:
               HS::NudgeOctave(HS::qview, -1);
             else {
               HS::q_edit = false;
-              select_mode = false;
+              select_mode = -1;
             }
 
             OC::ui.SetButtonIgnoreMask();
             break;
           }
 
-          switch (event.control) {
-            case OC::CONTROL_BUTTON_Z:
-              // X or Y + Z == go fullscreen
-              if (select_mode) {
-                bool h = (event.mask & OC::CONTROL_BUTTON_Y); // left or right
-                zoom_slot = HEM_SIDE(view_slot[h]*2 + h);
-                ToggleFullScreen();
-                select_mode = false;
-                OC::ui.SetButtonIgnoreMask();
-                break;
-              }
-
+          if (event.control == OC::CONTROL_BUTTON_Z)
+          {
               // Z-button - Zap the CLOCK!!
               ToggleClockRun();
               OC::ui.SetButtonIgnoreMask();
-              break;
-
-            case OC::CONTROL_BUTTON_L:
-            case OC::CONTROL_BUTTON_R:
-              if (event.mask == (OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_R)) {
-                // TODO: how to go to app menu?
-              }
+          } else if (
+            event.control == OC::CONTROL_BUTTON_L ||
+            event.control == OC::CONTROL_BUTTON_R)
+          {
               DelegateEncoderPush(event);
               // ignore long-press to prevent Main Menu >:)
               //OC::ui.SetButtonIgnoreMask();
-              break;
-
-            case OC::CONTROL_BUTTON_A:
-            case OC::CONTROL_BUTTON_B:
-            case OC::CONTROL_BUTTON_X:
-            case OC::CONTROL_BUTTON_Y:
+          } else if (
+            event.control == OC::CONTROL_BUTTON_A ||
+            event.control == OC::CONTROL_BUTTON_B ||
+            event.control == OC::CONTROL_BUTTON_X ||
+            event.control == OC::CONTROL_BUTTON_Y)
+          {
               if (CheckButtonCombos(event)) {
-                select_mode = false;
+                select_mode = -1;
+                isEditing = false;
                 OC::ui.SetButtonIgnoreMask(); // ignore release and long-press
-              }
-              break;
+              } else {
+                HEM_SIDE slot = ButtonToSlot(event);
+                if (OC::CORE::ticks - click_tick < HEMISPHERE_DOUBLE_CLICK_TIME
+                    && (slot == first_click))
+                {
+                    // This is a double-click on one button.
+                    SetFullScreen(slot);
+                    click_tick = 0;
+                    OC::ui.SetButtonIgnoreMask(); // ignore button release
+                    return;
+                }
 
-            default:
-              break;
+                // -- Single click
+                // If a help screen is already selected, and the button is for
+                // the opposite one, go to the other help screen
+                if (view_state == APPLET_FULLSCREEN) {
+                    if (zoom_slot != slot) SetFullScreen(slot);
+                    else ExitFullScreen(); // Exit help screen if same button is clicked
+                    OC::ui.SetButtonIgnoreMask(); // ignore release
+                }
+
+                // mark this single click
+                click_tick = OC::CORE::ticks;
+                first_click = slot;
+              }
           }
 
           break;
 
         case UI::EVENT_BUTTON_PRESS:
-          switch (event.control) {
-            // A/B/X/Y switch to corresponding applet on release
-            case OC::CONTROL_BUTTON_A:
-            case OC::CONTROL_BUTTON_B:
-            case OC::CONTROL_BUTTON_X:
-            case OC::CONTROL_BUTTON_Y:
-            {
-              HEM_SIDE slot = ButtonToSlot(event);
-              if (view_state == APPLET_FULLSCREEN && slot == zoom_slot)
-                view_state = APPLETS;
+          // A/B/X/Y switch to corresponding applet on release
+          if (event.control == OC::CONTROL_BUTTON_A ||
+              event.control == OC::CONTROL_BUTTON_B ||
+              event.control == OC::CONTROL_BUTTON_X ||
+              event.control == OC::CONTROL_BUTTON_Y)
+          {
+            HEM_SIDE slot = ButtonToSlot(event);
+            if (view_state == APPLET_FULLSCREEN && slot == zoom_slot)
+              view_state = APPLETS;
 
-              SwitchToSlot(slot);
-              break;
-            }
-
-            // ignore all other button release events
-            default: break;
+            SwitchToSlot(slot);
           }
+          // ignore all other button release events
           break;
 
         case UI::EVENT_BUTTON_LONG_PRESS:
@@ -784,8 +962,15 @@ public:
         }
     }
 
+protected:
+    bool CheckButtonCombo(uint16_t combo) {
+        return mask == combo && mask != last_mask;
+    }
+
 private:
-    int preset_id = 0;
+    char bank_filename[16] = "BANK_000.DAT";
+    uint8_t bank_num = 0;
+    int preset_id = -1;
     int queued_preset = 0;
     int preset_cursor = 0;
     HemisphereApplet *active_applet[4]; // Pointers to actual applets
@@ -797,13 +982,24 @@ private:
     bool view_slot[2] = {0, 0}; // Two applets on each side, only one visible at a time
     int config_cursor = 0;
 
-    bool select_mode = 0;
+    int select_mode = -1;
     HEM_SIDE zoom_slot; // Which of the hemispheres (if any) is in fullscreen/help mode
+    int zoom_cursor; // 0=select; 1,2=trigmap; 3,4=cvmap; 5,6=outmode
+    uint32_t click_tick; // Measure time between clicks for double-click
+    int first_click; // The first button pushed of a double-click set, to see if the same one is pressed
+
+    // Button combos can cause multiple triggers if the buttons are pressed
+    // close enough together. Each press will have its own event with both
+    // button marked in the mask. So, we track mask history to ensure button
+    // state has actually changed between events to register a combo.
+    uint16_t mask = 0;
+    uint16_t last_mask = 0;
 
     // State machine
     enum QuadrantsView {
       APPLETS,
       APPLET_FULLSCREEN,
+      OVERVIEW,
       //CONFIG_MENU,
       //PRESET_PICKER,
       CLOCK_SETUP,
@@ -830,6 +1026,8 @@ private:
         TRIG_LENGTH,
         SCREENSAVER_MODE,
         CURSOR_MODE,
+        PRESET_BANK_NUM,
+        MIDI_PC_CHANNEL,
 
         // Input Remapping
         TRIGMAP1, TRIGMAP2, TRIGMAP3, TRIGMAP4,
@@ -851,10 +1049,12 @@ private:
         if (!isEditing && !preset_cursor) {
           if (h == 0) { // change pages
             config_page += dir;
-            config_page = constrain(config_page, LOADSAVE_POPUP, QUANTIZER_SETTINGS);
+            config_page = constrain(config_page, LOADSAVE_POPUP, LAST_PAGE);
 
             const int cursorpos[] = { 0, LOAD_PRESET, TRIG_LENGTH, TRIGMAP1, QUANT1, SHOWHIDELIST };
             config_cursor = cursorpos[config_page];
+          } else if (config_page == SHOWHIDE_APPLETS) {
+            showhide_cursor.Scroll(dir);
           } else { // move cursor
             config_cursor += dir;
             config_cursor = constrain(config_cursor, 0, MAX_CURSOR);
@@ -862,6 +1062,13 @@ private:
             SetConfigPageFromCursor();
           }
           ResetCursor();
+          if (config_cursor > CONFIG_DUMMY) HS::popup_tick = 0;
+          return;
+        }
+
+        if (preset_cursor && isEditing) {
+          // bank select
+          bank_num = constrain(bank_num + dir, 0, 99);
           return;
         }
 
@@ -870,32 +1077,37 @@ private:
         case TRIGMAP2:
         case TRIGMAP3:
         case TRIGMAP4:
-            HS::trigger_mapping[config_cursor-TRIGMAP1] = constrain(
-                HS::trigger_mapping[config_cursor-TRIGMAP1] + dir, 0, TRIGMAP_MAX);
+            HS::trigmap[config_cursor-TRIGMAP1].ChangeSource(dir);
             break;
         case CVMAP1:
         case CVMAP2:
         case CVMAP3:
         case CVMAP4:
-            HS::cvmapping[config_cursor-CVMAP1] =
-              constrain( HS::cvmapping[config_cursor-CVMAP1] + dir, 0, CVMAP_MAX);
+            if (!EditSelectedInputMap(dir))
+              HS::cvmap[config_cursor-CVMAP1].ChangeSource(dir);
             break;
         case TRIGMAP5:
         case TRIGMAP6:
         case TRIGMAP7:
         case TRIGMAP8:
-            HS::trigger_mapping[config_cursor-TRIGMAP5 + 4] = constrain(
-                HS::trigger_mapping[config_cursor-TRIGMAP5 + 4] + dir, 0, TRIGMAP_MAX);
+            HS::trigmap[config_cursor-TRIGMAP5 + 4].ChangeSource(dir);
             break;
         case CVMAP5:
         case CVMAP6:
         case CVMAP7:
         case CVMAP8:
-            HS::cvmapping[config_cursor-CVMAP5 + 4] =
-              constrain( HS::cvmapping[config_cursor-CVMAP5 + 4] + dir, 0, CVMAP_MAX);
+            if (!EditSelectedInputMap(dir))
+              HS::cvmap[config_cursor-CVMAP5 + 4].ChangeSource(dir);
             break;
         case TRIG_LENGTH:
             HS::trig_length = (uint32_t) constrain( int(HS::trig_length + dir), 1, 127);
+            break;
+        case PRESET_BANK_NUM:
+            bank_num = constrain(bank_num + dir, 0, 99);
+            break;
+        case MIDI_PC_CHANNEL:
+            HS::frame.MIDIState.pc_channel =
+              constrain(HS::frame.MIDIState.pc_channel + dir, 0, 17);
             break;
         //case SCREENSAVER_MODE:
             // TODO?
@@ -911,7 +1123,19 @@ private:
         }
     }
     void ConfigButtonPush(int h) {
+      static uint8_t old_bank_num = 0xff;
         if (preset_cursor) {
+            // left enc toggles bank select
+            if (0 == h || isEditing) {
+              isEditing = !isEditing;
+              if (!isEditing) {
+                if (old_bank_num != bank_num) SetBank(bank_num);
+              } else
+                old_bank_num = bank_num;
+
+              return;
+            }
+
             // Save or Load on button push
             if (config_cursor == SAVE_PRESET)
                 StoreToPreset(preset_cursor-1);
@@ -927,6 +1151,21 @@ private:
         }
 
         switch (config_cursor) {
+        case CONFIG_DUMMY:
+            // reset input mappings to defaults
+            HS::Init();
+            // randomize all applets
+            for (int ch = 0; ch < APPLET_SLOTS; ++ch) {
+              size_t index = random(HEMISPHERE_AVAILABLE_APPLETS);
+              SetApplet(HEM_SIDE(ch), index);
+#ifdef PEWPEWPEW
+              // load random data !!!
+              // this will expose critical bugs in data validation ;)
+              HS::available_applets[index].instance[ch]->OnDataReceive(uint64_t(random()) << 32 | (uint64_t)random());
+#endif
+            }
+            break;
+
         case SAVE_PRESET:
         case LOAD_PRESET:
             preset_cursor = preset_id + 1;
@@ -947,14 +1186,6 @@ private:
             HS::QuantizerEdit(config_cursor - QUANT1);
             break;
 
-        case TRIGMAP1:
-        case TRIGMAP2:
-        case TRIGMAP3:
-        case TRIGMAP4:
-        case TRIGMAP5:
-        case TRIGMAP6:
-        case TRIGMAP7:
-        case TRIGMAP8:
         case CVMAP1:
         case CVMAP2:
         case CVMAP3:
@@ -963,18 +1194,53 @@ private:
         case CVMAP6:
         case CVMAP7:
         case CVMAP8:
+          if (CheckEditInputMapPress(
+                config_cursor,
+                IndexedInput(CVMAP1, cvmap[0]),
+                IndexedInput(CVMAP2, cvmap[1]),
+                IndexedInput(CVMAP3, cvmap[2]),
+                IndexedInput(CVMAP4, cvmap[3]),
+                IndexedInput(CVMAP5, cvmap[4]),
+                IndexedInput(CVMAP6, cvmap[5]),
+                IndexedInput(CVMAP7, cvmap[6]),
+                IndexedInput(CVMAP8, cvmap[7])
+              ))
+            break;
+        case TRIGMAP1:
+        case TRIGMAP2:
+        case TRIGMAP3:
+        case TRIGMAP4:
+        case TRIGMAP5:
+        case TRIGMAP6:
+        case TRIGMAP7:
+        case TRIGMAP8:
         case TRIG_LENGTH:
+        case MIDI_PC_CHANNEL:
             isEditing = !isEditing;
             break;
 
+        case PRESET_BANK_NUM:
+            isEditing = !isEditing;
+            if (!isEditing) SetBank(bank_num);
+            break;
+
         case SCREENSAVER_MODE:
-            ++HS::screensaver_mode %= 4;
+            ++HS::screensaver_mode %= SCREENSAVER_MODE_COUNT;
             break;
 
         case CURSOR_MODE:
             HS::cursor_wrap = !HS::cursor_wrap;
             break;
 
+        case SHOWHIDELIST:
+            if (h == 0) // left encoder inverts selection
+            {
+              HS::hidden_applets[0] = ~HS::hidden_applets[0];
+              HS::hidden_applets[1] = ~HS::hidden_applets[1];
+            }
+            else // right encoder toggles current
+              HS::showhide_applet(showhide_cursor.cursor_pos());
+            break;
         default: break;
         }
     }
@@ -990,15 +1256,15 @@ private:
           // Physical trigger input mappings
           // Physical CV input mappings
           // Top 2 applets
-          gfxPrint(4 + ch*32, 15, OC::Strings::trigger_input_names_none[ HS::trigger_mapping[ch] ] );
-          gfxPrint(4 + ch*32, 28, OC::Strings::cv_input_names_none[ HS::cvmapping[ch] ] );
+          gfxPrint(4 + ch*32, 15, HS::trigmap[ch].InputName() );
+          gfxPrint(4 + ch*32, 28, HS::cvmap[ch].InputName() );
 
           // Bottom 2 applets
-          gfxPrint(4 + ch*32, 41, OC::Strings::trigger_input_names_none[ HS::trigger_mapping[ch + 4] ] );
-          gfxPrint(4 + ch*32, 54, OC::Strings::cv_input_names_none[ HS::cvmapping[ch + 4] ] );
+          gfxPrint(4 + ch*32, 41, HS::trigmap[ch + 4].InputName() );
+          gfxPrint(4 + ch*32, 54, HS::cvmap[ch + 4].InputName() );
         }
 
-        gfxDottedLine(64, 11, 64, 63); // vert
+        gfxDottedLine(63, 11, 63, 63); // vert
         gfxDottedLine(0, 38, 127, 38); // horiz
 
         // Cursor location is within a 4x4 grid
@@ -1007,6 +1273,7 @@ private:
 
         gfxCursor(4 + 32*cur_x, 23 + 13*cur_y, 19);
 
+        gfxDisplayInputMapEditor();
     }
     void DrawQuantizerConfig() {
         gfxHeader("<  Quantizer Setup");
@@ -1022,18 +1289,17 @@ private:
 
           const bool upper = config_cursor < QUANT5;
           const int ch_view = upper ? ch : ch + 4;
+          auto &q = q_engine[ch_view];
 
           gfxIcon(x + 3, upper? 25 : 45, upper? UP_BTN_ICON : DOWN_BTN_ICON);
 
           // Scale
-          gfxPrint(x - 3, 30, OC::scale_names_short[ HS::quant_scale[ch_view] ]);
+          gfxPrint(x - 3, 30, OC::scale_names_short[ q.scale ]);
 
           // Root Note + Octave
-          gfxPrint(x - 3, 40, OC::Strings::note_names[ HS::root_note[ch_view] ]);
-          if (HS::q_octave[ch_view] >= 0) gfxPrint("+");
-          gfxPrint(HS::q_octave[ch_view]);
-
-          // (TODO: mask editor)
+          gfxPrint(x - 3, 40, OC::Strings::note_names[ q.root_note ]);
+          if (q.octave >= 0) gfxPrint("+");
+          gfxPrint(q.octave);
 
           // 5-8 on bottom
           gfxPrint(x, 55, "Q");
@@ -1066,20 +1332,21 @@ private:
         gfxPrint(HS::trig_length);
         gfxPrint("ms");
 
-        const char * ssmodes[4] = { "[blank]", "Meters", "Zaps",
-        #if defined(__IMXRT1062__)
-        "Stars"
-        #else
-        "Zips"
-        #endif
-        };
         gfxPrint(1, 25, "Screensaver:  ");
         gfxPrint( ssmodes[HS::screensaver_mode] );
 
-        const char * cursor_mode_name[3] = { "modal", "modal+wrap" };
-        gfxPrint(1, 35, "Cursor:  ");
-        gfxPrint(cursor_mode_name[HS::cursor_wrap]);
-        
+        gfxPrint(1, 35, "Cursor wrap:  ");
+        gfxPrint(OC::Strings::off_on[HS::cursor_wrap]);
+
+        gfxPrint(1, 45, "Preset Bank# ");
+        gfxPrint(bank_num);
+
+        const uint8_t pc_ch = HS::frame.MIDIState.pc_channel;
+        gfxPrint(1, 55, "MIDI-PC Ch:  ");
+        if (pc_ch == 0) graphics.printf("%4s", "Omni");
+        else if (pc_ch <= 16) graphics.printf("%4d", pc_ch);
+        else graphics.printf("%4s", "Off");
+
         switch (config_cursor) {
         case TRIG_LENGTH:
             gfxCursor(80, 23, 24);
@@ -1088,7 +1355,13 @@ private:
             gfxIcon(73, 25, RIGHT_ICON);
             break;
         case CURSOR_MODE:
-            gfxIcon(43, 35, RIGHT_ICON);
+            gfxIcon(73, 35, RIGHT_ICON);
+            break;
+        case PRESET_BANK_NUM:
+            gfxCursor(78, 53, 19);
+            break;
+        case MIDI_PC_CHANNEL:
+            gfxCursor(78, 63, 25);
             break;
         case CONFIG_DUMMY:
             gfxIcon(2, 1, LEFT_ICON);
@@ -1096,11 +1369,30 @@ private:
         }
     }
 
+    bool isValidPreset(int id) {
+      uint64_t data;
+      return PhzConfig::getValue(id << 11 | APPLET_METADATA_KEY, data);
+    }
+    HemisphereApplet* GetApplet(int id, size_t h) {
+        uint64_t data = 0;
+        PhzConfig::getValue(id << 11 | APPLET_METADATA_KEY, data);
+        int idx = HS::get_applet_index_by_id( Unpack(data, PackLocation{h*8, 8}) );
+        return HS::available_applets[idx].instance[h];
+    }
     void DrawPresetSelector() {
         gfxHeader((config_cursor == SAVE_PRESET) ? "Save" : "Load");
-        gfxPrint(30, 1, "Preset");
-        gfxDottedLine(16, 11, 16, 63);
+        gfxPrint(30, 1, "Preset: Bank# ");
+        gfxPrint(bank_num);
+        if (!SDcard_Ready) gfxInvert(78, 0, 30, 9);
 
+        // bank select cursor
+        if (isEditing) {
+          gfxIcon(114, 11, UP_ICON);
+          return;
+        }
+
+        // Draw preset list
+        gfxDottedLine(16, 11, 16, 63);
         int y = 5 + constrain(preset_cursor,1,5)*10;
         gfxIcon(0, y, RIGHT_ICON);
         const int top = constrain(preset_cursor - 4, 1, QUAD_PRESET_COUNT) - 1;
@@ -1112,12 +1404,14 @@ private:
             else
               gfxPrint(8, y, OC::Strings::capital_letters[i]);
 
-            if (!quad_presets[i].is_valid())
+            if (!isValidPreset(i))
                 gfxPrint(18, y, "(empty)");
             else {
-                gfxPrint(18, y, quad_presets[i].GetApplet(LEFT_HEMISPHERE)->applet_name());
+                gfxIcon(18, y, GetApplet(i, LEFT_HEMISPHERE)->applet_icon());
+                gfxPrint(26, y, GetApplet(i, LEFT_HEMISPHERE)->applet_name());
                 gfxPrint(", ");
-                gfxPrint(quad_presets[i].GetApplet(RIGHT_HEMISPHERE)->applet_name());
+                gfxPrint(GetApplet(i, RIGHT_HEMISPHERE)->applet_name());
+                gfxIcon(120, y, GetApplet(i, RIGHT_HEMISPHERE)->applet_icon(), true);
             }
 
             y += 10;
@@ -1125,47 +1419,10 @@ private:
     }
 };
 
-// TOTAL EEPROM SIZE: 4 * 56 bytes
-SETTINGS_DECLARE(QuadrantsPreset, QUADRANTS_SETTING_LAST) {
-    {0, 0, 255, "Applet ID L", NULL, settings::STORAGE_TYPE_U8},
-    {0, 0, 255, "Applet ID R", NULL, settings::STORAGE_TYPE_U8},
-    {0, 0, 255, "Applet ID L2", NULL, settings::STORAGE_TYPE_U8},
-    {0, 0, 255, "Applet ID R2", NULL, settings::STORAGE_TYPE_U8},
-    {0, 0, 65535, "Data L block 1", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Data L block 2", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Data L block 3", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Data L block 4", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Data R block 1", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Data R block 2", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Data R block 3", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Data R block 4", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Data L2 block 1", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Data L2 block 2", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Data L2 block 3", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Data L2 block 4", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Data R2 block 1", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Data R2 block 2", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Data R2 block 3", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Data R2 block 4", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Clock data 1", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Clock data 2", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Clock data 3", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Clock data 4", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Trig Map 123", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Trig Map 456", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Trig Map 78",  NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "CV Input Map1", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "CV Input Map2", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "CV Input Map3", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Globals1", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Globals2", NULL, settings::STORAGE_TYPE_U16}
-};
-
 QuadAppletManager quad_manager;
 
 void QuadrantSysExHandler() {
-    if (quad_active_preset)
-        quad_active_preset->OnReceiveSysEx();
+  // TODO
 }
 void QuadrantBeatSync() {
   quad_manager.ProcessQueue();
@@ -1181,22 +1438,16 @@ void QUADRANTS_init() {
 }
 
 static constexpr size_t QUADRANTS_storageSize() {
-    return QuadrantsPreset::storageSize() * QUAD_PRESET_COUNT;
+    return 0;
 }
 
 static size_t QUADRANTS_save(void *storage) {
     size_t used = 0;
-    for (int i = 0; i < QUAD_PRESET_COUNT; ++i) {
-        used += quad_presets[i].Save(static_cast<char*>(storage) + used);
-    }
     return used;
 }
 
 static size_t QUADRANTS_restore(const void *storage) {
     size_t used = 0;
-    for (int i = 0; i < QUAD_PRESET_COUNT; ++i) {
-        used += quad_presets[i].Restore(static_cast<const char*>(storage) + used);
-    }
     return used;
 }
 
@@ -1219,7 +1470,9 @@ void QUADRANTS_handleAppEvent(OC::AppEvent event) {
     }
 }
 
-void QUADRANTS_loop() {} // Essentially deprecated in favor of ISR
+void QUADRANTS_loop() {
+  audio_app.mainloop();
+} // Essentially deprecated in favor of ISR
 
 void QUADRANTS_menu() {
     quad_manager.View();
@@ -1227,13 +1480,15 @@ void QUADRANTS_menu() {
 
 void QUADRANTS_screensaver() {
     switch (HS::screensaver_mode) {
-    case 0x3: // Zips or Stars
-        ZapScreensaver(true);
+    case SCREEN_ZIPS:
+    case SCREEN_STARS:
+    case SCREEN_ZAPS:
+        ZapScreensaver(screensaver_mode - SCREEN_ZAPS);
         break;
-    case 0x2: // Zaps
-        ZapScreensaver();
+    case SCREEN_SCOPE: // output scope
+        OC::scope_render();
         break;
-    case 0x1: // Meters
+    case SCREEN_METERS: // Meters
         quad_manager.BaseScreensaver(true); // show note names
         break;
     default: break; // blank screen

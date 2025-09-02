@@ -16,43 +16,38 @@
 
 namespace OC {
 
-#if defined(NORTHERNLIGHT) || defined(VOR)
-static constexpr uint16_t DAC_OFFSET = 0;  // DAC offset, initial approx., ish (Easel card)
-#else
-static constexpr uint16_t DAC_OFFSET = 4890; // DAC offset, initial approx., ish --> -3.5V to 6V
-#endif
-
+static constexpr uint16_t _ADC_OFFSET_NLM = 4095; // 0V == maximum 12-bit ADC value
 #ifdef NORTHERNLIGHT
-  static constexpr uint16_t _ADC_OFFSET = (uint16_t)((float)pow(2,OC::ADC::kAdcResolution)*1.0f);       // ADC offset @3.3V
+static constexpr uint16_t _ADC_OFFSET = (uint16_t)((float)pow(2,OC::ADC::kAdcResolution)*1.0f);   // ADC offset @3.3V
 #else
-  static constexpr uint16_t _ADC_OFFSET = (uint16_t)((float)pow(2,OC::ADC::kAdcResolution)*0.6666667f); // ADC offset @2.2V
+static constexpr uint16_t _ADC_OFFSET = (uint16_t)((float)pow(2,OC::ADC::kAdcResolution)*0.6666667f); // ADC offset @2.2V
 #endif
 
 static constexpr unsigned kCalibrationAdcSmoothing = 4;
 
-enum CALIBRATION_STEP {  
+enum CALIBRATION_STEP {
   HELLO,
   CENTER_DISPLAY,
-  
+
   #ifdef VOR
-  DAC_A_VOLT_3m, DAC_A_VOLT_2m, DAC_A_VOLT_1m, DAC_A_VOLT_0, DAC_A_VOLT_1, DAC_A_VOLT_2, DAC_A_VOLT_3, DAC_A_VOLT_4, DAC_A_VOLT_5, DAC_A_VOLT_6, DAC_A_VOLT_7,
-  DAC_B_VOLT_3m, DAC_B_VOLT_2m, DAC_B_VOLT_1m, DAC_B_VOLT_0, DAC_B_VOLT_1, DAC_B_VOLT_2, DAC_B_VOLT_3, DAC_B_VOLT_4, DAC_B_VOLT_5, DAC_B_VOLT_6, DAC_B_VOLT_7,
-  DAC_C_VOLT_3m, DAC_C_VOLT_2m, DAC_C_VOLT_1m, DAC_C_VOLT_0, DAC_C_VOLT_1, DAC_C_VOLT_2, DAC_C_VOLT_3, DAC_C_VOLT_4, DAC_C_VOLT_5, DAC_C_VOLT_6, DAC_C_VOLT_7,
-  DAC_D_VOLT_3m, DAC_D_VOLT_2m, DAC_D_VOLT_1m, DAC_D_VOLT_0, DAC_D_VOLT_1, DAC_D_VOLT_2, DAC_D_VOLT_3, DAC_D_VOLT_4, DAC_D_VOLT_5, DAC_D_VOLT_6, DAC_D_VOLT_7,
+  DAC_A_VOLT_MIN, DAC_A_VOLT_HIGH,
+  DAC_B_VOLT_MIN, DAC_B_VOLT_HIGH,
+  DAC_C_VOLT_MIN, DAC_C_VOLT_HIGH,
+  DAC_D_VOLT_MIN, DAC_D_VOLT_HIGH,
   V_BIAS_BIPOLAR, V_BIAS_ASYMMETRIC,
   #else
-  DAC_A_VOLT_3m, DAC_A_VOLT_2m, DAC_A_VOLT_1m, DAC_A_VOLT_0, DAC_A_VOLT_1, DAC_A_VOLT_2, DAC_A_VOLT_3, DAC_A_VOLT_4, DAC_A_VOLT_5, DAC_A_VOLT_6,
-  DAC_B_VOLT_3m, DAC_B_VOLT_2m, DAC_B_VOLT_1m, DAC_B_VOLT_0, DAC_B_VOLT_1, DAC_B_VOLT_2, DAC_B_VOLT_3, DAC_B_VOLT_4, DAC_B_VOLT_5, DAC_B_VOLT_6,
-  DAC_C_VOLT_3m, DAC_C_VOLT_2m, DAC_C_VOLT_1m, DAC_C_VOLT_0, DAC_C_VOLT_1, DAC_C_VOLT_2, DAC_C_VOLT_3, DAC_C_VOLT_4, DAC_C_VOLT_5, DAC_C_VOLT_6,
-  DAC_D_VOLT_3m, DAC_D_VOLT_2m, DAC_D_VOLT_1m, DAC_D_VOLT_0, DAC_D_VOLT_1, DAC_D_VOLT_2, DAC_D_VOLT_3, DAC_D_VOLT_4, DAC_D_VOLT_5, DAC_D_VOLT_6,
+  DAC_A_VOLT_MIN, DAC_A_VOLT_HIGH,
+  DAC_B_VOLT_MIN, DAC_B_VOLT_HIGH,
+  DAC_C_VOLT_MIN, DAC_C_VOLT_HIGH,
+  DAC_D_VOLT_MIN, DAC_D_VOLT_HIGH,
 #ifdef ARDUINO_TEENSY41
-  DAC_E_VOLT_3m, DAC_E_VOLT_2m, DAC_E_VOLT_1m, DAC_E_VOLT_0, DAC_E_VOLT_1, DAC_E_VOLT_2, DAC_E_VOLT_3, DAC_E_VOLT_4, DAC_E_VOLT_5, DAC_E_VOLT_6,
-  DAC_F_VOLT_3m, DAC_F_VOLT_2m, DAC_F_VOLT_1m, DAC_F_VOLT_0, DAC_F_VOLT_1, DAC_F_VOLT_2, DAC_F_VOLT_3, DAC_F_VOLT_4, DAC_F_VOLT_5, DAC_F_VOLT_6,
-  DAC_G_VOLT_3m, DAC_G_VOLT_2m, DAC_G_VOLT_1m, DAC_G_VOLT_0, DAC_G_VOLT_1, DAC_G_VOLT_2, DAC_G_VOLT_3, DAC_G_VOLT_4, DAC_G_VOLT_5, DAC_G_VOLT_6,
-  DAC_H_VOLT_3m, DAC_H_VOLT_2m, DAC_H_VOLT_1m, DAC_H_VOLT_0, DAC_H_VOLT_1, DAC_H_VOLT_2, DAC_H_VOLT_3, DAC_H_VOLT_4, DAC_H_VOLT_5, DAC_H_VOLT_6,
+  DAC_E_VOLT_MIN, DAC_E_VOLT_HIGH,
+  DAC_F_VOLT_MIN, DAC_F_VOLT_HIGH,
+  DAC_G_VOLT_MIN, DAC_G_VOLT_HIGH,
+  DAC_H_VOLT_MIN, DAC_H_VOLT_HIGH,
 #endif
   #endif
-  
+
   CV_OFFSET_0, CV_OFFSET_1, CV_OFFSET_2, CV_OFFSET_3,
 #ifdef ARDUINO_TEENSY41
   CV_OFFSET_4, CV_OFFSET_5, CV_OFFSET_6, CV_OFFSET_7,
@@ -62,7 +57,7 @@ enum CALIBRATION_STEP {
   CALIBRATION_EXIT,
   CALIBRATION_STEP_LAST,
   CALIBRATION_STEP_FINAL = ADC_PITCH_C4
-};  
+};
 
 enum CALIBRATION_TYPE {
   CALIBRATE_NONE,
@@ -92,17 +87,17 @@ struct CalibrationStep {
   int min, max;
 };
 
-constexpr DAC_CHANNEL step_to_channel(int step) {
+static constexpr DAC_CHANNEL &step_to_channel(const int step) {
 #ifdef ARDUINO_TEENSY41
-  if (step >= DAC_H_VOLT_3m) return DAC_CHANNEL_H;
-  if (step >= DAC_G_VOLT_3m) return DAC_CHANNEL_G;
-  if (step >= DAC_F_VOLT_3m) return DAC_CHANNEL_F;
-  if (step >= DAC_E_VOLT_3m) return DAC_CHANNEL_E;
+  if (step >= DAC_H_VOLT_MIN) return DAC_CHANNEL_H;
+  if (step >= DAC_G_VOLT_MIN) return DAC_CHANNEL_G;
+  if (step >= DAC_F_VOLT_MIN) return DAC_CHANNEL_F;
+  if (step >= DAC_E_VOLT_MIN) return DAC_CHANNEL_E;
 #endif
-  if (step >= DAC_D_VOLT_3m) return DAC_CHANNEL_D;
-  if (step >= DAC_C_VOLT_3m) return DAC_CHANNEL_C;
-  if (step >= DAC_B_VOLT_3m) return DAC_CHANNEL_B;
-  /*if (step >= DAC_A_VOLT_3m)*/ 
+  if (step >= DAC_D_VOLT_MIN) return DAC_CHANNEL_D;
+  if (step >= DAC_C_VOLT_MIN) return DAC_CHANNEL_C;
+  if (step >= DAC_B_VOLT_MIN) return DAC_CHANNEL_B;
+  /*if (step >= DAC_A_VOLT_MIN)*/ 
   return DAC_CHANNEL_A;
 }
 
@@ -111,12 +106,11 @@ struct CalibrationState {
   const CalibrationStep *current_step;
   int encoder_value;
 
-  SmoothedValue<uint32_t, kCalibrationAdcSmoothing> adc_sum;
-
   uint16_t adc_1v;
   uint16_t adc_3v;
 
   bool used_defaults;
+  bool auto_scale_set[DAC_CHANNEL_LAST];
 };
 
 // Originally, this was a single bit that would reverse both encoders.
@@ -132,7 +126,10 @@ enum EncoderConfig : uint32_t {
 };
 
 enum CalibrationFlags : uint32_t {
-  CALIBRATION_FLAG_ENCODER_MASK = 0x3
+  CALIBRATION_FLAG_ENCODER_MASK = 0x3, // mask for the first two bits
+  CALIBRATION_FLAG_FLIP_MASK    = 0xc, // mask
+  CALIBRATION_FLAG_FLIPSCREEN   = 2, // bit index
+  CALIBRATION_FLAG_FLIPCONTROLS = 3, // bit index
 };
 
 struct CalibrationData {
@@ -152,8 +149,33 @@ struct CalibrationData {
   uint32_t reserved1;
 #endif
 
+  bool flipcontrols() const {
+    return (flags >> CALIBRATION_FLAG_FLIPCONTROLS) & 1;
+  }
+  bool flipscreen() const {
+    return (flags >> CALIBRATION_FLAG_FLIPSCREEN) & 1;
+  }
+  uint32_t flipmode() const {
+    return (flags & CALIBRATION_FLAG_FLIP_MASK) >> CALIBRATION_FLAG_FLIPSCREEN;
+  }
+  // default behavior - flip both screen and I/O
+  void toggle_flipmode() {
+    flags = (flags & ~CALIBRATION_FLAG_FLIP_MASK) |
+      ((flags & CALIBRATION_FLAG_FLIP_MASK) ? 0 : CALIBRATION_FLAG_FLIP_MASK);
+  }
+  // flip both bits independently
+  void cycle_flipmode() {
+    flags = (flags & ~CALIBRATION_FLAG_FLIP_MASK) |
+      ( ((flags & CALIBRATION_FLAG_FLIP_MASK) + (1 << CALIBRATION_FLAG_FLIPSCREEN))
+       & CALIBRATION_FLAG_FLIP_MASK );
+  }
+  bool toggle_flipscreen() {
+    flags ^= (1 << CALIBRATION_FLAG_FLIPSCREEN);
+
+    return flipscreen();
+  }
   EncoderConfig encoder_config() const {
-  	return static_cast<EncoderConfig>(flags & CALIBRATION_FLAG_ENCODER_MASK);
+    return static_cast<EncoderConfig>(flags & CALIBRATION_FLAG_ENCODER_MASK);
   }
 
   EncoderConfig next_encoder_config() {
@@ -175,7 +197,7 @@ static_assert(sizeof(ADC::CalibrationData) == 20, "ADC::CalibrationData size cha
 static_assert(sizeof(CalibrationData) == 212, "Calibration data size changed!");
 #endif
 
-typedef PageStorage<EEPROMStorage, EEPROM_CALIBRATIONDATA_START, EEPROM_CALIBRATIONDATA_END, CalibrationData> CalibrationStorage;
+using CalibrationStorage = PageStorage<EEPROMStorage, EEPROM_CALIBRATIONDATA_START, EEPROM_CALIBRATIONDATA_END, CalibrationData>;
 
 extern const CalibrationStep calibration_steps[CALIBRATION_STEP_LAST];
 extern CalibrationData calibration_data;
@@ -183,10 +205,7 @@ extern bool calibration_data_loaded;
 
 void calibration_load();
 void calibration_save();
-void calibration_update(CalibrationState &state);
 void calibration_reset();
-void calibration_draw(const CalibrationState &state);
-
 
 }; // namespace OC
 

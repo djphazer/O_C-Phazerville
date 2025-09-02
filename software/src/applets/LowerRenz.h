@@ -31,6 +31,7 @@ public:
     const char* applet_name() {
         return "LowerRenz";
     }
+    const uint8_t* applet_icon() { return PhzIcons::lowerenz; }
 
     void Start() {
         freq = 128;

@@ -3,86 +3,11 @@
 
 #include "OC_options.h"
 
-// Teensy 3.2 or Teensy 4.0 have fixed pinout
-//
-#if defined(__MK20DX256__) || (defined(__IMXRT1062__) && defined(ARDUINO_TEENSY40))
-
-#ifdef FLIP_180
-  #define CV4 19
-  #define CV3 18
-  #define CV2 20
-  #define CV1 17
-  
-  #define TR4 0
-  #define TR3 1
-  #define TR2 2
-  #define TR1 3
-  
-  #define but_top 4
-  #define but_bot 5
-#else
-  #define CV1 19
-  #define CV2 18
-  #define CV3 20
-  #define CV4 17
-  
-  #define TR1 0
-  #define TR2 1
-  #define TR3 2
-  #define TR4 3
-  
-#ifdef NLM_hOC
-  #define but_top 4
-  #define but_bot 5
-#else
-  #define but_top 5
-  #define but_bot 4
-#endif
-
-#endif
-
-#define OLED_DC 6
-#define OLED_RST 7
-#define OLED_CS 8
-
-#define DAC_CS 10
-
-#ifdef VOR
-  #define but_mid 9
-#else
-  #define DAC_RST 9
-#endif
-
-// NOTE: encoder pins R1/R2 changed for rev >= 2c
-#ifdef FLIP_180
-  #define encL1 16
-  #define encL2 15
-  #define butL  14
-  
-  #define encR1 22
-  #define encR2 21
-  #define butR  23
-#else
-  #define encR1 16
-  #define encR2 15
-  #define butR  14
-  
-  #define encL1 22
-  #define encL2 21
-  #define butL  23
-#endif
-
-// NOTE: back side :(
-#define OC_GPIO_DEBUG_PIN1 24
-#define OC_GPIO_DEBUG_PIN2 25
-
-#endif // Teensy 3.2 or Teensy 4.0
-
+// All platforms now have dynamic pinouts.
+// Controls can be remapped, and flip_180 is a calibration flag.
 // Teensy 4.1 has different pinouts depending on voltage at pin 41/A17
-//
-#if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
 
-extern uint8_t CV1, CV2, CV3, CV4;
+//extern uint8_t CV1, CV2, CV3, CV4;
 extern uint8_t TR1, TR2, TR3, TR4;
 extern uint8_t OLED_DC, OLED_RST, OLED_CS;
 extern uint8_t DAC_CS, DAC_RST;
@@ -96,7 +21,13 @@ extern bool I2S2_Audio_ADC;
 extern bool I2S2_Audio_DAC;
 extern bool I2C_Expansion;
 extern bool MIDI_Uses_Serial8;
-
+extern bool SDcard_Ready;
+#ifdef NORTHERNLIGHT
+static constexpr bool NorthernLightModular = true;
+#elif !defined(ARDUINO_TEENSY41)
+static constexpr bool NorthernLightModular = false;
+#else
+extern bool NorthernLightModular;
 #endif
 
 // OLED CS is active low
@@ -108,6 +39,7 @@ extern bool MIDI_Uses_Serial8;
 #define OC_GPIO_ENC_PINMODE INPUT_PULLUP
 
 /* local copy of pinMode (cf. cores/pins_teensy.c), using faster slew rate */
+// TODO: is this necessary? -NJM
 
 namespace OC { 
   
@@ -154,6 +86,7 @@ void inline pinMode(uint8_t pin, uint8_t mode) {
   }
 
 void Pinout_Detect();
+void SetFlipMode(bool flip_180);
 
 }
 

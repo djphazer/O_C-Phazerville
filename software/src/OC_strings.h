@@ -10,10 +10,15 @@ namespace OC {
   static const int kNumDelayTimes = 8;
 
   namespace Strings {
+    extern const char * const RELEASE_NAME;
     extern const char * const NAME;
     extern const char * const SHORT_NAME;
+    extern const char * const NAME_NLM;
+    extern const char * const SHORT_NAME_NLM;
     extern const char * const VERSION;
+    extern const char * const BUILD_TAG;
 
+    extern const char * const err_msg[];
     extern const char * const seq_playmodes[];
     extern const char * const channel_trigger_sources[];
     extern const char * const seq_directions[];
@@ -45,6 +50,7 @@ namespace OC {
     extern const char* const TM_aux_cv_destinations[];
     extern const char* const reset_behaviours[];
     extern const char* const falling_gate_behaviours[];
+    extern const char* const octave_constraint[];
     // Not strings but are constant integer sequences
     extern const uint8_t pi_digits[kIntSeqLen];
     // extern const uint8_t phi_digits[kIntSeqLen];

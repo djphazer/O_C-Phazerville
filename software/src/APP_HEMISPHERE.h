@@ -37,16 +37,34 @@
 #include "HSMIDI.h"
 #include "HSClockManager.h"
 
-#ifdef ARDUINO_TEENSY41
-#include "AudioSetup.h"
-#endif
-
 #include "hemisphere_config.h"
 
-#ifdef ENABLE_APP_CALIBR8OR
-// We depend on Calibr8or to save quantizer settings
-#include "APP_CALIBR8OR.h"
+#ifdef __IMXRT1062__
+#include "PhzConfig.h"
 #endif
+#ifdef ARDUINO_TEENSY41
+#include "hemisphere_audio_config.h"
+#endif
+
+void HS::DrawAppletList(bool blink) {
+  const size_t LineH = 12;
+
+  int y = (64 - (5 * LineH)) / 2;
+
+  for (int current = showhide_cursor.first_visible();
+       current <= showhide_cursor.last_visible();
+       ++current, y += LineH) {
+
+    if (!HS::applet_is_hidden(current))
+      gfxIcon(  12, y + 1, HS::available_applets[current].instance[0]->applet_icon());
+    gfxPrint( 23, y + 2, HS::available_applets[current].instance[0]->applet_name());
+
+    if (current == showhide_cursor.cursor_pos()) {
+      gfxIcon(1, y + 1, RIGHT_ICON);
+      if (blink) gfxInvert(0, y, 10, 10);
+    }
+  }
+}
 
 // The settings specify the selected applets, and 64 bits of data for each applet,
 // plus 64 bits of data for the ClockSetup applet (which includes some misc config).
@@ -70,22 +88,28 @@ enum HEMISPHERE_SETTINGS {
     HEMISPHERE_TRIGMAP,
     HEMISPHERE_CVMAP,
     HEMISPHERE_GLOBALS,
-    HEMISPHERE_SETTING_LAST
+    HEMISPHERE_SETTINGS_COUNT
 };
 
-#if defined(MOAR_PRESETS)
+#ifdef __IMXRT1062__
+// TODO: consider separate, smaller files - this could get slow
+static constexpr int HEM_NR_OF_PRESETS = 50;
+static const char* const PRESET_FILENAME = "HEM_PRESETS.DAT";
+#elif defined(MOAR_PRESETS)
 static constexpr int HEM_NR_OF_PRESETS = 16;
-#elif defined(PEWPEWPEW)
-static constexpr int HEM_NR_OF_PRESETS = 8;
-#else
+#elif defined(CUSTOM_BUILD) && !defined(PEWPEWPEW)
 static constexpr int HEM_NR_OF_PRESETS = 4;
+#else
+static constexpr int HEM_NR_OF_PRESETS = 8;
 #endif
 
 /* Hemisphere Preset
  * - conveniently store/recall multiple configurations
  */
+#ifdef __IMXRT1062__
+#else
 class HemispherePreset : public SystemExclusiveHandler,
-    public settings::SettingsBase<HemispherePreset, HEMISPHERE_SETTING_LAST> {
+    public settings::SettingsBase<HemispherePreset, HEMISPHERE_SETTINGS_COUNT> {
 public:
     int GetAppletId(int h) {
         return (h == LEFT_HEMISPHERE) ? values_[HEMISPHERE_SELECTED_LEFT_ID]
@@ -120,8 +144,8 @@ public:
       uint16_t cvmap = 0;
       uint16_t trigmap = 0;
       for (size_t i = 0; i < 4; ++i) {
-        trigmap |= (uint16_t(HS::trigger_mapping[i] + 1) & 0x0F) << (i*4);
-        cvmap |= (uint16_t(HS::cvmapping[i] + 1) & 0x0F) << (i*4);
+        trigmap |= (uint16_t(HS::trigmap[i].source + 1) & 0x0F) << (i*4);
+        cvmap |= (uint16_t(HS::cvmap[i].source + 1) & 0x0F) << (i*4);
       }
 
       bool changed = (uint16_t(values_[HEMISPHERE_TRIGMAP]) != trigmap)
@@ -135,11 +159,11 @@ public:
       for (size_t i = 0; i < 4; ++i) {
         int val = (uint16_t(values_[HEMISPHERE_TRIGMAP]) >> (i*4)) & 0x0F;
         if (val != 0)
-          HS::trigger_mapping[i] = constrain(val - 1, 0, TRIGMAP_MAX);
+          HS::trigmap[i].source = constrain(val - 1, 0, TRIGMAP_MAX);
 
         val = (uint16_t(values_[HEMISPHERE_CVMAP]) >> (i*4)) & 0x0F;
         if (val != 0)
-          HS::cvmapping[i] = constrain(val - 1, 0, CVMAP_MAX);
+          HS::cvmap[i].source = constrain(val - 1, 0, CVMAP_MAX);
       }
     }
 
@@ -215,10 +239,10 @@ public:
 
 };
 
-// HemispherePreset hem_config; // special place for Clock data and Config data, 64 bits each
-
+// 1 extra preset for global data... it's a dirty hack for T32.
 HemispherePreset hem_presets[HEM_NR_OF_PRESETS + 1];
 HemispherePreset *hem_active_preset = 0;
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 //// Hemisphere Manager
@@ -234,38 +258,50 @@ public:
     void Start() {
         //select_mode = -1; // Not selecting
 
-        help_hemisphere = -1;
+        zoom_slot = -1;
         clock_setup = 0;
+
+        // Defaults for Q-engine settings.
+        // These are overwritten later when global settings are loaded.
+        for (int i = 0; i < QUANT_CHANNEL_COUNT; ++i) {
+            q_engine[i].Configure( (i<4)? OC::Scales::SCALE_SEMI : i-4, 0xffff);
+        }
 
         showhide_cursor.Init(0, HEMISPHERE_AVAILABLE_APPLETS - 1);
         showhide_cursor.Scroll(0);
-
-        for (int i = 0; i < 4; ++i) {
-            quant_scale[i] = OC::Scales::SCALE_SEMI;
-            quantizer[i].Init();
-            quantizer[i].Configure(OC::Scales::GetScale(quant_scale[i]), 0xffff);
-        }
 
         SetApplet(LEFT_HEMISPHERE, HS::get_applet_index_by_id(18)); // DualTM
         SetApplet(RIGHT_HEMISPHERE, HS::get_applet_index_by_id(15)); // EuclidX
     }
 
     void Resume() {
+#ifdef __IMXRT1062__
+        // XXX: this assumes no other config file gets loaded while Hemisphere is active...
+        // Also notice that this loads only from LFS,
+        // assuming Hemisphere is only used by T40 and not T41.
+        // Of course, T40 also supports SD cards,
+        // so I should write code instead of comments, yeah?
+        PhzConfig::load_config(PRESET_FILENAME);
+        if (preset_id < 0)
+          LoadFromPreset(0);
+#else
         if (!hem_active_preset)
             LoadFromPreset(0);
-        // restore quantizer settings
-        for (int i = 0; i < 4; ++i) {
-            quantizer[i].Init();
-            quantizer[i].Configure(OC::Scales::GetScale(quant_scale[i]), 0xffff);
-        }
+#endif
     }
     void Suspend() {
+#ifdef __IMXRT1062__
+        if (HS::auto_save_enabled)
+            StoreToPreset(preset_id);
+#else
         if (hem_active_preset) {
             if (HS::auto_save_enabled || 0 == preset_id) StoreToPreset(preset_id, !HS::auto_save_enabled);
             hem_active_preset->OnSendSysEx();
         }
+#endif
     }
 
+#if defined(__MK20DX256__)
     void StoreToPreset(HemispherePreset* preset, bool skip_eeprom = false) {
         bool doSave = (preset != hem_active_preset);
 
@@ -294,45 +330,237 @@ public:
 
         if (hem_active_preset->StoreInputMap()) doSave = 1;
 
-        if (doSave) {
-        }
-
         // initiate actual EEPROM save - ONLY if necessary!
         if (doSave && !skip_eeprom) {
-#ifdef ENABLE_APP_CALIBR8OR
-          // call Calibr8or so it remembers quantizer settings
-          // this also takes care of the EEPROM save
-          Calibr8or_instance.SavePreset();
-#else
-        // initiate actual EEPROM save
-        OC::CORE::app_isr_enabled = false;
-        OC::draw_save_message(16);
-        delay(1);
-        OC::draw_save_message(32);
-        OC::save_app_data();
-        OC::draw_save_message(64);
+          // initiate actual EEPROM save
+          OC::CORE::app_isr_enabled = false;
+          //OC::draw_save_message(32);
+          OC::save_app_data();
+          //OC::draw_save_message(64);
+          OC::CORE::app_isr_enabled = true;
 
-        const uint32_t timeout = 100;
-        uint32_t start = millis();
-        while(millis() < start + timeout) {
-          GRAPHICS_BEGIN_FRAME(true);
-          graphics.setPrintPos(13, 18);
-          graphics.print("Settings saved");
-          graphics.setPrintPos(31, 27);
-          graphics.print("to EEPROM!");
-          GRAPHICS_END_FRAME();
+          PokePopup(HS::MESSAGE_POPUP, HS::PRESET_SAVED);
         }
-
-        OC::CORE::app_isr_enabled = true;
-#endif
-        }
-
     }
+#endif
+
+    // lower 9 bits of PhzConfig KEY
+    enum PresetDataKeys : uint16_t {
+        APPLET_METADATA_KEY = 0, // applet ids
+        CLOCK_DATA_KEY = 1,
+        GLOBALS_KEY = 2,
+        OLD_INPUT_MAP_KEY = 3,
+
+        OUTSKIP_KEY = 4,
+        TRIGMAP_KEY = 5, // 4 x 16-bit DigitalInputMap
+        CVMAP_KEY = 6, // 4 x 16-bit CVInputMap
+
+        APPLET_L_DATA_KEY = 10,
+        APPLET_R_DATA_KEY = 11,
+
+
+        FILTERMASK1_KEY = 100,
+        FILTERMASK2_KEY = 101,
+
+        PC_CHANNEL_KEY = 110,
+
+        MIDI_MAPS_KEY  = 150, // + 0..32
+
+        Q_ENGINE_KEY   = 200, // + slot number
+
+        // 300-500 = Sequences (aka Patterns)
+        SEQUENCES_KEY  = 300, // + blob index
+
+        VERSION_KEY = 0xFFFF
+    };
+
     void StoreToPreset(int id, bool skip_eeprom = false) {
+#ifdef __IMXRT1062__
+        uint16_t preset_key = id << 9;
+
+        // clock data
+        clock_data = ClockSetup_instance.OnDataRequest();
+        PhzConfig::setValue(preset_key | CLOCK_DATA_KEY, clock_data);
+
+        // vague globals
+        global_data = ClockSetup_instance.GetGlobals();
+        PhzConfig::setValue(preset_key | GLOBALS_KEY, global_data);
+
+        uint64_t data = 0;
+        // Input Mappings
+        data = PackPackables(HS::trigmap[0], HS::trigmap[1], HS::trigmap[2], HS::trigmap[3]);
+        PhzConfig::setValue(preset_key | TRIGMAP_KEY, data);
+
+        data = PackPackables(HS::cvmap[0], HS::cvmap[1], HS::cvmap[2], HS::cvmap[3]);
+        PhzConfig::setValue(preset_key | CVMAP_KEY, data);
+
+        data = 0;
+        for (size_t i = 0; i < DAC_CHANNEL_COUNT; ++i) {
+          Pack(data, PackLocation{i*8, 8}, HS::frame.clockskip[i]);
+        }
+        PhzConfig::setValue(preset_key | OUTSKIP_KEY, data);
+
+        data = 0;
+        for (size_t h = 0; h < 2; h++)
+        {
+            int index = my_applet[h];
+            Pack(data, PackLocation{h*8,8}, HS::available_applets[index].id);
+
+            // applet data
+            applet_data[h] = HS::available_applets[index].instance[h]->OnDataRequest();
+            PhzConfig::setValue(preset_key | (APPLET_L_DATA_KEY + h), applet_data[h]);
+        }
+
+        // applet ids, and maybe some other stuff?
+        PhzConfig::setValue(preset_key | APPLET_METADATA_KEY, data);
+
+        // -- Globals (per file) --
+        PhzConfig::setValue(FILTERMASK1_KEY, HS::hidden_applets[0]);
+        PhzConfig::setValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
+
+        PhzConfig::setValue(PC_CHANNEL_KEY, HS::frame.MIDIState.pc_channel);
+
+        // Global quantizer settings
+        for (size_t qslot = 0; qslot < QUANT_CHANNEL_COUNT; ++qslot) {
+          /* TODO
+            int8_t offset;
+            int16_t scale_factor; // precision of 0.01% as an offset from 100%
+            int8_t transpose; // in semitones
+          */
+          auto &q = q_engine[qslot];
+          data = PackPackables(
+              q.scale,
+              q.octave,
+              q.root_note,
+              q.mask
+              );
+          PhzConfig::setValue(Q_ENGINE_KEY + qslot, data);
+        }
+
+        // Global MIDI Maps
+        for (size_t midx = 0; midx < MIDIMAP_MAX; ++midx) {
+          data = PackPackables(frame.MIDIState.mapping[midx]);
+          PhzConfig::setValue(MIDI_MAPS_KEY + midx, data);
+        }
+
+        // User Patterns aka Sequences
+        for (size_t i = 0; i < OC::Patterns::PATTERN_USER_COUNT; ++i) {
+          data = 0;
+          for (size_t step = 0; step < ARRAY_SIZE(OC::Pattern::notes); ++step) {
+            Pack(data, PackLocation{(step & 0x3)*16, 16}, (uint16_t)OC::user_patterns[i].notes[step]);
+            if ((step & 0x3) == 0x3) {
+              PhzConfig::setValue(SEQUENCES_KEY + ((i << 2) | (step >> 2)), data);
+              data = 0;
+            }
+          }
+        }
+
+        if (PhzConfig::save_config(PRESET_FILENAME))
+          PokePopup(HS::MESSAGE_POPUP, HS::PRESET_SAVED);
+#else
         StoreToPreset( (HemispherePreset*)(hem_presets + id), skip_eeprom );
+#endif
         preset_id = id;
     }
     void LoadFromPreset(int id) {
+        preset_id = id;
+#ifdef __IMXRT1062__
+        // T4.x uses a LittleFS file via PhzConfig
+        uint16_t preset_key = id << 9;
+        uint64_t data;
+
+        // applet ids + misc
+        if (!PhzConfig::getValue(preset_key | APPLET_METADATA_KEY, data)) return;
+        if (!data) return;
+
+        for (size_t h = 0; h < 2; h++)
+        {
+            int index = HS::get_applet_index_by_id( Unpack(data, PackLocation{h*8, 8}) );
+
+            // applet data
+            PhzConfig::getValue(preset_key | (APPLET_L_DATA_KEY + h), applet_data[h]);
+            SetApplet(HEM_SIDE(h), index);
+            HS::available_applets[index].instance[h]->OnDataReceive(applet_data[h]);
+        }
+
+        // clock data
+        if (!PhzConfig::getValue(preset_key | CLOCK_DATA_KEY, clock_data)) return;
+        ClockSetup_instance.OnDataReceive(clock_data);
+        // if the first key exists, we are assuming the rest are present...
+
+        // vague globals
+        PhzConfig::getValue(preset_key | GLOBALS_KEY, global_data);
+        ClockSetup_instance.SetGlobals(global_data);
+
+        // Input Mappings
+        if (!PhzConfig::getValue(preset_key | CVMAP_KEY, data)) {
+          PhzConfig::getValue(preset_key | OLD_INPUT_MAP_KEY, data);
+          for (size_t i = 0; i < 4; ++i)
+          {
+            int val = Unpack(data, PackLocation{i*16, 4});
+            if (val != 0) HS::trigmap[i].source = constrain(val - 1, -1, TRIGMAP_MAX);
+
+            val = Unpack(data, PackLocation{4 + i*16, 4});
+            if (val != 0) HS::cvmap[i].source = constrain(val - 1, 0, CVMAP_MAX);
+
+            HS::frame.clockskip[i] = Unpack(data, PackLocation{8 + i*16, 8});
+          }
+        } else {
+          UnpackPackables(data, HS::cvmap[0], HS::cvmap[1], HS::cvmap[2], HS::cvmap[3]);
+
+          PhzConfig::getValue(preset_key | TRIGMAP_KEY, data);
+          UnpackPackables(data, HS::trigmap[0], HS::trigmap[1], HS::trigmap[2], HS::trigmap[3]);
+
+          PhzConfig::getValue(preset_key | OUTSKIP_KEY, data);
+          for (size_t i = 0; i < DAC_CHANNEL_COUNT; ++i)
+          {
+            HS::frame.clockskip[i] = Unpack(data, PackLocation{i*8, 8});
+          }
+        }
+
+        // --- Global stuff ---
+        // (per file, not per preset)
+
+        PhzConfig::getValue(FILTERMASK1_KEY, HS::hidden_applets[0]);
+        PhzConfig::getValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
+
+        if (PhzConfig::getValue(PC_CHANNEL_KEY, data)) HS::frame.MIDIState.pc_channel = (uint8_t) data;
+
+        for (size_t qslot = 0; qslot < QUANT_CHANNEL_COUNT; ++qslot) {
+          if (!PhzConfig::getValue(Q_ENGINE_KEY + qslot, data))
+              break;
+          auto &q = q_engine[qslot];
+          UnpackPackables(data,
+              q.scale,
+              q.octave,
+              q.root_note,
+              q.mask);
+          q.Reconfig();
+        }
+
+        // Global MIDI Maps
+        for (size_t midx = 0; midx < MIDIMAP_MAX; ++midx) {
+          if (!PhzConfig::getValue(MIDI_MAPS_KEY + midx, data))
+              break;
+          UnpackPackables(data, frame.MIDIState.mapping[midx]);
+        }
+        frame.MIDIState.UpdateMidiChannelFilter();
+        frame.MIDIState.UpdateMaxPolyphony();
+
+        // User Patterns aka Sequences
+        for (size_t i = 0; i < OC::Patterns::PATTERN_USER_COUNT; ++i) {
+          for (size_t step = 0; step < ARRAY_SIZE(OC::Pattern::notes); ++step) {
+            if ((step & 0x3) == 0x0) {
+              data = 0;
+              if (!PhzConfig::getValue(SEQUENCES_KEY + ((i << 2) | (step >> 2)), data))
+                break;
+            }
+            OC::user_patterns[i].notes[step] = Unpack(data, PackLocation{(step & 0x3)*16, 16});
+          }
+        }
+
+#else
+        // T3.2 uses EEPROM interface
         hem_active_preset = (HemispherePreset*)(hem_presets + id);
         if (hem_active_preset->is_valid()) {
             clock_data = hem_active_preset->GetClockData();
@@ -350,10 +578,8 @@ public:
                 SetApplet(HEM_SIDE(h), index);
                 HS::available_applets[index].instance[h]->OnDataReceive(applet_data[h]);
             }
-
-
         }
-        preset_id = id;
+#endif
         PokePopup(PRESET_POPUP);
     }
     void ProcessQueue() {
@@ -372,10 +598,6 @@ public:
         next_applet[h] = index;
     }
 
-    bool SelectModeEnabled() {
-        return select_mode > -1;
-    }
-
 #if defined(__IMXRT1062__)
   #if defined(ARDUINO_TEENSY41)
     template <typename T1, typename T2, typename T3>
@@ -391,17 +613,18 @@ public:
         HS::IOFrame &f = HS::frame;
 
         while (device.read()) {
-            const int message = device.getType();
-            const int data1 = device.getData1();
-            const int data2 = device.getData2();
+            const uint8_t message = device.getType();
+            const uint8_t data1 = device.getData1();
+            const uint8_t data2 = device.getData2();
 
             if (message == usbMIDI.SystemExclusive) {
                 ReceiveManagerSysEx();
                 continue;
             }
 
-            if (message == usbMIDI.ProgramChange) {
-                int slot = device.getData1();
+            if (message == usbMIDI.ProgramChange
+            && (device.getChannel() == f.MIDIState.pc_channel || f.MIDIState.pc_channel == f.MIDIState.PC_OMNI)) {
+                uint8_t slot = device.getData1();
                 if (slot < HEM_NR_OF_PRESETS) {
                   if (HS::clock_m.IsRunning()) {
                     queued_preset = slot;
@@ -410,10 +633,10 @@ public:
                   else
                     LoadFromPreset(slot);
                 }
-                continue;
+                //continue;
             }
 
-            f.MIDIState.ProcessMIDIMsg(device.getChannel(), message, data1, data2);
+            f.MIDIState.ProcessMIDIMsg({device.getChannel(), message, data1, data2});
 #if defined(__IMXRT1062__)
             next_device.send(message, data1, data2, device.getChannel(), 0);
   #if defined(ARDUINO_TEENSY41)
@@ -446,41 +669,12 @@ public:
         // execute Applets
         for (int h = 0; h < 2; h++)
         {
-            if (my_applet[h] != next_applet[h]) {
-              SetApplet(HEM_SIDE(h), next_applet[h]);
-            }
             int index = my_applet[h];
 
-            // MIDI signals mixed with inputs to applets
-            if (HS::available_applets[index].id != 150) // not MIDI In
-            {
-                ForEachChannel(ch) {
-                    int chan = h*2 + ch;
-                    // mix CV inputs with applicable MIDI signals
-                    switch (HS::frame.MIDIState.function[chan]) {
-                    case HEM_MIDI_CC_OUT:
-                    case HEM_MIDI_NOTE_OUT:
-                    case HEM_MIDI_VEL_OUT:
-                    case HEM_MIDI_AT_OUT:
-                    case HEM_MIDI_PB_OUT:
-                        HS::frame.inputs[chan] += HS::frame.MIDIState.outputs[chan];
-                        break;
-                    case HEM_MIDI_GATE_OUT:
-                        HS::frame.gate_high[chan] |= (HS::frame.MIDIState.outputs[chan] > (12 << 7));
-                        break;
-                    case HEM_MIDI_TRIG_OUT:
-                    case HEM_MIDI_CLOCK_OUT:
-                    case HEM_MIDI_START_OUT:
-                        HS::frame.clocked[chan] |= HS::frame.MIDIState.trigout_q[chan];
-                        HS::frame.MIDIState.trigout_q[chan] = 0;
-                        break;
-                    }
-                }
-            }
             if (HS::clock_m.auto_reset)
                 HS::available_applets[index].instance[h]->Reset();
 
-            HS::available_applets[index].instance[h]->BaseController();
+            HS::available_applets[index].instance[h]->Controller();
         }
         HS::clock_m.auto_reset = false;
 
@@ -488,9 +682,13 @@ public:
         // auto-trigger outputs E..H
         for (int ch = 0; ch < 4; ++ch) {
           if (abs(HS::frame.output_diff[ch]) > HEMISPHERE_CHANGE_THRESHOLD)
+          {
             HS::frame.ClockOut(DAC_CHANNEL(ch + 4));
+            HS::frame.output_diff[ch] = 0;
+          }
         }
 #endif
+        HemisphereApplet::ProcessCursors();
     }
 
     void View() {
@@ -533,7 +731,7 @@ public:
 #ifdef ARDUINO_TEENSY41
         if (view_state == AUDIO_SETUP) {
           gfxHeader("Audio DSP Setup");
-          OC::AudioDSP::DrawAudioSetup();
+          // OC::AudioDSP::DrawAudioSetup();
           draw_applets = false;
         }
 #endif
@@ -541,15 +739,40 @@ public:
         if (HS::q_edit)
           PokePopup(QUANTIZER_POPUP);
 
-        if (draw_applets && clock_setup) {
-          ClockSetup_instance.View();
-          draw_applets = false;
-        }
-
         if (draw_applets) {
-          if (help_hemisphere > -1) {
-            int index = my_applet[help_hemisphere];
-            HS::available_applets[index].instance[help_hemisphere]->BaseView(true);
+          if (zoom_slot > -1) {
+            int index = my_applet[zoom_slot];
+
+            if (select_mode == zoom_slot) {
+              showhide_cursor.Scroll(next_applet[zoom_slot] - showhide_cursor.cursor_pos());
+              DrawAppletList(CursorBlink());
+              // dotted screen border during applet select
+              gfxFrame(0, 0, 128, 64, true);
+            }
+            else {
+              HS::available_applets[index].instance[zoom_slot]->BaseView(true, zoom_cursor < 0);
+              gfxDisplayInputMapEditor();
+            }
+
+            // draw cursor for editing applet select and input maps
+            if (zoom_cursor < 0) {
+              gfxIcon(64 - 8*zoom_slot, 1, DOWN_ICON, true);
+            } else if (0 == zoom_cursor) {
+              if (select_mode != zoom_slot && CursorBlink())
+                gfxIcon(64 - 8*zoom_slot, 1, zoom_slot? RIGHT_ICON : LEFT_ICON, true);
+            } else if (isEditing) {
+              const int x = ((zoom_cursor-1)%2)*64;
+              const int y = 13 + 10*((zoom_cursor-1)/2);
+              gfxInvert(x, y, 19, 9);
+              gfxFrame(x, y, 19, 9, true);
+            } else {
+              if (CursorBlink()) {
+                const int x = 18 + 64*((zoom_cursor-1)%2);
+                const int y = 14 + 10*((zoom_cursor-1)/2);
+                gfxIcon(x, y, LEFT_ICON, true);
+              }
+            }
+
             draw_applets = false;
           } else {
             for (int h = 0; h < 2; h++)
@@ -565,16 +788,16 @@ public:
             graphics.drawLine(63, 0, 63, 63, 2);
           }
 
-          // Clock indicator icons in header
-          if (HS::clock_m.IsRunning()) {
-              gfxIcon(56, 1, HS::clock_m.Cycle() ? METRO_L_ICON : METRO_R_ICON);
-          } else if (HS::clock_m.IsPaused()) {
-              gfxIcon(56, 1, PAUSE_ICON);
+          // clock screen is an overlay
+          if (clock_setup) {
+            ClockSetup_instance.View();
+          } else {
+            ClockSetup_instance.DrawIndicator();
           }
         }
 
         // Overlay popup window last
-        if (OC::CORE::ticks - HS::popup_tick < HEMISPHERE_CURSOR_TICKS * 2) {
+        if (OC::CORE::ticks - HS::popup_tick < HEMISPHERE_CURSOR_TICKS * 4) {
           HS::DrawPopup(config_cursor, preset_id, CursorBlink());
         }
     }
@@ -590,7 +813,7 @@ public:
         }
 #ifdef ARDUINO_TEENSY41
         if (view_state == AUDIO_SETUP) {
-          if (!down) OC::AudioDSP::AudioSetupButtonAction(h);
+          // if (!down) OC::AudioDSP::AudioSetupButtonAction(h);
           return;
         }
 #endif
@@ -604,6 +827,41 @@ public:
         }
 
         // button release
+        if (zoom_slot > -1) {
+          switch (zoom_cursor) {
+            case -1:
+            {
+              int index = my_applet[zoom_slot];
+              HS::available_applets[index].instance[zoom_slot]->OnButtonPress();
+              break;
+            }
+
+            case 0:
+              if (zoom_slot == select_mode) {
+                SetApplet(HEM_SIDE(zoom_slot), next_applet[zoom_slot]);
+                SetFullScreen(-1);
+              } else
+                select_mode = zoom_slot;
+              break;
+            //// 0=select; 1,2=trigmap; 3,4=cvmap; 5,6=outmode
+            case 3:
+            case 4:
+              if (CheckEditInputMapPress(
+                    zoom_cursor,
+                    IndexedInput(3, cvmap[zoom_slot*2]),
+                    IndexedInput(4, cvmap[zoom_slot*2+1])
+                  ))
+                break;
+            case 1:
+            case 2:
+            case 5:
+            case 6:
+            default:
+              isEditing = !isEditing;
+              break;
+          }
+          return;
+        }
         if (select_mode == h) {
             select_mode = -1; // Pushing a button for the selected side turns off select mode
         } else if (!clock_setup) {
@@ -657,7 +915,7 @@ public:
 
     void DelegateSelectButtonPush(const UI::Event &event) {
         bool down = (event.type == UI::EVENT_BUTTON_DOWN);
-        const int hemisphere = (event.control == OC::CONTROL_BUTTON_UP) ? LEFT_HEMISPHERE : RIGHT_HEMISPHERE;
+        const int hemisphere = (event.control == OC::CONTROL_BUTTON_A) ? LEFT_HEMISPHERE : RIGHT_HEMISPHERE;
 
         if (!down && (preset_cursor || view_state != APPLETS)) {
             // cancel preset select, or config screen on select button release
@@ -675,9 +933,9 @@ public:
         // -- button down
         if (down) {
             // dual press for Clock Setup... check first_click, so we only process the 2nd button event
-            if (event.mask == (OC::CONTROL_BUTTON_UP | OC::CONTROL_BUTTON_DOWN) && hemisphere != first_click) {
+            if (event.mask == (OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_B) && hemisphere != first_click) {
                 clock_setup = 1;
-                SetHelpScreen(-1);
+                SetFullScreen(-1);
                 select_mode = -1;
                 OC::ui.SetButtonIgnoreMask(); // ignore button release
                 return;
@@ -686,19 +944,20 @@ public:
             if (OC::CORE::ticks - click_tick < HEMISPHERE_DOUBLE_CLICK_TIME) {
                 // This is a double-click on one button. Activate corresponding help screen and deactivate select mode.
                 if (hemisphere == first_click)
-                    SetHelpScreen(hemisphere);
+                    SetFullScreen(hemisphere);
 
                 // reset double-click timer either way
                 click_tick = 0;
+                OC::ui.SetButtonIgnoreMask(); // ignore button release
                 return;
             }
 
             // -- Single click
             // If a help screen is already selected, and the button is for
             // the opposite one, go to the other help screen
-            if (help_hemisphere > -1) {
-                if (help_hemisphere != hemisphere) SetHelpScreen(hemisphere);
-                else SetHelpScreen(-1); // Exit help screen if same button is clicked
+            if (zoom_slot > -1) {
+                if (zoom_slot != hemisphere) SetFullScreen(hemisphere);
+                else SetFullScreen(-1); // Exit help screen if same button is clicked
                 OC::ui.SetButtonIgnoreMask(); // ignore release
             }
 
@@ -717,16 +976,14 @@ public:
             // select button becomes aux button while editing a param
             applet->AuxButton();
           } else {
-            // Select Mode
             if (hemisphere == select_mode) select_mode = -1; // Exit Select Mode if same button is pressed
-            else if (help_hemisphere < 0) // Otherwise, set Select Mode - UNLESS there's a help screen
-              select_mode = hemisphere;
+            else select_mode = hemisphere;
           }
         }
     }
 
     void DelegateEncoderMovement(const UI::Event &event) {
-        int h = (event.control == OC::CONTROL_ENCODER_L) ? LEFT_HEMISPHERE : RIGHT_HEMISPHERE;
+        HEM_SIDE h = (event.control == OC::CONTROL_ENCODER_L) ? LEFT_HEMISPHERE : RIGHT_HEMISPHERE;
 
         if (HS::q_edit) {
           HS::QEditEncoderMove(h, event.value);
@@ -739,7 +996,7 @@ public:
         }
 #ifdef ARDUINO_TEENSY41
         if (view_state == AUDIO_SETUP) {
-          OC::AudioDSP::AudioMenuAdjust(h, event.value);
+          // OC::AudioDSP::AudioMenuAdjust(h, event.value);
           return;
         }
 #endif
@@ -749,8 +1006,51 @@ public:
             ClockSetup_instance.OnLeftEncoderMove(event.value);
           else
             ClockSetup_instance.OnEncoderMove(event.value);
+
+          return;
+        }
+
+        // Fullscreen cursor stuff
+        if (zoom_slot > -1) {
+          if (select_mode == zoom_slot) ChangeApplet(HEM_SIDE(zoom_slot), event.value);
+          else if (LEFT_HEMISPHERE == h) // left enc jumps between applet or config
+            zoom_cursor = (event.value > 0)? 0 : -1;
+          else if (zoom_cursor < 0) { // right enc is normal applet behavior
+            int index = my_applet[zoom_slot];
+            HS::available_applets[index].instance[zoom_slot]->OnEncoderMove(event.value);
+          } else if (isEditing) { // either enc changes config value
+            switch (zoom_cursor)
+            {
+              case 1:
+              case 2:
+              {
+                int chan = zoom_slot*2 + zoom_cursor - 1;
+                if (clock_m.IsRunning()) // && clock_m.GetMultiply(chan))
+                {
+                  clock_m.SetMultiply(clock_m.GetMultiply(chan) + event.value, chan);
+                } else
+                  HS::trigmap[zoom_slot*2 + zoom_cursor - 1].ChangeSource(event.value);
+                break;
+              }
+              case 3:
+              case 4:
+                if (!EditSelectedInputMap(event.value))
+                  HS::cvmap[zoom_slot*2 + zoom_cursor - 3].ChangeSource(event.value);
+                break;
+              case 5:
+              case 6:
+                // TODO: per applet?
+              default:
+                break;
+            }
+          } else { // right enc moves cursor
+            zoom_cursor = constrain(zoom_cursor + event.value, 0, 4);
+            ResetCursor();
+          }
         } else if (select_mode == h) {
-            ChangeApplet(HEM_SIDE(h), event.value);
+          // old style select mode
+          ChangeApplet(h, event.value);
+          SetApplet(h, next_applet[h]);
         } else {
             int index = my_applet[h];
             HS::available_applets[index].instance[h]->OnEncoderMove(event.value);
@@ -760,7 +1060,7 @@ public:
     void ToggleConfigMenu() {
       if (view_state != CONFIG_MENU) {
         view_state = CONFIG_MENU;
-        //SetHelpScreen(-1);
+        //SetFullScreen(-1);
       } else {
         view_state = APPLETS;
       }
@@ -771,8 +1071,10 @@ public:
         preset_cursor = preset_id + 1;
     }
 
-    void SetHelpScreen(int hemisphere) {
-        help_hemisphere = hemisphere;
+    void SetFullScreen(int hemisphere) {
+        zoom_slot = hemisphere;
+        select_mode = -1;
+        isEditing = false;
     }
 
     void HandleButtonEvent(const UI::Event &event) {
@@ -784,9 +1086,9 @@ public:
                 break;
             }
             if (HS::q_edit) {
-              if (event.control == OC::CONTROL_BUTTON_UP)
+              if (event.control == OC::CONTROL_BUTTON_A)
                 HS::NudgeOctave(HS::qview, 1);
-              else if (event.control == OC::CONTROL_BUTTON_DOWN)
+              else if (event.control == OC::CONTROL_BUTTON_B)
                 HS::NudgeOctave(HS::qview, -1);
               else
                 HS::q_edit = false;
@@ -797,7 +1099,7 @@ public:
             // most button-down events fall through here
         case UI::EVENT_BUTTON_PRESS:
 
-            if (event.control == OC::CONTROL_BUTTON_UP || event.control == OC::CONTROL_BUTTON_DOWN) {
+            if (event.control == OC::CONTROL_BUTTON_A || event.control == OC::CONTROL_BUTTON_B) {
                 DelegateSelectButtonPush(event);
             } else if (event.control == OC::CONTROL_BUTTON_L || event.control == OC::CONTROL_BUTTON_R) {
                 DelegateEncoderPush(event);
@@ -810,8 +1112,12 @@ public:
             break;
 
         case UI::EVENT_BUTTON_LONG_PRESS:
-            if (event.control == OC::CONTROL_BUTTON_DOWN) ToggleConfigMenu();
+            if (event.control == OC::CONTROL_BUTTON_B) ToggleConfigMenu();
+            break;
+
+        case UI::EVENT_BUTTON_LONG_RELEASE:
             if (event.control == OC::CONTROL_BUTTON_L) ToggleClockRun();
+            if (event.control == OC::CONTROL_BUTTON_R) OC::ui.JumpToMenu();
             break;
 
         default: break;
@@ -819,7 +1125,7 @@ public:
     }
 
 private:
-    int preset_id = 0;
+    int preset_id = -1;
     int queued_preset = 0;
     int preset_cursor = 0;
     int my_applet[2]; // Indexes to available_applets
@@ -830,17 +1136,16 @@ private:
     int config_page = 0;
     int dummy_count = 0;
 
-    OC::menu::ScreenCursor<5> showhide_cursor;
-
     int select_mode = -1;
-    int help_hemisphere; // Which of the hemispheres (if any) is in help mode, or -1 if none
+    int zoom_slot; // Which of the hemispheres (if any) is in fullscreen/help mode, -1 if none
+    int zoom_cursor; // 0=select; 1,2=trigmap; 3,4=cvmap; 5,6=outmode
     uint32_t click_tick; // Measure time between clicks for double-click
     int first_click; // The first button pushed of a double-click set, to see if the same one is pressed
 
     // State machine
     enum HEMView {
       APPLETS,
-      APPLET_FULLSCREEN,
+      //APPLET_FULLSCREEN,
       CONFIG_MENU,
       PRESET_PICKER,
       CLOCK_SETUP,
@@ -858,6 +1163,7 @@ private:
         SCREENSAVER_MODE,
         CURSOR_MODE,
         AUTO_MIDI,
+        MIDI_PC_CHANNEL,
 
         // Global Quantizers: 4x(Scale, Root, Octave, Mask?)
         QUANT1, QUANT2, QUANT3, QUANT4,
@@ -897,14 +1203,15 @@ private:
             config_cursor += dir;
             config_cursor = constrain(config_cursor, 0, MAX_CURSOR);
 
-            if (config_cursor < CONFIG_DUMMY) config_page = LOADSAVE_POPUP;
-            else if (config_cursor <= AUTO_MIDI) config_page = CONFIG_SETTINGS;
+            if (config_cursor <= CONFIG_DUMMY) config_page = LOADSAVE_POPUP;
+            else if (config_cursor < QUANT1) config_page = CONFIG_SETTINGS;
             else if (config_cursor < TRIGMAP1) config_page = QUANTIZER_SETTINGS;
             else if (config_cursor < SHOWHIDELIST) config_page = INPUT_SETTINGS;
             //else config_page = SHOWHIDE_APPLETS;
 
             ResetCursor();
           }
+          if (config_cursor > CONFIG_DUMMY) HS::popup_tick = 0;
           return;
         }
 
@@ -913,18 +1220,21 @@ private:
         case TRIGMAP2:
         case TRIGMAP3:
         case TRIGMAP4:
-            HS::trigger_mapping[config_cursor-TRIGMAP1] = constrain(
-                HS::trigger_mapping[config_cursor-TRIGMAP1] + dir,
-                0, TRIGMAP_MAX);
+            HS::trigmap[config_cursor-TRIGMAP1].ChangeSource(dir);
             break;
         case CVMAP1:
         case CVMAP2:
         case CVMAP3:
         case CVMAP4:
-            HS::cvmapping[config_cursor-CVMAP1] = constrain( HS::cvmapping[config_cursor-CVMAP1] + dir, 0, CVMAP_MAX);
+            if (!EditSelectedInputMap(dir))
+              HS::cvmap[config_cursor-CVMAP1].ChangeSource(dir);
             break;
         case TRIG_LENGTH:
             HS::trig_length = (uint32_t) constrain( int(HS::trig_length + dir), 1, 127);
+            break;
+        case MIDI_PC_CHANNEL:
+            HS::frame.MIDIState.pc_channel =
+              constrain(HS::frame.MIDIState.pc_channel + dir, 0, 17);
             break;
         //case SCREENSAVER_MODE:
             // TODO?
@@ -962,6 +1272,12 @@ private:
         switch (config_cursor) {
         case CONFIG_DUMMY:
             ++dummy_count;
+            // reset input mappings to defaults
+            HS::Init();
+            // randomize both applets
+            for (int ch = 0; ch < 2; ++ch) {
+              SetApplet(HEM_SIDE(ch), random(HEMISPHERE_AVAILABLE_APPLETS));
+            }
             break;
 
         case SAVE_PRESET:
@@ -984,21 +1300,30 @@ private:
             HS::QuantizerEdit(config_cursor - QUANT1);
             break;
 
-        case TRIGMAP1:
-        case TRIGMAP2:
-        case TRIGMAP3:
-        case TRIGMAP4:
         case CVMAP1:
         case CVMAP2:
         case CVMAP3:
         case CVMAP4:
+          if (CheckEditInputMapPress(
+                config_cursor,
+                IndexedInput(CVMAP1, cvmap[0]),
+                IndexedInput(CVMAP2, cvmap[1]),
+                IndexedInput(CVMAP3, cvmap[2]),
+                IndexedInput(CVMAP4, cvmap[3])
+              ))
+            break;
+        case TRIGMAP1:
+        case TRIGMAP2:
+        case TRIGMAP3:
+        case TRIGMAP4:
         case TRIG_LENGTH:
+        case MIDI_PC_CHANNEL:
         default:
             isEditing = !isEditing;
             break;
 
         case SCREENSAVER_MODE:
-            ++HS::screensaver_mode %= 4;
+            ++HS::screensaver_mode %= SCREENSAVER_MODE_COUNT;
             break;
 
         case CURSOR_MODE:
@@ -1030,10 +1355,10 @@ private:
 
         for (int ch=0; ch<4; ++ch) {
           // Physical trigger input mappings
-          gfxPrint(4 + ch*32, 25, OC::Strings::trigger_input_names_none[ HS::trigger_mapping[ch] ] );
+          gfxPrint(4 + ch*32, 25, HS::trigmap[ch].InputName() );
 
           // Physical CV input mappings
-          gfxPrint(4 + ch*32, 45, OC::Strings::cv_input_names_none[ HS::cvmapping[ch] ] );
+          gfxPrint(4 + ch*32, 45, HS::cvmap[ch].InputName() );
         }
 
         gfxLine(64, 11, 64, 63);
@@ -1053,6 +1378,7 @@ private:
           break;
         }
 
+        gfxDisplayInputMapEditor();
     }
 
     void DrawQuantizerConfig() {
@@ -1069,18 +1395,17 @@ private:
 
           const bool upper = config_cursor < QUANT5;
           const int ch_view = upper ? ch : ch + 4;
+          auto &q = q_engine[ch_view];
 
           gfxIcon(x + 3, upper? 25 : 45, upper? UP_BTN_ICON : DOWN_BTN_ICON);
 
           // Scale
-          gfxPrint(x - 3, 30, OC::scale_names_short[ HS::quant_scale[ch_view] ]);
+          gfxPrint(x - 3, 30, OC::scale_names_short[ q.scale ]);
 
           // Root Note + Octave
-          gfxPrint(x - 3, 40, OC::Strings::note_names[ HS::root_note[ch_view] ]);
-          if (HS::q_octave[ch_view] >= 0) gfxPrint("+");
-          gfxPrint(HS::q_octave[ch_view]);
-
-          // (TODO: mask editor)
+          gfxPrint(x - 3, 40, OC::Strings::note_names[ q.root_note ]);
+          if (q.octave >= 0) gfxPrint("+");
+          gfxPrint(q.octave);
 
           // 5-8 on bottom
           gfxPrint(x, 55, "Q");
@@ -1105,23 +1430,6 @@ private:
         }
     }
 
-    void DrawAppletList() {
-      // TODO: list all applets just like the main app menu
-      const size_t LineH = 12;
-
-      int y = (64 - (5 * LineH)) / 2;
-
-      for (int current = showhide_cursor.first_visible();
-           current <= showhide_cursor.last_visible();
-           ++current, y += LineH) {
-
-        gfxIcon(1, y + 1, HS::applet_is_hidden(current) ? CHECK_OFF_ICON : CHECK_ON_ICON);
-        gfxPrint( 11, y + 2, HS::available_applets[current].instance[0]->applet_name());
-
-        if (current == showhide_cursor.cursor_pos())
-          gfxInvert(0, y, 127, LineH - 1);
-      }
-    }
     void DrawConfigMenu() {
         // --- Config Selection
         gfxHeader("< General Settings >");
@@ -1130,22 +1438,20 @@ private:
         gfxPrint(HS::trig_length);
         gfxPrint("ms");
 
-        const char * const ssmodes[4] = { "[blank]", "Meters", "Scope",
-        #if defined(__IMXRT1062__)
-        "Stars"
-        #else
-        "Zips"
-        #endif
-        };
         gfxPrint(1, 25, "Screensaver:  ");
         gfxPrint( ssmodes[HS::screensaver_mode] );
 
-        const char * const cursor_mode_name[3] = { "modal", "modal+wrap" };
-        gfxPrint(1, 35, "Cursor:  ");
-        gfxPrint(cursor_mode_name[HS::cursor_wrap]);
+        gfxPrint(1, 35, "Cursor wrap:  ");
+        gfxPrint(OC::Strings::off_on[HS::cursor_wrap]);
 
         gfxPrint(1, 45, "Auto MIDI-Out:  ");
-        gfxPrint( HS::frame.autoMIDIOut ? "On" : "Off" );
+        gfxPrint( OC::Strings::off_on[HS::frame.autoMIDIOut]);
+
+        const uint8_t pc_ch = HS::frame.MIDIState.pc_channel;
+        gfxPrint(1, 55, "MIDI-PC Ch:  ");
+        if (pc_ch == 0) graphics.printf("%4s", "Omni");
+        else if (pc_ch <= 16) graphics.printf("%4d", pc_ch);
+        else graphics.printf("%4s", "Off");
 
         switch (config_cursor) {
         case CVMAP1:
@@ -1162,10 +1468,13 @@ private:
             gfxIcon(73, 25, RIGHT_ICON);
             break;
         case CURSOR_MODE:
-            gfxIcon(43, 35, RIGHT_ICON);
+            gfxIcon(73, 35, RIGHT_ICON);
             break;
         case AUTO_MIDI:
             gfxIcon(90, 45, RIGHT_ICON);
+            break;
+        case MIDI_PC_CHANNEL:
+            gfxCursor(78, 63, 25);
             break;
         case CONFIG_DUMMY:
             gfxIcon(2, 1, LEFT_ICON);
@@ -1173,6 +1482,25 @@ private:
         }
     }
 
+    bool isValidPreset(int id) {
+#ifdef __IMXRT1062__
+      uint64_t data;
+      return PhzConfig::getValue(id << 9 | APPLET_METADATA_KEY, data);
+#else
+      return hem_presets[id].is_valid();
+#endif
+    }
+
+    HemisphereApplet* GetApplet(int id, size_t h) {
+#ifdef __IMXRT1062__
+        uint64_t data = 0;
+        PhzConfig::getValue(id << 9 | APPLET_METADATA_KEY, data);
+        int idx = HS::get_applet_index_by_id( Unpack(data, PackLocation{h*8, 8}) );
+        return HS::available_applets[idx].instance[h];
+#else
+        return hem_presets[id].GetApplet(h);
+#endif
+    }
     void DrawPresetSelector() {
         gfxHeader((config_cursor == SAVE_PRESET) ? "Save" : "Load");
         gfxPrint(30, 1, "Preset");
@@ -1189,12 +1517,14 @@ private:
             else
               gfxPrint(8, y, OC::Strings::capital_letters[i]);
 
-            if (!hem_presets[i].is_valid())
+            if (!isValidPreset(i))
                 gfxPrint(18, y, "(empty)");
             else {
-                gfxPrint(18, y, hem_presets[i].GetApplet(0)->applet_name());
+                gfxIcon(18, y, GetApplet(i, 0)->applet_icon());
+                gfxPrint(26, y, GetApplet(i, 0)->applet_name());
                 gfxPrint(", ");
-                gfxPrint(hem_presets[i].GetApplet(1)->applet_name());
+                gfxPrint(GetApplet(i, 1)->applet_name());
+                gfxIcon(120, y, GetApplet(i, 1)->applet_icon(), true);
             }
 
             y += 10;
@@ -1203,8 +1533,10 @@ private:
 
 };
 
+#ifdef __IMXRT1062__
+#else
 // TOTAL EEPROM SIZE: 8 presets * 32 bytes
-SETTINGS_DECLARE(HemispherePreset, HEMISPHERE_SETTING_LAST) {
+SETTINGS_DECLARE(HemispherePreset, HEMISPHERE_SETTINGS_COUNT) {
     {0, 0, 255, "Applet ID L", NULL, settings::STORAGE_TYPE_U8},
     {0, 0, 255, "Applet ID R", NULL, settings::STORAGE_TYPE_U8},
     {0, 0, 65535, "Data L block 1", NULL, settings::STORAGE_TYPE_U16},
@@ -1223,12 +1555,17 @@ SETTINGS_DECLARE(HemispherePreset, HEMISPHERE_SETTING_LAST) {
     {0, 0, 65535, "CV Input Map", NULL, settings::STORAGE_TYPE_U16},
     {0, 0, 65535, "Misc Globals", NULL, settings::STORAGE_TYPE_U16}
 };
+#endif
 
 HemisphereManager manager;
 
 void ReceiveManagerSysEx() {
+#ifdef __IMXRT1062__
+    // TODO: reimplement SysEx backup
+#else
     if (hem_active_preset)
         hem_active_preset->OnReceiveSysEx();
+#endif
 }
 void BeatSyncProcess() {
   manager.ProcessQueue();
@@ -1244,30 +1581,48 @@ void HEMISPHERE_init() {
 }
 
 static constexpr size_t HEMISPHERE_storageSize() {
+#ifdef __IMXRT1062__
+    return 0;
+#else
     return HemispherePreset::storageSize() * (HEM_NR_OF_PRESETS + 1);
+#endif
 }
 
 static size_t HEMISPHERE_save(void *storage) {
+#ifdef __IMXRT1062__
+    return 0;
+#else
     // store hidden applet mask in secret preset
     hem_presets[HEM_NR_OF_PRESETS].SetData(HEM_SIDE(0), HS::hidden_applets[0]);
     hem_presets[HEM_NR_OF_PRESETS].SetData(HEM_SIDE(1), HS::hidden_applets[1]);
 
+    hem_presets[HEM_NR_OF_PRESETS].SetGlobals(HS::frame.MIDIState.pc_channel);
+
     size_t used = 0;
-    for (int i = 0; i <= HEM_NR_OF_PRESETS; ++i) {
+    for (int i = 0; i < HEM_NR_OF_PRESETS + 1; ++i) {
         used += hem_presets[i].Save(static_cast<char*>(storage) + used);
     }
     return used;
+#endif
 }
 
 static size_t HEMISPHERE_restore(const void *storage) {
+#ifdef __IMXRT1062__
+    return 0;
+#else
     size_t used = 0;
-    for (int i = 0; i <= HEM_NR_OF_PRESETS; ++i) {
+    for (int i = 0; i < HEM_NR_OF_PRESETS + 1; ++i) {
         used += hem_presets[i].Restore(static_cast<const char*>(storage) + used);
     }
 
     HS::hidden_applets[0] = hem_presets[HEM_NR_OF_PRESETS].GetData(HEM_SIDE(0));
     HS::hidden_applets[1] = hem_presets[HEM_NR_OF_PRESETS].GetData(HEM_SIDE(1));
+
+    HS::frame.MIDIState.pc_channel =
+      constrain((int)hem_presets[HEM_NR_OF_PRESETS].GetGlobals(), 0, 17);
+
     return used;
+#endif
 }
 
 void FASTRUN HEMISPHERE_isr() {
@@ -1297,14 +1652,15 @@ void HEMISPHERE_menu() {
 
 void HEMISPHERE_screensaver() {
     switch (HS::screensaver_mode) {
-    case 0x3: // Zips or Stars
-        ZapScreensaver(true);
+    case SCREEN_ZIPS:
+    case SCREEN_STARS:
+    case SCREEN_ZAPS:
+        ZapScreensaver(screensaver_mode - SCREEN_ZAPS);
         break;
-    case 0x2: // output scope
-        //ZapScreensaver();
+    case SCREEN_SCOPE: // output scope
         OC::scope_render();
         break;
-    case 0x1: // Meters
+    case SCREEN_METERS: // Meters
         manager.BaseScreensaver(true); // show note names
         break;
     default: break; // blank screen

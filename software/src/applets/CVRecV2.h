@@ -19,7 +19,6 @@
 // SOFTWARE.
 
 #include "../SegmentDisplay.h"
-#define CVREC_MAX_STEP 384
 
 const char* const CVRecV2_MODES[4] = {
     "Play", "Rec 1", "Rec 2", "Rec 1+2"
@@ -27,12 +26,16 @@ const char* const CVRecV2_MODES[4] = {
 
 class CVRecV2 : public HemisphereApplet {
 public:
+    static constexpr int CVREC_MAX_STEP = 384;
 
     const char* applet_name() {
         return "CVRec";
     }
+    const uint8_t* applet_icon() { return PhzIcons::cvRec; }
 
     void Start() {
+        cv[0] = new int16_t[CVREC_MAX_STEP];
+        cv[1] = new int16_t[CVREC_MAX_STEP];
         segment.Init(SegmentSize::BIG_SEGMENTS);
     }
 
@@ -107,7 +110,7 @@ public:
             MoveCursor(cursor, direction, 3);
             return;
         }
-        
+
         switch (cursor) {
         case 0: {
             int16_t fs = start; // Former start value
@@ -130,7 +133,7 @@ public:
             break;
         }
     }
-        
+
     uint64_t OnDataRequest() {
         uint64_t data = 0;
         Pack(data, PackLocation {0,9}, start);
@@ -140,8 +143,8 @@ public:
     }
 
     void OnDataReceive(uint64_t data) {
-        start = Unpack(data, PackLocation {0,9});
-        end = Unpack(data, PackLocation {9,9});
+        start = constrain(Unpack(data, PackLocation {0,9}), 0, CVREC_MAX_STEP - 2);
+        end = constrain(Unpack(data, PackLocation {9,9}), start + 1, CVREC_MAX_STEP - 1);
         smooth = Unpack(data, PackLocation {18,1});
     }
 
@@ -163,7 +166,7 @@ private:
     int cursor; // 0=Start 1=End 2=Smooth 3=Record Mode
     SegmentDisplay segment;
 
-    int16_t cv[2][CVREC_MAX_STEP];
+    int16_t* cv[2];
     simfloat rise[2];
     simfloat signal[2];
     bool smooth;
@@ -175,7 +178,7 @@ private:
     int16_t end = 63; // End step number
     int16_t step = 0; // Current step
     int16_t punch_out = 0;
-    
+
     void DrawInterface() {
         // Range
         gfxIcon(1, 15, LOOP_ICON);

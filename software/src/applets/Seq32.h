@@ -56,6 +56,7 @@ public:
     const char* applet_name() { // Maximum 10 characters
         return "Seq32";
     }
+    const uint8_t* applet_icon() { return PhzIcons::seq32; }
 
     void Start() {
     }
@@ -79,7 +80,7 @@ public:
         if (!write_mode) {
           // CV modulation of pattern and transposition
           pattern_mod = pattern_index;
-          Modulate(pattern_mod, 1, 0, 7);
+          Modulate(pattern_mod, 1, 0, MiniSeq::SEQUENCE_COUNT - 1);
           seq.SetPattern(pattern_mod);
 
           trans_mod = transpose;
@@ -173,6 +174,7 @@ public:
       }
       if (cursor >= NOTES) {
         seq.ToggleMute(cursor - NOTES);
+        CancelEdit();
         return;
       }
       if (cursor == ACCENT_MODE) {
@@ -188,7 +190,7 @@ public:
         seq.Clear();
 
       flash_ticker = 1000;
-      isEditing = false;
+      CancelEdit();
     }
 
     void OnEncoderMove(int direction) {

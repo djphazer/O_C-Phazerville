@@ -60,7 +60,7 @@ public:
         // EGs: .10Hz to 8Hz
         int mod_range_low[4] = {10, 11000, 10, 10};
         int mod_range_high[4] = {1500, 88000, 800, 800};
-        for (byte ch = 0; ch < 4; ch++)
+        for (int ch = 0; ch < 4; ch++)
         {
             if (DetentedIn(ch) && Changed(ch)) {
             		int cv = In(ch);
@@ -86,7 +86,7 @@ public:
 		gated = Gate(3);
 		
 		// Output for all test oscillators
-		for (byte ch = 0; ch < 4; ch++) Out(ch, test[ch].Next());
+		for (int ch = 0; ch < 4; ch++) Out(ch, test[ch].Next());
     }
 
     void View() {
@@ -96,19 +96,19 @@ public:
     }
 
     void OnSendSysEx() { // Left Enc Push
-        byte V[33];
+        uint8_t V[33];
 
         // There are 64 waveform segments, each containing two bytes. These will be
         // sent in four groups of 16 segments, for 32 bytes per segment. Each SysEx
         // payload will be 33 bytes (before packing), which includes the group
         // number.
-        for (byte gr = 0; gr < 4; gr++)
+        for (int gr = 0; gr < 4; gr++)
         {
             int ix = 0;
             V[ix++] = gr; // Add the group number, for future decoding
-            for (byte s = 0; s < 16; s++)
+            for (int s = 0; s < 16; s++)
             {
-                byte seg_ix = (gr * 4) + s; // Segment index
+                int seg_ix = (gr * 4) + s; // Segment index
                 V[ix++] = HS::user_waveforms[seg_ix].level;
                 V[ix++] = HS::user_waveforms[seg_ix].time;
             }
@@ -124,10 +124,10 @@ public:
         uint8_t V[35];
         if (ExtractSysExData(V, 'W')) {
             int ix = 0;
-            byte gr = V[ix++];
-            for (byte s = 0; s < 16; s++)
+            int gr = V[ix++];
+            for (int s = 0; s < 16; s++)
             {
-                byte seg_ix = (gr * 4) + s;
+                int seg_ix = (gr * 4) + s;
                 HS::user_waveforms[seg_ix].level = V[ix++];
                 HS::user_waveforms[seg_ix].time = V[ix++];
             }
@@ -166,13 +166,13 @@ public:
     }
 
     void OnUpButtonPress() {
-        byte old = waveform_number;
+        int old = waveform_number;
         waveform_number = constrain(waveform_number + 1, 0, waveform_count - 1);
         if (old != waveform_number) SwitchWaveform(waveform_number);
     }
 
     void OnDownButtonPress() {
-        byte old = waveform_number;
+        int old = waveform_number;
         waveform_number = constrain(waveform_number - 1, 0, waveform_count - 1);
         if (old != waveform_number) SwitchWaveform(waveform_number);
     }
@@ -186,8 +186,7 @@ public:
         if (add_delete_confirm) {
             add_waveform = 1 - add_waveform;
         } else {
-            if (direction < 0 && segment_number > 0) --segment_number;
-            if (direction > 0) segment_number = constrain(segment_number + 1, 0, osc.SegmentCount() - 1);
+            segment_number = constrain(segment_number + direction, 0, osc.SegmentCount() - 1);
         }
     }
 
@@ -197,11 +196,9 @@ public:
         } else {
             VOSegment seg = osc.GetSegment(segment_number);
             if (cursor == 0) { // Level
-                if (direction < 0 && seg.level > 0) seg.level = seg.level - 1;
-                if (direction > 0 && seg.level < 255) seg.level = seg.level + 1;
+              seg.level = constrain(seg.level + direction, 0, 255);
             } else {
-                if (direction < 0 && seg.time > 0) seg.time = seg.time - 1;
-                if (direction > 0 && seg.time < 9) seg.time = seg.time + 1;
+              seg.time = constrain(seg.time + direction, 0, 9);
             }
             osc.SetSegment(segment_number, seg);
             if (osc.TotalTime() == 0) {
@@ -210,16 +207,16 @@ public:
                 osc.SetSegment(segment_number, seg);
             }
 
-            for (byte t = 0; t < 4; t++) test[t].SetSegment(segment_number, seg);
+            for (int t = 0; t < 4; t++) test[t].SetSegment(segment_number, seg);
             WaveformManager::Update(waveform_number, segment_number, &seg);
         }
     }
 
 private:
     bool cursor = 0; // 0 = Level, 1 = Time
-    byte segment_number = 0;
-    byte waveform_count;
-    byte segments_remaining;
+    uint8_t segment_number = 0;
+    uint8_t waveform_count;
+    uint8_t segments_remaining;
 
     bool add_delete_confirm = 0; // 1=Show add/delete confirmation screen
     bool add_waveform = 1; // 1=Add waveform, 0=Delete waveform
@@ -259,15 +256,15 @@ private:
     void DrawWaveform() {
         uint16_t total_time = osc.TotalTime();
         VOSegment seg = osc.GetSegment(osc.SegmentCount() - 1);
-        byte prev_x = 0; // Starting coordinates
-        byte prev_y = 63 - Proportion(seg.level, 255, 40);
-        for (byte i = 0; i < osc.SegmentCount(); i++)
+        uint8_t prev_x = 0; // Starting coordinates
+        uint8_t prev_y = 63 - Proportion(seg.level, 255, 40);
+        for (int i = 0; i < osc.SegmentCount(); i++)
         {
             seg = osc.GetSegment(i);
-            byte y = 63 - Proportion(seg.level, 255, 40);
-            byte seg_x = Proportion(seg.time, total_time, 128);
-            byte x = prev_x + seg_x;
-            byte p = segment_number == i ? 1 : 2;
+            uint8_t y = 63 - Proportion(seg.level, 255, 40);
+            uint8_t seg_x = Proportion(seg.time, total_time, 128);
+            uint8_t x = prev_x + seg_x;
+            uint8_t p = segment_number == i ? 1 : 2;
             x = constrain(x, 0, 127);
             y = constrain(y, 0, 63);
             gfxDottedLine(prev_x, prev_y, x, y, p);
@@ -303,12 +300,12 @@ private:
         gfxPrint(104, 55, "[OK]");
     }
 
-    void SwitchWaveform(byte waveform_number_) {
+    void SwitchWaveform(uint8_t waveform_number_) {
         waveform_number = waveform_number_;
         osc = WaveformManager::VectorOscillatorFromWaveform(waveform_number);
         segment_number = 0;
 
-        for (byte t = 0; t < 4; t++)
+        for (int t = 0; t < 4; t++)
         {
             test[t] = WaveformManager::VectorOscillatorFromWaveform(waveform_number);
             test[t].SetScale((12 << 7) * 3);
@@ -322,14 +319,14 @@ private:
         test[3].Cycle(0);
         test[3].Sustain();
 
-        for (byte t = 0; t < 4; t++) test[t].Reset();
+        for (int t = 0; t < 4; t++) test[t].Reset();
     }
 
     void AddSegment() {
         // If there are any segments left, and there are fewer than VO_MAX_SEGMENTS in this waveform, add a segment
         if (segments_remaining < HS::VO_SEGMENT_COUNT && osc.SegmentCount() < HS::VO_MAX_SEGMENTS) {
             WaveformManager::AddSegmentToWaveformAtSegmentIndex(waveform_number, segment_number);
-            byte prev_segment_number = segment_number;
+            uint8_t prev_segment_number = segment_number;
             SwitchWaveform(waveform_number);
             segment_number = prev_segment_number + 1;
             --segments_remaining;
@@ -340,7 +337,7 @@ private:
         if (osc.SegmentCount() > 2) { // The segment cannot be deleted if it's the only segment in the waveform...
             if (osc.GetSegment(segment_number).time != osc.TotalTime()) {  // ...or if deletion would result in a 0 total time
                 WaveformManager::DeleteSegmentFromWaveformAtSegmentIndex(waveform_number, segment_number);
-                byte prev_segment_number = segment_number;
+                uint8_t prev_segment_number = segment_number;
                 SwitchWaveform(waveform_number);
                 segment_number = prev_segment_number;
                 if (segment_number > osc.SegmentCount() - 1) segment_number--;

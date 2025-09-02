@@ -37,7 +37,7 @@ class TB_3PO: public HemisphereApplet {
 
     enum TB3POCursor {
       LOCK_SEED, DIGIT1, DIGIT2, DIGIT3, DIGIT4,
-      DENSITY, QSELECT, LENGTH,
+      DENSITY, QSELECT, TRANS_MODE, LENGTH,
 
       MAX_CURSOR = LENGTH
     };
@@ -45,9 +45,9 @@ class TB_3PO: public HemisphereApplet {
     const char * applet_name() { // Maximum 10 characters
       return "TB-3PO";
     }
+    const uint8_t* applet_icon() { return PhzIcons::tb3P0; }
 
   void Start() {
-    manual_reset_flag = 0;
     rand_apply_anim = 0;
     curr_step_semitone = 0;
 
@@ -59,7 +59,7 @@ class TB_3PO: public HemisphereApplet {
 
     num_steps = 16;
 
-    gate_off_clock = 0;
+    gate_off_tick = 0;
     cycle_time = 0;
 
     curr_gate_cv = 0;
@@ -69,8 +69,7 @@ class TB_3PO: public HemisphereApplet {
     slide_end_cv = 0;
 
     lock_seed = 0;
-    reseed();
-
+    Reset();
   }
 
   void Reset() {
@@ -82,16 +81,13 @@ class TB_3PO: public HemisphereApplet {
   }
 
   void Controller() {
-    const int this_tick = OC::CORE::ticks;
+    const uint32_t this_tick = OC::CORE::ticks;
 
     if (Clock(1) || manual_reset_flag) {
       Reset();
     }
 
-    transpose_cv = 0;
-    if (DetentedIn(0)) {
-      transpose_cv = SemitoneIn(0) << 7;
-    }
+    transpose_amt = SemitoneIn(0);
 
     if (EditMode() && cursor == 5) density_auto[step] = density_encoder;
     const int den_ = (density_auto_enabled ? density_auto[step] : density_encoder);
@@ -129,16 +125,16 @@ class TB_3PO: public HemisphereApplet {
       if (step_is_gated(step) || step_is_slid(step_pv)) {
         curr_gate_cv = step_is_accent(step) ? HEMISPHERE_MAX_CV : HEMISPHERE_3V_CV;
 
-        int gate_time = (cycle_time / 2); // multiplier of 2
-        gate_off_clock = this_tick + gate_time;
+        uint32_t gate_time = (cycle_time / 2); // multiplier of 2
+        gate_off_tick = this_tick + gate_time;
       }
 
       curr_step_semitone = get_semitone_for_step(step);
 
     }
 
-    if (curr_gate_cv > 0 && gate_off_clock > 0 && this_tick >= gate_off_clock) {
-      gate_off_clock = 0;
+    if (curr_gate_cv > 0 && gate_off_tick > 0 && this_tick >= gate_off_tick) {
+      gate_off_tick = 0;
 
       if (!step_is_slid(step)) {
         curr_gate_cv = 0;
@@ -177,7 +173,13 @@ class TB_3PO: public HemisphereApplet {
     DrawGraphics();
   }
 
-  // void OnButtonPress() { }
+  void OnButtonPress() override {
+    if (cursor == TRANS_MODE) {
+      transpose_in_semitones ^= 1;
+    }
+    else
+      CursorToggle();
+  }
 
   void AuxButton() {
     if (cursor == DENSITY) {
@@ -186,7 +188,10 @@ class TB_3PO: public HemisphereApplet {
     if (cursor == QSELECT) {
       HS::QuantizerEdit(qselect);
     }
-    isEditing = false;
+    if (cursor == LENGTH) {
+      no_slides ^= 1;
+    }
+    CancelEdit();
   }
 
   void OnEncoderMove(int direction) {
@@ -222,6 +227,8 @@ class TB_3PO: public HemisphereApplet {
       uint32_t mask = 0xf;
       seed &= ~(mask << shift_amt); // Clear bits where this nibble lives
       seed |= (nib << shift_amt); // Move the nibble to its home
+
+      regenerate_all();
       break;
     }
     case DENSITY: // density
@@ -249,10 +256,13 @@ class TB_3PO: public HemisphereApplet {
     //Pack(data, PackLocation { 0, 8 }, GetScale(0));
     //Pack(data, PackLocation { 8, 4 }, GetRootNote(0));
 
+    Pack(data, PackLocation { 0, 1 }, lock_seed);
+    Pack(data, PackLocation { 1, 1 }, transpose_in_semitones);
+
     Pack(data, PackLocation { 12, 4 }, density_encoder);
     Pack(data, PackLocation { 16, 16 }, seed);
     // old octave setting was here:
-    //Pack(data, PackLocation { 32, 8 }, HS::q_octave[io_offset]);
+    //Pack(data, PackLocation { 32, 8 }, q.octave);
     Pack(data, PackLocation { 40, 5 }, num_steps - 1);
 
     Pack(data, PackLocation { 48, 4 }, qselect);
@@ -261,6 +271,8 @@ class TB_3PO: public HemisphereApplet {
   }
 
   void OnDataReceive(uint64_t data) {
+    lock_seed = Unpack(data, PackLocation { 0, 1 });
+    transpose_in_semitones = Unpack(data, PackLocation { 1, 1 });
 
     density_encoder = Unpack(data, PackLocation { 12, 4 });
     seed = Unpack(data, PackLocation { 16, 16 });
@@ -286,7 +298,7 @@ protected:
         //                    "-------" <-- Label size guide
         help[HELP_DIGITAL1] = "Clock";
         help[HELP_DIGITAL2] = "Regen";
-        help[HELP_CV1]      = "Transp";
+        help[HELP_CV1]      = transpose_in_semitones? "Root":"Transp";
         help[HELP_CV2]      = "Density";
         help[HELP_OUT1]     = "Pitch";
         help[HELP_OUT2]     = "Gate";
@@ -299,12 +311,11 @@ private:
   int cursor = 0;
 
   // User settings
-
-  // Bool
   bool manual_reset_flag = 0; // Manual trigger to reset/regen
 
-  // bool 
   int lock_seed; // If 1, the seed won't randomize (and manual editing is enabled)
+  bool no_slides = false;
+  bool transpose_in_semitones = false;
 
   uint16_t seed; // The random seed that deterministically builds the sequence
 
@@ -326,7 +337,7 @@ private:
   // Playback
   uint8_t step = 0; // Current sequencer step
 
-  int32_t transpose_cv; // Quantized transpose in cv
+  int32_t transpose_amt; // in semitones or scale degrees
 
   // Generated sequence data
   uint32_t gates = 0; // Bitfield of gates;  ((gates >> step) & 1) means gate
@@ -341,8 +352,8 @@ private:
   uint8_t current_pattern_scale_size; // Track what size scale was used to render the current pattern (for change detection)
 
   // For gate timing as ~32nd notes at tempo, detect clock rate like a clock multiplier
-  int gate_off_clock; // Scheduled cycle at which the gate should be turned off (when applicable)
-  int cycle_time; // Cycle time between the last two clock inputs
+  uint32_t gate_off_tick; // Scheduled cycle at which the gate should be turned off (when applicable)
+  uint32_t cycle_time; // Cycle time between the last two clock inputs
 
   // CV output values
   int32_t curr_gate_cv = 0;
@@ -362,6 +373,11 @@ private:
   int get_pitch_for_step(int step_num) {
     int quant_note = 64 + int(notes[step_num]);
 
+    if (!transpose_in_semitones) {
+      // transpose in scale degrees, proportioned from semitones
+      quant_note += transpose_amt * scale_size / 12;
+    }
+
     // Transpose by one octave up or down if flagged to (note this is one full span of whatever scale is active to give doubling octave behavior)
     if (step_is_oct_up(step_num)) {
       quant_note += scale_size;
@@ -371,11 +387,9 @@ private:
 
     quant_note = constrain(quant_note, 0, 127);
 
-    // Apply semitone transpose after scale lookup - effectively a root note transpose
-    // I previously thought to apply transpose in scale degrees,
-    // but some vocal users prefer it this way. -NJM
-    return HS::QuantizerLookup(qselect, quant_note) + transpose_cv;
-    //return QuantizerLookup(0, 64 );  // Test: note 64 is definitely 0v=c4 if output directly, on ALL scales
+    //return QuantizerLookup(0, 64);  // Test: note 64 is definitely 0v=c4 if output directly, on ALL scales
+
+    return HS::QuantizerLookup(qselect, quant_note) + (transpose_in_semitones * transpose_amt << 7);
   }
 
   int get_semitone_for_step(int step_num) {
@@ -431,6 +445,7 @@ private:
     case 4:
       apply_density();
       regenerate_phase = 0;
+      randomSeed(micros()); // restore true random
       break;
     default:
       break;
@@ -544,6 +559,7 @@ private:
   }
 
   bool step_is_slid(int step_num) {
+    if (no_slides) return false;
     return (slides & (0x01 << step_num));
   }
 
@@ -653,14 +669,15 @@ private:
     gfxPrint(14, 37, dens_display);
     if (density_auto_enabled) gfxFrame(8, 35, 16, 11, true);
 
-    if (cursor == QSELECT) {
+    if (cursor == QSELECT || cursor == TRANS_MODE) {
       const char txt[] = { 'Q', char('1' + qselect), '\0' };
-      gfxPrint(44, 31, txt);
+      gfxPrint(44, 26, txt);
+      gfxPrint(38, 36, transpose_in_semitones? "Root":"Deg");
     } else {
       // Show scale and root note like old times
       gfxPrint(38, 26, OC::scale_names_short[HS::GetScale(qselect)]);
 
-      int8_t &q_oct = HS::q_octave[io_offset];
+      int8_t &q_oct = HS::q_engine[qselect].octave;
       gfxPrint((q_oct == 0 ? 44 : 38), 36, OC::Strings::note_names_unpadded[HS::GetRootNote(qselect)]);
       if (q_oct != 0) {
         gfxPrint(50, 36, q_oct);
@@ -707,8 +724,11 @@ private:
       gfxPrint(37, 46, "!");
     }
 
-    if (step_is_slid(step)) {
+    if (step_is_slid(step) || no_slides) {
       gfxBitmap(42, 46, 8, BEND_ICON);
+    }
+    if (no_slides) {
+      gfxPrint(42, 46, "X");
     }
 
     // Show that the "slide circuit" is actively
@@ -732,10 +752,13 @@ private:
       gfxSpicyCursor(9, 45, 14);
       break;
     case QSELECT:
-      gfxSpicyCursor(44, 39, 13);
+      gfxSpicyCursor(44, 34, 13);
+      break;
+    case TRANS_MODE:
+      gfxIcon(31, 36, RIGHT_ICON);
       break;
     case LENGTH:
-      gfxCursor(20, 54, 12, 8);
+      gfxSpicyCursor(20, 54, 12, 8);
       break;
     }
   }

@@ -13,7 +13,8 @@ enum DigitalInput {
   DIGITAL_INPUT_2,
   DIGITAL_INPUT_3,
   DIGITAL_INPUT_4,
-  DIGITAL_INPUT_LAST
+  // deprecated
+  DIGITAL_INPUT_LAST = DIGITAL_INPUT_COUNT
 };
 
 #define DIGITAL_INPUT_MASK(x) (0x1 << (x))
@@ -25,12 +26,6 @@ static constexpr uint32_t DIGITAL_INPUT_4_MASK = DIGITAL_INPUT_MASK(DIGITAL_INPU
 
 #if defined(__MK20DX256__) // Teensy 3.2
 
-template <DigitalInput> struct InputPinDesc { };
-template <> struct InputPinDesc<DIGITAL_INPUT_1> { static constexpr int PIN = TR1; };
-template <> struct InputPinDesc<DIGITAL_INPUT_2> { static constexpr int PIN = TR2; };
-template <> struct InputPinDesc<DIGITAL_INPUT_3> { static constexpr int PIN = TR3; };
-template <> struct InputPinDesc<DIGITAL_INPUT_4> { static constexpr int PIN = TR4; };
-
 void tr1_ISR();
 void tr2_ISR();
 void tr3_ISR();
@@ -40,9 +35,7 @@ class DigitalInputs {
 public:
 
   static void Init();
-
-  static void reInit();
-
+  static void reInit() { Init(); }
   static void Scan();
 
   // @return mask of all pins cloked since last call (does not reset state)
@@ -61,7 +54,7 @@ public:
   }
 
   template <DigitalInput input> static inline bool read_immediate() {
-    return !digitalReadFast(InputPinDesc<input>::PIN);
+    return !digitalReadFast(InputPinMap(input));
   }
 
   static inline bool read_immediate(DigitalInput input) {
@@ -82,10 +75,10 @@ private:
 
   inline static int InputPinMap(DigitalInput input) {
     switch (input) {
-      case DIGITAL_INPUT_1: return InputPinDesc<DIGITAL_INPUT_1>::PIN;
-      case DIGITAL_INPUT_2: return InputPinDesc<DIGITAL_INPUT_2>::PIN;
-      case DIGITAL_INPUT_3: return InputPinDesc<DIGITAL_INPUT_3>::PIN;
-      case DIGITAL_INPUT_4: return InputPinDesc<DIGITAL_INPUT_4>::PIN;
+      case DIGITAL_INPUT_1: return TR1;
+      case DIGITAL_INPUT_2: return TR2;
+      case DIGITAL_INPUT_3: return TR3;
+      case DIGITAL_INPUT_4: return TR4;
       default: break;
     }
     return 0;
@@ -104,7 +97,6 @@ private:
     }
   }
 };
-
 
 #elif defined(__IMXRT1062__) // Teensy 4.0 or 4.1
 
@@ -150,7 +142,6 @@ private:
 };
 
 #endif
-
 
 // Helper class for visualizing digital inputs with decay
 // Uses 4 bits for decay

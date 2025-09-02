@@ -35,6 +35,7 @@ public:
     const char* applet_name() { // Maximum 10 characters
         return "RndWalk";
     }
+    const uint8_t* applet_icon() { return PhzIcons::rndWalk; }
 
     void Start() {
         ForEachChannel(ch)

@@ -29,6 +29,7 @@ public:
     const char* applet_name() {
         return "BinaryCtr";
     }
+    const uint8_t* applet_icon() { return PhzIcons::binaryCounter; }
 
     void Start() {
         segment.Init(SegmentSize::BIG_SEGMENTS);

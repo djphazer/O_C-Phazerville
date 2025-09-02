@@ -41,7 +41,8 @@ public:
         LENGTH2, BEATS2, OFFSET2, PADDING2,
         CV_DEST1,
         CV_DEST2,
-        LAST_SETTING = CV_DEST2
+        GATE_MODE,
+        LAST_SETTING = GATE_MODE
     };
     static constexpr const char* const cv_labels[] = {
       "Length1", "Fill 1", "Rotate1", "Pad 1",
@@ -51,6 +52,7 @@ public:
     const char* applet_name() {
         return "EuclidX";
     }
+    const uint8_t* applet_icon() { return PhzIcons::euclidX; }
 
     void Start() {
         ForEachChannel(ch)
@@ -118,8 +120,12 @@ public:
                 // actually output the triggers
                 int sb = step % (actual_length[ch] + actual_padding[ch]);
                 if ((pattern[ch] >> sb) & 0x01) {
+                  if (gate_mode)
+                    GateOut(ch, true);
+                  else
                     ClockOut(ch);
-                }
+                } else
+                  GateOut(ch, 0);
             }
 
             // Plan for the thing to run forever and ever
@@ -127,8 +133,12 @@ public:
         }
     }
 
+    void DrawFullScreen() {
+        DrawSteps(true);
+        DrawEditor();
+    }
     void View() {
-        DrawSteps();
+        DrawSteps(false);
         DrawEditor();
     }
 
@@ -170,6 +180,9 @@ public:
         case CV_DEST2:
             cv_dest[cursor - CV_DEST1] = (EuclidXParam) constrain(cv_dest[cursor - CV_DEST1] + direction, LENGTH1, PADDING2);
             break;
+        case GATE_MODE:
+            gate_mode = !gate_mode;
+            break;
         }
     }
 
@@ -183,6 +196,7 @@ public:
             Pack(data, PackLocation {idx++ * PARAM_SIZE, PARAM_SIZE}, padding[ch]);
             Pack(data, PackLocation {idx++ * PARAM_SIZE, PARAM_SIZE}, cv_dest[ch]);
         }
+        Pack(data, PackLocation {60, 1}, gate_mode);
         return data;
     }
 
@@ -195,6 +209,7 @@ public:
             actual_padding[ch] = padding[ch] = Unpack(data, PackLocation {idx++ * PARAM_SIZE, PARAM_SIZE});
             cv_dest[ch] = (EuclidXParam) Unpack(data, PackLocation {idx++ * PARAM_SIZE, PARAM_SIZE});
         }
+        gate_mode = Unpack(data, PackLocation{60, 1});
         step = 0; // reset
     }
 
@@ -216,6 +231,7 @@ private:
     int step;
     int cursor = LENGTH1; // EuclidXParam 
     uint32_t pattern[2];
+    bool gate_mode = false;
 
     // Settings
     uint8_t length[2];
@@ -229,24 +245,27 @@ private:
 
     EuclidXParam cv_dest[2] = {BEATS1, BEATS2}; // input modulation
 
-    void DrawSteps() {
-        gfxLine(0, 45, 63, 45);
-        gfxLine(0, 62, 63, 62);
-        gfxLine(0, 53, 63, 53);
-        gfxLine(0, 54, 63, 54);
+    void DrawSteps(bool fullscreen) {
+        const int x = -(fullscreen * gfx_offset);
+        const int w = (fullscreen+1)*64 - 1;
+        gfxLine(x, 45, x+w, 45);
+        gfxLine(x, 53, x+w, 53);
+        gfxLine(x, 54, x+w, 54);
+        gfxLine(x, 62, x+w, 62);
         ForEachChannel(ch) {
-            for (int i = 0; i < 16; i++) {
+            for (int i = 0; i < (fullscreen+1)*16; i++) {
                 if ((pattern[ch] >> ((i + step) % (actual_length[ch]+actual_padding[ch]) )) & 0x1) {
-                    gfxRect(4 * i + 1, 48 + 9 * ch, 3, 3);
+                    gfxRect(x + 4 * i + 1, 48 + 9 * ch, 3, 3);
                     //gfxLine(4 * i + 2, 47 + 9 * ch, 4 * i + 2, 47 + 9 * ch + 4);
                 } else {
-                    gfxPixel(4 * i + 2, 47 + 9 * ch + 2);
+                    gfxPixel(x + 4 * i + 2, 49 + 9 * ch);
                 }
 
                 if ((i + step) % (actual_length[ch]+actual_padding[ch]) == 0) {
                     //gfxLine(4 * i, 46 + 9 * ch, 4 * i, 52 + 9 * ch);
-                    gfxLine(4 * i, 46 + 9 * ch, 4 * i, 46 + 9 * ch + 1);
-                    gfxLine(4 * i, 52 + 9 * ch - 1, 4 * i, 52 + 9 * ch);
+                    const int xpos = x + 4*i;
+                    gfxLine(xpos, 46 + 9 * ch, xpos, 46 + 9 * ch + 1);
+                    gfxLine(xpos, 52 + 9 * ch - 1, xpos, 52 + 9 * ch);
                 }
             }
         }
@@ -256,11 +275,11 @@ private:
         const int spacing = 16;
         const int pad_left = 5;
 
-        if (cursor < CV_DEST1) {
-            gfxBitmap(pad_left + 0 * spacing, 15, 8, LENGTH_ICON);
+        if (cursor < CV_DEST1 || cursor > CV_DEST2) {
+          gfxIcon(pad_left + 0 * spacing, 15, LENGTH_ICON);
         }
-        gfxBitmap(pad_left + 1 * spacing, 15, 8, PULSES_ICON);
-        gfxBitmap(pad_left + 2 * spacing, 15, 8, ROTATE_ICON);
+        gfxIcon(pad_left + 1 * spacing, 15, gate_mode ? GATE_ICON : PULSES_ICON);
+        gfxIcon(pad_left + 2 * spacing, 15, ROTATE_ICON);
         gfxIcon(pad_left + 3 * spacing, 15, OFFSET_ICON);
 
         int y = 15;
@@ -300,6 +319,9 @@ private:
             gfxBitmap(0, 13 + (cursor - CV_DEST1)*5, 8, CV_ICON);
             gfxBitmap(8, 15, 3, (cursor - CV_DEST1)? SUB_TWO : SUP_ONE);
             gfxCursor(0, 19 + (cursor - CV_DEST1)*5, 11, 7);
+            break;
+        case GATE_MODE:
+            gfxCursor(pad_left + 1 * spacing - 1, 23, 10);
             break;
         }
     }

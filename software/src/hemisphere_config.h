@@ -18,11 +18,14 @@
 #include "applets/ASR.h"
 #include "applets/AttenuateOffset.h"
 #include "applets/Binary.h"
+#ifdef PEWPEWPEW
 #include "applets/BootsNCat.h"
+#endif
 #include "applets/Brancher.h"
 #include "applets/BugCrack.h"
 #include "applets/Burst.h"
 #include "applets/Button.h"
+#include "applets/BitBeat.h"
 #include "applets/Cumulus.h"
 #include "applets/CVRecV2.h"
 #include "applets/Calculate.h"
@@ -30,6 +33,7 @@
 #include "applets/Carpeggio.h"
 #include "applets/Chordinator.h"
 #include "applets/ClockDivider.h"
+#include "applets/ClkToGate.h"
 #ifdef ARDUINO_TEENSY41
 #include "applets/ClockSetupT4.h"
 #else
@@ -38,9 +42,13 @@
 #include "applets/ClockSkip.h"
 #include "applets/Compare.h"
 #include "applets/DivSeq.h"
+#include "applets/DivSeq10.h"
 #include "applets/DrumMap.h"
 #include "applets/DualQuant.h"
-#include "applets/DualTM.h"
+#include "applets/TwoRings.h"
+#if !defined(CUSTOM_BUILD) || defined(PEWPEWPEW)
+#include "applets/DuoTET.h"
+#endif
 #include "applets/EbbAndLfo.h"
 #include "applets/EnigmaJr.h"
 //#include "applets/EnsOscKey.h"
@@ -53,6 +61,7 @@
 #include "applets/Logic.h"
 #include "applets/LowerRenz.h"
 #include "applets/Metronome.h"
+#include "applets/MidiLoop.h"
 #include "applets/MixerBal.h"
 #include "applets/MultiScale.h"
 #include "applets/Palimpsest.h"
@@ -90,6 +99,9 @@
 #include "applets/VectorMod.h"
 #include "applets/VectorMorph.h"
 #include "applets/Voltage.h"
+#ifdef PEWPEWPEW
+#include "applets/WTVCO.h"
+#endif
 #include "applets/hMIDIIn.h"
 #include "applets/hMIDIOut.h"
 
@@ -130,25 +142,32 @@ AppletRegistry reg{
     DeclareApplet<ASR>{47, 0x09},
     DeclareApplet<AttenuateOffset>{56, 0x10},
     DeclareApplet<Binary>{41, 0x41},
+    DeclareApplet<BitBeat>{79, 0x01},
+#ifdef PEWPEWPEW
     DeclareApplet<BootsNCat>{55, 0x80},
+#endif
     DeclareApplet<Brancher>{4, 0x14},
     DeclareApplet<BugCrack>{51, 0x80},
     DeclareApplet<Burst>{31, 0x04},
     DeclareApplet<Button>{65, 0x10},
-    DeclareApplet<Calculate>{12, 0x10},\
+    DeclareApplet<Calculate>{12, 0x10},
     DeclareApplet<Calibr8>{88, 0x10},
     DeclareApplet<Carpeggio>{32, 0x0a},
     DeclareApplet<Chordinator>{64, 0x08},
     DeclareApplet<ClockDivider>{6, 0x04},
+    DeclareApplet<ClkToGate>{78, 0x04},
     DeclareApplet<ClockSkip>{28, 0x04},
     DeclareApplet<Compare>{30, 0x10},
-    DeclareApplet<Cumulus>{74, 0x40},
+    DeclareApplet<Cumulus>{5, 0x40},
     DeclareApplet<CVRecV2>{24, 0x02},
     DeclareApplet<DivSeq>{68, 0x06},
+    DeclareApplet<DivSeq10>{80, 0x06},
     DeclareApplet<DrLoFi>{16, 0x80},
     DeclareApplet<DrumMap>{57, 0x02},
     DeclareApplet<DualQuant>{9, 0x08},
-    DeclareApplet<DualTM>{18, 0x02},
+#if !defined(CUSTOM_BUILD) || defined(PEWPEWPEW)
+    DeclareApplet<DuoTET>{63, 0x08},
+#endif
     DeclareApplet<EbbAndLfo>{7, 0x01},
     DeclareApplet<EnigmaJr>{45, 0x02},
     DeclareApplet<EnvFollow>{42, 0x11},
@@ -159,6 +178,7 @@ AppletRegistry reg{
     DeclareApplet<Logic>{10, 0x44},
     DeclareApplet<LowerRenz>{21, 0x01},
     DeclareApplet<Metronome>{50, 0x04},
+    DeclareApplet<MidiLoop>{81, 0x20},
     DeclareApplet<hMIDIIn>{150, 0x20},
     DeclareApplet<hMIDIOut>{27, 0x20},
     DeclareApplet<MixerBal>{33, 0x10},
@@ -193,19 +213,22 @@ AppletRegistry reg{
     DeclareApplet<TrigSeq>{11, 0x06},
     DeclareApplet<TrigSeq16>{25, 0x06},
     DeclareApplet<Tuner>{39, 0x80},
+    DeclareApplet<TwoRings>{18, 0x02},
     DeclareApplet<VectorEG>{52, 0x01},
     DeclareApplet<VectorLFO>{49, 0x01},
     DeclareApplet<VectorMod>{53, 0x01},
     DeclareApplet<VectorMorph>{54, 0x01},
     DeclareApplet<Voltage>{43, 0x10},
+#ifdef PEWPEWPEW
+    DeclareApplet<WTVCO>{67, 0x80},
+#endif
 };
 
 
 namespace HS {
   static constexpr auto & available_applets = reg.applets;
-  static constexpr int HEMISPHERE_AVAILABLE_APPLETS = ARRAY_SIZE(available_applets);
+  constexpr int HEMISPHERE_AVAILABLE_APPLETS = ARRAY_SIZE(available_applets);
 
-  // TODO: figure out where to store this
   uint64_t hidden_applets[2] = { 0, 0 };
   bool applet_is_hidden(const int& index) {
     return (hidden_applets[index/64] >> (index%64)) & 1;

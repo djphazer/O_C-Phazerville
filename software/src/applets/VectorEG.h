@@ -30,6 +30,7 @@ public:
     const char* applet_name() {
         return "VectorEG";
     }
+    const uint8_t* applet_icon() { return PhzIcons::vectorEG; }
 
     void Start() {
         ForEachChannel(ch)

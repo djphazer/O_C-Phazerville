@@ -9,20 +9,45 @@ namespace OC {
 #ifdef OC_VERSION_EXTRA
     OC_VERSION_EXTRA
 #endif
-#ifdef OC_BUILD_TAG
-    "-"
-    OC_BUILD_TAG
-#endif
     ;
-#ifdef NORTHERNLIGHT
-  const char * const NAME = "NLM cOC/hOC/2OC";
-  const char * const SHORT_NAME = "xOC";
-#elif defined(VOR)
+#ifdef OC_BUILD_TAG
+  const char * const BUILD_TAG = OC_BUILD_TAG;
+#else
+  const char * const BUILD_TAG = "";
+#endif
+
+  // 17 char width                  |                 |
+  const char * const RELEASE_NAME = "Phazerville Suite";
+  // TODO: array of alternate titles, one for every letter of the alphabet
+
+#if defined(VOR)
   const char * const NAME = "Plum Audio O_C+";
   const char * const SHORT_NAME = "OC+";
+#elif defined(ARDUINO_TEENSY41)
+  const char * const NAME = "O.R.N.8";
+  const char * const SHORT_NAME = "oC8";
+  // TODO: array of vendor names, hardware variants
+#elif defined(__IMXRT1062__)
+  const char * const NAME = "O_C T4.0";
+  const char * const SHORT_NAME = "o_C";
 #else
   const char * const NAME = "Ornaments & Crimes";
   const char * const SHORT_NAME = "o_C";
+#endif
+
+  const char * const err_msg[] = { "(missing msg)",
+    "LFS WRITE ERROR!",
+    "PRESET SAVED!",
+    "MYSTERIOUS ERROR",
+  };
+
+#ifdef NORTHERNLIGHT
+  // legacy T3.2 builds
+  const char * const NAME_NLM = "NLM cOC/hOC/2OC";
+  const char * const SHORT_NAME_NLM = "xOC";
+#else
+  const char * const NAME_NLM = "NLM Xenomorpher";
+  const char * const SHORT_NAME_NLM = "XoC";
 #endif
 
   const char * const seq_playmodes[] = {" -", "SEQ+1", "SEQ+2", "SEQ+3", "TR+1", "TR+2", "TR+3", "ARP", "S+H#1", "S+H#2", "S+H#3", "S+H#4", "CV#1", "CV#2", "CV#3", "CV#4"};
@@ -68,11 +93,24 @@ namespace OC {
 #ifdef ARDUINO_TEENSY41
     "E", "F", "G", "H",
 #endif
+    // Midi Maps in MIDIFrame::mapping[]
+    "M 1","M 2","M 3","M 4",
+    "M 5","M 6","M 7","M 8",
+    "M 9","M10","M11","M12",
+    "M13","M14","M15","M16",
+    "M17","M18","M19","M20",
+    "M21","M22","M23","M24",
+    "M25","M26","M27","M28",
+    "M29","M30","M31","M32"
   };
 
   const char * const channel_id[4] = { "#A", "#B", "#C", "#D" };
 
-  const char * const capital_letters[26] = { "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z" };
+  const char * const capital_letters[52] = {
+    "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
+    "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z",
+    "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m",
+    "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z" };
 
   const char * const no_yes[] = { "No", "Yes" };
 
@@ -121,6 +159,10 @@ namespace OC {
 
   const char* const falling_gate_behaviours[] = {
   "Ignor",  "Honor", 
+  };
+
+  const char* const octave_constraint[] = {
+    "Off",  "Up", "Down", 
   };
 
   const uint8_t pi_digits[kIntSeqLen] =     

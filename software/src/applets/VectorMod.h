@@ -27,6 +27,7 @@ public:
     const char* applet_name() {
         return "VectorMod";
     }
+    const uint8_t* applet_icon() { return PhzIcons::vectorMod; }
 
     void Start() {
         ForEachChannel(ch)

@@ -27,6 +27,7 @@ public:
     const char* applet_name() { // Maximum 10 characters
         return "Slew";
     }
+    const uint8_t* applet_icon() { return PhzIcons::slew; }
 
     void Start() {
         ForEachChannel(ch) signal[ch] = 0;

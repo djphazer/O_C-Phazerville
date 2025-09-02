@@ -2,19 +2,19 @@
 
 namespace OC {
 
-Scale user_scales[Scales::SCALE_USER_LAST];
+Scale user_scales[Scales::SCALE_USER_COUNT];
 Scale dummy_scale;
 
 /*static*/
 void Scales::Init() {
-  for (size_t i = 0; i < SCALE_USER_LAST; ++i)
+  for (size_t i = 0; i < SCALE_USER_COUNT; ++i)
     memcpy(&user_scales[i], &braids::scales[1], sizeof(Scale));
 }
 
 /*static*/
 void Scales::Validate() {
   // protecc from garbage EEPROM data
-  for (size_t i = 0; i < SCALE_USER_LAST; ++i) {
+  for (size_t i = 0; i < SCALE_USER_COUNT; ++i) {
     CONSTRAIN(user_scales[i].num_notes, 4, 16);
     CONSTRAIN(user_scales[i].span, 12 << 7, 24 << 7);
     // TODO: note values?
@@ -24,10 +24,10 @@ void Scales::Validate() {
 /*static*/
 const Scale &Scales::GetScale(int index) {
   CONSTRAIN(index, 0, NUM_SCALES - 1);
-  if (index < SCALE_USER_LAST)
+  if (index < SCALE_USER_COUNT)
     return user_scales[index];
   else
-    return braids::scales[index - SCALE_USER_LAST];
+    return braids::scales[index - SCALE_USER_COUNT];
 }
 
 const char* const scale_names_short[] = {
@@ -358,6 +358,6 @@ const char* const voltage_scalings[] = {
     } ;
 
 static_assert( ARRAY_SIZE(scale_names) == ARRAY_SIZE(scale_names_short), "Different number of long vs. short scale names!");
-static_assert( ARRAY_SIZE(scale_names) == (ARRAY_SIZE(braids::scales) + Scales::SCALE_USER_LAST), "Mismatched number of scale definitions!");
+static_assert( ARRAY_SIZE(scale_names) == (ARRAY_SIZE(braids::scales) + Scales::SCALE_USER_COUNT), "Mismatched number of scale definitions!");
 
 }; // namespace OC

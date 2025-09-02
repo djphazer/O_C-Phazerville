@@ -26,6 +26,7 @@ public:
     const char* applet_name() { // Maximum 10 characters
         return "DualQuant";
     }
+    const uint8_t* applet_icon() { return PhzIcons::dualQuantizer; }
 
     void Start() {
         cursor = 0;

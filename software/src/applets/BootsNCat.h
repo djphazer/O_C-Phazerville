@@ -31,6 +31,7 @@ public:
     const char* applet_name() {
         return "BootsNCat";
     }
+    const uint8_t* applet_icon() { return PhzIcons::boots_n_cats; }
 
     void Start() {
         tone[0] = 32; // Bass drum freq
@@ -126,7 +127,7 @@ public:
             }
         }
     }
-        
+
     uint64_t OnDataRequest() {
         uint64_t data = 0;
         Pack(data, PackLocation {0,6}, tone[0]);
@@ -166,7 +167,7 @@ private:
     int noise_tone_countdown = 0;
     uint32_t noise;
     int levels[2]; // For display
-    
+
     // Settings
     int tone[2];
     int decay[2];

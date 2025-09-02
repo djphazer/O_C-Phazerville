@@ -36,6 +36,8 @@ extern PagedDisplayDriver<SH1106_128x64_Driver> driver;
 
 void Init();
 void AdjustOffset(uint8_t offset);
+void SetFlipMode(bool flip180);
+void SetContrast(uint8_t contrast);
 
 static inline void Flush() __attribute__((always_inline));
 static inline void Flush() {

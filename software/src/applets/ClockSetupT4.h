@@ -23,6 +23,7 @@
 
 class ClockSetup : public HemisphereApplet {
 public:
+    static constexpr int SLIDEOUT_TIME = HS::MENU_ANIMATION_TIME;
 
     enum ClockSetupCursor {
         PLAY_STOP,
@@ -45,43 +46,59 @@ public:
         TRIG6,
         TRIG7,
         TRIG8,
-        LAST_SETTING = TRIG8
+        OUTSKIP1,
+        OUTSKIP2,
+        OUTSKIP3,
+        OUTSKIP4,
+        OUTSKIP5,
+        OUTSKIP6,
+        OUTSKIP7,
+        OUTSKIP8,
+        LAST_SETTING = OUTSKIP8
     };
 
     const char* applet_name() {
         return "ClockSet";
     }
+    const uint8_t* applet_icon() { return CLOCK_ICON; }
 
     void Start() { }
 
     // The ClockSetup controller handles MIDI Clock and Transport Start/Stop
     void Controller() {
         bool clock_sync = OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_1>();
+        bool midi_sync = false;
 
         // MIDI Clock is filtered to 2 PPQN
         if (frame.MIDIState.clock_q) {
             frame.MIDIState.clock_q = 0;
             clock_sync = 1;
+            midi_sync = 1;
         }
         if (frame.MIDIState.start_q) {
             frame.MIDIState.start_q = 0;
             HS::clock_m.DisableMIDIOut();
             HS::clock_m.Start();
+            OC::ui._Poke();
+            HS::PokePopup(HS::CLOCK_POPUP);
         }
         if (frame.MIDIState.stop_q) {
             frame.MIDIState.stop_q = 0;
             HS::clock_m.Stop();
             HS::clock_m.EnableMIDIOut();
+            HS::PokePopup(HS::CLOCK_POPUP);
         }
 
         // Paused means wait for clock-sync to start
-        if (HS::clock_m.IsPaused() && clock_sync)
+        if (HS::clock_m.IsPaused() && clock_sync) {
             HS::clock_m.Start();
-        // TODO: automatically stop...
+            OC::ui._Poke();
+            HS::PokePopup(HS::CLOCK_POPUP);
+        }
 
         // Advance internal clock, sync to external clock / reset
         if (HS::clock_m.IsRunning())
-            HS::clock_m.SyncTrig( clock_sync );
+            HS::clock_m.SyncTrig( clock_sync, midi_sync );
 
         // ------------ //
         if (HS::clock_m.IsRunning() && HS::clock_m.MIDITock()) {
@@ -101,10 +118,31 @@ public:
         }
 
         if (button_ticker) --button_ticker;
+        if (slide_anim) --slide_anim;
     }
 
+    void DrawIndicator(const bool centered = false) {
+      const int x = centered? 27 : 4;
+      // Clock indicator icons overlay
+      if (HS::clock_m.IsRunning() || HS::clock_m.IsPaused()) {
+        graphics.clearRect(59, x, 10, 10);
+
+        if (HS::clock_m.IsPaused()) {
+          gfxFrame(59, x, 10, 10);
+          gfxIcon(60, x+1, PAUSE_ICON);
+        } else {
+          gfxIcon(60, x+1, HS::clock_m.Cycle() ? METRO_L_ICON : METRO_R_ICON);
+        }
+      }
+    }
     void View() {
-        DrawInterface();
+      hemisphere = HS::GLOBAL_CURSOR;
+      if (OC::CORE::ticks - view_tick > 1000) {
+        slide_anim = SLIDEOUT_TIME;
+      }
+      view_tick = OC::CORE::ticks;
+      if (cursor >= OUTSKIP1) DrawIndicator();
+      DrawInterface();
     }
 
     void OnButtonPress() {
@@ -153,7 +191,7 @@ public:
         case TRIG6:
         case TRIG7:
         case TRIG8:
-            HS::trigger_mapping[cursor-TRIG1] = constrain( HS::trigger_mapping[cursor-TRIG1] + direction, 0, TRIGMAP_MAX);
+            HS::trigmap[cursor-TRIG1].ChangeSource(direction);
             break;
 
         /* the boops shall return in a hidden form
@@ -165,6 +203,17 @@ public:
             button_ticker = HEMISPHERE_PULSE_ANIMATION_TIME_LONG;
             break;
         */
+
+        case OUTSKIP1:
+        case OUTSKIP2:
+        case OUTSKIP3:
+        case OUTSKIP4:
+        case OUTSKIP5:
+        case OUTSKIP6:
+        case OUTSKIP7:
+        case OUTSKIP8:
+            HS::frame.NudgeSkip(cursor-OUTSKIP1, direction);
+            break;
 
         case EXT_PPQN:
             HS::clock_m.SetClockPPQN(HS::clock_m.GetClockPPQN() + direction);
@@ -227,34 +276,36 @@ public:
         uint64_t data = 0;
         Pack(data, PackLocation { 0, 1 }, HS::auto_save_enabled);
         Pack(data, PackLocation { 1, 1 }, HS::cursor_wrap);
-        Pack(data, PackLocation { 2, 2 }, HS::screensaver_mode);
+        // 2 empty bits
         Pack(data, PackLocation { 4, 7 }, HS::trig_length);
         Pack(data, PackLocation { 11, 5 }, HS::clock_m.GetClockPPQN());
-        // 48 bits free
+        Pack(data, PackLocation { 16, 1 }, (HS::clock_m.IsRunning() || HS::clock_m.IsPaused()));
+        //Pack(data, PackLocation { 17, 3 }, HS::screensaver_mode); // old spot
+        Pack(data, PackLocation { 20, 4 }, HS::screensaver_mode);
+        // 45 bits free
         return data;
     }
     void SetGlobals(const uint64_t &data) {
         HS::auto_save_enabled = Unpack(data, PackLocation { 0, 1 });
         HS::cursor_wrap = Unpack(data, PackLocation { 1, 1 });
-        HS::screensaver_mode = Unpack(data, PackLocation { 2, 2 });
+
         HS::trig_length = constrain( Unpack(data, PackLocation { 4, 7 }), 1, 127);
         HS::clock_m.SetClockPPQN(Unpack(data, PackLocation { 11, 5 }));
+        if (Unpack(data, PackLocation{16, 1}) && !HS::clock_m.IsRunning())
+          HS::clock_m.Start(true);
+        HS::screensaver_mode = Unpack(data, PackLocation { 17, 3 }) // backward compat
+                             + Unpack(data, PackLocation { 20, 4 });
     }
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "";
-        help[HEMISPHERE_HELP_CVS]      = "";
-        help[HEMISPHERE_HELP_OUTS]     = "";
-        help[HEMISPHERE_HELP_ENCODER]  = "";
-        //                               "------------------" <-- Size Guide
-    }
+    void SetHelp() { }
 
 private:
     int cursor; // ClockSetupCursor
     int flash_ticker[8];
     int button_ticker;
+    int slide_anim = 0;
+    uint32_t view_tick = 0;
 
     static const int NR_OF_TAPS = 3;
 
@@ -271,40 +322,75 @@ private:
         }
     }
 
+    // This applet is an overlay, drawn on top of the applet view.
+    // Space must be cleared first, depending on the cursor position.
     void DrawInterface() {
-        // Header: This is sort of a faux applet, so its header
-        // needs to extend across the screen
+      if (slide_anim) {
+        if (cursor < OUTSKIP1) {
+          const int height = 23 - (slide_anim * 23 / SLIDEOUT_TIME);
+          graphics.clearRect(0, 0, 128, height+1);
+          gfxDottedLine(0, height, 127, height);
+          gfxLine(0, height+1, 127, height+1);
+        } else {
+          const int height = 23 - (slide_anim * 23 / SLIDEOUT_TIME);
+          const int y = 63 - height;
+          graphics.clearRect(0, y, 128, height+1);
+          gfxLine(0, y, 127, y);
+          gfxDottedLine(0, y+1, 127, y+1);
+        }
+
+        return;
+      }
+      /*
         graphics.setPrintPos(1, 2);
         graphics.print("Clocks/Triggers");
         gfxLine(0, 10, 127, 10);
+      */
+      if (cursor < OUTSKIP1) {
+        // upper section
+        graphics.clearRect(0, 0, 128, 24);
 
-        int y = 14;
+        gfxDottedLine(0, 21, 127, 21);
+        gfxLine(0, 22, 127, 22);
+      } else {
+        // lower section
+        graphics.clearRect(0, 41, 128, 23);
+        graphics.clearRect(0, 30, 50, 11); // label box
+
+        gfxLine(0, 31, 49, 31);
+        gfxLine(49, 31, 49, 41);
+        gfxPrint(0, 33, "TrigSkip");
+        gfxLine(0, 42, 127, 42);
+        gfxDottedLine(0, 43, 127, 43);
+      }
+
+      if (cursor <= EXT_PPQN) {
+        int y = 1;
         // Clock State
-        gfxIcon(1, y, CLOCK_ICON);
-        if (HS::clock_m.IsRunning()) {
+        if (clock_m.IsRunning()) {
+            gfxIcon(1, y, clock_m.cycle ? METRO_R_ICON : METRO_L_ICON );
             gfxIcon(12, y, PLAY_ICON);
-        } else if (HS::clock_m.IsPaused()) {
-            gfxIcon(12, y, PAUSE_ICON);
         } else {
-            gfxIcon(12, y, STOP_ICON);
+            gfxIcon(1, y, CLOCK_ICON);
+            gfxIcon(12, y, clock_m.IsPaused()? PAUSE_ICON : STOP_ICON);
         }
 
         // Tempo
-        gfxPrint(22 + pad(100, HS::clock_m.GetTempo()), y, HS::clock_m.GetTempo());
+        gfxPrint(22 + pad(100, clock_m.GetTempo()), y, clock_m.GetTempo());
         if (cursor != SHUFFLE)
             gfxPrint(" BPM");
         else {
             // Shuffle
             gfxIcon(44, y, METRO_R_ICON);
-            gfxPrint(52 + pad(10, HS::clock_m.GetShuffle()), y, HS::clock_m.GetShuffle());
+            gfxPrint(52 + pad(10, clock_m.GetShuffle()), y, clock_m.GetShuffle());
             gfxPrint("%");
         }
 
         // Input PPQN
         gfxPrint(79, y, "Sync=");
-        gfxPrint(HS::clock_m.GetClockPPQN());
-
-        y += 10;
+        gfxPrint(clock_m.GetClockPPQN());
+      } else if (cursor <= MULT8) {
+        int y = 1;
         for (int ch=0; ch<8; ++ch) {
             const int x = (ch % 4) * 32;
             if (ch == 4) y += 10;
@@ -315,30 +401,43 @@ private:
                 gfxPrint(1 + x, y, (mult >= 0) ? "x" : "/");
                 gfxPrint( (mult >= 0) ? mult : 1 - mult );
             }
+        }
+      } else if (cursor <= TRIG8) {
+        int y = 1;
+        for (int ch=0; ch<8; ++ch) {
+            const int x = (ch % 4) * 32;
+            if (ch == 4) y += 10;
 
             // Physical trigger input mappings
-            gfxPrint(1 + x, y + 21, OC::Strings::trigger_input_names_none[ HS::trigger_mapping[ch] ] );
+            gfxPrint(1 + x, y, HS::trigmap[ch].InputName() );
 
             // Trigger indicators
-            gfxIcon(23 + x, y + 20, DOWN_BTN_ICON);
-            if (flash_ticker[ch]) gfxInvert(22 + x, y + 22, 9, 8);
+            gfxIcon(23 + x, y, DOWN_BTN_ICON);
+            if (flash_ticker[ch]) gfxInvert(22 + x, y, 9, 8);
         }
+      } else if (cursor <= OUTSKIP8) {
+        int y = 45;
+        for (int ch=0; ch<8; ++ch) {
+            const int x = (ch % 4) * 32;
+            if (ch == 4) y += 10;
 
-        y += 9;
-        gfxDottedLine(0, y, 127, y, 3);
+            gfxPrint(1 + x + pad(100, HS::frame.clockskip[ch]), y, HS::frame.clockskip[ch] );
+            gfxPrint(23 + x, y, "%");
+        }
+      }
 
         switch ((ClockSetupCursor)cursor) {
         case PLAY_STOP:
-            gfxFrame(11, 13, 10, 10);
+            gfxFrame(11, 0, 10, 10);
             break;
         case TEMPO:
-            gfxCursor(22, 22, 19);
+            gfxCursor(22, 9, 19);
             break;
         case SHUFFLE:
-            gfxCursor(52, 22, 13);
+            gfxCursor(52, 9, 13);
             break;
         case EXT_PPQN:
-            gfxCursor(109,22, 13);
+            gfxCursor(109,9, 13);
             break;
 
         case MULT1:
@@ -351,7 +450,7 @@ private:
         case MULT8:
         {
           const int x_ = 8 + 32 * ((cursor-MULT1) % 4);
-          const int y_ = 32 + ((cursor-MULT1) / 4 * 10);
+          const int y_ = 9 + ((cursor-MULT1) / 4 * 10);
           gfxCursor(x_, y_, 12);
           break;
         }
@@ -366,7 +465,22 @@ private:
         case TRIG8:
         {
           const int x_ = 1 + 32 * ((cursor-TRIG1) % 4);
-          const int y_ = 53 + ((cursor-TRIG1) / 4 * 10);
+          const int y_ = 9 + ((cursor-TRIG1) / 4 * 10);
+          gfxCursor(x_, y_, 19);
+          break;
+        }
+
+        case OUTSKIP1:
+        case OUTSKIP2:
+        case OUTSKIP3:
+        case OUTSKIP4:
+        case OUTSKIP5:
+        case OUTSKIP6:
+        case OUTSKIP7:
+        case OUTSKIP8:
+        {
+          const int x_ = 1 + 32 * ((cursor-OUTSKIP1) % 4);
+          const int y_ = 53 + ((cursor-OUTSKIP1) / 4 * 10);
           gfxCursor(x_, y_, 19);
           break;
         }

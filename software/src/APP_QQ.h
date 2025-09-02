@@ -107,6 +107,8 @@ enum ChannelSetting {
   CHANNEL_SETTING_INT_SEQ_RANGE_CV_SOURCE,
   CHANNEL_SETTING_INT_SEQ_STRIDE_CV_SOURCE,
   CHANNEL_SETTING_INT_SEQ_RESET_TRIGGER,
+  CHANNEL_SETTING_OCTAVE_CONSTRAINT,
+  CHANNEL_SETTING_OCTAVE_CONSTRAINT_LEN,
   CHANNEL_SETTING_LAST
 };
 
@@ -218,6 +220,14 @@ public:
 
   int get_octave() const {
     return values_[CHANNEL_SETTING_OCTAVE];
+  }
+
+  uint8_t get_octave_constraint() const {
+    return values_[CHANNEL_SETTING_OCTAVE_CONSTRAINT];
+  }
+
+  uint8_t get_octave_constraint_len() const {
+    return values_[CHANNEL_SETTING_OCTAVE_CONSTRAINT_LEN];
   }
 
   int get_fine() const {
@@ -464,6 +474,7 @@ public:
     int32_t temp_sample = 0;
     int32_t history_sample = 0;
 
+    quantizer_.ConfigureOctaveConstraint(get_octave_constraint(), get_octave_constraint_len());
 
     switch (source) {
       case CHANNEL_SOURCE_TURING: {
@@ -1018,6 +1029,10 @@ public:
     *settings++ = CHANNEL_SETTING_OCTAVE;
     *settings++ = CHANNEL_SETTING_TRANSPOSE;
     *settings++ = CHANNEL_SETTING_FINE;
+    *settings++ = CHANNEL_SETTING_OCTAVE_CONSTRAINT;
+    if (get_octave_constraint()) {
+      *settings++ = CHANNEL_SETTING_OCTAVE_CONSTRAINT_LEN;
+    }
 
     num_enabled_settings_ = settings - enabled_settings_;
   }
@@ -1062,6 +1077,7 @@ public:
       case CHANNEL_SETTING_INT_SEQ_RESET_TRIGGER:
       case CHANNEL_SETTING_CLKDIV:
       case CHANNEL_SETTING_DELAY:
+      case CHANNEL_SETTING_OCTAVE_CONSTRAINT_LEN:
         return true;
       default: break;
     }
@@ -1135,7 +1151,7 @@ SETTINGS_DECLARE(QuantizerChannel, CHANNEL_SETTING_LAST) {
   { CHANNEL_SOURCE_CV1, CHANNEL_SOURCE_CV1, CHANNEL_SOURCE_LAST - 1, "CV Source", channel_input_sources, settings::STORAGE_TYPE_U8 },
   { QQ_DEST_NONE, QQ_DEST_NONE, QQ_DEST_LAST - 1, "CV aux >", aux_cv_dest, settings::STORAGE_TYPE_U8 },
   { CHANNEL_TRIGGER_CONTINUOUS_DOWN, 0, CHANNEL_TRIGGER_LAST - 1, "Trigger source", OC::Strings::channel_trigger_sources, settings::STORAGE_TYPE_U8 },
-  { 1, 1, 16, "Clock div", NULL, settings::STORAGE_TYPE_U8 },
+  { 1, 1, 128, "Clock div", NULL, settings::STORAGE_TYPE_U8 },
   { 0, 0, OC::kNumDelayTimes - 1, "Trigger delay", OC::Strings::trigger_delay_times, settings::STORAGE_TYPE_U8 },
   { 0, -5, 7, "Transpose", NULL, settings::STORAGE_TYPE_I8 },
   { 0, -4, 4, "Octave", NULL, settings::STORAGE_TYPE_I8 },
@@ -1175,7 +1191,9 @@ SETTINGS_DECLARE(QuantizerChannel, CHANNEL_SETTING_LAST) {
   { 0, 0, 4, "IntSeq mod CV", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
   { 0, 0, 4, "IntSeq rng CV", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
   { 0, 0, 4, "F. stride CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "IntSeq reset", OC::Strings::trigger_input_names_none, settings::STORAGE_TYPE_U4 }
+  { 0, 0, 4, "IntSeq reset", OC::Strings::trigger_input_names_none, settings::STORAGE_TYPE_U4 },
+  { braids::OCTAVE_CONSTRAINT_OFF, braids::OCTAVE_CONSTRAINT_OFF, braids::OCTAVE_CONSTRAINT_LAST - 1, "Oct constraint", OC::Strings::octave_constraint, settings::STORAGE_TYPE_U4 },
+  { 0, 0, 4, "Oct constraint len", NULL, settings::STORAGE_TYPE_U4 },
 };
 
 // WIP refactoring to better encapsulate and for possible app interface change
@@ -1410,6 +1428,7 @@ void QQ_handleEncoderEvent(const UI::Event &event) {
           case CHANNEL_SETTING_SCALE:
           case CHANNEL_SETTING_TRIGGER:
           case CHANNEL_SETTING_SOURCE:
+          case CHANNEL_SETTING_OCTAVE_CONSTRAINT:
             selected.update_enabled_settings();
             qq_state.cursor.AdjustEnd(selected.num_enabled_settings() - 1);
           break;

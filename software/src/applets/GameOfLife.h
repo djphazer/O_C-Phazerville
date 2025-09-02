@@ -6,6 +6,7 @@ public:
     const char* applet_name() {
         return "Game/Life";
     }
+    const uint8_t* applet_icon() { return PhzIcons::gameOfLife; }
 
     void Start() {
         for (int i = 0; i < 80; i++) board[i] = 0;
@@ -23,8 +24,8 @@ public:
     }
 
     void Controller() {
-        tx = ProportionCV(In(0), 63);
-        ty = ProportionCV(In(1), 39);
+        tx = ProportionCV(In(0), 63, HEMISPHERE_MAX_INPUT_CV);
+        ty = ProportionCV(In(1), 39, HEMISPHERE_MAX_INPUT_CV);
 
         if (Clock(0)) {
             ProcessGameBoard(tx, ty);

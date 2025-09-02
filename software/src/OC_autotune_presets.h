@@ -7,7 +7,6 @@
 namespace OC {
 
   struct Autotune_data {
- 
     uint8_t use_auto_calibration_;
     uint16_t auto_calibrated_octaves[OCTAVES + 1];
   };

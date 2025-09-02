@@ -31,13 +31,17 @@ public:
     const char* applet_name() {
         return "\"A\"SR";
     }
+    const uint8_t* applet_icon() { return PhzIcons::ASR; }
 
     void Start() {
-        buffer_m.SetIndex(1);
+        buffer_m.Register(hemisphere);
+    }
+    void Unload() {
+        buffer_m.Unload(hemisphere);
+        AllowRestart();
     }
 
     void Controller() {
-        buffer_m.Register(hemisphere);
         bool secondary = buffer_m.IsLinked() && hemisphere == RIGHT_HEMISPHERE;
 
         if (Clock(0) && !secondary) {
@@ -72,7 +76,7 @@ public:
       if (cursor > 0)
         HS::QuantizerEdit(cursor - 1 + io_offset);
       else
-        isEditing = !isEditing;
+        CursorToggle();
     }
 
     void OnEncoderMove(int direction) {
@@ -126,14 +130,16 @@ protected:
     help[HELP_EXTRA2] = "shared buffer.";
     //                  "---------------------" <-- Extra text size guide
   }
-    
+
 private:
     int cursor;
     int index_mod; // Effect of modulation
-    
+
+    RingBufferManager &buffer_m = RingBufferManager::get();
+
     void DrawInterface() {
         // Show Link icon if linked with another ASR
-        if (buffer_m.IsLinked() && hemisphere == RIGHT_HEMISPHERE) gfxIcon(56, 1, LINK_ICON);
+        if (buffer_m.IsLinked() && hemisphere == RIGHT_HEMISPHERE) gfxIcon(25, 1, LINK_ICON);
 
         // Index (shared between all instances of ASR)
         uint8_t ix = buffer_m.GetIndex() + index_mod;

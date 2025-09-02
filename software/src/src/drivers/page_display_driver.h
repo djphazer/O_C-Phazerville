@@ -28,9 +28,9 @@ public:
 
   void Update() {
     uint_fast8_t page = current_page_index_;
-    if (page < display_driver::kNumPages) {
-      const uint8_t *data = current_page_data_;
-      display_driver::SendPage(page, data);
+    const uint8_t *data = current_page_data_;
+
+    if (page < display_driver::kNumPages && display_driver::SendPage(page, data)) {
       current_page_index_ = page + 1;
       current_page_data_ = data + display_driver::kPageSize;
     }

@@ -34,6 +34,7 @@ public:
     const char* applet_name() {
         return "Trending";
     }
+    const uint8_t* applet_icon() { return PhzIcons::trending; }
 
     void Start() {
         ForEachChannel(ch)

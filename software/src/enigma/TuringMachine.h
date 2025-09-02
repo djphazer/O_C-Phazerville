@@ -39,14 +39,14 @@
 
 namespace HS {
 
-const byte TURING_MACHINE_COUNT = 40; // Five banks of eight
+const uint8_t TURING_MACHINE_COUNT = 40; // Five banks of eight
 
 struct TuringMachine {
     uint16_t reg; // 16-bit shift register containing data
-    byte len; // Length of this machine, in steps. 0 indicates an uninitialized TM
+    uint8_t len; // Length of this machine, in steps. 0 indicates an uninitialized TM
     bool favorite; // Basically locks this Turing Machine
 
-    static void SetName(char *n, byte ix) {
+    static void SetName(char *n, uint8_t ix) {
         n[0] = 'A' + (ix / 8);
         n[1] = '-';
         n[2] = '1'  + (ix % 8);

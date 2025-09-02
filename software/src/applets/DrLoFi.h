@@ -17,6 +17,10 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+/*
+ * heavily modified from the original LoFi Tape applet by Chysn,
+ * with concepts from armandvedel, implementation by djphazer
+ */
 
 #define HEM_LOFI_PCM_BUFFER_SIZE 2048
 #define HEM_LOFI_PCM_SPEED 4
@@ -27,8 +31,6 @@
 #define PCM_TO_CV(S) Proportion((int)S - 127, 127, CLIPLIMIT)
 #define CV_TO_PCM(S) Proportion(constrain(S, -CLIPLIMIT, CLIPLIMIT), CLIPLIMIT, 127) + 127
 
-DMAMEM uint8_t lofi_pcm_buffer[HEM_LOFI_PCM_BUFFER_SIZE];
-
 class DrLoFi : public HemisphereApplet {
 public:
     const int length = HEM_LOFI_PCM_BUFFER_SIZE;
@@ -36,12 +38,19 @@ public:
     const char* applet_name() { // Maximum 10 characters
         return "Dr. LoFi";
     }
+    const uint8_t* applet_icon() { return PhzIcons::drLoFi; }
 
     void Start() {
         countdown = HEM_LOFI_PCM_SPEED;
         // this might take too long, which causes crashes. It's not crucial.
         //for (int i = 0; i < HEM_LOFI_PCM_BUFFER_SIZE; i++) lofi_pcm_buffer[i] = 127;
         cursor = 1; //for gui
+        lofi_pcm_buffer = new uint8_t[HEM_LOFI_PCM_BUFFER_SIZE];
+        AllowRestart();
+    }
+
+    void Unload() override {
+        delete lofi_pcm_buffer;
     }
 
     void Controller() {
@@ -55,19 +64,19 @@ public:
                     //ClockOut(1);
                 }
 
-                int cv = SmoothedIn(0);
+                int cv = In(0);
 
                 // bitcrush the input
                 cv = cv >> depth;
                 cv = cv << depth;
 
-                // int dt = dt_pct * length / 100; //convert delaytime to length in samples 
+                // int dt = dt_pct * length / 100; //convert delaytime to length in samples
                 head_w = (head + length + dt_pct*length/100) % length; //have to add the extra length to keep modulo positive in case delaytime is neg
 
                 // mix input into the buffer ahead, respecting feedback
                 int fbmix = PCM_TO_CV(lofi_pcm_buffer[head]) * fdbk_g / 100 + cv;
                 lofi_pcm_buffer[head_w] = CV_TO_PCM(fbmix);
-                
+
                 rate_mod = rate;
                 Modulate(rate_mod, 1, 1, 64);
 
@@ -118,10 +127,10 @@ public:
     }
 
     void OnDataReceive(uint64_t data) {
-        dt_pct = Unpack(data, PackLocation {0,7});
-        feedback = Unpack(data, PackLocation {7,7});
-        rate = Unpack(data, PackLocation {14,5});
-        depth = Unpack(data, PackLocation {19,4});
+        dt_pct = constrain(Unpack(data, PackLocation {0,7}), 0, 99);
+        feedback = constrain(Unpack(data, PackLocation {7,7}), 0, 125);
+        rate = constrain(Unpack(data, PackLocation {14,5}), 1, 32);
+        depth = constrain(Unpack(data, PackLocation {19,4}), 0, 13);
     }
 
 protected:
@@ -150,7 +159,9 @@ private:
     uint8_t rate_mod = rate;
     int depth = 0; // bit reduction depth aka bitcrush
     int cursor; //for gui
-    
+
+    uint8_t* lofi_pcm_buffer;
+
     void DrawWaveform() {
         int inc = rate_mod/2 + 1;
         int pos = head - (inc * 31) - random(1,3); // Try to center the head
@@ -164,7 +175,7 @@ private:
             if (pos >= length) pos -= length;
         }
     }
-    
+
     void DrawSelector()
     {
         if (cursor < 2) {

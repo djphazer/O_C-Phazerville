@@ -34,6 +34,7 @@ public:
     const char* applet_name() {
         return "EnvFollow";
     }
+    const uint8_t* applet_icon() { return PhzIcons::envelopeFollower; }
 
     void Start() {
         ForEachChannel(ch)

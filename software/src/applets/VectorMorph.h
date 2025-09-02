@@ -27,6 +27,7 @@ public:
     const char* applet_name() {
         return "VectMorph";
     }
+    const uint8_t* applet_icon() { return PhzIcons::vectorMorph; }
 
     void Start() {
         ForEachChannel(ch)
@@ -44,12 +45,13 @@ public:
     		
         ForEachChannel(ch)
         {
-        		if (!linked || ch == 0) {
-        		    cv_phase = Proportion(In(ch), HEMISPHERE_MAX_INPUT_CV, 3599);
-        		    	cv_phase = constrain(cv_phase, -3599, 3599);
-        		}
-        		last_phase[ch] = (phase[ch] * 10) + cv_phase;
-			Out(ch, osc[ch].Phase(last_phase[ch]));
+            if (!linked || ch == 0) {
+                cv_phase = Proportion(In(ch), HEMISPHERE_MAX_INPUT_CV, 3599);
+                cv_phase = constrain(cv_phase, -3599, 3599);
+            }
+
+            last_phase[ch] = (((phase[ch] * 10) + cv_phase) + 3600) % 3600;
+            Out(ch, osc[ch].Phase(last_phase[ch]));
         }
     }
 
@@ -146,13 +148,14 @@ private:
         VOSegment seg = osc[ch].GetSegment(osc[ch].SegmentCount() - 1);
         byte prev_x = 0; // Starting coordinates
         byte prev_y = 63 - Proportion(seg.level, 255, 38);
+        uint16_t time = 0;
 
         for (byte i = 0; i < osc[ch].SegmentCount(); i++)
         {
             seg = osc[ch].GetSegment(i);
+            time += seg.time;
             byte y = 63 - Proportion(seg.level, 255, 38);
-            byte seg_x = Proportion(seg.time, total_time, 62);
-            byte x = prev_x + seg_x;
+            byte x = Proportion(time, total_time, 62);
             x = constrain(x, 0, 62);
             y = constrain(y, 25, 62);
             gfxLine(prev_x, prev_y, x, y);

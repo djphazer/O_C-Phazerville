@@ -54,7 +54,7 @@ public:
     chord_inversion_ = 0;
     chord_base_note_ = 0;
     chord_octave_ = 0;
-    max_chords_ = OC::Chords::NUM_CHORDS - 1;
+    max_chords_ = OC::Chords::NUM_CHORDS_PER_CHAN - 1;
   }
 
   bool active() const {
@@ -63,11 +63,11 @@ public:
 
   void Edit(Owner *owner, int chord, int num_chords, int num_progression) {
 
-    if (chord > OC::Chords::CHORDS_USER_LAST - 1)
+    if (chord > OC::Chords::CHORDS_USER_COUNT - 1)
       return;
     
     edit_this_progression_ = num_progression;
-    chord_ = &OC::user_chords[chord + edit_this_progression_ * OC::Chords::NUM_CHORDS];
+    chord_ = &OC::user_chords[chord + edit_this_progression_ * OC::Chords::NUM_CHORDS_PER_CHAN];
     max_chords_ = num_chords;
     owner_ = owner;
     BeginEditing();
@@ -286,7 +286,7 @@ void ChordEditor<Owner>::HandleEncoderEvent(const UI::Event &event) {
   	if (cursor_pos_ < (uint8_t)(max_chords_ + 1)) {
       
       // write to the right slot, at the right index/offset (a nicer struct would be nicer, but well)
-      OC::Chord *edit_user_chord_ = &OC::user_chords[edit_this_chord_ + edit_this_progression_ * OC::Chords::NUM_CHORDS]; 
+      OC::Chord *edit_user_chord_ = &OC::user_chords[edit_this_chord_ + edit_this_progression_ * OC::Chords::NUM_CHORDS_PER_CHAN]; 
       
 	    switch(cursor_quality_pos_) {
 
@@ -334,7 +334,7 @@ void ChordEditor<Owner>::HandleEncoderEvent(const UI::Event &event) {
         // expand/contract
         int max_chords = max_chords_;
         max_chords += event.value;
-        CONSTRAIN(max_chords, 0, OC::Chords::NUM_CHORDS - 0x1);
+        CONSTRAIN(max_chords, 0, OC::Chords::NUM_CHORDS_PER_CHAN - 0x1);
 
         max_chords_ = max_chords;
         cursor_pos_ = max_chords_ + 1;

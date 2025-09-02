@@ -24,6 +24,7 @@ public:
     const char* applet_name() {
         return "Switch";
     }
+    const uint8_t* applet_icon() { return PhzIcons::switchApp; }
 
     void Start() {
         active[0] = 1;

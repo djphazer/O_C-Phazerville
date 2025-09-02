@@ -227,7 +227,7 @@ public:
   OC::Autotuner<ReferenceChannel> autotuner;
 
   void Init() {
-    int dac_channel = DAC_CHANNEL_A;
+    int dac_channel = 0;
     for (auto &channel : channels_)
       channel.Init(static_cast<DAC_CHANNEL>(dac_channel++));
 

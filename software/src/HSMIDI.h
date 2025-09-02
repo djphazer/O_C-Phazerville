@@ -34,7 +34,6 @@
 // See https://www.pjrc.com/teensy/td_midi.html
 
 #if defined(__IMXRT1062__)
-#define USB_MIDI_HOST
 #include <MIDI.h>
 #include <USBHost_t36.h>
 extern USBHost thisUSB;
@@ -42,18 +41,20 @@ extern MIDIDevice usbHostMIDI;
 extern midi::MidiInterface<midi::SerialMIDI<HardwareSerial> > MIDI1;
 #endif
 
-#define HEM_MIDI_NOTE_ON usbMIDI.NoteOn
-#define HEM_MIDI_NOTE_OFF usbMIDI.NoteOff
-#define HEM_MIDI_CC usbMIDI.ControlChange
-#define HEM_MIDI_AFTERTOUCH usbMIDI.AfterTouchChannel
-#define HEM_MIDI_PITCHBEND usbMIDI.PitchBend
-#define HEM_MIDI_SYSEX usbMIDI.SystemExclusive
+namespace HS {
 
-#define HEM_MIDI_CLOCK usbMIDI.Clock
-#define HEM_MIDI_START usbMIDI.Start
-#define HEM_MIDI_STOP usbMIDI.Stop
-
-#define HEM_MIDI_CLOCK_DIVISOR 12
+enum HemMidiType {
+  HEM_MIDI_NOTE_ON = usbMIDI.NoteOn,
+  HEM_MIDI_NOTE_OFF = usbMIDI.NoteOff,
+  HEM_MIDI_CC = usbMIDI.ControlChange,
+  HEM_MIDI_AFTERTOUCH_CHANNEL = usbMIDI.AfterTouchChannel,
+  HEM_MIDI_AFTERTOUCH_POLY = usbMIDI.AfterTouchPoly,
+  HEM_MIDI_PITCHBEND = usbMIDI.PitchBend,
+  HEM_MIDI_SYSEX = usbMIDI.SystemExclusive,
+  HEM_MIDI_CLOCK = usbMIDI.Clock,
+  HEM_MIDI_START = usbMIDI.Start,
+  HEM_MIDI_STOP = usbMIDI.Stop,
+};
 
 const char* const midi_note_numbers[128] = {
     "C-1","C#-1","D-1","D#-1","E-1","F-1","F#-1","G-1","G#-1","A-1","A#-1","B-1",
@@ -70,28 +71,77 @@ const char* const midi_note_numbers[128] = {
 };
 
 const char* const midi_channels[17] = {
-    "Off", " 1", " 2", " 3", " 4", " 5", " 6", " 7", " 8",
-    " 9", "10", "11", "12", "13", "14", "15", "16"
+    " 1", " 2", " 3", " 4", " 5", " 6", " 7", " 8",
+    " 9", "10", "11", "12", "13", "14", "15", "16", "Om"
 };
 
 // The functions available for each output
-enum MIDIFunctions {
+enum MIDIFunctions : uint8_t {
     HEM_MIDI_NOOP = 0,
+
     HEM_MIDI_NOTE_OUT,
+    HEM_MIDI_NOTE_POLY_OUT,
+    HEM_MIDI_NOTE_MIN_OUT,
+    HEM_MIDI_NOTE_MAX_OUT,
+    HEM_MIDI_NOTE_PEDAL_OUT,
+    HEM_MIDI_NOTE_INV_OUT,
+
     HEM_MIDI_TRIG_OUT,
+    HEM_MIDI_TRIG_1ST_OUT,
+    HEM_MIDI_TRIG_ALWAYS_OUT,
+
     HEM_MIDI_GATE_OUT,
+    HEM_MIDI_GATE_POLY_OUT,
+    HEM_MIDI_GATE_INV_OUT,
+
     HEM_MIDI_VEL_OUT,
+    HEM_MIDI_VEL_POLY_OUT,
+
     HEM_MIDI_CC_OUT,
-    HEM_MIDI_AT_OUT,
+
+    HEM_MIDI_AT_CHAN_OUT,
+    HEM_MIDI_AT_KEY_POLY_OUT,
+
     HEM_MIDI_PB_OUT,
-    HEM_MIDI_CLOCK_OUT,
+
     HEM_MIDI_RUN_OUT,
     HEM_MIDI_START_OUT,
+    HEM_MIDI_CLOCK_OUT, // quarter note
+    HEM_MIDI_CLOCK_8_OUT,
+    HEM_MIDI_CLOCK_16_OUT,
+    HEM_MIDI_CLOCK_24_OUT, // full 24ppqn
 
-    HEM_MIDI_MAX_FUNCTION = HEM_MIDI_START_OUT
+    HEM_MIDI_LEARN,
+
+    HEM_MIDI_FN_COUNT,
+    HEM_MIDI_MAX_FUNCTION = HEM_MIDI_CLOCK_24_OUT,
 };
-const char* const midi_fn_name[HEM_MIDI_MAX_FUNCTION + 1] = {"None", "Note#", "Trig", "Gate", "Veloc", "CC#", "Aft", "Bend", "Clock", "Run", "Start"};
+const char* const midi_fn_name[HEM_MIDI_FN_COUNT] = {
+    "None",
+    "Note", "PolyN", "LoNote", "HiNote", "PdlNote", "InvNote",
+    "Trig", "Trig1st", "TrgAlws",
+    "Gate", "PolyG", "GateInv",
+    "Veloc", "PolyV",
+    "CC#",
+    "ChnAft", "KeyAft",
+    "Bend",
+    "Run", "Start",
+    "Clk-2", "Clk-4", "Clk-8", "Clk24",
+    "(learn)",
+};
 
+enum MIDIPolyMode : uint8_t {
+    POLY_RESET = 0,
+    POLY_ROTATE,
+    POLY_REUSE,
+
+    POLY_LAST = POLY_REUSE
+};
+const char* const midi_poly_mode_name[POLY_LAST + 1] = {
+    "Reset", "Rotate", "Reuse"
+};
+
+} // namespace HS
 
 /* Hemisphere Suite Data Packing
  *
@@ -124,7 +174,7 @@ const char* const midi_fn_name[HEM_MIDI_MAX_FUNCTION + 1] = {"None", "Note#", "T
  * and unpacked data, several typedefs are included to disambiguate the role of the data in
  * your code.
  */
-typedef struct _SysExData {
+struct _SysExData {
     int size;
     uint8_t data[SYSEX_DATA_MAX_SIZE];
 
@@ -216,7 +266,10 @@ typedef struct _SysExData {
         packed.set_data(psize, pdata);
         return packed;
     }
-} SysExData, UnpackedData, PackedData;
+};
+using SysExData = _SysExData;
+using UnpackedData = _SysExData;
+using PackedData = _SysExData;
 
 /*
  * Base class for applications that need MIDI SysEx support.
@@ -332,23 +385,26 @@ private:
 class MIDIQuantizer {
 public:
     /* Given a pitch CV value, return the MIDI note number */
-    static uint8_t NoteNumber(int cv, int transpose = 0) {
+    static uint8_t NoteNumber(int cv, int transpose = 0, uint8_t bias = OC::DAC::kOctaveZero) {
         // CV controllers might be right on the border between voltages, so provide 1/4 tone offset
         if (cv > 0) cv += 32;
         if (cv < 0) cv -= 32;
         int octave = cv / (12 << 7);
         int semitone = (cv % (12 << 7)) / 128;
-        int midi_note_number = (octave * 12) + semitone + transpose + 60;
+        int midi_note_number = (octave * 12) + semitone + transpose + (12 * bias);
         if (midi_note_number > 127) midi_note_number = 127;
         if (midi_note_number < 0) midi_note_number = 0;
         return static_cast<uint8_t>(midi_note_number);
     }
 
     /* Given a MIDI note number, return the pitch CV value */
-    static int CV(uint8_t midi_note_number, int transpose = 0) {
+    static int CV(uint8_t midi_note_number, int transpose = 0, uint8_t bias = OC::DAC::kOctaveZero) {
         int octave = midi_note_number / 12;
         int semitone = midi_note_number % 12;
-        int cv = (octave * (12 << 7)) + (semitone * 128) + (transpose * 128) - (5 * (12 << 7));
+        int cv = (octave * (12 << 7))
+          + (semitone * 128)
+          + (transpose * 128)
+          - (bias * (12 << 7)); // floor depends on output bias
         return cv;
     }
 };

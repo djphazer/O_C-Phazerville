@@ -12,6 +12,7 @@
 #include "OC_menus.h"
 #include "OC_ui.h"
 #include "OC_options.h"
+#include "PhzIcons.h"
 #include "src/drivers/display.h"
 
 #ifdef VOR
@@ -50,6 +51,7 @@ void Ui::Init() {
   button_ignore_mask_ = 0;
   screensaver_ = false;
   preempt_screensaver_ = false;
+  jump_to_menu_ = false;
 
   encoder_right_.Init(OC_GPIO_ENC_PINMODE);
   encoder_left_.Init(OC_GPIO_ENC_PINMODE);
@@ -75,6 +77,7 @@ void Ui::set_screensaver_timeout(uint32_t seconds) {
 }
 
 void FASTRUN Ui::_Poke() {
+  screensaver_ = false;
   event_queue_.Poke();
 }
 
@@ -160,19 +163,28 @@ UiMode Ui::DispatchEvents(const App *app) {
             app->HandleButtonEvent(event);
         break;
       case UI::EVENT_BUTTON_LONG_PRESS:
-        if (OC::CONTROL_BUTTON_UP == event.control) {
-          if (!preempt_screensaver_) screensaver_ = true;
+        if (OC::CONTROL_BUTTON_UP == event.control && !preempt_screensaver_) {
           SetButtonIgnoreMask(); // ignore release
+          screensaver_ = true;
         }
-        else if (OC::CONTROL_BUTTON_R == event.control)
-          return UI_MODE_APP_SETTINGS;
+        //else if (event.control == OC::CONTROL_BUTTON_R) {
+          // only if holding both encoders...
+          //if (event.mask == (OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_R))
+          //jump_to_menu_ = true;
+        //}
         else
           app->HandleButtonEvent(event);
         break;
       case UI::EVENT_BUTTON_LONG_RELEASE:
-        app->HandleButtonEvent(event);
+        if (event.control == OC::CONTROL_BUTTON_R)
+          jump_to_menu_ = true;
+        else
+          app->HandleButtonEvent(event);
         break;
       case UI::EVENT_ENCODER:
+        // if either encoder is turned while held down, ignore release/long-press
+        if (event.mask & (OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_R))
+          SetButtonIgnoreMask();
         app->HandleEncoderEvent(event);
         break;
       default:
@@ -187,7 +199,11 @@ UiMode Ui::DispatchEvents(const App *app) {
 
   if (screensaver_)
     return UI_MODE_SCREENSAVER;
-  else
+  else if (jump_to_menu_) {
+    SetButtonIgnoreMask(); // ignore release
+    jump_to_menu_ = false;
+    return UI_MODE_APP_SETTINGS;
+  } else
     return UI_MODE_MENU;
 }
 
@@ -217,7 +233,7 @@ UiMode Ui::Splashscreen(bool &reset_settings) {
     GRAPHICS_BEGIN_FRAME(true);
 
     menu::DefaultTitleBar::Draw();
-    graphics.print("Welcome 2 Phazerville");
+    graphics.print( NorthernLightModular? OC::Strings::NAME_NLM : OC::Strings::NAME);
     weegfx::coord_t y = menu::CalcLineY(0);
 
     graphics.setPrintPos(menu::kIndentDx, y + menu::kTextDy);
@@ -239,10 +255,22 @@ UiMode Ui::Splashscreen(bool &reset_settings) {
       graphics.setPrintPos(menu::kIndentDx, y + menu::kTextDy);
     }
     graphics.print(OC::Strings::VERSION);
+    graphics.print(" ");
+    graphics.print(OC::Strings::BUILD_TAG);
 
+    const uint8_t *iconroulette[] = {
+      PhzIcons::clockDivider, PhzIcons::clockSkip,
+      PhzIcons::clock_warp_A, PhzIcons::clock_warp_B,
+      PhzIcons::polyDiv,
+      ZAP_ICON
+    };
+
+    static int pick = 0;
+    if (now % 50 == 0) pick = random(6);
     // pew pew?
     for (int i = 0; i < 124; i+=8)
-      graphics.drawBitmap8(i, 56, 8, ZAP_ICON);
+      graphics.drawBitmap8(i, 56, 8, iconroulette[pick]);
+
     // chargin mah lazerrrr
     weegfx::coord_t w = (now-start)*128 / (SPLASHSCREEN_DELAY_MS/6);
     w %= 256;

@@ -26,6 +26,7 @@ public:
     const char* applet_name() {
         return "RunglBook";
     }
+    const uint8_t* applet_icon() { return PhzIcons::runglBook; }
 
     void Start() {
         threshold = (12 << 7) * 2;

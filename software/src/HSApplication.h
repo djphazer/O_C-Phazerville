@@ -30,7 +30,7 @@
 #ifndef int2simfloat
 #define int2simfloat(x) (x << 14)
 #define simfloat2int(x) (x >> 14)
-typedef int32_t simfloat;
+using simfloat = int32_t;
 #endif
 
 #include "HSicons.h"
@@ -54,6 +54,17 @@ using namespace HS;
 class HSApplication {
 public:
     bool isEditing = false;
+
+    inline bool EditMode() {
+        return isEditing;
+    }
+    void CursorToggle() {
+      isEditing ^= 1;
+      ResetCursor();
+    }
+    void CancelEdit() {
+      isEditing = false;
+    }
 
     virtual void Start() = 0;
     virtual void Controller() = 0;
@@ -95,11 +106,14 @@ public:
         last_view_tick = OC::CORE::ticks;
     }
 
-    // general screensaver view, visualizing inputs and outputs
+    // "Meters" screensaver view, visualizing inputs and outputs
     void BaseScreensaver(bool notenames = 0) {
-        gfxDottedLine(0, 32, 127, 32, 3); // horizontal baseline
-        const size_t w = 128 / DAC_CHANNEL_LAST;
-        for (int ch = 0; ch < DAC_CHANNEL_LAST; ++ch)
+        const int h = 32 + (OC::DAC::kOctaveZero == 0)*31;
+        const int w = 128 / DAC_CHANNEL_COUNT;
+
+        gfxDottedLine(0, h, 127, h, 3); // horizontal baseline
+
+        for (int ch = 0; ch < DAC_CHANNEL_COUNT; ++ch)
         {
             if (notenames) {
                 // approximate notes being output
@@ -111,14 +125,14 @@ public:
             if (trig) gfxIcon(4 + w*ch, 0, CLOCK_ICON);
 
             // input
-            int height = ProportionCV(HS::frame.inputs[ch], 32);
-            int y = constrain(32 - height, 0, 32);
+            int height = ProportionCV(HS::frame.inputs[ch], h);
+            int y = constrain(h - height, 0, h);
             const int w_ = (w - 4) / 2;
             gfxFrame(2 + (w * ch), y, w_, abs(height));
 
             // output
-            height = ProportionCV(HS::frame.outputs[ch], 32);
-            y = constrain(32 - height, 0, 32);
+            height = ProportionCV(HS::frame.outputs[ch], h);
+            y = constrain(h - height, 0, h);
             gfxInvert(3 + w_ + (w * ch), y, w_, abs(height));
 
             gfxDottedLine(w * ch, 0, w*ch, 63, 3); // vertical divider, left side
@@ -133,14 +147,22 @@ public:
     }
 
     int In(int ch) {
-        const int c = cvmapping[ch];
-        if (!c) return 0;
-        return (c <= ADC_CHANNEL_LAST) ? frame.inputs[c - 1] : frame.outputs[c - 1 - ADC_CHANNEL_LAST];
+      return cvmap[ch].In();
     }
 
     // Apply small center detent to input, so it reads zero before a threshold
     int DetentedIn(int ch) {
-        return (In(ch) > 64 || In(ch) < -64) ? In(ch) : 0;
+        if (NorthernLightModular && In(ch) < HEMISPHERE_CENTER_DETENT)
+          return 0;
+
+        if (In(ch) > (HEMISPHERE_CENTER_INPUT_CV + HEMISPHERE_CENTER_DETENT)
+          || In(ch) < (HEMISPHERE_CENTER_INPUT_CV - HEMISPHERE_CENTER_DETENT))
+          return In(ch);
+
+        return HEMISPHERE_CENTER_INPUT_CV;
+    }
+    int SemitoneIn(int ch) {
+      return input_quant[ch].Process(In(ch));
     }
 
     // Standard bi-polar CV modulation scenario
@@ -155,12 +177,7 @@ public:
     }
 
     bool Gate(int ch) {
-        const int t = trigger_mapping[ch];
-        const int offset = OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_LAST;
-        if (!t) return false;
-        return (t <= offset)
-          ? frame.gate_high[t - 1]
-          : (frame.outputs[t - 1 - offset] > GATE_THRESHOLD);
+        return trigmap[ch].Gate();
     }
 
     void GateOut(int ch, bool high) {
@@ -168,29 +185,7 @@ public:
     }
 
     bool Clock(int ch) {
-        bool clocked = 0;
-        const int trmap = trigger_mapping[ch];
-
-        if (HS::clock_m.IsRunning() && HS::clock_m.GetMultiply(ch) != 0)
-            clocked = HS::clock_m.Tock(ch);
-        else if (trmap > 0) {
-          const int offset = OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_LAST;
-          if (trmap <= offset)
-            clocked = frame.clocked[ trmap - 1 ];
-          else {
-            clocked = frame.clockout_q[ trmap - 1 - offset ];
-            frame.clockout_q[ trmap - 1 - offset ] = false;
-          }
-        }
-
-        // manual triggers
-        clocked = clocked || HS::clock_m.Beep(ch);
-
-        if (clocked) {
-            frame.cycle_ticks[ch] = OC::CORE::ticks - frame.last_clock[ch];
-            frame.last_clock[ch] = OC::CORE::ticks;
-        }
-        return clocked;
+        return frame.clocked[ch];
     }
 
     void ClockOut(int ch, int ticks = 100) {
@@ -200,7 +195,7 @@ public:
     // Buffered I/O functions for use in Views
     int ViewIn(int ch) {return frame.inputs[ch];}
     int ViewOut(int ch) {return frame.outputs[ch];}
-    int ClockCycleTicks(int ch) {return frame.cycle_ticks[ch];}
+    uint32_t ClockCycleTicks(int ch) {return frame.cycle_ticks[ch];}
 
     /* ADC Lag: There is a small delay between when a digital input can be read and when an ADC can be
      * read. The ADC value lags behind a bit in time. So StartADCLag() and EndADCLag() are used to
@@ -237,7 +232,103 @@ public:
       }
     }
 
+    bool EditInputMap(CVInputMap& input_map) {
+      if (!IsEditingInputMap()) {
+        selected_input_map = &input_map;
+        return true;
+      }
+      return false;
+    }
+
+    bool EditInputMap(DigitalInputMap& input_map) {
+      if (!IsEditingInputMap()) {
+        selected_input_map = &input_map;
+        return true;
+      }
+      return false;
+    }
+
+    void ClearEditInputMap() {
+      selected_input_map = std::monostate{};
+      if (EditMode()) CursorToggle();
+    }
+
+    bool EditSelectedInputMap(int direction) {
+      if (IsEditingInputMap()) {
+        switch (selected_input_map.index()) {
+          case CV_INPUT_MAP: {
+            int8_t& att
+              = std::get<CVInputMap*>(selected_input_map)->attenuversion;
+            att = constrain(att + direction, -127, 127); // 448% range
+            break;
+          }
+          case DIGITAL_INPUT_MAP: {
+            int8_t& div
+              = std::get<DigitalInputMap*>(selected_input_map)->division;
+            div = constrain(div + direction, -64, 64);
+            break;
+          }
+          default:
+            break;
+        }
+        return true;
+      }
+      return false;
+    }
+
+    void gfxDisplayInputMapEditor(weegfx::coord_t x_off = 0) {
+      if (selected_input_map.index()) {
+        graphics.clearRect(x_off, 0, 63, 11);
+        switch (selected_input_map.index()) {
+          case CV_INPUT_MAP: {
+            gfxPos(32 - 7 * 6 / 2, 2);
+            int tenths = std::get<CVInputMap*>(selected_input_map)->Atten();
+            graphics.printf("%4d.%d%%", tenths / 10, abs(tenths) % 10);
+            break;
+          }
+          case DIGITAL_INPUT_MAP: {
+            gfxPos(32 - 4 * 6 / 2, 2);
+            int8_t div = std::get<DigitalInputMap*>(selected_input_map)->division;
+            if (div < 0) graphics.printf("/%3d", -div + 1);
+            else graphics.printf("X%3d", div + 1);
+            break;
+          }
+          default:
+            break;
+        }
+        gfxInvert(0, 0, 63, 11);
+      }
+    }
+
+    bool IsEditingInputMap() const {
+      return selected_input_map.index() > 0;
+    }
+
+    template <typename... Pairs>
+    bool CheckEditInputMapPress(int cursor, Pairs&&... indexed_input_maps) {
+      if (IsEditingInputMap()) {
+        ClearEditInputMap();
+        return !EditMode();
+      } else if (!EditMode()) {
+        return false;
+      }
+
+      return (
+        ...
+        || (cursor == indexed_input_maps.first ? EditInputMap(indexed_input_maps.second) : false)
+      );
+    }
+
 protected:
+    enum SelectedInputMapType {
+      NONE,
+      CV_INPUT_MAP,
+      DIGITAL_INPUT_MAP,
+    };
+
+    std::variant<std::monostate, CVInputMap*, DigitalInputMap*>
+      selected_input_map;
+
     // Check cursor blink cycle
     bool CursorBlink() {
         return (cursor_countdown > 0);
@@ -252,7 +343,7 @@ private:
 };
 
 // --- Phazerville Screensaver Library ---
-typedef struct {
+struct Zap {
     int x = 0;
     int y = 0;
     int x_v = 6;
@@ -282,20 +373,19 @@ typedef struct {
             if (y_v == 0) ++y_v;
         }
     }
-} Zap;
+};
 static constexpr int HOW_MANY_ZAPS = 30;
 static Zap zaps[HOW_MANY_ZAPS];
-static void ZapScreensaver(const bool stars = false) {
+static void ZapScreensaver(const uint8_t stars = 0) {
   static int frame_delay = 0;
   for (int i = 0; i < (stars ? HOW_MANY_ZAPS : 5); i++) {
     if (frame_delay & 0x1) {
-        #if defined(__IMXRT1062__)
-        zaps[i].Move(stars); // centered starfield
-        #else
+      if (stars > 1) {
         // Zips respawn from their previous sibling
         if (0 == i) zaps[0].Move();
         else zaps[i].Move(zaps[i-1].x, zaps[i-1].y);
-        #endif
+      } else
+        zaps[i].Move(stars == 1); // centered starfield
     }
 
     if (stars && frame_delay == 0) {
