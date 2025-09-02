@@ -57,7 +57,7 @@ public:
      *
      *  @return none
      */
-    SafeNoteFrequencyAnalyzer( void ) : AudioStream( 1, inputQueueArray ), enabled( false ), new_output(false) {
+    SafeNoteFrequencyAnalyzer(void) : AudioStream(1, inputQueueArray), enabled(false), new_output(false) {
         inputQueueArray[0] = nullptr;
         for (int i = 0; i < AUDIO_GUITARTUNER_BLOCKS; ++i) {
             blocklist1[i] = nullptr;
@@ -73,7 +73,7 @@ public:
      *
      *  @return none
      */
-    void begin( float threshold );
+    void begin(float threshold, float lp_cutoff_hz);
     
     /**
      *  sets threshold value
@@ -81,34 +81,34 @@ public:
      *  @param thresh
      *  @return none
      */
-    void threshold( float p );
+    void threshold(float p);
     
     /**
      *  triggers true when valid frequency is found
      *
      *  @return flag to indicate valid frequency is found
      */
-    bool available( void );
+    bool available(void);
     /**
      *  get frequency
      *
      *  @return frequency in hertz
      */
-    float read( void );
+    float read(void);
     
     /**
      *  get predicitity
      *
      *  @return probability of frequency found
      */
-    float probability( void );
+    float probability(void);
     
     /**
      *  Audio Library calls this update function ~2.9ms
      *
      *  @return none
      */
-    virtual void update( void );
+    virtual void update(void);
 
     void end(); // flush and disable to save CPU usage
     void pause_switch(bool p); // quick on/off switch without teardown (like for audio being unplugged)
@@ -133,7 +133,15 @@ private:
      *  @return none
      */
     void process( void );
-    
+
+    /**
+     *  performs LPF on audio buffer based on specified cuttoff freq,
+     *  before it is processed on the next run into the YIN algorithm
+     *
+     *  @return none
+     */
+    void filter_inplace_block(int16_t *dst);
+
     /**
      *  Variables
      */
@@ -152,5 +160,11 @@ private:
     audio_block_t *blocklist1[AUDIO_GUITARTUNER_BLOCKS];
     audio_block_t *blocklist2[AUDIO_GUITARTUNER_BLOCKS];
     audio_block_t *inputQueueArray[1];
+
+    // one-pole low-pass params (simple, cheap smoothing)
+    float lpf_alpha;   // default smoothing coefficient (0..1)
+    float lpf_state;     // persistent filter state across samples/blocks
+    float lpf_cutoff;    // low-pass filter cutoff frequency modifiable by user
+    bool lpf_initiated = false; // initialize LPF state on first use to avoid a startup step
 };
 #endif

@@ -24,8 +24,15 @@
 #include "SafeNoteFrequencyAnalyzer.h"
 #include "utility/dspinst.h"
 #include "arm_math.h"
+#include <cmath>
 
 #define HALF_BLOCKS AUDIO_GUITARTUNER_BLOCKS * 64
+
+// // initial declarations of low-pass filter variables
+// float SafeNoteFrequencyAnalyzer::lpf_alpha = 0.0f;
+// float SafeNoteFrequencyAnalyzer::lpf_state = 0.0f;
+// float SafeNoteFrequencyAnalyzer::lpf_cutoff = 0.0f;
+// bool  SafeNoteFrequencyAnalyzer::lpf_initiated = false;
 
 /**
  *  Copy internal blocks of data to class buffer
@@ -37,6 +44,18 @@ static void copy_buffer(void *destination, const void *source) {
     const uint16_t *src = ( const uint16_t * )source;
     uint16_t *dst = (  uint16_t * )destination;
     for (int i=0; i < AUDIO_BLOCK_SAMPLES; i++)  *dst++ = (*src++);
+}
+
+// Derive alpha for LPF from cutoff (Hz) and sample rate.
+// α = 1 - exp(-2π fc / Fs)
+static inline float lpf_alpha_from_cutoff(float cutoff_hz, float sample_rate_hz) {
+  if (cutoff_hz <= 0.0f || sample_rate_hz <= 0.0f) return 0.0f; // disabled / invalid
+  if (cutoff_hz > 0.45f * sample_rate_hz) cutoff_hz = 0.45f * sample_rate_hz; // below Nyquist
+  const float x = -2.0f * 3.1415926535f * cutoff_hz / sample_rate_hz;
+  float a = 1.0f - expf(x);                       // 0 < a < 1
+  if (a < 1.0e-6f) a = 1.0e-6f;                   // numeric floor
+  if (a > 1.0f)    a = 1.0f;
+  return a;
 }
 
 /**
@@ -63,21 +82,11 @@ void SafeNoteFrequencyAnalyzer::update( void ) {
     }
     
     if ( state >= AUDIO_GUITARTUNER_BLOCKS ) {
-        // if ( next_buffer ) {
-        //     if ( !first_run && process_buffer ) process( );
-        //     for ( int i = 0; i < AUDIO_GUITARTUNER_BLOCKS; i++ ) copy_buffer( AudioBuffer+( i * 0x80 ), blocklist1[i]->data );
-        //     for ( int i = 0; i < AUDIO_GUITARTUNER_BLOCKS; i++ ) release( blocklist1[i] );
-        //     next_buffer = false;
-        // } else {
-        //     if ( !first_run && process_buffer ) process( );
-        //     for ( int i = 0; i < AUDIO_GUITARTUNER_BLOCKS; i++ ) copy_buffer( AudioBuffer+( i * 0x80 ), blocklist2[i]->data );
-        //     for ( int i = 0; i < AUDIO_GUITARTUNER_BLOCKS; i++ ) release( blocklist2[i] );
-        //     next_buffer = true;
-        // }
         if ( next_buffer ) {
             if ( !first_run && process_buffer ) process( );
             for ( int i = 0; i < AUDIO_GUITARTUNER_BLOCKS; i++ ) {
                 copy_buffer( AudioBuffer + ( i * AUDIO_BLOCK_SAMPLES ), blocklist1[i]->data );
+                //filter_inplace_block( AudioBuffer + ( i * AUDIO_BLOCK_SAMPLES ));
             }
             for ( int i = 0; i < AUDIO_GUITARTUNER_BLOCKS; i++ ) {
                 release( blocklist1[i] );
@@ -88,6 +97,7 @@ void SafeNoteFrequencyAnalyzer::update( void ) {
             if ( !first_run && process_buffer ) process( );
             for ( int i = 0; i < AUDIO_GUITARTUNER_BLOCKS; i++ ) {
                 copy_buffer( AudioBuffer + ( i * AUDIO_BLOCK_SAMPLES ), blocklist2[i]->data );
+                //filter_inplace_block( AudioBuffer + ( i * AUDIO_BLOCK_SAMPLES ));
             }
             for ( int i = 0; i < AUDIO_GUITARTUNER_BLOCKS; i++ ) {
                 release( blocklist2[i] );
@@ -100,6 +110,24 @@ void SafeNoteFrequencyAnalyzer::update( void ) {
         state = 0;
     }
     
+}
+
+// low pass filtering for YIN optimization. filters audio buffer in place to save memory
+void SafeNoteFrequencyAnalyzer::filter_inplace_block(int16_t *dst) {
+  if (lpf_cutoff <= 0.0f || lpf_alpha <= 0.0f) return; // disabled
+  if (!lpf_initiated) { lpf_state = (float)dst[0]; lpf_initiated = true; } // ensure state is set
+
+  float y = lpf_state; // scratch variable for state
+
+  for (int i = 0; i < AUDIO_BLOCK_SAMPLES; ++i) {
+    y += lpf_alpha * ((float)dst[i] - y);  // one-pole LPF
+    int32_t out = (int32_t)lrintf(y);      // clamp to int16
+    if (out > INT16_MAX) out = INT16_MAX;
+    else if (out < INT16_MIN) out = INT16_MIN;
+    dst[i] = (int16_t)out;
+  }
+
+  lpf_state = y; // state taken from last output block, persist to next buffer chunk 
 }
 
 /**
@@ -223,7 +251,7 @@ uint16_t SafeNoteFrequencyAnalyzer::estimate( uint64_t *yin, uint64_t *rs, uint1
  *
  *  @param threshold Allowed uncertainty
  */
-void SafeNoteFrequencyAnalyzer::begin( float threshold ) {
+void SafeNoteFrequencyAnalyzer::begin( float threshold , float cutoff_hz) {
 
     size_t n = AUDIO_GUITARTUNER_BLOCKS * 128;
     AudioBuffer = reinterpret_cast<int16_t*>(
@@ -232,6 +260,8 @@ void SafeNoteFrequencyAnalyzer::begin( float threshold ) {
     __disable_irq( );
     process_buffer = false;
     yin_threshold  = threshold;
+    lpf_cutoff     = (float)cutoff_hz;
+    lpf_alpha      = lpf_alpha_from_cutoff(lpf_cutoff, AUDIO_SAMPLE_RATE_EXACT); // Cache alpha unless cutoff changes
     periodicity    = 0.0f;
     next_buffer    = true;
     running_sum    = 0;
@@ -315,6 +345,7 @@ void SafeNoteFrequencyAnalyzer::end() {
     process_buffer = false;
     first_run = true;
     new_output = false;
+    lpf_initiated = false;
     yin_idx = 1;
     running_sum = 0;
     tau_global = 1;
