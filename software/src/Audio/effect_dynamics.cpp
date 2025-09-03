@@ -197,8 +197,8 @@ void AudioEffectDynamics::update(void) {
         float totalGain = gatedb + compdb + makeupdb + limitdb;
 
         float multiplier = dbToUnit(totalGain);
-        int16_t result = sample * multiplier;
-        block->data[i] = result;
+        int result = sample * multiplier;
+        block->data[i] = saturate16(result);
         //Apply gain to block
     }
 
