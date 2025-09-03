@@ -1407,6 +1407,11 @@ void AppQuadrants::HandleButtonEvent(const UI::Event &event) {
         view_state = APPLETS;
         return;
       }
+      // dual press A+X for Load Preset
+      if (CheckButtonCombo(OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_X)) {
+        ShowPresetSelector();
+        return;
+      }
       if ((event.control == OC::CONTROL_BUTTON_L
            || event.control == OC::CONTROL_BUTTON_R)) {
         audio_app.HandleEncoderButtonEvent(event);
