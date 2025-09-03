@@ -8,5 +8,8 @@ namespace OC {
     AudioInputI2S2& InputStream();
     AudioStream& OutputStream();
     void Init();
+    void RecordStart();
+    void RecordStop();
+    void RecordFlush(File &file);
   }
 }
