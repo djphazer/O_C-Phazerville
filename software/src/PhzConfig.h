@@ -17,6 +17,7 @@ namespace PhzConfig {
   extern LittleFS_Program myfs;
 
   // Forward Decl
+  void Init();
   void listFiles(FS &fs = myfs);
   bool load_config(const char* filename = CONFIG_FILENAME, FS &fs = myfs);
   bool save_config(const char* filename = CONFIG_FILENAME, FS &fs = myfs);
@@ -29,7 +30,6 @@ namespace PhzConfig {
   void printDirectory(FS &fs = myfs);
   void printDirectory(File dir, int numSpaces);
   void printSpaces(int num);
-  void setup();
   void eraseFiles(FS &fs = myfs);
 
 }

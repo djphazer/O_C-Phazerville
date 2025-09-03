@@ -8,6 +8,11 @@
 #include "PhzConfig.h"
 #include "HSUtils.h"
 #include "util/util_misc.h"
+#include "usb_desc.h"
+
+#ifdef MTP_INTERFACE
+#include <MTP_Teensy.h>
+#endif
 
 namespace PhzConfig {
 
@@ -23,8 +28,19 @@ static constexpr uint32_t diskSize = 1024 * 512;
 static constexpr uint32_t HEADER_SIZE = 12;
 
 FLASHMEM
-void setup()
+void Init()
 {
+#ifdef MTP_INTERFACE
+  MTP.begin();
+#endif
+  if (SDcard_Ready) {
+#ifdef MTP_INTERFACE
+    MTP.addFilesystem(SD, "SD_Card");
+#endif
+    SERIAL_PRINTLN("SD card available for preset storage");
+    //listFiles(SD);
+  }
+
   // This mounts or creates a LittleFS drive in Teensy PCB Flash.
   if (!myfs.begin(diskSize)) {
     SERIAL_PRINTLN("LittleFS unavailable!! Settings WILL NOT BE SAVED!");
@@ -32,17 +48,16 @@ void setup()
   }
   SERIAL_PRINTLN("LittleFS initialized.");
 
+#ifdef MTP_INTERFACE
+  MTP.addFilesystem(myfs, "Internal_LFS");
+#endif
+
   /*
   if (myfs.mediaPresent()) {
     listFiles(myfs);
     //load_config();
   }
   */
-
-  if (SDcard_Ready) {
-    SERIAL_PRINTLN("SD card available for preset storage");
-    //listFiles(SD);
-  }
 }
 
 void clear_config() {

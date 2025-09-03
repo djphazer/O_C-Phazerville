@@ -54,6 +54,7 @@ MIDIDevice_BigBuffer usbHostMIDI(thisUSB);
 #if defined(ARDUINO_TEENSY41)
 MIDI_CREATE_INSTANCE(HardwareSerial, Serial8, MIDI1);
 #include "AudioIO.h"
+#include "usb_desc.h"
 #endif
 
 #endif // __IMXRT1062__
@@ -207,7 +208,7 @@ void setup() {
   #endif
 
   // initialize LittleFS for config files
-  PhzConfig::setup();
+  PhzConfig::Init();
 
   // USB Host support for both 4.0 and 4.1
   usbHostMIDI.begin();
@@ -309,6 +310,11 @@ void FASTRUN loop() {
 
     if (millis() - LAST_REDRAW_TIME > REDRAW_TIMEOUT_MS)
       MENU_REDRAW = 1;
+
+#ifdef MTP_INTERFACE
+    // handle MTP Disk requests
+    MTP.loop();
+#endif
 
     static size_t cap_idx = 0;
     static elapsedMicros cap_send_time = 0;
