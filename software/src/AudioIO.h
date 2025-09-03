@@ -8,5 +8,8 @@ namespace OC {
     AudioStream& InputStream(int interface = 0);
     AudioStream& OutputStream();
     void Init();
+    void RecordStart();
+    void RecordStop();
+    void RecordFlush(File &file);
   }
 }
