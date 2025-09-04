@@ -274,16 +274,18 @@ public:
   void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
     // STOP playback to avoid SD card hangup on preset save
     wavplayer.stop();
-    data[0] = PackPackables(level, level_cv, int8_t(playrate), playrate_cv, wavplayer_select, djfilter);
+    uint8_t filenum = (uint8_t)wavplayer_select;
+    data[0] = PackPackables(level, level_cv, int8_t(playrate), playrate_cv, filenum, djfilter);
     data[1] = PackPackables(playrate, djfilter_cv, playstop_cv, loop_length);
   }
   void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
     int8_t old_playrate;
-    UnpackPackables(data[0], level, level_cv, old_playrate, playrate_cv, wavplayer_select, djfilter);
+    uint8_t filenum;
+    UnpackPackables(data[0], level, level_cv, old_playrate, playrate_cv, filenum, djfilter);
     UnpackPackables(data[1], playrate, djfilter_cv, playstop_cv, loop_length);
     if (playrate == 0) playrate = old_playrate;
     if (loop_length == 0) loop_length = 8;
-    ChangeToFile(wavplayer_select);
+    ChangeToFile(filenum);
   }
 
   AudioStream* InputStream() override {
@@ -355,7 +357,7 @@ private:
   bool wavplayer_reload = true;
   bool wavplayer_playtrig = false;
   bool wavplayer_ready = false;
-  uint8_t wavplayer_select = 1;
+  uint16_t wavplayer_select = 1;
   uint8_t loop_length = 8;
   int8_t loop_count = 0;
   bool loop_on = false;
@@ -364,7 +366,8 @@ private:
   // SD file player functions
   void FileLoad() {
     char filename[] = "000.WAV";
-    filename[1] += wavplayer_select / 10;
+    filename[0] += wavplayer_select / 100;
+    filename[1] += wavplayer_select / 10 % 10;
     filename[2] += wavplayer_select % 10;
     wavplayer_ready = wavplayer.playWav(filename);
   }
@@ -423,7 +426,7 @@ private:
   }
 
   void ChangeToFile(int select) {
-    wavplayer_select = (uint8_t)constrain(select, 0, 99);
+    wavplayer_select = (uint16_t)constrain(select, 0, 999);
     wavplayer_reload = true;
     if (wavplayer.isPlaying()) {
       StartPlaying();
