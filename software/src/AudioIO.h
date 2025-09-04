@@ -10,6 +10,7 @@ namespace OC {
     void Init();
     void RecordStart();
     void RecordStop();
-    void RecordFlush(File &file);
+    size_t RecordFlush(File &file);
+    int GetRecordQueueSize();
   }
 }
