@@ -1,14 +1,15 @@
 #pragma once
 
 #include "AudioIO.h"
+#include "FS.h"
 #include "HSUtils.h"
 #include "HemisphereAudioApplet.h"
 #include "OC_ui.h"
 #include "PhzConfig.h"
+#include "waveheaderparser.h"
 #include "src/UI/ui_events.h"
 #include "util/util_tuples.h"
 #include <Audio.h>
-#include <cstdint>
 
 #define ForEachSide(ch) for (HEM_SIDE ch : {LEFT_HEMISPHERE, RIGHT_HEMISPHERE})
 
@@ -92,6 +93,9 @@ public:
   }
 
   void mainloop() {
+    static bool _rec = false;
+    static int _rec_size = 0;
+
     for (size_t slot = 0; slot < Slots; slot++) {
       if (IsStereo(slot)) {
         get_selected_stereo_applet(slot).mainloop();
@@ -100,9 +104,63 @@ public:
         get_selected_mono_applet(RIGHT_HEMISPHERE, slot).mainloop();
       }
     }
+
+    // handle RecordQueue flushing, file duties here
+    if (record_active && !_rec) {
+      // starting
+
+      if (SD.exists(_wavfilename)) {
+        record_active = false;
+        return;
+      }
+
+      _wavfile = SD.open(_wavfilename, FILE_WRITE_BEGIN);
+      if (_wavfile) {
+        wav_header hdr = wav_header(true);
+        wav_data_header datahdr = wav_data_header(true);
+
+        _wavfile.write((const uint8_t*)&hdr, sizeof(hdr));
+        _wavfile.write((const uint8_t*)&datahdr, sizeof(datahdr));
+        _rec_size = 0;
+        // and then? we're good?
+        _rec = true;
+        OC::AudioIO::RecordStart();
+      }
+      else
+        record_active = false;
+    } else if (!record_active && _rec) {
+      // stopping
+      OC::AudioIO::RecordFlush(_wavfile);
+      OC::AudioIO::RecordStop();
+
+      // write data size to chunk headers
+      int wavsize = _rec_size + 36;
+      _wavfile.seek(4);
+      _wavfile.write((const uint8_t*)&wavsize, 4);
+      _wavfile.seek(40);
+      _wavfile.write((const uint8_t*)&_rec_size, 4);
+
+      _wavfile.close();
+      //_rec_size = 0;
+      _rec = false;
+    }
+
+    if (record_active && _rec && _wavfile) {
+      _rec_size += OC::AudioIO::RecordFlush(_wavfile);
+    }
   }
 
   void View() {
+    if (RECORD_CONFIG == view_state) {
+      gfxHeader("Record To WAV");
+      gfxPrint(5, 15, _wavfilename);
+      gfxIcon(45, 15, record_active ? RECORD_ICON : LEFT_ICON);
+
+      gfxPrint(1, 35, "Buffer: ");
+      gfxPrint(OC::AudioIO::GetRecordQueueSize());
+      return;
+    }
+
     for (size_t i = 0; i < Slots; i++) {
       print_applet_line(i);
     }
@@ -149,16 +207,29 @@ public:
 
   // returns true to exit
   bool HandleButtonEvent(const UI::Event& event) {
+    static size_t mask = 0;
+    static size_t last_mask = 0;
+    last_mask = mask;
+    mask = event.mask;
+
+    if (RECORD_CONFIG == view_state && event.type == UI::EVENT_BUTTON_DOWN) {
+      view_state = NORMAL;
+      return false;
+    }
+    if (event.type == UI::EVENT_BUTTON_DOWN
+        && (event.mask == (OC::CONTROL_BUTTON_X | OC::CONTROL_BUTTON_Y))
+        && mask != last_mask) {
+      // C-C-C-COMBO
+      view_state = RECORD_CONFIG;
+    }
     if (event.type == UI::EVENT_BUTTON_PRESS) {
       switch (event.control) {
         case OC::CONTROL_BUTTON_A:
-          if (MOVE_CURSOR == state[0])
-            return true;
+          if (MOVE_CURSOR == state[0]) return true;
           state[0] = MOVE_CURSOR;
           break;
         case OC::CONTROL_BUTTON_B:
-          if (MOVE_CURSOR == state[1])
-            return true;
+          if (MOVE_CURSOR == state[1]) return true;
           state[1] = MOVE_CURSOR;
           break;
         case OC::CONTROL_BUTTON_X:
@@ -194,7 +265,15 @@ public:
     }
   }
 
+  void ToggleRecord() {
+    record_active ^= 1;
+  }
   void HandleEncoderButtonEvent(const UI::Event& event) {
+    if (RECORD_CONFIG == view_state) {
+      if (UI::EVENT_BUTTON_PRESS == event.type) ToggleRecord();
+      return;
+    }
+
     if (event.mask == (OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_R)) {
       // check ready_for_press to suppress double events on button combos
       if (cursor[0] == cursor[1] && ready_for_press) {
@@ -266,6 +345,12 @@ public:
 
   void HandleEncoderEvent(const UI::Event& event) {
     int dir = event.value;
+    if (RECORD_CONFIG == view_state) {
+      _wavfilenum = constrain(_wavfilenum + event.value, 0, 999);
+      _wavfilename[0] = '0' + _wavfilenum / 100;
+      _wavfilename[1] = '0' + _wavfilenum / 10 % 10;
+      _wavfilename[2] = '0' + _wavfilenum % 10;
+    }
     if (event.control == OC::CONTROL_ENCODER_L)
       HandleEncoderEvent(LEFT_HEMISPHERE, dir);
     if (event.control == OC::CONTROL_ENCODER_R)
@@ -489,6 +574,11 @@ private:
   array<array<AudioConnection, Slots + 1>, 2> peak_conns;
   array<array<float, Slots + 1>, 2> lpf_peak_db;
 
+  size_t _wavfilenum = 100;
+  char _wavfilename[8] = "100.WAV";
+  File _wavfile;
+  bool record_active = false;
+
   bool ready_for_press = false;
   size_t total, user, free;
 
@@ -498,12 +588,14 @@ private:
   int16_t cpu_percent = 0;
   uint32_t last_stats_update = 0;
 
+  enum ViewState { NORMAL, RECORD_CONFIG, MASTER_FX };
   enum EditState {
     MOVE_CURSOR,
     SWITCH_APPLET,
     EDIT_APPLET,
   };
 
+  ViewState view_state = NORMAL;
   EditState state[2];
   int cursor[2]; // selected slot for each side
   // candidate applet for each side, referenced by index into applets arrays

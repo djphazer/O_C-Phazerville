@@ -39,8 +39,10 @@ namespace OC {
       AudioMemory(AUDIO_MEMORY);
     }
 
+    int GetRecordQueueSize() {
+      return min(record_queue[0].available(), record_queue[1].available());
+    }
     void RecordStart() {
-      // TODO: open file and write header...
       record_queue[0].begin();
       record_queue[1].begin();
     }
@@ -51,22 +53,27 @@ namespace OC {
       record_queue[1].clear();
     }
 
-    void RecordFlush(File &file) {
-      // check number of packets; each packet is 128 x 16-bit samples
-      int count = min(record_queue[0].available(), record_queue[1].available());
+    size_t RecordFlush(File &file) {
+      size_t written = 0;
 
-      do {
+      noInterrupts();
+      // check number of packets; each packet is 128 x 16-bit samples
+      if (record_queue[0].available() && record_queue[1].available()) {
         int16_t *packet_left = record_queue[0].readBuffer();
         int16_t *packet_right = record_queue[1].readBuffer();
+        //if (!packet_left || !packet_right) break;
         for (int i = 0; i < 128; ++i) {
-          file.write((uint8_t*)packet_left, 2);
-          file.write((uint8_t*)packet_right, 2);
+          written += file.write((uint8_t*)packet_left, 2);
+          written += file.write((uint8_t*)packet_right, 2);
           ++packet_left;
           ++packet_right;
         }
         record_queue[0].freeBuffer();
         record_queue[1].freeBuffer();
-      } while (--count > 0);
+      }
+      interrupts();
+
+      return written;
     }
 
   }
