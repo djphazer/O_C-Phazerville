@@ -15,16 +15,27 @@ class BungverbApplet : public HemisphereAudioApplet {
             return "Bungverb";
         }
         void Start() override {
+            if (!reverb) reverb = new AudioEffectReverbSchroeder();
             filter.frequency(15000);
+            input_to_reverb.connect(input, 0, *reverb, 0);
+            reverb_to_dry_wet.connect(*reverb, 0, filter, 0);
+            filter_to_dry_wet.connect(filter, 0, dry_wet_mixer, 0);
+            input_to_dry_wet.connect(input, 0, dry_wet_mixer, 1);
         }
 
         void Unload() override {
+            input_to_reverb.disconnect();
+            reverb_to_dry_wet.disconnect();
+            filter_to_dry_wet.disconnect();
+            input_to_dry_wet.disconnect();
             AllowRestart();
         }
 
         void Controller() override {
-            reverb.setDecayTime(decay_time + decay_time_cv.InF() * 0.01f);
-            reverb.setDamping((damp * 0.01f) + damp_cv.InF() * 0.01f);
+          if (reverb) {
+            reverb->setDecayTime(decay_time + decay_time_cv.InF() * 0.01f);
+            reverb->setDamping((damp * 0.01f) + damp_cv.InF() * 0.01f);
+          }
 
             filter.frequency(cutoff);
 
@@ -161,15 +172,15 @@ class BungverbApplet : public HemisphereAudioApplet {
         int8_t cursor = DECAY_TIME;
         AudioPassthrough<MONO> input;
         
-        AudioEffectReverbSchroeder reverb;
+        AudioEffectReverbSchroeder* reverb;
         AudioFilterStateVariable filter;
         
         AudioMixer<2> dry_wet_mixer;
 
-        AudioConnection input_to_reverb{input, 0, reverb, 0};
-        AudioConnection reverb_to_dry_wet{reverb, 0, filter, 0};
-        AudioConnection filter_to_dry_wet{filter, 0, dry_wet_mixer, 0};
-        AudioConnection input_to_dry_wet{input, 0, dry_wet_mixer, 1};
+        AudioConnection input_to_reverb;
+        AudioConnection reverb_to_dry_wet;
+        AudioConnection filter_to_dry_wet;
+        AudioConnection input_to_dry_wet;
 
         int8_t mix = 100;
         float decay_time = 1.0f;
