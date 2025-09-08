@@ -48,7 +48,9 @@
  *                      or B(flat)0.                                   *
  *                                                                     *
  ***********************************************************************/
-#define AUDIO_GUITARTUNER_BLOCKS  24
+// through testing, determined this is optimal. 
+//one block = ~2.9ms of signal time per https://forum.pjrc.com/index.php?threads/different-range-fft-algorithm.32252/page-2
+#define AUDIO_GUITARTUNER_BLOCKS  16 
 /***********************************************************************/
 class SafeNoteFrequencyAnalyzer : public AudioStream {
 public:
@@ -110,6 +112,13 @@ public:
      */
     virtual void update(void);
 
+    /**
+     *  Returns delay
+     * 
+     *  @return delay in milliseconds
+     */
+    uint32_t get_buffer_delay(void);
+
     void end(); // flush and disable to save CPU usage
     void pause_switch(bool p); // quick on/off switch without teardown (like for audio being unplugged)
     bool isEnabled(); // get enabled state for TuneTracker functionality
@@ -126,7 +135,16 @@ private:
      *  @return tau
      */
     uint16_t estimate( uint64_t *yin, uint64_t *rs, uint16_t head, uint16_t tau );
-    
+
+    /**
+     *  compartamentalized function to adapt frequency search area based on how high or low we are
+     */
+    void adapt_window_from_tau(float tau_samples);
+
+    // recovery path functions for tau window shortening/lengthening
+    void set_window_blocks(uint16_t nb);
+    void widen_to_max_window();
+
     /**
      *  process audio data
      *
@@ -161,10 +179,25 @@ private:
     audio_block_t *blocklist2[AUDIO_GUITARTUNER_BLOCKS];
     audio_block_t *inputQueueArray[1];
 
+    //custom params for optimizing YIN
+    uint16_t needed_blocks;     // how many 128-sample blocks our window needs
+    uint16_t window_samples;    // number of samples our analysis uses
+    uint16_t half_window_samples; // half the number of samples for processing
+    uint16_t HALF_BLOCKS;       // redefinition of constant, to accomodate sliding window algo
+
     // one-pole low-pass params (simple, cheap smoothing)
     float lpf_alpha;   // default smoothing coefficient (0..1)
     float lpf_state;     // persistent filter state across samples/blocks
     float lpf_cutoff;    // low-pass filter cutoff frequency modifiable by user
     bool lpf_initiated = false; // initialize LPF state on first use to avoid a startup step
+
+    // delay calculation params
+    uint32_t first_block_time_us;
+    uint32_t last_buffer_latency_us; // can read via debugger/Serial if needed
+
+    // recovery and miss chance bookkeeping
+    uint8_t  miss_frames = 0;          // consecutive process() calls with no lock
+    uint8_t  widen_cooldown = 0;       // prevent flapping after a widen
+    uint16_t max_window_blocks = 0;    // precomputed from your chosen max ms cap
 };
 #endif
