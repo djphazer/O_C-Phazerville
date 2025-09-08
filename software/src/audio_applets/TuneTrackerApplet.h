@@ -37,7 +37,7 @@ public:
     for (int i = 0; i < Channels; i++) {
         // using the passthru as our input
         in_conns[i].connect(passthru, i, note_freqs[i], 0);
-        note_freqs[i].begin(0.14, 2200); // initializes the pitch tracking algo. threshold 0.1-0.2 for optimal error rates
+        note_freqs[i].begin(0.09, 2200); // initializes the pitch tracking algo. threshold 0.1-0.2 for optimal error rates
     }
   }
   void Unload() override {
@@ -117,21 +117,7 @@ public:
     // gfxStartCursor();
     // gfxPrint(pitch_env_selection.Name());
     // gfxEndCursor(cursor == PITCH_ENV_OUT, false, pitch_env_selection.Name());
-
-    gfxPrint(label_x, 45, "PitchVolt:");
-    // gfxPrint(label_x, 55, pitch_cv_selection.ReadVolts());
-    float rv = pitch_cv_selection.ReadVolts();
-    bool rneg = rv < 0.0f;
-    float arv = rneg ? -rv : rv;
-    int rvi = (int)arv;
-    int rvf = (int)((arv - rvi) * 100.0f + 0.5f);
-    if (rvf == 100) { rvi += 1; rvf = 0; }
-    if (rneg) { gfxPrint(label_x, 55, "-"); gfxPrint(rvi); }
-    else { gfxPrint(label_x, 55, rvi); }
-    gfxPrint(".");
-    if (rvf < 10) gfxPrint("0");
-    gfxPrint(rvf);
-
+    
     gfxDisplayInputMapEditor(); // this bookends any GUI with editable CV inputs
 
    }
