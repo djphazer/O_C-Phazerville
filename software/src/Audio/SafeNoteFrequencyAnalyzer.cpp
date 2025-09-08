@@ -26,9 +26,9 @@
 #include "arm_math.h"
 #include <cmath>
 
-#define HALF_BLOCKS AUDIO_GUITARTUNER_BLOCKS * 64
+// #define HALF_BLOCKS AUDIO_GUITARTUNER_BLOCKS * 64
 
-// // initial declarations of low-pass filter variables
+// initial declarations of low-pass filter variables (FILTER CURRENTLY DISABLED)
 // float SafeNoteFrequencyAnalyzer::lpf_alpha = 0.0f;
 // float SafeNoteFrequencyAnalyzer::lpf_state = 0.0f;
 // float SafeNoteFrequencyAnalyzer::lpf_cutoff = 0.0f;
@@ -41,9 +41,7 @@
  *  @param source      source address
  */
 static void copy_buffer(void *destination, const void *source) {
-    const uint16_t *src = ( const uint16_t * )source;
-    uint16_t *dst = (  uint16_t * )destination;
-    for (int i=0; i < AUDIO_BLOCK_SAMPLES; i++)  *dst++ = (*src++);
+    memcpy(destination, source, AUDIO_BLOCK_SAMPLES * sizeof(int16_t)); // AUDIO_BLOCK_SAMPLES samples copied are 2 bytes each
 }
 
 // Derive alpha for LPF from cutoff (Hz) and sample rate.
@@ -64,9 +62,14 @@ static inline float lpf_alpha_from_cutoff(float cutoff_hz, float sample_rate_hz)
 void SafeNoteFrequencyAnalyzer::update( void ) {
     
     audio_block_t *block;
+
+    // lightweight timing: record first block arrival for the current buffer,
+    // and compute buffer-fill latency when the buffer becomes full.
+    const uint32_t now_us = (uint32_t)micros();
     
     block = receiveReadOnly();
     if (!block) return;
+    if (state==0) first_block_time_us = now_us;
     
     if ( !enabled ) {
         release( block );
@@ -75,40 +78,39 @@ void SafeNoteFrequencyAnalyzer::update( void ) {
     
     if ( next_buffer ) {
         blocklist1[state++] = block;
-        if ( !first_run && process_buffer ) process( );
     } else {
         blocklist2[state++] = block;
-        if ( !first_run && process_buffer ) process( );
     }
-    
-    if ( state >= AUDIO_GUITARTUNER_BLOCKS ) {
-        if ( next_buffer ) {
-            if ( !first_run && process_buffer ) process( );
-            for ( int i = 0; i < AUDIO_GUITARTUNER_BLOCKS; i++ ) {
-                copy_buffer( AudioBuffer + ( i * AUDIO_BLOCK_SAMPLES ), blocklist1[i]->data );
-                //filter_inplace_block( AudioBuffer + ( i * AUDIO_BLOCK_SAMPLES ));
-            }
-            for ( int i = 0; i < AUDIO_GUITARTUNER_BLOCKS; i++ ) {
-                release( blocklist1[i] );
-                blocklist1[i] = nullptr;    // <<< important: avoid double-release later
-            }
-            next_buffer = false;
-        } else {
-            if ( !first_run && process_buffer ) process( );
-            for ( int i = 0; i < AUDIO_GUITARTUNER_BLOCKS; i++ ) {
-                copy_buffer( AudioBuffer + ( i * AUDIO_BLOCK_SAMPLES ), blocklist2[i]->data );
-                //filter_inplace_block( AudioBuffer + ( i * AUDIO_BLOCK_SAMPLES ));
-            }
-            for ( int i = 0; i < AUDIO_GUITARTUNER_BLOCKS; i++ ) {
-                release( blocklist2[i] );
-                blocklist2[i] = nullptr;    // <<< important: avoid double-release later    
-            }
-            next_buffer = true;
-        }
-        process_buffer = true;
-        first_run = false;
-        state = 0;
+
+    if (state >= needed_blocks) {
+    // compute start index so we copy the tail window
+    int start = state - needed_blocks;  // 0-based within the current list
+    int dst_idx = 0;
+    for (int i = 0; i < needed_blocks; ++i) {
+        const audio_block_t* srcblk = next_buffer ? blocklist1[start + i]
+                                                  : blocklist2[start + i];
+        copy_buffer(AudioBuffer + dst_idx, srcblk->data);
+        // optionally enable this to prefilter: filter_inplace_block(AudioBuffer + dst_idx);
+        dst_idx += AUDIO_BLOCK_SAMPLES;
     }
+
+    // mark that we are ready to process this sliding window
+    process_buffer = true;
+    process();
+    first_run = false;
+    // When we’ve consumed a block, release the **oldest** one to avoid leaks:
+    // (only if state has grown beyond needed_blocks)
+    if (state > needed_blocks) {
+        int release_idx = 0;  // release the oldest of the queue
+        if (next_buffer) { release(blocklist1[release_idx]); blocklist1[release_idx] = nullptr; }
+        else              { release(blocklist2[release_idx]); blocklist2[release_idx] = nullptr; }
+
+        // shift remaining pointers left by one (cheap memmove of pointers, not audio)
+        if (next_buffer) memmove(&blocklist1[0], &blocklist1[1], (state-1)*sizeof(audio_block_t*));
+        else             memmove(&blocklist2[0], &blocklist2[1], (state-1)*sizeof(audio_block_t*));
+        state -= 1;
+    }
+}
     
 }
 
@@ -139,7 +141,9 @@ void SafeNoteFrequencyAnalyzer::filter_inplace_block(int16_t *dst) {
  *  size limit.
  */
 void SafeNoteFrequencyAnalyzer::process( void ) {
-    
+
+    //const uint32_t now_us = (uint32_t)micros();
+    //first_block_time_us = now_us;
     const int16_t *p;
     p = AudioBuffer;
     
@@ -147,7 +151,9 @@ void SafeNoteFrequencyAnalyzer::process( void ) {
     uint16_t tau = tau_global;
     do {
         uint16_t x   = 0;
-        uint64_t  sum = 0;
+        uint64_t sum = 0;
+        uint16_t XMAX = (tau < window_samples) ? (uint16_t)(window_samples - tau) : 0;
+        if (XMAX == 0) break; // no valid samples for this tau, skip it
         do {
             int16_t current, lag, delta;
             lag = *( ( int16_t * )p + ( x+tau ) );
@@ -173,8 +179,9 @@ void SafeNoteFrequencyAnalyzer::process( void ) {
             delta = ( current-lag );
             sum += delta * delta;
             x += 4;
-        } while ( x < HALF_BLOCKS );
+        } while ( x < half_window_samples );
         
+        // update running stats, estimate tau for next cycle
         uint64_t rs = running_sum;
         rs += sum;
         yin_buffer[yin_idx] = sum*tau;
@@ -184,16 +191,37 @@ void SafeNoteFrequencyAnalyzer::process( void ) {
         tau = estimate( yin_buffer, rs_buffer, yin_idx, tau );
         
         if ( tau == 0 ) {
+            miss_frames = 0; // reset miss counter on success
+            if (widen_cooldown > 0) --widen_cooldown;
+            //adapt_window_from_tau(data); // adjust window size for next round, data holds the sub-sample period time set in estimate()
             process_buffer  = false;
             new_output      = true;
             yin_idx         = 1;
             running_sum     = 0;
-            tau_global      = 1;
+            // Seed next frame near what estimate() calculated, but clamp to legal range
+            uint16_t seed = (uint16_t)data;
+            if (seed < 1) seed = 1;
+            if (seed >= half_window_samples) seed = (uint16_t)(half_window_samples - 1);
+            //tau_global = seed;
+            tau_global = 1; // reset to 1 for now.
             return;
         }
     } while ( --cycles );
-    //digitalWriteFast(10, LOW);
-    if ( tau >= HALF_BLOCKS ) {
+
+    // widen-on-miss logic
+    // If tau ran into the half-window ceiling, or even if it didn't,
+    // // this frame still didn't have a pitch to lock on / narrow tau window for.
+    // if (widen_cooldown == 0 && ++miss_frames >= 2) {   // ~2*2.9ms ≈ 5.8 ms of failure
+    //     widen_to_max_window();
+    //     miss_frames = 0;
+    // } else if (widen_cooldown > 0) {
+    //     --widen_cooldown;
+    // }
+
+    // old ceiling guard just in case we need it
+    // Reset per-buffer state before returning to caller
+    if ( tau >= half_window_samples ) {
+
         process_buffer  = false;
         new_output      = false;
         yin_idx         = 1;
@@ -202,8 +230,61 @@ void SafeNoteFrequencyAnalyzer::process( void ) {
         return;
     }
     tau_global = tau;
+    //last_buffer_latency_us = (uint32_t)( (uint32_t)micros() - first_block_time_us );
 }
 
+
+// === Window adaptation tuned for YIN (constant evaluation length) ===
+// Policy:
+//  - Expand quickly to fit low notes (K * tau).
+//  - Shrink slowly (by 1 block) to avoid thrashing on vibrato/noise.
+//  - Keep min/max window bounds in milliseconds.
+//  - Always update via set_window_blocks() so tau_global is clamped safely.
+
+void SafeNoteFrequencyAnalyzer::adapt_window_from_tau(float tau_samples) {
+    // Require at least ~2.25 periods in the FULL window so half_window >= tau with margin
+    const float K = 2.30f; // 2.25–2.40 is fine for guitar
+    float target_samples = K * tau_samples;
+
+    // Bounds: keep it responsive but allow low-E safely.
+    const float min_ms = 12.0f;   // lower than this gets twitchy
+    const float max_ms = 28.0f;   // 28–30 ms covers E2 / drop tunings better
+    const float Fs = AUDIO_SAMPLE_RATE_EXACT;
+
+    float min_samps = Fs * (min_ms / 1000.0f);
+    float max_samps = Fs * (max_ms / 1000.0f);
+
+    if (target_samples < min_samps) target_samples = min_samps;
+    if (target_samples > max_samps) target_samples = max_samps;
+
+    // Convert to blocks
+    uint16_t target_blocks =
+        (uint16_t)(( (uint32_t)lrintf(target_samples) + AUDIO_BLOCK_SAMPLES - 1) / AUDIO_BLOCK_SAMPLES);
+
+    // Hysteresis: expand immediately; shrink slowly by 1 block per call.
+    if (target_blocks > needed_blocks) {
+        set_window_blocks(target_blocks);               // expand now (low note jumped in)
+    } else if (target_blocks + 1 < needed_blocks) {
+        set_window_blocks(needed_blocks - 1);           // shrink gently
+    } // else keep as-is
+}
+
+void SafeNoteFrequencyAnalyzer::set_window_blocks(uint16_t nb) {
+    if (nb < 4) nb = 4;
+    if (nb > AUDIO_GUITARTUNER_BLOCKS) nb = AUDIO_GUITARTUNER_BLOCKS;
+    needed_blocks       = nb;
+    window_samples      = (uint16_t)(needed_blocks * AUDIO_BLOCK_SAMPLES);
+    half_window_samples = (uint16_t)(window_samples >> 1);
+
+    // keep tau_global valid
+    if (tau_global >= half_window_samples)
+        tau_global = (half_window_samples > 1) ? (half_window_samples - 1) : 1;
+}
+
+void SafeNoteFrequencyAnalyzer::widen_to_max_window() {
+    set_window_blocks(max_window_blocks);
+    widen_cooldown = 3;  // ignore further widens for ~3 blocks
+}
 /**
  *  check the sampled data for fundamental frequency
  *
@@ -257,11 +338,37 @@ void SafeNoteFrequencyAnalyzer::begin( float threshold , float cutoff_hz) {
     AudioBuffer = reinterpret_cast<int16_t*>(
         ::operator new[](n * sizeof(int16_t), std::align_val_t(4)));
 
+    // choosing a window in ms based on the lowest note we care to detect. higher values increase latency
+    const float window_ms = 21.0f;                                                           // sweet spot for E2; use 18–24 ms range
+    window_samples = (uint16_t)lrintf(AUDIO_SAMPLE_RATE_EXACT * (window_ms / 1000.0f));
+
+    // round up to blocks of 128
+    needed_blocks = (window_samples + AUDIO_BLOCK_SAMPLES - 1) / AUDIO_BLOCK_SAMPLES;
+    if (needed_blocks < 4) needed_blocks = 4;                                                // safety
+    if (needed_blocks > AUDIO_GUITARTUNER_BLOCKS) needed_blocks = AUDIO_GUITARTUNER_BLOCKS;  // cap at our buffer
+    HALF_BLOCKS = (uint16_t)((uint32_t)needed_blocks * AUDIO_BLOCK_SAMPLES / 2);
+
+    // Derive sample counts
+    window_samples      = (uint16_t)(needed_blocks * AUDIO_BLOCK_SAMPLES);
+    half_window_samples = (uint16_t)(window_samples >> 1);
+
+    // Cap the *maximum* window to something that covers E2/drop-D comfortably.
+    // 28 ms @ 44.1 kHz ≈ 1235 samples → 10 blocks (1280) once rounded.
+    // this stuff is all for adaptive tau windowing
+    const float max_ms_cap = 28.0f;
+    uint16_t max_samps = (uint16_t)lrintf(AUDIO_SAMPLE_RATE_EXACT * (max_ms_cap / 1000.0f));
+    max_window_blocks = (max_samps + AUDIO_BLOCK_SAMPLES - 1) / AUDIO_BLOCK_SAMPLES;
+    if (max_window_blocks > AUDIO_GUITARTUNER_BLOCKS) max_window_blocks = AUDIO_GUITARTUNER_BLOCKS;
+
+    miss_frames = 0;
+    widen_cooldown = 0;
+
+    // initialize actual YIN parameters
     __disable_irq( );
     process_buffer = false;
     yin_threshold  = threshold;
     lpf_cutoff     = (float)cutoff_hz;
-    lpf_alpha      = lpf_alpha_from_cutoff(lpf_cutoff, AUDIO_SAMPLE_RATE_EXACT); // Cache alpha unless cutoff changes
+    lpf_alpha      = lpf_alpha_from_cutoff(lpf_cutoff, AUDIO_SAMPLE_RATE_EXACT);             // Cache alpha unless cutoff changes
     periodicity    = 0.0f;
     next_buffer    = true;
     running_sum    = 0;
@@ -320,6 +427,11 @@ void SafeNoteFrequencyAnalyzer::threshold( float p ) {
     __disable_irq( );
     yin_threshold = p;
     __enable_irq( );
+}
+
+// get delay in milliseconds from buffer processing
+uint32_t SafeNoteFrequencyAnalyzer::get_buffer_delay( void ){
+    return last_buffer_latency_us / 1000; // convert to ms
 }
 
 void SafeNoteFrequencyAnalyzer::end() {
