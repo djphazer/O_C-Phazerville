@@ -195,9 +195,15 @@ private:
     uint32_t first_block_time_us;
     uint32_t last_buffer_latency_us; // can read via debugger/Serial if needed
 
-    // recovery and miss chance bookkeeping
-    uint8_t  miss_frames = 0;          // consecutive process() calls with no lock
-    uint8_t  widen_cooldown = 0;       // prevent flapping after a widen
-    uint16_t max_window_blocks = 0;    // precomputed from your chosen max ms cap
+    // --- confidence/holding & smoothing state ---
+    float sm_logf = NAN;           // log2 smoothing state (initialized lazy)
+    float last_good_period = 0.0f; // period (samples) of last accepted lock
+    bool  have_good = false;       // have we accepted at least one good lock?
+    uint8_t hold_count = 0;        // how many frames left to hold last_good_period
+
+    // tuning constants for gating/hold
+    static constexpr float   CONF_RISE = 0.75f;  // need this to accept a *new* lock
+    static constexpr float   CONF_FALL = 0.70f;  // lower bar to keep an *existing* lock (hysteresis)
+    static constexpr uint8_t HOLD_MAX  = 6;      // frames to keep last good on low confidence (≈ 6×process cadence)
 };
 #endif
