@@ -112,7 +112,7 @@ public:
         isLooping = loop_linker.IsLooping();
 
         // reseed from ProbDiv
-        regen = regen || loop_linker.ShouldReseed();
+        regen = regen || loop_linker.ShouldRegenerate();
 
         // reseed loop if range has changed due to CV
         regen = regen || (isLooping && (down_mod != oldDown || up_mod != oldUp));
@@ -140,11 +140,20 @@ public:
     }
 
     void View() {
-        DrawParams();
-        DrawKeyboard();
+        if (showDebug) {
+            DrawDebug();
+        } else {
+            DrawParams();
+            DrawKeyboard();    
+        }
+        
     }
 
     // void OnButtonPress() { }
+
+    void AuxButton() {
+        showDebug = !showDebug;
+    }
 
     void OnEncoderMove(int direction) {
         if (!EditMode()) {
@@ -227,6 +236,8 @@ private:
     uint8_t seqloop[2][HEM_PROB_MEL_MAX_LOOP_LENGTH];
     int8_t rotation[2] = {0};
     int8_t cv_mode = 0;
+
+    bool showDebug = false;
 
     ProbLoopLinker &loop_linker = ProbLoopLinker::get();
 
@@ -328,6 +339,14 @@ private:
     }
 
     void GenerateLoop() {
+        int full_seed = 0;
+        for (int p = 0; p < 12; p++) {
+            full_seed ^= (weights[p] + 1) << p; // add 1 to weights to offset negative values
+        }
+
+        full_seed ^= ((up << 6) | down);
+        full_seed |= (loop_linker.GetSeed() << 16);
+        randomSeed(full_seed);
         // always fill the whole loop to make things easier
         for (int i = 0; i < HEM_PROB_MEL_MAX_LOOP_LENGTH; ++i) {
             seqloop[0][i] = GetNextWeightedPitch();
@@ -446,6 +465,36 @@ private:
             if (ws[i] < 0) gfxPrint(34, 16, "X");
             else gfxPrint(34, 16, ws[i]);
             gfxInvert(1, 15, 60, 10);
+        }
+    }
+
+    void DrawDebug() {
+        int full_seed = 0;
+        for (int p = 0; p < 12; p++) {
+            full_seed ^= (weights[p] < 0 ? 0 : weights[p]) << p;
+        }
+        full_seed ^= ((up << 6) ^ down) | (loop_linker.GetSeed() << 16);
+        char sz2[2];
+        sz2[1] = 0; // Null terminated string for easy print
+        gfxPos(1, 15);
+        for (int i = 7; i >= 0; --i) {
+          // Grab each nibble in turn, starting with most significant
+          int nib2 = (full_seed >> (i * 4)) & 0xF;
+          if (nib2 <= 9) {
+            gfxPrint(nib2);
+          } else {
+            sz2[0] = 'a' + nib2 - 10;
+            gfxPrint(static_cast<const char *>(sz2));
+          }
+        }
+        // gfxPrint(1,35,down);
+        // gfxPrint(20,35,up);
+
+        for (int i = 0; i < 16; i++) {
+            int xOffset = (i % 4) * 16;
+            int yOffset = (i / 4) * 10;
+            gfxPrint(1 + xOffset, 25 + yOffset, seqloop[0][i]);
+            gfxPrint(",");
         }
     }
 

@@ -77,8 +77,8 @@ public:
             int reseed = DetentedIn(1);
             // trigger reseed if CV2 is > 2.5v
             if (reseed > (HEMISPHERE_MAX_CV >> 1) && !reseed_high) {
-                GenerateLoop(false);
-                loop_linker.Reseed();
+                GenerateLoop(true, false);
+                loop_linker.TriggerRegeneration();
                 reseed_high = true;
                 reseed_animation = HEMISPHERE_PULSE_ANIMATION_TIME_LONG;
             }
@@ -136,10 +136,18 @@ public:
     }
 
     void View() {
-        DrawInterface();
+        if (showDebug) {
+            DrawDebug();
+        } else {
+            DrawInterface();
+        }
     }
 
     // void OnButtonPress() { }
+
+    void AuxButton() {
+        showDebug = !showDebug;
+    }
 
     void OnEncoderMove(int direction) {
         if (!EditMode()) {
@@ -157,7 +165,8 @@ public:
             loop_length = constrain(loop_length + direction, 0, MAX_LOOP_LENGTH);
             if (old == 0 && loop_length > 0) {
                 // seed loop
-                GenerateLoop(true);
+                GenerateLoop(true, true);
+                loop_linker.TriggerRegeneration();
             }
             break;
         }
@@ -165,7 +174,7 @@ public:
         }
 
         if (cursor < LOOP_LENGTH && loop_length > 0) {
-          GenerateLoop(false);
+          GenerateLoop(false, false);
         }
     }
         
@@ -177,6 +186,7 @@ public:
         Pack(data, PackLocation {8,4}, weight_4); 
         Pack(data, PackLocation {12,4}, weight_8); 
         Pack(data, PackLocation {16,8}, loop_length);
+        Pack(data, PackLocation {24,16}, loop_linker.GetSeed());
         return data;
     }
 
@@ -187,9 +197,10 @@ public:
         weight_4 = Unpack(data, PackLocation {8,4});
         weight_8 = Unpack(data, PackLocation {12,4});
         loop_length = Unpack(data, PackLocation {16,8});
+        loop_linker.SetSeed(Unpack(data, PackLocation {24, 16}));
         if (loop_length > 0) {
             // seed loop
-            GenerateLoop(true);
+            GenerateLoop(false, true);
         }
     }
 
@@ -219,6 +230,8 @@ private:
     int loop_step;
     // used to keep track of reseed cv inputs so it only reseeds on rising edge
     bool reseed_high;
+
+    bool showDebug = false;
 
     int skip_steps;
     int pulse_animation = 0;
@@ -262,6 +275,29 @@ private:
         }
     }
 
+    void DrawDebug() {
+        int disp_seed = loop_linker.GetSeed(); //0xABCD // test display accuracy
+        char sz[2];
+        sz[1] = 0; // Null terminated string for easy print
+        gfxPos(1, 15);
+        for (int i = 3; i >= 0; --i) {
+          // Grab each nibble in turn, starting with most significant
+          int nib = (disp_seed >> (i * 4)) & 0xF;
+          if (nib <= 9) {
+            gfxPrint(nib);
+          } else {
+            sz[0] = 'a' + nib - 10;
+            gfxPrint(static_cast<const char *>(sz));
+          }
+        }
+        for (int i = 0; i < 16; i++) {
+            int xOffset = (i % 4) * 12;
+            int yOffset = (i / 4) * 10;
+            gfxPrint(1 + xOffset, 25 + yOffset, loop[i]);
+            gfxPrint(",");
+        }
+    }
+
     int GetNextWeightedDiv() {
         int total_weights = 0;
 
@@ -279,7 +315,7 @@ private:
         return 0;
     }
 
-    void GenerateLoop(bool restart) {
+    void GenerateLoop(bool reseed, bool restart) {
         memset(loop, 0, sizeof(loop)); // reset loop
         if (restart) {
             loop_step = 0;
@@ -287,6 +323,16 @@ private:
         }
         int index = 0;
         int counter = 0;
+        if (reseed) {
+            randomSeed(micros());
+            loop_linker.SetSeed(random(0, 65535)); // 16 bits
+        }
+        int full_seed = (loop_linker.GetSeed() << 16) |
+                        (weight_1 << 12) |
+                        (weight_2 << 8) |
+                        (weight_4 << 4) |
+                        weight_8;
+        randomSeed(full_seed);
         while (counter < MAX_LOOP_LENGTH) {
             int div = GetNextWeightedDiv();
             if (div == 0) {
