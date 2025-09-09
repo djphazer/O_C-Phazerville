@@ -25,18 +25,19 @@
 
 struct ProbLoopLinker {
     static ProbLoopLinker *instance;
+    uint16_t seed;
     int loopStep;
     bool trig_q[4] = {0, 0, 0, 0};
     bool registered[2]; // { Div, Melo }
     bool isLooping;
-    bool reseed;
+    bool regenerate;
 
     uint32_t last_advance_tick = 0; // To prevent double-advancing
 
     ProbLoopLinker() {
       isLooping = false;
       loopStep = 0;
-      reseed = false;
+      regenerate = false;
       registered[0] = 0; // Div
       registered[1] = 0; // Melo
     }
@@ -93,13 +94,21 @@ struct ProbLoopLinker {
         return loopStep;
     }
 
-    void Reseed() {
-        reseed = true;
+    void SetSeed(uint16_t _seed) {
+        seed = _seed;
     }
 
-    bool ShouldReseed() {
-        if (reseed) {
-            reseed = false;
+    uint16_t GetSeed() {
+        return seed;
+    }
+
+    void TriggerRegeneration() {
+        regenerate = true;
+    }
+
+    bool ShouldRegenerate() {
+        if (regenerate) {
+            regenerate = false;
             return true;
         }
         return false;
