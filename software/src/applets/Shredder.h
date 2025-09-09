@@ -45,7 +45,7 @@ public:
         reset = true;
         quant_channels = 0;
         ForEachChannel(ch) {
-            Shred(ch);
+            Shred(ch, true);
         }
         VoltageOut();
     }
@@ -56,7 +56,7 @@ public:
         VoltageOut();
         ForEachChannel(ch) {
           if (shred_on_reset[ch])
-            Shred(ch);
+            Shred(ch, true);
         }
     }
 
@@ -105,7 +105,7 @@ public:
 
     void AuxButton() {
       if (cursor < 2) {
-        Shred(cursor);
+        Shred(cursor, true);
       }
       else
         CancelEdit();
@@ -116,7 +116,7 @@ public:
         case CHAN1_RANGE:
         case CHAN2_RANGE:
           if (OC::CORE::ticks - click_tick < HS::HEMISPHERE_DOUBLE_CLICK_TIME)
-            Shred(cursor);
+            Shred(cursor, true);
           else
             click_tick = OC::CORE::ticks;
         default:
@@ -175,6 +175,8 @@ public:
         Pack(data, PackLocation {13,1}, shred_on_reset[1]);
         Pack(data, PackLocation {16,8}, quant_channels);
         Pack(data, PackLocation {24,8}, GetScale(0));
+        Pack(data, PackLocation {32, 16}, seed[0]);
+        Pack(data, PackLocation {48, 16}, seed[1]);
         return data;
     }
 
@@ -187,8 +189,10 @@ public:
         shred_on_reset[1] = Unpack(data, PackLocation {13,1});
         quant_channels = Unpack(data, PackLocation {16,8});
         SetScale(0, Unpack(data, PackLocation {24,8}));
+        seed[0] = Unpack(data, PackLocation {32, 16});
+        seed[1] = Unpack(data, PackLocation {48, 16});
         ForEachChannel(ch) {
-            Shred(ch);
+            Shred(ch, false);
         }
         VoltageOut();
     }
@@ -210,6 +214,7 @@ protected:
 private:
     int cursor;
     uint32_t click_tick = 0;
+    uint16_t seed[2] = {0,0};
 
     // Sequencer state
     uint8_t step; // Current step number
@@ -309,9 +314,15 @@ private:
         }
     }
 
-    void Shred(int ch) {
+    void Shred(int ch, bool reseed) {
         int max;
         int min;
+        if (reseed) {
+            // generate a random seed value and then reseed using that value
+            randomSeed(micros());
+            seed[ch] = random(0, 65535); // 16 bits
+        }
+        randomSeed(seed[ch]);
         for (int i = 0; i < 16; i++) {
             if (range[ch] == 0) {
                 sequence[ch][i] = 0;
