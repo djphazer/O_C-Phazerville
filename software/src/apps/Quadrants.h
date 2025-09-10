@@ -40,10 +40,10 @@
 #include "HSClockManager.h"
 
 #include "PackingUtils.h"
-#include "hemisphere_config.h"
-#include "hemisphere_audio_config.h"
-
 #include "PhzConfig.h"
+
+//#include "applets/_config.h"
+//#include "audio_applets/_config.h"
 
 // per bank file
 static constexpr int QUAD_PRESET_COUNT = 32;

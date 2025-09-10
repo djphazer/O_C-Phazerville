@@ -1,5 +1,7 @@
 #pragma once
 
+#include "HemisphereApplet.h"
+
 // Categories*:
 // 0x01 = Modulator
 // 0x02 = Sequencer
@@ -11,6 +13,8 @@
 // 0x80 = Other
 //
 // *currently unused, but may be useful again someday
+
+using namespace HS;
 
 #include "applets/ADSREG.h"
 #include "applets/ADEG.h"
