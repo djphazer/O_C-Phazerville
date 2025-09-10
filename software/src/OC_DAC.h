@@ -205,12 +205,15 @@ public:
   // @return DAC output value
   static int32_t PitchToScaledDAC(DAC_CHANNEL channel, int32_t pitch, OutputVoltageScaling scaling, bool autotune_enabled)
   {
-    pitch = Scale(pitch, scaling);
-    pitch += kOctaveZero * 12 << 7;
-    CONSTRAIN(pitch, 0, (120 << 7));
+    const int interval_size = 12*(1+DAC_20Vpp) << 7;
+    const int max_pitch = OCTAVES * interval_size;
 
-    const int32_t octave = pitch / (12 << 7);
-    const int32_t fractional = pitch - octave * (12 << 7);
+    pitch = Scale(pitch, scaling);
+    pitch += kOctaveZero * interval_size;
+    CONSTRAIN(pitch, 0, max_pitch);
+
+    const int32_t octave = pitch / interval_size;
+    const int32_t fractional = pitch - octave * interval_size;
 
     const uint16_t *calibrated_octaves =
       (!autotune_enabled || !autotune_calibration_data_->channels[channel].is_valid())
@@ -220,7 +223,7 @@ public:
     int32_t sample = calibrated_octaves[octave];
     if (fractional) {
       int32_t span = calibrated_octaves[octave + 1] - sample;
-      sample += (fractional * span) / (12 << 7);
+      sample += (fractional * span) / interval_size;
     }
     return sample;
   }
@@ -265,7 +268,7 @@ public:
 
   // Set integer voltage value, where 0 = 0V, 1 = 1V
   static void set_octave(DAC_CHANNEL channel, int v) {
-    set(channel, calibration_data_->calibrated_octaves[channel][kOctaveZero + v]);
+    set(channel, get_octave_offset(channel, v));
   }
 
   // Set all channels to integer voltage value, where 0 = 0V, 1 = 1V
@@ -279,7 +282,14 @@ public:
   }
 
   static uint32_t get_octave_offset(DAC_CHANNEL channel, int octave) {
-    return calibration_data_->calibrated_octaves[channel][kOctaveZero + octave];
+    const int base_oct = kOctaveZero + octave/(1+DAC_20Vpp);
+    int cv = calibration_data_->calibrated_octaves[channel][base_oct];
+    if (DAC_20Vpp && (octave & 1)) {
+      // odd-numbered octaves are halfway between
+      const int neighbor = base_oct + (octave % 2);
+      cv = (cv + calibration_data_->calibrated_octaves[channel][neighbor]) / 2;
+    }
+    return cv;
   }
 
   static uint16_t get_unipolar_max(DAC_CHANNEL channel) {

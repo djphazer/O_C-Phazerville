@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <algorithm>
 #include "HSUtils.h"
+#include "OC_DAC.h"
 #include "OC_digital_inputs.h"
 #include "OC_gpio.h"
 #include "OC_ADC.h"
@@ -26,6 +27,7 @@ bool MIDI_Uses_Serial8=false;
 float id_voltage = 0.0;
 bool flip_mode = false;
 bool SDcard_Ready = false;
+bool DAC_20Vpp = false;
 
 FLASHMEM
 void OC::SetFlipMode(bool flip_180) {
@@ -168,6 +170,12 @@ void OC::Pinout_Detect() {
     I2S2_Audio_DAC = true;        // pins 2=DATA, 3=LRCLK, 4=BCLK, 33=MCLK
     I2C_Expansion = true;         // pins 18=SDA, 19=SCL
     MIDI_Uses_Serial8 = true;     // pins 34=IN, 35=OUT
+  }
+
+  DAC_20Vpp = (id_voltage >= 0.11 && id_voltage <= 0.15);
+  if (DAC_20Vpp) {
+    DAC::kOctaveZero = 5;
+    HS::octave_max = 10;
   }
 
   NorthernLightModular = NorthernLightModular || (id_voltage >= 0.45f);

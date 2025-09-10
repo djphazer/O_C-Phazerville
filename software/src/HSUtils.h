@@ -20,7 +20,7 @@ using simfloat = int32_t;
 // Reference Constants
 #define PULSE_VOLTAGE HS::octave_max
 #define HEMISPHERE_MAX_CV (HS::octave_max * 12 << 7)
-#define HEMISPHERE_MIN_CV (-OC::DAC::kOctaveZero * (12 << 7))
+#define HEMISPHERE_MIN_CV (-OC::DAC::kOctaveZero * (12 << 7)*(1+DAC_20Vpp))
 #define HEMISPHERE_CENTER_CV ((HEMISPHERE_MAX_CV-HEMISPHERE_MIN_CV)/2)
 #define HEMISPHERE_3V_CV 4608
 #define HEMISPHERE_CENTER_INPUT_CV (NorthernLightModular*HEMISPHERE_MAX_CV/2)

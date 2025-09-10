@@ -124,6 +124,22 @@ const CalibrationData kNLMCalibrationDefaults = {
   { 0, 0, 0 }, // reserved0
   0 // reserved1
 };
+
+const DAC::CalibrationData kDAC20VppDefaults = {
+  {
+  #ifdef ARDUINO_TEENSY41
+    {936, 7303, 13670, 20037, 26404, 32771, 39138, 45505, 51872, 58239, 64610},
+    {936, 7303, 13670, 20037, 26404, 32771, 39138, 45505, 51872, 58239, 64610},
+    {936, 7303, 13670, 20037, 26404, 32771, 39138, 45505, 51872, 58239, 64610},
+    {936, 7303, 13670, 20037, 26404, 32771, 39138, 45505, 51872, 58239, 64610},
+  #endif
+    {936, 7303, 13670, 20037, 26404, 32771, 39138, 45505, 51872, 58239, 64610},
+    {936, 7303, 13670, 20037, 26404, 32771, 39138, 45505, 51872, 58239, 64610},
+    {936, 7303, 13670, 20037, 26404, 32771, 39138, 45505, 51872, 58239, 64610},
+    {936, 7303, 13670, 20037, 26404, 32771, 39138, 45505, 51872, 58239, 64610}
+  }
+};
+
 #if defined(NORTHERNLIGHT) || defined(VOR)
 static constexpr uint16_t DAC_OFFSET = 0;  // DAC offset, initial approx., ish (Easel card)
 #else
@@ -135,6 +151,11 @@ FLASHMEM void calibration_reset() {
     memcpy(&OC::calibration_data, &kNLMCalibrationDefaults, sizeof(OC::calibration_data));
   } else {
     memcpy(&OC::calibration_data, &kCalibrationDefaults, sizeof(OC::calibration_data));
+    if (DAC_20Vpp) {
+      memcpy(&OC::calibration_data.dac, &kDAC20VppDefaults, sizeof(OC::calibration_data.dac));
+      return;
+    }
+
     for (int ch = 0; ch < DAC_CHANNEL_LAST; ++ch) {
       for (int i = 0; i < OCTAVES; ++i) {
         OC::calibration_data.dac.calibrated_octaves[ch][i] += DAC_OFFSET;
