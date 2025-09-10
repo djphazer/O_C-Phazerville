@@ -35,14 +35,8 @@
 #include "HSicons.h"
 #include "HSMIDI.h"
 #include "HSClockManager.h"
-
-#include "hemisphere_config.h"
-
 #ifdef __IMXRT1062__
 #include "PhzConfig.h"
-#endif
-#ifdef ARDUINO_TEENSY41
-#include "hemisphere_audio_config.h"
 #endif
 
 void HS::DrawAppletList(bool blink) {
