@@ -46,6 +46,7 @@ public:
         loop_index = 0;
         loop_step = 0;
         skip_steps = 0;
+        bypass_loop = false;
         ForEachChannel(ch) {
             GateOut(ch, false);
         }
@@ -63,7 +64,7 @@ public:
             // TODO: regenerate if changing from 0?
         }
 
-        loop_linker.SetLooping(loop_length_mod > 0);
+        loop_linker.SetLooping(loop_length_mod > 0 && !bypass_loop);
 
         // reset
         if (Clock(1)) {
@@ -87,6 +88,12 @@ public:
                 reseed_high = false;
             }
 
+            if (reseed < -(HEMISPHERE_MAX_CV >> 1)) {
+                bypass_loop = true;
+            } else {
+                bypass_loop = false;
+            }
+
             // reset loop
             if (loop_length_mod > 0 && loop_step >= loop_length_mod) {
                 loop_step = 0;
@@ -107,10 +114,12 @@ public:
                 return;
             }
 
-            // get next weighted div or next div from loop
+            // always advance the loop if looping is active
             if (loop_length_mod > 0) {
                 skip_steps = GetNextLoopDiv();
-            } else {
+            } 
+            // get a random div if loop is not active or if loop is in bypass, this might replace the value above
+            if (loop_length_mod == 0 || bypass_loop) {
                 skip_steps = GetNextWeightedDiv();
             }
 
@@ -136,18 +145,10 @@ public:
     }
 
     void View() {
-        if (showDebug) {
-            DrawDebug();
-        } else {
-            DrawInterface();
-        }
+        DrawInterface();
     }
 
     // void OnButtonPress() { }
-
-    void AuxButton() {
-        showDebug = !showDebug;
-    }
 
     void OnEncoderMove(int direction) {
         if (!EditMode()) {
@@ -230,8 +231,7 @@ private:
     int loop_step;
     // used to keep track of reseed cv inputs so it only reseeds on rising edge
     bool reseed_high;
-
-    bool showDebug = false;
+    bool bypass_loop;
 
     int skip_steps;
     int pulse_animation = 0;
@@ -272,29 +272,6 @@ private:
 
         if (reset_animation > 0) {
             gfxPrint(52, 55, "R");
-        }
-    }
-
-    void DrawDebug() {
-        int disp_seed = loop_linker.GetSeed(); //0xABCD // test display accuracy
-        char sz[2];
-        sz[1] = 0; // Null terminated string for easy print
-        gfxPos(1, 15);
-        for (int i = 3; i >= 0; --i) {
-          // Grab each nibble in turn, starting with most significant
-          int nib = (disp_seed >> (i * 4)) & 0xF;
-          if (nib <= 9) {
-            gfxPrint(nib);
-          } else {
-            sz[0] = 'a' + nib - 10;
-            gfxPrint(static_cast<const char *>(sz));
-          }
-        }
-        for (int i = 0; i < 16; i++) {
-            int xOffset = (i % 4) * 12;
-            int yOffset = (i / 4) * 10;
-            gfxPrint(1 + xOffset, 25 + yOffset, loop[i]);
-            gfxPrint(",");
         }
     }
 
