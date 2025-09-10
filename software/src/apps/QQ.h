@@ -39,10 +39,6 @@
 #include "OC_scale_edit.h"
 #include "OC_strings.h"
 
-// unsigned long LAST_REDRAW_TIME = 0;
-extern uint_fast8_t MENU_REDRAW;
-// OC::UiMode ui_mode = OC::UI_MODE_MENU;
-
 #ifdef NORTHERNLIGHT
  #define QQ_OFFSET_X 20
 #else
@@ -872,7 +868,6 @@ public:
     bool changed = continuous ? (last_sample_ != temp_sample) : (last_sample_ != sample);
 
     if (changed) {
-      MENU_REDRAW = 1;
       last_sample_ = continuous ? temp_sample : sample;
     }
 
