@@ -516,10 +516,17 @@ public:
               SwitchToStep(event.value);
             }
             break;
-          case CONTROL_ENCODER_R:
-            calstate.encoder_value = constrain(calstate.encoder_value + event.value,
-                calstate.current_step->min, calstate.current_step->max);
+          case CONTROL_ENCODER_R: {
+            int delta = event.value;
+            if (event.mask & OC::CONTROL_BUTTON_X) delta *= 16;
+            else if (event.mask & OC::CONTROL_BUTTON_Y) delta *= 32;
+            calstate.encoder_value = constrain(
+              calstate.encoder_value + delta,
+              calstate.current_step->min,
+              calstate.current_step->max
+            );
             break;
+          }
 
           case CONTROL_BUTTON_UP:
           case CONTROL_BUTTON_DOWN:
