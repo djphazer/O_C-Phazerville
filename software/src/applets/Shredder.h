@@ -314,17 +314,13 @@ private:
         }
     }
 
-    void Reseed(int ch) {
-        // generate a random seed value and then reseed using that value
-        randomSeed(micros());
-        seed[ch] = random(0, 65535); // 16 bits
-    }
-
     void Shred(int ch, bool reseed) {
         int max;
         int min;
         if (reseed) {
-            Reseed(ch);
+            // generate a random seed value and then reseed using that value
+            randomSeed(micros());
+            seed[ch] = random(0, 65535); // 16 bits
         }
         randomSeed(seed[ch]);
         for (int i = 0; i < 16; i++) {
