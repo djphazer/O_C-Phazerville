@@ -29,6 +29,10 @@ bool flip_mode = false;
 bool SDcard_Ready = false;
 bool DAC_20Vpp = false;
 
+float OC::GetIDVoltage() {
+  return id_voltage;
+}
+
 FLASHMEM
 void OC::SetFlipMode(bool flip_180) {
   flip_mode = flip_180;

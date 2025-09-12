@@ -46,6 +46,7 @@ namespace OC {
 
 void Pinout_Detect();
 void SetFlipMode(bool flip_180);
+float GetIDVoltage();
 
 }
 

@@ -117,6 +117,11 @@ static void debug_menu_version()
   graphics.setPrintPos(2, y);
   graphics.print("USB_SERIAL");
 #endif
+
+#ifdef __IMXRT1062__
+  graphics.setPrintPos(2, 52);
+  graphics.printf("HW_ID= 0.%03dV", int(GetIDVoltage() * 1000));
+#endif
 }
 
 static void debug_menu_gfx() {
