@@ -52,6 +52,14 @@ struct TuringMachine {
         n[2] = '1'  + (ix % 8);
         n[3] = '\0';
     }
+
+    void Validate() {
+        if (len == 0 || len > 16) {
+            reg = random(0, 0xffff);
+            len = 16;
+            favorite = 0;
+        }
+    }
 };
 
 DMAMEM TuringMachine user_turing_machines[TURING_MACHINE_COUNT];

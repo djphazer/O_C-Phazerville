@@ -507,6 +507,7 @@ void Init(bool reset_settings) {
   global_settings.reserved0 = false;
   global_settings.reserved1 = false;
   global_settings.DAC_scaling = VOLTAGE_SCALING_1V_PER_OCT;
+  memset(HS::user_turing_machines, 0, sizeof(HS::user_turing_machines));
 
   if (reset_settings) {
     if (ui.ConfirmReset()) {
@@ -663,6 +664,11 @@ void Init(bool reset_settings) {
     } else {
       restore_app_data();
     }
+  }
+
+  // Validate user_turing_machines
+  for (int i = 0; i < HS::TURING_MACHINE_COUNT; ++i) {
+    HS::user_turing_machines[i].Validate();
   }
 
   int current_app_index = apps::index_of(global_settings.current_app_id);

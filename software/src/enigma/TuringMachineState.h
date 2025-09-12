@@ -30,11 +30,7 @@ class TuringMachineState {
 public:
     void Init(byte ix_) {
         ix = constrain(ix_, 0, HS::TURING_MACHINE_COUNT - 1);
-        if (HS::user_turing_machines[ix].len == 0 || HS::user_turing_machines[ix].len > 17) {
-            HS::user_turing_machines[ix].reg = (random(0, 0xff) << 8) + random(0, 0xff);
-            HS::user_turing_machines[ix].len = 16;
-            HS::user_turing_machines[ix].favorite = 0;
-        }
+        //HS::user_turing_machines[ix].Validate();
         reg = HS::user_turing_machines[ix].reg;
         len = HS::user_turing_machines[ix].len;
         fav = HS::user_turing_machines[ix].favorite;
