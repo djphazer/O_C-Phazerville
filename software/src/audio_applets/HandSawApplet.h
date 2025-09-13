@@ -17,7 +17,6 @@ class HandSawApplet : public HemisphereAudioApplet {
           synth1_to_mixer1.connect(synth1, 0, mixer1, 0);
           synth2_to_mixer1.connect(synth2, 0, mixer1, 1);
           synth3_to_mixer1.connect(synth3, 0, mixer1, 2);
-          in_to_mixer1.connect(input_stream, 0, mixer1, 3);
           synth4_to_mixer2.connect(synth4, 0, mixer2, 0);
           synth5_to_mixer2.connect(synth5, 0, mixer2, 1);
           synth6_to_mixe2.connect(synth6, 0, mixer2, 2);
@@ -35,12 +34,12 @@ class HandSawApplet : public HemisphereAudioApplet {
 
           input_to_outputMixer.connect(input_stream, 0, outputMixer, 0);
           stackMixer_to_outputMixer.connect(stackMixer, 0, outputMixer, 1);
+          outputMixer.gain(0, 1.0f); // passthru
         }
         void Unload() override {
           synth1_to_mixer1.disconnect();
           synth2_to_mixer1.disconnect();
           synth3_to_mixer1.disconnect();
-          in_to_mixer1.disconnect();
           synth4_to_mixer2.disconnect();
           synth5_to_mixer2.disconnect();
           synth6_to_mixe2.disconnect();
@@ -128,8 +127,6 @@ class HandSawApplet : public HemisphereAudioApplet {
             mixer3.gain(2, 0.33f);
             mixer4.gain(2, 0.33f);
 
-            mixer1.gain(3, 0.0f);
-            
             stackMixer.gain(0, 0.25f);
             stackMixer.gain(1, 0.25f);
             stackMixer.gain(2, 0.25f);
@@ -139,7 +136,7 @@ class HandSawApplet : public HemisphereAudioApplet {
                 = constrain(static_cast<float>(mix) * 0.01f + mix_cv.InF(), 0.0f, 1.0f);
 
             outputMixer.gain(1, m);
-            outputMixer.gain(0, 1.0f - m);
+            //outputMixer.gain(0, 1.0f - m);
         }
 
         void View() override {
@@ -195,7 +192,7 @@ class HandSawApplet : public HemisphereAudioApplet {
             gfxPrint(phase_cv);
             gfxEndCursor(cursor == PHASE_CV, false, phase_cv.InputName());
 
-            gfxPrint(1, 55, "Mix: ");
+            gfxPrint(1, 55, "Lvl: ");
             gfxStartCursor();
             graphics.printf("%3d%%", mix);
             gfxEndCursor(cursor == MIX);
@@ -368,10 +365,10 @@ class HandSawApplet : public HemisphereAudioApplet {
         CVInputMap mix_cv;
 
         AudioPassthrough<MONO> input_stream;
-        AudioMixer<4> mixer1;
-        AudioMixer<4> mixer2;
-        AudioMixer<4> mixer3;
-        AudioMixer<4> mixer4;
+        AudioMixer<3> mixer1;
+        AudioMixer<3> mixer2;
+        AudioMixer<3> mixer3;
+        AudioMixer<3> mixer4;
         AudioMixer<4> stackMixer;
         AudioMixer<2> outputMixer;
         
@@ -391,7 +388,6 @@ class HandSawApplet : public HemisphereAudioApplet {
         AudioConnection synth1_to_mixer1;
         AudioConnection synth2_to_mixer1;
         AudioConnection synth3_to_mixer1;
-        AudioConnection in_to_mixer1;
         AudioConnection synth4_to_mixer2;
         AudioConnection synth5_to_mixer2;
         AudioConnection synth6_to_mixe2;
