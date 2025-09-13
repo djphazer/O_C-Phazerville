@@ -26,23 +26,23 @@ struct NoDuplicateIDs<First, Rest...>
     : std::bool_constant<((First != Rest) && ...) && NoDuplicateIDs<Rest...>::value> {};
 
 // --- Registry ---
-template <std::size_t MaxID, typename... Declarations>
-struct AppletRegistry {
+template <class T, std::size_t MaxID, typename... Declarations>
+struct Registry {
     using ID = uint16_t;
-    using FactoryFn = HemisphereApplet* (*)();
+    using FactoryFn = T* (*)();
 
     // Compile-time build of factories array
     static constexpr std::array<FactoryFn, MaxID + 1> buildFactories() {
         std::array<FactoryFn, MaxID + 1> arr{};
-        ((arr[Declarations::id] = +[]() -> HemisphereApplet* { return new typename Declarations::type(); }), ...);
+        ((arr[Declarations::id] = +[]() -> T* { return new typename Declarations::type(); }), ...);
         return arr;
     }
 
     static constexpr std::array<FactoryFn, MaxID + 1> factories = buildFactories();
 
-    mutable std::array<std::array<HemisphereApplet*, MaxID + 1>, HS::APPLET_SLOTS> instances{}; // Raw pointers, default nullptr
+    mutable std::array<std::array<T*, MaxID + 1>, HS::APPLET_SLOTS> instances{}; // Raw pointers, default nullptr
 
-    constexpr AppletRegistry() {
+    constexpr Registry() {
         static_assert(NoDuplicateIDs<Declarations::id...>::value,
                       "Duplicate Applet IDs detected in Registry!");
         // TODO: compiler doesn't like this syntax?
@@ -68,7 +68,7 @@ struct AppletRegistry {
       return ZAP_ICON;
     }
 
-    HemisphereApplet* get(ID id, HS::HEM_SIDE slot = 0) const {
+    T* get(ID id, HS::HEM_SIDE slot = 0) const {
         if (id > MaxID || !factories[id]) {
             return nullptr;
         }
