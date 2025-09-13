@@ -35,6 +35,15 @@ public:
       out_conns[i].connect(mixer[i], 0, output, i);
     }
 
+    patchCordWav1L.connect(wavplayer, 0, hpfilter[0], 0);
+    patchCordWav1R.connect(wavplayer, 1, hpfilter[1], 0);
+    patchCordWav1Ldry.connect(wavplayer, 0, mixer[0], 0);
+    patchCordWav1Rdry.connect(wavplayer, 1, mixer[1], 0);
+    patchCordWavHPF1L.connect(hpfilter[0], 2, mixer[0], 1);
+    patchCordWavHPF1R.connect(hpfilter[1], 2, mixer[1], 1);
+    patchCordWavLPF2L.connect(hpfilter[0], 0, mixer[0], 2);
+    patchCordWavLPF2R.connect(hpfilter[1], 0, mixer[1], 2);
+
     hpfilter[0].resonance(1.0);
     hpfilter[1].resonance(1.0);
     SetFilter(0);
@@ -50,6 +59,19 @@ public:
   }
   void Unload() {
     wavplayer.stop();
+    for (int i = 0; i < Channels; i++) {
+      in_conns[i].disconnect();
+      out_conns[i].disconnect();
+    }
+    patchCordWav1L.disconnect();
+    patchCordWav1R.disconnect();
+    patchCordWav1Ldry.disconnect();
+    patchCordWav1Rdry.disconnect();
+    patchCordWavHPF1L.disconnect();
+    patchCordWavHPF1R.disconnect();
+    patchCordWavLPF2L.disconnect();
+    patchCordWavLPF2R.disconnect();
+    AllowRestart();
   }
 
   void Controller() {
@@ -344,14 +366,14 @@ private:
   std::array<AudioConnection, Channels> in_conns;
   std::array<AudioConnection, Channels> out_conns;
 
-  AudioConnection          patchCordWav1L{wavplayer, 0, hpfilter[0], 0};
-  AudioConnection          patchCordWav1R{wavplayer, 1, hpfilter[1], 0};
-  AudioConnection          patchCordWav1Ldry{wavplayer, 0, mixer[0], 0};
-  AudioConnection          patchCordWav1Rdry{wavplayer, 1, mixer[1], 0};
-  AudioConnection          patchCordWavHPF1L{hpfilter[0], 2, mixer[0], 1};
-  AudioConnection          patchCordWavHPF1R{hpfilter[1], 2, mixer[1], 1};
-  AudioConnection          patchCordWavLPF2L{hpfilter[0], 0, mixer[0], 2};
-  AudioConnection          patchCordWavLPF2R{hpfilter[1], 0, mixer[1], 2};
+  AudioConnection patchCordWav1L;
+  AudioConnection patchCordWav1R;
+  AudioConnection patchCordWav1Ldry;
+  AudioConnection patchCordWav1Rdry;
+  AudioConnection patchCordWavHPF1L;
+  AudioConnection patchCordWavHPF1R;
+  AudioConnection patchCordWavLPF2L;
+  AudioConnection patchCordWavLPF2R;
 
   // SD player vars, copied from other dev branch
   bool wavplayer_reload = true;
