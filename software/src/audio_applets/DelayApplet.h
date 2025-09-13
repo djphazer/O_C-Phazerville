@@ -35,11 +35,16 @@ public:
   }
 
   void Unload() {
+    if (Channels == STEREO) {
+      ForEachChannel(ch) {
+        ping_pong_conns[ch].disconnect();
+      }
+    }
     /* what if we just... kept it forever?
      * the problem is, unloading & reloading is slow when jumping presets
+     */
     for (auto& ch : channels) ch.Stop();
     AllowRestart();
-    */
   }
 
   void Controller() {
@@ -438,8 +443,8 @@ private:
     AudioMixer<8> taps_mixer;
     AudioMixer<2> wet_dry_mixer;
 
-    AudioConnection mixer_to_delay{input_mixer, 0, delaystream, 0};
-    AudioConnection wet_conn{taps_mixer, 0, wet_dry_mixer, WD_WET_CH};
+    AudioConnection mixer_to_delay;
+    AudioConnection wet_conn;
 
     AudioConnection input_to_mixer;
     AudioConnection taps_conns[8];
@@ -458,11 +463,22 @@ private:
         taps_conns[i].connect(delaystream, i, taps_mixer, i);
       }
 
+      mixer_to_delay.connect(input_mixer, 0, delaystream, 0);
+      wet_conn.connect(taps_mixer, 0, wet_dry_mixer, WD_WET_CH);
       dry_conn.connect(input, channel, wet_dry_mixer, WD_DRY_CH);
       mix_to_output.connect(wet_dry_mixer, 0, output, channel);
     }
 
     void Stop() {
+      input_to_mixer.disconnect();
+      for (int i = 0; i < 8; i++) {
+        taps_conns[i].disconnect();
+      }
+
+      mixer_to_delay.disconnect();
+      wet_conn.disconnect();
+      dry_conn.disconnect();
+      mix_to_output.disconnect();
       delaystream.Release();
     }
   } channels[Channels];
