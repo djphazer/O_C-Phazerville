@@ -26,8 +26,18 @@ public:
   void Start() {
     for (int i = 0; i < Channels; i++) {
       in_conns[i].connect(input, i, filtfolder[i].folder, 0);
+      filtfolder[i].Start();
       out_conns[i].connect(filtfolder[i].mixer, 0, output, i);
     }
+  }
+
+  void Unload() {
+    for (int i = 0; i < Channels; i++) {
+      in_conns[i].disconnect();
+      filtfolder[i].Stop();
+      out_conns[i].disconnect();
+    }
+    AllowRestart();
   }
 
   void Controller() {
@@ -207,13 +217,7 @@ private:
 
     uint8_t modesel = 0; // 0 = BYPASS, 1 = LPF, 2 = BPF, 3 = HPF, 4 = Tilt
 
-    AudioConnection conn0{folder, 0, filter, 0};
-    AudioConnection conn2{folder, 0, mixer, 0};
-    AudioConnection conn1{filter, 0, mixer, 1};
-    AudioConnection conn1a{filter, 1, mixer, 2};
-    AudioConnection conn1b{filter, 2, mixer, 3};
-
-    AudioConnection conn4{drive, 0, folder, 1};
+    std::array<AudioConnection, 6> conns;
 
     void AmpAndFold(float foldF, float level, int tilt = 0) {
       drive.amplitude(foldF);
@@ -223,6 +227,18 @@ private:
         if (i==3) chanlvl *= -dbToScalar(-tilt) / 2;
         mixer.gain(i, chanlvl);
       }
+    }
+
+    void Start() {
+      conns[0].connect(folder, 0, filter, 0);
+      conns[1].connect(folder, 0, mixer, 0);
+      conns[2].connect(filter, 0, mixer, 1);
+      conns[3].connect(filter, 1, mixer, 2);
+      conns[4].connect(filter, 2, mixer, 3);
+      conns[5].connect(drive, 0, folder, 1);
+    }
+    void Stop() {
+      for (auto &c : conns) c.disconnect();
     }
   };
 
