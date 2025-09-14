@@ -586,6 +586,7 @@ void AppSwitcher::Init(bool reset_settings) {
   delay(100);
 }
 
+FLASHMEM
 void draw_save_message(uint8_t c) {
   GRAPHICS_BEGIN_FRAME(true);
   uint8_t _size = c % 120;
