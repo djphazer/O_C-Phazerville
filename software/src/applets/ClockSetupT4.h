@@ -370,16 +370,21 @@ private:
       if (cursor < OUTSKIP1) {
         // upper section
         graphics.clearRect(0, 0, 128, 24);
+        graphics.clearRect(0, 24, 52, 12); // label box
+
+        gfxLine(0, 35, 50, 35);
+        gfxLine(50, 23, 50, 35);
+        gfxPrint(0, 25, (cursor<MULT1)? "Tempo" : ((cursor<TRIG1)? "Clk Mult":"Trig Ins"));
 
         gfxDottedLine(0, 21, 127, 21);
         gfxLine(0, 22, 127, 22);
       } else {
         // lower section
         graphics.clearRect(0, 41, 128, 23);
-        graphics.clearRect(0, 30, 50, 11); // label box
+        graphics.clearRect(0, 29, 52, 12); // label box
 
-        gfxLine(0, 31, 49, 31);
-        gfxLine(49, 31, 49, 41);
+        gfxLine(0, 30, 50, 30);
+        gfxLine(50, 30, 50, 41);
         gfxPrint(0, 33, (cursor<OUTSLEW1) ? "TrigSkip" : "Out Slew");
         gfxLine(0, 42, 127, 42);
         gfxDottedLine(0, 43, 127, 43);
