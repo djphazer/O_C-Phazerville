@@ -5,6 +5,7 @@
 #include "OC_gpio.h"
 #include "OC_scales.h"
 #include "PackingUtils.h"
+#include "src/extern/peaks_multistage_envelope.h"
 #include "util/util_semitone_quantizer.h"
 #include "util/util_turing.h"
 
@@ -197,11 +198,17 @@ namespace HS {
   extern uint8_t mview;
   extern ErrMsgIndex msg_idx;
 
+  extern peaks::MultistageEnvelope env_[DAC_CHANNEL_COUNT];
+  static peaks::MultistageEnvelope& GetEnvelope(int index) {
+    return env_[index];
+  }
+
   // input quantizers, because sometimes we need hysteresis
   extern util::SemitoneQuantizer input_quant[ADC_CHANNEL_COUNT];
-  extern util::TuringShiftRegister turing_machine_[ADC_CHANNEL_COUNT];
+  extern util::TuringShiftRegister* turing_machine_[ADC_CHANNEL_COUNT];
   static util::TuringShiftRegister& GetTM(int index) {
-    return turing_machine_[index];
+    if (!turing_machine_[index]) turing_machine_[index] = new util::TuringShiftRegister();
+    return *turing_machine_[index];
   }
 
   extern QuantEngine q_engine[QUANT_CHANNEL_COUNT];

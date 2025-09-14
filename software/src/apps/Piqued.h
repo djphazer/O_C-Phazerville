@@ -23,6 +23,7 @@
 // Quad enevelope generator app, based on the multistage envelope implementation
 // from Peaks by Emilie Gillet (see peaks_multistage_envelope.h/cpp)
 
+#include "HSUtils.h"
 #include "OC_apps.h"
 #include "OC_bitmaps.h"
 #include "OC_config.h"
@@ -503,6 +504,7 @@ public:
     CONSTRAIN(s[CV_MAPPING_MAX_LOOPS], 0, 65535);
 
     EnvelopeType type = get_type();
+    auto &env_ = HS::GetEnvelope(channel_index_);
     switch (type) {
       case ENV_TYPE_AD: env_.set_ad(s[CV_MAPPING_SEG1], s[CV_MAPPING_SEG2], 0, 0); break;
       case ENV_TYPE_ADSR: env_.set_adsr(s[CV_MAPPING_SEG1], s[CV_MAPPING_SEG2], s[CV_MAPPING_SEG3]>>1, s[CV_MAPPING_SEG4]); break;
@@ -630,10 +632,12 @@ public:
   }
 
   uint16_t RenderPreview(int16_t *values, uint16_t *segment_start_points, uint16_t *loop_points, uint16_t &current_phase) const {
+    auto &env_ = HS::GetEnvelope(channel_index_);
     return env_.RenderPreview(values, segment_start_points, loop_points, current_phase);
   }
 
   uint16_t RenderFastPreview(int16_t *values) const {
+    auto &env_ = HS::GetEnvelope(channel_index_);
     return env_.RenderFastPreview(values);
   }
 
@@ -647,14 +651,17 @@ public:
 
 #ifdef ENVGEN_DEBUG
   inline uint16_t get_amplitude_value() const {
+    auto &env_ = HS::GetEnvelope(channel_index_);
     return(env_.get_amplitude_value()) ;
   }
 
   inline uint16_t get_sampled_amplitude_value() const {
+    auto &env_ = HS::GetEnvelope(channel_index_);
     return(env_.get_sampled_amplitude_value()) ;
   }
 
   inline bool get_is_amplitude_sampled() const {
+    auto &env_ = HS::GetEnvelope(channel_index_);
     return(env_.get_is_amplitude_sampled()) ;
   }
 #endif
@@ -664,6 +671,7 @@ public:
   }
 
   uint64_t internal_trigger_mask() const {
+    auto &env_ = HS::GetEnvelope(channel_index_);
     return env_.get_state_mask();
   }
 
@@ -671,7 +679,6 @@ private:
 
   int channel_index_;
  
-  peaks::MultistageEnvelope env_;
   EnvelopeType last_type_;
   bool gate_raised_;
   uint32_t euclidean_counter_;
@@ -773,7 +780,6 @@ EnvelopeGenerator::EnvelopeGenerator(OC::DigitalInput default_trigger) {
 
   InitDefaults();
   apply_value(ENV_SETTING_TRIGGER_INPUT, default_trigger);
-  env_.Init();
   channel_index_ = idx++;
   last_type_ = ENV_TYPE_LAST;
   gate_raised_ = false;
