@@ -34,6 +34,10 @@ public:
   static const uint8_t kDefaultLength = 16;
   static const uint8_t kDefaultProbability = 128;
 
+  TuringShiftRegister() {
+    Init();
+  }
+
   void Init() {
     length_ = kDefaultLength;
     probability_ = kDefaultProbability;
