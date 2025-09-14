@@ -24,7 +24,8 @@ namespace HS {
   uint8_t qview = 0; // which quantizer's setting is shown in popup
   ErrMsgIndex msg_idx;
 
-  util::SemitoneQuantizer input_quant[ADC_CHANNEL_LAST];
+  util::SemitoneQuantizer input_quant[ADC_CHANNEL_COUNT];
+  util::TuringShiftRegister turing_machine_[ADC_CHANNEL_COUNT];
 
   // All of the HS:: globals should be instantiated here
   TuringMachine user_turing_machines[TURING_MACHINE_COUNT];
@@ -62,11 +63,15 @@ namespace HS {
     for (auto &q : q_engine)
       q.quantizer.Init();
 
+    for (auto &tm : turing_machine_)
+      tm.Init();
+
     for (int i = 0; i < APPLET_SLOTS * 2; ++i) {
       trigmap[i].source = (i%4) + 1;
       cvmap[i].source = i + 1;
       clock_m.SetMultiply(0, i);
     }
+
   }
 
   void PokePopup(PopupType pop, ErrMsgIndex err) {
