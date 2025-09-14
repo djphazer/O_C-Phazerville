@@ -54,6 +54,7 @@ namespace HS {
 
   OC::menu::ScreenCursor<5> showhide_cursor;
 
+  FLASHMEM
   void Init() {
     for (auto &iq : input_quant)
       iq.Init();

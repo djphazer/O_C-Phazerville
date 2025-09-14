@@ -83,6 +83,7 @@ enum GlobalSettingsDataKeys : uint16_t {
 };
 #endif
 
+FLASHMEM
 static void SaveGlobalSettings() {
   APPS_SERIAL_PRINTLN("Save global settings");
 
@@ -215,6 +216,7 @@ static constexpr size_t totalsize = total_storage_size();
 static_assert(totalsize < OC::AppData::kAppDataSize, "EEPROM Allocation Exceeded");
 */
 
+FLASHMEM
 static void SaveAppData() {
   SaveGlobalSettings(); // yeah, why not
   APPS_SERIAL_PRINTLN("Save app data... (%u bytes available)", OC::AppData::kAppDataSize);
@@ -257,6 +259,7 @@ static void SaveAppData() {
   APPS_SERIAL_PRINTLN("Saved app settings in page_index %d", app_data_storage.page_index());
 }
 
+FLASHMEM
 static void RestoreAppData() {
   APPS_SERIAL_PRINTLN("Restoring app data from page_index %d, used=%u", app_data_storage.page_index(), app_data.used);
 
@@ -320,6 +323,7 @@ void AppSwitcher::set_current_app(size_t index)
   #endif
 }
 
+FLASHMEM
 void AppSwitcher::Init(bool reset_settings) {
 
   APPS_SERIAL_PRINTLN("Init");
@@ -528,6 +532,7 @@ void AppSwitcher::Init(bool reset_settings) {
   delay(100);
 }
 
+FLASHMEM
 void draw_save_message(uint8_t c) {
   GRAPHICS_BEGIN_FRAME(true);
   uint8_t _size = c % 120;
@@ -537,6 +542,7 @@ void draw_save_message(uint8_t c) {
   GRAPHICS_END_FRAME();
 }
 
+FLASHMEM
 bool Ui::AppSettings(bool drawmenu) {
   static menu::ScreenCursor<5> cursor;
   static bool change_app = false;
@@ -663,6 +669,7 @@ bool Ui::AppSettings(bool drawmenu) {
   return false; // close menu
 }
 
+FLASHMEM
 bool Ui::ConfirmReset() {
 
   SetButtonIgnoreMask();
@@ -705,6 +712,7 @@ bool Ui::ConfirmReset() {
   return confirm;
 }
 
+FLASHMEM
 void start_calibration() {
   OC::calibration_data.set_calstart();
   OC::app_switcher.set_current_app(0);

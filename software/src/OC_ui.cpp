@@ -26,6 +26,7 @@ namespace OC {
 
 Ui ui;
 
+FLASHMEM
 void Ui::Init() {
   ticks_ = 0;
   set_screensaver_timeout(SCREENSAVER_TIMEOUT_S);
@@ -59,6 +60,7 @@ void Ui::Init() {
   event_queue_.Init();
 }
 
+FLASHMEM
 void Ui::configure_encoders(EncoderConfig encoder_config) {
   SERIAL_PRINTLN("Configuring encoders: %s (%x)", OC::Strings::encoder_config_strings[encoder_config], encoder_config);
 
@@ -66,6 +68,7 @@ void Ui::configure_encoders(EncoderConfig encoder_config) {
   encoder_left_.reverse(encoder_config & ENCODER_CONFIG_L_REVERSED);
 }
 
+FLASHMEM
 void Ui::set_screensaver_timeout(uint32_t seconds) {
   uint32_t timeout = seconds * 1000U;
   if (timeout < kLongPressTicks * 2)
@@ -230,6 +233,7 @@ UiMode Ui::DispatchEvents(AppBase *app) {
   }
 }
 
+FLASHMEM
 UiMode Ui::Splashscreen(bool &reset_settings) {
 
   UiMode mode = UI_MODE_MENU;
