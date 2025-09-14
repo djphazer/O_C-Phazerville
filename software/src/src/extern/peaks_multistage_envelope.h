@@ -95,27 +95,27 @@ class MultistageEnvelope {
     }
   }
   
-  inline void set_time(uint16_t segment, uint16_t time) {
+  void set_time(uint16_t segment, uint16_t time) {
     time_[segment] = time;
   }
 
-  inline void set_time_multiplier(uint16_t segment, uint16_t time_multiplier) {
+  void set_time_multiplier(uint16_t segment, uint16_t time_multiplier) {
     time_multiplier_[segment] = time_multiplier;
   }
   
-  inline void set_level(uint16_t segment, int16_t level) {
+  void set_level(uint16_t segment, int16_t level) {
     level_[segment] = level;
   }
   
-  inline void set_num_segments(uint16_t num_segments) {
+  void set_num_segments(uint16_t num_segments) {
     num_segments_ = num_segments;
   }
   
-  inline void set_sustain_point(uint16_t sustain_point) {
+  void set_sustain_point(uint16_t sustain_point) {
     sustain_point_ = sustain_point;
   }
 
-  inline void set_adsr(
+  void set_adsr(
       uint16_t attack,
       uint16_t decay,
       uint16_t sustain,
@@ -144,7 +144,7 @@ class MultistageEnvelope {
     loop_start_ = loop_end_ = 0;
   }
   
-  inline void set_ad(uint16_t attack, uint16_t decay, uint16_t loop_start, uint16_t loop_end) {
+  void set_ad(uint16_t attack, uint16_t decay, uint16_t loop_start, uint16_t loop_end) {
     num_segments_ = 2;
     sustain_point_ = 0;
     sustain_index_ = 0;
@@ -166,7 +166,7 @@ class MultistageEnvelope {
     loop_end_ = loop_end;
   }
 
-  inline void set_adr(
+  void set_adr(
       uint16_t attack,
       uint16_t decay,
       uint16_t sustain,
@@ -198,7 +198,7 @@ class MultistageEnvelope {
     loop_end_ = loop_end ;
   }
 
-  inline void set_ar(uint16_t attack, uint16_t release) {
+  void set_ar(uint16_t attack, uint16_t release) {
     num_segments_ = 2;
     sustain_point_ = 1;
     sustain_index_ = 0;
@@ -219,7 +219,7 @@ class MultistageEnvelope {
     loop_start_ = loop_end_ = 0;
   }
   
-  inline void set_adsar(
+  void set_adsar(
       uint16_t attack,
       uint16_t decay,
       uint16_t sustain,
@@ -252,7 +252,7 @@ class MultistageEnvelope {
     loop_start_ = loop_end_ = 0;
   }
   
-  inline void set_adar(
+  void set_adar(
       uint16_t attack,
       uint16_t decay,
       uint16_t sustain,
@@ -288,19 +288,19 @@ class MultistageEnvelope {
     loop_end_ = loop_end;
   }
         
-  inline void set_attack_reset_behaviour(EnvResetBehaviour reset_behaviour) {
+  void set_attack_reset_behaviour(EnvResetBehaviour reset_behaviour) {
     attack_reset_behaviour_ = reset_behaviour;
   }
 
-  inline void set_attack_falling_gate_behaviour(EnvFallingGateBehaviour falling_gate_behaviour) {
+  void set_attack_falling_gate_behaviour(EnvFallingGateBehaviour falling_gate_behaviour) {
     attack_falling_gate_behaviour_ = falling_gate_behaviour;
   }
 
-  inline void set_decay_release_reset_behaviour(EnvResetBehaviour reset_behaviour) {
+  void set_decay_release_reset_behaviour(EnvResetBehaviour reset_behaviour) {
     decay_release_reset_behaviour_ = reset_behaviour;
   }
 
-  inline void reset() {
+  void reset() {
     if (segment_ > num_segments_) {
       segment_ = 0;
       phase_ = 0;
@@ -308,55 +308,55 @@ class MultistageEnvelope {
     }
   }
 
-  inline void set_attack_shape(EnvelopeShape shape) {
+  void set_attack_shape(EnvelopeShape shape) {
     attack_shape_ = shape;
   }
 
-  inline void set_decay_shape(EnvelopeShape shape) {
+  void set_decay_shape(EnvelopeShape shape) {
     decay_shape_ = shape;
   }
 
-  inline void set_release_shape(EnvelopeShape shape) {
+  void set_release_shape(EnvelopeShape shape) {
     release_shape_ = shape;
   }
 
-  inline void set_attack_time_multiplier(uint16_t mult) {
+  void set_attack_time_multiplier(uint16_t mult) {
     attack_multiplier_ = mult;
   }
 
-  inline void set_decay_time_multiplier(uint16_t mult) {
+  void set_decay_time_multiplier(uint16_t mult) {
     decay_multiplier_ = mult;
   }
 
-  inline void set_release_time_multiplier(uint16_t mult) {
+  void set_release_time_multiplier(uint16_t mult) {
     release_multiplier_ = mult;
   }
 
-  inline void set_amplitude(uint16_t amp, bool sampled) {
+  void set_amplitude(uint16_t amp, bool sampled) {
     amplitude_ = amp;
     amplitude_sampled_ = sampled;
   }
 
-  inline void set_max_loops(uint16_t max_loops) {
+  void set_max_loops(uint16_t max_loops) {
     max_loops_ = static_cast<uint8_t>(max_loops >> 9);
   }
  
 #ifdef ENVGEN_DEBUG
-  inline uint16_t get_amplitude_value() const {
+  uint16_t get_amplitude_value() const {
     return(amplitude_) ;
   }
 
-   inline uint16_t get_sampled_amplitude_value() const {
+   uint16_t get_sampled_amplitude_value() const {
     return(sampled_amplitude_) ;
   }
 
-   inline bool get_is_amplitude_sampled() const {
+   bool get_is_amplitude_sampled() const {
     return(amplitude_sampled_) ;
   }
 #endif
 
   // Get current state mask; note that this is reset every call to ::Process
-  inline uint8_t get_state_mask() const {
+  uint8_t get_state_mask() const {
     return state_mask_;
   }
 
