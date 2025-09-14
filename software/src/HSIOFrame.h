@@ -10,6 +10,7 @@
 #pragma once
 
 #include <vector>
+#include "OC_config.h"
 #include "OC_digital_inputs.h"
 #include "OC_io.h"
 #include "HSMIDI.h"
@@ -498,6 +499,7 @@ struct IOFrame {
     bool autoMIDIOut = false;
     bool synctrig = false;
     uint8_t clockskip[DAC_CHANNEL_COUNT] = {0};
+    int8_t output_slew[DAC_CHANNEL_COUNT] = {0};
 
     // pre-calculated clocks, subject to trigger mapping
     bool clocked[OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_COUNT];
@@ -534,11 +536,14 @@ struct IOFrame {
         // short circuit if skip probability is zero to avoid consuming random numbers
         if (0 == clockskip[ch] || random(100) >= clockskip[ch]) {
             clock_countdown[ch] = pulselength;
-            outputs[ch] = PULSE_VOLTAGE * (12 << 7);
+            outputs_smooth[ch] = outputs[ch] = HEMISPHERE_MAX_CV;
         }
     }
     void NudgeSkip(int ch, int dir) {
         clockskip[ch] = constrain(clockskip[ch] + dir, 0, 100);
+    }
+    void NudgeSlew(int ch, int dir) {
+        output_slew[ch] = constrain(output_slew[ch] + dir, -1, 100);
     }
 
     // --- Hard IO ---

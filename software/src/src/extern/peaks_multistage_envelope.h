@@ -76,7 +76,7 @@ const uint32_t kFastPreviewWidth = 64;
 
 class MultistageEnvelope {
  public:
-  MultistageEnvelope() { }
+  MultistageEnvelope() { Init(); }
   ~MultistageEnvelope() { }
   
   void Init();

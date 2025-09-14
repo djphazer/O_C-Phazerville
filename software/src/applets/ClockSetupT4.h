@@ -54,7 +54,15 @@ public:
         OUTSKIP6,
         OUTSKIP7,
         OUTSKIP8,
-        LAST_SETTING = OUTSKIP8
+        OUTSLEW1,
+        OUTSLEW2,
+        OUTSLEW3,
+        OUTSLEW4,
+        OUTSLEW5,
+        OUTSLEW6,
+        OUTSLEW7,
+        OUTSLEW8,
+        LAST_SETTING = OUTSLEW8
     };
 
     const char* applet_name() {
@@ -217,6 +225,17 @@ public:
             HS::frame.NudgeSkip(cursor-OUTSKIP1, direction);
             break;
 
+        case OUTSLEW1:
+        case OUTSLEW2:
+        case OUTSLEW3:
+        case OUTSLEW4:
+        case OUTSLEW5:
+        case OUTSLEW6:
+        case OUTSLEW7:
+        case OUTSLEW8:
+            HS::frame.NudgeSlew(cursor-OUTSLEW1, direction);
+            break;
+
         case EXT_PPQN:
             HS::clock_m.SetClockPPQN(HS::clock_m.GetClockPPQN() + direction);
             break;
@@ -361,7 +380,7 @@ private:
 
         gfxLine(0, 31, 49, 31);
         gfxLine(49, 31, 49, 41);
-        gfxPrint(0, 33, "TrigSkip");
+        gfxPrint(0, 33, (cursor<OUTSLEW1) ? "TrigSkip" : "Out Slew");
         gfxLine(0, 42, 127, 42);
         gfxDottedLine(0, 43, 127, 43);
       }
@@ -426,6 +445,20 @@ private:
             gfxPrint(1 + x + pad(100, HS::frame.clockskip[ch]), y, HS::frame.clockskip[ch] );
             gfxPrint(23 + x, y, "%");
         }
+      } else if (cursor <= OUTSLEW8) {
+        int y = 45;
+        for (int ch=0; ch<8; ++ch) {
+            const int x = (ch % 4) * 32;
+            if (ch == 4) y += 10;
+
+            const int slew = HS::frame.output_slew[ch];
+            if (slew < 0)
+              gfxPrint(1 + x, y, "Env");
+            else {
+              gfxPrint(1 + x + pad(100, HS::frame.output_slew[ch]), y, HS::frame.output_slew[ch] );
+              gfxPrint(23 + x, y, "%");
+            }
+        }
       }
 
         switch ((ClockSetupCursor)cursor) {
@@ -483,6 +516,21 @@ private:
         {
           const int x_ = 1 + 32 * ((cursor-OUTSKIP1) % 4);
           const int y_ = 53 + ((cursor-OUTSKIP1) / 4 * 10);
+          gfxCursor(x_, y_, 19);
+          break;
+        }
+
+        case OUTSLEW1:
+        case OUTSLEW2:
+        case OUTSLEW3:
+        case OUTSLEW4:
+        case OUTSLEW5:
+        case OUTSLEW6:
+        case OUTSLEW7:
+        case OUTSLEW8:
+        {
+          const int x_ = 1 + 32 * ((cursor-OUTSLEW1) % 4);
+          const int y_ = 53 + ((cursor-OUTSLEW1) / 4 * 10);
           gfxCursor(x_, y_, 19);
           break;
         }

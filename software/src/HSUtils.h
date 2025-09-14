@@ -202,7 +202,7 @@ namespace HS {
   extern util::SemitoneQuantizer input_quant[ADC_CHANNEL_COUNT];
   extern util::TuringShiftRegister* turing_machine_[ADC_CHANNEL_COUNT];
   static util::TuringShiftRegister& GetTM(int index) {
-    if (!turing_machine_[index]) turing_machine_[index] = new util::TuringShiftRegister();
+    if (nullptr == turing_machine_[index]) turing_machine_[index] = new util::TuringShiftRegister();
     return *turing_machine_[index];
   }
 
