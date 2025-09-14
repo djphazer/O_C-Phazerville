@@ -20,6 +20,7 @@
 
 #include "util/util_settings.h"
 #include "util/util_trigger_delay.h"
+#include "HSUtils.h"
 #include "OC_apps.h"
 #include "OC_DAC.h"
 #include "OC_menus.h"
@@ -813,7 +814,6 @@ public:
     quantizer_.Init();
     quantizer_.Requantize();
     input_map_.Init();
-    env_.Init();
     force_update_ = true;
     force_scale_update_ = true;
     gate_state_ = step_state_ = OFF;
@@ -1155,6 +1155,8 @@ public:
             int32_t _sustain = get_sustain_level();
             int32_t _release = get_release_duration();
             int32_t _loops = get_max_loops();
+
+            auto &env_ = HS::GetEnvelope(channel_id_);
 
             switch (_aux_mode) {
                 case ENV_AD:
@@ -1905,7 +1907,7 @@ public:
         else if (prev_gate_raised_)
           env_gate_state_ |= peaks::CONTROL_GATE_FALLING;
         prev_gate_raised_ = env_gate_raised_;
-        ioframe->outputs.set_unipolar_value(dac_channel, env_.ProcessSingleSample(env_gate_state_));
+        ioframe->outputs.set_unipolar_value(dac_channel, HS::GetEnvelope(channel_id_).ProcessSingleSample(env_gate_state_));
         break;
       default:
         break;
@@ -1970,7 +1972,6 @@ private:
   braids::Quantizer quantizer_;
   OC::Input_Map input_map_;
   OC::DigitalInputDisplay clock_display_;
-  peaks::MultistageEnvelope env_;
 
   // TOTAL EEPROM SIZE: 2 * 56 bytes
   SETTINGS_ARRAY_DECLARE() {{
