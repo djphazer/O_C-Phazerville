@@ -6,6 +6,7 @@
 #include "OC_scales.h"
 #include "PackingUtils.h"
 #include "util/util_semitone_quantizer.h"
+#include "util/util_turing.h"
 
 // misc. utility functions extracted from Hemisphere
 // -NJM
@@ -197,9 +198,16 @@ namespace HS {
   extern ErrMsgIndex msg_idx;
 
   // input quantizers, because sometimes we need hysteresis
-  extern util::SemitoneQuantizer input_quant[ADC_CHANNEL_LAST];
+  extern util::SemitoneQuantizer input_quant[ADC_CHANNEL_COUNT];
+  extern util::TuringShiftRegister turing_machine_[ADC_CHANNEL_COUNT];
+  static util::TuringShiftRegister& GetTM(int index) {
+    return turing_machine_[index];
+  }
 
   extern QuantEngine q_engine[QUANT_CHANNEL_COUNT];
+  static QuantEngine& GetQEngine(int index) {
+    return q_engine[index];
+  }
 
 #if defined(ARDUINO_TEENSY41) || defined(VOR)
   extern int octave_max;

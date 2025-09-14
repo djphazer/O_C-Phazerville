@@ -31,7 +31,8 @@ namespace HS {
   int midi_edit = 0;
   uint8_t mview = 0;
 
-  util::SemitoneQuantizer input_quant[ADC_CHANNEL_LAST];
+  util::SemitoneQuantizer input_quant[ADC_CHANNEL_COUNT];
+  util::TuringShiftRegister turing_machine_[ADC_CHANNEL_COUNT];
 
   // All of the HS:: globals should be instantiated here
   TuringMachine user_turing_machines[TURING_MACHINE_COUNT];
@@ -72,6 +73,9 @@ namespace HS {
       q_engine[i].Configure( (i<4)? OC::Scales::SCALE_SEMI : i-4, 0xffff);
     }
 
+    for (auto &tm : turing_machine_)
+      tm.Init();
+
     ResetMappings();
   }
   void ResetMappings() {
@@ -85,6 +89,7 @@ namespace HS {
       frame.clockskip[i] = 0;
       clock_m.SetMultiply(0, i);
     }
+
   }
 
   void PokePopup(PopupType pop, const char* msg) {

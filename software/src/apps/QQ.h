@@ -25,6 +25,7 @@
 // from Braids by Olivier Gillet (see braids_quantizer.h/cc et al.). It has since
 // grown a little bit...
 
+#include "HSUtils.h"
 #include "OC_apps.h"
 #include "util/util_logistic_map.h"
 #include "util/util_settings.h"
@@ -436,11 +437,9 @@ public:
     prev_destination_ = 0;
 
     trigger_delay_.Init();
-    turing_machine_.Init();
     logistic_map_.Init();
     bytebeat_.Init();
     int_seq_.Init(get_int_seq_start(), get_int_seq_length());
-    quantizer_.Init();
     update_scale(true, false);
     trigger_display_.Init();
     update_enabled_settings();
@@ -512,10 +511,12 @@ public:
     int32_t sample = last_sample_;
     int32_t temp_sample = 0;
 
+    auto &quantizer_ = HS::GetQEngine(channel_index_).quantizer;
     quantizer_.ConfigureOctaveConstraint(get_octave_constraint(), get_octave_constraint_len());
 
     switch (source) {
       case CHANNEL_SOURCE_TURING: {
+          auto &turing_machine_ = HS::GetTM(index);
           // this doesn't make sense when continuously quantizing; should be hidden via the menu ...
           if (continuous) // TODO[PLD] Fix this mess
             break;
@@ -903,6 +904,7 @@ public:
   }
 
   uint32_t get_shift_register() const {
+    const auto &turing_machine_ = HS::GetTM(index);
     return turing_machine_.get_shift_register();
   }
 
@@ -1109,11 +1111,9 @@ private:
   int8_t prev_root_cv_;
 
   util::TriggerDelay<OC::kMaxTriggerDelayTicks> trigger_delay_;
-  util::TuringShiftRegister turing_machine_;
   util::LogisticMap logistic_map_;
   peaks::ByteBeat bytebeat_ ;
   util::IntegerSequence int_seq_ ;
-  braids::Quantizer quantizer_;
   OC::DigitalInputDisplay trigger_display_;
 
   int num_enabled_settings_;
@@ -1133,7 +1133,8 @@ private:
     if (force || (last_scale_ != scale || last_mask_ != mask)) {
       last_scale_ = scale;
       last_mask_ = mask;
-      quantizer_.Configure(OC::Scales::GetScale(scale), mask);
+      HS::GetQEngine(channel_index_).Configure(scale, mask);
+      //quantizer_.Configure(OC::Scales::GetScale(scale), mask);
       return true;
     } else {
       return false;
