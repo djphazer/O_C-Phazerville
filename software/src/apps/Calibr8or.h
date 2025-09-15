@@ -375,7 +375,6 @@ public:
         }
 
 #if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
-        thisUSB.Task();
         while (usbHostMIDI.read()) {
             const uint8_t message = usbHostMIDI.getType();
             const uint8_t data1 = usbHostMIDI.getData1();

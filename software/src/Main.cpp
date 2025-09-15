@@ -253,6 +253,7 @@ void FASTRUN loop() {
   uint32_t last_redraw_time = 0;
 
   while (true) {
+    thisUSB.Task();
 
     // Refresh display
     if (MENU_REDRAW && CORE::display_update_enabled) {

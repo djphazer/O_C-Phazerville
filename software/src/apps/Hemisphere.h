@@ -686,12 +686,10 @@ public:
 #if defined(__IMXRT1062__)
   #if defined(ARDUINO_TEENSY41)
         ProcessMIDI(usbMIDI, usbHostMIDI, MIDI1);
-        thisUSB.Task();
         ProcessMIDI(usbHostMIDI, usbMIDI, MIDI1);
         ProcessMIDI(MIDI1, usbMIDI, usbHostMIDI);
   #else
         ProcessMIDI(usbMIDI, usbHostMIDI);
-        thisUSB.Task();
         ProcessMIDI(usbHostMIDI, usbMIDI);
   #endif
 #else
