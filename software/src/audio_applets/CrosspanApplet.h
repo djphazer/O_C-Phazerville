@@ -12,7 +12,7 @@
 
 class CrosspanApplet : public HemisphereAudioApplet {
 public:
-  const char* applet_name() override {
+  const char* applet_name() {
     return "Crosspan";
   }
 

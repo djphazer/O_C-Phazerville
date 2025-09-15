@@ -10,7 +10,7 @@
 
 class HandSawApplet : public HemisphereAudioApplet {
     public: 
-        const char* applet_name() override {
+        const char* applet_name() {
             return "HandSaw";
         }
         void Start() override {

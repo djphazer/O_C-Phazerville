@@ -7,7 +7,7 @@
 
 class OscApplet : public HemisphereAudioApplet {
 public:
-  const char* applet_name() override {
+  const char* applet_name() {
     return "Osc";
   }
   void Start() override {

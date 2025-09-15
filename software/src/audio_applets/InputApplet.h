@@ -13,9 +13,8 @@ public:
     return strhash("Input");
   }
 
-  const char* applet_name() override {
-    return Channels == MONO ? (mono_mode == LEFT ? "Input L" : "Input R")
-                            : "Inputs";
+  const char* applet_name() {
+    return Channels == MONO ? "Input" : "Inputs";
   }
   void Start() override {
     if (MONO == Channels) {

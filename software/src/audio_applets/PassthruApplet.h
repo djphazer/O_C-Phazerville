@@ -5,7 +5,7 @@
 template <AudioChannels Channels>
 class PassthruApplet : public HemisphereAudioApplet {
 public:
-  const char* applet_name() override {
+  const char* applet_name() {
     return " - ";
   }
   void Start() override {}

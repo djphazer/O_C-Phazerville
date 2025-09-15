@@ -54,18 +54,20 @@ struct Registry {
       return arr;
     }
 
-    // TODO:
-    //static constexpr std::array<const char *, sizeof...(Declarations)> getNames() {
-      //return {Declarations::type::applet_name ...};
-    //}
-
-    const char* getName(ID id) const {
-      // TODO: make names static
-      return "[name]";
+    static constexpr std::array<const char *, sizeof...(Declarations)> getNames() {
+      return {Declarations::type::applet_name_() ...};
     }
-    const uint8_t* getIcon(ID id) const {
+    static constexpr std::array<const uint8_t*, sizeof...(Declarations)> getIcons() {
+      return {Declarations::type::applet_icon_() ...};
+    }
+
+    const char* getName(int index) const {
+      // TODO: make names static
+      return getNames()[index];
+    }
+    const uint8_t* getIcon(int index) const {
       // TODO: make icons static
-      return ZAP_ICON;
+      return getIcons()[index];
     }
 
     T* get(ID id, HS::HEM_SIDE slot = 0) const {
