@@ -16,6 +16,14 @@
 
 using namespace HS;
 
+// hacks to effectively rewrite part of the applet boilerplate,
+// making names and icons static
+#define applet_name applet_name() override { return applet_name_(); } \
+  static constexpr const char* applet_name_
+
+#define applet_icon applet_icon() override { return applet_icon_(); } \
+  static constexpr const uint8_t* applet_icon_
+
 #include "applets/ADSREG.h"
 #include "applets/ADEG.h"
 #include "applets/ASR.h"
@@ -111,6 +119,9 @@ using namespace HS;
 #include "applets/Xfader.h"
 #include "applets/hMIDIIn.h"
 #include "applets/hMIDIOut.h"
+
+#undef applet_name
+#undef applet_icon
 
 #include "AppletRegistry.h"
 
@@ -226,11 +237,11 @@ namespace HS {
   }
 
   const char * get_applet_name(const int index) {
-    return reg.getName(appletIds[index]);
+    return reg.getName(index);
   }
 
   const uint8_t * get_applet_icon(const int index) {
-    return reg.getIcon(appletIds[index]);
+    return reg.getIcon(index);
   }
 
   constexpr int get_applet_index_by_id(const int& id) {

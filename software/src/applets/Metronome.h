@@ -24,7 +24,9 @@ public:
     const char* applet_name() {
         return "Metronome";
     }
-    const uint8_t* applet_icon() { return HS::clock_m.Cycle()? METRO_L_ICON : METRO_R_ICON; }
+    const uint8_t* applet_icon() {
+      return METRO_L_ICON; // : METRO_R_ICON;
+    }
 
     void Start() { }
 

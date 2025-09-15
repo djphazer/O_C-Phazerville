@@ -8,7 +8,7 @@ public:
   }
 
   const char* applet_name() {
-    return "Inputs";
+    return "Input";
   }
   void Start() override {
     if (MONO == Channels) {

@@ -26,8 +26,8 @@ public:
   const uint64_t applet_id() override {
     return strhash("WavPlay");
   }
-  const char* applet_name() override {
-    return titlestat;
+  const char* applet_name() {
+    return "WavPlay";
   }
 
   void Start() {
