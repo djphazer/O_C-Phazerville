@@ -89,7 +89,7 @@ public:
             }
 
             // bypass the loop if CV2 is > -2.5v
-            bypass_loop = (reseed < -(HEMISPHERE_MAX_CV >> 1)) ? true : false;
+            bypass_loop = (reseed < -(HEMISPHERE_MAX_CV >> 1));
 
             // reset loop
             if (loop_length_mod > 0 && loop_step >= loop_length_mod) {
