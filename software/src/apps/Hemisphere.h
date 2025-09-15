@@ -377,6 +377,8 @@ public:
         TRIGMAP_KEY = 5, // 4 x 16-bit DigitalInputMap
         CVMAP_KEY = 6, // 4 x 16-bit CVInputMap
 
+        OUTSLEW_KEY = 7,
+
         APPLET_L_DATA_KEY = 10,
         APPLET_R_DATA_KEY = 11,
 
@@ -421,6 +423,11 @@ public:
           Pack(data, PackLocation{i*8, 8}, HS::frame.clockskip[i]);
         }
         PhzConfig::setValue(preset_key | OUTSKIP_KEY, data);
+        data = 0;
+        for (size_t i = 0; i < DAC_CHANNEL_COUNT; ++i) {
+          Pack(data, PackLocation{i*8, 8}, HS::frame.output_slew[i]);
+        }
+        PhzConfig::setValue(preset_key | OUTSLEW_KEY, data);
 
         data = 0;
         for (size_t h = 0; h < 2; h++)
@@ -538,6 +545,12 @@ public:
           {
             HS::frame.clockskip[i] = Unpack(data, PackLocation{i*8, 8});
           }
+        }
+
+        PhzConfig::getValue(preset_key | OUTSLEW_KEY, data);
+        for (size_t i = 0; i < DAC_CHANNEL_COUNT; ++i)
+        {
+          HS::frame.output_slew[i] = Unpack(data, PackLocation{i*8, 8});
         }
 
         // --- Global stuff ---
@@ -784,10 +797,18 @@ public:
               if (select_mode != zoom_slot && CursorBlink())
                 gfxIcon(64 - 8*zoom_slot, 1, zoom_slot? RIGHT_ICON : LEFT_ICON, true);
             } else if (isEditing) {
-              const int x = ((zoom_cursor-1)%2)*64;
+              const int x = 64*((zoom_cursor-1)%2);
               const int y = 13 + 10*((zoom_cursor-1)/2);
               gfxInvert(x, y, 19, 9);
               gfxFrame(x, y, 19, 9, true);
+              if (zoom_cursor >= 5) {
+                gfxIcon(x + 18, y + 1, DOWN_ICON, true);
+
+                graphics.clearRect(0, y + 10, 127, 20);
+                gfxPrint(x, y+10, "Slew=");
+                gfxPrint(HS::frame.output_slew[zoom_slot*2 + zoom_cursor-5]);
+                gfxPrint("%");
+              }
             } else {
               if (CursorBlink()) {
                 const int x = 18 + 64*((zoom_cursor-1)%2);
@@ -1062,12 +1083,13 @@ public:
                 break;
               case 5:
               case 6:
-                // TODO: per applet?
+                HS::frame.NudgeSlew(zoom_slot*2 + zoom_cursor - 5, event.value);
+                break;
               default:
                 break;
             }
           } else { // right enc moves cursor
-            zoom_cursor = constrain(zoom_cursor + event.value, 0, 4);
+            zoom_cursor = constrain(zoom_cursor + event.value, 0, 6);
             ResetCursor();
           }
         } else if (select_mode == h) {

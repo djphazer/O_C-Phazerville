@@ -790,7 +790,7 @@ public:
                   break;
                 case 5:
                 case 6:
-                  // TODO: edit OutSkip & OutSlew params
+                  // TODO: also edit OutSkip param somehow...
                   HS::frame.NudgeSlew(zoom_slot*2 + zoom_cursor - 5, increment);
                   break;
                 default:
