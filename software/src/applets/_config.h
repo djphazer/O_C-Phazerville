@@ -130,7 +130,9 @@ constexpr Registry reg = Registry<HemisphereApplet, 200 // max ID
     , DeclareApplet<ADEG, 34, 0x01>
     , DeclareApplet<MiniASR, 47, 0x09>
     , DeclareApplet<AttenuateOffset, 56, 0x10>
+#ifdef PEWPEWPEW
     , DeclareApplet<Binary, 41, 0x41>
+#endif
     , DeclareApplet<BitBeat, 79, 0x01>
     , DeclareApplet<BootsNCat, 55, 0x80>
     , DeclareApplet<Brancher, 4, 0x14>
@@ -153,7 +155,9 @@ constexpr Registry reg = Registry<HemisphereApplet, 200 // max ID
     , DeclareApplet<DrLoFi, 16, 0x80>
     , DeclareApplet<DrumMap, 57, 0x02>
     , DeclareApplet<DualQuant, 9, 0x08>
+#ifdef PEWPEWPEW
     , DeclareApplet<OffsetQuant, 90, 0x08>
+#endif
 #if !defined(CUSTOM_BUILD) || defined(PEWPEWPEW)
     , DeclareApplet<DuoTET, 63, 0x08>
 #endif
@@ -163,7 +167,9 @@ constexpr Registry reg = Registry<HemisphereApplet, 200 // max ID
     , DeclareApplet<EnvFollow, 42, 0x11>
     , DeclareApplet<EnvSeq, 91, 0x02>
     , DeclareApplet<EuclidX, 15, 0x02>
+#ifdef PEWPEWPEW
     , DeclareApplet<GameOfLife, 22, 0x01>
+#endif
     , DeclareApplet<GateDelay, 29, 0x04>
     , DeclareApplet<GatedVCA, 17, 0x50>
     , DeclareApplet<Logic, 10, 0x44>
@@ -191,7 +197,9 @@ constexpr Registry reg = Registry<HemisphereApplet, 200 // max ID
     , DeclareApplet<SeqPlay7, 76, 0x02>
     , DeclareApplet<SequenceX, 14, 0x02>
     , DeclareApplet<ShiftGate, 48, 0x45>
+#ifdef PEWPEWPEW
     , DeclareApplet<ShiftReg, 77, 0x45>
+#endif
     , DeclareApplet<Shredder, 58, 0x01>
     , DeclareApplet<Shuffle, 36, 0x04>
     , DeclareApplet<Slew, 19, 0x01>
