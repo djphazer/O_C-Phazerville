@@ -142,143 +142,131 @@ void SafeNoteFrequencyAnalyzer::filter_inplace_block(int16_t *dst) {
  */
 void SafeNoteFrequencyAnalyzer::process( void ) {
 
-    //const uint32_t now_us = (uint32_t)micros();
-    //first_block_time_us = now_us;
-    const int16_t *p;
-    p = AudioBuffer;
+    // const uint32_t now_us = (uint32_t)micros();
+    // first_block_time_us = now_us;
+    const int16_t *p = AudioBuffer;
     uint16_t cycles = 64;
     uint16_t tau = tau_global;
+
     do {
-        uint16_t x   = 0;
+        uint16_t x = 0;
         uint64_t sum = 0;
-        uint16_t XMAX = (tau < half_window_samples) ? (uint16_t)(half_window_samples - tau) : 0;
-        if (XMAX == 0) break;              // nothing valid to sum for this tau
+        // using XMAX as the bound for the below while loop introduces instability at low pitches
+        // uint16_t XMAX = (tau < half_window_samples) ? (uint16_t)(half_window_samples - tau) : 0;
+        // if (XMAX == 0) break; // nothing valid to sum for this tau
         do {
             int16_t current, lag, delta;
-            lag = *( ( int16_t * )p + ( x+tau ) );
-            current = *( ( int16_t * )p+x );
-            delta = ( current-lag );
+
+            lag = *((int16_t *)p + (x + tau));
+            current = *((int16_t *)p + x);
+            delta = (current - lag);
             sum += delta * delta;
             x += 4;
-            
-            lag = *( ( int16_t * )p + ( x+tau ) );
-            current = *( ( int16_t * )p+x );
-            delta = ( current-lag );
+
+            lag = *((int16_t *)p + (x + tau));
+            current = *((int16_t *)p + x);
+            delta = (current - lag);
             sum += delta * delta;
             x += 4;
-            
-            lag = *( ( int16_t * )p + ( x+tau ) );
-            current = *( ( int16_t * )p+x );
-            delta = ( current-lag );
+
+            lag = *((int16_t *)p + (x + tau));
+            current = *((int16_t *)p + x);
+            delta = (current - lag);
             sum += delta * delta;
             x += 4;
-            
-            lag = *( ( int16_t * )p + ( x+tau ) );
-            current = *( ( int16_t * )p+x );
-            delta = ( current-lag );
+
+            lag = *((int16_t *)p + (x + tau));
+            current = *((int16_t *)p + x);
+            delta = (current - lag);
             sum += delta * delta;
             x += 4;
-        } while (x < XMAX);
-        
+        } while (x < half_window_samples);
+
         // update running stats, estimate tau for next cycle
         uint64_t rs = running_sum;
         rs += sum;
-        yin_buffer[yin_idx] = sum*tau;
+        yin_buffer[yin_idx] = sum * tau;
         rs_buffer[yin_idx] = rs;
         running_sum = rs;
-        yin_idx = ( ++yin_idx >= 5 ) ? 0 : yin_idx;
-        tau = estimate( yin_buffer, rs_buffer, yin_idx, tau );
-        
+        yin_idx = (++yin_idx >= 5) ? 0 : yin_idx;
+        tau = estimate(yin_buffer, rs_buffer, yin_idx, tau);
+
         // tau = 0 means we've found a pitch
-        if ( tau == 0 ) {
-
+        if (tau == 0) {
             // Period just measured (samples) from estimate()
-            float T_new = data;
-            const float Fs    = AUDIO_SAMPLE_RATE_EXACT;
-            const float f_raw = (T_new > 0.0f) ? (Fs / T_new) : 0.0f;
-
+            const float f_raw = AUDIO_SAMPLE_RATE_EXACT / data;
+            uint16_t seed = (uint16_t)lrintf(data);                  // data = period in samples
+            if (seed < 1) seed = 1;
+            if (seed >= half_window_samples) seed = half_window_samples - 1;
+            tau_global = seed;   
             // period smoothing logic
             // ---------- low-frequency-only smoothing (log2 domain) ----------
-            {
-                // T_new and f_raw are expected to be in-scope (preserve existing logic)
-                // Apply extra smoothing only for low frequencies to improve stability.
-                if (f_raw > 0.0f && f_raw < 100.0f) {
-                    float logf_new = log2f(f_raw);
-                    if (!isfinite(sm_logf)) {
-                        sm_logf = logf_new; // initialize on first use
-                    }
+            // T_new and f_raw are expected to be in-scope (preserve existing logic)
+            // Apply extra smoothing only for low frequencies to improve stability.
+            // if (f_raw < 112.0f) {
+            //     float logf_new = log2f(f_raw);
+            //     if (!isfinite(sm_logf)) {
+            //         sm_logf = logf_new; // initialize on first use
+            //     }
+            //     // Asymmetric attack/release smoothing (faster when pitch rises)
+            //     const float alpha_attack  = 0.85f;
+            //     const float alpha_release = 0.30f;
+            //     float conf = periodicity;
+            //     conf = (conf < 0.0f) ? 0.0f : ((conf > 1.0f) ? 1.0f : conf);
+            //     float alpha = (logf_new > sm_logf) ? alpha_attack : alpha_release;
+            //     alpha *= (0.6f + 0.4f * conf); // scale by confidence (0.6..1.0)
+            //     sm_logf = alpha * logf_new + (1.0f - alpha) * sm_logf;
+            //     // back to linear frequency and update period if valid
+            //     float f_smooth = exp2f(sm_logf);
+            //     if (f_smooth > 0.0f) {
+            //         T_new = Fs / f_smooth;
+            //     }
+            // } 
+            // // ----------------------------------------------------------------
+            // // ---------- confidence gate + hold-last-good ----------
+            //     bool pass_gate =
+            //         (!have_good  && periodicity >= CONF_RISE) ||   // first good lock
+            //         ( have_good  && periodicity >= CONF_FALL);     // hysteresis to keep lock
 
-                    // Asymmetric attack/release smoothing (faster when pitch rises)
-                    const float alpha_attack  = 0.85f;
-                    const float alpha_release = 0.30f;
-                    float conf = periodicity;
-                    conf = (conf < 0.0f) ? 0.0f : ((conf > 1.0f) ? 1.0f : conf);
-
-                    float alpha = (logf_new > sm_logf) ? alpha_attack : alpha_release;
-                    alpha *= (0.6f + 0.4f * conf); // scale by confidence (0.6..1.0)
-
-                    sm_logf = alpha * logf_new + (1.0f - alpha) * sm_logf;
-
-                    // back to linear frequency and update period if valid
-                    float f_smooth = exp2f(sm_logf);
-                    if (f_smooth > 0.0f) {
-                        T_new = Fs / f_smooth;
-                    }
-                } else if (f_raw > 0.0f) {
-                    // keep internal state synced for higher frequencies
-                    sm_logf = log2f(f_raw);
-                }
-            }
-            // ----------------------------------------------------------------
-
-            // ---------- confidence gate + hold-last-good ----------
-            {
-                bool pass_gate =
-                    (!have_good  && periodicity >= CONF_RISE) ||   // first good lock
-                    ( have_good  && periodicity >= CONF_FALL);     // hysteresis to keep lock
-
-                if (pass_gate) {
-                    // accept/update last-good
-                    last_good_period = T_new;
-                    have_good = true;
-                    hold_count = HOLD_MAX;
-                    data = last_good_period;        // publish for read()
-                } else if (have_good && hold_count > 0) {
-                    // confidence too low → keep previous stable value for a few frames
-                    --hold_count;
-                    data = last_good_period;        // publish held value
-                } else {
-                    // no good history to hold; publish the raw T_new
-                    data = T_new;
-                }
-            }
-            // ------------------------------------------------------
+            //     if (pass_gate) {
+            //         // accept/update last-good
+            //         last_good_period = T_new;
+            //         have_good = true;
+            //         hold_count = HOLD_MAX;
+            //         data = last_good_period;        // publish for read()
+            //     } else if (have_good && hold_count > 0) {
+            //         // confidence too low → keep previous stable value for a few frames
+            //         --hold_count;
+            //         data = last_good_period;        // publish held value
+            //     } else {
+            //         // no good history to hold; publish the raw T_new
+            //         data = T_new;
+            //     }
+            // // ------------------------------------------------------
             // ---- end smoothing block ----
-
             tau_global = 1; // reset to 1 for now.
-            process_buffer  = false;
-            new_output      = true;
-            yin_idx         = 1;
-            running_sum     = 0;
+            process_buffer = false;
+            new_output = true;
+            yin_idx = 1;
+            running_sum = 0;
             return;
         }
-    } while ( --cycles );
+    } while (--cycles);
 
-    // old ceiling guard just in case we need it
     // Reset per-buffer state before returning to caller
-    if ( tau >= half_window_samples ) {
-
-        process_buffer  = false;
-        new_output      = false;
-        yin_idx         = 1;
-        running_sum     = 0;
-        tau_global      = 1; // conservative restart on miss
+    if (tau >= half_window_samples) {
+        process_buffer = false;
+        new_output = false;
+        yin_idx = 1;
+        running_sum = 0;
+        tau_global = 1; // conservative restart on miss
         return;
     }
 
     tau_global = tau;
-    //last_buffer_latency_us = (uint32_t)( (uint32_t)micros() - first_block_time_us );
+    // last_buffer_latency_us = (uint32_t)((uint32_t)micros() - first_block_time_us );
 }
+
 
 /**
  *  check the sampled data for fundamental frequency
@@ -334,7 +322,7 @@ void SafeNoteFrequencyAnalyzer::begin( float threshold , float cutoff_hz) {
         ::operator new[](n * sizeof(int16_t), std::align_val_t(4)));
 
     // choosing a window in ms based on the lowest note we care to detect. higher values increase latency
-    const float window_ms = 42.0f;   // this is what's going to affect the lowest pitch we can track; use 18–24 ms range
+    const float window_ms = 48.0f;   // this is what's going to affect the lowest pitch we can track; use 18–24 ms range
     window_samples = (uint16_t)lrintf(AUDIO_SAMPLE_RATE_EXACT * (window_ms / 1000.0f));
 
     // round up to blocks of 128
