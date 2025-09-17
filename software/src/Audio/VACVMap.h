@@ -6,7 +6,7 @@
 
 struct VACVMap {
   // 0=None; 1..N = VA1..VAN (1-based for UI)
-  int8_t   ch01   = 0;
+  int8_t   source   = 0;
   uint16_t owner  = 0;
 
   // ---- scaling constants/helpers --------------------------------------------
@@ -16,9 +16,9 @@ struct VACVMap {
   static constexpr int   HEM_UNITS_PER_V = (12 << 7);          // 1536
 
   // Keep the caller’s initial channel in constructor; claim later when we have an owner.
-  VACVMap(int8_t init_ch01 = 0, uint16_t init_owner = 0)
-    : ch01(init_ch01), owner(0) {
-    if (init_owner) AttachOwner(init_owner);  // this will Claim(ch01)
+  VACVMap(int8_t init_source = 0, uint16_t init_owner = 0)
+    : source(init_source), owner(0) {
+    if (init_owner) AttachOwner(init_owner);  // this will Claim(source)
   }
 
   // RAII safety if these ever live beyond an applet
@@ -28,60 +28,65 @@ struct VACVMap {
   char const* InputName() const { return Name(); }
 
   void AttachOwner(uint16_t owner_id) {
-    if (!owner_id || owner == owner_id) return;
+    if (!owner_id || owner == owner_id) return; // don't change anything if owner id 0 or same as current
     if (owner && !IsNone()) VACVRegistry::I().release(Channel0(), owner);
     owner = owner_id;
     // IMPORTANT: claim whatever is currently selected (including ctor preselect)
-    if (!IsNone()) Claim(ch01);
+    if (!IsNone()) Claim(source);
   }
 
   void DetachOwner() {
     if (owner && !IsNone()) VACVRegistry::I().release(Channel0(), owner);
     owner = 0;
-    ch01  = 0;
+    source = 0;
   }
 
-  bool IsNone()   const { return ch01 <= 0 || ch01 > HS::VACV_CHANNEL_COUNT; }
-  int  Channel01() const { return IsNone() ? 0 : ch01; } // for UI strings
-  int  Channel0()  const { return IsNone() ? -1 : (ch01 - 1); } // zero based index, -1 if none, used for accessing ch01 as a public variable
+  bool IsNone()   const { return source <= 0 || source > HS::VACV_CHANNEL_COUNT; }
+  int  Channel01() const { return IsNone() ? 0 : source; } // for UI strings
+  int  Channel0()  const { return IsNone() ? -1 : (source - 1); } // zero based index, -1 if none, used for accessing source as a public variable
 
   // Convenience: selected channel as 0-based index, or -1 if none. This way we can access the channel in a more friendly manner to users
   int SelectedChannel() const { return Channel0(); }
 
-  bool Claim(int new_ch01) {
-    if (!owner) return false;                   // must have an owner first
-    int c = constrain(new_ch01, 0, HS::VACV_CHANNEL_COUNT);
-    if (c == ch01) return true;                 // no change
-    // release old
-    if (!IsNone()) VACVRegistry::I().release(Channel0(), owner);
-    ch01 = c;
-    if (IsNone()) return true;                  // None
+  // bool Claim(int new_source) {
+  //   if (!owner) return false;                   // must have an owner first
+  //   int c = constrain(new_source, 0, HS::VACV_CHANNEL_COUNT);
+  //   if (c == source) return true;                 // no change
+  //   // release old
+  //   if (!IsNone()) VACVRegistry::I().release(Channel0(), owner);
+  //   source = c;
+  //   if (IsNone()) return true;                  // None
+  //   if (VACVRegistry::I().claim(Channel0(), owner)) return true;
+  //   source = 0;                                   // failed, revert to None
+  //   return false;
+  // }
+  bool Claim(int new_source) {
+    if (!owner) return false;                                                   // Selecting a real channel requires a valid owner.
+    if (source == (new_source = constrain(new_source, 0, HS::VACV_CHANNEL_COUNT))) return true;    // Check old source against constrained new source, to see if it goes out of bounds or is same.
+
+    if (new_source == 0) {                                                      // Always allow selecting None ("-"), regardless of owner state.
+      if (owner && !IsNone()) VACVRegistry::I().release(Channel0(), owner);
+      source = 0;
+      return true;
+    }
+
+    if (!IsNone()) VACVRegistry::I().release(Channel0(), owner);                // Release previous claim (if any), then try to claim the new one.
+    source = new_source;
     if (VACVRegistry::I().claim(Channel0(), owner)) return true;
-    ch01 = 0;                                   // failed, revert to None
+
+    // Failed to claim → revert to None
+    source = 0;
     return false;
   }
 
   // Step in +/- direction; if target is taken by someone else, hop to next free.
   void ChangeSource(int dir) {
     if (dir == 0) return;
-    if (HS::VACV_CHANNEL_COUNT == 0) { ch01 = 0; return; }
-    int target = ch01 + (dir > 0 ? 1 : -1);
-    target = constrain(target, 0, HS::VACV_CHANNEL_COUNT);
-    if (target == 0) { Claim(0); return; }
+    if (HS::VACV_CHANNEL_COUNT == 0) { source = 0; return; }
+    int target = constrain(source + dir, 0, HS::VACV_CHANNEL_COUNT);
     // Let Claim() decide — it allows same-owner collisions
     if (Claim(target)) return;
     int free0 = VACVRegistry::I().findFree(target - 1, dir);
-    Claim(free0 < 0 ? 0 : (free0 + 1));
-  }
-
-  // Optional: wrap around instead of clamping
-  void Rotate(int dir) {
-    if (dir == 0) return;
-    if (HS::VACV_CHANNEL_COUNT == 0) { ch01 = 0; return; }
-    int next = ( (ch01==0?0:(ch01-1)) + (dir>0?1:-1) + HS::VACV_CHANNEL_COUNT + 1 )
-               % (HS::VACV_CHANNEL_COUNT + 1);   // in [0..N]
-    if (Claim(next)) return;
-    int free0 = VACVRegistry::I().findFree((next?next-1:0), dir);
     Claim(free0 < 0 ? 0 : (free0 + 1));
   }
 
@@ -146,7 +151,7 @@ struct VACVMap {
   const char* Name() const {
     static char s[6];
     if (IsNone()) return "—";
-    snprintf(s, sizeof(s), "VA%d", ch01);
+    snprintf(s, sizeof(s), "VA%d", source);
     return s;
   }
 
@@ -165,7 +170,7 @@ struct VACVMap {
     else Claim(0);
   }
 
-  // pack/unpack (persist ch01 only; ownership is runtime)
-  uint16_t Pack() const { return (uint16_t)(ch01 & 0xFF); }
+  // pack/unpack (persist source only; ownership is runtime)
+  uint16_t Pack() const { return (uint16_t)(source & 0xFF); }
   void Unpack(uint16_t d) { Claim((int8_t)(d & 0xFF)); }
 };

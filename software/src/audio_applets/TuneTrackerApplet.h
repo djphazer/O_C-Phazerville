@@ -26,9 +26,9 @@ public:
     cv_stream.Acquire();
 
     //handle VACV assignment and ownership
-    if (!vacv_owner) vacv_owner = VACVRegistry::I().registerOwner();
-    pitch_cv_selection.AttachOwner(vacv_owner);
-    pitch_env_selection.AttachOwner(vacv_owner);
+    if (!vacv_owner_id) vacv_owner_id = VACVRegistry::I().registerOwner();
+    pitch_cv_selection.AttachOwner(vacv_owner_id);
+    pitch_env_selection.AttachOwner(vacv_owner_id);
     // Ensure initial selections are actually claimed (if you want defaults)
     if (!pitch_cv_selection.IsNone()) pitch_cv_selection.Claim(pitch_cv_selection.Channel01());
     if (!pitch_env_selection.IsNone()) pitch_env_selection.Claim(pitch_env_selection.Channel01());
@@ -54,7 +54,7 @@ public:
     // Release VA claims and ID so future applets can reuse channels
     pitch_cv_selection.DetachOwner();
     pitch_env_selection.DetachOwner();
-    if (vacv_owner) { VACVRegistry::I().unregisterOwner(vacv_owner); vacv_owner = 0; }
+    if (vacv_owner_id) { VACVRegistry::I().unregisterOwner(vacv_owner_id); vacv_owner_id = 0; }
 
     cv_stream.Release();
     AllowRestart();
@@ -192,7 +192,7 @@ private:
   int int_part = 0;
   int frac_part = 0;
 
-  uint16_t vacv_owner = 0;
+  uint16_t vacv_owner_id = 0;
   float volts = 0.0f;
 
 };
