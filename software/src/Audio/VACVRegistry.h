@@ -2,6 +2,11 @@
 #pragma once
 #include "HSIOFrame.h"
 
+// Class to manage ownership of Virtual Audio CV channels across multiple applets.
+// Each applet that wants to use VACV channels should register as an owner,
+// and then claim/release channels as needed. The registry ensures no two owners
+// can claim the same channel at the same time, avoiding overwritten voltages.
+
 class VACVRegistry {
 public:
   static VACVRegistry& I() { static VACVRegistry inst; return inst; }

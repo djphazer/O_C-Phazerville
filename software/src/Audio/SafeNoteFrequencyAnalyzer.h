@@ -210,5 +210,9 @@ private:
     uint8_t octave_suspect = 0;     // consecutive potential octave-down hits
     static constexpr float  OCTAVE_DOWN_RATIO = 1.6f; // period growth treated as octave-ish
     static constexpr uint8_t OCTAVE_CONFIRM   = 4;    // need this many consecutive before accepting
+
+    uint64_t tau_min_next = 0;
+    uint64_t tau_max_next = 0;
+    float p_last_accepted = 1.00f; // last accepted periodicity, for gating what values we accept
 };
 #endif

@@ -349,6 +349,11 @@ public:
     return (section << 8) | key;
   }
 
+  // Returns a reference to the filtered peak dB value for a given side and slot. useful if we want to stop processing at some gated value without instantiating a whole applet.
+  float& get_peak_db(HEM_SIDE side, size_t slot) {
+    return lpf_peak_db[side][slot];
+  }
+
   void LoadPreset(int id) {
     // preset id is upper 5 bits - 32 presets per bank
     uint16_t preset_key = id << 11;
