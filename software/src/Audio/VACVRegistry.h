@@ -11,7 +11,9 @@ class VACVRegistry {
 public:
   static VACVRegistry& I() { static VACVRegistry inst; return inst; }
 
-  // Hand out an ID that is NOT present in owners_ right now.
+  // This function is designed to be used when instantiating audio applets (that need VACV channels).
+  // Returns an "owner ID" that is NOT assigned to any applet
+  // Returns 0 if none available (all channels taken)
   uint16_t registerOwner() {
     __disable_irq();
     uint16_t start = next_owner_ ? next_owner_ : 1;
@@ -26,9 +28,10 @@ public:
       id++;
     } while (id != start);
     __enable_irq();
-    return 0; // shouldn't happen unless COUNT==0
+    return 0; // shouldn't happen unless VACV_CHANNEL_COUNT==0
   }
 
+  // Release the owner ID and and any VACV channels it owns
   void unregisterOwner(uint16_t owner) {
     if (!owner) return;
     __disable_irq();
@@ -37,6 +40,7 @@ public:
     __enable_irq();
   }
 
+  // Register a VACV channel (0-based) to an owner.
   bool claim(int ch0, uint16_t owner) {
     if (ch0 < 0 || ch0 >= HS::VACV_CHANNEL_COUNT || !owner) return false;
     __disable_irq();
@@ -46,6 +50,7 @@ public:
     return ok;
   }
 
+  // Release a VACV channel (0-based) from an owner.
   void release(int ch0, uint16_t owner) {
     if (ch0 < 0 || ch0 >= HS::VACV_CHANNEL_COUNT || !owner) return;
     __disable_irq();
@@ -53,6 +58,7 @@ public:
     __enable_irq();
   }
 
+  // Check if a channel is claimed by any owner
   bool isClaimed(int ch0) const {
     if (ch0 < 0 || ch0 >= HS::VACV_CHANNEL_COUNT) return false;
     __disable_irq(); uint16_t o = owners_[ch0]; __enable_irq();
