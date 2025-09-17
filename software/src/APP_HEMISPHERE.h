@@ -277,6 +277,10 @@ public:
     void Resume() {
 #ifdef __IMXRT1062__
         // XXX: this assumes no other config file gets loaded while Hemisphere is active...
+        // Also notice that this loads only from LFS,
+        // assuming Hemisphere is only used by T40 and not T41.
+        // Of course, T40 also supports SD cards,
+        // so I should write code instead of comments, yeah?
         PhzConfig::load_config(PRESET_FILENAME);
         if (preset_id < 0)
           LoadFromPreset(0);
@@ -360,7 +364,14 @@ public:
 
         PC_CHANNEL_KEY = 110,
 
+        MIDI_MAPS_KEY  = 150, // + 0..32
+
         Q_ENGINE_KEY   = 200, // + slot number
+
+        // 300-500 = Sequences (aka Patterns)
+        SEQUENCES_KEY  = 300, // + blob index
+
+        VERSION_KEY = 0xFFFF
     };
 
     void StoreToPreset(int id, bool skip_eeprom = false) {
@@ -426,7 +437,26 @@ public:
           PhzConfig::setValue(Q_ENGINE_KEY + qslot, data);
         }
 
-        PhzConfig::save_config(PRESET_FILENAME);
+        // Global MIDI Maps
+        for (size_t midx = 0; midx < MIDIMAP_MAX; ++midx) {
+          data = PackPackables(frame.MIDIState.mapping[midx]);
+          PhzConfig::setValue(MIDI_MAPS_KEY + midx, data);
+        }
+
+        // User Patterns aka Sequences
+        for (size_t i = 0; i < OC::Patterns::PATTERN_USER_COUNT; ++i) {
+          data = 0;
+          for (size_t step = 0; step < ARRAY_SIZE(OC::Pattern::notes); ++step) {
+            Pack(data, PackLocation{(step & 0x3)*16, 16}, (uint16_t)OC::user_patterns[i].notes[step]);
+            if ((step & 0x3) == 0x3) {
+              PhzConfig::setValue(SEQUENCES_KEY + ((i << 2) | (step >> 2)), data);
+              data = 0;
+            }
+          }
+        }
+
+        if (PhzConfig::save_config(PRESET_FILENAME))
+          PokePopup(HS::MESSAGE_POPUP, HS::PRESET_SAVED);
 #else
         StoreToPreset( (HemispherePreset*)(hem_presets + id), skip_eeprom );
 #endif
@@ -507,6 +537,28 @@ public:
               q.mask);
           q.Reconfig();
         }
+
+        // Global MIDI Maps
+        for (size_t midx = 0; midx < MIDIMAP_MAX; ++midx) {
+          if (!PhzConfig::getValue(MIDI_MAPS_KEY + midx, data))
+              break;
+          UnpackPackables(data, frame.MIDIState.mapping[midx]);
+        }
+        frame.MIDIState.UpdateMidiChannelFilter();
+        frame.MIDIState.UpdateMaxPolyphony();
+
+        // User Patterns aka Sequences
+        for (size_t i = 0; i < OC::Patterns::PATTERN_USER_COUNT; ++i) {
+          for (size_t step = 0; step < ARRAY_SIZE(OC::Pattern::notes); ++step) {
+            if ((step & 0x3) == 0x0) {
+              data = 0;
+              if (!PhzConfig::getValue(SEQUENCES_KEY + ((i << 2) | (step >> 2)), data))
+                break;
+            }
+            OC::user_patterns[i].notes[step] = Unpack(data, PackLocation{(step & 0x3)*16, 16});
+          }
+        }
+
 #else
         // T3.2 uses EEPROM interface
         hem_active_preset = (HemispherePreset*)(hem_presets + id);

@@ -355,7 +355,11 @@ private:
       } else {
         // lower section
         graphics.clearRect(0, 41, 128, 23);
+        graphics.clearRect(0, 30, 50, 11); // label box
 
+        gfxLine(0, 31, 49, 31);
+        gfxLine(49, 31, 49, 41);
+        gfxPrint(0, 33, "TrigSkip");
         gfxLine(0, 42, 127, 42);
         gfxDottedLine(0, 43, 127, 43);
       }
@@ -417,7 +421,7 @@ private:
             const int x = (ch % 4) * 32;
             if (ch == 4) y += 10;
 
-            gfxPrint(1 + x, y, HS::frame.clockskip[ch] );
+            gfxPrint(1 + x + pad(100, HS::frame.clockskip[ch]), y, HS::frame.clockskip[ch] );
             gfxPrint(23 + x, y, "%");
         }
       }

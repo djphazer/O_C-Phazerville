@@ -207,7 +207,7 @@ public:
       return HS::QuantizerLookup(ch + io_offset, note);
     }
     void QuantizerConfigure(int ch, int scale, uint16_t mask = 0xffff) {
-      q_engine[ch].Configure(scale, mask);
+      q_engine[io_offset + ch].Configure(scale, mask);
     }
     void SetScale(int ch, int scale) {
       QuantizerConfigure(ch, scale);

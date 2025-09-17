@@ -212,9 +212,11 @@ public:
         DrawADSR();
     }
 
+    /*
     void AuxButton() {
         shape_edit ^= 1;
     }
+    */
     //void OnButtonPress() { }
 
     void OnEncoderMove(int direction) {
@@ -226,9 +228,11 @@ public:
         const int curEG = (cursor / NUM_STAGES);
         const int stage = cursor % NUM_STAGES;
         auto &adsr = adsr_env[curEG];
+        /*
         if (shape_edit)
           adsr.shape[stage] = constrain(adsr.shape[stage] + direction, 0, 0xff);
         else
+        */
           adsr.setting[stage] = constrain(adsr.setting[stage] + direction, 1, STAGE_MAX_VALUE);
     }
 
@@ -273,7 +277,7 @@ protected:
 private:
     int cursor;
     MiniADSR adsr_env[2];
-    bool shape_edit = false;
+    //bool shape_edit = false;
 
     // TODO: implement destination mapping; currently hardcoded to Release stage
 

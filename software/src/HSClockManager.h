@@ -36,6 +36,7 @@ static constexpr uint16_t CLOCK_TEMPO_MAX = 0xFFFF;
 static constexpr uint32_t CLOCK_TICKS_MIN = 1000000 / CLOCK_TEMPO_MAX;
 static constexpr uint32_t CLOCK_TICKS_MAX = 1000000 / CLOCK_TEMPO_MIN;
 
+constexpr int MIDI_CLOCK_PPQN = 2;
 constexpr int MIDI_OUT_PPQN = 24;
 constexpr int CLOCK_MAX_MULTIPLE = 24;
 constexpr int CLOCK_MIN_MULTIPLE = -31; // becomes /32
@@ -176,7 +177,7 @@ public:
     // call this on every tick when clock is running, before all Controllers
     void SyncTrig(bool clocked, bool midi_sync = false) {
         const uint32_t now = OC::CORE::ticks;
-        const int ppqn = (midi_sync) ? 24 : clock_ppqn;
+        const int ppqn = (midi_sync || !midi_out_enabled) ? MIDI_CLOCK_PPQN : clock_ppqn;
 
         // Reset only when all multipliers have been met
         bool reset = 1;

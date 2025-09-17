@@ -286,7 +286,13 @@ namespace HS {
             gfxIcon(22 + (q_edit-4)*5, 44, UP_BTN_ICON);
 
           gfxInvert(20, 23, 88, 28);
+
+          // context clues at top/bottom of screen
+          gfxFooter("L:cursor     R:adjust");
+          graphics.clearRect(0, 0, 128, 10);
+          gfxHeader("A:Oct+         B:Oct-");
         }
+
         break;
       }
     }
@@ -442,4 +448,15 @@ void gfxHeader(const char *str, const uint8_t *icon) {
   gfxPrint(x, 1, str);
   gfxLine(0, 10, 127, 10);
   //gfxLine(0, 11, 127, 11);
+}
+
+void gfxFooter(const char *str, const uint8_t *icon) {
+  graphics.clearRect(0, 54, 128, 10);
+  gfxLine(0, 54, 127, 54);
+  int x = 1;
+  if (icon) {
+    gfxIcon(x, 1, icon);
+    x += 8;
+  }
+  gfxPrint(x, 56, str);
 }

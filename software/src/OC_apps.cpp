@@ -71,9 +71,7 @@ namespace menu = OC::menu;
 #include "APP_SCALEEDITOR.h"
 #include "APP_WAVEFORMEDITOR.h"
 #include "APP_PONGGAME.h"
-#ifndef __IMXRT1062__
 #include "APP_Backup.h"
-#endif
 #include "APP_SETTINGS.h"
 
 #define DECLARE_APP(a, b, name, prefix) \
@@ -172,10 +170,8 @@ static constexpr OC::App available_apps[] = {
   DECLARE_APP('R','F', "References", REFS),
   #endif
 
-#ifndef __IMXRT1062__
   // SysEx backup needs to be updated for T4.x
   DECLARE_APP('B','R', "Backup / Restore", Backup),
-#endif
 };
 
 static constexpr int NUM_AVAILABLE_APPS = ARRAY_SIZE(available_apps);

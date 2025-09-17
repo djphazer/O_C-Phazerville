@@ -4,21 +4,20 @@
 // arguments are raw data from MIDI system, so channel starts at 1 (not 0)
 void HS::MIDIFrame::ProcessMIDIMsg(const MIDIMessage msg) {
     const uint8_t m_ch = msg.channel - 1;
-    if (!CheckMidiChannelFilter(m_ch)) return;
 
-    switch (msg.message) {
+    switch (msg.message) { // System Real Time messages
         case usbMIDI.Clock:
-            clock_q = 1;
+            clock_q = (clock_count % (24/MIDI_CLOCK_PPQN) == 0); // for internal sync @ 2ppqn
             ++clock_count;
             for(int ch = 0; ch < MIDIMAP_MAX; ++ch) {
-              mapping[ch].ProcessClock(clock_count);
+                mapping[ch].ProcessClock(clock_count);
             }
             if (clock_count == 24) clock_count = 0;
             return;
             break;
 
-        case usbMIDI.Continue: // treat Continue like Start
         case usbMIDI.Start:
+        case usbMIDI.Continue: // treat Continue like Start
             start_q = 1;
             clock_count = 0;
             clock_run = true;
@@ -33,8 +32,8 @@ void HS::MIDIFrame::ProcessMIDIMsg(const MIDIMessage msg) {
             return;
             break;
 
-        case usbMIDI.SystemReset:
         case usbMIDI.Stop:
+        case usbMIDI.SystemReset:
             stop_q = 1;
             clock_run = false;
             // a way to reset stuck notes
@@ -47,7 +46,11 @@ void HS::MIDIFrame::ProcessMIDIMsg(const MIDIMessage msg) {
             }
             return;
             break;
+    }
 
+    if (!CheckMidiChannelFilter(m_ch)) return;
+
+    switch (msg.message) { // Channel Voice messages
         case usbMIDI.NoteOn:
             MonoBufferPush(m_ch, msg.data1, msg.data2);
             PolyBufferPush(m_ch, msg.data1, msg.data2);

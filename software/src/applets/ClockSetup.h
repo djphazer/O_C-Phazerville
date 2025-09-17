@@ -343,8 +343,13 @@ private:
         gfxDottedLine(0, 21, 127, 21);
         gfxLine(0, 22, 127, 22);
       } else {
+        // lower section
         graphics.clearRect(0, 51, 128, 13);
+        graphics.clearRect(0, 40, 50, 11); // label box
 
+        gfxLine(0, 41, 49, 41);
+        gfxLine(49, 41, 49, 51);
+        gfxPrint(0, 43, "TrigSkip");
         gfxLine(0, 52, 127, 52);
         gfxDottedLine(0, 53, 127, 53);
       }
@@ -400,7 +405,7 @@ private:
         // output trig-skip
         for (int ch=0; ch<4; ++ch) {
             const int x = ch * 32;
-            gfxPrint(1 + x, y, HS::frame.clockskip[ch]);
+            gfxPrint(1 + x + pad(100, HS::frame.clockskip[ch]), y, HS::frame.clockskip[ch]);
             gfxPrint("%");
         }
       }

@@ -82,6 +82,9 @@ static constexpr unsigned long SETTINGS_SAVE_TIMEOUT_MS = 1000;
 
 #define OC_ENCODERS_ENABLE_ACCELERATION_DEFAULT true
 
+// Alternate encoder handling - processes both rising and falling edge on pins
+//#define TINRS_ENCODERS
+
 #define OC_CALIBRATION_DEFAULT_FLAGS (0)
 
 /* ------------ uncomment line below to print boot-up and settings saving/restore info to serial ----- */
