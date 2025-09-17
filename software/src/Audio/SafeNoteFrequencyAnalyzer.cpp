@@ -193,57 +193,6 @@ void SafeNoteFrequencyAnalyzer::process( void ) {
 
         // tau = 0 means we've found a pitch
         if (tau == 0) {
-            // Period just measured (samples) from estimate()
-            const float f_raw = AUDIO_SAMPLE_RATE_EXACT / data;
-            uint16_t seed = (uint16_t)lrintf(data);                  // data = period in samples
-            if (seed < 1) seed = 1;
-            if (seed >= half_window_samples) seed = half_window_samples - 1;
-            tau_global = seed;   
-            // period smoothing logic
-            // ---------- low-frequency-only smoothing (log2 domain) ----------
-            // T_new and f_raw are expected to be in-scope (preserve existing logic)
-            // Apply extra smoothing only for low frequencies to improve stability.
-            // if (f_raw < 112.0f) {
-            //     float logf_new = log2f(f_raw);
-            //     if (!isfinite(sm_logf)) {
-            //         sm_logf = logf_new; // initialize on first use
-            //     }
-            //     // Asymmetric attack/release smoothing (faster when pitch rises)
-            //     const float alpha_attack  = 0.85f;
-            //     const float alpha_release = 0.30f;
-            //     float conf = periodicity;
-            //     conf = (conf < 0.0f) ? 0.0f : ((conf > 1.0f) ? 1.0f : conf);
-            //     float alpha = (logf_new > sm_logf) ? alpha_attack : alpha_release;
-            //     alpha *= (0.6f + 0.4f * conf); // scale by confidence (0.6..1.0)
-            //     sm_logf = alpha * logf_new + (1.0f - alpha) * sm_logf;
-            //     // back to linear frequency and update period if valid
-            //     float f_smooth = exp2f(sm_logf);
-            //     if (f_smooth > 0.0f) {
-            //         T_new = Fs / f_smooth;
-            //     }
-            // } 
-            // // ----------------------------------------------------------------
-            // // ---------- confidence gate + hold-last-good ----------
-            //     bool pass_gate =
-            //         (!have_good  && periodicity >= CONF_RISE) ||   // first good lock
-            //         ( have_good  && periodicity >= CONF_FALL);     // hysteresis to keep lock
-
-            //     if (pass_gate) {
-            //         // accept/update last-good
-            //         last_good_period = T_new;
-            //         have_good = true;
-            //         hold_count = HOLD_MAX;
-            //         data = last_good_period;        // publish for read()
-            //     } else if (have_good && hold_count > 0) {
-            //         // confidence too low → keep previous stable value for a few frames
-            //         --hold_count;
-            //         data = last_good_period;        // publish held value
-            //     } else {
-            //         // no good history to hold; publish the raw T_new
-            //         data = T_new;
-            //     }
-            // // ------------------------------------------------------
-            // ---- end smoothing block ----
             tau_global = 1; // reset to 1 for now.
             process_buffer = false;
             new_output = true;
@@ -285,6 +234,7 @@ uint16_t SafeNoteFrequencyAnalyzer::estimate( uint64_t *yin, uint64_t *rs, uint1
     const float thresh = yin_threshold;
     _tau = tau;
     _head = head;
+    const float plast = periodicity;
     
     if ( _tau > 4 ) {
         
@@ -303,6 +253,12 @@ uint16_t SafeNoteFrequencyAnalyzer::estimate( uint64_t *yin, uint64_t *rs, uint1
         if ( s1 < thresh && s1 < s2 ) {
             uint16_t period = _tau - 3;
             periodicity = 1 - s1;
+            // do not update data if periodicity drops by at least 0.05
+            // this helps with low frequency jitteriness as YIN struggles to find a good match the lower we get our latency
+            if ((periodicity - p_last_accepted) <= -0.05f || periodicity < 0.90f){
+                return 0;
+            }
+            p_last_accepted = periodicity; // now that we know we aren't accepting a dud, save this value
             data = period + 0.5f * ( s0 - s2 ) / ( s0 - 2.0f * s1 + s2 );
             return 0;
         }
@@ -322,7 +278,7 @@ void SafeNoteFrequencyAnalyzer::begin( float threshold , float cutoff_hz) {
         ::operator new[](n * sizeof(int16_t), std::align_val_t(4)));
 
     // choosing a window in ms based on the lowest note we care to detect. higher values increase latency
-    const float window_ms = 48.0f;   // this is what's going to affect the lowest pitch we can track; use 18–24 ms range
+    const float window_ms = 42.0f;   // this is what's going to affect the lowest pitch we can track; use 18–24 ms range
     window_samples = (uint16_t)lrintf(AUDIO_SAMPLE_RATE_EXACT * (window_ms / 1000.0f));
 
     // round up to blocks of 128

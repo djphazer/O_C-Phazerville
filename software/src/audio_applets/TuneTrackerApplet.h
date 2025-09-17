@@ -37,7 +37,7 @@ public:
     for (int i = 0; i < Channels; i++) {
         // using the passthru as our input
         in_conns[i].connect(passthru, i, note_freqs[i], 0);
-        note_freqs[i].begin(0.1, 2200); // initializes the pitch tracking algo. threshold 0.1-0.2 for optimal error rates
+        note_freqs[i].begin(0.14, 7000); // initializes the pitch tracking algo. threshold 0.1-0.2 for optimal error rates
     }
   }
   void Unload() override {
@@ -110,7 +110,7 @@ public:
 
     gfxPrint(label_x, 35, "CVOut:  ");
     gfxStartCursor();
-    gfxPrint(pitch_cv_selection.Name());
+    //gfxPrint(pitch_cv_selection.Name());
     gfxEndCursor(cursor == PITCH_CV_OUT, false, pitch_cv_selection.Name());
 
     float prob = note_freqs[0].probability();
