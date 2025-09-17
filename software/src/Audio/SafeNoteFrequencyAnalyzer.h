@@ -50,7 +50,7 @@
  ***********************************************************************/
 // through testing, determined this is optimal. 
 //one block = ~2.9ms of signal time per https://forum.pjrc.com/index.php?threads/different-range-fft-algorithm.32252/page-2
-#define AUDIO_GUITARTUNER_BLOCKS  16 
+#define AUDIO_GUITARTUNER_BLOCKS  18 
 /***********************************************************************/
 class SafeNoteFrequencyAnalyzer : public AudioStream {
 public:
@@ -202,8 +202,13 @@ private:
     uint8_t hold_count = 0;        // how many frames left to hold last_good_period
 
     // tuning constants for gating/hold
-    static constexpr float   CONF_RISE = 0.75f;  // need this to accept a *new* lock
-    static constexpr float   CONF_FALL = 0.70f;  // lower bar to keep an *existing* lock (hysteresis)
-    static constexpr uint8_t HOLD_MAX  = 6;      // frames to keep last good on low confidence (≈ 6×process cadence)
+    static constexpr float   CONF_RISE = 0.97f;  // need this to accept a *new* lock
+    static constexpr float   CONF_FALL = 0.95f;  // lower bar to keep an *existing* lock (hysteresis)
+    static constexpr uint8_t HOLD_MAX  = 8;      // frames to keep last good on low confidence (≈ 6×process cadence)
+
+    // octave / decay guards
+    uint8_t octave_suspect = 0;     // consecutive potential octave-down hits
+    static constexpr float  OCTAVE_DOWN_RATIO = 1.6f; // period growth treated as octave-ish
+    static constexpr uint8_t OCTAVE_CONFIRM   = 4;    // need this many consecutive before accepting
 };
 #endif
