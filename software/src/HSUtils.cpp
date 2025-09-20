@@ -64,6 +64,17 @@ namespace HS {
 
   OC::menu::ScreenCursor<5> showhide_cursor;
 
+  peaks::MultistageEnvelope& GetEnvelope(int index) {
+    return env_[index];
+  }
+  util::TuringShiftRegister& GetTM(int index) {
+    if (!turing_machine_[index]) turing_machine_[index] = new util::TuringShiftRegister();
+    return *turing_machine_[index];
+  }
+  QuantEngine& GetQEngine(int index) {
+    return q_engine[index];
+  }
+
   FLASHMEM
   void Init() {
     for (auto &iq : input_quant)
@@ -440,7 +451,6 @@ namespace HS {
       }
     }
   }
-
 } // namespace HS
 
 //////////////// Hemisphere-like graphics methods for easy porting
