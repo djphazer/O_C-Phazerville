@@ -511,7 +511,7 @@ struct IOFrame {
     // output value cache, countdowns
     int outputs[DAC_CHANNEL_COUNT];
     int output_diff[DAC_CHANNEL_COUNT];
-    int outputs_smooth[DAC_CHANNEL_COUNT];
+    int outputs_target[DAC_CHANNEL_COUNT];
     int clock_countdown[DAC_CHANNEL_COUNT];
     int adc_lag_countdown[ADC_CHANNEL_COUNT]; // Time between a clock event and an ADC read event
     // calculated values
@@ -529,14 +529,15 @@ struct IOFrame {
 
     // --- Soft IO ---
     void Out(DAC_CHANNEL channel, int value) {
-        output_diff[channel] += value - outputs[channel];
-        outputs[channel] = value;
+        output_diff[channel] += value - outputs_target[channel];
+        outputs_target[channel] = value;
     }
     void ClockOut(DAC_CHANNEL ch, const int pulselength = HEMISPHERE_CLOCK_TICKS * trig_length) {
         // short circuit if skip probability is zero to avoid consuming random numbers
         if (0 == clockskip[ch] || random(100) >= clockskip[ch]) {
             clock_countdown[ch] = pulselength;
-            outputs_smooth[ch] = outputs[ch] = HEMISPHERE_MAX_CV;
+            // assign to both to override slew - instant attack
+            outputs_target[ch] = outputs[ch] = HEMISPHERE_MAX_CV;
         }
     }
     void NudgeSkip(int ch, int dir) {

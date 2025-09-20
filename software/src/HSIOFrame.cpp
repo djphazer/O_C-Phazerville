@@ -386,7 +386,7 @@ void HS::IOFrame::Load(OC::IOFrame *ioframe) {
     // Handle clock pulse timing
     for (int i = 0; i < DAC_CHANNEL_COUNT; ++i) {
         if (clock_countdown[i] > 0) {
-            if (--clock_countdown[i] == 0) outputs[i] = 0;
+            if (--clock_countdown[i] == 0) outputs_target[i] = 0;
         }
     }
     for (int i = 0; i < MIDIMAP_MAX; ++i) {
@@ -432,15 +432,12 @@ void HS::IOFrame::Send(OC::IOFrame *ioframe) {
 
     const uint32_t now = OC::CORE::ticks;
     for (int i = 0; i < DAC_CHANNEL_COUNT; ++i) {
-      // TODO: apply slew/smoothing here, per channel
-      // - also envelope outputs, and maybe other alt output modes?
-
       /* envelope output! */
       if (output_slew[i] < 0) {
         uint8_t gate_state = 0;
-        const bool outgate_high = (outputs[i] > GATE_THRESHOLD);
-        const bool outgate_rising = outgate_high && (outputs[i] - output_diff[i] < GATE_THRESHOLD);
-        const bool outgate_falling = !outgate_high && (outputs[i] - output_diff[i] > GATE_THRESHOLD);
+        const bool outgate_high = (outputs_target[i] > GATE_THRESHOLD);
+        const bool outgate_rising = outgate_high && ((outputs_target[i] - output_diff[i]) < GATE_THRESHOLD);
+        const bool outgate_falling = !outgate_high && ((outputs_target[i] - output_diff[i]) > GATE_THRESHOLD);
 
         if (outgate_rising)
           gate_state |= peaks::CONTROL_GATE_RISING;
@@ -452,13 +449,18 @@ void HS::IOFrame::Send(OC::IOFrame *ioframe) {
 
         const int value = GetEnvelope(i).ProcessSingleSample(gate_state); // 0 to 32767
         ioframe->outputs.set_pitch_value(chan[i], Proportion(value, 32767, HEMISPHERE_MAX_CV));
-      } else if (output_slew[i]) {
+
+        continue;
+      }
+
+      if (output_slew[i]) {
         if (now % output_slew[i] == 0) {
-          outputs_smooth[i] = (outputs_smooth[i] * (output_slew[i] - 1) + outputs[i]) / output_slew[i];
+          outputs[i] = (outputs[i] * (output_slew[i] - 1) + outputs_target[i]) / output_slew[i];
         }
-        ioframe->outputs.set_pitch_value(chan[i], outputs_smooth[i]);
       } else
-        ioframe->outputs.set_pitch_value(chan[i], outputs[i]);
+        outputs[i] = outputs_target[i];
+
+      ioframe->outputs.set_pitch_value(chan[i], outputs[i]);
     }
     if (autoMIDIOut) MIDIState.Send(outputs);
 }

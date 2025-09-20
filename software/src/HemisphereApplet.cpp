@@ -131,11 +131,12 @@ void HemisphereApplet::Out(int ch, int value, int octave) const {
     frame.Out( (DAC_CHANNEL)(ch + io_offset), value + (octave * (12 << 7)));
 }
 
+[[deprecated("SmoothedOut() was a bad idea")]]
 void HemisphereApplet::SmoothedOut(int ch, int value, int kSmoothing) const {
   if (OC::CORE::ticks % kSmoothing == 0) {
     DAC_CHANNEL channel = (DAC_CHANNEL)(ch + io_offset);
-    value = (frame.outputs_smooth[channel] * (kSmoothing - 1) + value) / kSmoothing;
-    frame.outputs[channel] = frame.outputs_smooth[channel] = value;
+    value = (frame.outputs_target[channel] * (kSmoothing - 1) + value) / kSmoothing;
+    frame.outputs_target[channel] = value;
   }
 }
 void HemisphereApplet::ClockOut(const int ch, const int ticks) const {
