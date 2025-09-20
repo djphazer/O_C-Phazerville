@@ -194,22 +194,11 @@ namespace HS {
   extern ErrMsgIndex msg_idx;
 
   extern peaks::MultistageEnvelope env_[DAC_CHANNEL_COUNT];
-  static peaks::MultistageEnvelope& GetEnvelope(int index) {
-    return env_[index];
-  }
+  extern util::TuringShiftRegister* turing_machine_[ADC_CHANNEL_COUNT];
 
   // input quantizers, because sometimes we need hysteresis
   extern util::SemitoneQuantizer input_quant[ADC_CHANNEL_COUNT];
-  extern util::TuringShiftRegister* turing_machine_[ADC_CHANNEL_COUNT];
-  static util::TuringShiftRegister& GetTM(int index) {
-    if (nullptr == turing_machine_[index]) turing_machine_[index] = new util::TuringShiftRegister();
-    return *turing_machine_[index];
-  }
-
   extern QuantEngine q_engine[QUANT_CHANNEL_COUNT];
-  static QuantEngine& GetQEngine(int index) {
-    return q_engine[index];
-  }
 
 #if defined(ARDUINO_TEENSY41) || defined(VOR)
   extern int octave_max;
@@ -248,6 +237,10 @@ namespace HS {
   void DrawPopup(const int config_cursor = 0, const int preset_id = 0, const bool blink = 0);
   void ToggleClockRun();
   void PokePopup(PopupType pop, ErrMsgIndex err = NO_ERROR);
+
+  peaks::MultistageEnvelope& GetEnvelope(int index);
+  util::TuringShiftRegister& GetTM(int index);
+  QuantEngine& GetQEngine(int index);
 
 } // namespace HS
 
