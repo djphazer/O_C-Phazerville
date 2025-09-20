@@ -202,11 +202,12 @@ private:
         osc[ch] = WaveformManager::VectorOscillatorFromWaveform(waveform);
         waveform_number[ch] = waveform;
         osc[ch].SetPhaseIncrement(ComputePhaseIncrement(pitch[ch]));
-#ifdef NORTHERNLIGHT
-        osc[ch].Offset((12 << 7) * 4);
-        osc[ch].SetScale((12 << 7) * 4);
-#else
-        osc[ch].SetScale((12 << 7) * 3);
-#endif
+        if (OC::DAC::kOctaveZero == 0) {
+          osc[ch].Offset(HEMISPHERE_MAX_CV/2);
+          osc[ch].SetScale(HEMISPHERE_MAX_CV/2);
+        } else {
+          osc[ch].Offset(0);
+          osc[ch].SetScale(-HEMISPHERE_MIN_CV);
+        }
     }
 };
