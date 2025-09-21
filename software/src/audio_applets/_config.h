@@ -19,6 +19,7 @@
 #include "audio_applets/SamverbApplet.h"
 #include "audio_applets/PhaserApplet.h"
 #include "audio_applets/ThreeBandz.h"
+#include "audio_applets/TuneTrackerApplet.h"
 
 const size_t NUM_SLOTS = 5;
 
@@ -53,6 +54,7 @@ DMAMEM std::tuple<
   ReverbApplet,
   BungverbApplet,
   DynamicsApplet<MONO>,
+  TuneTrackerApplet<MONO>,
   UpsampledApplet<MONO>>
     mono_processors_pool[2][NUM_SLOTS - 1];
 DMAMEM std::tuple<
