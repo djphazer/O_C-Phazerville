@@ -128,6 +128,7 @@ public:
             map.function = HEM_MIDI_LEARN;
             map.function_cc = -1; // auto-learn MIDI CC or precise NoteOn
             frame.MIDIState.clock_count = 0;
+            frame.MIDIState.UpdateMidiChannelFilter();
             break;
           }
         default: break;
