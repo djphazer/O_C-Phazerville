@@ -62,11 +62,9 @@ struct Registry {
     }
 
     const char* getName(int index) const {
-      // TODO: make names static
       return getNames()[index];
     }
     const uint8_t* getIcon(int index) const {
-      // TODO: make icons static
       return getIcons()[index];
     }
 
