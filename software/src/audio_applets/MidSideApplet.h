@@ -12,9 +12,9 @@ public:
 
   void Start() override {
     ForEachChannel(to) {
-      out_conns[to].connect(mixers[to], 0, output, to);
+      PatchCable(mixers[to], 0, output, to);
       ForEachChannel(from) {
-        conns[from][to].connect(input, from, mixers[to], from);
+        PatchCable(input, from, mixers[to], from);
       }
     }
     SetGain(gain);
@@ -67,7 +67,4 @@ private:
   AudioPassthrough<2> input;
   std::array<AudioMixer<2>, 2> mixers;
   AudioPassthrough<2> output;
-
-  std::array<std::array<AudioConnection, 2>, 2> conns;
-  std::array<AudioConnection, 2> out_conns;
 };

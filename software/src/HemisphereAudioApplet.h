@@ -25,10 +25,14 @@ enum AudioChannels : uint8_t {
 class HemisphereAudioApplet : public HemisphereApplet {
 public:
   static const uint_fast8_t CONFIG_SIZE = 4;
+  static const uint_fast8_t MAX_CABLES = 32;
 
   // -90 = 15bits of depth so no point in going lower
   static const int LVL_MIN_DB = -90;
   static const int LVL_MAX_DB = 90;
+
+  AudioConnection* cables = nullptr;
+  size_t cable_count;
 
   // If applet_name() can return different things at different times, you
   // *must* override this or saving and loading won't work!
@@ -58,6 +62,31 @@ public:
     data[1] = 0;
     data[2] = 0;
     data[3] = 0;
+  }
+
+  virtual void Unload() override {
+    // always all restart, so virtual PatchCable's can be reconnected
+    AllowRestart();
+  }
+
+  // call this from Start() to connect objects together
+  void PatchCable(AudioStream &source, uint8_t s_ch, AudioStream &dest, uint8_t d_ch) {
+    if (!cables) cables = new AudioConnection[MAX_CABLES];
+
+    // TODO: we need a static_assert, if possible... or use a vector instead
+    if (cable_count >= MAX_CABLES) {
+      HS::PokePopup(HS::MESSAGE_POPUP, HS::MYSTERIOUS_ERROR);
+      return;
+    }
+
+    cables[cable_count++].connect(source, s_ch, dest, d_ch);
+  }
+
+  void Disconnect() {
+    for (int i = 0; i < cable_count; ++i) {
+      cables[i].disconnect();
+    }
+    cable_count = 0;
   }
 
   void gfxPrintTuningIndicator(int16_t pitch) {

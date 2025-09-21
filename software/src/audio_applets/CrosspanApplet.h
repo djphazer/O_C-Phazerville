@@ -27,6 +27,25 @@ public:
         vcas[from][to].rectify(true);
       }
     }
+
+    PatchCable(input, 0, vcas[0][0], 0);
+    PatchCable(input, 0, vcas[0][1], 0);
+    PatchCable(input, 1, vcas[1][0], 0);
+    PatchCable(input, 1, vcas[1][1], 0);
+
+    PatchCable(attenuations[0], 0, vcas[0][0], 1);
+    PatchCable(attenuations[0], 0, vcas[1][1], 1);
+    PatchCable(attenuations[1], 0, vcas[0][1], 1);
+    PatchCable(attenuations[1], 0, vcas[1][0], 1);
+
+    PatchCable(vcas[0][0], 0, mixers[0], 0);
+    PatchCable(vcas[0][1], 0, mixers[1], 0);
+    PatchCable(vcas[1][0], 0, mixers[0], 1);
+    PatchCable(vcas[1][1], 0, mixers[1], 1);
+
+    PatchCable(mixers[0], 0, output, 0);
+    PatchCable(mixers[1], 0, output, 1);
+
     AllowRestart();
   }
 
@@ -128,22 +147,4 @@ private:
   std::array<std::array<AudioVCA, 2>, 2> vcas;
   std::array<AudioMixer<2>, 2> mixers;
   AudioPassthrough<2> output;
-
-  AudioConnection in_to_ll{input, 0, vcas[0][0], 0};
-  AudioConnection in_to_lr{input, 0, vcas[0][1], 0};
-  AudioConnection in_to_rl{input, 1, vcas[1][0], 0};
-  AudioConnection in_to_rr{input, 1, vcas[1][1], 0};
-
-  AudioConnection fade_out_to_ll{attenuations[0], 0, vcas[0][0], 1};
-  AudioConnection fade_out_to_rr{attenuations[0], 0, vcas[1][1], 1};
-  AudioConnection fade_in_to_lr{attenuations[1], 0, vcas[0][1], 1};
-  AudioConnection fade_in_to_rl{attenuations[1], 0, vcas[1][0], 1};
-
-  AudioConnection ll_to_l_mixer{vcas[0][0], 0, mixers[0], 0};
-  AudioConnection lr_to_r_mixer{vcas[0][1], 0, mixers[1], 0};
-  AudioConnection rl_to_l_mixer{vcas[1][0], 0, mixers[0], 1};
-  AudioConnection rr_to_r_mixer{vcas[1][1], 0, mixers[1], 1};
-
-  AudioConnection l_mixer_to_out{mixers[0], 0, output, 0};
-  AudioConnection r_mixer_to_out{mixers[1], 0, output, 1};
 };

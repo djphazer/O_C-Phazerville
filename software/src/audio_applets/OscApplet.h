@@ -22,6 +22,15 @@ public:
     vca_cv.Acquire();
     vca_cv.Method(INTERPOLATION_LINEAR);
     vca.rectify(true);
+
+    PatchCable(input_stream, 0, mod_vca, 0);
+    PatchCable(mod_cv_stream, 0, mod_vca, 1);
+    PatchCable(mod_vca, 0, synth, 0);
+    PatchCable(input_stream, 0, mixer, 0);
+    PatchCable(pwm_stream, 0, synth, 1);
+    PatchCable(vca_cv, 0, vca, 1);
+    PatchCable(synth, 0, vca, 0);
+    PatchCable(vca, 0, mixer, 1);
   }
 
   void Unload() override {
@@ -289,13 +298,4 @@ private:
   InterpolatingStream<> vca_cv;
   AudioVCA vca;
   AudioMixer<2> mixer;
-
-  AudioConnection input_to_mod_vca{input_stream, 0, mod_vca, 0};
-  AudioConnection mod_cv_to_mod_vca{mod_cv_stream, 0, mod_vca, 1};
-  AudioConnection mod_vca_to_synth{mod_vca, 0, synth, 0};
-  AudioConnection in_conn{input_stream, 0, mixer, 0};
-  AudioConnection pwm_conn{pwm_stream, 0, synth, 1};
-  AudioConnection cv_to_vca{vca_cv, 0, vca, 1};
-  AudioConnection synth_to_vca{synth, 0, vca, 0};
-  AudioConnection vca_to_mixer{vca, 0, mixer, 1};
 };

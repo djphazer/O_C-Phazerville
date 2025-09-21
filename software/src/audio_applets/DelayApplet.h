@@ -19,11 +19,11 @@ public:
   }
   void Start() {
     for (int ch = 0; ch < Channels; ch++) {
-      channels[ch].Start(ch, input_stream, output_stream);
+      channels[ch].Start(this, ch, input_stream, output_stream);
     }
     if (Channels == STEREO) {
       ForEachChannel(ch) {
-        ping_pong_conns[ch].connect(
+        PatchCable(
           channels[ch].taps_mixer, 0, channels[1 - ch].input_mixer, PP_CH
         );
         channels[1 - ch].input_mixer.gain(PP_CH, 0.0f);
@@ -35,11 +35,6 @@ public:
   }
 
   void Unload() {
-    if (Channels == STEREO) {
-      ForEachChannel(ch) {
-        ping_pong_conns[ch].disconnect();
-      }
-    }
     /* what if we just... kept it forever?
      * the problem is, unloading & reloading is slow when jumping presets
      */
@@ -443,48 +438,27 @@ private:
     AudioMixer<8> taps_mixer;
     AudioMixer<2> wet_dry_mixer;
 
-    AudioConnection mixer_to_delay;
-    AudioConnection wet_conn;
-
-    AudioConnection input_to_mixer;
-    AudioConnection taps_conns[8];
-    AudioConnection tap_mixer_to_mixer;
-    AudioConnection dry_conn;
-    AudioConnection mix_to_output;
-
     DelayChannel()
       : delaystream(external_psram_size ? DELAY_LENGTH : DELAY_LENGTH / 16) {}
 
-    void Start(int channel, AudioStream& input, AudioStream& output) {
+    void Start(HemisphereAudioApplet* owner, int channel, AudioStream& input, AudioStream& output) {
       delaystream.Acquire();
 
-      input_to_mixer.connect(input, channel, input_mixer, 0);
+      owner->PatchCable(input, channel, input_mixer, 0);
       for (int i = 0; i < 8; i++) {
-        taps_conns[i].connect(delaystream, i, taps_mixer, i);
+        owner->PatchCable(delaystream, i, taps_mixer, i);
       }
-
-      mixer_to_delay.connect(input_mixer, 0, delaystream, 0);
-      wet_conn.connect(taps_mixer, 0, wet_dry_mixer, WD_WET_CH);
-      dry_conn.connect(input, channel, wet_dry_mixer, WD_DRY_CH);
-      mix_to_output.connect(wet_dry_mixer, 0, output, channel);
+      owner->PatchCable(input_mixer, 0, delaystream, 0);
+      owner->PatchCable(taps_mixer, 0, wet_dry_mixer, WD_WET_CH);
+      owner->PatchCable(input, channel, wet_dry_mixer, WD_DRY_CH);
+      owner->PatchCable(wet_dry_mixer, 0, output, channel);
     }
 
     void Stop() {
-      input_to_mixer.disconnect();
-      for (int i = 0; i < 8; i++) {
-        taps_conns[i].disconnect();
-      }
-
-      mixer_to_delay.disconnect();
-      wet_conn.disconnect();
-      dry_conn.disconnect();
-      mix_to_output.disconnect();
       delaystream.Release();
     }
   } channels[Channels];
   AudioPassthrough<Channels> output_stream;
-
-  AudioConnection ping_pong_conns[2];
 
   // [-4,-2]=>-1, [-1,1]=>0, [2,4]=>1, etc
   int16_t semitones_to_div(int16_t semis) {

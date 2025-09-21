@@ -14,8 +14,8 @@ public:
 
   void Start() {
     for (int i = 0; i < Channels; i++) {
-      in_conns[i].connect(input, i, filters[i], 0);
-      out_conns[i].connect(filters[i], 0, output, i);
+      PatchCable(input, i, filters[i], 0);
+      PatchCable(filters[i], 0, output, i);
     }
   }
 
@@ -136,7 +136,4 @@ private:
   AudioPassthrough<Channels> input;
   std::array<AudioFilterLadder, Channels> filters;
   AudioPassthrough<Channels> output;
-
-  std::array<AudioConnection, Channels> in_conns;
-  std::array<AudioConnection, Channels> out_conns;
 };

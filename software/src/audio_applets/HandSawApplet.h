@@ -14,50 +14,27 @@ class HandSawApplet : public HemisphereAudioApplet {
             return "HandSaw";
         }
         void Start() override {
-          synth1_to_mixer1.connect(synth1, 0, mixer1, 0);
-          synth2_to_mixer1.connect(synth2, 0, mixer1, 1);
-          synth3_to_mixer1.connect(synth3, 0, mixer1, 2);
-          synth4_to_mixer2.connect(synth4, 0, mixer2, 0);
-          synth5_to_mixer2.connect(synth5, 0, mixer2, 1);
-          synth6_to_mixe2.connect(synth6, 0, mixer2, 2);
-          synth7_to_mixer3.connect(synth7, 0, mixer3, 0);
-          synth8_to_mixer3.connect(synth8, 0, mixer3, 1);
-          synth9_to_mixer3.connect(synth9, 0, mixer3, 2);
-          synth10_to_mixer4.connect(synth10, 0, mixer4, 0);
-          synth11_to_mixer4.connect(synth11, 0, mixer4, 1);
-          synth12_to_mixer4.connect(synth12, 0, mixer4, 2);
+          PatchCable(synth1, 0, mixer1, 0);
+          PatchCable(synth2, 0, mixer1, 1);
+          PatchCable(synth3, 0, mixer1, 2);
+          PatchCable(synth4, 0, mixer2, 0);
+          PatchCable(synth5, 0, mixer2, 1);
+          PatchCable(synth6, 0, mixer2, 2);
+          PatchCable(synth7, 0, mixer3, 0);
+          PatchCable(synth8, 0, mixer3, 1);
+          PatchCable(synth9, 0, mixer3, 2);
+          PatchCable(synth10, 0, mixer4, 0);
+          PatchCable(synth11, 0, mixer4, 1);
+          PatchCable(synth12, 0, mixer4, 2);
 
-          mixer1_to_stackMixer.connect(mixer1, 0, stackMixer, 0);
-          mixer2_to_stackMixer.connect(mixer2, 0, stackMixer, 1);
-          mixer3_to_stackMixer.connect(mixer3, 0, stackMixer, 2);
-          mixer4_to_stackMixer.connect(mixer4, 0, stackMixer, 3);
+          PatchCable(mixer1, 0, stackMixer, 0);
+          PatchCable(mixer2, 0, stackMixer, 1);
+          PatchCable(mixer3, 0, stackMixer, 2);
+          PatchCable(mixer4, 0, stackMixer, 3);
 
-          input_to_outputMixer.connect(input_stream, 0, outputMixer, 0);
-          stackMixer_to_outputMixer.connect(stackMixer, 0, outputMixer, 1);
+          PatchCable(input_stream, 0, outputMixer, 0);
+          PatchCable(stackMixer, 0, outputMixer, 1);
           outputMixer.gain(0, 1.0f); // passthru
-        }
-        void Unload() override {
-          synth1_to_mixer1.disconnect();
-          synth2_to_mixer1.disconnect();
-          synth3_to_mixer1.disconnect();
-          synth4_to_mixer2.disconnect();
-          synth5_to_mixer2.disconnect();
-          synth6_to_mixe2.disconnect();
-          synth7_to_mixer3.disconnect();
-          synth8_to_mixer3.disconnect();
-          synth9_to_mixer3.disconnect();
-          synth10_to_mixer4.disconnect();
-          synth11_to_mixer4.disconnect();
-          synth12_to_mixer4.disconnect();
-
-          mixer1_to_stackMixer.disconnect();
-          mixer2_to_stackMixer.disconnect();
-          mixer3_to_stackMixer.disconnect();
-          mixer4_to_stackMixer.disconnect();
-
-          input_to_outputMixer.disconnect();
-          stackMixer_to_outputMixer.disconnect();
-          AllowRestart();
         }
 
         void Controller() override {
@@ -384,25 +361,4 @@ class HandSawApplet : public HemisphereAudioApplet {
         AudioSynthWaveform synth10;
         AudioSynthWaveform synth11;
         AudioSynthWaveform synth12;
-
-        AudioConnection synth1_to_mixer1;
-        AudioConnection synth2_to_mixer1;
-        AudioConnection synth3_to_mixer1;
-        AudioConnection synth4_to_mixer2;
-        AudioConnection synth5_to_mixer2;
-        AudioConnection synth6_to_mixe2;
-        AudioConnection synth7_to_mixer3;
-        AudioConnection synth8_to_mixer3;
-        AudioConnection synth9_to_mixer3;
-        AudioConnection synth10_to_mixer4;
-        AudioConnection synth11_to_mixer4;
-        AudioConnection synth12_to_mixer4;
-
-        AudioConnection mixer1_to_stackMixer;
-        AudioConnection mixer2_to_stackMixer;
-        AudioConnection mixer3_to_stackMixer;
-        AudioConnection mixer4_to_stackMixer;
-        
-        AudioConnection input_to_outputMixer;
-        AudioConnection stackMixer_to_outputMixer;
 };

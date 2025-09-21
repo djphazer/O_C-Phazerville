@@ -22,9 +22,9 @@ public:
     cv_stream.Method(INTERPOLATION_LINEAR);
     cv_stream.Acquire();
     for (int i = 0; i < Channels; i++) {
-      in_conns[i].connect(input, i, vcas[i], 0);
-      cv_conns[i].connect(cv_stream, 0, vcas[i], 1);
-      out_conns[i].connect(vcas[i], 0, output, i);
+      PatchCable(input, i, vcas[i], 0);
+      PatchCable(cv_stream, 0, vcas[i], 1);
+      PatchCable(vcas[i], 0, output, i);
     }
     SetLevel(level);
     SetBias(bias);
@@ -177,10 +177,6 @@ private:
   InterpolatingStream<> cv_stream;
   std::array<AudioVCA, Channels> vcas;
   AudioPassthrough<Channels> output;
-
-  std::array<AudioConnection, Channels> in_conns;
-  std::array<AudioConnection, Channels> cv_conns;
-  std::array<AudioConnection, Channels> out_conns;
 
   // Gives variable curve exponent by controlling the base normalized to go from
   // 0 to 1 for powers 0 to 1.

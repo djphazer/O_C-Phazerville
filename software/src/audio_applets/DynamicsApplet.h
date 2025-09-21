@@ -25,8 +25,8 @@ public:
     for (int i = 0; i < Channels; i++) {
       complimit[i].Acquire();
 
-      in_conns[i].connect(input, i, complimit[i], 0);
-      out_conns[i].connect(complimit[i], 0, output, i);
+      PatchCable(input, i, complimit[i], 0);
+      PatchCable(complimit[i], 0, output, i);
 
       SetParams();
     }
@@ -143,9 +143,6 @@ private:
   //void makeupGain(float gain = 0.0f)
 
   AudioPassthrough<Channels> input;
-  std::array<AudioConnection, Channels> in_conns;
   std::array<AudioEffectDynamics, Channels> complimit;
-  std::array<AudioConnection, Channels> out_conns;
   AudioPassthrough<Channels> output;
-
 };

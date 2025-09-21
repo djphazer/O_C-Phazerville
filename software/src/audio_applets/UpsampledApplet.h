@@ -17,9 +17,9 @@ public:
     interp_stream.Method(static_cast<InterpolationMethod>(method));
 
     for (int c = 0; c < Channels; c++) {
-      interp_conn[c].connect(interp_stream, 0, mixer[c], 0);
-      in_conn[c].connect(input_stream, c, mixer[c], 1);
-      out_conn[c].connect(mixer[c], 0, output_stream, c);
+      PatchCable(interp_stream, 0, mixer[c], 0);
+      PatchCable(input_stream, c, mixer[c], 1);
+      PatchCable(mixer[c], 0, output_stream, c);
       mixer[c].gain(0, 1.0f);
       mixer[c].gain(1, 1.0f);
     }
@@ -144,10 +144,6 @@ private:
   InterpolatingStream<> interp_stream;
   AudioMixer<2> mixer[Channels];
   AudioPassthrough<Channels> output_stream;
-
-  AudioConnection in_conn[Channels];
-  AudioConnection interp_conn[Channels];
-  AudioConnection out_conn[Channels];
 
   float lp = 0.0f;
   int cursor = 0;

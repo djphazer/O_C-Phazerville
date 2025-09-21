@@ -17,18 +17,10 @@ class BungverbApplet : public HemisphereAudioApplet {
         void Start() override {
             if (!reverb) reverb = new AudioEffectReverbSchroeder();
             filter.frequency(15000);
-            input_to_reverb.connect(input, 0, *reverb, 0);
-            reverb_to_dry_wet.connect(*reverb, 0, filter, 0);
-            filter_to_dry_wet.connect(filter, 0, dry_wet_mixer, 0);
-            input_to_dry_wet.connect(input, 0, dry_wet_mixer, 1);
-        }
-
-        void Unload() override {
-            input_to_reverb.disconnect();
-            reverb_to_dry_wet.disconnect();
-            filter_to_dry_wet.disconnect();
-            input_to_dry_wet.disconnect();
-            AllowRestart();
+            PatchCable(input, 0, *reverb, 0);
+            PatchCable(*reverb, 0, filter, 0);
+            PatchCable(filter, 0, dry_wet_mixer, 0);
+            PatchCable(input, 0, dry_wet_mixer, 1);
         }
 
         void Controller() override {
@@ -171,16 +163,11 @@ class BungverbApplet : public HemisphereAudioApplet {
 
         int8_t cursor = DECAY_TIME;
         AudioPassthrough<MONO> input;
-        
+
         AudioEffectReverbSchroeder* reverb;
         AudioFilterStateVariable filter;
-        
-        AudioMixer<2> dry_wet_mixer;
 
-        AudioConnection input_to_reverb;
-        AudioConnection reverb_to_dry_wet;
-        AudioConnection filter_to_dry_wet;
-        AudioConnection input_to_dry_wet;
+        AudioMixer<2> dry_wet_mixer;
 
         int8_t mix = 100;
         float decay_time = 1.0f;

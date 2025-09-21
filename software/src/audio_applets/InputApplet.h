@@ -19,24 +19,24 @@ public:
   void Start() override {
     if (MONO == Channels) {
       mono_mode = hemisphere;
-      in_conn[0].connect(OC::AudioIO::InputStream(), 0, mixer[0], 0);
-      cross_conn[0].connect(OC::AudioIO::InputStream(), 1, mixer[0], 1);
-      in_conn[1].connect(input, 0, mixer[0], 2);
+      PatchCable(OC::AudioIO::InputStream(), 0, mixer[0], 0);
+      PatchCable(OC::AudioIO::InputStream(), 1, mixer[0], 1);
+      PatchCable(input, 0, mixer[0], 2);
 
-      out_conn[0].connect(mixer[0], 0, output, 0);
+      PatchCable(mixer[0], 0, output, 0);
 
-      peakpatch[0].connect(OC::AudioIO::InputStream(), 0, peakmeter[0], 0);
+      PatchCable(OC::AudioIO::InputStream(), 0, peakmeter[0], 0);
 
       mixer[0].gain(2, 1.0); // passthru
     } else {
       for (int i = 0; i < Channels; ++i) {
-        in_conn[i].connect(OC::AudioIO::InputStream(), i, mixer[i], 0);
-        cross_conn[i].connect(OC::AudioIO::InputStream(), i, mixer[1 - i], 1);
-        in_conn[i + 2].connect(input, i, mixer[i], 2);
+        PatchCable(OC::AudioIO::InputStream(), i, mixer[i], 0);
+        PatchCable(OC::AudioIO::InputStream(), i, mixer[1 - i], 1);
+        PatchCable(input, i, mixer[i], 2);
 
-        out_conn[i].connect(mixer[i], 0, output, i);
+        PatchCable(mixer[i], 0, output, i);
 
-        peakpatch[i].connect(OC::AudioIO::InputStream(), i, peakmeter[i], 0);
+        PatchCable(OC::AudioIO::InputStream(), i, peakmeter[i], 0);
 
         mixer[i].gain(2, 1.0); // passthru
       }
@@ -142,14 +142,10 @@ protected:
 
 private:
   AudioPassthrough<Channels> input;
-  AudioConnection in_conn[Channels * 2];
-  AudioConnection cross_conn[Channels];
   AudioMixer<3> mixer[Channels];
-  AudioConnection out_conn[Channels];
   AudioPassthrough<Channels> output;
 
   AudioAnalyzePeak peakmeter[Channels];
-  AudioConnection peakpatch[Channels];
 
   int8_t mono_mode = LEFT;
   int8_t level = 0;

@@ -251,11 +251,13 @@ public:
     if (IsStereo(c)) {
       get_selected_stereo_applet(c).BaseStart(LEFT_HEMISPHERE);
       ForEachSide(side) {
+        get_selected_mono_applet(side, c).Disconnect();
         get_selected_mono_applet(side, c).Unload();
         ConnectStereoToNext(side, c);
         if (c > 0) ConnectSlotToNext(side, c - 1);
       }
     } else {
+      get_selected_stereo_applet(c).Disconnect();
       get_selected_stereo_applet(c).Unload();
       ForEachSide(side) {
         get_selected_mono_applet(side, c).BaseStart(side);
@@ -316,6 +318,7 @@ public:
   void ChangeStereoApplet(HEM_SIDE side, size_t slot, int ix) {
     int& sel = selected_stereo_applets[slot];
     if (ix == sel) return;
+    get_selected_stereo_applet(slot).Disconnect();
     get_selected_stereo_applet(slot).Unload();
     sel = ix;
     auto& app = get_selected_stereo_applet(slot);
@@ -329,6 +332,7 @@ public:
   void ChangeMonoApplet(HEM_SIDE side, size_t slot, int ix) {
     int& sel = selected_mono_applets[side][slot];
     if (ix == sel) return;
+    get_selected_mono_applet(side, slot).Disconnect();
     get_selected_mono_applet(side, slot).Unload();
     sel = ix;
     auto& app = get_selected_mono_applet(side, slot);

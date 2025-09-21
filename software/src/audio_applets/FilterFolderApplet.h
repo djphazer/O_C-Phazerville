@@ -25,19 +25,10 @@ public:
 
   void Start() {
     for (int i = 0; i < Channels; i++) {
-      in_conns[i].connect(input, i, filtfolder[i].folder, 0);
-      filtfolder[i].Start();
-      out_conns[i].connect(filtfolder[i].mixer, 0, output, i);
+      PatchCable(input, i, filtfolder[i].folder, 0);
+      filtfolder[i].Start(this);
+      PatchCable(filtfolder[i].mixer, 0, output, i);
     }
-  }
-
-  void Unload() {
-    for (int i = 0; i < Channels; i++) {
-      in_conns[i].disconnect();
-      filtfolder[i].Stop();
-      out_conns[i].disconnect();
-    }
-    AllowRestart();
   }
 
   void Controller() {
@@ -217,8 +208,6 @@ private:
 
     uint8_t modesel = 0; // 0 = BYPASS, 1 = LPF, 2 = BPF, 3 = HPF, 4 = Tilt
 
-    std::array<AudioConnection, 6> conns;
-
     void AmpAndFold(float foldF, float level, int tilt = 0) {
       drive.amplitude(foldF);
       for (int i = 0; i < 4; ++i) {
@@ -229,25 +218,19 @@ private:
       }
     }
 
-    void Start() {
-      conns[0].connect(folder, 0, filter, 0);
-      conns[1].connect(folder, 0, mixer, 0);
-      conns[2].connect(filter, 0, mixer, 1);
-      conns[3].connect(filter, 1, mixer, 2);
-      conns[4].connect(filter, 2, mixer, 3);
-      conns[5].connect(drive, 0, folder, 1);
-    }
-    void Stop() {
-      for (auto &c : conns) c.disconnect();
+    void Start(HemisphereAudioApplet* owner) {
+      owner->PatchCable(folder, 0, filter, 0);
+      owner->PatchCable(folder, 0, mixer, 0);
+      owner->PatchCable(filter, 0, mixer, 1);
+      owner->PatchCable(filter, 1, mixer, 2);
+      owner->PatchCable(filter, 2, mixer, 3);
+      owner->PatchCable(drive, 0, folder, 1);
     }
   };
 
   AudioPassthrough<Channels> input;
   std::array<FilterFolder, Channels> filtfolder;
   AudioPassthrough<Channels> output;
-
-  std::array<AudioConnection, Channels> in_conns;
-  std::array<AudioConnection, Channels> out_conns;
 
   void ChangeMode(int dir) {
     uint8_t newmode = constrain(filtfolder[0].modesel + dir, 0, 4);
