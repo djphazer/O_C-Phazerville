@@ -48,9 +48,8 @@
  *                      or B(flat)0.                                   *
  *                                                                     *
  ***********************************************************************/
-// through testing, determined this is optimal. 
 //one block = ~2.9ms of signal time per https://forum.pjrc.com/index.php?threads/different-range-fft-algorithm.32252/page-2
-#define AUDIO_GUITARTUNER_BLOCKS  18 
+#define AUDIO_GUITARTUNER_BLOCKS  24
 /***********************************************************************/
 class SafeNoteFrequencyAnalyzer : public AudioStream {
 public:
