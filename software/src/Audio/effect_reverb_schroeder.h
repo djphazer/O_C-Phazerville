@@ -121,14 +121,16 @@ private:
 
   // Delay line layout
   static constexpr int sr = 44100;
-  static constexpr int COMB_COUNT = 4;
+  static constexpr int COMB_COUNT = 8;
   static constexpr int combLenConst[COMB_COUNT] = {
     1319,  // ~29.9 ms
     1493,  // ~33.9 ms
     1559,  // ~35.3 ms
     1613,  // ~36.6 ms
-    // 1747,  // ~39.6 ms
-    // 1873,  // ~42.5 ms
+    1747,  // ~39.6 ms
+    1873,  // ~42.5 ms
+    2017,
+    2153,
   };
 
   static constexpr int ALLPASS_COUNT = 4;
@@ -142,7 +144,7 @@ private:
 
   int combLen[COMB_COUNT] = {
     combLenConst[0], combLenConst[1], combLenConst[2], combLenConst[3],
-    // combLenConst[4], combLenConst[5],
+    combLenConst[4], combLenConst[5], combLenConst[6], combLenConst[7],
   };
   int apLen[ALLPASS_COUNT] = { apLenConst[0], apLenConst[1], apLenConst[2], apLenConst[3] };
 
