@@ -121,7 +121,7 @@ private:
 
   // Delay line layout
   static constexpr int sr = 44100;
-  static constexpr int COMB_COUNT = 8;
+  static constexpr int COMB_COUNT = 16;
   static constexpr int combLenConst[COMB_COUNT] = {
     1319,  // ~29.9 ms
     1493,  // ~33.9 ms
@@ -129,24 +129,40 @@ private:
     1613,  // ~36.6 ms
     1747,  // ~39.6 ms
     1873,  // ~42.5 ms
-    2017,
-    2153,
+    2017,  // ~45.7 ms
+    2153,  // ~48.8 ms
+    2311,  // ~52.5 ms
+    2447,  // ~55.5 ms
+    2633,  // ~59.7 ms
+    2749,  // ~62.2 ms
+    2903,  // ~65.8 ms
+    3037,  // ~68.9 ms
+    3191,  // ~72.4 ms
+    3359   // ~76.2 ms
   };
 
-  static constexpr int ALLPASS_COUNT = 4;
+  static constexpr int ALLPASS_COUNT = 8;
   static constexpr int apLenConst[ALLPASS_COUNT] = {
-    int(0.0050f * sr + 0.5f),  // ~5 ms
     int(0.0017f * sr + 0.5f),   // ~1.7 ms
+    int(0.0050f * sr + 0.5f),  // ~5 ms
     int(0.0083f * sr + 0.5f),  // ~8.3 ms
-    int(0.0126f * sr + 0.5f)   // ~12.6 ms
+    int(0.0126f * sr + 0.5f),  // ~12.6 ms
+    int(0.0161f * sr + 0.5f),  // ~16.1 ms
+    int(0.0197f * sr + 0.5f),  // ~19.7 ms
+    int(0.0241f * sr + 0.5f),  // ~24.1 ms
+    int(0.0303f * sr + 0.5f)   // ~30.3 ms
   };
   static constexpr float AP_GAIN = 0.5f;
 
   int combLen[COMB_COUNT] = {
     combLenConst[0], combLenConst[1], combLenConst[2], combLenConst[3],
     combLenConst[4], combLenConst[5], combLenConst[6], combLenConst[7],
+    combLenConst[8], combLenConst[9], combLenConst[10], combLenConst[11],
+    combLenConst[12], combLenConst[13], combLenConst[14], combLenConst[15]
   };
-  int apLen[ALLPASS_COUNT] = { apLenConst[0], apLenConst[1], apLenConst[2], apLenConst[3] };
+  int apLen[ALLPASS_COUNT] = { apLenConst[0], apLenConst[1], apLenConst[2], apLenConst[3],
+    apLenConst[4], apLenConst[5], apLenConst[6], apLenConst[7] 
+  };
 
   // The maximum buffer size must fit the largest delay
   static constexpr int COMB_MAX = combLenConst[COMB_COUNT - 1];
