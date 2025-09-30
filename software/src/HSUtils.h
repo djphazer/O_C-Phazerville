@@ -17,13 +17,14 @@ using simfloat = int32_t;
 #endif
 
 // Reference Constants
+#define ONE_OCTAVE (12 << 7)
 #define PULSE_VOLTAGE HS::octave_max
-#define HEMISPHERE_MAX_CV (HS::octave_max * 12 << 7)
-#define HEMISPHERE_MIN_CV (-OC::DAC::kOctaveZero * (12 << 7))
+#define HEMISPHERE_MAX_CV (HS::octave_max * ONE_OCTAVE)
+#define HEMISPHERE_MIN_CV (-OC::DAC::kOctaveZero * ONE_OCTAVE)
 #define HEMISPHERE_CENTER_CV ((HEMISPHERE_MAX_CV-HEMISPHERE_MIN_CV)/2)
-#define HEMISPHERE_3V_CV 4608
+#define HEMISPHERE_3V_CV (3 * ONE_OCTAVE)
 #define HEMISPHERE_CENTER_INPUT_CV (NorthernLightModular*HEMISPHERE_MAX_CV/2)
-#define HEMISPHERE_MAX_INPUT_CV (9216 + NorthernLightModular*(4*12<<7)) // 6V or 10V
+#define HEMISPHERE_MAX_INPUT_CV (6*ONE_OCTAVE + NorthernLightModular*(4*ONE_OCTAVE)) // 6V or 10V
 #define HEMISPHERE_CENTER_DETENT 80
 #define HEMISPHERE_CLOCK_TICKS 17 // one millisecond
 #define HEMISPHERE_CURSOR_TICKS 5000
@@ -163,10 +164,10 @@ namespace HS {
 
     int Process(int cv, int root, int transpose) {
       if (root == 0) root = (root_note << 7);
-      return quantizer.Process(cv, root, transpose) + (octave * 12 << 7);
+      return quantizer.Process(cv, root, transpose) + (octave * ONE_OCTAVE);
     }
     int Lookup(int note) {
-      return quantizer.Lookup(note) + (root_note << 7) + (octave * 12 << 7);
+      return quantizer.Lookup(note) + (root_note << 7) + (octave * ONE_OCTAVE);
     }
 
     const int Size() {

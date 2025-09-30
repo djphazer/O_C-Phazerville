@@ -77,19 +77,19 @@ public:
         if (Clock(0)) {
             int reseed = DetentedIn(1);
             // trigger reseed if CV2 is > 2.5v
-            if (reseed > (HEMISPHERE_MAX_CV >> 1) && !reseed_high) {
+            if (reseed > (5*ONE_OCTAVE >> 1) && !reseed_high) {
                 GenerateLoop(true, false);
                 loop_linker.TriggerRegeneration();
                 reseed_high = true;
                 reseed_animation = HEMISPHERE_PULSE_ANIMATION_TIME_LONG;
             }
 
-            if (reseed < (HEMISPHERE_MAX_CV >> 1) && reseed_high) {
+            if (reseed < (5*ONE_OCTAVE >> 1) && reseed_high) {
                 reseed_high = false;
             }
 
             // bypass the loop if CV2 is > -2.5v
-            bypass_loop = (reseed < -(HEMISPHERE_MAX_CV >> 1));
+            bypass_loop = (reseed < -(5*ONE_OCTAVE >> 1));
 
             // reset loop
             if (loop_length_mod > 0 && loop_step >= loop_length_mod) {
