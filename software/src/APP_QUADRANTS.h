@@ -1084,9 +1084,9 @@ private:
             HS::frame.MIDIState.pc_channel =
               constrain(HS::frame.MIDIState.pc_channel + dir, 0, 17);
             break;
-        //case SCREENSAVER_MODE:
-            // TODO?
-            //break;
+        case SCREENSAVER_MODE:
+            HS::screensaver_mode = constrain(HS::screensaver_mode + dir, 0, SCREENSAVER_MODE_COUNT - 1);
+            break;
         case LOAD_PRESET:
         case SAVE_PRESET:
             if (h == 0) {
@@ -1167,16 +1167,13 @@ private:
         case CVMAP8:
         case TRIG_LENGTH:
         case MIDI_PC_CHANNEL:
+        case SCREENSAVER_MODE:
             isEditing = !isEditing;
             break;
 
         case PRESET_BANK_NUM:
             isEditing = !isEditing;
             if (!isEditing) SetBank(bank_num);
-            break;
-
-        case SCREENSAVER_MODE:
-            ++HS::screensaver_mode %= SCREENSAVER_MODE_COUNT;
             break;
 
         case CURSOR_MODE:
@@ -1304,6 +1301,7 @@ private:
             break;
         case SCREENSAVER_MODE:
             gfxIcon(73, 25, RIGHT_ICON);
+            if (isEditing) gfxInvert(81, 25, 47, 10);
             break;
         case CURSOR_MODE:
             gfxIcon(73, 35, RIGHT_ICON);
