@@ -409,7 +409,7 @@ public:
         HS::IOFrame &f = HS::frame;
         int load_slot = -1;
 
-        while (timeout < 40 && device.read()) {
+        while (timeout < 60 && device.read()) {
             const uint8_t message = device.getType();
             const uint8_t data1 = device.getData1();
             const uint8_t data2 = device.getData2();
@@ -434,13 +434,14 @@ public:
         }
     }
 
-    void Controller() {
+    void mainloop() {
         timeout = 0;
         // top-level MIDI-to-CV handling - alters frame outputs
         ProcessMIDI(usbMIDI, usbHostMIDI, MIDI1);
         ProcessMIDI(usbHostMIDI, usbMIDI, MIDI1);
         ProcessMIDI(MIDI1, usbMIDI, usbHostMIDI);
-
+    }
+    void Controller() {
         // Clock Setup applet handles internal clock duties
         ClockSetup_instance.Controller();
 
@@ -1537,6 +1538,7 @@ void QUADRANTS_handleAppEvent(OC::AppEvent event) {
 }
 
 void QUADRANTS_loop() {
+  quad_manager.mainloop();
   audio_app.mainloop();
 } // Essentially deprecated in favor of ISR
 
