@@ -1,6 +1,8 @@
 #pragma once
 // -- This entire header is meant to be included once in HSIOFrame.h
 
+#include "bjorklund.h"
+#include "util/clkdivmult.h"
 const int NUM_CV_INPUTS = CVMAP_MAX + 1;
 //const int NUM_CV_INPUTS = ADC_CHANNEL_LAST * 2 + 1;
 // We *could* reuse HS::input_quant for inputs, but easier to just do it
@@ -92,29 +94,46 @@ struct DigitalInputMap {
     MIDI_MAP,
   };
 
-  int8_t source = 0;
-  int8_t division = 0; // -2 = /3, -1 = /2, 0 = x1, 1 = x2, 2 = x3...
-  bool last_gate_state = true; // for detecting clocks
   static const int ppqn = 4;
   static constexpr float internal_clocked_gate_pw = 0.5f;
   static const int num_sources = TRIGMAP_MAX;
 
   static constexpr size_t Size = 16; // Make this compatible with Packable
 
+  // settings
+  int8_t source = 0;
+  ClkDivMult div_mult;
+  int8_t e_length, e_beats, e_rotate;
+
+  // state
+  bool last_gate_state = false; // for detecting clocks
+  uint32_t clkcount = 0;
+
   void ChangeSource(int dir) {
     source = constrain(source + dir, -1, num_sources);
+  }
+
+  void Reset() {
+    div_mult.Reset();
+    last_gate_state = false;
+    clkcount = 0;
   }
 
   bool Gate() {
     switch (source_type()) {
       case CLOCK: {
         if (!clock_m.IsRunning()) return false;
+
         uint32_t ticks_since_beat = OC::CORE::ticks - clock_m.beat_tick;
-        // TODO: implement division for ticks_per_beat
-        uint32_t tick_phase
-          = (ppqn * ticks_since_beat) % clock_m.ticks_per_beat;
-        bool gate
-          = tick_phase < internal_clocked_gate_pw * clock_m.ticks_per_beat;
+        uint32_t tpb = clock_m.GetTempoTicks();
+
+        // TODO: this doesn't work for larger divisions, because beat_tick gets reset
+        //if (div_mult.steps < 0) tpb = tpb * -div_mult.steps;
+        //if (div_mult.steps == 0) tpb = tpb;
+        //if (div_mult.steps > 0) tpb = tpb / (div_mult.steps+1);
+
+        uint32_t tick_phase = (ppqn * ticks_since_beat) % tpb;
+        bool gate = tick_phase < (internal_clocked_gate_pw * tpb);
         return gate;
       }
       case DIGITAL_INPUT:
@@ -137,16 +156,28 @@ struct DigitalInputMap {
    * to false until the gate goes low again.
    **/
   bool Clock() {
+    if (clock_m.auto_reset) Reset();
     bool gate = Gate();
     bool tock = !last_gate_state && gate;
     last_gate_state = gate;
+    //if (source_type() != CLOCK) {
+    tock = div_mult.Tick(tock);
+    //}
+
+    // process trigger filters here - Euclidean, etc
+    if (tock) {
+      if (e_length > 0)
+        tock = EuclideanFilter(e_length, e_beats, e_rotate, clkcount);
+      ++clkcount;
+    }
+
     return tock;
   }
 
   uint8_t const* Icon() const {
     switch (source_type()) {
       case CLOCK:
-        return clock_m.cycle ? METRO_L_ICON : METRO_R_ICON;
+        return (clkcount & 1) ? METRO_L_ICON : METRO_R_ICON;
       case DIGITAL_INPUT:
         return DIGITAL_INPUT_ICONS + digital_input_index() * 8;
       case CV_INPUT:
@@ -161,19 +192,20 @@ struct DigitalInputMap {
     }
   }
   char const* InputName() const {
-    if (source == -1) return "CLK"; // TODO: division
+    if (source == -1) return "CLK";
     if (source > OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_LAST + DAC_CHANNEL_LAST)
       return OC::Strings::cv_input_names_none[source - OC::DIGITAL_INPUT_LAST];
     return OC::Strings::trigger_input_names_none[source];
   }
 
   uint16_t Pack() const {
-    return (source & 0xFF) | as_unsigned(division << 8);
+    return (source & 0xFF) | as_unsigned(div_mult.steps << 8);
   }
 
   void Unpack(uint16_t data) {
     source = data & 0xFF;
-    division = extract_value<int8_t>(data >> 8);
+    div_mult.Set(extract_value<int8_t>(data >> 8));
+    if (0 == div_mult.steps) div_mult.steps = 1;
   }
 
 private:
