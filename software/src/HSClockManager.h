@@ -135,6 +135,7 @@ public:
     float GetTempoFloat() {
       return 1000000.0f / ticks_per_beat;
     }
+    uint32_t GetTempoTicks() {return ticks_per_beat;}
     uint32_t GetCycleTicks(int ch = 0) {
       if (tocks_per_beat[ch] > 0) return ticks_per_beat / tocks_per_beat[ch];
       if (tocks_per_beat[ch] < 0) return ticks_per_beat * (1 - tocks_per_beat[ch]);

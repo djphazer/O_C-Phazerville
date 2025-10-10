@@ -647,6 +647,12 @@ public:
                 break;
             case 1:
             case 2:
+              if (CheckEditInputMapPress(
+                    zoom_cursor,
+                    IndexedInput(1, trigmap[zoom_slot*2]),
+                    IndexedInput(2, trigmap[zoom_slot*2+1])
+                  ))
+                break;
             case 5:
             case 6:
             default:
@@ -770,7 +776,7 @@ public:
                   if (clock_m.IsRunning()) // && clock_m.GetMultiply(chan))
                   {
                     clock_m.SetMultiply(clock_m.GetMultiply(chan) + event.value, chan);
-                  } else
+                  } else if (!EditSelectedInputMap(event.value))
                     HS::trigmap[chan].ChangeSource(event.value);
                   break;
                 }
@@ -1106,7 +1112,8 @@ private:
         case TRIGMAP2:
         case TRIGMAP3:
         case TRIGMAP4:
-            HS::trigmap[config_cursor-TRIGMAP1].ChangeSource(dir);
+            if (!EditSelectedInputMap(dir))
+              HS::trigmap[config_cursor-TRIGMAP1].ChangeSource(dir);
             break;
         case CVMAP1:
         case CVMAP2:
@@ -1119,7 +1126,8 @@ private:
         case TRIGMAP6:
         case TRIGMAP7:
         case TRIGMAP8:
-            HS::trigmap[config_cursor-TRIGMAP5 + 4].ChangeSource(dir);
+            if (!EditSelectedInputMap(dir))
+              HS::trigmap[config_cursor-TRIGMAP5 + 4].ChangeSource(dir);
             break;
         case CVMAP5:
         case CVMAP6:
@@ -1243,6 +1251,18 @@ private:
         case TRIGMAP6:
         case TRIGMAP7:
         case TRIGMAP8:
+          if (CheckEditInputMapPress(
+                config_cursor,
+                IndexedInput(TRIGMAP1, trigmap[0]),
+                IndexedInput(TRIGMAP2, trigmap[1]),
+                IndexedInput(TRIGMAP3, trigmap[2]),
+                IndexedInput(TRIGMAP4, trigmap[3]),
+                IndexedInput(TRIGMAP5, trigmap[4]),
+                IndexedInput(TRIGMAP6, trigmap[5]),
+                IndexedInput(TRIGMAP7, trigmap[6]),
+                IndexedInput(TRIGMAP8, trigmap[7])
+              ))
+            break;
         case TRIG_LENGTH:
         case MIDI_PC_CHANNEL:
         case SCREENSAVER_MODE:
