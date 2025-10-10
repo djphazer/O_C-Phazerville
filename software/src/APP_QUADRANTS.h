@@ -1276,7 +1276,7 @@ private:
         // --- Config Selection
         gfxHeader("< General Settings  >");
 
-        gfxPrint(1, 15, "Trig Length: ");
+        gfxPrint(1, 15, "Trig Length:  ");
         gfxPrint(HS::trig_length);
         gfxPrint("ms");
 
@@ -1286,31 +1286,34 @@ private:
         gfxPrint(1, 35, "Cursor wrap:  ");
         gfxPrint(OC::Strings::off_on[HS::cursor_wrap]);
 
-        gfxPrint(1, 45, "Preset Bank# ");
+        gfxPrint(1, 45, "Preset Bank#  ");
         gfxPrint(bank_num);
 
         const uint8_t pc_ch = HS::frame.MIDIState.pc_channel;
-        gfxPrint(1, 55, "MIDI-PC Ch:  ");
-        if (pc_ch == 0) graphics.printf("%4s", "Omni");
-        else if (pc_ch <= 16) graphics.printf("%4d", pc_ch);
-        else graphics.printf("%4s", "Off");
+        gfxPrint(1, 55, "MIDI-PC Ch:   ");
+        if (pc_ch == 0) gfxPrint("Omni");
+        else if (pc_ch <= 16) gfxPrint(pc_ch);
+        else gfxPrint("Off");
 
         switch (config_cursor) {
         case TRIG_LENGTH:
-            gfxCursor(80, 23, 24);
+            gfxIcon(73, 15, RIGHT_ICON);
+            if (isEditing) gfxInvert(82, 14, 45, 10);
             break;
         case SCREENSAVER_MODE:
             gfxIcon(73, 25, RIGHT_ICON);
-            if (isEditing) gfxInvert(81, 25, 47, 10);
+            if (isEditing) gfxInvert(82, 24, 45, 10);
             break;
         case CURSOR_MODE:
             gfxIcon(73, 35, RIGHT_ICON);
             break;
         case PRESET_BANK_NUM:
-            gfxCursor(78, 53, 19);
+            gfxIcon(73, 45, RIGHT_ICON);
+            if (isEditing) gfxInvert(82, 44, 45, 10);
             break;
         case MIDI_PC_CHANNEL:
-            gfxCursor(78, 63, 25);
+            gfxIcon(73, 55, RIGHT_ICON);
+            if (isEditing) gfxInvert(82, 54, 45, 10);
             break;
         case CONFIG_DUMMY:
             gfxIcon(2, 1, LEFT_ICON);
