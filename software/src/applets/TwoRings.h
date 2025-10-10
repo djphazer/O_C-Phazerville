@@ -400,7 +400,7 @@ private:
     uint32_t reg[2]; // 32-bit sequence registers
     uint32_t reg_snap[2]; // for resetting
     bool reset_active = false;
-    bool rotate_right = true;
+    bool rotate_right = false;
 
     // most recent output values
     int Output[2] = {0, 0};
