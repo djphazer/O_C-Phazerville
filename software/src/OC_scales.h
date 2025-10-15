@@ -1,6 +1,7 @@
 #ifndef OS_SCALES_H_
 #define OS_SCALES_H_
 
+#include "FS.h"
 #include "braids_quantizer.h"
 #include "braids_quantizer_scales.h"
 
@@ -29,6 +30,9 @@ public:
   static void Validate();
   static const Scale &GetScale(int index);
   static constexpr int NUM_SCALES = SCALE_USER_COUNT + sizeof(braids::scales) / sizeof(braids::scales[0]);
+
+  static void SaveToScala(Scale &scale, File &file);
+  static void LoadScala(Scale &scale, File &file);
 };
 
 // H1200/A11Z are semitone based, so don't need to go "full quanty" for now.
