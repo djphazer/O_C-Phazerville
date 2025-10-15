@@ -33,6 +33,63 @@ const Scale &Scales::GetScale(int index) {
     return braids::scales[index - SCALE_USER_COUNT];
 }
 
+void Scales::SaveToScala(Scale &scale, File &file) {
+  file.print("O_C User Scale\n");
+
+  file.printf("%d\n", scale.num_notes);
+
+  // skip the first pitch because it's ALWAYS ZERO
+  for (size_t i = 1; i < scale.num_notes; ++i) {
+    int cents = scale.notes[i] * 100 / 128;
+    int decimal = (scale.notes[i] * 100 * 10000 / 128) % 10000;
+    file.printf("%d.%04d\n", cents, decimal);
+  }
+
+  // TA-DA!! it's that easy.
+}
+void Scales::LoadScala(Scale &scale, File &file) {
+  if (!file.available()) return;
+  String buf = file.readStringUntil('\n'); // grab the first line
+
+  // maybe it's a comment
+  while (buf.charAt(0) == '!') {
+    if (!file.available()) return;
+    buf = file.readStringUntil('\n');
+  }
+  // found the first non-comment - description. skip it.
+  if (!file.available()) return;
+  buf = file.readStringUntil('\n'); // next line - number of notes
+  scale.num_notes = buf.toInt();
+  CONSTRAIN(scale.num_notes, 2, 16);
+
+  bool largespan = false;
+  scale.notes[0] = 0;
+  // start at one because 0.0 is implicit
+  for (size_t i = 1; i < scale.num_notes; ++i) {
+    if (!file.available()) return;
+    buf = file.readStringUntil('\n'); // a note, either a decimal or fraction
+                                      // so we look for either '.' or '/' inside
+    float notef = buf.toFloat();
+    int dividx = buf.indexOf('/');
+    if (dividx > 0) {
+      int numer = buf.substring(0,dividx).toInt();
+      int denom = buf.substring(dividx+1).toInt();
+      notef = 1200.0 * (static_cast<float>(numer) / static_cast<float>(denom)) - 1200.0f;
+    }
+
+    // from cents to CV values (128 per semitone)
+    notef += 0.001; // just trying not to round down
+    int pitch = notef * 128 / 100;
+    CONSTRAIN(pitch, 1, 12 * 128 * 2); // max span... two octaves?
+    scale.notes[i] = pitch;
+
+    if (pitch > (12 << 7)) largespan = true;
+  }
+  // either one or two octaves
+  // if you want more, hack it in yourself :P
+  scale.span = (12 << 7) * (1+largespan);
+}
+
 const char* const scale_names_short[] = {
     "USR1",
     "USR2",
