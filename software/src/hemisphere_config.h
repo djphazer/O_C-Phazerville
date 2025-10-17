@@ -44,6 +44,7 @@
 #include "applets/DivSeq10.h"
 #include "applets/DrumMap.h"
 #include "applets/DualQuant.h"
+#include "applets/OffsetQuant.h"
 #include "applets/TwoRings.h"
 #if !defined(CUSTOM_BUILD) || defined(PEWPEWPEW)
 #include "applets/DuoTET.h"
@@ -164,6 +165,7 @@ AppletRegistry reg{
     DeclareApplet<DrLoFi>{16, 0x80},
     DeclareApplet<DrumMap>{57, 0x02},
     DeclareApplet<DualQuant>{9, 0x08},
+    DeclareApplet<OffsetQuant>{90, 0x08},
 #if !defined(CUSTOM_BUILD) || defined(PEWPEWPEW)
     DeclareApplet<DuoTET>{63, 0x08},
 #endif
