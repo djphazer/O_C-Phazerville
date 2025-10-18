@@ -244,8 +244,6 @@ class TB_3PO: public HemisphereApplet {
     case QSELECT:
       qselect = constrain(qselect + direction, 0, QUANT_CHANNEL_COUNT - 1);
       set_quantizer_scale();
-      HS::qview = qselect;
-      HS::PokePopup(QUANTIZER_POPUP);
       break;
     case LENGTH: // pattern length
       num_steps = constrain(num_steps + direction, 1, 32);
@@ -607,6 +605,15 @@ private:
     scale_size = quant_scale.num_notes; // Track this scale size for octaves and display
   }
 
+  void DrawScalePreview(int x, int y) {
+    gfxPrint(x, y, OC::scale_names_short[HS::GetScale(qselect)]);
+
+    int8_t &q_oct = HS::q_engine[qselect].octave;
+    gfxPrint((q_oct == 0 ? x+6 : x), y+10, OC::Strings::note_names_unpadded[HS::GetRootNote(qselect)]);
+    if (q_oct != 0) {
+      gfxPrint(x+12, y+10, q_oct);
+    }
+  }
   void DrawGraphics() {
     int heart_y = 15;
     int die_y = 15;
@@ -689,13 +696,7 @@ private:
       gfxPrint(38, 36, transpose_in_semitones? "Root":"Deg");
     } else {
       // Show scale and root note like old times
-      gfxPrint(38, 26, OC::scale_names_short[HS::GetScale(qselect)]);
-
-      int8_t &q_oct = HS::q_octave[io_offset];
-      gfxPrint((q_oct == 0 ? 44 : 38), 36, OC::Strings::note_names_unpadded[HS::GetRootNote(qselect)]);
-      if (q_oct != 0) {
-        gfxPrint(50, 36, q_oct);
-      }
+      DrawScalePreview(38, 26);
     }
 
     // Current / total steps
@@ -764,15 +765,25 @@ private:
       break;
     case DENSITY:
       gfxSpicyCursor(9, 45, 14);
+      gfxIcon(26, 37, LEFT_ICON);
       break;
     case QSELECT:
       gfxSpicyCursor(44, 34, 13);
+      gfxIcon(35, 26, RIGHT_ICON);
+      if (EditMode()) {
+        // overlay preview of scale + root
+        gfxClear(35, 34, 26, 21);
+        gfxFrame(35, 34, 26, 21, true);
+
+        DrawScalePreview(36, 36);
+      }
       break;
     case TRANS_MODE:
       gfxIcon(31, 36, RIGHT_ICON);
       break;
     case LENGTH:
       gfxSpicyCursor(20, 54, 12, 8);
+      gfxIcon(33, 47, LEFT_ICON, true);
       break;
     }
   }

@@ -510,7 +510,8 @@ public:
         if (CursorBlink()) gfxBitmap(x, y, w, data);
     }
 
-    void gfxIcon(int x, int y, const uint8_t *data) {
+    void gfxIcon(int x, int y, const uint8_t *data, bool clearfirst = false) {
+        if (clearfirst) gfxClear(x, y, 8, 8);
         gfxBitmap(x, y, 8, data);
     }
 
