@@ -209,6 +209,7 @@ namespace HS {
   void DrawAppletList(bool blink = false);
 
   // --- Quantizer helpers
+  QuantEngine& GetQuantEngine(int ch);
   int GetLatestNoteNumber(int ch);
   int Quantize(int ch, int cv, int root = 0, int transpose = 0);
   int QuantizerLookup(int ch, int note);

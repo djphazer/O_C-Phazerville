@@ -859,7 +859,8 @@ public:
             else if (event.control == OC::CONTROL_BUTTON_DOWN)
               HS::NudgeOctave(HS::qview, -1);
             else {
-              HS::q_edit = false;
+              HS::q_edit = 0;
+              HS::popup_tick = 0;
               select_mode = -1;
             }
 

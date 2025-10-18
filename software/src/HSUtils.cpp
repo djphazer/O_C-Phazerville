@@ -89,6 +89,9 @@ namespace HS {
   }
 
   // --- Quantizer helpers
+  QuantEngine& GetQuantEngine(int ch) {
+    return q_engine[ch];
+  }
   int GetLatestNoteNumber(int ch) {
     return q_engine[ch].quantizer.GetLatestNoteNumber();
   }
@@ -342,6 +345,26 @@ void gfxPrint(int num) {
 void gfxPrint(int x_adv, int num) { // Print number with character padding
     for (int c = 0; c < (x_adv / 6); c++) gfxPrint(" ");
     gfxPrint(num);
+}
+
+void gfxPrint(int x, int y, HS::QuantEngine &q_eng, bool overlay = true) {
+  if (overlay) {
+    graphics.clearRect(x - 2, y - 2, 29, 22);
+    gfxFrame(x - 1, y - 2, 27, 21, true);
+  }
+
+  gfxPrint(x, y, OC::scale_names_short[q_eng.scale]);
+  gfxPrint(
+    (q_eng.octave == 0 ? x + 6 : x),
+    y + 10,
+    OC::Strings::note_names_unpadded[q_eng.root_note]
+  );
+  if (q_eng.octave != 0) {
+    gfxPrint(x + 12, y + 10, q_eng.octave);
+  }
+}
+void gfxPrintScale(int x, int y, int qsel) {
+  gfxPrint(x, y, HS::q_engine[qsel]);
 }
 
 /* Convert CV value to voltage level and print  to two decimal places */

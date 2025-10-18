@@ -607,15 +607,6 @@ private:
     scale_size = quant_scale.num_notes; // Track this scale size for octaves and display
   }
 
-  void DrawScalePreview(int x, int y) {
-    gfxPrint(x, y, OC::scale_names_short[HS::GetScale(qselect)]);
-
-    int8_t &q_oct = HS::q_engine[qselect].octave;
-    gfxPrint((q_oct == 0 ? x+6 : x), y+10, OC::Strings::note_names_unpadded[HS::GetRootNote(qselect)]);
-    if (q_oct != 0) {
-      gfxPrint(x+12, y+10, q_oct);
-    }
-  }
   void DrawGraphics() {
     int heart_y = 15;
     int die_y = 15;
@@ -698,7 +689,7 @@ private:
       gfxPrint(38, 36, transpose_in_semitones? "Root":"Deg");
     } else {
       // Show scale and root note like old times
-      DrawScalePreview(38, 26);
+      gfxPrint(36, 26, HS::GetQuantEngine(qselect), false);
     }
 
     // Current / total steps
@@ -774,10 +765,7 @@ private:
       gfxIcon(35, 26, RIGHT_ICON);
       if (EditMode()) {
         // overlay preview of scale + root
-        gfxClear(35, 34, 26, 21);
-        gfxFrame(35, 34, 26, 21, true);
-
-        DrawScalePreview(36, 36);
+        gfxPrint(36, 36, HS::GetQuantEngine(qselect));
       }
       break;
     case TRANS_MODE:

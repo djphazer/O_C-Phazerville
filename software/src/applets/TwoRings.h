@@ -263,8 +263,8 @@ public:
     }
 
     void View() {
-        DrawSelector();
         DrawIndicator();
+        DrawSelector();
     }
 
     // void DrawFullScreen() { }
@@ -308,9 +308,8 @@ public:
             break;
         case QUANT_A:
         case QUANT_B:
-            HS::qview = qselect[cursor - QUANT_A] =
+            qselect[cursor - QUANT_A] =
               constrain(qselect[cursor - QUANT_A] + direction, 0, QUANT_CHANNEL_COUNT - 1);
-            HS::PokePopup(QUANTIZER_POPUP);
             break;
         case RANGE:
             range = constrain(range + direction, 1, 32);
@@ -577,8 +576,17 @@ private:
         switch ((TM2Cursor)cursor) {
             case LENGTH: gfxSpicyCursor(11, 23, 13); break;
             case PROB:   gfxSpicyCursor(35, 23, 19); break;
-            case QUANT_A:  gfxSpicyCursor(12, 33, 13); break;
-            case QUANT_B:  gfxSpicyCursor(39, 33, 13); break;
+            case QUANT_A:
+            case QUANT_B: {
+              const int ch = (cursor-QUANT_A);
+              gfxSpicyCursor(12 + 27 * ch, 33, 13);
+              gfxIcon(25 + 5 * ch, 25, ch ? RIGHT_ICON : LEFT_ICON);
+              if (EditMode()) {
+                gfxPrint(20, 35, HS::GetQuantEngine(qselect[ch]));
+              }
+              break;
+            }
+
             case RANGE:  gfxCursor(10, 43, 13); break;
             case SLEW:   gfxCursor(44, 43, 19); break;
 
