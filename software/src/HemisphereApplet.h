@@ -249,20 +249,45 @@ public:
 
     //////////////// Offset graphics methods
     ////////////////////////////////////////////////////////////////////////////////
-    void gfxCursor(int x, int y, int w, int h = 9) { // assumes standard text height for highlighting
+    void gfxCursor(int x, int y, int w, const char *str) {
+      gfxCursor(x, y, w, 9, str);
+    }
+    void gfxCursor(int x, int y, int w, int h = 9, const char *str = nullptr) {
+      // assumes standard text height for highlighting
       if (EditMode()) {
         gfxInvert(x, y - h, w, h);
+        if (str) {
+          const int box_w = strlen(str)*6 + 4;
+          const int box_x = min(x, 63 - box_w);
+          const int box_y = (y > (63 - h - 2)) ? y - 2*h - 2 : y;
+
+          gfxClear(box_x, box_y, box_w, h+3);
+          gfxFrame(box_x+1, box_y, box_w, h+2);
+          gfxPrint(box_x+2, box_y+2, str);
+        }
       } else if (CursorBlink()) {
         gfxLine(x, y, x + w - 1, y);
         gfxPixel(x, y-1);
         gfxPixel(x + w - 1, y-1);
       }
     }
-    void gfxSpicyCursor(int x, int y, int w, int h = 9) {
+    void gfxSpicyCursor(int x, int y, int w, const char *str) {
+      gfxSpicyCursor(x, y, w, 9, str);
+    }
+    void gfxSpicyCursor(int x, int y, int w, int h = 9, const char *str = nullptr) {
       if (EditMode()) {
         if (CursorBlink())
           gfxFrame(x, y - h, w, h, true);
         gfxInvert(x, y - h, w, h);
+        if (str) {
+          const int box_w = strlen(str)*6 + 4;
+          const int box_x = min(x, 63 - box_w);
+          const int box_y = (y > (63 - h - 2)) ? y - 2*h - 2 : y;
+
+          gfxClear(box_x, box_y, box_w, h+3);
+          gfxFrame(box_x+1, box_y, box_w, h+2);
+          gfxPrint(box_x+2, box_y+2, str);
+        }
       } else {
         gfxLine(x - CursorBlink(), y, x + w - 1, y, 2);
         gfxPixel(x, y-1);
