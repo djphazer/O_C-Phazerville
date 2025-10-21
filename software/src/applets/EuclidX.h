@@ -311,7 +311,7 @@ private:
         case BEATS1:
         case OFFSET1:
         case PADDING1:
-            gfxCursor(f * spacing, y, 13);
+            gfxCursor(f * spacing, y, 13, cv_labels[cursor]);
             break;
 
         case CV_DEST1:
@@ -321,7 +321,7 @@ private:
             gfxCursor(0, 19 + (cursor - CV_DEST1)*5, 11, 7);
             break;
         case GATE_MODE:
-            gfxCursor(pad_left + 1 * spacing - 1, 23, 10);
+            gfxCursor(pad_left + 1 * spacing - 1, 23, 10, gate_mode? "Gate":"Trig");
             break;
         }
     }
