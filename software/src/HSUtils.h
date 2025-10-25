@@ -188,6 +188,9 @@ namespace HS {
     }
   };
 
+  struct DigitalInputMap;
+  struct CVInputMap;
+
   extern uint32_t popup_tick; // for button feedback
   extern PopupType popup_type;
   extern uint8_t qview; // which quantizer's setting is shown in popup
@@ -271,6 +274,8 @@ void gfxPrint(int num);
 void gfxPrint(int x_adv, int num);
 void gfxPrintVoltage(int cv);
 void gfxPrintFreqFromPitch(int16_t pitch);
+void gfxPrint(HS::DigitalInputMap &map);
+void gfxPrint(HS::CVInputMap &map);
 void gfxPixel(int x, int y);
 void gfxFrame(int x, int y, int w, int h, bool dotted = false);
 void gfxRect(int x, int y, int w, int h);
