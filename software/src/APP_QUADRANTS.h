@@ -152,6 +152,14 @@ public:
         VERSION_KEY = 0xFFFF
     };
 
+    void DeletePreset(int id) {
+        uint16_t preset_key = id << 11;
+        // non-global values are all 0-99 in the enum
+        for (int i = 0; i < 100; ++i) {
+          PhzConfig::deleteKey(preset_key | i);
+        }
+    }
+
     void StoreToPreset(int id) {
         // preset id is upper 5 bits - 32 presets per bank
         uint16_t preset_key = id << 11;
@@ -1055,6 +1063,7 @@ private:
     int config_page = HIDE_CONFIG;
 
     enum QuadrantsConfigCursor {
+        DELETE_PRESET,
         LOAD_PRESET, SAVE_PRESET,
         AUTO_SAVE,
         CONFIG_DUMMY, // past this point goes full screen
@@ -1149,10 +1158,11 @@ private:
         case SCREENSAVER_MODE:
             HS::screensaver_mode = constrain(HS::screensaver_mode + dir, 0, SCREENSAVER_MODE_COUNT - 1);
             break;
+        case DELETE_PRESET:
         case LOAD_PRESET:
         case SAVE_PRESET:
             if (h == 0) {
-              config_cursor = constrain(config_cursor + dir, LOAD_PRESET, SAVE_PRESET);
+              config_cursor = constrain(config_cursor + dir, DELETE_PRESET, SAVE_PRESET);
             } else {
               preset_cursor = constrain(preset_cursor + dir, 1, QUAD_PRESET_COUNT);
             }
@@ -1174,10 +1184,17 @@ private:
             }
 
             // Save or Load on button push
-            if (config_cursor == SAVE_PRESET)
-                StoreToPreset(preset_cursor-1);
-            else {
+            switch (config_cursor) {
+              case DELETE_PRESET:
+                DeletePreset(preset_cursor - 1);
+                return; // don't close menu
+                break;
+              case SAVE_PRESET:
+                StoreToPreset(preset_cursor - 1);
+                break;
+              case LOAD_PRESET:
                 QueuePresetLoad(preset_cursor - 1);
+                break;
             }
 
             preset_cursor = 0; // deactivate preset selection
@@ -1203,6 +1220,7 @@ private:
             }
             break;
 
+        case DELETE_PRESET:
         case SAVE_PRESET:
         case LOAD_PRESET:
             preset_cursor = preset_id + 1;
@@ -1430,7 +1448,8 @@ private:
         return HS::available_applets[idx].instance[h];
     }
     void DrawPresetSelector() {
-        gfxHeader((config_cursor == SAVE_PRESET) ? "Save" : "Load");
+        const char * const hdrtxt[] = { "DEL!", "Load", "Save", "???" };
+        gfxHeader(hdrtxt[config_cursor]);
         gfxPrint(30, 1, "Preset: Bank# ");
         gfxPrint(bank_num);
         if (!SDcard_Ready) gfxInvert(78, 0, 30, 9);
