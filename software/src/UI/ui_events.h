@@ -28,7 +28,7 @@
 
 namespace UI {
 
-enum EventType {
+enum EventType : uint8_t {
   EVENT_NONE,
   EVENT_BUTTON_DOWN,
   EVENT_BUTTON_PRESS,
@@ -48,6 +48,12 @@ struct Event {
   Event() { }
   Event(EventType t, uint16_t c, int16_t v, uint16_t m)
   : type(t), control(c), value(v), mask(m) { }
+
+  const bool IsEncoder() const { return type == EVENT_ENCODER; }
+  const bool IsPress() const { return type == EVENT_BUTTON_DOWN; }
+  const bool IsRelease() const { return type == EVENT_BUTTON_PRESS; }
+  const bool IsLongPress() const { return type == EVENT_BUTTON_LONG_PRESS; }
+  const bool IsLongRelease() const { return type == EVENT_BUTTON_LONG_RELEASE; }
 };
 
 }; // namespace UI
