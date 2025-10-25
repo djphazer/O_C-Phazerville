@@ -204,7 +204,10 @@ public:
                     next_tock_tick += shuffle * ticks_per_beat / 100 / static_cast<uint32_t>(tocks_per_beat[ch]);
 
                 tock[ch] = now >= next_tock_tick;
-                if (tock[ch]) ++count[ch]; // increment multiplier counter
+                if (tock[ch]) {
+                  ++count[ch]; // increment multiplier counter
+                  if (1 == count[ch]) beatsync = 1;
+                }
 
                 beatsync = beatsync || (count[ch] > tocks_per_beat[ch]); // multiplier has been exceeded
                 reset = reset && (count[ch] > tocks_per_beat[ch]);

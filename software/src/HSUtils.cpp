@@ -363,6 +363,22 @@ void gfxPrintScale(int x, int y, int qsel) {
   gfxPrint(x, y, HS::q_engine[qsel]);
 }
 
+void gfxPrintIcon(const uint8_t *data, int16_t w = 8) {
+    gfxIcon(graphics.getPrintPosX(), graphics.getPrintPosY(), data);
+    gfxPos(graphics.getPrintPosX() + w, graphics.getPrintPosY());
+}
+void gfxPrint(HS::DigitalInputMap &map) {
+  gfxPrintIcon(map.Icon());
+  if (map.Gate()) gfxInvert(graphics.getPrintPosX()-8, graphics.getPrintPosY(), 8, 8);
+}
+void gfxPrint(HS::CVInputMap &map) {
+  gfxPrintIcon(map.Icon());
+  const int xpos = graphics.getPrintPosX() - 1;
+  const int ypos = graphics.getPrintPosY() + 4;
+  const int height = map.InRescaled(24);
+  gfxLine(xpos, ypos, xpos, ypos - height);
+}
+
 /* Convert CV value to voltage level and print  to two decimal places */
 void gfxPrintVoltage(int cv) {
     int v = (cv * (NorthernLightModular? 120 : 100)) / (12 << 7);

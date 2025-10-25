@@ -389,6 +389,14 @@ public:
       else
         LoadFromPreset(id);
     }
+    void JumpToNextPreset() {
+      int next_id = preset_id + 1;
+      while (!isValidPreset(next_id) && next_id != preset_id) {
+        ++next_id %= QUAD_PRESET_COUNT;
+      }
+      if (next_id != preset_id)
+        QueuePresetLoad(next_id);
+    }
 
     // does not modify the preset, only the quad_manager
     void SetApplet(HEM_SIDE hemisphere, int index) {
@@ -442,6 +450,9 @@ public:
         ProcessMIDI(MIDI1, usbMIDI, usbHostMIDI);
     }
     void Controller() {
+        if (jump_trig_.Clock() && !HS::clock_m.auto_reset)
+          JumpToNextPreset();
+
         // Clock Setup applet handles internal clock duties
         ClockSetup_instance.Controller();
 
@@ -1030,6 +1041,8 @@ private:
     uint32_t click_tick; // Measure time between clicks for double-click
     int first_click; // The first button pushed of a double-click set, to see if the same one is pressed
 
+    DigitalInputMap jump_trig_;
+
     // Button combos can cause multiple triggers if the buttons are pressed
     // close enough together. Each press will have its own event with both
     // button marked in the mask. So, we track mask history to ensure button
@@ -1072,6 +1085,7 @@ private:
         SCREENSAVER_MODE,
         CURSOR_MODE,
         PRESET_BANK_NUM,
+        PRESET_JUMP_TRIG,
         MIDI_PC_CHANNEL,
 
         // Input Remapping
@@ -1148,6 +1162,10 @@ private:
             break;
         case TRIG_LENGTH:
             HS::trig_length = (uint32_t) constrain( int(HS::trig_length + dir), 1, 127);
+            break;
+        case PRESET_JUMP_TRIG:
+            if (!EditSelectedInputMap(dir))
+              jump_trig_.ChangeSource(dir);
             break;
         case PRESET_BANK_NUM:
             bank_num = constrain(bank_num + dir, 0, 99);
@@ -1288,6 +1306,14 @@ private:
             isEditing = !isEditing;
             break;
 
+        case PRESET_JUMP_TRIG:
+          if (!CheckEditInputMapPress(
+                config_cursor,
+                IndexedInput(PRESET_JUMP_TRIG, jump_trig_)
+              ))
+            isEditing ^= 1;
+          break;
+
         case PRESET_BANK_NUM:
             isEditing = !isEditing;
             if (!isEditing) SetBank(bank_num);
@@ -1405,6 +1431,18 @@ private:
 
         gfxPrint(1, 45, "Preset Bank#  ");
         gfxPrint(bank_num);
+        gfxPrint("  ");
+
+        int cursor_start_x = graphics.getPrintPosX();
+        int cursor_start_y = graphics.getPrintPosY();
+        gfxPrint(jump_trig_);
+        if (config_cursor == PRESET_JUMP_TRIG) {
+          graphics.clearRect(cursor_start_x - 14, cursor_start_y-1, 24, 10);
+          gfxFrame(cursor_start_x - 13, cursor_start_y-1, 22, 10);
+          gfxPrint(cursor_start_x - 11, cursor_start_y+1, jump_trig_.InputName());
+          if (EditMode())
+            gfxInvert(cursor_start_x - 14, cursor_start_y-1, 24, 10);
+        }
 
         const uint8_t pc_ch = HS::frame.MIDIState.pc_channel;
         gfxPrint(1, 55, "MIDI-PC Ch:   ");
@@ -1436,6 +1474,8 @@ private:
             gfxIcon(2, 1, LEFT_ICON);
             break;
         }
+
+        gfxDisplayInputMapEditor();
     }
 
     bool isValidPreset(int id) {
