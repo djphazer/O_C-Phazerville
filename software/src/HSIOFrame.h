@@ -121,6 +121,13 @@ struct MIDIMapping : public MIDIMapSettings {
   void AdjustVoice(int dir) {
     dac_polyvoice = constrain(dac_polyvoice + dir, 0, DAC_CHANNEL_COUNT - 1);
   }
+
+  void AutoLearn() {
+    channel = 16; // omni
+    function = HEM_MIDI_LEARN;
+    function_cc = -1; // auto-learn MIDI CC or precise NoteOn
+  }
+
   void AdjustTranspose(int dir) {
     transpose = constrain(transpose + dir, -48, 48);
   }

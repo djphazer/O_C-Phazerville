@@ -87,10 +87,12 @@ void HS::MIDIFrame::ProcessMIDIMsg(const MIDIMessage msg) {
             case usbMIDI.NoteOn: {
                 if (map.function == HEM_MIDI_LEARN) {
                   //TODO: set range based on polyphony, or alternate learn modes
-                  //if (map.function_cc < 0)
-                    //map.range_low = map.range_high = msg.data1;
-                  map.function = HEM_MIDI_NOTE_OUT;
-                  map.function_cc = 0;
+                  if (map.function_cc < 0) {
+                    map.range_low = min(map.range_low, msg.data1);
+                    map.range_high = max(map.range_high, msg.data1);
+                  }
+                  //map.function = HEM_MIDI_NOTE_OUT;
+                  //map.function_cc = 0;
                   map.channel = msg.channel - 1;
                 }
                 if (!map.InRange(msg.data1)) break;
@@ -154,6 +156,10 @@ void HS::MIDIFrame::ProcessMIDIMsg(const MIDIMessage msg) {
             case usbMIDI.NoteOff: {
                 if (!map.InRange(msg.data1)) break;
                 map.semitone_mask = map.semitone_mask & ~(1u << (msg.data1 % 12));
+                if (map.function == HEM_MIDI_LEARN && map.semitone_mask == 0) {
+                  map.function = HEM_MIDI_NOTE_OUT;
+                  map.function_cc = 0;
+                }
 
                 // don't update output when last note is released
                 // or if sustain is engaged

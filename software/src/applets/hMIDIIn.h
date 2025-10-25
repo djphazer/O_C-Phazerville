@@ -124,9 +124,7 @@ public:
           {
             int ch = map_index[io_page];
             MIDIMapping &map = frame.MIDIState.mapping[ch];
-            map.channel = 16; // omni
-            map.function = HEM_MIDI_LEARN;
-            map.function_cc = -1; // auto-learn MIDI CC or precise NoteOn
+            map.AutoLearn();
             frame.MIDIState.clock_count = 0;
             frame.MIDIState.UpdateMidiChannelFilter();
             break;

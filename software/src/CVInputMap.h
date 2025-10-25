@@ -10,11 +10,21 @@ const int NUM_CV_INPUTS = CVMAP_MAX + 1;
 inline std::array<OC::SemitoneQuantizer, NUM_CV_INPUTS> cv_semitone_quants;
 
 struct CVInputMap {
+  // TODO: rework source into 3 bits for type, 5 bits for index
   int8_t source = 0;
   int8_t attenuversion = 60; // 60 is 100%
                              // max range is +/- 127 (448%)
 
   static constexpr size_t Size = 16; // Make this compatible with Packable
+
+  const bool IsMidi() const {
+    return source > ADC_CHANNEL_COUNT + DAC_CHANNEL_COUNT;
+  }
+  void AutoLearn() {
+    if (IsMidi()) {
+      frame.MIDIState.mapping[source - ADC_CHANNEL_LAST - DAC_CHANNEL_LAST - 1].AutoLearn();
+    }
+  }
 
   int RawIn() {
     return source <= ADC_CHANNEL_LAST
