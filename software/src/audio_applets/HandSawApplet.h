@@ -80,7 +80,7 @@ class HandSawApplet : public HemisphereAudioApplet {
             float detuneValue = detune + (detune_cv.In() * 0.01f);
             float phaseValue = phase + (phase_cv.In() * 0.01f);
 
-            float freq1 = PitchToRatio(pitch1 + pitch_cv1.In()) * C3;
+            float freq1 = PitchToRatio(pitch[0] + pitch_cv[0].In()) * C3;
             // set the first 3 oscillators to freq1
             synth1.frequency(freq1);
             synth2.frequency(freq1 + (3 * detuneValue / detuneFactor));
@@ -89,7 +89,7 @@ class HandSawApplet : public HemisphereAudioApplet {
             synth2.phase((3 * phaseValue / phaseFactor));
             synth3.phase((2 * phaseValue / phaseFactor));
 
-            float freq2 = PitchToRatio(pitch2 + pitch_cv2.In()) * C3;
+            float freq2 = PitchToRatio(pitch[1] + pitch_cv[1].In()) * C3;
             // set the next 3 oscillators to freq2
             synth4.frequency(freq2 + (detuneValue / detuneFactor));
             synth5.frequency(freq2 + (4 * detuneValue / detuneFactor));
@@ -98,7 +98,7 @@ class HandSawApplet : public HemisphereAudioApplet {
             synth5.phase((4 * phaseValue / phaseFactor));
             synth6.phase((5 * phaseValue / phaseFactor));
 
-            float freq3 = PitchToRatio(pitch3 + pitch_cv3.In()) * C3;
+            float freq3 = PitchToRatio(pitch[2] + pitch_cv[2].In()) * C3;
             // set the last 3 oscillators to freq3
             synth7.frequency(freq3 - (detuneValue / detuneFactor));
             synth8.frequency(freq3 + (2 * detuneValue / detuneFactor));
@@ -107,7 +107,7 @@ class HandSawApplet : public HemisphereAudioApplet {
             synth8.phase((2 * phaseValue / phaseFactor));
             synth9.phase((3 * phaseValue / phaseFactor));
 
-            float freq4 = PitchToRatio(pitch4 + pitch_cv4.In()) * C3;
+            float freq4 = PitchToRatio(pitch[3] + pitch_cv[3].In()) * C3;
             // set the last 3 oscillators to freq4
             synth10.frequency(freq4 + (6 * detuneValue / detuneFactor));
             synth11.frequency(freq4 + (5 * detuneValue / detuneFactor));
@@ -123,33 +123,20 @@ class HandSawApplet : public HemisphereAudioApplet {
 
         void View() override {
 
-            gfxStartCursor(1, 15);
-            gfxPrintTuningIndicator(pitch1);
-            gfxEndCursor(cursor == PITCH1);
-            gfxStartCursor();
-            gfxPrint(pitch_cv1);
-            gfxEndCursor(cursor == PITCH_CV1, false, pitch_cv1.InputName());
-
-            gfxStartCursor(16, 15);
-            gfxPrintTuningIndicator(pitch2);
-            gfxEndCursor(cursor == PITCH2);
-            gfxStartCursor();
-            gfxPrint(pitch_cv2);
-            gfxEndCursor(cursor == PITCH_CV2, false, pitch_cv2.InputName());
-
-            gfxStartCursor(31, 15);
-            gfxPrintTuningIndicator(pitch3);
-            gfxEndCursor(cursor == PITCH3);
-            gfxStartCursor();
-            gfxPrint(pitch_cv3);
-            gfxEndCursor(cursor == PITCH_CV3, false, pitch_cv3.InputName());
-
-            gfxStartCursor(46, 15);
-            gfxPrintTuningIndicator(pitch4);
-            gfxEndCursor(cursor == PITCH4);
-            gfxStartCursor();
-            gfxPrint(pitch_cv4);
-            gfxEndCursor(cursor == PITCH_CV4, false, pitch_cv4.InputName());
+            for (int i = 0; i < 4; ++i) {
+              gfxStartCursor(1 + 15*i, 15);
+              gfxPrintTuningIndicator(pitch[i]);
+              gfxEndCursor(cursor == PITCH1 + i);
+              if (cursor == PITCH1 + i) {
+                gfxIcon(1 + 15*i, 25, UP_ICON, true);
+              }
+            }
+            // the mappings need to sit on top of the pitches
+            for (int i = 0; i < 4; ++i) {
+              gfxStartCursor(10 + 15*i, 15);
+              gfxPrint(pitch_cv[i]);
+              gfxEndCursor(cursor == PITCH_CV1 + i, false, pitch_cv[i].InputName());
+            }
 
             gfxPrint(1, 25, "Wave: ");
             gfxStartCursor();
@@ -187,12 +174,12 @@ class HandSawApplet : public HemisphereAudioApplet {
         }
 
     #define SWARM_OSC_PARAMS \
-        pitch1, pitch2, pitch3, pitch4
+        pitch[0], pitch[1], pitch[2], pitch[3]
 
         void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
             int8_t dummy = 0; // former mix/amp value in %
             data[0] = PackPackables(SWARM_OSC_PARAMS);
-            data[1] = PackPackables(pitch_cv1, pitch_cv2, pitch_cv3, pitch_cv4);
+            data[1] = PackPackables(pitch_cv[0], pitch_cv[1], pitch_cv[2], pitch_cv[3]);
             data[2] = PackPackables(detune_cv, phase_cv, amp_cv);
             data[3] = PackPackables(waveform, detune, phase, dummy, amp);
         }
@@ -200,11 +187,33 @@ class HandSawApplet : public HemisphereAudioApplet {
         void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
             int8_t dummy;
             UnpackPackables(data[0], SWARM_OSC_PARAMS);
-            UnpackPackables(data[1], pitch_cv1, pitch_cv2, pitch_cv3, pitch_cv4);
+            UnpackPackables(data[1], pitch_cv[0], pitch_cv[1], pitch_cv[2], pitch_cv[3]);
             UnpackPackables(data[2], detune_cv, phase_cv, amp_cv);
             UnpackPackables(data[3], waveform, detune, phase, dummy, amp);
 
             SetWaveform(waveform);
+        }
+
+        void AuxButton() override {
+          switch (cursor) {
+            case PITCH1:
+            case PITCH2:
+            case PITCH3:
+            case PITCH4: {
+              // shortcut to snap to closest semitone
+              auto& p = pitch[(cursor - PITCH1) / 2];
+              p = (((p + 63) >> 7) << 7);
+              break;
+            }
+            case PITCH_CV1:
+            case PITCH_CV2:
+            case PITCH_CV3:
+            case PITCH_CV4:
+              // shortcut for auto-learn
+              auto& p = pitch_cv[(cursor - PITCH_CV1) / 2];
+              if (p.IsMidi()) p.AutoLearn();
+              break;
+          }
         }
 
         void OnButtonPress() override {
@@ -244,28 +253,28 @@ class HandSawApplet : public HemisphereAudioApplet {
             const int min_pitch = -3 * 12 * 128;
             switch (cursor) {
                 case PITCH1:
-                    pitch1 = constrain(pitch1 + direction * 4, min_pitch, max_pitch);
+                    pitch[0] = constrain(pitch[0] + direction * 4, min_pitch, max_pitch);
                     break;
                 case PITCH_CV1:
-                    pitch_cv1.ChangeSource(direction);
+                    pitch_cv[0].ChangeSource(direction);
                     break;
                 case PITCH2:
-                    pitch2 = constrain(pitch2 + direction * 4, min_pitch, max_pitch);
+                    pitch[1] = constrain(pitch[1] + direction * 4, min_pitch, max_pitch);
                     break;
                 case PITCH_CV2:
-                    pitch_cv2.ChangeSource(direction);
+                    pitch_cv[1].ChangeSource(direction);
                     break;
                 case PITCH3:
-                    pitch3 = constrain(pitch3 + direction * 4, min_pitch, max_pitch);
+                    pitch[2] = constrain(pitch[2] + direction * 4, min_pitch, max_pitch);
                     break;
                 case PITCH_CV3:
-                    pitch_cv3.ChangeSource(direction);
+                    pitch_cv[2].ChangeSource(direction);
                     break;
                 case PITCH4:
-                    pitch4 = constrain(pitch4 + direction * 4, min_pitch, max_pitch);
+                    pitch[3] = constrain(pitch[3] + direction * 4, min_pitch, max_pitch);
                     break;
                 case PITCH_CV4:
-                    pitch_cv4.ChangeSource(direction);
+                    pitch_cv[3].ChangeSource(direction);
                     break;
                 case WAVEFORM:
                     SetWaveform(waveform + direction);
@@ -305,12 +314,12 @@ class HandSawApplet : public HemisphereAudioApplet {
     private:
         enum Cursor: int8_t {
             PITCH1,
-            PITCH_CV1,
             PITCH2,
-            PITCH_CV2,
             PITCH3,
-            PITCH_CV3,
             PITCH4,
+            PITCH_CV1,
+            PITCH_CV2,
+            PITCH_CV3,
             PITCH_CV4,
             WAVEFORM,
             DETUNE,
@@ -326,10 +335,12 @@ class HandSawApplet : public HemisphereAudioApplet {
         static constexpr char const* WAVEFORM_NAMES[5] = {"SIN", "TRI", "SAW", "PLS", "SAWR"};
         uint8_t waveform = WAVEFORM_SINE;
         int8_t cursor = PITCH1;
-        int16_t pitch1 = -1 * 12 * 128; // C2
-        int16_t pitch2 = -1 * 12 * 128; // C2
-        int16_t pitch3 = -1 * 12 * 128; // C2
-        int16_t pitch4 = -1 * 12 * 128; // C2
+        int16_t pitch[4] = {
+          -1 * 12 * 128, // C2
+          -1 * 12 * 128, // C2
+          -1 * 12 * 128, // C2
+          -1 * 12 * 128, // C2
+        };
 
         int16_t detune = 0;
         int16_t phase = 0;
@@ -339,10 +350,7 @@ class HandSawApplet : public HemisphereAudioApplet {
         int8_t detuneFactor = 50;
         int8_t phaseFactor = 1;
 
-        CVInputMap pitch_cv1;
-        CVInputMap pitch_cv2;
-        CVInputMap pitch_cv3;
-        CVInputMap pitch_cv4;
+        CVInputMap pitch_cv[4];
 
         CVInputMap detune_cv;
         CVInputMap phase_cv;
