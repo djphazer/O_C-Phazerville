@@ -1047,7 +1047,7 @@ private:
     int next_applet_index[4]; // queued from UI thread, handled by Controller
     uint64_t clock_data, global_data, applet_data[4]; // cache of applet data
     bool view_slot[2] = {0, 0}; // Two applets on each side, only one visible at a time
-    int config_cursor = 0;
+    int config_cursor = LOAD_PRESET;
 
     int select_mode = -1;
     HEM_SIDE zoom_slot; // Which of the hemispheres (if any) is in fullscreen/help mode
@@ -1129,8 +1129,7 @@ private:
           } else if (config_page == SHOWHIDE_APPLETS) {
             showhide_cursor.Scroll(dir);
           } else { // move cursor
-            config_cursor += dir;
-            config_cursor = constrain(config_cursor, 0, MAX_CURSOR);
+            config_cursor = constrain(config_cursor + dir, LOAD_PRESET, MAX_CURSOR);
 
             SetConfigPageFromCursor();
           }
