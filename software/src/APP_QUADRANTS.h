@@ -96,6 +96,8 @@ public:
       if (!success) // fallback load from LFS
         PhzConfig::load_config(bank_filename);
 
+      LoadGlobals();
+
       // Version flag - for future reconfigurations...
       //  - This can be used to migrate old data after breaking changes to the schema
       //  - Right now, its existence indicates v1.10.1+
@@ -140,6 +142,7 @@ public:
         FILTERMASK2_KEY = 101,
 
         PC_CHANNEL_KEY  = 110,
+        PRESET_JUMP_KEY = 111,
 
         MIDI_MAPS_KEY   = 150, // + 0..32
 
@@ -212,6 +215,9 @@ public:
         PhzConfig::setValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
 
         PhzConfig::setValue(PC_CHANNEL_KEY, HS::frame.MIDIState.pc_channel);
+
+        data = PackPackables(jump_trig_);
+        PhzConfig::setValue(PRESET_JUMP_KEY, data);
 
         // Global quantizer settings
         for (size_t qslot = 0; qslot < QUANT_CHANNEL_COUNT; ++qslot) {
@@ -332,11 +338,22 @@ public:
           HS::frame.output_slew[i] = Unpack(data, PackLocation{i*8, 8});
         }
 
-        // applet filtering is actually just global
+        //LoadGlobals();
+
+        audio_app.LoadPreset(id);
+        PokePopup(PRESET_POPUP);
+    }
+    void LoadGlobals() {
+        // applet filtering
         PhzConfig::getValue(FILTERMASK1_KEY, HS::hidden_applets[0]);
         PhzConfig::getValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
 
-        if (PhzConfig::getValue(PC_CHANNEL_KEY, data)) HS::frame.MIDIState.pc_channel = (uint8_t) data;
+        uint64_t data = 0;
+        if (PhzConfig::getValue(PC_CHANNEL_KEY, data))
+          HS::frame.MIDIState.pc_channel = (uint8_t)data;
+
+        if (PhzConfig::getValue(PRESET_JUMP_KEY, data))
+          UnpackPackables(data, jump_trig_);
 
         // Global quantizer settings
         for (size_t qslot = 0; qslot < QUANT_CHANNEL_COUNT; ++qslot) {
@@ -371,9 +388,6 @@ public:
             OC::user_patterns[i].notes[step] = Unpack(data, PackLocation{(step & 0x3)*16, 16});
           }
         }
-
-        audio_app.LoadPreset(id);
-        PokePopup(PRESET_POPUP);
     }
     void ProcessQueue() {
       if (queued_preset >= 0) {
