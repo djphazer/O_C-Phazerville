@@ -174,6 +174,7 @@ namespace HS {
   void DrawPopup(const int config_cursor, const int preset_id, const bool blink) {
 
     enum ConfigCursor {
+        DELETE_PRESET,
         LOAD_PRESET, SAVE_PRESET,
         AUTO_SAVE,
         CONFIG_DUMMY, // past this point goes full screen

@@ -345,6 +345,7 @@ public:
 
     // lower 9 bits of PhzConfig KEY
     enum PresetDataKeys : uint16_t {
+        // preset data, 0-99
         APPLET_METADATA_KEY = 0, // applet ids
         CLOCK_DATA_KEY = 1,
         GLOBALS_KEY = 2,
@@ -359,7 +360,7 @@ public:
         APPLET_L_DATA_KEY = 10,
         APPLET_R_DATA_KEY = 11,
 
-
+        // globals, 100-500
         FILTERMASK1_KEY = 100,
         FILTERMASK2_KEY = 101,
 
@@ -1180,6 +1181,7 @@ private:
     HEMView view_state = APPLETS;
 
     enum HEMConfigCursor {
+        DELETE_PRESET,
         LOAD_PRESET, SAVE_PRESET,
         AUTO_SAVE,
         CONFIG_DUMMY, // past this point goes full screen
@@ -1216,16 +1218,14 @@ private:
     void ConfigEncoderAction(const int h, const int dir) {
         if (!isEditing && !preset_cursor) {
           if (h == 0) { // change pages
-            config_page += dir;
-            config_page = constrain(config_page, 0, LAST_PAGE);
+            config_page = constrain(config_page + dir, 0, LAST_PAGE);
 
             const int cursorpos[] = { LOAD_PRESET, TRIG_LENGTH, QUANT1, TRIGMAP1, SHOWHIDELIST };
             config_cursor = cursorpos[config_page];
           } else if (config_page == SHOWHIDE_APPLETS) {
             showhide_cursor.Scroll(dir);
           } else { // move cursor
-            config_cursor += dir;
-            config_cursor = constrain(config_cursor, 0, MAX_CURSOR);
+            config_cursor = constrain(config_cursor + dir, LOAD_PRESET, MAX_CURSOR);
 
             if (config_cursor <= CONFIG_DUMMY) config_page = LOADSAVE_POPUP;
             else if (config_cursor < QUANT1) config_page = CONFIG_SETTINGS;
@@ -1263,34 +1263,48 @@ private:
         case SCREENSAVER_MODE:
             HS::screensaver_mode = constrain(HS::screensaver_mode + dir, 0, SCREENSAVER_MODE_COUNT - 1);
             break;
+        case DELETE_PRESET:
         case LOAD_PRESET:
         case SAVE_PRESET:
             if (h == 0) {
-              config_cursor = constrain(config_cursor + dir, LOAD_PRESET, SAVE_PRESET);
+              config_cursor = constrain(config_cursor + dir, DELETE_PRESET, SAVE_PRESET);
             } else {
               preset_cursor = constrain(preset_cursor + dir, 1, HEM_NR_OF_PRESETS);
             }
             break;
         }
     }
+    void DeletePreset(int id) {
+#ifdef __IMXRT1062__
+      uint16_t preset_key = id << 9;
+      // non-global values are all 0-99 in the enum
+      for (int i = 0; i < 100; ++i) {
+        PhzConfig::deleteKey(preset_key | i);
+      }
+#endif
+    }
     void ConfigButtonPush(int h) {
         if (preset_cursor) {
-            // Save or Load on button push
-            if (config_cursor == SAVE_PRESET)
-                StoreToPreset(preset_cursor-1);
-            else {
+          // Save or Load on button push
+          switch (config_cursor) {
+            case DELETE_PRESET:
+              DeletePreset(preset_cursor - 1);
+              break;
+            case SAVE_PRESET:
+              StoreToPreset(preset_cursor - 1);
+              break;
+            case LOAD_PRESET:
               if (HS::clock_m.IsRunning()) {
                 queued_preset = preset_cursor - 1;
-                HS::clock_m.BeatSync( [this](){ ProcessQueue(); } );
-              }
-              else
-                LoadFromPreset(preset_cursor-1);
-            }
+                HS::clock_m.BeatSync([this]() { ProcessQueue(); });
+              } else LoadFromPreset(preset_cursor - 1);
+              break;
+          }
 
-            preset_cursor = 0; // deactivate preset selection
-            view_state = APPLETS;
-            isEditing = false;
-            return;
+          preset_cursor = 0; // deactivate preset selection
+          view_state = APPLETS;
+          isEditing = false;
+          return;
         }
 
         switch (config_cursor) {
@@ -1304,6 +1318,7 @@ private:
             }
             break;
 
+        case DELETE_PRESET:
         case SAVE_PRESET:
         case LOAD_PRESET:
             preset_cursor = preset_id + 1;
@@ -1526,7 +1541,8 @@ private:
 #endif
     }
     void DrawPresetSelector() {
-        gfxHeader((config_cursor == SAVE_PRESET) ? "Save" : "Load");
+        const char * const hdrtxt[] = { "DEL!", "Load", "Save", "???" };
+        gfxHeader(hdrtxt[config_cursor]);
         gfxPrint(30, 1, "Preset");
         gfxDottedLine(16, 11, 16, 63);
 
