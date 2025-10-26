@@ -1444,17 +1444,19 @@ private:
 
         gfxPrint(1, 45, "Preset Bank#  ");
         gfxPrint(bank_num);
-        gfxPrint("  ");
+        gfxPrint("   ");
 
-        int cursor_start_x = graphics.getPrintPosX();
-        int cursor_start_y = graphics.getPrintPosY();
+        int x = graphics.getPrintPosX();
         gfxPrint(jump_trig_);
         if (config_cursor == PRESET_JUMP_TRIG) {
-          graphics.clearRect(cursor_start_x - 14, cursor_start_y-1, 24, 10);
-          gfxFrame(cursor_start_x - 13, cursor_start_y-1, 22, 10);
-          gfxPrint(cursor_start_x - 11, cursor_start_y+1, jump_trig_.InputName());
-          if (EditMode())
-            gfxInvert(cursor_start_x - 14, cursor_start_y-1, 24, 10);
+          int y = graphics.getPrintPosY();
+          int w = strlen(jump_trig_.InputName()) * 6 + 2;
+          CONSTRAIN(x, 3, 126-w);
+
+          graphics.clearRect(x - 2, y - 1, w + 3, 12);
+          gfxFrame(x - 1, y - 1, w + 1, 11);
+          gfxPrint(x, y + 1, jump_trig_.InputName());
+          if (EditMode()) gfxInvert(x - 1, y - 1, w + 1, 11);
         }
 
         const uint8_t pc_ch = HS::frame.MIDIState.pc_channel;
