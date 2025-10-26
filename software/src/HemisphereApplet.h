@@ -383,11 +383,13 @@ public:
     void gfxEndCursor(bool selected, bool spicy = false, const char *str = nullptr) {
         if (selected) {
           if (str) {
-            gfxClear(cursor_start_x - 14, cursor_start_y-1, 24, 10);
-            gfxFrame(cursor_start_x - 13, cursor_start_y-1, 22, 10, spicy);
-            gfxPrint(cursor_start_x - 11, cursor_start_y+1, str);
+            const int w = strlen(str)*6 + 2;
+            const int x = constrain(gfxGetPrintPosX() - w, 0, 63 - w);
+            gfxClear(x - 2, cursor_start_y-1, w + 3, 12);
+            gfxFrame(x - 1, cursor_start_y-1, w + 1, 11, spicy);
+            gfxPrint(x, cursor_start_y+1, str);
             if (EditMode())
-              gfxInvert(cursor_start_x - 14, cursor_start_y-1, 24, 10);
+              gfxInvert(x - 1, cursor_start_y-1, w + 1, 11);
           } else {
             int16_t w = gfxGetPrintPosX() - cursor_start_x;
             int16_t y = gfxGetPrintPosY() + 8;
