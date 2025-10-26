@@ -110,7 +110,7 @@ struct DigitalInputMap {
   uint32_t clkcount = 0;
 
   void ChangeSource(int dir) {
-    source = constrain(source + dir, -1, num_sources);
+    source = constrain(source + dir, -2, num_sources);
   }
 
   void Reset() {
@@ -126,13 +126,14 @@ struct DigitalInputMap {
 
         uint32_t ticks_since_beat = OC::CORE::ticks - clock_m.beat_tick;
         uint32_t tpb = clock_m.GetTempoTicks();
+        int mult = (source == -2) ? 1 : ppqn;
 
         // TODO: this doesn't work for larger divisions, because beat_tick gets reset
         //if (div_mult.steps < 0) tpb = tpb * -div_mult.steps;
         //if (div_mult.steps == 0) tpb = tpb;
         //if (div_mult.steps > 0) tpb = tpb / (div_mult.steps+1);
 
-        uint32_t tick_phase = (ppqn * ticks_since_beat) % tpb;
+        uint32_t tick_phase = (mult * ticks_since_beat) % tpb;
         bool gate = tick_phase < (internal_clocked_gate_pw * tpb);
         return gate;
       }
@@ -192,7 +193,8 @@ struct DigitalInputMap {
     }
   }
   char const* InputName() const {
-    if (source == -1) return "CLK";
+    if (source == -1) return "CLK4";
+    if (source == -2) return "CLK1";
     if (source > OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_LAST + DAC_CHANNEL_LAST)
       return OC::Strings::cv_input_names_none[source - OC::DIGITAL_INPUT_LAST];
     return OC::Strings::trigger_input_names_none[source];
@@ -211,6 +213,7 @@ struct DigitalInputMap {
 private:
   DigitalSourceType source_type() const {
     switch (source) {
+      case -2:
       case -1:
         return CLOCK;
       case 0:

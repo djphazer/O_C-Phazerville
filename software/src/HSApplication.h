@@ -287,7 +287,9 @@ public:
           }
           case DIGITAL_INPUT_MAP: {
             gfxPos(32 - 4 * 6 / 2, 2);
-            int8_t div = std::get<DigitalInputMap*>(selected_input_map)->div_mult.steps;
+            DigitalInputMap* map = std::get<DigitalInputMap*>(selected_input_map);
+            int8_t div = map->div_mult.steps;
+            if (map->source < 0) graphics.print(1 + 3*(2 + map->source)); // "1" or "4"
             if (div > 0) graphics.printf("/%2d", div);
             else graphics.printf("x%2d", -div);
             break;
