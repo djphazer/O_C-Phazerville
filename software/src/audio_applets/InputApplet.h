@@ -7,55 +7,61 @@ public:
     return strhash("Input");
   }
 
-  const char* applet_name() override {
-    return Channels == MONO ? (mono_mode == LEFT ? "Input L" : "Input R")
-                            : "Inputs";
+  const char* applet_name() {
+    return "Inputs";
   }
   void Start() override {
     if (MONO == Channels) {
-      mono_mode = hemisphere;
+      modesel_ = hemisphere;
+    }
+
+    ForEachChannel(ch) {
+      PatchCable(OC::AudioIO::InputStream(0), ch, srcmix[ch], 0);
+#ifdef USB_AUDIO
+      PatchCable(OC::AudioIO::InputStream(1), ch, srcmix[ch], 1);
+#endif
+
+      attenuations[ch].Method(INTERPOLATION_LINEAR);
+      attenuations[ch].Acquire();
+      PatchCable(srcmix[ch], 0, vcas[ch], 0);
+      PatchCable(attenuations[ch], 0, vcas[ch], 1);
+
+      PatchCable(srcmix[ch], 0, peakmeter[ch], 0);
     }
 
     for (int i = 0; i < Channels; ++i) {
       ForEachChannel(ch) {
-        attenuations[i*2 + ch].Method(INTERPOLATION_LINEAR);
-        attenuations[i*2 + ch].Acquire();
-
-        PatchCable(OC::AudioIO::InputStream(), ch, vcas[i*2 + ch], 0);
-        PatchCable(attenuations[i*2 + ch], 0, vcas[i*2 + ch], 1);
-        PatchCable(vcas[i*2 + ch], 0, mixer[i], ch);
+        PatchCable(vcas[ch], 0, mixer[i], ch);
       }
       PatchCable(passthru, i, mixer[i], 2);
       PatchCable(mixer[i], 0, output, i);
 
-      PatchCable(OC::AudioIO::InputStream(), i, peakmeter[i], 0);
+      mixer[i].gain(0, 0.0); // Left to i
+      mixer[i].gain(1, 0.0); // Right to i
 
-      mixer[i].gain(0, 1.0); // Left
-      mixer[i].gain(1, 1.0); // Right
       mixer[i].gain(2, 1.0); // passthru
     }
   }
   void Unload() override {
     for (int i = 0; i < Channels; ++i) {
-      ForEachChannel(ch) attenuations[i*2 + ch].Release();
+      attenuations[i].Release();
     }
     AllowRestart();
   }
   void Controller() override {
-    UpdateMix();
+    ForEachChannel(ch) {
+      attenuations[ch].Push(float_to_q15(level_cv.InF(1.0)));
+    }
   }
   void View() override {
-    const char* const txt[] = {"Left", "Right", "Mixed"};
-    gfxPrint(3, 15, txt[mono_mode]);
-    if constexpr (Channels == STEREO) {
-      gfxPrint("+Right");
-
-      gfxPrint(10, 25, "Mix? ");
-      gfxPrint(10, 35, mixtomono ? "Mono" : "Stereo");
-      if (cursor == CHANNEL_MODE) gfxCursor(10, 43, 37);
-    } else {
-      if (cursor == CHANNEL_MODE) gfxCursor(3, 23, 31);
-    }
+    const char* const txt[] = {
+      "Left", "Right", "Dual", "Mixed",
+#ifdef USB_AUDIO
+      "USB L", "USB R", "USB Dual", "USB Mix"
+#endif
+    };
+    gfxPrint(3, 15, txt[modesel_]);
+    if (cursor == CHANNEL_MODE) gfxCursor(3, 23, 31);
     gfxPrint(1, 45, "Lvl:");
     gfxPrintDb(level);
     if (cursor == IN_LEVEL) gfxCursor(26, 53, 26);
@@ -63,7 +69,7 @@ public:
     gfxPrint(level_cv);
     gfxEndCursor(cursor == LEVEL_CV, false, level_cv.InputName());
 
-    for (int ch = 0; ch < Channels; ++ch) {
+    ForEachChannel(ch) {
       if (peakmeter[ch].available()) {
         int peaklvl = peakmeter[ch].read() * 64;
         gfxInvert(ch*61, 64 - peaklvl, 3, peaklvl);
@@ -72,11 +78,14 @@ public:
 
     gfxDisplayInputMapEditor();
   }
-  uint64_t OnDataRequest() override {
-    return PackPackables(pack<4>(mono_mode), pack(level), pack<1>(mixtomono), level_cv);
+  void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
+    // abandoning old data at index 0
+    //data[0] = PackPackables(...);
+    data[1] = PackPackables(modesel_, level, level_cv);
   }
-  void OnDataReceive(uint64_t data) override {
-    UnpackPackables(data, pack<4>(mono_mode), pack(level), pack<1>(mixtomono), level_cv);
+  void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
+    UnpackPackables(data[1], modesel_, level, level_cv);
+    UpdateMix();
   }
 
   // *****
@@ -100,15 +109,15 @@ public:
         level_cv.ChangeSource(direction);
         break;
       case CHANNEL_MODE:
-        if (Channels == MONO) {
-          if (cursor == CHANNEL_MODE) {
-            mono_mode = constrain(mono_mode + direction, 0, MODE_COUNT - 1);
-          }
-        } else {
-          mixtomono = !mixtomono;
-        }
+        modesel_ = constrain(modesel_ + direction, 0, MODE_COUNT - 1);
+        if (Channels == MONO && (modesel_ == DUAL
+#ifdef USB_AUDIO
+            || modesel_ == USB_DUAL
+#endif
+          )) modesel_ += direction;
         break;
     }
+    UpdateMix();
   }
 
   AudioStream* InputStream() override {
@@ -119,23 +128,63 @@ public:
   }
 
   void UpdateMix() {
-    float lvl_scalar = level < LVL_MIN_DB ? 0.0f : dbToScalar(level) * level_cv.InF(1.0f);
-    q15_t lvl = float_to_q15(lvl_scalar);
+    float lvl_scalar = level < LVL_MIN_DB ? 0.0f : dbToScalar(level); // * level_cv.InF(1.0f);
+    //q15_t lvl = float_to_q15(lvl_scalar);
 
-    if (Channels == MONO) {
-      if (mono_mode == MIXED) {
-        attenuations[0].Push(lvl);
-        attenuations[1].Push(lvl);
-      } else {
-        attenuations[mono_mode].Push(lvl);
-        attenuations[1-mono_mode].Push(0.0);
+    ForEachChannel(ch) {
+      switch (modesel_) {
+#ifdef USB_AUDIO
+        case USB_DUAL:
+        case USB_MIX:
+        case USB_L:
+        case USB_R:
+          srcmix[ch].gain(0, 0.0f); // i2s
+          srcmix[ch].gain(1, 1.0f); // usb
+          break;
+#endif
+        case DUAL:
+        case MIXED:
+        case LEFT:
+        case RIGHT:
+          srcmix[ch].gain(0, 1.0f); // i2s
+          srcmix[ch].gain(1, 0.0f); // usb
+          break;
       }
-    } else {
-      attenuations[0].Push(lvl); // left to left
-      attenuations[1].Push(mixtomono? lvl : 0.0); // right to left
-      attenuations[2].Push(mixtomono? lvl : 0.0); // left to right
-      attenuations[3].Push(lvl); // right to right
     }
+    for (int ch = 0; ch < Channels; ++ch) {
+      switch (modesel_) {
+#ifdef USB_AUDIO
+        case USB_DUAL:
+#endif
+        case DUAL:
+          mixer[ch].gain(0, lvl_scalar * (1-ch)); // Left to ch
+          mixer[ch].gain(1, lvl_scalar * ch); // Right to ch
+          break;
+#ifdef USB_AUDIO
+        case USB_MIX:
+#endif
+        case MIXED:
+          // TODO: adjust by 0.5 when mixing to mono?
+          mixer[ch].gain(0, lvl_scalar); // Left to ch
+          mixer[ch].gain(1, lvl_scalar); // Right to ch
+          break;
+#ifdef USB_AUDIO
+        case USB_L:
+#endif
+        case LEFT:
+          mixer[ch].gain(0, lvl_scalar); // Left to ch
+          mixer[ch].gain(1, 0.0f); // Right to ch
+          break;
+#ifdef USB_AUDIO
+        case USB_R:
+#endif
+        case RIGHT:
+          mixer[ch].gain(0, 0.0f); // Left to ch
+          mixer[ch].gain(1, lvl_scalar); // Right to ch
+          break;
+      }
+    }
+
   }
 
 protected:
@@ -143,19 +192,24 @@ protected:
 
 private:
   AudioPassthrough<Channels> passthru;
-  std::array<InterpolatingStream<>, Channels*2> attenuations;
-  std::array<AudioVCA, Channels*2> vcas;
+  std::array<InterpolatingStream<>, 2> attenuations;
+  std::array<AudioVCA, 2> vcas;
+  AudioMixer<2> srcmix[2];
   AudioMixer<3> mixer[Channels];
   AudioPassthrough<Channels> output;
+  AudioAnalyzePeak peakmeter[2];
 
-  AudioAnalyzePeak peakmeter[Channels];
-
-  int8_t mono_mode = LEFT;
+  int8_t modesel_ = MIXED;
   int8_t level = 0;
   CVInputMap level_cv;
-  bool mixtomono = 0;
 
-  enum SideMode { LEFT, RIGHT, MIXED, MODE_COUNT };
-  enum { CHANNEL_MODE, IN_LEVEL, LEVEL_CV, MAX_CURSOR = LEVEL_CV };
+  enum ModeSelect {
+    LEFT, RIGHT, DUAL, MIXED,
+#ifdef USB_AUDIO
+    USB_L, USB_R, USB_DUAL, USB_MIX,
+#endif
+    MODE_COUNT
+  };
+  enum InputCursor { CHANNEL_MODE, IN_LEVEL, LEVEL_CV, MAX_CURSOR = LEVEL_CV };
   int cursor = 0;
 };
