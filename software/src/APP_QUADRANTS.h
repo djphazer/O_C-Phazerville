@@ -478,9 +478,9 @@ public:
 
             active_applet[h]->Controller();
         }
-        HS::clock_m.auto_reset = false;
         audio_app.Controller();
         HemisphereApplet::ProcessCursors();
+        HS::clock_m.auto_reset = false;
     }
 
     void DrawFullScreen() {
