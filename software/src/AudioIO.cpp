@@ -2,14 +2,33 @@
 
 #include "AudioIO.h"
 #include "PhzConfig.h"
+#include "Audio/AudioPassthrough.h"
+#include "usb_desc.h"
 
 namespace OC {
   namespace AudioIO {
     AudioInputI2S2 input_stream;
-    AudioOutputI2S2* output_stream = nullptr;
 
-    AudioInputI2S2& InputStream() {
-      return input_stream;
+    AudioOutputI2S2* output_stream = nullptr;
+    AudioPassthrough<2> output_route;
+#ifdef AUDIO_INTERFACE
+    AudioInputUSB input_usb;
+    AudioOutputUSB output_usb;
+    AudioConnection out_conn_usbL{output_route, 0, output_usb, 0};
+    AudioConnection out_conn_usbR{output_route, 1, output_usb, 1};
+#endif
+    AudioConnection out_conn[2];
+
+    AudioStream& InputStream(int interface) {
+      switch (interface) {
+        default:
+        case 0:
+          return input_stream;
+#ifdef AUDIO_INTERFACE
+        case 1:
+          return input_usb;
+#endif
+      }
     }
 
     AudioStream& OutputStream() {
@@ -20,8 +39,10 @@ namespace OC {
       // fix for now.
       if (output_stream == nullptr) {
         output_stream = new AudioOutputI2S2();
+        out_conn[0].connect(output_route, 0, *output_stream, 0);
+        out_conn[1].connect(output_route, 1, *output_stream, 1);
       }
-      return *output_stream;
+      return output_route;
     }
 
     void Init() {
