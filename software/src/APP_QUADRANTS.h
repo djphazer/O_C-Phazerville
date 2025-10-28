@@ -681,7 +681,7 @@ public:
                 break;
             case 1:
             case 2:
-              if (CheckEditInputMapPress(
+              if (!clock_m.IsRunning() && CheckEditInputMapPress(
                     zoom_cursor,
                     IndexedInput(1, trigmap[zoom_slot*2]),
                     IndexedInput(2, trigmap[zoom_slot*2+1])
@@ -885,12 +885,14 @@ public:
     void ExitFullScreen() {
       view_state = APPLETS;
       isEditing = false;
+      ClearEditInputMap();
       select_mode = -1;
     }
     void SetFullScreen(HEM_SIDE hemisphere) {
       SwitchToSlot(hemisphere);
       view_state = APPLET_FULLSCREEN;
       isEditing = false;
+      ClearEditInputMap();
       select_mode = -1;
     }
     void ToggleFullScreen() {
@@ -975,6 +977,7 @@ public:
               if (CheckButtonCombos(event)) {
                 select_mode = -1;
                 isEditing = false;
+                ClearEditInputMap();
                 OC::ui.SetButtonIgnoreMask(); // ignore release and long-press
               } else {
                 HEM_SIDE slot = ButtonToSlot(event);

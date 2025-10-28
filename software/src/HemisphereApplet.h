@@ -116,6 +116,7 @@ public:
     }
     void CancelEdit() {
       enc_edit[hemisphere].isEditing = false;
+      ClearEditInputMap();
     }
 
     template<typename T>
