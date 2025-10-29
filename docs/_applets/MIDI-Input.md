@@ -3,28 +3,26 @@ layout: default
 ---
 # MIDI Input
 
-## Video
-[![MIDI Mapping Video Demo](http://img.youtube.com/vi/SpgH4tNvikc/0.jpg)](http://www.youtube.com/watch?v=SpgH4tNvikc "MIDI Input Mapping")
-
 ## Advanced MIDI-to-CV For Hemisphere
 ![hMIDIIn screenshot](images/hMIDIIn.png)
 
-Phazerville greatly expands on the capabilities of the original [**MIDI In** applet](https://github.com/Chysn/O_C-HemisphereSuite/wiki/MIDI-In). MIDI messages coming in via USB are parsed and handled at a high level; the applet acts as a configuration UI, and also passes signals to the outputs.
+Phazerville greatly expands on the capabilities of the original [**MIDI In** applet](https://github.com/Chysn/O_C-HemisphereSuite/wiki/MIDI-In). Incoming MIDI messages are parsed and handled at a high level; the applet acts as a configuration UI, and also passes signals to the outputs.
 
-If you switch to a different applet, the configured incoming MIDI messages are rerouted to the _inputs_ of the selected applet and are _combined with the physical CV or trigger input_. This allows things like modulating parameters via MIDI CC or Pitch Bend, quantizing MIDI Notes to a scale, or triggering sequencer applets with MIDI Note-On. You can use **AttenOff** to scale and offset MIDI CC values. You can transpose **TB-3PO** patterns via MIDI Note and modulate Density with the Velocity, or Aftertouch, etc.
+As of v1.10+, there are 32 slots for MIDI Maps (M1 to M32), available for [Input Mapping](Hemisphere-Input-Mapping) in other applets. This allows things like modulating parameters via MIDI CC or Pitch Bend, quantizing MIDI Notes to a scale, or triggering sequencer applets with MIDI Note-On. You can use **AttenOff** to scale and offset MIDI CC values. You can transpose **TB-3PO** patterns via MIDI Note and modulate Density with the Velocity, or Aftertouch, etc.
 
-MIDI _Clock_, _Start_, and _Stop_ messages are also handled automatically by the internal **[Clock Setup](https://github.com/djphazer/O_C-Phazerville/wiki/Clock-Setup)** applet. Incoming MIDI Clock is divided from 24 PPQN to 2 PPQN internally.
+MIDI _Clock_, _Start_, and _Stop_ messages are also handled automatically by the internal **[Clock Setup](https://github.com/djphazer/O_C-Phazerville/wiki/Clock-Setup)**. Incoming MIDI Clock is divided from 24 PPQN down to 2 PPQN internally for clock sync, to help reduce jitter (especially over USB).
 
-MIDI _Program Change_ messages can be used to switch among saved HS presets, and the channel on which the O_C listens for PC messages can be selected on the Global tab of the MIDIIn applet. It may be set to a specific channel [1-16], Omni, or Off. When the preset is saved, the PC channel filter is saved globally, so it won't revert when switching presets.
+MIDI _Program Change_ messages can be used to switch among saved HS presets, and the channel on which the O_C listens for PC messages can be selected in General Settings, or on the Global tab of the MIDIIn applet. It may be set to a specific channel [1-16], Omni, or Off. The PC channel filter setting is saved globally when a preset is saved, so it won't revert when switching presets.
 
-### Channel Settings
+### Map Settings
 
-By default, all channels are set to "None". A pair of the MIDI In applets can be [saved as a Preset](https://github.com/djphazer/O_C-Phazerville/wiki/Hemisphere-Config) to quickly recall settings.
+By default, all MIDI Maps are set to "None". Map settings are saved globally in the preset bank whenever a preset is saved.
 
-Each channel filters and translates incoming MIDI messages as output CV from **MIDI In** applet, or to a corresponding logical input for other applets.
-- **MIDI Channel** (independent for each CV channel)
+Each Map filters and translates incoming MIDI messages as CV, output from the **MIDI In** applet, or routed to a logical input for other applets. Settings include:
+- **MIDI Channel**
 - **Mode**
 - **Voice** (only used in polyphonic Modes)
+- **Note Range** - min & max
 
 The available "monophonic" modes are:
 - **None** - disabled
@@ -54,9 +52,9 @@ The available "polyphonic" modes are:
 - **KeyAft** - Polyphonic Aftertouch, positive CV from _Key Aftertouch_ messages by MIDI controllers that support it (some only produce Channel Aftertouch)
 
 Other Modes:
-- **Clock** - standard trigger pulse from _MIDI Clock_ (divided internally to 2 PPQN)
+- **Clk-2**, **Clk-4**, **Clk-8**, **Clk24** - trigger pulse from _MIDI Clock_ @ various PPQN
 - **Run** - high gate output while MIDI Transport state is "running"
-- **Start** - standard trigger pulse from _MIDI Start_
+- **Start** - trigger pulse from _MIDI Start_
 
 Some notes on Polyphonic Mode configuration:
 
