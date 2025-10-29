@@ -10,7 +10,7 @@ Phazerville greatly expands on the capabilities of the original [**MIDI In** app
 
 As of v1.10+, there are 32 slots for MIDI Maps (M1 to M32), available for [Input Mapping](Hemisphere-Input-Mapping) in other applets. This allows things like modulating parameters via MIDI CC or Pitch Bend, quantizing MIDI Notes to a scale, or triggering sequencer applets with MIDI Note-On. You can use **AttenOff** to scale and offset MIDI CC values. You can transpose **TB-3PO** patterns via MIDI Note and modulate Density with the Velocity, or Aftertouch, etc.
 
-MIDI _Clock_, _Start_, and _Stop_ messages are also handled automatically by the internal **[Clock Setup](https://github.com/djphazer/O_C-Phazerville/wiki/Clock-Setup)**. Incoming MIDI Clock is divided from 24 PPQN down to 2 PPQN internally for clock sync, to help reduce jitter (especially over USB).
+MIDI _Clock_, _Start_, and _Stop_ messages are also handled automatically by the internal **[Clock Setup](Clock-Setup)**. Incoming MIDI Clock is divided from 24 PPQN down to 2 PPQN internally for clock sync, to help reduce jitter (especially over USB).
 
 MIDI _Program Change_ messages can be used to switch among saved HS presets, and the channel on which the O_C listens for PC messages can be selected in General Settings, or on the Global tab of the MIDIIn applet. It may be set to a specific channel [1-16], Omni, or Off. The PC channel filter setting is saved globally when a preset is saved, so it won't revert when switching presets.
 
