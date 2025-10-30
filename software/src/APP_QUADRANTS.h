@@ -574,6 +574,11 @@ public:
             // the popup will linger when moving onto the Config Dummy
             break;
 
+          case MIDI_MAPS_PAGE:
+            DrawMidiMaps();
+            draw_applets = false;
+            break;
+
           case INPUT_SETTINGS:
             DrawInputMappings();
             draw_applets = false;
@@ -597,6 +602,8 @@ public:
         }
         if (HS::q_edit)
           PokePopup(QUANTIZER_POPUP);
+        else if (HS::midi_edit)
+          PokePopup(MIDI_POPUP);
 
         if (draw_applets) {
           if (view_state == AUDIO_SETUP) {
@@ -774,6 +781,10 @@ public:
           HS::QEditEncoderMove(h, event.value);
           return;
         }
+        if (HS::midi_edit) {
+          HS::MEditEncoderMove(h, event.value);
+          return;
+        }
 
         if (config_page > HIDE_CONFIG || preset_cursor) {
             ConfigEncoderAction(h, event.value);
@@ -845,7 +856,8 @@ public:
       if (config_cursor <= CONFIG_DUMMY) config_page = LOADSAVE_POPUP;
       else if (config_cursor < TRIGMAP1) config_page = CONFIG_SETTINGS;
       else if (config_cursor < QUANT1) config_page = INPUT_SETTINGS;
-      else if (config_cursor < SHOWHIDELIST) config_page = QUANTIZER_SETTINGS;
+      else if (config_cursor < MIDIMAP1) config_page = QUANTIZER_SETTINGS;
+      else if (config_cursor < SHOWHIDELIST) config_page = MIDI_MAPS_PAGE;
       else config_page = LAST_PAGE;
     }
     void ToggleConfigMenu() {
@@ -952,6 +964,23 @@ public:
               select_mode = -1;
             }
 
+            OC::ui.SetButtonIgnoreMask();
+            break;
+          }
+
+          if (HS::midi_edit) {
+            if (event.control == OC::CONTROL_BUTTON_A) {
+              mview = constrain(mview - 1, 0, MIDIMAP_MAX-1);
+              config_cursor = MIDIMAP1 + mview;
+            } else if (event.control == OC::CONTROL_BUTTON_B) {
+              mview = constrain(mview + 1, 0, MIDIMAP_MAX-1);
+              config_cursor = MIDIMAP1 + mview;
+            } else {
+              // TODO: auto-learn from Z button
+              HS::midi_edit = 0;
+              HS::popup_tick = 0;
+              select_mode = -1;
+            }
             OC::ui.SetButtonIgnoreMask();
             break;
           }
@@ -1087,6 +1116,7 @@ private:
       CONFIG_SETTINGS,
       INPUT_SETTINGS,
       QUANTIZER_SETTINGS,
+      MIDI_MAPS_PAGE,
       SHOWHIDE_APPLETS,
 
       LAST_PAGE = SHOWHIDE_APPLETS
@@ -1115,10 +1145,20 @@ private:
         QUANT1, QUANT2, QUANT3, QUANT4,
         QUANT5, QUANT6, QUANT7, QUANT8,
 
+        // MIDI Mappings
+        MIDIMAP1, MIDIMAP2, MIDIMAP3, MIDIMAP4,
+        MIDIMAP5, MIDIMAP6, MIDIMAP7, MIDIMAP8,
+        MIDIMAP9, MIDIMAP10, MIDIMAP11, MIDIMAP12,
+        MIDIMAP13, MIDIMAP14, MIDIMAP15, MIDIMAP16,
+        MIDIMAP17, MIDIMAP18, MIDIMAP19, MIDIMAP20,
+        MIDIMAP21, MIDIMAP22, MIDIMAP23, MIDIMAP24,
+        MIDIMAP25, MIDIMAP26, MIDIMAP27, MIDIMAP28,
+        MIDIMAP29, MIDIMAP30, MIDIMAP31, MIDIMAP32,
+
         // Applet visibility (dummy position)
         SHOWHIDELIST,
 
-        MAX_CURSOR = QUANT8
+        MAX_CURSOR = MIDIMAP32
     };
 
     void ConfigEncoderAction(int h, int dir) {
@@ -1127,7 +1167,7 @@ private:
             config_page += dir;
             config_page = constrain(config_page, LOADSAVE_POPUP, LAST_PAGE);
 
-            const int cursorpos[] = { 0, LOAD_PRESET, TRIG_LENGTH, TRIGMAP1, QUANT1, SHOWHIDELIST };
+            const int cursorpos[] = { 0, LOAD_PRESET, TRIG_LENGTH, TRIGMAP1, QUANT1, MIDIMAP1, SHOWHIDELIST };
             config_cursor = cursorpos[config_page];
           } else if (config_page == SHOWHIDE_APPLETS) {
             showhide_cursor.Scroll(dir);
@@ -1240,7 +1280,7 @@ private:
         }
 
         switch (config_cursor) {
-        case CONFIG_DUMMY:
+          case CONFIG_DUMMY:
             // reset input mappings to defaults
             HS::Init();
             // randomize all applets
@@ -1250,110 +1290,133 @@ private:
 #ifdef PEWPEWPEW
               // load random data !!!
               // this will expose critical bugs in data validation ;)
-              HS::available_applets[index].instance[ch]->OnDataReceive(uint64_t(random()) << 32 | (uint64_t)random());
+              HS::available_applets[index].instance[ch]->OnDataReceive(
+                uint64_t(random()) << 32 | (uint64_t)random()
+              );
 #endif
             }
             break;
 
-        case DELETE_PRESET:
-        case SAVE_PRESET:
-        case LOAD_PRESET:
+          case DELETE_PRESET:
+          case SAVE_PRESET:
+          case LOAD_PRESET:
             preset_cursor = preset_id + 1;
             break;
 
-        case AUTO_SAVE:
+          case AUTO_SAVE:
             HS::auto_save_enabled = !HS::auto_save_enabled;
             break;
 
-        case QUANT1:
-        case QUANT2:
-        case QUANT3:
-        case QUANT4:
-        case QUANT5:
-        case QUANT6:
-        case QUANT7:
-        case QUANT8:
+          case QUANT1:
+          case QUANT2:
+          case QUANT3:
+          case QUANT4:
+          case QUANT5:
+          case QUANT6:
+          case QUANT7:
+          case QUANT8:
             HS::QuantizerEdit(config_cursor - QUANT1);
             break;
 
-        case CVMAP1:
-        case CVMAP2:
-        case CVMAP3:
-        case CVMAP4:
-        case CVMAP5:
-        case CVMAP6:
-        case CVMAP7:
-        case CVMAP8:
-          if (CheckEditInputMapPress(
-                config_cursor,
-                IndexedInput(CVMAP1, cvmap[0]),
-                IndexedInput(CVMAP2, cvmap[1]),
-                IndexedInput(CVMAP3, cvmap[2]),
-                IndexedInput(CVMAP4, cvmap[3]),
-                IndexedInput(CVMAP5, cvmap[4]),
-                IndexedInput(CVMAP6, cvmap[5]),
-                IndexedInput(CVMAP7, cvmap[6]),
-                IndexedInput(CVMAP8, cvmap[7])
-              ))
-            break;
-        case TRIGMAP1:
-        case TRIGMAP2:
-        case TRIGMAP3:
-        case TRIGMAP4:
-        case TRIGMAP5:
-        case TRIGMAP6:
-        case TRIGMAP7:
-        case TRIGMAP8:
-          if (CheckEditInputMapPress(
-                config_cursor,
-                IndexedInput(TRIGMAP1, trigmap[0]),
-                IndexedInput(TRIGMAP2, trigmap[1]),
-                IndexedInput(TRIGMAP3, trigmap[2]),
-                IndexedInput(TRIGMAP4, trigmap[3]),
-                IndexedInput(TRIGMAP5, trigmap[4]),
-                IndexedInput(TRIGMAP6, trigmap[5]),
-                IndexedInput(TRIGMAP7, trigmap[6]),
-                IndexedInput(TRIGMAP8, trigmap[7])
-              ))
-            break;
-        case TRIG_LENGTH:
-        case MIDI_PC_CHANNEL:
-        case SCREENSAVER_MODE:
+          case CVMAP1:
+          case CVMAP2:
+          case CVMAP3:
+          case CVMAP4:
+          case CVMAP5:
+          case CVMAP6:
+          case CVMAP7:
+          case CVMAP8:
+            if (CheckEditInputMapPress(
+                  config_cursor,
+                  IndexedInput(CVMAP1, cvmap[0]),
+                  IndexedInput(CVMAP2, cvmap[1]),
+                  IndexedInput(CVMAP3, cvmap[2]),
+                  IndexedInput(CVMAP4, cvmap[3]),
+                  IndexedInput(CVMAP5, cvmap[4]),
+                  IndexedInput(CVMAP6, cvmap[5]),
+                  IndexedInput(CVMAP7, cvmap[6]),
+                  IndexedInput(CVMAP8, cvmap[7])
+                ))
+              break;
+          case TRIGMAP1:
+          case TRIGMAP2:
+          case TRIGMAP3:
+          case TRIGMAP4:
+          case TRIGMAP5:
+          case TRIGMAP6:
+          case TRIGMAP7:
+          case TRIGMAP8:
+            if (CheckEditInputMapPress(
+                  config_cursor,
+                  IndexedInput(TRIGMAP1, trigmap[0]),
+                  IndexedInput(TRIGMAP2, trigmap[1]),
+                  IndexedInput(TRIGMAP3, trigmap[2]),
+                  IndexedInput(TRIGMAP4, trigmap[3]),
+                  IndexedInput(TRIGMAP5, trigmap[4]),
+                  IndexedInput(TRIGMAP6, trigmap[5]),
+                  IndexedInput(TRIGMAP7, trigmap[6]),
+                  IndexedInput(TRIGMAP8, trigmap[7])
+                ))
+              break;
+          case TRIG_LENGTH:
+          case MIDI_PC_CHANNEL:
+          case SCREENSAVER_MODE:
             isEditing = !isEditing;
             break;
 
-        case PRESET_JUMP_TRIG:
-          if (!CheckEditInputMapPress(
-                config_cursor,
-                IndexedInput(PRESET_JUMP_TRIG, jump_trig_)
-              ))
-            isEditing ^= 1;
-          break;
+          case PRESET_JUMP_TRIG:
+            if (!CheckEditInputMapPress(
+                  config_cursor, IndexedInput(PRESET_JUMP_TRIG, jump_trig_)
+                ))
+              isEditing ^= 1;
+            break;
 
-        case PRESET_BANK_NUM:
+          case PRESET_BANK_NUM:
             isEditing = !isEditing;
             if (!isEditing) SetBank(bank_num);
             break;
 
-        case CURSOR_MODE:
+          case CURSOR_MODE:
             HS::cursor_wrap = !HS::cursor_wrap;
             break;
 
-        case SHOWHIDELIST:
+          case SHOWHIDELIST:
             if (h == 0) // left encoder inverts selection
             {
               HS::hidden_applets[0] = ~HS::hidden_applets[0];
               HS::hidden_applets[1] = ~HS::hidden_applets[1];
-            }
-            else // right encoder toggles current
+            } else // right encoder toggles current
               HS::showhide_applet(showhide_cursor.cursor_pos());
             break;
-        default: break;
+          default: {
+            // I'm not going to paste 32 different MIDI cursor positions so it's just the default :P
+            int midx = constrain(config_cursor - MIDIMAP1, 0, 31);
+            HS::MidiMapEdit(midx);
+            break;
+          }
         }
     }
 
+    void DrawMidiMaps() {
+      const int w = 16;
+      const int h = 13;
+      CVInputMap cv_;
+      gfxHeader("<    MIDI Maps     >");
+      for (size_t midx = 0; midx < MIDIMAP_MAX; ++midx) {
+        cv_.SetMidiMap(midx);
+        int x = 1 + (midx%8)*w;
+        int y = 12 + (midx/8)*h;
+        gfxPos(x, y);
+        gfxPrint(cv_);
+        //gfxIcon(x, y, PhzIcons::midiIn);
+        //graphics.printf("M%d", midx+1);
+      }
+      int curx = 9 + ((config_cursor - MIDIMAP1)%8)*w;
+      int cury = 12 + ((config_cursor - MIDIMAP1)/8)*h;
+      gfxIcon(curx, cury, LEFT_ICON);
+    }
     void DrawInputMappings() {
-        gfxHeader("<  Input Mapping  >");
+        gfxHeader("<  Input Mapping    >");
         gfxIcon(25, 13, TR_ICON); gfxIcon(89, 13, TR_ICON);
         gfxIcon(25, 26, CV_ICON); gfxIcon(89, 26, CV_ICON);
         gfxIcon(25, 39, TR_ICON); gfxIcon(89, 39, TR_ICON);
@@ -1383,7 +1446,7 @@ private:
         gfxDisplayInputMapEditor();
     }
     void DrawQuantizerConfig() {
-        gfxHeader("<  Quantizer Setup");
+        gfxHeader("<  Quantizer Setup  >");
 
         for (int ch=0; ch<4; ++ch) {
           const int x = 8 + ch*32;

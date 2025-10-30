@@ -105,6 +105,18 @@ struct MIDIMapping : public MIDIMapSettings {
     return (note >= range_low && note <= range_high);
   }
 
+  void AdjustChannel(int dir) {
+    channel = constrain(channel + dir, 0, 16);
+  }
+  void AdjustFunction(int dir) {
+    function = constrain(function + dir, 0, HEM_MIDI_MAX_FUNCTION);
+    if (function == HEM_MIDI_CC_OUT)
+      function_cc = -1; // auto-learn MIDI CC
+  }
+
+  void AdjustVoice(int dir) {
+    dac_polyvoice = constrain(dac_polyvoice + dir, 0, DAC_CHANNEL_COUNT - 1);
+  }
   void AdjustTranspose(int dir) {
     transpose = constrain(transpose + dir, -24, 24);
   }
