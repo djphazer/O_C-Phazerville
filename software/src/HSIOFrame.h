@@ -114,6 +114,9 @@ struct MIDIMapping : public MIDIMapSettings {
       function_cc = -1; // auto-learn MIDI CC
   }
 
+  void AdjustVoice(int dir) {
+    dac_polyvoice = constrain(dac_polyvoice + dir, 0, DAC_CHANNEL_COUNT - 1);
+  }
   void AdjustTranspose(int dir) {
     transpose = constrain(transpose + dir, -24, 24);
   }

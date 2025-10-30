@@ -969,11 +969,13 @@ public:
           }
 
           if (HS::midi_edit) {
-            if (event.control == OC::CONTROL_BUTTON_A)
+            if (event.control == OC::CONTROL_BUTTON_A) {
               mview = constrain(mview - 1, 0, MIDIMAP_MAX-1);
-            else if (event.control == OC::CONTROL_BUTTON_B)
+              config_cursor = MIDIMAP1 + mview;
+            } else if (event.control == OC::CONTROL_BUTTON_B) {
               mview = constrain(mview + 1, 0, MIDIMAP_MAX-1);
-            else {
+              config_cursor = MIDIMAP1 + mview;
+            } else {
               HS::midi_edit = 0;
               HS::popup_tick = 0;
               select_mode = -1;

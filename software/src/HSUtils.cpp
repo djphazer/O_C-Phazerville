@@ -202,11 +202,13 @@ namespace HS {
           map.AdjustFunction(dir);
           break;
         case 3: // voice (poly only)
-          // TODO:
+          map.AdjustVoice(dir);
           break;
         case 4: // low
+          map.AdjustRangeLow(dir);
+          break;
         case 5: // high
-          // TODO:
+          map.AdjustRangeHigh(dir);
           break;
       }
     }
@@ -330,7 +332,7 @@ namespace HS {
           else
             gfxIcon(22 + (q_edit-4)*5, 44, UP_BTN_ICON);
 
-          gfxInvert(20, 23, 88, 28);
+          gfxInvert(px, py, pw, ph);
 
           // context clues at top/bottom of screen
           gfxFooter("L:cursor     R:adjust");
@@ -342,21 +344,35 @@ namespace HS {
       }
       case MIDI_POPUP:
       {
-        MIDIMapping &map = frame.MIDIState.mapping[mview];
-        graphics.printf("Ch:%d  %s", map.channel, midi_fn_name[map.function]);
+        MIDIMapping& map = frame.MIDIState.mapping[mview];
+        graphics.printf(
+          "Ch:%s  %s", midi_channels[map.channel], midi_fn_name[map.function]
+        );
         if (map.function == HEM_MIDI_CC_OUT) gfxPrint(map.function_cc);
-        // TODO:
+
+        graphics.setPrintPos(px + 5, py + 15);
+        graphics.printf(
+          "V:%d<%s:%s>",
+          map.dac_polyvoice + 1,
+          midi_note_numbers[map.range_low],
+          midi_note_numbers[map.range_high]
+        );
 
         if (midi_edit) {
           if (midi_edit < 3) // chan or mode
-            gfxIcon(18 + 30*midi_edit, 35, UP_BTN_ICON);
+            gfxIcon(px + 5 + 24 * midi_edit, 35, UP_BTN_ICON);
+          else // voice, range low, range high
+            gfxIcon(px + 17 + 20 * (midi_edit - 3), 45, UP_BTN_ICON);
 
           // context clues at top/bottom of screen
           gfxFooter("L:cursor     R:adjust");
           graphics.clearRect(0, 0, 128, 10);
           gfxHeader("A:Prev   M     B:Next");
-          gfxPrint(61, 1, mview+1);
+          gfxPrint(61, 1, mview + 1);
         }
+
+        gfxInvert(px, py, pw, ph);
+        break;
       }
     }
   }
