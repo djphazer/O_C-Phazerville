@@ -59,6 +59,10 @@ struct CVInputMap {
     source = x;
   }
 
+  void SetMidiMap(int midx) {
+    source = 1 + ADC_CHANNEL_LAST + DAC_CHANNEL_COUNT + midx;
+  }
+
   char const* InputName() const {
     return OC::Strings::cv_input_names_none[source];
   }
