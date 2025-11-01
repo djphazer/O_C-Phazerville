@@ -464,11 +464,20 @@ public:
         ProcessMIDI(MIDI1, usbMIDI, usbHostMIDI);
     }
     void Controller() {
-        if (jump_trig_.Clock() && !HS::clock_m.auto_reset)
-          JumpToNextPreset();
-
         // Clock Setup applet handles internal clock duties
         ClockSetup_instance.Controller();
+        // ^ this will process the queue and load presets
+
+        // this might be triggered by the internal clock...
+        if (jump_trig_.Clock() && !HS::clock_m.auto_reset) {
+          JumpToNextPreset();
+          // ^ this will sometimes queue a preset load
+
+          // The paradox is we need to process the clock first, in case jump_trig needs it,
+          // but then jump_trig will queue another preset load,
+          // so we have to process the queue again.
+          if (jump_trig_.source < 0) ProcessQueue();
+        }
 
         // execute Applets
         for (int h = 0; h < APPLET_SLOTS; h++)
