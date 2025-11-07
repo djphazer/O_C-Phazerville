@@ -133,10 +133,10 @@ public:
     }
 
     void OnDataReceive(uint64_t data) {
-        accoperator = (AccOperator) Unpack(data, PackLocation { 0, 3});
-        b_constant = Unpack(data, PackLocation { 3, 4});
-        outmode[0] = Unpack(data, PackLocation { 7, 4});
-        outmode[1] = Unpack(data, PackLocation {13, 4});
+        accoperator = (AccOperator) constrain(Unpack(data, PackLocation { 0, 3}), 0, OP_LAST - 1);
+        b_constant = constrain(Unpack(data, PackLocation { 3, 4}), ACC_MIN_B, ACC_MAX_B);
+        outmode[0] = constrain(Unpack(data, PackLocation { 7, 4}), 0, 7);
+        outmode[1] = constrain(Unpack(data, PackLocation {13, 4}), 0, 7);
     }
 
 protected:
@@ -170,7 +170,7 @@ private:
 
 
     void DrawSelector() {
-        a_display = isEditing ? outmode[0] : a_mod;
+        a_display = EditMode() ? outmode[0] : a_mod;
         gfxIcon(1, 15, CLOCK_ICON);
         gfxPrint(12, 15, OP_NAMES[accoperator]);
 
@@ -199,11 +199,11 @@ private:
         gfxPrint(1, 52, "Z");
 
         // when editing modulating parameters show original value
-        b_display = isEditing ? b_constant : b_constant_mod;
+        b_display = EditMode() ? b_constant : b_constant_mod;
 
         for (int i = 0; i < 8; i++) {
             gfxPrint(12 + (i * 6), 52, (acc_register >> (7 - i)) & 1);
-            
+
             if (i > 3) gfxPrint(12 + (i * 6), 40, (b_display >> (7 - i)) & 1);
         }
 

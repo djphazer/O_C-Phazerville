@@ -45,13 +45,15 @@
 #include "HSMIDI.h"
 
 #if defined(__IMXRT1062__)
+#include "PhzConfig.h"
+
 USBHost thisUSB;
 USBHub hub1(thisUSB);
-MIDIDevice usbHostMIDI(thisUSB);
+MIDIDevice_BigBuffer usbHostMIDI(thisUSB);
 
 #if defined(ARDUINO_TEENSY41)
 MIDI_CREATE_INSTANCE(HardwareSerial, Serial8, MIDI1);
-#include "AudioSetup.h"
+#include "AudioIO.h"
 #endif
 
 #endif // __IMXRT1062__
@@ -74,6 +76,8 @@ void FASTRUN UI_timer_ISR() {
 /*  ------------------------ core timer ISR ---------------------------   */
 IntervalTimer CORE_timer;
 volatile bool OC::CORE::app_isr_enabled = false;
+volatile bool OC::CORE::display_update_enabled = false;
+volatile bool OC::CORE::app_loop_enabled = false;
 volatile uint32_t OC::CORE::ticks = 0;
 
 void FASTRUN CORE_timer_ISR() {
@@ -122,20 +126,7 @@ void setup() {
 
   #if defined(ARDUINO_TEENSY41)
   OC::Pinout_Detect();
-
-  // Standard MIDI I/O on Serial8, only for Teensy 4.1
-  if (MIDI_Uses_Serial8) {
-    Serial8.begin(31250);
-    MIDI1.begin(MIDI_CHANNEL_OMNI);
-  }
-
-  if (I2S2_Audio_ADC && I2S2_Audio_DAC) {
-    OC::AudioDSP::Init();
-  }
   #endif
-
-  // USB Host support for both 4.0 and 4.1
-  usbHostMIDI.begin();
 #endif
 #if defined(__MK20DX256__)
   NVIC_SET_PRIORITY(IRQ_PORTB, 0); // TR1 = 0 = PTB16
@@ -161,10 +152,6 @@ void setup() {
     delay(400);
 #if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
   }
-
-  if (OLED_Uses_SPI1) {
-    SPI1.begin();
-  }
 #endif
 
   OC::calibration_load();
@@ -183,7 +170,6 @@ void setup() {
   GRAPHICS_BEGIN_FRAME(true);
   GRAPHICS_END_FRAME();
 
-  OC::menu::Init();
   OC::ui.Init();
   OC::ui.configure_encoders(OC::calibration_data.encoder_config());
 
@@ -195,6 +181,36 @@ void setup() {
   SERIAL_PRINTLN("* UI ISR @%luus", OC_UI_TIMER_RATE);
   UI_timer.begin(UI_timer_ISR, OC_UI_TIMER_RATE);
   UI_timer.priority(OC_UI_TIMER_PRIO);
+#endif
+
+  // first sign of life
+  GRAPHICS_BEGIN_FRAME(true);
+  graphics.setPrintPos(1, 28);
+  graphics.print("*Main Screen Turn On*");
+  GRAPHICS_END_FRAME();
+
+  // --- more hardware init
+#ifdef __IMXRT1062__
+  #if defined(ARDUINO_TEENSY41)
+  // this takes a couple seconds to timeout if no card
+  SDcard_Ready = SD.begin(BUILTIN_SDCARD);
+
+  // Standard MIDI I/O on Serial8, only for Teensy 4.1
+  if (MIDI_Uses_Serial8) {
+    Serial8.begin(31250);
+    MIDI1.begin(MIDI_CHANNEL_OMNI);
+  }
+
+  if (I2S2_Audio_ADC && I2S2_Audio_DAC) {
+    OC::AudioIO::Init();
+  }
+  #endif
+
+  // initialize LittleFS for config files
+  PhzConfig::setup();
+
+  // USB Host support for both 4.0 and 4.1
+  usbHostMIDI.begin();
 #endif
 
   // Display splash screen and optional calibration
@@ -225,19 +241,24 @@ void setup() {
 void FASTRUN loop() {
 
   OC::CORE::app_isr_enabled = true;
+  OC::CORE::display_update_enabled = true;
+  OC::CORE::app_loop_enabled = true;
   uint32_t menu_redraws = 0;
   while (true) {
-
-    // don't change current_app while it's running
-    if (OC::UI_MODE_APP_SETTINGS == ui_mode) {
-      OC::ui.AppSettings();
-      ui_mode = OC::UI_MODE_MENU;
-    }
+#ifdef __IMXRT1062__
+    thisUSB.Task();
+#endif
 
     // Refresh display
-    if (MENU_REDRAW) {
+    if (MENU_REDRAW && OC::CORE::display_update_enabled) {
       GRAPHICS_BEGIN_FRAME(false); // Don't busy wait
-        if (OC::UI_MODE_MENU == ui_mode) {
+
+        if (OC::UI_MODE_APP_SETTINGS == ui_mode) {
+          // Only draw the App menu here...
+          // Handle events and process state changes elsewhere.
+          OC::ui.AppSettings(true);
+
+        } else if (OC::UI_MODE_MENU == ui_mode) {
           OC_DEBUG_RESET_CYCLES(menu_redraws, 512, OC::DEBUG::MENU_draw_cycles);
           OC_DEBUG_PROFILE_SCOPE(OC::DEBUG::MENU_draw_cycles);
           OC::apps::current_app->DrawMenu();
@@ -258,18 +279,32 @@ void FASTRUN loop() {
     }
 
     // Run current app
-    OC::apps::current_app->loop();
+    if (OC::CORE::app_loop_enabled)
+      OC::apps::current_app->loop();
+
+    // Take care of queued tasks
+    OC::CORE::FlushTasks();
 
     // UI events
-    OC::UiMode mode = OC::ui.DispatchEvents(OC::apps::current_app);
+    if (OC::UI_MODE_APP_SETTINGS == ui_mode) {
+      if (!OC::ui.AppSettings(false)) {
+        // exit menu, resume app
+        ui_mode = OC::UI_MODE_MENU;
+      }
+    } else {
+      OC::UiMode mode = OC::ui.DispatchEvents(OC::apps::current_app);
 
-    // State transition for app
-    if (mode != ui_mode) {
-      if (OC::UI_MODE_SCREENSAVER == mode)
-        OC::apps::current_app->HandleAppEvent(OC::APP_EVENT_SCREENSAVER_ON);
-      else if (OC::UI_MODE_SCREENSAVER == ui_mode)
-        OC::apps::current_app->HandleAppEvent(OC::APP_EVENT_SCREENSAVER_OFF);
-      ui_mode = mode;
+      // State transition for app
+      if (mode != ui_mode) {
+        if (OC::UI_MODE_SCREENSAVER == mode)
+          OC::apps::current_app->HandleAppEvent(OC::APP_EVENT_SCREENSAVER_ON);
+        else if (OC::UI_MODE_SCREENSAVER == ui_mode)
+          OC::apps::current_app->HandleAppEvent(OC::APP_EVENT_SCREENSAVER_OFF);
+        else if (OC::UI_MODE_APP_SETTINGS == mode)
+          OC::apps::current_app->HandleAppEvent(OC::APP_EVENT_SUSPEND);
+
+        ui_mode = mode;
+      }
     }
 
     if (millis() - LAST_REDRAW_TIME > REDRAW_TIMEOUT_MS)
@@ -279,9 +314,84 @@ void FASTRUN loop() {
     static elapsedMicros cap_send_time = 0;
     // check for request from PC to capture the screen
     if (Serial && Serial.available() > 0) {
-      do { Serial.read(); } while (Serial.available() > 0);
-      display::frame_buffer.capture_request();
-      cap_idx = 0;
+      bool capreq = false;
+      do {
+        int cmd = Serial.read();
+        switch (cmd) {
+#ifdef PRINT_DEBUG
+          case 'z':
+            Serial.println("-=[ PEW PEW NERDS! ]=-");
+            Serial.println("Secret Menu Options:");
+            Serial.printf("'I' = Toggle App ISR [%s]\n", OC::CORE::app_isr_enabled ? "ON" : "OFF");
+            Serial.printf("'D' = Toggle Display Redraw [%s]\n", OC::CORE::display_update_enabled ? "ON" : "OFF");
+            Serial.printf("'L' = Toggle App Loop [%s]\n", OC::CORE::app_loop_enabled ? "ON" : "OFF");
+#if defined(__IMXRT1062__)
+            Serial.println("'l' = list all files in flash (LittleFS)");
+            Serial.println("'s' = list all files on SD card");
+            Serial.println("'C' = clear/reset default Config file");
+            Serial.println("'F' = format/erase all LittleFS files");
+#endif
+            break;
+
+          case 'I':
+            OC::CORE::app_isr_enabled = !OC::CORE::app_isr_enabled;
+            Serial.printf("App ISR = %s\n", OC::CORE::app_isr_enabled ? "ON" : "OFF");
+            break;
+          case 'D':
+            OC::CORE::display_update_enabled = !OC::CORE::display_update_enabled;
+            Serial.printf("Display Redraw = %s\n", OC::CORE::display_update_enabled ? "ON" : "OFF");
+            break;
+          case 'L':
+            OC::CORE::app_loop_enabled = !OC::CORE::app_loop_enabled;
+            Serial.printf("App Loop = %s\n", OC::CORE::app_loop_enabled ? "ON" : "OFF");
+            break;
+
+#if defined(__IMXRT1062__)
+          case 'C':
+            Serial.println("Resetting Config File!!");
+            PhzConfig::clear_config();
+            PhzConfig::save_config();
+          case 'l':
+            Serial.println(" -=- LittleFS -=- ");
+            PhzConfig::listFiles();
+            break;
+          case 's':
+            Serial.println(" -=- SD Card -=- ");
+            PhzConfig::listFiles(SD);
+            break;
+          case 'F':
+            Serial.println("!! ERASING ALL FILES on LittleFS !!");
+            PhzConfig::eraseFiles();
+            break;
+#endif
+
+            // TODO:
+          case '+':
+          case '-':
+            // simulate UP and DOWN buttons
+            break;
+          case '[':
+          case ']':
+            // simulate Encoder button press
+            break;
+          case ',':
+          case '.':
+            // simulate Left Encoder turn
+            break;
+          case '<':
+          case '>':
+            // simulate Right Encoder turn
+            break;
+#endif
+          default:
+            capreq = true;
+            break;
+        }
+      } while (Serial.available() > 0);
+      if (capreq) {
+        display::frame_buffer.capture_request();
+        cap_idx = 0;
+      }
     }
 
     // check for frame buffer to have capture data ready

@@ -495,7 +495,7 @@ namespace H1200 {
     ACTION_MANUAL_RESET
   };
 
-  typedef uint32_t UiAction;
+  using UiAction = uint32_t;
 };
 
 H1200Settings h1200_settings;

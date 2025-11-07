@@ -40,6 +40,7 @@ public:
 
         // handles physical and logical clock
         if (Clock(0)) {
+            flipflopmode = false;
             choice = (random(1, 100) <= p_mod) ? 0 : 1;
 
             // will be true only for logical clocks
@@ -48,9 +49,15 @@ public:
             if (clocked) ClockOut(choice);
         }
 
+        // using 2nd trig input enables flip-flop gate
+        if (Clock(1)) {
+            flipflopmode = true;
+            choice = (random(1, 100) <= p_mod) ? 0 : 1;
+        }
+
         // only pass thru physical gates
-        if (!clocked) {
-            GateOut(choice, Gate(0));
+        if (!clocked || flipflopmode) {
+            GateOut(choice, Gate(0) || flipflopmode);
             GateOut(1 - choice, 0); // reset the other output
         }
     }
@@ -75,29 +82,30 @@ public:
     }
 
     void OnDataReceive(uint64_t data) {
-        p = Unpack(data, PackLocation {0,7});
+        p = constrain(Unpack(data, PackLocation {0,7}), 0, 100);
     }
 
 protected:
   void SetHelp() {
     //                    "-------" <-- Label size guide
     help[HELP_DIGITAL1] = "Clk/Gte";
-    help[HELP_DIGITAL2] = "";
+    help[HELP_DIGITAL2] = "AltClk";
     help[HELP_CV1]      = "p Mod";
     help[HELP_CV2]      = "";
     help[HELP_OUT1]     = "Left";
     help[HELP_OUT2]     = "Right";
-    help[HELP_EXTRA1] = "";
+    help[HELP_EXTRA1] = "AltClk=flip-flop gate";
     help[HELP_EXTRA2] = "Encoder: Set p";
     //                  "---------------------" <-- Extra text size guide
   }
 
 private:
-	int p, p_mod;
-	int choice;
+    int p, p_mod;
+    int choice;
     bool clocked; // indicates a logical clock without a physical gate
+    bool flipflopmode = 0; // simple flip-flop gate
 
-	void DrawInterface() {
+    void DrawInterface() {
         // Show the probability in the middle
         gfxPrint(1, 15, "p=");
         gfxPrint(15 + pad(100, p_mod), 15, p_mod);
@@ -108,7 +116,10 @@ private:
 
         gfxPrint(12, 45, OutputLabel(0));
         gfxPrint(44, 45, OutputLabel(1));
-        gfxFrame(9 + (32 * choice), 42, 13, 13);
-	}
+        if (flipflopmode)
+            gfxInvert(9 + (32 * choice), 42, 13, 13);
+        else
+            gfxFrame(9 + (32 * choice), 42, 13, 13);
+    }
 };
 #endif

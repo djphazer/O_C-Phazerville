@@ -1,0 +1,467 @@
+#pragma once
+
+#include "HSicons.h"
+#include "HemisphereAudioApplet.h"
+#include "dsputils.h"
+#include "dsputils_arm.h"
+#include "Audio/AudioDelayExt.h"
+#include "Audio/AudioMixer.h"
+#include "Audio/AudioPassthrough.h"
+#include <Audio.h>
+
+extern "C" uint8_t external_psram_size;
+
+template <AudioChannels Channels>
+class DelayApplet : public HemisphereAudioApplet {
+public:
+  const char* applet_name() {
+    return "Delay";
+  }
+  void Start() {
+    for (int ch = 0; ch < Channels; ch++) {
+      channels[ch].Start(this, ch, input_stream, output_stream);
+    }
+    if (Channels == STEREO) {
+      ForEachChannel(ch) {
+        PatchCable(
+          channels[ch].taps_mixer, 0, channels[1 - ch].input_mixer, PP_CH
+        );
+        channels[1 - ch].input_mixer.gain(PP_CH, 0.0f);
+      }
+    }
+    set_taps(taps);
+    MAX_DELAY_SECS = channels[0].delaystream.MAX_DELAY_SECS;
+    MIN_DELAY_SECS = channels[0].delaystream.MIN_DELAY_SECS;
+  }
+
+  void Unload() {
+    /* what if we just... kept it forever?
+     * the problem is, unloading & reloading is slow when jumping presets
+     */
+    for (auto& ch : channels) ch.Stop();
+    AllowRestart();
+  }
+
+  void Controller() {
+    clock_count++;
+    if (clock_source.Clock()) {
+      clock_base_secs = clock_count / 16666.0f;
+      clock_count = 0;
+    }
+
+    // if (Clock(1)) frozen = !frozen;
+
+    float d;
+    switch (time_units) {
+      case HZ:
+        d = DelaySecsFromPitch(
+          delay_time + delay_cv.Process(delay_time_cv.In())
+        );
+        break;
+      case CLOCK:
+        d = DelaySecsFromRatio(
+          ratio + semitones_to_div(delay_time_cv.SemitoneIn())
+        );
+        break;
+      default:
+      case SECS:
+        d = DelaySecsFromMs(
+          delay_time + 0.1f * delay_cv.Process(delay_time_cv.In())
+        );
+        break;
+    }
+    for (int tap = 0; tap < taps; tap++) {
+      float t = d * static_cast<float>(taps - tap) / taps;
+      CONSTRAIN(d, 0.0f, MAX_DELAY_SECS);
+      switch (delay_mod_type) {
+        case CROSSFADE:
+          for (auto& ch : channels) ch.delaystream.cf_delay(tap, t);
+          break;
+        case STRETCH:
+          for (auto& ch : channels) ch.delaystream.delay(tap, t);
+          break;
+      }
+    }
+
+    const float total_feedback = (0.01f * feedback + feedback_cv.InF());
+    // I'm not totally sure why equal amplitude feedback is necessary, but equal
+    // power was resulting in divergence when the feedback setting would pass
+    // the equal power coefficient. Thus, need equal amplitude instead.
+    float fb = constrain(total_feedback, 0.0, 2.0f) / taps;
+
+    for (auto& ch : channels) {
+      if (frozen) {
+        ch.input_mixer.gain(0, 0.0f);
+        ch.delaystream.feedback(8, 1.0f);
+        for (int tap = 0; tap < 8; tap++) {
+          ch.delaystream.feedback(tap, 0.0f);
+        }
+      } else {
+        ch.input_mixer.gain(0, 1.0f);
+        for (int tap = 0; tap < 9; tap++) {
+          ch.delaystream.feedback(tap, tap < taps ? fb : 0.0f);
+        }
+      }
+    }
+
+    if (Channels == STEREO) {
+      for (auto& ch : channels) {
+        // The tap mixer has already used equal power mixing on the taps. With
+        // feedback, we want equal amplitude, so just multiply by one more
+        // factor of equal power and voila (since equal amplitude scalars are
+        // the square roots of equal power)
+        ch.input_mixer.gain(
+          PP_CH,
+          constrain(-total_feedback * EQUAL_POWER_EQUAL_MIX[taps], 0.0f, 2.0f)
+        );
+      }
+    }
+    float dry_gain, wet_gain;
+    EqualPowerFade(
+      dry_gain, wet_gain, constrain(0.01f * wet + wet_cv.InF(), 0.0f, 1.0f)
+    );
+
+    for (auto& ch : channels) {
+      ch.wet_dry_mixer.gain(WD_WET_CH, wet_gain);
+      ch.wet_dry_mixer.gain(WD_DRY_CH, dry_gain);
+    }
+  }
+
+  void View() {
+    // gfxPrint(0, 15, delaySecs * 1000.0f, 0);
+    int unit_x = 6 * 7 + 1;
+    gfxPos(1, 15);
+
+    switch (time_units) {
+      case SECS:
+        gfxStartCursor();
+        graphics.printf("  %5d", delay_time);
+        gfxEndCursor(cursor == TIME);
+
+        gfxStartCursor(unit_x, 15);
+        gfxPrint("ms");
+        gfxEndCursor(cursor == TIME_UNITS);
+        break;
+      case HZ:
+        gfxStartCursor();
+        graphics.printf(
+          "%5d.%01d", SPLIT_INT_DEC(1.0f / DelaySecsFromPitch(delay_time), 10)
+        );
+        gfxEndCursor(cursor == TIME);
+
+        gfxStartCursor(unit_x, 15);
+        gfxPrint(unit_x, 15, "Hz");
+        gfxEndCursor(cursor == TIME_UNITS);
+        break;
+      case CLOCK:
+        gfxStartCursor();
+        gfxPrint(clock_source);
+        gfxEndCursor(cursor == CLOCK_SOURCE);
+        gfxPrint(" ");
+
+        gfxStartCursor();
+        if (ratio < 0) {
+          graphics.printf("X %d", -ratio + 1);
+        } else {
+          graphics.printf("/ %d", ratio + 1);
+        }
+        gfxEndCursor(cursor == TIME);
+
+        gfxStartCursor(unit_x, 15);
+        gfxPrintIcon(CLOCK_ICON);
+        gfxEndCursor(cursor == TIME_UNITS);
+        break;
+    }
+
+    gfxStartCursor(unit_x + 2 * 6, 15);
+    gfxPrint(delay_time_cv);
+    gfxEndCursor(cursor == TIME_CV, false, delay_time_cv.InputName());
+
+    int param_right_x = 63 - 8;
+    gfxPrint(1, 25, "FB:");
+    gfxStartCursor(param_right_x - 4 * 6, 25);
+    graphics.printf("%3d%%", feedback);
+    gfxEndCursor(cursor == FEEDBACK);
+
+    gfxStartCursor();
+    gfxPrint(feedback_cv);
+    gfxEndCursor(cursor == FEEDBACK_CV, false, feedback_cv.InputName());
+
+    // gfxIcon(54, 25, LOOP_ICON);
+    // if (frozen) gfxInvert(54, 25, 8, 8);
+    // if (cursor == FREEZE) gfxCursor(54, 32, 8);
+
+    gfxPrint(1, 35, "Wet:");
+    gfxStartCursor(param_right_x - 4 * 6, 35);
+    graphics.printf("%3d%%", wet);
+    gfxEndCursor(cursor == WET);
+
+    gfxStartCursor();
+    gfxPrint(wet_cv);
+    gfxEndCursor(cursor == WET_CV, false, wet_cv.InputName());
+
+    gfxPrint(1, 45, "Taps:");
+    gfxStartCursor(param_right_x - 2 * 6, 45);
+    gfxPrint(taps);
+    gfxEndCursor(cursor == TAPS);
+
+    gfxStartCursor(1, 55);
+    gfxPrint(delay_mod_type == CROSSFADE ? "Crossfade" : "Stretch  ");
+    gfxEndCursor(cursor == TIME_MOD);
+
+    gfxDisplayInputMapEditor();
+  }
+
+  void OnButtonPress() override {
+    if (CheckEditInputMapPress(
+          cursor,
+          IndexedInput(TIME_CV, delay_time_cv),
+          IndexedInput(FEEDBACK_CV, feedback_cv),
+          IndexedInput(WET_CV, wet_cv)
+        ))
+      return;
+    CursorToggle();
+  }
+
+  void OnEncoderMove(int direction) override {
+    if (!EditMode()) {
+      MoveCursor(cursor, direction, CURSOR_LENGTH - 1);
+      if (cursor == CLOCK_SOURCE && time_units != CLOCK)
+        MoveCursor(cursor, direction, CURSOR_LENGTH - 1);
+      return;
+    }
+    if (EditSelectedInputMap(direction)) return;
+
+    knob_accel += direction - direction * (millis_since_turn / 10);
+    if (direction * knob_accel <= 0) knob_accel = direction;
+    CONSTRAIN(knob_accel, -100, 100);
+
+    switch (cursor) {
+      case TIME:
+        switch (time_units) {
+          case CLOCK:
+            ratio = constrain(ratio + direction, -127, 127);
+            break;
+          case HZ:
+            // Adjust by 1/8 semitone, and ensure we hit semitones.
+            delay_time /= 16;
+            delay_time += knob_accel;
+            delay_time *= 16;
+
+            CONSTRAIN(
+              delay_time,
+              static_cast<int>(PitchFromDelaySecs(1.0f)),
+              static_cast<int>(PitchFromDelaySecs(MIN_DELAY_SECS)) - 1
+            );
+            break;
+          case SECS:
+            delay_time += knob_accel;
+            CONSTRAIN(
+              delay_time,
+              static_cast<int>(MIN_DELAY_SECS * 1000),
+              static_cast<int>(MAX_DELAY_SECS * 1000) - 1
+            );
+            break;
+        }
+        break;
+      case CLOCK_SOURCE:
+        clock_source.ChangeSource(direction);
+        break;
+      case TIME_UNITS:
+        time_units = constrain(time_units + direction, 0, TIME_REP_LENGTH - 1);
+        break;
+      case TIME_CV:
+        delay_time_cv.ChangeSource(direction);
+        break;
+      case TIME_MOD:
+        delay_mod_type += direction;
+        CONSTRAIN(delay_mod_type, 0, 1);
+        break;
+      case FEEDBACK:
+        feedback += direction;
+        CONSTRAIN(feedback, Channels == STEREO ? -100 : 0, 100);
+        break;
+      case FEEDBACK_CV:
+        feedback_cv.ChangeSource(direction);
+        break;
+      case WET:
+        wet += direction;
+        CONSTRAIN(wet, 0, 100);
+        break;
+      case WET_CV:
+        wet_cv.ChangeSource(direction);
+        break;
+      case TAPS:
+        set_taps(taps + direction);
+        break;
+      case CURSOR_LENGTH:
+        break;
+    }
+    millis_since_turn = 0;
+  }
+
+#define DELAY_PARAMS \
+  delay_time, pack<3>(time_units), ratio, pack<1>(delay_mod_type), feedback, \
+    wet, pack<4>(taps)
+
+  void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
+    data[0] = PackPackables(DELAY_PARAMS);
+    data[1] = PackPackables(delay_time_cv, feedback_cv, wet_cv, clock_source);
+  }
+
+  void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
+    UnpackPackables(data[0], DELAY_PARAMS);
+    set_taps(taps);
+    UnpackPackables(data[1], delay_time_cv, feedback_cv, wet_cv, clock_source);
+  }
+
+  AudioStream* InputStream() {
+    return &input_stream;
+  }
+
+  AudioStream* OutputStream() {
+    return &output_stream;
+  }
+
+  int PitchFromDelaySecs(float secs) {
+    return -RatioToPitch(C3 * 2 * secs);
+  }
+
+  float DelaySecsFromPitch(int pitch) {
+    return constrain(
+      PitchToRatio(-pitch) / (C3 * 2), MIN_DELAY_SECS, MAX_DELAY_SECS
+    );
+  }
+
+  float DelaySecsFromMs(float ms) {
+    return constrain(0.001f * ms, MIN_DELAY_SECS, MAX_DELAY_SECS);
+  }
+
+  float DelaySecsFromRatio(int ratio) {
+    return constrain(clock_base_secs * DelayRatio(ratio), 0.0f, MAX_DELAY_SECS);
+  }
+
+  float DelayRatio(int16_t ratio) {
+    return ratio < 0 ? 1.0f / (-ratio + 1) : ratio + 1;
+  }
+
+protected:
+  void SetHelp() {}
+
+  void set_taps(size_t t) {
+    taps = t;
+    CONSTRAIN(taps, 1, 8);
+    float tap_gain = EQUAL_POWER_EQUAL_MIX[taps];
+    for (auto& ch : channels) {
+      for (int i = 0; i < taps; i++) ch.taps_mixer.gain(i, tap_gain);
+      for (int i = taps; i < 8; i++) ch.taps_mixer.gain(i, 0.0f);
+      ch.delaystream.taps(taps);
+    }
+  }
+
+private:
+  // Uses 1MB of psram and gives just under 12 secs of delay time.
+  static const size_t DELAY_LENGTH = 1024 * 512;
+  using DelayStream = AudioDelayExt<9>;
+
+  enum Cursor {
+    CLOCK_SOURCE,
+    TIME,
+    TIME_UNITS,
+    TIME_CV,
+    FEEDBACK,
+    FEEDBACK_CV,
+    // FREEZE,
+    WET,
+    WET_CV,
+    TAPS,
+    TIME_MOD,
+    CURSOR_LENGTH,
+  };
+
+  enum TimeUnits {
+    SECS,
+    CLOCK,
+    HZ,
+    TIME_REP_LENGTH,
+  };
+
+  enum TimeMod {
+    CROSSFADE,
+    STRETCH,
+  };
+
+  int cursor = TIME;
+
+  float MAX_DELAY_SECS, MIN_DELAY_SECS;
+
+  int16_t delay_time = 500;
+  CVInputMap delay_time_cv;
+  int8_t ratio = 0;
+  DigitalInputMap clock_source;
+  uint8_t time_units = 0;
+  // Only need 7 bits on these but the sign makes CONSTRAIN work
+  int8_t feedback = 0;
+  CVInputMap feedback_cv;
+  int8_t wet = 50;
+  CVInputMap wet_cv;
+  uint8_t taps = 1;
+  int8_t delay_mod_type = CROSSFADE;
+
+  NoiseSuppressor delay_cv{
+    0.0f,
+    0.05f, // This needs checking against various sequencers and such
+    // 16 determined empirically by checking typical range with static
+    // voltages
+    16.0f,
+    64, // a little less than 4ms
+  };
+
+  uint32_t clock_count = 0;
+  float clock_base_secs = 0.0f;
+
+  boolean frozen = false;
+
+  int16_t knob_accel = 0;
+  elapsedMillis millis_since_turn;
+
+  static const uint8_t WD_DRY_CH = 0;
+  static const uint8_t WD_WET_CH = 1;
+
+  static const uint8_t PP_CH = 1;
+
+  AudioPassthrough<Channels> input_stream;
+  struct DelayChannel {
+    AudioMixer<2> input_mixer;
+    // 9th tap is freeze head
+    DelayStream delaystream;
+    AudioMixer<8> taps_mixer;
+    AudioMixer<2> wet_dry_mixer;
+
+    DelayChannel()
+      : delaystream(external_psram_size ? DELAY_LENGTH : DELAY_LENGTH / 16) {}
+
+    void Start(HemisphereAudioApplet* owner, int channel, AudioStream& input, AudioStream& output) {
+      delaystream.Acquire();
+
+      owner->PatchCable(input, channel, input_mixer, 0);
+      for (int i = 0; i < 8; i++) {
+        owner->PatchCable(delaystream, i, taps_mixer, i);
+      }
+      owner->PatchCable(input_mixer, 0, delaystream, 0);
+      owner->PatchCable(taps_mixer, 0, wet_dry_mixer, WD_WET_CH);
+      owner->PatchCable(input, channel, wet_dry_mixer, WD_DRY_CH);
+      owner->PatchCable(wet_dry_mixer, 0, output, channel);
+    }
+
+    void Stop() {
+      delaystream.Release();
+    }
+  } channels[Channels];
+  AudioPassthrough<Channels> output_stream;
+
+  // [-4,-2]=>-1, [-1,1]=>0, [2,4]=>1, etc
+  int16_t semitones_to_div(int16_t semis) {
+    return (semis + 32767) / 3 - 10922;
+  }
+};

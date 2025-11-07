@@ -1,0 +1,150 @@
+#pragma once
+
+#include "HSUtils.h"
+#include "HemisphereAudioApplet.h"
+#include "dspinst.h"
+#include "dsputils_arm.h"
+#include "Audio/AudioMixer.h"
+#include "Audio/AudioPassthrough.h"
+#include "Audio/AudioVCA.h"
+#include "Audio/InterpolatingStream.h"
+#include <Audio.h>
+
+class CrosspanApplet : public HemisphereAudioApplet {
+public:
+  const char* applet_name() override {
+    return "Crosspan";
+  }
+
+  void Start() override {
+    ForEachChannel(from) {
+      attenuations[from].Method(INTERPOLATION_LINEAR);
+      attenuations[from].Acquire();
+      ForEachChannel(to) {
+        mixers[from].gain(to, 1.0f);
+        vcas[from][to].level(1.0f);
+        vcas[from][to].bias(0.0f);
+        vcas[from][to].rectify(true);
+      }
+    }
+
+    PatchCable(input, 0, vcas[0][0], 0);
+    PatchCable(input, 0, vcas[0][1], 0);
+    PatchCable(input, 1, vcas[1][0], 0);
+    PatchCable(input, 1, vcas[1][1], 0);
+
+    PatchCable(attenuations[0], 0, vcas[0][0], 1);
+    PatchCable(attenuations[0], 0, vcas[1][1], 1);
+    PatchCable(attenuations[1], 0, vcas[0][1], 1);
+    PatchCable(attenuations[1], 0, vcas[1][0], 1);
+
+    PatchCable(vcas[0][0], 0, mixers[0], 0);
+    PatchCable(vcas[0][1], 0, mixers[1], 0);
+    PatchCable(vcas[1][0], 0, mixers[0], 1);
+    PatchCable(vcas[1][1], 0, mixers[1], 1);
+
+    PatchCable(mixers[0], 0, output, 0);
+    PatchCable(mixers[1], 0, output, 1);
+
+    AllowRestart();
+  }
+
+  void Unload() override {
+    ForEachChannel(ch) attenuations[ch].Release();
+  }
+
+  void Controller() override {
+    float total_crosspan = constrain(
+      static_cast<float>(crosspan) * 0.01f + crosspan_cv.InF(), 0.0f, 1.0f
+    );
+    float out, in;
+    if (xfade_shape == EQUAL_POWER) EqualPowerFade(out, in, total_crosspan);
+    else {
+      out = 1.0f - total_crosspan;
+      in = total_crosspan;
+    }
+    attenuations[0].Push(float_to_q15(out));
+    attenuations[1].Push(float_to_q15(in));
+  }
+
+  void View() override {
+    gfxFrame(1, 28, 62, 8);
+
+    int param_x = static_cast<int>(static_cast<float>(crosspan) * 0.01f * 62);
+    gfxLine(param_x, 26, param_x, 38);
+
+    int cv_x = constrain(param_x + crosspan_cv.InF() * 62, 1, 63);
+    if (cv_x < param_x) gfxRect(cv_x, 30, param_x - cv_x, 4);
+    else gfxRect(param_x, 30, cv_x - param_x, 4);
+    if (cursor == 0) gfxCursor(1, 40, 62, 14);
+
+    gfxStartCursor(28, 42);
+    gfxPrint(crosspan_cv);
+    gfxEndCursor(cursor == 1, false, crosspan_cv.InputName());
+
+    gfxStartCursor(32 - 3 * 9, 55);
+    gfxPrint(xfade_shape == EQUAL_POWER ? "Equal pow" : "Equal amp");
+    gfxEndCursor(cursor == 2);
+
+    gfxDisplayInputMapEditor();
+  }
+
+  void OnButtonPress() override {
+    if (CheckEditInputMapPress(cursor, IndexedInput(1, crosspan_cv)))
+      return;
+    CursorToggle();
+  }
+
+  void OnEncoderMove(int direction) override {
+    if (!EditMode()) {
+      MoveCursor(cursor, direction, 2);
+      return;
+    }
+    if (EditSelectedInputMap(direction)) return;
+    switch (cursor) {
+      case 0:
+        crosspan = constrain(crosspan + direction, 0, 100);
+        break;
+      case 1:
+        crosspan_cv.ChangeSource(direction);
+        break;
+      case 2:
+        xfade_shape = static_cast<XfadeShape>(xfade_shape + direction);
+
+      default:
+        break;
+    }
+  }
+
+  uint64_t OnDataRequest() override {
+    return PackPackables(crosspan, crosspan_cv, pack<1>(xfade_shape));
+  }
+
+  void OnDataReceive(uint64_t data) override {
+    UnpackPackables(data, crosspan, crosspan_cv, pack<1>(xfade_shape));
+  }
+
+  AudioStream* InputStream() override {
+    return &input;
+  }
+
+  AudioStream* OutputStream() override {
+    return &output;
+  }
+
+protected:
+  void SetHelp() override {}
+
+private:
+  enum XfadeShape : bool { EQUAL_POWER, EQUAL_AMPLITUDE };
+  int8_t cursor = 0;
+  int8_t crosspan = 0;
+  CVInputMap crosspan_cv;
+  XfadeShape xfade_shape;
+
+  AudioPassthrough<2> input;
+  std::array<InterpolatingStream<>, 2> attenuations;
+  std::array<std::array<AudioVCA, 2>, 2> vcas;
+  std::array<AudioMixer<2>, 2> mixers;
+  AudioPassthrough<2> output;
+};

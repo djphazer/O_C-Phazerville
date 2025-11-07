@@ -5,11 +5,9 @@ nav_order: 3
 
 # Build Choices
 
-By default, all [release builds](https://github.com/djphazer/O_C-Phazerville/releases) include **Hemisphere** + all applets, plus **Calibr8or, Scenes, Pong, Piqued, Quadraturia, Passencore, Viznutcracker, Dialectic Ping Pong** (check the release notes to be sure)
+By default, all [release builds](https://github.com/djphazer/O_C-Phazerville/releases) include **Hemisphere** + all applets, plus a variety of other Apps (check the release notes for details)
 
-Or you can roll your own! Generate a [custom firmware](https://github.com/djphazer/O_C-BenisphereSuite/discussions/38) with your choice of Apps! (Read and leave a comment on the Discussion, and a robot will build it for you.)
-
-## Your choices of [default builds](https://github.com/djphazer/O_C-Phazerville/releases)
+Or you can roll your own! Generate a [custom firmware](https://github.com/djphazer/O_C-BenisphereSuite/discussions/38) for Teensy 3.2 with your choice of Apps! (Read and leave a comment on the Discussion, and a robot will build it for you.)
 
 ### Flipped Operation
 

@@ -20,8 +20,7 @@
 
 #include "../vector_osc/HSVectorOscillator.h"
 #include "../vector_osc/WaveformManager.h"
-
-static constexpr int pow10_lut[] = { 1, 10, 100, 1000 };
+#include "../tideslite.h"
 
 class VectorLFO : public HemisphereApplet {
 public:
@@ -37,7 +36,7 @@ public:
     void Start() {
         ForEachChannel(ch)
         {
-            freq[ch] = 200;
+            pitch[ch] = 0;
             waveform_number[ch] = 0;
             SwitchWaveform(ch, 0);
             Out(ch, 0);
@@ -46,9 +45,7 @@ public:
 
     void Controller() {
         // Input 1 is frequency modulation for channel 1
-        int freq_mod = Proportion(DetentedIn(0), HEMISPHERE_3V_CV, 3000);
-        freq_mod = constrain(freq[0] + freq_mod, min_freq, max_freq);
-        osc[0].SetFrequency(freq_mod);
+        osc[0].SetPhaseIncrement(ComputePhaseIncrement(pitch[0] + In(0)));
 
         // Input 2 determines signal 1's level on the B/D output mix
         int mix_level = DetentedIn(1);
@@ -59,9 +56,9 @@ public:
         {
             if (Clock(ch)) {
                 uint32_t ticks = ClockCycleTicks(ch);
-                int new_freq = 1666666 / ticks;
-                freq[ch] = constrain(new_freq, min_freq, max_freq);
-                osc[ch].SetFrequency(freq[ch]);
+                uint32_t phase_inc = 0xffffffff / ticks;
+                osc[ch].SetPhaseIncrement(phase_inc);
+                pitch[ch] = ComputePitch(phase_inc);
                 osc[ch].Reset();
             }
 
@@ -105,47 +102,31 @@ public:
             ForEachChannel(ch) osc[ch].Reset();
         }
         if (c == 0) { // Frequency
-            int sign = (direction > 0) ? 1 : -1;
-
-            // if the encoder moved more than once, ensure we use the appropriate increment
-            //  when crossing boundaries
-            for (int i = 0; i < abs(direction); ++i) {
-              int cur_direction = sign;
-              if (freq[ch] + sign > 10000) cur_direction *= 1000;
-              else if (freq[ch] + sign > 1000) cur_direction *= 100;
-              else if (freq[ch] + sign > 250) cur_direction *= 10;  
-              freq[ch] = constrain(freq[ch] + cur_direction, min_freq, max_freq);
-            }
-            osc[ch].SetFrequency(freq[ch]);  
+            // macro needs to act on an int and this reads better than a cast.
+            int new_accel = knob_accel + direction - direction * (millis_since_turn / 20);
+            knob_accel = constrain(new_accel, -120, 120);
+            if (direction * knob_accel <= 0) knob_accel = direction;
+            pitch[ch] = constrain(
+                pitch[ch] + knob_accel,
+                -32768 - HEMISPHERE_MIN_CV,
+                ComputePitch(0x7fffffff) // nyquist
+            );
+            osc[ch].SetPhaseIncrement(ComputePhaseIncrement(pitch[ch]));
         }
+        millis_since_turn = 0;
     }
-        
+
     uint64_t OnDataRequest() {
         uint64_t data = 0;
         Pack(data, PackLocation {0,6}, waveform_number[0]);
         Pack(data, PackLocation {6,6}, waveform_number[1]);
-
-        for (int i = 0; i < 2; ++i) {
-          int exponent = 0;
-          if (freq[i] > 250) exponent++;
-          if (freq[i] > 1000) exponent++;
-          if (freq[i] > 10000) exponent++;
-          Pack(data, PackLocation {uint8_t(12 + i * 10), 2}, exponent);
-
-          int mantissa = freq[i] / pow10_lut[exponent];
-          Pack(data, PackLocation {uint8_t(12 + i * 10 + 2), 8}, mantissa);
-        }
-        
+        Pack(data, PackLocation {12,16}, pitch[0]);
+        Pack(data, PackLocation {28,16}, pitch[1]);
         return data;
     }
-    
     void OnDataReceive(uint64_t data) {
-        for (int i = 0; i < 2; ++i) {
-          int exponent = Unpack(data, PackLocation {uint8_t(12 + i * 10), 2});
-          int mantissa = Unpack(data, PackLocation {uint8_t(12 + i * 10 + 2), 8});
-          
-          freq[i] = mantissa * pow10_lut[exponent];
-        }
+        pitch[0] = Unpack(data, PackLocation {12,16});
+        pitch[1] = Unpack(data, PackLocation {28,16});
         SwitchWaveform(0, Unpack(data, PackLocation {0,6}));
         SwitchWaveform(1, Unpack(data, PackLocation {6,6}));
     }
@@ -170,8 +151,12 @@ private:
 
     // Settings
     int waveform_number[2];
-    int freq[2]; // in centihertz
+    int16_t pitch[2];
+
+    int8_t knob_accel = 0;
+    elapsedMillis millis_since_turn;
     
+
     void DrawInterface() {
         byte c = cursor;
         byte ch = cursor < 2 ? 0 : 1;
@@ -182,15 +167,9 @@ private:
         gfxPrint(OutputLabel(ch));
         gfxInvert(1, 14, 7, 9);
 
-        gfxPrint(10, 15, ones(freq[ch]));
-        if (freq[ch] < 1000) {
-          gfxPrint(".");
-          int h = hundredths(freq[ch]);
-          if (h < 10) gfxPrint("0");
-          gfxPrint(h);  
-        }
-        
-        gfxPrint(" Hz");
+        gfxPos(10, 15);
+        gfxPrintFreqFromPitch(pitch[ch]);
+
         DrawWaveform(ch);
 
         if (c == 0) gfxCursor(8, 23, 55);
@@ -222,15 +201,13 @@ private:
     void SwitchWaveform(byte ch, int waveform) {
         osc[ch] = WaveformManager::VectorOscillatorFromWaveform(waveform);
         waveform_number[ch] = waveform;
-        osc[ch].SetFrequency(freq[ch]);
-#ifdef NORTHERNLIGHT
-        osc[ch].Offset((12 << 7) * 4);
-        osc[ch].SetScale((12 << 7) * 4);
-#else
-        osc[ch].SetScale((12 << 7) * 3);
-#endif
+        osc[ch].SetPhaseIncrement(ComputePhaseIncrement(pitch[ch]));
+        if (OC::DAC::kOctaveZero == 0) {
+          osc[ch].Offset(HEMISPHERE_MAX_CV/2);
+          osc[ch].SetScale(HEMISPHERE_MAX_CV/2);
+        } else {
+          osc[ch].Offset(0);
+          osc[ch].SetScale(-HEMISPHERE_MIN_CV);
+        }
     }
-
-    int ones(int n) {return (n / 100);}
-    int hundredths(int n) {return (n % 100);}
 };

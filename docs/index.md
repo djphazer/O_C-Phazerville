@@ -16,17 +16,18 @@ nav_order: 1
 ![Various O_C modules running the firmware](images/three_criminals.jpg)
 
 ## Key Features:
-* More apps now fit on the same hardware (you can even [choose your own selection](https://github.com/djphazer/O_C-Phazerville/discussions/38))
-* Many new and improved [Hemisphere applets](App-and-Applet-Index#hemisphere-applets)
-* New full screen apps: [Scenes](Scenes), [Calibr8or](Calibr8or), and [Passencore](Passencore)
+* Support for next-gen [Teensy 4.1-based "O.R.N.8" hardware](https://github.com/PaulStoffregen/O_C_T41) using [Quadrants](Quadrants) App
+* Support for Teensy 4.0 on original O_C hardware
+* More Apps fit into the original Teensy 3.2 (you can even [choose your own App selection](https://github.com/djphazer/O_C-Phazerville/discussions/38))
+* Many new and improved [Hemisphere Applets](App-and-Applet-Index#hemisphere-applets)
+* New full screen apps: [Scenery](Scenery), [Calibr8or](Calibr8or), and [Passencore](Passencore)
 * New UI features, codebase optimizations, and QoL improvements
     * [Hemisphere Presets](Hemisphere-Presets) — with auto save and loading via MIDI program changes
     * [Trigger and CV Input re-mapping](Hemisphere-Input-Mapping) (including internal routing)
     * [Internal clock improvements](Clock-Setup): swing, per-channel multiplication / division, manual performance triggers
     * [Global per-channel quantization](Hemisphere-Quantizer-Setup) (with pop-up editor and performance transposition)
-    * Intuitive USB MIDI In clock sync
+    * Intuitive MIDI or CV clock sync
     * Experimental [automatic USB MIDI Out](Hemisphere-General-Settings#auto-midi-output)
-* And [someday very soon](https://ko-fi.com/djphazer): Next-gen hardware powered by Teensy 4.1
 
 ***
 

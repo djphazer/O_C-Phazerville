@@ -13,7 +13,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        ref: phazerville
+        ref: T32
 
     - name: Setup env
       env:

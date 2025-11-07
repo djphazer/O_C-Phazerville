@@ -2,6 +2,7 @@
 
 struct MiniSeq {
 
+  static constexpr int SEQUENCE_COUNT = OC::Patterns::PATTERN_USER_COUNT;
   static constexpr int MAX_STEPS = 32;
   static constexpr int MIN_VALUE = 0;
   static constexpr int MAX_VALUE = 63;
@@ -12,7 +13,7 @@ struct MiniSeq {
   bool reset = 1;
 
   void SetPattern(int &index) {
-    CONSTRAIN(index, 0, 7);
+    CONSTRAIN(index, 0, SEQUENCE_COUNT - 1);
     note = (uint8_t*)(OC::user_patterns[index].notes);
   }
   void Clear() {

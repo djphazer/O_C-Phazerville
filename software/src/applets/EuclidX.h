@@ -133,8 +133,12 @@ public:
         }
     }
 
+    void DrawFullScreen() {
+        DrawSteps(true);
+        DrawEditor();
+    }
     void View() {
-        DrawSteps();
+        DrawSteps(false);
         DrawEditor();
     }
 
@@ -241,24 +245,27 @@ private:
 
     EuclidXParam cv_dest[2] = {BEATS1, BEATS2}; // input modulation
 
-    void DrawSteps() {
-        gfxLine(0, 45, 63, 45);
-        gfxLine(0, 62, 63, 62);
-        gfxLine(0, 53, 63, 53);
-        gfxLine(0, 54, 63, 54);
+    void DrawSteps(bool fullscreen) {
+        const int x = -(fullscreen * gfx_offset);
+        const int w = (fullscreen+1)*64 - 1;
+        gfxLine(x, 45, x+w, 45);
+        gfxLine(x, 53, x+w, 53);
+        gfxLine(x, 54, x+w, 54);
+        gfxLine(x, 62, x+w, 62);
         ForEachChannel(ch) {
-            for (int i = 0; i < 16; i++) {
+            for (int i = 0; i < (fullscreen+1)*16; i++) {
                 if ((pattern[ch] >> ((i + step) % (actual_length[ch]+actual_padding[ch]) )) & 0x1) {
-                    gfxRect(4 * i + 1, 48 + 9 * ch, 3, 3);
+                    gfxRect(x + 4 * i + 1, 48 + 9 * ch, 3, 3);
                     //gfxLine(4 * i + 2, 47 + 9 * ch, 4 * i + 2, 47 + 9 * ch + 4);
                 } else {
-                    gfxPixel(4 * i + 2, 47 + 9 * ch + 2);
+                    gfxPixel(x + 4 * i + 2, 49 + 9 * ch);
                 }
 
                 if ((i + step) % (actual_length[ch]+actual_padding[ch]) == 0) {
                     //gfxLine(4 * i, 46 + 9 * ch, 4 * i, 52 + 9 * ch);
-                    gfxLine(4 * i, 46 + 9 * ch, 4 * i, 46 + 9 * ch + 1);
-                    gfxLine(4 * i, 52 + 9 * ch - 1, 4 * i, 52 + 9 * ch);
+                    const int xpos = x + 4*i;
+                    gfxLine(xpos, 46 + 9 * ch, xpos, 46 + 9 * ch + 1);
+                    gfxLine(xpos, 52 + 9 * ch - 1, xpos, 52 + 9 * ch);
                 }
             }
         }

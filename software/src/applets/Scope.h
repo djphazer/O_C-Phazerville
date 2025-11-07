@@ -73,8 +73,10 @@ public:
                 ++sample_num %= 128;
 
                 for (int n = 0; n < 2; n++) {
-                  int sample = Proportion(In(n) + HEMISPHERE_MAX_INPUT_CV, 2*HEMISPHERE_MAX_INPUT_CV, 255);
-                  sample = constrain(sample, 0, 255);
+                  int sample = In(n);
+                  if (!NorthernLightModular)
+                    sample = (sample + HEMISPHERE_MAX_INPUT_CV) / 2;
+                  sample = constrain(Proportion(sample, HEMISPHERE_MAX_INPUT_CV, 255), 0, 255);
                   snapshot[n][sample_num] = (uint8_t)sample;
                 }
             }

@@ -89,4 +89,9 @@ struct SmoothedValue {
 
 #define SCALE8_16(x) ((((x + 1) << 16) >> 8) - 1)
 
+inline int16_t InterpLinear16(int16_t start, int16_t end, uint16_t phase) {
+  int32_t delta = (end - start) * phase;
+  return (delta / 65535) + start;
+}
+
 #endif // UTIL_MATH_H_

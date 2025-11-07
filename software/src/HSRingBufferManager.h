@@ -18,34 +18,49 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-DMAMEM struct RingBufferManager {
-    int buffer[256];
-    uint8_t position = 0;
-    uint8_t index = 0;
-    uint32_t registered[2];
+#pragma once
 
-    void Register(bool hemisphere) {
-        registered[hemisphere] = OC::CORE::ticks;
+struct RingBufferManager {
+    static RingBufferManager* _instance;
+
+    int16_t buffer[256];
+    uint8_t position;
+    uint8_t index;
+    bool registered[2];
+
+    RingBufferManager() {
+      position = 0;
+      index = 1;
+      registered[0] = 0;
+      registered[1] = 0;
+    }
+
+    static RingBufferManager& get() {
+      if (!_instance) _instance = new RingBufferManager;
+      return *_instance;
+    }
+    void Register(HEM_SIDE hemisphere) {
+        registered[hemisphere] = true;
+    }
+    void Unload(HEM_SIDE hemisphere) {
+        registered[hemisphere] = false;
     }
 
     bool IsLinked() {
-        const uint32_t t = OC::CORE::ticks;
-        return ( (t - registered[LEFT_HEMISPHERE] < 160)
-            && (t - registered[RIGHT_HEMISPHERE] < 160));
+      return (registered[0] && registered[1]);
     }
 
     inline void SetIndex(uint8_t ix) {index = ix;}
 
     inline uint8_t GetIndex() {return index;}
 
-    inline void WriteValue(int cv) {
+    inline void WriteValue(int16_t cv) {
         buffer[position] = cv;
     }
 
-    int ReadValue(uint8_t output, int index_mod = 0) {
+    int16_t ReadValue(uint8_t output, int index_mod = 0) {
         uint8_t ix = position - (index * output) - index_mod;
-        int cv = buffer[ix];
-        return cv;
+        return buffer[ix];
     }
 
     inline void Advance() {
@@ -61,5 +76,7 @@ DMAMEM struct RingBufferManager {
         y = constrain(y, 0, 23);
         return 23 - y;
     }
-} buffer_m;
+};
+
+RingBufferManager* RingBufferManager::_instance = 0;
 

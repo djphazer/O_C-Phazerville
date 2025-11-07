@@ -44,6 +44,13 @@ struct Scale {
   int16_t notes[16];
 };
 
+enum OctaveConstraint {
+  OCTAVE_CONSTRAINT_OFF,
+  OCTAVE_CONSTRAINT_UP,
+  OCTAVE_CONSTRAINT_DOWN,
+  OCTAVE_CONSTRAINT_LAST
+};
+
 void SortScale(Scale &);
 class Quantizer {
  public:
@@ -78,6 +85,20 @@ class Quantizer {
   // Force Process to process again (for after re-configuring)
   void Requantize() { requantize_ = true; }
 
+  void ConfigureOctaveConstraint(uint8_t octave_constraint, int octave_constraint_len) {
+    octave_constraint_ = octave_constraint;
+    if (octave_constraint == OCTAVE_CONSTRAINT_DOWN) {
+      octave_constraint_min_ = -octave_constraint_len;
+      octave_constraint_max_ = 0;
+    }
+    else {
+      octave_constraint_min_ = 0;
+      octave_constraint_max_ = octave_constraint_len;
+    }
+  }
+
+  int16_t ConstrainOctave(int16_t octave) const;
+
  private:
   bool enabled_;
   int32_t codeword_;
@@ -87,6 +108,9 @@ class Quantizer {
   int32_t span_;
   int16_t notes_[16];
   uint8_t num_notes_;
+  uint8_t octave_constraint_;
+  int octave_constraint_min_;
+  int octave_constraint_max_;
 
   uint16_t note_number_;
   bool requantize_;

@@ -36,6 +36,8 @@
 #include "bjorklund.h"
 #include "OC_euclidean_mask_draw.h"
 
+static constexpr int ENVGEN_CHANNEL_COUNT = 4;
+
 // peaks::MultistageEnvelope allow setting of more parameters per stage, but
 // that will involve more editing code, so keeping things simple for now
 // with one value per stage.
@@ -317,7 +319,7 @@ public:
     return 0;
   }
 
-  inline void apply_cv_mapping(EnvelopeSettings cv_setting, const int32_t cvs[ADC_CHANNEL_LAST], int32_t segments[CV_MAPPING_LAST]) {
+  inline void apply_cv_mapping(EnvelopeSettings cv_setting, const int32_t cvs[ENVGEN_CHANNEL_COUNT], int32_t segments[CV_MAPPING_LAST]) {
     // segments is indexed directly with CVMapping enum values
     int mapping = values_[cv_setting];
     switch (mapping) {
@@ -419,7 +421,7 @@ public:
     return false;
   }
 
-  void Update(uint32_t triggers, uint32_t internal_trigger_mask, const int32_t cvs[ADC_CHANNEL_LAST], DAC_CHANNEL dac_channel) {
+  void Update(uint32_t triggers, uint32_t internal_trigger_mask, const int32_t cvs[ENVGEN_CHANNEL_COUNT], DAC_CHANNEL dac_channel) {
     int32_t s[CV_MAPPING_LAST];
     s[CV_MAPPING_NONE] = 0; // unused, but needs a placeholder to align with enum CVMapping
     s[CV_MAPPING_SEG1] = SCALE8_16(static_cast<int32_t>(get_segment_value(0)));
@@ -526,7 +528,7 @@ public:
       }
     }
 
-    if (triggered && get_euclidean_length() && !EuclideanFilter(euclidean_length, euclidean_fill, euclidean_offset, euclidean_counter_)) {
+    if (triggered && get_euclidean_length() && !EuclideanFilter(euclidean_length + 1, euclidean_fill, euclidean_offset, euclidean_counter_)) {
       triggered = false;
     }
 
@@ -746,10 +748,17 @@ SETTINGS_DECLARE(EnvelopeGenerator, ENV_SETTING_LAST) {
   { 0, 0, 32, "Offset", NULL, settings::STORAGE_TYPE_U8 },
   { 0, 0, 4, "Eucl reset", OC::Strings::trigger_input_names_none, settings::STORAGE_TYPE_U8 },
   { 1, 1, 255, "Eucl reset div", NULL, settings::STORAGE_TYPE_U8 },
+#ifdef ARDUINO_TEENSY41
+  { CV_MAPPING_NONE, CV_MAPPING_NONE, CV_MAPPING_LAST - 1, "CV5 -> ", cv_mapping_names, settings::STORAGE_TYPE_U4 },
+  { CV_MAPPING_NONE, CV_MAPPING_NONE, CV_MAPPING_LAST - 1, "CV6 -> ", cv_mapping_names, settings::STORAGE_TYPE_U4 },
+  { CV_MAPPING_NONE, CV_MAPPING_NONE, CV_MAPPING_LAST - 1, "CV7 -> ", cv_mapping_names, settings::STORAGE_TYPE_U4 },
+  { CV_MAPPING_NONE, CV_MAPPING_NONE, CV_MAPPING_LAST - 1, "CV8 -> ", cv_mapping_names, settings::STORAGE_TYPE_U4 },
+#else
   { CV_MAPPING_NONE, CV_MAPPING_NONE, CV_MAPPING_LAST - 1, "CV1 -> ", cv_mapping_names, settings::STORAGE_TYPE_U4 },
   { CV_MAPPING_NONE, CV_MAPPING_NONE, CV_MAPPING_LAST - 1, "CV2 -> ", cv_mapping_names, settings::STORAGE_TYPE_U4 },
   { CV_MAPPING_NONE, CV_MAPPING_NONE, CV_MAPPING_LAST - 1, "CV3 -> ", cv_mapping_names, settings::STORAGE_TYPE_U4 },
   { CV_MAPPING_NONE, CV_MAPPING_NONE, CV_MAPPING_LAST - 1, "CV4 -> ", cv_mapping_names, settings::STORAGE_TYPE_U4 },
+#endif
   { peaks::RESET_BEHAVIOUR_NULL, peaks::RESET_BEHAVIOUR_NULL, peaks::RESET_BEHAVIOUR_LAST - 1, "Attack reset", OC::Strings::reset_behaviours, settings::STORAGE_TYPE_U4 },
   { peaks::FALLING_GATE_BEHAVIOUR_IGNORE, peaks::FALLING_GATE_BEHAVIOUR_IGNORE, peaks::FALLING_GATE_BEHAVIOUR_LAST - 1, "Att fall gt", OC::Strings::falling_gate_behaviours, settings::STORAGE_TYPE_U8 },
   { peaks::RESET_BEHAVIOUR_SEGMENT_PHASE, peaks::RESET_BEHAVIOUR_NULL, peaks::RESET_BEHAVIOUR_LAST - 1, "DecRel reset", OC::Strings::reset_behaviours, settings::STORAGE_TYPE_U4 },
@@ -799,7 +808,7 @@ public:
     cv4.push(OC::ADC::value<ADC_CHANNEL_4>());
 #endif
 
-    const int32_t cvs[ADC_CHANNEL_LAST] = { cv1.value(), cv2.value(), cv3.value(), cv4.value() };
+    const int32_t cvs[ENVGEN_CHANNEL_COUNT] = { cv1.value(), cv2.value(), cv3.value(), cv4.value() };
     uint32_t triggers = OC::DigitalInputs::clocked();
 
     uint32_t internal_trigger_mask =
@@ -845,7 +854,7 @@ public:
     return envelopes_[ui.selected_channel];
   }
 
-  EnvelopeGenerator envelopes_[4];
+  EnvelopeGenerator envelopes_[ENVGEN_CHANNEL_COUNT];
 
   SmoothedValue<int32_t, kCvSmoothing> cv1;
   SmoothedValue<int32_t, kCvSmoothing> cv2;
@@ -860,7 +869,7 @@ void ENVGEN_init() {
 }
 
 static constexpr size_t ENVGEN_storageSize() {
-  return 4 * EnvelopeGenerator::storageSize();
+  return ENVGEN_CHANNEL_COUNT * EnvelopeGenerator::storageSize();
 }
 
 static size_t ENVGEN_save(void *storage) {
@@ -1067,7 +1076,7 @@ void ENVGEN_menu_settings() {
 void ENVGEN_menu() {
 
   menu::QuadTitleBar::Draw();
-  for (uint_fast8_t i = 0; i < 4; ++i) {
+  for (uint_fast8_t i = 0; i < ENVGEN_CHANNEL_COUNT; ++i) {
     menu::QuadTitleBar::SetColumn(i);
     graphics.print((char)('A' + i));
     menu::QuadTitleBar::DrawGateIndicator(i, envgen.envelopes_[i].getTriggerState());

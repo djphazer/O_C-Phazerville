@@ -1,18 +1,51 @@
+---
+title: FAQ
+nav_order: 2
+---
+
 # Frequently Asked Questions
+{: .no_toc :}
 
-1. [Input & output mapping](#io)
-2. [Clock sync](#clock)
-3. [Internal clock](#int-clock)
-4. [Quantizer engines](#quantizers)
-5. [Calibration](#calibration)
-6. [Encoder direction](#encoders)
-7. [How can I reflash the firmware without unscrewing the module from my rack?](#ezflash)
+- TOC
+{:toc}
 
-## Q1: How do the physical input and output jacks relate to the apps / applets? <a id='io'>
+## Q: How do I switch Apps?
 
-A: Within Hemisphere, any of the physical input jacks (trigger/gate and CV) may be flexibly [mapped](Hemisphere-Input-Mapping) to any of 4 virtual (software) inputs of each applet. The output jacks of each applet are hardcoded to A/B (Left Hemisphere) & C/D (Right Hemisphere), and these outputs may also be routed to the virtual inputs.
+A: Long-press the Right Encoder to find the main App Menu. The _Applets_ can be found within **Hemispheres** or [**Quadrants**](Quadrants).
 
-Using the [Input mapping screen](Hemisphere-Input-Mapping), you can configure applets to share Triggers or CV sources, directly route the output of one applet as the input of another, or disable (mute) a physical input jack.
+## Q: How do I set the default app on startup?
+
+A: Long-press the Right Encoder while on the main App Menu to save _Global Settings_, including the currently selected App.
+
+## Q: How do I run it upside-down?
+
+A: There's a quick gesture to toggle it (A+B or UP+DOWN) right inside the [**Setup / About**](Setup-About) App. After saving, a power cycle is required.
+
+<hr>
+
+## Q: How do I calibrate the hardware? <a id='calibration'>
+
+A: See the app [Setup/About](Setup-About)
+
+<hr>
+
+## Q: My encoders are going the wrong way! How do I change them? <a id='encoders'>
+
+A: If your encoders don't rotate the way you expect, you can flip the behaviour of one, the other, or both as part of the [Setup / About](Setup-About) calibration routine.
+
+<img src="images/Encoder_direction.png" alt="Edit encoder direction">
+
+After selecting "Calibrate" in Setup / About (short press of LEFT encoder), press either the UP and DOWN buttons to choose your encoder reversal: L, R, both (LR), or neither (normal) — press the RIGHT encoder to accept.
+
+If you want to use non-default calibration, you will need to scroll through the entire calibration routine to save the encoder reversal setting (rotate LEFT encoder to the last page, press RIGHT encoder to save).
+
+<hr>
+
+## Q: How do the physical Input and Output jacks connect to the Apps / Applets? <a id='io'>
+
+A: Each Applet has 2 trigger inputs, 2 CV inputs, and 2 outputs - this is **logical** or **virtual** I/O. Any of the **physical** input jacks (trigger/gate and CV) may be flexibly [mapped](Hemisphere-Input-Mapping) to any of the 4 virtual (software) inputs of each Applet. The virtual outputs of each Applet slot are hardcoded to the physical outputs sequentially: A/B (Left side), C/D (Right side), etc. All the virtual outputs may also be routed to the virtual inputs (loopback).
+
+Using the [Input mapping screen](Hemisphere-Input-Mapping), you can configure applets to share physical Triggers or CV sources, directly route the output of one applet as the input of another, or disable (mute) a physical input jack.
 
 **NOTE: Some full screen apps (those other than the original stock apps) will respect the current input mapping saved within Hemisphere. Within full screen apps, the name displayed for a given input corresponds to its _software_ destination (i.e. its position within the Input Mapping Config)**
 
@@ -32,7 +65,7 @@ Within Hemisphere, each applet's help screen will dynamically label the physical
 
 <hr>
 
-## Q2: How does external clock sync work? <a id='clock'>
+## Q: How does external clock sync work? <a id='clock'>
 
 A: See the [Clock Setup screen](Clock-Setup)
 
@@ -54,7 +87,7 @@ To disable external clock sync, set `Sync` to 0
 
 <hr>
 
-## Q3 How do I trigger applets from the internal clock? <a id='int-clock'>
+## Q: How do I trigger applets from the internal clock? <a id='int-clock'>
 
 A: See the [Clock Setup screen](Clock-Setup)
 
@@ -62,7 +95,7 @@ You can forward internal clock pulses (or multiples / divisions thereof) to any 
 
 <hr>
 
-## Q4: What is the deal with the quantizer engines? <a id='quantizers'>
+## Q: What is the deal with the quantizer engines? <a id='quantizers'>
 
 A: Instead of single, individual quantizers built into each applet, applets now share access to pool of 8 quantizer engines (Q1 - Q8) which can be configured in either a pop-up window, or in the [configuration menu](Hemisphere-Quantizer-Setup). Each quantizer engine includes a root note, scale, octave adjustment, and note mask.
 
@@ -74,25 +107,7 @@ Or, see the [configuration menu](Hemisphere-Quantizer-Setup) to edit all 8 engin
 
 <hr>
 
-## Q5: How do I calibrate the hardware? <a id='calibration'>
-
-A: See the app [Setup/About](Setup-About)
-
-<hr>
-
-## Q6: My encoders are going the wrong way! How do I change them? <a id='encoders'>
-
-A: If your encoders don't rotate the way you expect, you can flip the behaviour of one, the other, or both as part of the [Setup / About](Setup-About) calibration routine.
-
-<img src="images/Encoder_direction.png" alt="Edit encoder direction">
-
-After selecting "Calibrate" in Setup / About (short press of LEFT encoder), press either the UP and DOWN buttons to choose your encoder reversal: L, R, both (LR), or neither (normal) — press the RIGHT encoder to accept.
-
-If you want to use non-default calibration, you will need to scroll through the entire calibration routine to save the encoder reversal setting (rotate LEFT encoder to the last page, press RIGHT encoder to save).
-
-<hr>
-
-## Q7: Do I have to take the module out of my rack every time I want to update the firmware? <a id='ezflash'>
+## Q: Do I have to take the module out of my rack every time I want to update the firmware? <a id='ezflash'>
 
 A: Not if you are updating from Phazerville v1.8.1 or later! If so, you can reflash without accessing the button at the back of the module (so long as you have a USB connection)
 

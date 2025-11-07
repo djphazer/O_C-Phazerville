@@ -9,14 +9,22 @@
 #include "OC_menus.h"
 #include "util/util_debugpins.h"
 #include "src/drivers/display.h"
+#include <functional>
+#include <queue>
+
+using Task = std::function<void()>;
 
 namespace OC {
   namespace CORE {
-  extern volatile uint32_t ticks;
-  extern volatile bool app_isr_enabled;
+    extern volatile uint32_t ticks;
+    extern volatile bool app_isr_enabled;
+    extern volatile bool display_update_enabled;
+    extern volatile bool app_loop_enabled;
 
+    void DeferTask(Task func);
+    void FlushTasks();
+    int FreeRam();
   }; // namespace CORE
-
 
   struct TickCount {
     TickCount() { }

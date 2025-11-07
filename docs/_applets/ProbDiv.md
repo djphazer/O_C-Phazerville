@@ -16,7 +16,7 @@ At the heart of ProbDiv is a clock divider. There are four clock divisions that 
 |        | 1/3 | 2/4 |
 | ------ | :-: | :-: |
 | TRIG   |  Clock   |  Reset   |
-| CV INs |   Loop length  |  Reseed loop using current probabilities (when > 2.5v)   |
+| CV INs |   Loop length  |  Reseed loop/Bypass loop   |
 | OUTs   |  Divided clock | Skipped pulses (when a division `/1` is active)   |
 
 ### UI Parameters
@@ -33,7 +33,9 @@ Probabilities are defined as weights from 0-10 for choosing a specific division.
 
 Loop can be enabled by setting the loop length > 0. Once loop has been activated, an entire 32 step sequence of divisions will be generated based on the current settings. The length will use a subset of this sequence. If the final division in the sequence goes beyond 32 steps it will get cut off. 
 
-Changing any of the probabilities while loop is enabled will generate a new loop using the new values. Loops are non-deterministic, so changing a probability and then changing it back will still result in a new loop. Changing loop length will not result in a new loop, unless you disable the loop by changing loop length to 0. A voltage of 2.5 or greater on CV2 will reseed the loop (if enabled) and a trigger on Digital 1 will reset the loop (if enabled)
+Changing any of the probabilities while loop is enabled will generate a new loop using the new values. As of v1.11, loops are now deterministic. This means once you lock in a loop, changing a probability and then changing it back will result in the same loop you started with. A voltage of 2.5 or greater on CV2 will reseed the loop (if enabled) and a trigger on Digital 1 will reset the loop (if enabled). You can also reseed the loop by setting loop length back to 0 and then setting it > 0. Additionally, loop seeds are now saved in v1.11, which means you can recall the loop across presets and power cycles.
+
+**Also new in v1.11**, a negative voltage < -2.5v on CV2 will bypass the loop, allowing you to temporarily return to randomly weighted values. The loop will continue to count in the background so you will be able dip in and out of the loop in time.
 
 ## Pairing with ProbMeloD
 

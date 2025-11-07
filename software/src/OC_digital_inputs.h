@@ -13,7 +13,8 @@ enum DigitalInput {
   DIGITAL_INPUT_2,
   DIGITAL_INPUT_3,
   DIGITAL_INPUT_4,
-  DIGITAL_INPUT_LAST
+  // deprecated
+  DIGITAL_INPUT_LAST = DIGITAL_INPUT_COUNT
 };
 
 #define DIGITAL_INPUT_MASK(x) (0x1 << (x))

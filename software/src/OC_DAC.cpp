@@ -52,8 +52,8 @@ DAC_CHANNEL DAC_CHANNEL_E=4, DAC_CHANNEL_F=5, DAC_CHANNEL_G=6, DAC_CHANNEL_H=7;
 
 namespace OC {
 
-#ifdef VOR
-int DAC::kOctaveZero = 0;
+#if defined(ARDUINO_TEENSY41) || defined(VOR)
+int DAC::kOctaveZero = 3;
 #endif
 
 /*static*/
@@ -90,7 +90,7 @@ void DAC::Init(CalibrationData *calibration_data, bool flip180) {
 #endif
 
   history_tail_ = 0;
-  memset(history_, 0, sizeof(uint16_t) * kHistoryDepth * DAC_CHANNEL_LAST);
+  memset(history_, 0, sizeof(uint16_t) * kHistoryDepth * DAC_CHANNEL_COUNT);
 
 #if defined(__MK20DX256__)
   if (F_BUS == 60000000 || F_BUS == 48000000) 
@@ -98,7 +98,6 @@ void DAC::Init(CalibrationData *calibration_data, bool flip180) {
 
 #elif defined(__IMXRT1062__)
   #if defined(ARDUINO_TEENSY40)
-  SPI.begin();
   IOMUXC_SW_MUX_CTL_PAD_GPIO_B0_00 = 3; // DAC CS pin controlled by SPI
   #elif defined(ARDUINO_TEENSY41)
   if (DAC8568_Uses_SPI) {
@@ -106,7 +105,6 @@ void DAC::Init(CalibrationData *calibration_data, bool flip180) {
     // so we don't need to do any more hardware init, and calling SPI.begin()
     // again could cause problems.
   } else {
-    SPI.begin();
     IOMUXC_SW_MUX_CTL_PAD_GPIO_B0_00 = 3; // DAC CS pin controlled by SPI
   }
   if (ADC33131D_Uses_FlexIO) {
@@ -132,7 +130,7 @@ void DAC::set_auto_channel_calibration_data(uint8_t channel_id) {
   
   SERIAL_PRINTLN("use auto calibration data ... (channel: %d)", channel_id + 1);
   
-  if (channel_id < DAC_CHANNEL_LAST) {
+  if (channel_id < DAC_CHANNEL_COUNT) {
   
     OC::Autotune_data *_autotune_data = &OC::auto_calibration_data[channel_id];
     if (_autotune_data->use_auto_calibration_ == 0xFF)  { // = data available ?
@@ -150,7 +148,7 @@ void DAC::set_default_channel_calibration_data(uint8_t channel_id) {
   
   SERIAL_PRINTLN("reset to core/default calibration data ... (channel: %d)", channel_id + 1);
   
-  if (channel_id < DAC_CHANNEL_LAST) {
+  if (channel_id < DAC_CHANNEL_COUNT) {
 
     // reset data
     for (int i = 0; i < OCTAVES + 1; i++) 
@@ -168,7 +166,7 @@ void DAC::update_auto_channel_calibration_data(uint8_t channel_id, int8_t octave
   
   SERIAL_PRINTLN("update: ch.#%d -> %d (%d)", (int)(channel_id + 1), (int)pitch_data, (int)octave);
   
-  if (channel_id < DAC_CHANNEL_LAST) {
+  if (channel_id < DAC_CHANNEL_COUNT) {
 
       // write data
       OC::Autotune_data *autotune_data = &OC::auto_calibration_data[channel_id];
@@ -184,7 +182,7 @@ void DAC::update_auto_channel_calibration_data(uint8_t channel_id, int8_t octave
 void DAC::reset_auto_channel_calibration_data(uint8_t channel_id) {
   
   // reset data
-  if (channel_id < DAC_CHANNEL_LAST) {
+  if (channel_id < DAC_CHANNEL_COUNT) {
     SERIAL_PRINTLN("reset channel# %d calibration data", (int)(channel_id + 1));
     OC::Autotune_data *autotune_data = &OC::auto_calibration_data[channel_id];
     autotune_data->use_auto_calibration_ = 0x0;
@@ -194,14 +192,14 @@ void DAC::reset_auto_channel_calibration_data(uint8_t channel_id) {
 }
 /*static*/
 void DAC::reset_all_auto_channel_calibration_data(){
-   for (int i = 0; i < DAC_CHANNEL_LAST; i++)
+   for (int i = 0; i < DAC_CHANNEL_COUNT; i++)
       reset_auto_channel_calibration_data(i);
 }
 /*static*/
 void DAC::choose_calibration_data() {
   
   // at this point, global settings are restored
-  for (int i = 0; i < DAC_CHANNEL_LAST; i++) {
+  for (int i = 0; i < DAC_CHANNEL_COUNT; i++) {
     
     const OC::Autotune_data &autotune_data = OC::AUTOTUNE::GetAutotune_data(i);
 
@@ -223,24 +221,23 @@ uint8_t DAC::get_voltage_scaling(uint8_t channel_id) {
 /*static*/
 void DAC::set_scaling(uint8_t scaling, uint8_t channel_id) {
 
-  if (channel_id < DAC_CHANNEL_LAST)
+  if (channel_id < DAC_CHANNEL_COUNT)
     DAC_scaling[channel_id] = scaling;
 }
 /*static*/
 void DAC::restore_scaling(uint32_t scaling) {
-  
   // restore scaling from global settings
-  for (int i = 0; i < DAC_CHANNEL_LAST; i++) {
-    uint8_t _scaling = (scaling >> (i * 8)) & 0xFF;
+  for (int i = 0; i < DAC_CHANNEL_COUNT; i++) {
+    uint8_t _scaling = (scaling >> (i * 32/DAC_CHANNEL_COUNT)) & 0x0F;
     set_scaling(_scaling, i);
   }
 }
 uint32_t DAC::store_scaling() {
 
   uint32_t _scaling = 0;
-  // merge values into uint32_t : 
-  for (int i = 0; i < DAC_CHANNEL_LAST; i++)
-    _scaling |= (DAC_scaling[i] << (i * 8)); 
+  // merge values into uint32_t :
+  for (int i = 0; i < DAC_CHANNEL_COUNT; i++)
+    _scaling |= (DAC_scaling[i] << (i * 32/DAC_CHANNEL_COUNT));
   return _scaling;
 }
 
@@ -270,13 +267,13 @@ void DAC::set_Vbias(uint32_t data) {
 /*static*/
 DAC::CalibrationData *DAC::calibration_data_ = nullptr;
 /*static*/
-uint32_t DAC::values_[DAC_CHANNEL_LAST];
+uint32_t DAC::values_[DAC_CHANNEL_COUNT];
 /*static*/
-uint16_t DAC::history_[DAC_CHANNEL_LAST][DAC::kHistoryDepth];
+uint16_t DAC::history_[DAC_CHANNEL_COUNT][DAC::kHistoryDepth];
 /*static*/ 
 volatile size_t DAC::history_tail_;
 /*static*/ 
-uint8_t DAC::DAC_scaling[DAC_CHANNEL_LAST];
+uint8_t DAC::DAC_scaling[DAC_CHANNEL_COUNT];
 }; // namespace OC
 
 #if defined(__MK20DX256__)
@@ -410,13 +407,15 @@ void SPI_init() {
 
 #elif defined(__IMXRT1062__)
 void SPI_init() {
-  // TODO Teensy 4.1
+  SPI.begin();
+  if (OLED_Uses_SPI1) {
+    SPI1.begin();
+  }
 }
 
 #if defined(ARDUINO_TEENSY41)
 void OC::DAC::DAC8568_Vref_enable() {
   Serial.println("DAC8568 Vref enable");
-  SPI.begin();
   IOMUXC_SW_MUX_CTL_PAD_GPIO_B0_00 = 3; // DAC CS pin controlled by SPI
   SPI.beginTransaction(SPISettings(24000000, MSBFIRST, SPI_MODE1));
   LPSPI4_TCR = (LPSPI4_TCR & 0xF8000000) | LPSPI_TCR_FRAMESZ(31)

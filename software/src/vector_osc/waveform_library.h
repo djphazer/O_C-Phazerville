@@ -1,7 +1,7 @@
 namespace HS {
 
 #define VO_TOC 255
-const byte WAVEFORM_LIBRARY_COUNT = 32;
+const uint8_t WAVEFORM_LIBRARY_COUNT = 32;
 
 // Waveform Library Names
 enum {

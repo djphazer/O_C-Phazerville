@@ -1,5 +1,7 @@
 #include <Arduino.h>
 #include <algorithm>
+#include "HSUtils.h"
+#include "OC_DAC.h"
 #include "OC_digital_inputs.h"
 #include "OC_gpio.h"
 #include "OC_ADC.h"
@@ -15,12 +17,23 @@ uint8_t OC_GPIO_DEBUG_PIN1=24, OC_GPIO_DEBUG_PIN2=25;
 bool ADC33131D_Uses_FlexIO=false;
 bool OLED_Uses_SPI1=false;
 bool DAC8568_Uses_SPI=false;
+#if !defined(NORTHERNLIGHT) && defined(ARDUINO_TEENSY41)
+bool NorthernLightModular=false;
+#endif
 bool I2S2_Audio_ADC=false;
 bool I2S2_Audio_DAC=false;
 bool I2C_Expansion=false;
 bool MIDI_Uses_Serial8=false;
 float id_voltage = 0.0;
 bool flip_mode = false;
+bool SDcard_Ready = false;
+#ifdef ARDUINO_TEENSY41
+bool DAC_20Vpp = false;
+#endif
+
+float OC::GetIDVoltage() {
+  return OC::ADC::Read_ID_Voltage();
+}
 
 FLASHMEM
 void OC::SetFlipMode(bool flip_180) {
@@ -120,6 +133,7 @@ void OC::SetFlipMode(bool flip_180) {
   }
 }
 
+#if defined(ARDUINO_TEENSY41)
 FLASHMEM
 void OC::Pinout_Detect() {
   id_voltage = OC::ADC::Read_ID_Voltage();
@@ -128,7 +142,7 @@ void OC::Pinout_Detect() {
   const int cents = f % 1000;
   Serial.printf("ID voltage (pin A17) = %1d.%03d\n", value, cents);
 
-  if (id_voltage >= 0.05f && id_voltage < 0.15f) {
+  if (id_voltage >= 0.05f) { // && id_voltage < 0.15f) {
     //CV1 = 255;
     //CV2 = 255;               // CV inputs with ADC33131D
     //CV3 = 255;
@@ -164,4 +178,16 @@ void OC::Pinout_Detect() {
     MIDI_Uses_Serial8 = true;     // pins 34=IN, 35=OUT
   }
 
+  DAC_20Vpp = (id_voltage >= 0.11 && id_voltage <= 0.15);
+  if (DAC_20Vpp) {
+    DAC::kOctaveZero = 5;
+    HS::octave_max = 10;
+  }
+
+  NorthernLightModular = NorthernLightModular || (id_voltage >= 0.45f);
+  if (NorthernLightModular) {
+    DAC::kOctaveZero = 0;
+    HS::octave_max = 10;
+  }
 }
+#endif

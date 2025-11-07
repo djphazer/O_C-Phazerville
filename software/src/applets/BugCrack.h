@@ -304,8 +304,8 @@ public:
         snap = Unpack(data, PackLocation {36,6});
         blend_snare = Unpack(data, PackLocation {42,6});
 
-        cv_mode_kick = Unpack(data, PackLocation {48,4});
-        cv_mode_snare = Unpack(data, PackLocation {52,4});
+        cv_mode_kick = constrain(Unpack(data, PackLocation {48,4}), 0, 4);
+        cv_mode_snare = constrain(Unpack(data, PackLocation {52,4}), 0, 4);
 
         mix_outs = Unpack(data, PackLocation {56,1});
     }
@@ -502,9 +502,9 @@ private:
     }
 
     void SetEnvDecaySnare(int decay) {
-        // 50 ms - 1000 ms -> 20 Hz - 1 Hz
-        env_snare.SetFrequency(2000 - Proportion(decay, BNC_MAX_PARAM, 1900));
-        env_noise.SetFrequency(1000 - Proportion(decay, BNC_MAX_PARAM, 950));
+        // 12.5 ms - 1000 ms -> 80 Hz - 1 Hz
+        env_snare.SetFrequency(8000 - Proportion(decay, BNC_MAX_PARAM, 7900));
+        env_noise.SetFrequency(4000 - Proportion(decay, BNC_MAX_PARAM, 3950));
     }
     void SetEnvDecaySnap(int decay) {
         // 12.5 ms - 200 ms -> 80 Hz - 5 Hz

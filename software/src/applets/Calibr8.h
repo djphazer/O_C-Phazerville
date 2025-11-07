@@ -1,4 +1,5 @@
 // Copyright (c) 2023, Nicholas J. Michalek
+// GUI updates copyright (C) 2024, Beau Sterling
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -95,25 +96,25 @@ public:
         default: break;
         }
     }
-        
+
     uint64_t OnDataRequest() {
         uint64_t data = 0;
-        Pack(data, PackLocation { 0,10}, scale_factor[0] + 500); 
-        Pack(data, PackLocation {10,10}, scale_factor[1] + 500); 
-        Pack(data, PackLocation {20, 8}, offset[0] + 100); 
-        Pack(data, PackLocation {28, 8}, offset[1] + 100); 
-        Pack(data, PackLocation {36, 7}, transpose[0] + 36); 
-        Pack(data, PackLocation {43, 7}, transpose[1] + 36); 
+        Pack(data, PackLocation { 0,10}, scale_factor[0] + 500);
+        Pack(data, PackLocation {10,10}, scale_factor[1] + 500);
+        Pack(data, PackLocation {20, 8}, offset[0] + 100);
+        Pack(data, PackLocation {28, 8}, offset[1] + 100);
+        Pack(data, PackLocation {36, 7}, transpose[0] + 36);
+        Pack(data, PackLocation {43, 7}, transpose[1] + 36);
         return data;
     }
 
     void OnDataReceive(uint64_t data) {
-        scale_factor[0] = Unpack(data, PackLocation { 0,10}) - 500;
-        scale_factor[1] = Unpack(data, PackLocation {10,10}) - 500;
-        offset[0]       = Unpack(data, PackLocation {20, 8}) - 100;
-        offset[1]       = Unpack(data, PackLocation {28, 8}) - 100;
-        transpose[0]    = Unpack(data, PackLocation {36, 7}) - 36;
-        transpose[1]    = Unpack(data, PackLocation {43, 7}) - 36;
+        scale_factor[0] = constrain((Unpack(data, PackLocation { 0,10}) - 500), -500, 500);
+        scale_factor[1] = constrain((Unpack(data, PackLocation {10,10}) - 500), -500, 500);
+        offset[0]       = constrain((Unpack(data, PackLocation {20, 8}) - 100), -100, 100);
+        offset[1]       = constrain((Unpack(data, PackLocation {28, 8}) - 100), -100, 100);
+        transpose[0]    = constrain((Unpack(data, PackLocation {36, 7}) - 36),  -36,  60);
+        transpose[1]    = constrain((Unpack(data, PackLocation {43, 7}) - 36),  -36,  60);
     }
 
 protected:
@@ -137,10 +138,11 @@ private:
     int offset[2] = {0,0}; // fine-tuning offset
     int transpose[2] = {0,0}; // in semitones
     int transpose_active[2] = {0,0}; // held value while waiting for trigger
-    
+
     void DrawInterface() {
+        int y_shift = 27; // B+D section y offset
         ForEachChannel(ch) {
-            int y = 14 + ch*21;
+            int y = 13 + (ch * y_shift);
             gfxPrint(0, y, OutputLabel(ch));
 
             int whole = (scale_factor[ch] + CAL8_PRECISION) / 100;
@@ -158,15 +160,34 @@ private:
             gfxIcon(32, y, UP_DOWN_ICON);
             gfxPrint(40, y, offset[ch]);
         }
-        gfxLine(0, 33, 63, 33); // gotta keep em separated
 
         bool ch = (cursor > OFFSET_A);
         int param = (cursor % 3);
         if (param == 0) // Scaling
-            gfxCursor(12, 22 + ch*21, 40);
+            gfxCursor(12, 21 + (ch * y_shift), 40);
         else // Transpose or Fine Tune
-            gfxCursor(8 + (param-1)*32, 32 + ch*21, 20);
+            gfxCursor(8 + (param-1)*32, 31 + (ch * y_shift), 20);
 
-        gfxSkyline();
+        // resize cv meter bars at the bottom of each section:
+        ForEachChannel(ch) {
+            int length;
+            int max_length = 60; // max transpose value from above
+            int in_bar_y = 33 + (ch * y_shift);
+            int out_bar_y = 35 + (ch * y_shift);
+
+            // positve values extend bars from left side of screen to the right
+            // negative values go from right side to left
+            length = ProportionCV(abs(In(ch)), max_length);
+            if (In(ch) < 0)
+                gfxFrame(max_length - length, in_bar_y, length, 1);
+            else
+                gfxFrame(1, in_bar_y, length, 1);
+
+            length = ProportionCV(abs(ViewOut(ch)), max_length);
+            if (ViewOut(ch) < 0)
+                gfxFrame(max_length - length, out_bar_y, length, 2);
+            else
+                gfxFrame(1, out_bar_y, length, 2);
+        }
     }
 };

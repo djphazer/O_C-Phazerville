@@ -624,7 +624,7 @@ public:
 
   int32_t get_pitch_at_step(uint8_t seq, uint8_t step) const {
 
-    uint8_t _channel_offset = !channel_id_ ? 0x0 : OC::Patterns::NUM_PATTERNS;
+    uint8_t _channel_offset = !channel_id_ ? 0x0 : OC::Patterns::NUM_PATTERNS_PER_CHAN;
 
     OC::Pattern *read_pattern_ = &OC::user_patterns[seq + _channel_offset];
     return read_pattern_->notes[step];
@@ -632,7 +632,7 @@ public:
 
   void set_pitch_at_step(uint8_t seq, uint8_t step, int32_t pitch) {
 
-    uint8_t _channel_offset = !channel_id_ ? 0x0 : OC::Patterns::NUM_PATTERNS;
+    uint8_t _channel_offset = !channel_id_ ? 0x0 : OC::Patterns::NUM_PATTERNS_PER_CHAN;
 
     OC::Pattern *write_pattern_ = &OC::user_patterns[seq + _channel_offset];
     write_pattern_->notes[step] = pitch;
@@ -644,14 +644,14 @@ public:
 
   void clear_user_pattern(uint8_t seq) {
 
-    uint8_t _channel_offset = !channel_id_ ? 0x0 : OC::Patterns::NUM_PATTERNS;
+    uint8_t _channel_offset = !channel_id_ ? 0x0 : OC::Patterns::NUM_PATTERNS_PER_CHAN;
     memcpy(&OC::user_patterns[seq + _channel_offset], &OC::patterns[0], sizeof(OC::Pattern));
   }
 
   void copy_seq(uint8_t seq, uint8_t len, uint16_t mask) {
 
     // which sequence ?
-    copy_sequence = seq + (!channel_id_ ? 0x0 : OC::Patterns::NUM_PATTERNS);
+    copy_sequence = seq + (!channel_id_ ? 0x0 : OC::Patterns::NUM_PATTERNS_PER_CHAN);
     copy_length = len;
     copy_mask = mask;
     copy_timeout = 0;
@@ -662,7 +662,7 @@ public:
     if (copy_timeout < COPYTIMEOUT) {
 
        // which sequence to copy to ?
-       uint8_t sequence = seq + (!channel_id_ ? 0x0 : OC::Patterns::NUM_PATTERNS);
+       uint8_t sequence = seq + (!channel_id_ ? 0x0 : OC::Patterns::NUM_PATTERNS_PER_CHAN);
        // copy length:
        set_sequence_length(copy_length, seq);
        // copy mask:
@@ -1309,7 +1309,7 @@ public:
 
       if (get_sequence_cv_source()) {
         num_sequence_cv = _num_seq += (OC::ADC::value(static_cast<ADC_CHANNEL>(get_sequence_cv_source() - 1)) + 255) >> 9;
-        CONSTRAIN(_num_seq, 0, OC::Patterns::PATTERN_USER_LAST - 0x1);
+        CONSTRAIN(_num_seq, 0, OC::Patterns::NUM_PATTERNS_PER_CHAN - 0x1);
       }
 
       if (get_sequence_length_cv_source())
@@ -1351,15 +1351,15 @@ public:
                 // update
                 active_sequence_ = _num_seq + sequence_cnt_;
                 // wrap around:
-                if (active_sequence_ >= OC::Patterns::PATTERN_USER_LAST)
-                    active_sequence_ -= OC::Patterns::PATTERN_USER_LAST;
+                if (active_sequence_ >= OC::Patterns::NUM_PATTERNS_PER_CHAN)
+                    active_sequence_ -= OC::Patterns::NUM_PATTERNS_PER_CHAN;
                 // reset
                 _clock(get_sequence_length(active_sequence_), 0x0, sequence_max, true);
                 _reset = true;
               }
               else if (num_sequence_cv)  {
                 active_sequence_ += num_sequence_cv;
-                CONSTRAIN(active_sequence_, 0, OC::Patterns::PATTERN_USER_LAST - 1);
+                CONSTRAIN(active_sequence_, 0, OC::Patterns::NUM_PATTERNS_PER_CHAN - 1);
               }
               sequence_cnt = sequence_cnt_;
         }
@@ -1384,12 +1384,12 @@ public:
             // + reset
             _reset = true;
             // wrap around:
-            if (active_sequence_ >= OC::Patterns::PATTERN_USER_LAST)
-                active_sequence_ -= OC::Patterns::PATTERN_USER_LAST;
+            if (active_sequence_ >= OC::Patterns::NUM_PATTERNS_PER_CHAN)
+                active_sequence_ -= OC::Patterns::NUM_PATTERNS_PER_CHAN;
           }
           else if (num_sequence_cv)  {
               active_sequence_ += num_sequence_cv;
-              CONSTRAIN(active_sequence_, 0, OC::Patterns::PATTERN_USER_LAST - 1);
+              CONSTRAIN(active_sequence_, 0, OC::Patterns::NUM_PATTERNS_PER_CHAN - 1);
           }
           sequence_advance_state_ = _advance_trig;
           sequence_max = 0x0;
@@ -1836,15 +1836,12 @@ public:
    num_enabled_settings_ = settings - enabled_settings_;
   }
 
-  template <DAC_CHANNEL &dacChannel>
-  void update_main_channel() {
+  void update_main_channel(DAC_CHANNEL &dacChannel) {
     int32_t _output = OC::DAC::pitch_to_scaled_voltage_dac(dacChannel, get_step_pitch(), 0, OC::DAC::get_voltage_scaling(dacChannel));
-    OC::DAC::set<dacChannel>(_output);
-
+    OC::DAC::set(dacChannel, _output);
   }
 
-  template <DAC_CHANNEL &dacChannel>
-  void update_aux_channel()
+  void update_aux_channel(DAC_CHANNEL &dacChannel)
   {
 
       int8_t _mode = get_aux_mode();
@@ -1880,7 +1877,7 @@ public:
         default:
         break;
       }
-      OC::DAC::set<dacChannel>(_output);
+      OC::DAC::set(dacChannel, _output);
   }
 
   void RenderScreensaver() const;
@@ -1991,7 +1988,7 @@ SETTINGS_DECLARE(SEQ_Channel, SEQ_CHANNEL_SETTING_LAST) {
   { 65535, 0, 65535, "--> edit", NULL, settings::STORAGE_TYPE_U16 }, // seq 2
   { 65535, 0, 65535, "--> edit", NULL, settings::STORAGE_TYPE_U16 }, // seq 3
   { 65535, 0, 65535, "--> edit", NULL, settings::STORAGE_TYPE_U16 }, // seq 4
-  { OC::Patterns::PATTERN_USER_0_1, 0, OC::Patterns::PATTERN_USER_LAST-1, "sequence #", OC::pattern_names_short, settings::STORAGE_TYPE_U8 },
+  { OC::Patterns::PATTERN_USER_0_1, 0, OC::Patterns::NUM_PATTERNS_PER_CHAN-1, "sequence #", OC::pattern_names_short, settings::STORAGE_TYPE_U8 },
   { OC::Patterns::kMax, OC::Patterns::kMin, OC::Patterns::kMax, "sequence length", NULL, settings::STORAGE_TYPE_U8 }, // seq 1
   { OC::Patterns::kMax, OC::Patterns::kMin, OC::Patterns::kMax, "sequence length", NULL, settings::STORAGE_TYPE_U8 }, // seq 2
   { OC::Patterns::kMax, OC::Patterns::kMin, OC::Patterns::kMax, "sequence length", NULL, settings::STORAGE_TYPE_U8 }, // seq 3
@@ -2147,11 +2144,11 @@ void SEQ_isr() {
   seq_channel[0].Update(triggers, DAC_CHANNEL_A);
   seq_channel[1].Update(triggers, DAC_CHANNEL_B);
   // update DAC channels A, B:
-  seq_channel[0].update_main_channel<DAC_CHANNEL_A>();
-  seq_channel[1].update_main_channel<DAC_CHANNEL_B>();
+  seq_channel[0].update_main_channel(DAC_CHANNEL_A);
+  seq_channel[1].update_main_channel(DAC_CHANNEL_B);
   // update DAC channels C, D:
-  seq_channel[0].update_aux_channel<DAC_CHANNEL_C>();
-  seq_channel[1].update_aux_channel<DAC_CHANNEL_D>();
+  seq_channel[0].update_aux_channel(DAC_CHANNEL_C);
+  seq_channel[1].update_aux_channel(DAC_CHANNEL_D);
 }
 
 void SEQ_handleButtonEvent(const UI::Event &event) {
@@ -2342,9 +2339,7 @@ void SEQ_rightButton() {
     case SEQ_CHANNEL_SETTING_MASK4:
     {
       int pattern = selected.get_sequence();
-      if (OC::Patterns::PATTERN_NONE != pattern) {
-        seq_state.pattern_editor.Edit(&selected, pattern);
-      }
+      seq_state.pattern_editor.Edit(&selected, pattern);
     }
     break;
     case SEQ_CHANNEL_SETTING_DUMMY:

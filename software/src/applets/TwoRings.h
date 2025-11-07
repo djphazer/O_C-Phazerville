@@ -27,12 +27,13 @@
  * Thanks to Tom Whitwell for creating the concept, and for clarifying some things
  * Thanks to Jon Wheeler for the CV length and probability updates
  *
- * Heavily adapted as DualTM from ShiftReg/TM by djphazer (Nicholas J. Michalek)
+ * Heavily adapted as TwoRings (previously DualTM, ShiftReg, TM) by djphazer (Nicholas J. Michalek)
+ * with bits from benirose, and probably others!
  */
 
-class DualTM : public HemisphereApplet {
+class TwoRings : public HemisphereApplet {
 public:
-    
+
     static constexpr int MAX_SCALE = OC::Scales::NUM_SCALES;
     static constexpr int MIN_LENGTH = 2;
     static constexpr int MAX_LENGTH = 32;
@@ -89,7 +90,7 @@ public:
     };
 
     const char* applet_name() {
-        return "DualTM";
+        return "TwoRings";
     }
     const uint8_t* applet_icon() {
         return PhzIcons::DualTM;
@@ -159,7 +160,9 @@ public:
             case TRANSPOSE2:
             case BLEND_XFADE:
                 if (update_cv) // S&H style transpose
-                    trans_mod[cvmode[ch] - TRANSPOSE1] = MIDIQuantizer::NoteNumber(cv_data[ch], 0) - 60; // constrain to range_mod?
+                    trans_mod[cvmode[ch] - TRANSPOSE1] =
+                      MIDIQuantizer::NoteNumber(cv_data[ch], 0)
+                      - (12*OC::DAC::kOctaveZero); // make it bipolar
                 break;
 
             default: break;
@@ -181,7 +184,7 @@ public:
           else
             ShiftLeft(prob);
         }
- 
+
         // Send 8-bit scaled and quantized CV
         const int32_t note[2] = {
           Proportion(reg[0] & 0xff, 0xff, range_mod) + 64,
@@ -205,11 +208,14 @@ public:
               slew(Output[ch], HS::QuantizerLookup(qselect_mod[ch], note[1] + note_trans[1]));
               break;
             case MOD1: // 8-bit bi-polar proportioned CV
-              slew(Output[ch], Proportion( int(reg[0] & 0xff)-0x7f, 0x80, HEMISPHERE_MAX_CV) );
+            case MOD2: {
+              const int rnum = outmode[ch] - MOD1;
+              const uint32_t mask = (1u << min(len_mod, 8)) - 1;
+              slew(Output[ch],
+                  Proportion( int(reg[rnum] & mask) - (mask>>1), (mask>>1)+1, HEMISPHERE_MAX_CV)
+              );
               break;
-            case MOD2:
-              slew(Output[ch], Proportion( int(reg[1] & 0xff)-0x7f, 0x80, HEMISPHERE_MAX_CV) );
-              break;
+            }
             case TRIGPITCH1:
             case TRIGPITCH2: {
               const int rnum = outmode[ch] - TRIGPITCH1;
@@ -257,17 +263,11 @@ public:
     }
 
     void View() {
-        DrawSelector();
         DrawIndicator();
+        DrawSelector();
     }
 
-    void DrawFullScreen() {
-      HemisphereApplet::DrawFullScreen();
-      if (cursor >= CVMODE1 && cursor <= OUT_B) {
-        // this is an ugly hack, but it'll work lol
-        gfxCursor(19 - gfx_offset + 64*((cursor-CVMODE1)%2), 32 + 10*((cursor-CVMODE1)/2), 44);
-      }
-    }
+    // void DrawFullScreen() { }
     // void OnButtonPress() { }
 
     void AuxButton() {
@@ -276,7 +276,7 @@ public:
       case QUANT_B:
         HS::QuantizerEdit(qselect[cursor - QUANT_A]);
       default:
-        isEditing = false;
+        CancelEdit();
         break;
 
       case PROB:
@@ -308,9 +308,8 @@ public:
             break;
         case QUANT_A:
         case QUANT_B:
-            HS::qview = qselect[cursor - QUANT_A] =
+            qselect[cursor - QUANT_A] =
               constrain(qselect[cursor - QUANT_A] + direction, 0, QUANT_CHANNEL_COUNT - 1);
-            HS::PokePopup(QUANTIZER_POPUP);
             break;
         case RANGE:
             range = constrain(range + direction, 1, 32);
@@ -334,7 +333,7 @@ public:
         default: break;
         }
     }
-        
+
     uint64_t OnDataRequest() {
         uint64_t data = 0;
         Pack(data, PackLocation {0,7}, p);
@@ -390,7 +389,7 @@ protected:
     help[HELP_EXTRA2]  = "AuxBtn: Reverse/Lock";
     //                   "---------------------" <-- Extra text size guide
   }
-    
+
 private:
     int cursor; // TM2Cursor
 
@@ -400,7 +399,7 @@ private:
     uint32_t reg[2]; // 32-bit sequence registers
     uint32_t reg_snap[2]; // for resetting
     bool reset_active = false;
-    bool rotate_right = true;
+    bool rotate_right = false;
 
     // most recent output values
     int Output[2] = {0, 0};
@@ -577,8 +576,17 @@ private:
         switch ((TM2Cursor)cursor) {
             case LENGTH: gfxSpicyCursor(11, 23, 13); break;
             case PROB:   gfxSpicyCursor(35, 23, 19); break;
-            case QUANT_A:  gfxSpicyCursor(12, 33, 13); break;
-            case QUANT_B:  gfxSpicyCursor(39, 33, 13); break;
+            case QUANT_A:
+            case QUANT_B: {
+              const int ch = (cursor-QUANT_A);
+              gfxSpicyCursor(12 + 27 * ch, 33, 13);
+              gfxIcon(25 + 5 * ch, 25, ch ? RIGHT_ICON : LEFT_ICON);
+              if (EditMode()) {
+                gfxPrint(20, 35, HS::GetQuantEngine(qselect[ch]));
+              }
+              break;
+            }
+
             case RANGE:  gfxCursor(10, 43, 13); break;
             case SLEW:   gfxCursor(44, 43, 19); break;
 
@@ -618,4 +626,3 @@ private:
     }
 
 };
-

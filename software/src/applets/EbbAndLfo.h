@@ -1,5 +1,5 @@
 #include "../tideslite.h"
-#include "util/util_phase_extractor.h"
+#include "../util/util_phase_extractor.h"
 
 class EbbAndLfo : public HemisphereApplet {
 public:
@@ -96,13 +96,19 @@ public:
     }
 
     // check for rollover and stop for one-shot mode
-    if (phase < oldphase && oneshot_mode) {
-      phase = 0;
-      oneshot_active = false;
-      Out(0, 0);
-      Out(1, 0);
-      return;
+    if (phase < oldphase) {
+      eoa_reached = false;
+      if (oneshot_mode) {
+        phase = 0;
+        oneshot_active = false;
+        Out(0, 0);
+        Out(1, 0);
+        return;
+      }
+    } else {
+      eoa_reached = eoa_reached || (sample.flags & FLAG_EOA);
     }
+
 
     // COMPUTE
     int s = constrain(slope_mod, 0, 65535);
@@ -115,31 +121,41 @@ public:
                     level_mod / 1000);
         break;
       case BIPOLAR:
-#ifdef VOR
-        Out(ch, Proportion(sample.bipolar, 32767, 7680) * level_mod /
-                    1000); // hardcoded at 5V for Plum Audio
-#else
-        Out(ch, Proportion(sample.bipolar, 32767, HEMISPHERE_MAX_CV / 2) *
-                    level_mod / 1000);
-#endif
+      {
+        int outcv = Proportion(sample.bipolar, 32767, HEMISPHERE_MAX_CV) * level_mod / 1000;
+        if (OC::DAC::kOctaveZero == 0)
+            outcv = outcv / 2 + HEMISPHERE_CENTER_CV;
+        Out(ch, outcv);
+
         break;
+      }
       case EOA:
-        GateOut(ch, sample.flags & FLAG_EOA);
+        GateOut(ch, eoa_reached);
         break;
       case EOR:
-        GateOut(ch, sample.flags & FLAG_EOR);
+        GateOut(ch, !eoa_reached);
         break;
       }
     }
   }
 
-  void View() {
+  void DrawFullScreen() override {
+    DrawInterface(true);
+  }
+  void View() override {
+    DrawInterface(false);
+  }
+  void DrawInterface(bool fullscreen) {
+    const int x = (1-fullscreen)*gfx_offset;
+    const int w = (fullscreen+1)*64;
+    // waveform display
     ForEachChannel(ch) {
-      int h = 17;
+      const int h = 19;
+
       int bottom = 32 + (h + 1) * ch;
       int last = bottom;
-      for (int i = 0; i < 64; i++) {
-        ProcessSample(slope_mod, shape_mod, fold_mod, 0xffffffff / 64 * i,
+      for (int i = 0; i < w; i++) {
+        ProcessSample(slope_mod, shape_mod, fold_mod, 0xffffffff / w * i,
                       disp_sample);
         int next = 0;
         switch (output(ch)) {
@@ -158,14 +174,15 @@ public:
           break;
         }
         if (i > 0)
-          gfxLine(i - 1, last, i, next);
+          graphics.drawLine(x + i - 1, last, x + i, next);
         last = next;
       }
     }
 
     // position is first 6 bits of phase, which gives 0 through 63.
-    uint32_t p = phase >> 26;
-    gfxLine(p, 15, p, 50);
+    // fullscreen uses 7 bits, 0 to 127
+    uint32_t p = phase >> (26-fullscreen);
+    graphics.drawLine(x+p, 12, x+p, 52);
 
     const int param_y = 55;
     bool uses_cursor = false;
@@ -188,7 +205,7 @@ public:
           gfxPrint(-ratio + 1);
         }
       } else {
-        gfxPrintFreq(pitch);
+        gfxPrintFreqFromPitch(pitch);
       }
       gfxEndCursor(cursor == FREQUENCY);
 
@@ -386,6 +403,7 @@ private:
   bool oneshot_active = 0;
   bool clocked = 0;
   bool reset = 0;
+  bool eoa_reached = false;
 
   PhaseExtractor<> phase_extractor;
 
@@ -413,40 +431,4 @@ private:
 
   CV cv_type(int ch) { return (CV)((cv >> ((1 - ch) * 2)) & 0b11); }
 
-  void gfxPrintFreq(int16_t pitch) {
-    uint32_t num = ComputePhaseIncrement(pitch);
-    uint32_t denom = 0xffffffff / 16666;
-    bool swap = num < denom;
-    if (swap) {
-      uint32_t t = num;
-      num = denom;
-      denom = t;
-    }
-    int int_part = num / denom;
-    int digits = 0;
-    if (int_part < 10)
-      digits = 1;
-    else if (int_part < 100)
-      digits = 2;
-    else if (int_part < 1000)
-      digits = 3;
-    else
-      digits = 4;
-
-    gfxPrint(int_part);
-    gfxPrint(".");
-
-    num %= denom;
-    while (digits < 4) {
-      num *= 10;
-      gfxPrint(num / denom);
-      num %= denom;
-      digits++;
-    }
-    if (swap) {
-      gfxPrint("s");
-    } else {
-      gfxPrint("Hz");
-    }
-  }
 };

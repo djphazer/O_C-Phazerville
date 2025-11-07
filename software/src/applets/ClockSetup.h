@@ -24,7 +24,7 @@ using HS::clock_m;
 
 class ClockSetup : public HemisphereApplet {
 public:
-    static constexpr int SLIDEOUT_TIME = 100;
+    static constexpr int SLIDEOUT_TIME = HS::MENU_ANIMATION_TIME;
 
     enum ClockSetupCursor {
         PLAY_STOP,
@@ -60,30 +60,39 @@ public:
     // The ClockSetup controller handles MIDI Clock and Transport Start/Stop
     void Controller() {
         bool clock_sync = OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_1>();
+        bool midi_sync = false;
 
         // MIDI Clock is filtered to 2 PPQN
         if (frame.MIDIState.clock_q) {
             frame.MIDIState.clock_q = 0;
             clock_sync = 1;
+            midi_sync = 1;
+            clock_m.DisableMIDIOut();
         }
         if (frame.MIDIState.start_q) {
             frame.MIDIState.start_q = 0;
             clock_m.DisableMIDIOut();
             clock_m.Start();
+            OC::ui._Poke();
+            HS::PokePopup(HS::CLOCK_POPUP);
         }
         if (frame.MIDIState.stop_q) {
             frame.MIDIState.stop_q = 0;
             clock_m.Stop();
             clock_m.EnableMIDIOut();
+            HS::PokePopup(HS::CLOCK_POPUP);
         }
 
         // Paused means wait for clock-sync to start
-        if (clock_m.IsPaused() && clock_sync)
+        if (clock_m.IsPaused() && clock_sync) {
             clock_m.Start();
+            OC::ui._Poke();
+            HS::PokePopup(HS::CLOCK_POPUP);
+        }
 
         // Advance internal clock, sync to external clock / reset
         if (clock_m.IsRunning())
-            clock_m.SyncTrig( clock_sync );
+            clock_m.SyncTrig( clock_sync, midi_sync );
 
         // ------------ //
         if (clock_m.IsRunning() && clock_m.MIDITock()) {
@@ -101,6 +110,7 @@ public:
         */
 
         if (button_ticker) --button_ticker;
+        if (slide_anim) --slide_anim;
     }
 
     void DrawIndicator() {
@@ -117,6 +127,7 @@ public:
       }
     }
     void View() {
+      hemisphere = HS::GLOBAL_CURSOR;
       if (OC::CORE::ticks - view_tick > 1000) {
         slide_anim = SLIDEOUT_TIME;
       }
@@ -171,7 +182,7 @@ public:
         case TRIG2:
         case TRIG3:
         case TRIG4:
-            HS::trigger_mapping[cursor-TRIG1] = constrain( HS::trigger_mapping[cursor-TRIG1] + direction, 0, TRIGMAP_MAX);
+            HS::trigmap[cursor-TRIG1].ChangeSource(direction);
             break;
 
         case OUTSKIP1:
@@ -231,6 +242,8 @@ public:
         }
         Pack(data, PackLocation { 40, 5 }, clock_m.GetClockPPQN());
 
+        Pack(data, PackLocation { 45, 4 }, HS::screensaver_mode);
+
         return data;
     }
 
@@ -242,6 +255,8 @@ public:
             clock_m.SetMultiply(Unpack(data, PackLocation { 16+i*6, 6 })-32, i);
         }
         clock_m.SetClockPPQN(Unpack(data, PackLocation { 40, 5 }));
+
+        HS::screensaver_mode = Unpack(data, PackLocation { 45, 4 });
     }
 
     uint64_t GetGlobals() {
@@ -249,7 +264,7 @@ public:
         // only the first 16 bits are actually stored on T3.2
         Pack(data, PackLocation { 0, 1 }, HS::auto_save_enabled);
         Pack(data, PackLocation { 1, 1 }, HS::cursor_wrap);
-        Pack(data, PackLocation { 2, 2 }, HS::screensaver_mode);
+        //Pack(data, PackLocation { 2, 2 }, HS::screensaver_mode);
         Pack(data, PackLocation { 4, 7 }, HS::trig_length);
 
 #ifdef VOR
@@ -257,12 +272,14 @@ public:
         VBiasManager *v = v->get();
         Pack(data, PackLocation { 11, 2 }, v->GetState());
 #endif
+
+        Pack(data, PackLocation{13, 1}, (clock_m.IsRunning() || clock_m.IsPaused()));
         return data;
     }
     void SetGlobals(const uint64_t &data) {
         HS::auto_save_enabled = Unpack(data, PackLocation { 0, 1 });
         HS::cursor_wrap = Unpack(data, PackLocation { 1, 1 });
-        HS::screensaver_mode = Unpack(data, PackLocation { 2, 2 });
+        //HS::screensaver_mode = Unpack(data, PackLocation { 2, 2 });
         HS::trig_length = constrain( Unpack(data, PackLocation { 4, 7 }), 1, 127);
 
 #ifdef VOR
@@ -270,18 +287,14 @@ public:
         VBiasManager::VState bias_state = (VBiasManager::VState)Unpack(data, PackLocation { 11, 2 });
         v->SetState( bias_state );
 #endif
+
+        if (Unpack(data, PackLocation{13, 1}) && !clock_m.IsRunning())
+          clock_m.Start(true);
     }
 
 
 protected:
-    void SetHelp() {
-        //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "";
-        help[HEMISPHERE_HELP_CVS]      = "";
-        help[HEMISPHERE_HELP_OUTS]     = "";
-        help[HEMISPHERE_HELP_ENCODER]  = "";
-        //                               "------------------" <-- Size Guide
-    }
+    void SetHelp() { }
 
 private:
     int cursor; // ClockSetupCursor
@@ -322,7 +335,6 @@ private:
           gfxDottedLine(0, y+1, 127, y+1);
         }
 
-        --slide_anim;
         return;
       }
 
@@ -332,8 +344,13 @@ private:
         gfxDottedLine(0, 21, 127, 21);
         gfxLine(0, 22, 127, 22);
       } else {
+        // lower section
         graphics.clearRect(0, 51, 128, 13);
+        graphics.clearRect(0, 40, 50, 11); // label box
 
+        gfxLine(0, 41, 49, 41);
+        gfxLine(49, 41, 49, 51);
+        gfxPrint(0, 43, "TrigSkip");
         gfxLine(0, 52, 127, 52);
         gfxDottedLine(0, 53, 127, 53);
       }
@@ -380,7 +397,7 @@ private:
         for (int ch=0; ch<4; ++ch) {
             const int x = ch * 32;
             // Physical trigger input mappings
-            gfxPrint(1 + x, y, OC::Strings::trigger_input_names_none[ HS::trigger_mapping[ch] ] );
+            gfxPrint(1 + x, y, HS::trigmap[ch].InputName() );
             // Manual trigger buttons
             gfxIcon(4 + x, y + 10, (button_ticker && ch == cursor-BOOP1)?BTN_ON_ICON:BTN_OFF_ICON);
         }
@@ -389,7 +406,7 @@ private:
         // output trig-skip
         for (int ch=0; ch<4; ++ch) {
             const int x = ch * 32;
-            gfxPrint(1 + x, y, HS::frame.clockskip[ch]);
+            gfxPrint(1 + x + pad(100, HS::frame.clockskip[ch]), y, HS::frame.clockskip[ch]);
             gfxPrint("%");
         }
       }

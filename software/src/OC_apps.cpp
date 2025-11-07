@@ -33,6 +33,7 @@
 #include "src/drivers/FreqMeasure/OC_FreqMeasure.h"
 #include "util/util_pagestorage.h"
 #include "util/EEPROMStorage.h"
+#include "PhzConfig.h"
 #include "VBiasManager.h"
 #include "HSClockManager.h"
 
@@ -83,22 +84,27 @@ namespace menu = OC::menu;
   prefix ## _isr \
 }
 
+// The order here is not inconsequential.
+// Each app's Start() method is called in sequence.
+// For example, the default quantizer settings from Hemisphere
+// are overwritten when Calibr8or loads its settings
 static constexpr OC::App available_apps[] = {
   DECLARE_APP('S','E', "Setup / About", Settings),
-
-  #ifdef ENABLE_APP_CALIBR8OR
-  DECLARE_APP('C','8', "Calibr8or", Calibr8or),
-  #endif
-  #ifdef ENABLE_APP_SCENES
-  DECLARE_APP('S','X', "Scenes", ScenesApp),
-  #endif
 
 #ifndef NO_HEMISPHERE
   #ifdef ARDUINO_TEENSY41
   DECLARE_APP('Q','S', "Quadrants", QUADRANTS),
   #endif
-  DECLARE_APP('H','S', "Hemisphere", HEMISPHERE),
+  DECLARE_APP('H','S', "Hemispheres", HEMISPHERE),
 #endif
+
+  #ifdef ENABLE_APP_CALIBR8OR
+  DECLARE_APP('C','8', "Calibr8or", Calibr8or),
+  #endif
+  #ifdef ENABLE_APP_SCENES
+  DECLARE_APP('S','X', "Scenery", ScenesApp),
+  #endif
+
   #ifdef ENABLE_APP_ASR
   DECLARE_APP('A','S', "CopierMaschine", ASR),
   #endif
@@ -163,6 +169,8 @@ static constexpr OC::App available_apps[] = {
   #ifdef ENABLE_APP_REFERENCES
   DECLARE_APP('R','F', "References", REFS),
   #endif
+
+  // SysEx backup needs to be updated for T4.x
   DECLARE_APP('B','R', "Backup / Restore", Backup),
 };
 
@@ -181,16 +189,22 @@ struct GlobalSettings {
   uint32_t DAC_scaling;
   uint16_t current_app_id;
 
-  OC::Scale user_scales[OC::Scales::SCALE_USER_LAST];
-  OC::Pattern user_patterns[OC::Patterns::PATTERN_USER_ALL];
+#ifdef __IMXRT1062__
+#else
+  OC::Scale user_scales[OC::Scales::SCALE_USER_COUNT];
+  OC::Pattern user_patterns[OC::Patterns::PATTERN_USER_COUNT];
   // These both occupy 160 bytes
 #ifdef ENABLE_APP_CHORDS
-  OC::Chord user_chords[OC::Chords::CHORDS_USER_LAST];
+  OC::Chord user_chords[OC::Chords::CHORDS_USER_COUNT];
 #else
   HS::TuringMachine user_turing_machines[HS::TURING_MACHINE_COUNT];
 #endif
   HS::VOSegment user_waveforms[HS::VO_SEGMENT_COUNT];
   OC::Autotune_data auto_calibration_data[DAC_CHANNEL_LAST];
+
+  HS::QuantEngineSettings q_engines[QUANT_CHANNEL_COUNT];
+  HS::MIDIMapSettings midi_maps[MIDIMAP_MAX];
+#endif
 };
 
 // App settings are packed into a single blob of binary data; each app's chunk
@@ -211,11 +225,30 @@ struct AppData {
   size_t used;
 };
 
-typedef PageStorage<EEPROMStorage, EEPROM_GLOBALSETTINGS_START, EEPROM_GLOBALSETTINGS_END, GlobalSettings> GlobalSettingsStorage;
-typedef PageStorage<EEPROMStorage, EEPROM_APPDATA_START, EEPROM_APPDATA_END, AppData> AppDataStorage;
+using AppDataStorage = PageStorage<EEPROMStorage, EEPROM_APPDATA_START, EEPROM_APPDATA_END, AppData>;
 
 DMAMEM GlobalSettings global_settings;
+#ifdef __IMXRT1062__
+enum GlobalSettingsDataKeys : uint16_t {
+  // upper 8 bits of key, non-zero
+  METADATA_KEY        = 1 << 8, // selected app id, etc.
+  USER_SCALES_KEY     = 2 << 8,
+  SEQUENCES_KEY       = 3 << 8,
+  CHORDS_KEY          = 4 << 8,
+  TURING_MACHINES_KEY = 5 << 8,
+  WAVEFORMS_KEY       = 6 << 8,
+  AUTOCAL_KEY         = 7 << 8,
+
+  // lower 8 bits of key
+  SCALE_METADATA = 0xff,
+  SCALE_NOTEDATA = 0,
+};
+#else
+static_assert(sizeof(GlobalSettings) < (EEPROM_GLOBALSETTINGS_END - EEPROM_GLOBALSETTINGS_START), "GlobalSettings EEPROM size overflow");
+
+using GlobalSettingsStorage = PageStorage<EEPROMStorage, EEPROM_GLOBALSETTINGS_START, EEPROM_GLOBALSETTINGS_END, GlobalSettings>;
 DMAMEM GlobalSettingsStorage global_settings_storage;
+#endif
 
 DMAMEM AppData app_settings;
 DMAMEM AppDataStorage app_data_storage;
@@ -223,9 +256,97 @@ DMAMEM AppDataStorage app_data_storage;
 static constexpr int DEFAULT_APP_INDEX = 1;
 static const uint16_t DEFAULT_APP_ID = available_apps[DEFAULT_APP_INDEX].id;
 
+FLASHMEM
 void save_global_settings() {
-  SERIAL_PRINTLN("Save global settings");
+  SERIAL_PRINTLN("Saving global settings...");
 
+#ifdef __IMXRT1062__
+  //PhzConfig::clear_config();
+  PhzConfig::load_config(); // use default config file
+
+  // Metadata
+  uint64_t data = 0;
+  global_settings.DAC_scaling = OC::DAC::store_scaling();
+  Pack(data, PackLocation{0, 16}, global_settings.current_app_id);
+  Pack(data, PackLocation{16, 1}, global_settings.encoders_enable_acceleration);
+  // 15 bits empty...
+  Pack(data, PackLocation{32, 32}, global_settings.DAC_scaling);
+  PhzConfig::setValue(METADATA_KEY, data);
+
+  // User Scales
+  for (size_t i = 0; i < Scales::SCALE_USER_COUNT; ++i) {
+    PhzConfig::setValue(USER_SCALES_KEY | (i << 4) | SCALE_METADATA, uint64_t(user_scales[i].span) << 16 | user_scales[i].num_notes);
+    data = 0;
+    for (size_t nn = 0; nn < user_scales[i].num_notes; ++nn) {
+      Pack(data, PackLocation{(nn & 0x3)*16, 16}, (uint16_t)user_scales[i].notes[nn]);
+
+      // after every 4th value (64 bits), store and reset
+      if ((nn & 0x3) == 0x3) {
+        PhzConfig::setValue(USER_SCALES_KEY | (i << 4) | (SCALE_NOTEDATA + (nn >> 2)), data);
+        data = 0;
+      }
+    }
+  }
+
+  // User Patterns aka Sequences
+  for (size_t i = 0; i < Patterns::PATTERN_USER_COUNT; ++i) {
+    data = 0;
+    for (size_t step = 0; step < ARRAY_SIZE(Pattern::notes); ++step) {
+      Pack(data, PackLocation{(step & 0x3)*16, 16}, (uint16_t)user_patterns[i].notes[step]);
+      if ((step & 0x3) == 0x3) {
+        PhzConfig::setValue(SEQUENCES_KEY | (i << 3) | (step >> 2), data);
+        data = 0;
+      }
+    }
+  }
+
+  // User Chords (progression sequences from Acid Curds)
+  for (size_t i = 0; i < Chords::CHORDS_USER_COUNT; ++i) {
+    data = 0;
+    Pack(data, PackLocation{0, 8}, (uint8_t)user_chords[i].quality);
+    Pack(data, PackLocation{8, 8}, (uint8_t)user_chords[i].inversion);
+    Pack(data, PackLocation{16,8}, (uint8_t)user_chords[i].voicing);
+    Pack(data, PackLocation{24,8}, (uint8_t)user_chords[i].base_note);
+    Pack(data, PackLocation{32,8}, (uint8_t)user_chords[i].octave);
+    PhzConfig::setValue(CHORDS_KEY | i, data);
+  }
+
+  // User Turing Machines (for Enigma and friends)
+  for (size_t i = 0; i < HS::TURING_MACHINE_COUNT; ++i) {
+    data = 0;
+    Pack(data, PackLocation{0, 16}, HS::user_turing_machines[i].reg);
+    Pack(data, PackLocation{16, 8}, HS::user_turing_machines[i].len);
+    Pack(data, PackLocation{24, 1}, HS::user_turing_machines[i].favorite);
+    PhzConfig::setValue(TURING_MACHINES_KEY | i, data);
+  }
+
+  data = 0;
+  // User Waveform (custom VectorOsc shapes)
+  for (size_t i = 0; i < HS::VO_SEGMENT_COUNT; ++i) {
+    Pack(data, PackLocation{(i & 0x3) * 16, 16}, uint16_t(HS::user_waveforms[i].level) << 8 | HS::user_waveforms[i].time);
+
+    if ((i & 0x3) == 0x3) {
+      PhzConfig::setValue(WAVEFORMS_KEY | (i >> 2), data);
+      data = 0;
+    }
+  }
+
+  // Auto Calibration Data
+  for (size_t i = 0; i < DAC_CHANNEL_LAST; ++i) {
+    data = 0;
+    PhzConfig::setValue(AUTOCAL_KEY | (0xff - i), auto_calibration_data[i].use_auto_calibration_);
+
+    for (size_t oct = 0; oct < OCTAVES + 1; ++oct) {
+      Pack(data, PackLocation{(oct & 0x3) * 16, 16}, auto_calibration_data[i].auto_calibrated_octaves[oct]);
+      if ((oct & 0x3) == 0x3) {
+        PhzConfig::setValue(AUTOCAL_KEY | (i << 4) | (oct >> 2), data);
+        data = 0;
+      }
+    }
+  }
+
+  PhzConfig::save_config(); // save to default config file
+#else
   memcpy(global_settings.user_scales, OC::user_scales, sizeof(OC::user_scales));
   memcpy(global_settings.user_patterns, OC::user_patterns, sizeof(OC::user_patterns));
 #ifdef ENABLE_APP_CHORDS
@@ -238,8 +359,25 @@ void save_global_settings() {
   // scaling settings:
   global_settings.DAC_scaling = OC::DAC::store_scaling();
 
+  for (int i = 0; i < QUANT_CHANNEL_COUNT; ++i) {
+    global_settings.q_engines[i].scale = HS::q_engine[i].scale;
+    global_settings.q_engines[i].mask = HS::q_engine[i].mask;
+    global_settings.q_engines[i].octave = HS::q_engine[i].octave;
+    global_settings.q_engines[i].root_note = HS::q_engine[i].root_note;
+  }
+  for (int i = 0; i < MIDIMAP_MAX; ++i) {
+    global_settings.midi_maps[i].channel       = HS::frame.MIDIState.mapping[i].channel      ;
+    global_settings.midi_maps[i].dac_polyvoice = HS::frame.MIDIState.mapping[i].dac_polyvoice;
+    global_settings.midi_maps[i].function      = HS::frame.MIDIState.mapping[i].function     ;
+    global_settings.midi_maps[i].function_cc   = HS::frame.MIDIState.mapping[i].function_cc  ;
+    global_settings.midi_maps[i].transpose     = HS::frame.MIDIState.mapping[i].transpose    ;
+    global_settings.midi_maps[i].range_low     = HS::frame.MIDIState.mapping[i].range_low    ;
+    global_settings.midi_maps[i].range_high    = HS::frame.MIDIState.mapping[i].range_high   ;
+  }
+
   global_settings_storage.Save(global_settings);
   SERIAL_PRINTLN("Saved global settings: page_index %d", global_settings_storage.page_index());
+#endif
 }
 
 static constexpr size_t total_storage_size() {
@@ -254,7 +392,10 @@ static constexpr size_t total_storage_size() {
 static constexpr size_t totalsize = total_storage_size();
 static_assert(totalsize < OC::AppData::kAppDataSize, "EEPROM Allocation Exceeded");
 
+FLASHMEM
 void save_app_data() {
+  save_global_settings(); // yeah, why not
+
   SERIAL_PRINTLN("Save app data... (%u bytes available)", OC::AppData::kAppDataSize);
 
   app_settings.used = 0;
@@ -289,6 +430,7 @@ void save_app_data() {
   SERIAL_PRINTLN("Saved app settings in page_index %d", app_data_storage.page_index());
 }
 
+FLASHMEM
 void restore_app_data() {
   SERIAL_PRINTLN("Restoring app data from page_index %d, used=%u", app_data_storage.page_index(), app_settings.used);
 
@@ -337,6 +479,7 @@ void restore_app_data() {
 
 namespace apps {
 
+FLASHMEM
 void set_current_app(int index) {
   current_app = &available_apps[index];
   global_settings.current_app_id = current_app->id;
@@ -363,6 +506,7 @@ int index_of(uint16_t id) {
   return i;
 }
 
+FLASHMEM
 void Init(bool reset_settings) {
 
   Scales::Init();
@@ -371,11 +515,14 @@ void Init(bool reset_settings) {
   for (auto &app : available_apps)
     app.Init();
 
+  HS::frame.Init();
+
   global_settings.current_app_id = DEFAULT_APP_ID;
   global_settings.encoders_enable_acceleration = OC_ENCODERS_ENABLE_ACCELERATION_DEFAULT;
   global_settings.reserved0 = false;
   global_settings.reserved1 = false;
   global_settings.DAC_scaling = VOLTAGE_SCALING_1V_PER_OCT;
+  memset(HS::user_turing_machines, 0, sizeof(HS::user_turing_machines));
 
   if (reset_settings) {
     if (ui.ConfirmReset()) {
@@ -386,7 +533,11 @@ void Init(bool reset_settings) {
         *d++ = 0;
       SERIAL_PRINTLN("...done");
       SERIAL_PRINTLN("Skip settings, using defaults...");
+#ifdef __IMXRT1062__
+      PhzConfig::eraseFiles();
+#else
       global_settings_storage.Init();
+#endif
       app_data_storage.Init();
     } else {
       reset_settings = false;
@@ -394,6 +545,101 @@ void Init(bool reset_settings) {
   }
 
   if (!reset_settings) {
+#ifdef __IMXRT1062__
+    PhzConfig::load_config(); // use default config file
+
+    // Metadata
+    uint64_t data = 0;
+    if (PhzConfig::getValue(METADATA_KEY, data)) {
+      global_settings.current_app_id = Unpack(data, PackLocation{0, 16});
+      global_settings.encoders_enable_acceleration = Unpack(data, PackLocation{16, 1});
+      // 15 bits empty...
+      global_settings.DAC_scaling = Unpack(data, PackLocation{32, 32});
+      OC::DAC::restore_scaling(global_settings.DAC_scaling);
+
+      // User Scales
+      for (size_t i = 0; i < Scales::SCALE_USER_COUNT; ++i) {
+        if (!PhzConfig::getValue(USER_SCALES_KEY | (i << 4) | SCALE_METADATA, data))
+          break;
+
+        user_scales[i].span = (data >> 16) & 0xffff;
+        user_scales[i].num_notes = data & 0x00ff;
+
+        for (size_t nn = 0; nn < user_scales[i].num_notes; ++nn) {
+          // the first of every 4 values needs a new config chunk
+          if ((nn & 0x3) == 0x0) {
+            data = 0;
+            if (!PhzConfig::getValue(USER_SCALES_KEY | (i << 4) | (SCALE_NOTEDATA + (nn >> 2)), data))
+              break;
+          }
+          user_scales[i].notes[nn] = Unpack(data, PackLocation{(nn & 0x3)*16, 16});
+        }
+      }
+
+      // User Patterns aka Sequences
+      for (size_t i = 0; i < Patterns::PATTERN_USER_COUNT; ++i) {
+        for (size_t step = 0; step < ARRAY_SIZE(Pattern::notes); ++step) {
+          if ((step & 0x3) == 0x0) {
+            data = 0;
+            if (!PhzConfig::getValue(SEQUENCES_KEY | (i << 3) | (step >> 2), data))
+              break;
+          }
+          user_patterns[i].notes[step] = Unpack(data, PackLocation{(step & 0x3)*16, 16});
+        }
+      }
+
+      // User Chords (progression sequences from Acid Curds)
+      for (size_t i = 0; i < Chords::CHORDS_USER_COUNT; ++i) {
+        data = 0;
+        if (!PhzConfig::getValue(CHORDS_KEY | i, data))
+          break;
+        user_chords[i].quality = Unpack(data, PackLocation{0, 8});
+        user_chords[i].inversion = Unpack(data, PackLocation{8, 8});
+        user_chords[i].voicing = Unpack(data, PackLocation{16,8});
+        user_chords[i].base_note = Unpack(data, PackLocation{24,8});
+        user_chords[i].octave = Unpack(data, PackLocation{32,8});
+      }
+
+      // -- User Turing Machines (for Enigma and friends)
+      for (size_t i = 0; i < HS::TURING_MACHINE_COUNT; ++i) {
+        data = 0;
+        if (!PhzConfig::getValue(TURING_MACHINES_KEY | i, data))
+          break;
+        HS::user_turing_machines[i].reg = Unpack(data, PackLocation{0, 16});
+        HS::user_turing_machines[i].len = Unpack(data, PackLocation{16, 8});
+        HS::user_turing_machines[i].favorite = Unpack(data, PackLocation{24, 1});
+      }
+
+      // -- User Waveform (custom VectorOsc shapes)
+      for (size_t i = 0; i < HS::VO_SEGMENT_COUNT; ++i) {
+        if ((i & 0x3) == 0x0) {
+          data = 0;
+          if (!PhzConfig::getValue(WAVEFORMS_KEY | (i >> 2), data))
+            break;
+        }
+        uint16_t wavedata = Unpack(data, PackLocation{(i & 0x3) * 16, 16});
+        HS::user_waveforms[i].level = (wavedata >> 8) & 0xff;
+        HS::user_waveforms[i].time = wavedata & 0xff;
+      }
+
+      // -- Auto Calibration Data
+      for (size_t i = 0; i < DAC_CHANNEL_LAST; ++i) {
+        data = 0;
+        if (!PhzConfig::getValue(AUTOCAL_KEY | (0xff - i), data))
+          break;
+        auto_calibration_data[i].use_auto_calibration_ = data;
+        for (size_t oct = 0; oct < OCTAVES + 1; ++oct) {
+          if ((oct & 0x3) == 0x0) {
+            data = 0;
+            if (!PhzConfig::getValue(AUTOCAL_KEY | (i << 4) | (oct >> 2), data))
+              break;
+          }
+          auto_calibration_data[i].auto_calibrated_octaves[oct] = Unpack(data, PackLocation{(oct & 0x3) * 16, 16});
+        }
+      }
+    }
+
+#else
     SERIAL_PRINTLN("Load global settings: size: %u, PAGESIZE=%u, PAGES=%u, LENGTH=%u",
                   sizeof(GlobalSettings),
                   GlobalSettingsStorage::PAGESIZE,
@@ -418,8 +664,30 @@ void Init(bool reset_settings) {
       DAC::choose_calibration_data(); // either use default data, or auto_calibration_data
       DAC::restore_scaling(global_settings.DAC_scaling); // recover output scaling settings
       Scales::Validate();
-    }
 
+      // restore q_engines and midi_maps
+      for (int i = 0; i < QUANT_CHANNEL_COUNT; ++i) {
+        HS::q_engine[i].scale     = global_settings.q_engines[i].scale;
+        HS::q_engine[i].mask      = global_settings.q_engines[i].mask;
+        HS::q_engine[i].octave    = global_settings.q_engines[i].octave;
+        HS::q_engine[i].root_note = global_settings.q_engines[i].root_note;
+        HS::q_engine[i].Reconfig();
+      }
+      for (int i = 0; i < MIDIMAP_MAX; ++i) {
+        HS::frame.MIDIState.mapping[i].channel       = global_settings.midi_maps[i].channel      ;
+        HS::frame.MIDIState.mapping[i].dac_polyvoice = global_settings.midi_maps[i].dac_polyvoice;
+        HS::frame.MIDIState.mapping[i].function      = global_settings.midi_maps[i].function     ;
+        HS::frame.MIDIState.mapping[i].function_cc   = global_settings.midi_maps[i].function_cc  ;
+        HS::frame.MIDIState.mapping[i].transpose     = global_settings.midi_maps[i].transpose    ;
+        HS::frame.MIDIState.mapping[i].range_low     = global_settings.midi_maps[i].range_low    ;
+        HS::frame.MIDIState.mapping[i].range_high    = global_settings.midi_maps[i].range_high   ;
+      }
+      HS::frame.MIDIState.UpdateMidiChannelFilter();
+      HS::frame.MIDIState.UpdateMaxPolyphony();
+    }
+#endif
+
+    // old school EEPROM storage for legacy apps
     SERIAL_PRINTLN("Load app data: size is %u, PAGESIZE=%u, PAGES=%u, LENGTH=%u",
                   sizeof(AppData),
                   AppDataStorage::PAGESIZE,
@@ -433,10 +701,14 @@ void Init(bool reset_settings) {
     }
   }
 
+  // Validate user_turing_machines
+  for (int i = 0; i < HS::TURING_MACHINE_COUNT; ++i) {
+    HS::user_turing_machines[i].Validate();
+  }
+
   int current_app_index = apps::index_of(global_settings.current_app_id);
   if (current_app_index < 0 || current_app_index >= NUM_AVAILABLE_APPS) {
     SERIAL_PRINTLN("App id %02x not found, using default!", global_settings.current_app_id);
-    global_settings.current_app_id = DEFAULT_APP_INDEX;
     current_app_index = DEFAULT_APP_INDEX;
   }
 
@@ -451,37 +723,6 @@ void Init(bool reset_settings) {
 
 }; // namespace apps
 
-void draw_app_menu(const menu::ScreenCursor<5> &cursor) {
-  GRAPHICS_BEGIN_FRAME(true);
-
-  if (global_settings.encoders_enable_acceleration)
-    graphics.drawBitmap8(120, 1, 4, bitmap_indicator_4x8);
-
-  menu::SettingsListItem item;
-  item.x = menu::kIndentDx + 8;
-  item.y = (64 - (5 * menu::kMenuLineH)) / 2;
-
-  for (int current = cursor.first_visible();
-       current <= cursor.last_visible();
-       ++current, item.y += menu::kMenuLineH) {
-    item.selected = current == cursor.cursor_pos();
-    item.SetPrintPos();
-    graphics.movePrintPos(weegfx::kFixedFontW, 0);
-    graphics.print(available_apps[current].name);
-
-    if (global_settings.current_app_id == available_apps[current].id)
-      graphics.drawBitmap8(0, item.y + 1, 8, ZAP_ICON);
-
-    item.DrawCustom();
-  }
-
-#ifdef VOR
-  VBiasManager *vbias_m = vbias_m->get();
-  vbias_m->DrawPopupPerhaps();
-#endif
-
-  GRAPHICS_END_FRAME();
-}
 
 void draw_save_message(uint8_t c) {
   GRAPHICS_BEGIN_FRAME(true);
@@ -492,20 +733,54 @@ void draw_save_message(uint8_t c) {
   GRAPHICS_END_FRAME();
 }
 
-void Ui::AppSettings() {
+FLASHMEM
+bool Ui::AppSettings(bool drawmenu) {
+  static menu::ScreenCursor<5> cursor;
+  static bool change_app = false;
+  static bool save = false;
+  static bool opened = false;
 
-  SetButtonIgnoreMask();
+  // --- state change: entering App Menu
+  if (!opened) {
+    cursor.Init(0, NUM_AVAILABLE_APPS - 1);
+    cursor.Scroll(apps::index_of(global_settings.current_app_id));
+    opened = true;
+  }
 
-  apps::current_app->HandleAppEvent(APP_EVENT_SUSPEND);
+  // View - graphics
+  if (drawmenu) {
+    // assumes this is called from within a graphics frame context
+    if (global_settings.encoders_enable_acceleration)
+      graphics.drawBitmap8(120, 1, 4, bitmap_indicator_4x8);
 
-  menu::ScreenCursor<5> cursor;
-  cursor.Init(0, NUM_AVAILABLE_APPS - 1);
-  cursor.Scroll(apps::index_of(global_settings.current_app_id));
+    menu::SettingsListItem item;
+    item.x = menu::kIndentDx + 8;
+    item.y = (64 - (5 * menu::kMenuLineH)) / 2;
 
-  bool change_app = false;
-  bool save = false;
-  while (!change_app && idle_time() < APP_SELECTION_TIMEOUT_MS) {
+    for (int current = cursor.first_visible();
+         current <= cursor.last_visible();
+         ++current, item.y += menu::kMenuLineH) {
+      item.selected = current == cursor.cursor_pos();
+      item.SetPrintPos();
+      graphics.movePrintPos(weegfx::kFixedFontW, 0);
+      graphics.print(available_apps[current].name);
 
+      if (global_settings.current_app_id == available_apps[current].id)
+        graphics.drawBitmap8(0, item.y + 1, 8, ZAP_ICON);
+
+      item.DrawCustom();
+    }
+
+#ifdef VOR
+    VBiasManager *vbias_m = vbias_m->get();
+    vbias_m->DrawPopupPerhaps();
+#endif
+
+    return true;
+  }
+
+  // UI - event handling
+  if (!change_app && idle_time() < APP_SELECTION_TIMEOUT_MS) {
     while (event_queue_.available()) {
       UI::Event event = event_queue_.PullEvent();
       if (IgnoreEvent(event))
@@ -547,13 +822,14 @@ void Ui::AppSettings() {
       }
     }
 
-    draw_app_menu(cursor);
-    delay(2); // VOR calibration hack
+    return true;
   }
-
+  // else... idle time expired, or an app was selected via UI
+  // cleanup and exit
   event_queue_.Flush();
   event_queue_.Poke();
 
+  // --- state change: exiting App menu
   CORE::app_isr_enabled = false;
   delay(1);
 
@@ -562,13 +838,14 @@ void Ui::AppSettings() {
     FreqMeasure.end();
     OC::DigitalInputs::reInit();
     if (save) {
-      save_global_settings();
       save_app_data();
       // draw message:
       int cnt = 0;
       while(idle_time() < SETTINGS_SAVE_TIMEOUT_MS)
         draw_save_message((cnt++) >> 4);
+      save = false;
     }
+    change_app = false;
   }
 
   OC::ui.encoders_enable_acceleration(global_settings.encoders_enable_acceleration);
@@ -576,8 +853,12 @@ void Ui::AppSettings() {
   // Restore state
   apps::current_app->HandleAppEvent(APP_EVENT_RESUME);
   CORE::app_isr_enabled = true;
+
+  opened = false;
+  return false; // close menu
 }
 
+FLASHMEM
 bool Ui::ConfirmReset() {
 
   SetButtonIgnoreMask();
@@ -620,9 +901,10 @@ bool Ui::ConfirmReset() {
   return confirm;
 }
 
+FLASHMEM
 void start_calibration() {
   OC::apps::set_current_app(0); // switch to Settings app
-  Settings_instance.Calibration(); // Set up calibration mode in Settings app
+  Settings_instance.StartCalibration(); // Set up calibration mode in Settings app
 }
 
 }; // namespace OC

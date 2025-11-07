@@ -20,7 +20,7 @@ for item in flags:
         custom_defines += " -DNLM_cardOC"
     if f.startswith('NLM_2OC_L'):
         custom_defines += " -DNORTHERNLIGHT_2OC_LEFTSIDE"
-    if f.startswith('CALIBR8'):
+    if f.startswith('CALIBR'):
         custom_defines += " -DENABLE_APP_CALIBR8OR"
     if f.startswith('SCENE'):
         custom_defines += " -DENABLE_APP_SCENES"

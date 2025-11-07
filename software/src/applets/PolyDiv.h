@@ -18,8 +18,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "../HSProbLoopLinker.h"
-
 class PolyDiv : public HemisphereApplet {
 public:
 
@@ -69,7 +67,6 @@ public:
     }
     void TrigOut(int ch) {
         ClockOut(ch);
-        loop_linker->Trigger(ch);
     }
     bool Enabled(int ch, int div_id) {
         return (div_enabled >> (ch*4 + div_id)) & 0x01;
@@ -79,8 +76,6 @@ public:
     }
 
     void Controller() {
-        loop_linker->RegisterDiv(hemisphere);
-
         // reset
         if (Clock(1)) {
             Reset();
@@ -182,8 +177,6 @@ private:
     int pulse_animation[4] = {0,0,0,0};
     uint8_t div_enabled = 0b00100001; // bitmask for enabling dividers per output
                          // bits 0-3 for A, bits 4-7 for B
-
-    ProbLoopLinker *loop_linker = loop_linker->get();
 
     void DrawInterface() {
       char outlabel[] = { (char)('A' + io_offset), ' ',  (char)('B' + io_offset), '\0' };

@@ -49,6 +49,9 @@ void Quantizer::Init() {
   transpose_ = 0;
   previous_boundary_ = 0;
   next_boundary_ = 0;
+  octave_constraint_ = OCTAVE_CONSTRAINT_OFF;
+  octave_constraint_min_ = 0;
+  octave_constraint_max_ = 0;
 }
 
 int32_t Quantizer::Process(int32_t pitch, int32_t root, int32_t transpose) {
@@ -112,6 +115,9 @@ int32_t Quantizer::Process(int32_t pitch, int32_t root, int32_t transpose) {
       octave--;
     }
 
+    // apply octave constraint
+    octave = ConstrainOctave(octave);
+
     // set final values
     note_number_ = (octave + 2) * num_notes_ + q + 64; // 64 is C2
     codeword_ = notes_[q] + octave * span_;
@@ -136,7 +142,19 @@ int32_t Quantizer::Lookup(int32_t index) const {
     octave--;
     rel_ix += num_notes_;
   }
+
+  // apply octave constraint
+  octave = ConstrainOctave(octave);
+
   int32_t pitch = notes_[rel_ix] + octave * span_;
   return pitch;
 }
+
+int16_t Quantizer::ConstrainOctave(int16_t octave) const {
+  if (octave_constraint_) {
+    CONSTRAIN(octave, octave_constraint_min_, octave_constraint_max_);
+  }
+  return octave;
+}
+
 }  // namespace braids

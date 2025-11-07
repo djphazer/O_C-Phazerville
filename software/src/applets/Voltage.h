@@ -18,10 +18,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#define VOLTAGE_INCREMENTS 128
 
 class Voltage : public HemisphereApplet {
 public:
+
+  static constexpr int VOLTAGE_INCREMENTS = 128;
+  #define VOLTAGE_MIN (HEMISPHERE_MIN_CV / VOLTAGE_INCREMENTS)
+  #define VOLTAGE_MAX (HEMISPHERE_MAX_CV / VOLTAGE_INCREMENTS)
 
     const char* applet_name() {
         return "Voltage";
@@ -29,8 +32,8 @@ public:
     const uint8_t* applet_icon() { return PhzIcons::voltage; }
 
     void Start() {
-        voltage[0] = (5 * (12 << 7)) / VOLTAGE_INCREMENTS; // 5V
-        voltage[1] = (-3 * (12 << 7)) / VOLTAGE_INCREMENTS; // -3V
+        voltage[0] = VOLTAGE_MAX;
+        voltage[1] = VOLTAGE_MIN;
         gate[0] = 0;
         gate[1] = 0;
     }
@@ -66,14 +69,12 @@ public:
         uint8_t ch = cursor / 2;
         if (cursor == 0 || cursor == 2) {
             // Change voltage
-            int min = -HEMISPHERE_MAX_CV / VOLTAGE_INCREMENTS;
-            int max = HEMISPHERE_MAX_CV / VOLTAGE_INCREMENTS;
-            voltage[ch] = constrain(voltage[ch] + direction, min, max);
+            voltage[ch] = constrain(voltage[ch] + direction, VOLTAGE_MIN, VOLTAGE_MAX);
         } else {
             gate[ch] = 1 - gate[ch];
         }
     }
-        
+
     uint64_t OnDataRequest() {
         uint64_t data = 0;
         Pack(data, PackLocation {0,9}, voltage[0] + 256);
@@ -88,6 +89,9 @@ public:
         voltage[1] = Unpack(data, PackLocation {10,9}) - 256;
         gate[0] = Unpack(data, PackLocation {19,1});
         gate[1] = Unpack(data, PackLocation {20,1});
+
+        CONSTRAIN(voltage[0], VOLTAGE_MIN, VOLTAGE_MAX);
+        CONSTRAIN(voltage[1], VOLTAGE_MIN, VOLTAGE_MAX);
     }
 
 protected:
@@ -103,15 +107,15 @@ protected:
         help[HELP_EXTRA2] = "";
        //                   "---------------------" <-- Extra text size guide
     }
-    
+
 private:
     int cursor;
     bool view[2];
-    
+
     // Settings
     int voltage[2];
     bool gate[2]; // 0 = Normally on, gate turns off, 1= Normally off, gate turns on
-    
+
     void DrawInterface() {
         ForEachChannel(ch)
         {

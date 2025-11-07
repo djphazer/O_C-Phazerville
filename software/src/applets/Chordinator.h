@@ -88,7 +88,7 @@ public:
 
   void OnButtonPress() {
     if (cursor < 2) {
-      isEditing = !isEditing;
+      CursorToggle();
     } else {
       chord_mask ^= 1 << (cursor - 2);
       update_chord_quantizer();
@@ -96,7 +96,7 @@ public:
   }
 
   void OnEncoderMove(int direction) {
-    if (!isEditing) {
+    if (!EditMode()) {
       MoveCursor(cursor, direction, 1 + int(active_scale.num_notes));
       return;
     }

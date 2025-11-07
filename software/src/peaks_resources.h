@@ -40,7 +40,7 @@
 
 namespace peaks {
 
-typedef uint8_t ResourceId;
+using ResourceId = uint8_t;
 
 extern const char* string_table[];
 

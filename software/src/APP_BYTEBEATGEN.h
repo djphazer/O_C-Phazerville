@@ -246,7 +246,7 @@ public:
   }
   // end conditional menu items infrastructure
 
-  inline void apply_cv_mapping(ByteBeatSettings cv_setting, const int32_t cvs[ADC_CHANNEL_LAST], int32_t segments[kMaxByteBeatParameters]) {
+  inline void apply_cv_mapping(ByteBeatSettings cv_setting, const int32_t cvs[4], int32_t segments[kMaxByteBeatParameters]) {
     int mapping = values_[cv_setting];
     uint8_t bytebeat_cv_rshift = 12;
     switch (mapping) {
@@ -272,7 +272,7 @@ public:
      segments[mapping - BYTEBEAT_CV_MAPPING_FIRST] += (cvs[cv_setting - BYTEBEAT_SETTING_CV1] * 65536) >> bytebeat_cv_rshift;
   }
 
-  void Update(uint32_t triggers, const int32_t cvs[ADC_CHANNEL_LAST], DAC_CHANNEL dac_channel) {
+  void Update(uint32_t triggers, const int32_t cvs[4], DAC_CHANNEL dac_channel) {
 
     int32_t s[kMaxByteBeatParameters];
     s[0] = SCALE8_16(static_cast<int32_t>(get_equation() << 4));
@@ -372,10 +372,17 @@ SETTINGS_DECLARE(ByteBeat, BYTEBEAT_SETTING_LAST) {
   { 255, 0, 255, "Loop end", NULL, settings::STORAGE_TYPE_U8 },
   { OC::DIGITAL_INPUT_1, OC::DIGITAL_INPUT_1, OC::DIGITAL_INPUT_4, "Trigger input", OC::Strings::trigger_input_names, settings::STORAGE_TYPE_U4 },
   { 0, 0, 1, "Step mode", OC::Strings::no_yes, settings::STORAGE_TYPE_U4 },
+#ifdef ARDUINO_TEENSY41
+  { BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_LAST - 1, "CV5 -> ", bytebeat_cv_mapping_names, settings::STORAGE_TYPE_U4 },
+  { BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_LAST - 1, "CV6 -> ", bytebeat_cv_mapping_names, settings::STORAGE_TYPE_U4 },
+  { BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_LAST - 1, "CV7 -> ", bytebeat_cv_mapping_names, settings::STORAGE_TYPE_U4 },
+  { BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_LAST - 1, "CV8 -> ", bytebeat_cv_mapping_names, settings::STORAGE_TYPE_U4 },
+#else
   { BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_LAST - 1, "CV1 -> ", bytebeat_cv_mapping_names, settings::STORAGE_TYPE_U4 },
   { BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_LAST - 1, "CV2 -> ", bytebeat_cv_mapping_names, settings::STORAGE_TYPE_U4 },
   { BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_LAST - 1, "CV3 -> ", bytebeat_cv_mapping_names, settings::STORAGE_TYPE_U4 },
   { BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_NONE, BYTEBEAT_CV_MAPPING_LAST - 1, "CV4 -> ", bytebeat_cv_mapping_names, settings::STORAGE_TYPE_U4 },
+#endif
 };
 
 class QuadByteBeats {
@@ -414,7 +421,7 @@ public:
     cv4.push(OC::ADC::value<ADC_CHANNEL_4>());
 #endif
 
-    const int32_t cvs[ADC_CHANNEL_LAST] = { cv1.value(), cv2.value(), cv3.value(), cv4.value() };
+    const int32_t cvs[4] = { cv1.value(), cv2.value(), cv3.value(), cv4.value() };
     uint32_t triggers = OC::DigitalInputs::clocked();
 
     bytebeats_[0].Update(triggers, cvs, DAC_CHANNEL_A);

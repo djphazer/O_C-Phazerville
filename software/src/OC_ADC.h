@@ -11,15 +11,14 @@
 // If enabled, use an interrupt to track DMA completion; otherwise use polling
 //#define OC_ADC_ENABLE_DMA_INTERRUPT
 
-typedef int ADC_CHANNEL;
+using ADC_CHANNEL = int;
 
 extern ADC_CHANNEL ADC_CHANNEL_1, ADC_CHANNEL_2, ADC_CHANNEL_3, ADC_CHANNEL_4;
 #if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
 extern ADC_CHANNEL ADC_CHANNEL_5, ADC_CHANNEL_6, ADC_CHANNEL_7, ADC_CHANNEL_8;
-static constexpr int ADC_CHANNEL_LAST = 8;
-#else
-static constexpr int ADC_CHANNEL_LAST = 4;
 #endif
+
+static constexpr int ADC_CHANNEL_LAST = ADC_CHANNEL_COUNT;
 
 #define DMA_BUF_SIZE 16
 #define DMA_NUM_CH 4
@@ -44,7 +43,7 @@ public:
 
 
   struct CalibrationData {
-    uint16_t offset[ADC_CHANNEL_LAST];
+    uint16_t offset[ADC_CHANNEL_COUNT];
     uint16_t pitch_cv_scale;
     int16_t pitch_cv_offset;
   };
@@ -105,8 +104,8 @@ private:
   static size_t scan_channel_;
   static CalibrationData *calibration_data_;
 
-  static uint32_t raw_[ADC_CHANNEL_LAST];
-  static uint32_t smoothed_[ADC_CHANNEL_LAST];
+  static uint32_t raw_[ADC_CHANNEL_COUNT];
+  static uint32_t smoothed_[ADC_CHANNEL_COUNT];
 
   /*  
    *   below: channel ids for the ADCx_SCA register: we have 4 inputs

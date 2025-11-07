@@ -46,14 +46,17 @@ public:
         loop_index = 0;
         loop_step = 0;
         skip_steps = 0;
+        bypass_loop = false;
         ForEachChannel(ch) {
             GateOut(ch, false);
         }
     }
+    void Unload() {
+        loop_linker.UnloadDiv(hemisphere);
+    };
 
     void Controller() {
-        loop_linker->RegisterDiv(hemisphere);
-
+        loop_linker.RegisterDiv(hemisphere);
         // CV 1 control over loop length
         loop_length_mod = loop_length;
         if (DetentedIn(0)) {
@@ -61,7 +64,7 @@ public:
             // TODO: regenerate if changing from 0?
         }
 
-        loop_linker->SetLooping(loop_length_mod > 0);
+        loop_linker.SetLooping(loop_length_mod > 0 && !bypass_loop);
 
         // reset
         if (Clock(1)) {
@@ -74,16 +77,19 @@ public:
         if (Clock(0)) {
             int reseed = DetentedIn(1);
             // trigger reseed if CV2 is > 2.5v
-            if (reseed > (HEMISPHERE_MAX_CV >> 1) && !reseed_high) {
-                GenerateLoop(false);
-                loop_linker->Reseed();
+            if (reseed > (5*ONE_OCTAVE >> 1) && !reseed_high) {
+                GenerateLoop(true, false);
+                loop_linker.TriggerRegeneration();
                 reseed_high = true;
                 reseed_animation = HEMISPHERE_PULSE_ANIMATION_TIME_LONG;
             }
 
-            if (reseed < (HEMISPHERE_MAX_CV >> 1) && reseed_high) {
+            if (reseed < (5*ONE_OCTAVE >> 1) && reseed_high) {
                 reseed_high = false;
             }
+
+            // bypass the loop if CV2 is > -2.5v
+            bypass_loop = (reseed < -(5*ONE_OCTAVE >> 1));
 
             // reset loop
             if (loop_length_mod > 0 && loop_step >= loop_length_mod) {
@@ -93,7 +99,7 @@ public:
                 reset_animation = HEMISPHERE_PULSE_ANIMATION_TIME_LONG;
             } 
 
-            loop_linker->SetLoopStep(loop_index);
+            loop_linker.SetLoopStep(loop_index);
 
             // continue with active division
             if (--skip_steps > 0) {
@@ -101,14 +107,16 @@ public:
                     loop_step++;
                 }
                 ClockOut(1);
-                loop_linker->Trigger(1);
+                loop_linker.Trigger(1);
                 return;
             }
 
-            // get next weighted div or next div from loop
+            // always advance the loop if looping is active
             if (loop_length_mod > 0) {
                 skip_steps = GetNextLoopDiv();
-            } else {
+            } 
+            // get a random div if loop is not active or if loop is in bypass, this might replace the value above
+            if (loop_length_mod == 0 || bypass_loop) {
                 skip_steps = GetNextWeightedDiv();
             }
 
@@ -118,7 +126,7 @@ public:
             }
 
             ClockOut(0);
-            loop_linker->Trigger(0);
+            loop_linker.Trigger(0);
             pulse_animation = HEMISPHERE_PULSE_ANIMATION_TIME;
         }
 
@@ -155,7 +163,8 @@ public:
             loop_length = constrain(loop_length + direction, 0, MAX_LOOP_LENGTH);
             if (old == 0 && loop_length > 0) {
                 // seed loop
-                GenerateLoop(true);
+                GenerateLoop(true, true);
+                loop_linker.TriggerRegeneration();
             }
             break;
         }
@@ -163,7 +172,7 @@ public:
         }
 
         if (cursor < LOOP_LENGTH && loop_length > 0) {
-          GenerateLoop(false);
+          GenerateLoop(false, false);
         }
     }
         
@@ -175,6 +184,7 @@ public:
         Pack(data, PackLocation {8,4}, weight_4); 
         Pack(data, PackLocation {12,4}, weight_8); 
         Pack(data, PackLocation {16,8}, loop_length);
+        Pack(data, PackLocation {24,16}, loop_linker.GetSeed());
         return data;
     }
 
@@ -185,9 +195,10 @@ public:
         weight_4 = Unpack(data, PackLocation {8,4});
         weight_8 = Unpack(data, PackLocation {12,4});
         loop_length = Unpack(data, PackLocation {16,8});
+        loop_linker.SetSeed(Unpack(data, PackLocation {24, 16}));
         if (loop_length > 0) {
             // seed loop
-            GenerateLoop(true);
+            GenerateLoop(false, true);
         }
     }
 
@@ -217,13 +228,14 @@ private:
     int loop_step;
     // used to keep track of reseed cv inputs so it only reseeds on rising edge
     bool reseed_high;
+    bool bypass_loop;
 
     int skip_steps;
     int pulse_animation = 0;
     int reseed_animation = 0;
     int reset_animation = 0;
 
-    ProbLoopLinker *loop_linker = loop_linker->get();
+    ProbLoopLinker &loop_linker = ProbLoopLinker::get();
 
     // pointer arrays that make loops easier
     const int *weights[4] = {&weight_1, &weight_2, &weight_4, &weight_8};
@@ -277,7 +289,7 @@ private:
         return 0;
     }
 
-    void GenerateLoop(bool restart) {
+    void GenerateLoop(bool reseed, bool restart) {
         memset(loop, 0, sizeof(loop)); // reset loop
         if (restart) {
             loop_step = 0;
@@ -285,6 +297,16 @@ private:
         }
         int index = 0;
         int counter = 0;
+        if (reseed) {
+            randomSeed(micros());
+            loop_linker.SetSeed(random(0, 65535)); // 16 bits
+        }
+        int full_seed = (loop_linker.GetSeed() << 16) |
+                        (weight_1 << 12) |
+                        (weight_2 << 8) |
+                        (weight_4 << 4) |
+                        weight_8;
+        randomSeed(full_seed);
         while (counter < MAX_LOOP_LENGTH) {
             int div = GetNextWeightedDiv();
             if (div == 0) {

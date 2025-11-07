@@ -9,6 +9,7 @@ namespace OC {
     const int AUTOTUNE::NUM_DAC_CHANNELS = DAC_CHANNEL_LAST;
 
     /*static*/
+    FLASHMEM
     void AUTOTUNE::Init() {
       for (size_t i = 0; i < DAC_CHANNEL_LAST; i++)
         memcpy(&auto_calibration_data[i], &OC::autotune_data_default[0], sizeof(Autotune_data));

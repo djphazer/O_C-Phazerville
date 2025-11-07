@@ -26,7 +26,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-typedef int note_t;
+using note_t = int;
 
 enum EMode {
   MODE_MAJOR

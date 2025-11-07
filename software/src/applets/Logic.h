@@ -63,7 +63,7 @@ public:
                 // The last selection puts the index under CV control
                 int cv = In(ch);
                 if (cv < 0) cv = -cv; // So that CV input is bipolar (for use with LFOs, etc.)
-                idx = constrain(ProportionCV(cv, 6), 0, 5);
+                idx = constrain(ProportionCV(cv, 6, HEMISPHERE_MAX_INPUT_CV), 0, 5);
             }
             result[ch] = logic_gate[idx](s1, s2);
             source[ch] = idx; // In case it comes from CV, need to display the right icon

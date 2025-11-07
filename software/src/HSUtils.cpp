@@ -1,63 +1,79 @@
 #include <Arduino.h>
 #include "OC_core.h"
-#include "HemisphereApplet.h"
+#include "tideslite.h"
+#include "OC_gpio.h"
 #include "HSUtils.h"
+#include "HSIOFrame.h"
 
 #ifdef ARDUINO_TEENSY41
-#include "AudioSetup.h"
+#include "SD.h"
 #endif
+
+const int ProportionCV(const int cv_value, const int max_pixels, const int max_cv) {
+    int prop = constrain(Proportion(cv_value, max_cv, max_pixels), -max_pixels, max_pixels);
+    return prop;
+}
 
 namespace HS {
 
   uint32_t popup_tick; // for button feedback
   PopupType popup_type = MENU_POPUP;
-  uint8_t qview = 0; // which quantizer's setting is shown in popup
   int q_edit = 0; // edit cursor for quantizer popup, 0 = not editing
+  uint8_t qview = 0; // which quantizer's setting is shown in popup
+  ErrMsgIndex msg_idx;
 
   OC::SemitoneQuantizer input_quant[ADC_CHANNEL_LAST];
 
-  braids::Quantizer quantizer[QUANT_CHANNEL_COUNT]; // global shared quantizers
-  int quant_scale[QUANT_CHANNEL_COUNT];
-  int8_t root_note[QUANT_CHANNEL_COUNT];
-  int8_t q_octave[QUANT_CHANNEL_COUNT];
-  uint16_t q_mask[QUANT_CHANNEL_COUNT];
+  // global shared quantizers
+  QuantEngine q_engine[QUANT_CHANNEL_COUNT];
 
   // for Beat Sync'd octave or key switching
   int next_ch = -1;
   int8_t next_octave, next_root_note;
 
-  int octave_max = 5;
+#if defined(ARDUINO_TEENSY41) || defined(VOR)
+  int octave_max = 6;
+#endif
 
   bool cursor_wrap = 0;
   bool auto_save_enabled = false;
-#ifdef ARDUINO_TEENSY41
-  int trigger_mapping[] = { 1, 2, 3, 4, 1, 2, 3, 4 };
-  int cvmapping[] = { 5, 6, 7, 8, 5, 6, 7, 8 };
-#else
-  int trigger_mapping[] = { 1, 2, 3, 4 };
-  int cvmapping[] = { 1, 2, 3, 4 };
-#endif
+  DigitalInputMap trigmap[ADC_CHANNEL_LAST];
+  CVInputMap cvmap[ADC_CHANNEL_LAST];
   uint8_t trig_length = 10; // in ms, multiplier for HEMISPHERE_CLOCK_TICKS
-  uint8_t screensaver_mode = 3; // 0 = blank, 1 = Meters, 2 = Scope/Zaps, 3 = Zips/Stars
+  uint8_t screensaver_mode = SCREEN_STARS; // ScreensaverMode
+  const char * const ssmodes[SCREENSAVER_MODE_COUNT] = {
+    "[blank]",
+    "Meters", "Scope",
+    "Zaps", "Stars", "Zips",
+  };
 
+  OC::menu::ScreenCursor<5> showhide_cursor;
+
+  FLASHMEM
   void Init() {
-    for (int i = 0; i < ADC_CHANNEL_LAST; ++i)
-      input_quant[i].Init();
+    for (auto &iq : input_quant)
+      iq.Init();
 
-    for (int i = 0; i < QUANT_CHANNEL_COUNT; ++i)
-      quantizer[i].Init();
+    for (auto &q : q_engine)
+      q.quantizer.Init();
+
+    for (int i = 0; i < APPLET_SLOTS * 2; ++i) {
+      trigmap[i].source = (i%4) + 1;
+      cvmap[i].source = i + 1;
+      clock_m.SetMultiply(0, i);
+    }
   }
 
-
-  void PokePopup(PopupType pop) {
+  void PokePopup(PopupType pop, ErrMsgIndex err) {
+    msg_idx = err;
     popup_type = pop;
     popup_tick = OC::CORE::ticks;
   }
 
   void ProcessBeatSync() {
     if (next_ch > -1) {
-      q_octave[next_ch] = next_octave;
-      root_note[next_ch] = next_root_note;
+      q_engine[next_ch].octave = next_octave;
+      q_engine[next_ch].root_note = next_root_note;
       next_ch = -1;
     }
   }
@@ -69,45 +85,44 @@ namespace HS {
   }
 
   // --- Quantizer helpers
+  QuantEngine& GetQuantEngine(int ch) {
+    return q_engine[ch];
+  }
   int GetLatestNoteNumber(int ch) {
-    return quantizer[ch].GetLatestNoteNumber();
+    return q_engine[ch].quantizer.GetLatestNoteNumber();
   }
   int Quantize(int ch, int cv, int root, int transpose) {
-    if (root == 0) root = (root_note[ch] << 7);
-    return quantizer[ch].Process(cv, root, transpose) + (q_octave[ch] * 12 << 7);
+    return q_engine[ch].Process(cv, root, transpose);
   }
   int QuantizerLookup(int ch, int note) {
-    return quantizer[ch].Lookup(note) + (root_note[ch] << 7) + (q_octave[ch] * 12 << 7);
+    return q_engine[ch].Lookup(note);
   }
   void QuantizerConfigure(int ch, int scale, uint16_t mask) {
-    CONSTRAIN(scale, 0, OC::Scales::NUM_SCALES - 1);
-    quant_scale[ch] = scale;
-    q_mask[ch] = mask;
-    quantizer[ch].Configure(OC::Scales::GetScale(scale), mask);
+    q_engine[ch].Configure(scale, mask);
   }
   int GetScale(int ch) {
-    return quant_scale[ch];
+    return q_engine[ch].scale;
   }
   int GetRootNote(int ch) {
-    return root_note[ch];
+    return q_engine[ch].root_note;
   }
   int SetRootNote(int ch, int root) {
     CONSTRAIN(root, 0, 11);
-    return (root_note[ch] = root);
+    return (q_engine[ch].root_note = root);
   }
   void NudgeRootNote(int ch, int dir) {
     if (next_ch < 0) {
       next_ch = ch;
-      next_root_note = root_note[ch];
-      next_octave = q_octave[ch];
+      next_root_note = q_engine[ch].root_note;
+      next_octave = q_engine[ch].octave;
     }
     next_root_note += dir;
 
-    if (next_root_note > 11 && next_octave < 5) {
+    if (next_root_note > 11 && next_octave < octave_max) {
       ++next_octave;
       next_root_note -= 12;
     }
-    if (next_root_note < 0 && next_octave > -5) {
+    if (next_root_note < 0 && next_octave > -octave_max) {
       --next_octave;
       next_root_note += 12;
     }
@@ -118,38 +133,19 @@ namespace HS {
   void NudgeOctave(int ch, int dir) {
     if (next_ch < 0) {
       next_ch = ch;
-      next_root_note = root_note[ch];
-      next_octave = q_octave[ch];
+      next_root_note = q_engine[ch].root_note;
+      next_octave = q_engine[ch].octave;
     }
     next_octave += dir;
-    CONSTRAIN(next_octave, -5, 5);
+    CONSTRAIN(next_octave, -octave_max, octave_max);
 
     QueueBeatSync();
   }
   void NudgeScale(int ch, int dir) {
-    const int max = OC::Scales::NUM_SCALES;
-    int &s = quant_scale[ch];
-
-    s+= dir;
-    if (s >= max) s = 0;
-    if (s < 0) s = max - 1;
-    QuantizerConfigure(ch, s, q_mask[ch]);
+    q_engine[ch].NudgeScale(dir);
   }
   void RotateMask(int ch, int dir) {
-    const size_t scale_size = OC::Scales::GetScale( quant_scale[ch] ).num_notes;
-    uint16_t &mask = q_mask[ch];
-    uint16_t used_bits = ~(0xffffU << scale_size);
-    mask &= used_bits;
-
-    if (dir < 0) {
-      dir = -dir;
-      mask = (mask >> dir) | (mask << (scale_size - dir));
-    } else {
-      mask = (mask << dir) | (mask >> (scale_size - dir));
-    }
-    mask |= ~used_bits; // fill upper bits
-
-    quantizer[ch].Configure(OC::Scales::GetScale(quant_scale[ch]), mask);
+    q_engine[ch].RotateMask(dir);
   }
   void QuantizerEdit(int ch) {
     qview = constrain(ch, 0, QUANT_CHANNEL_COUNT - 1);
@@ -158,7 +154,7 @@ namespace HS {
   void QEditEncoderMove(bool rightenc, int dir) {
     if (!rightenc) {
       // left encoder moves q_edit cursor
-      const int scale_size = OC::Scales::GetScale( quant_scale[qview] ).num_notes;
+      const int scale_size = q_engine[qview].Size();
       q_edit = constrain(q_edit + dir, 1, 3 + scale_size);
     } else {
       // right encoder is delegated
@@ -170,8 +166,7 @@ namespace HS {
         RotateMask(qview, dir);
       } else { // edit mask bits
         const int idx = q_edit - 4;
-        uint16_t mask = dir>0 ? (q_mask[qview] | (1u << idx)) : (q_mask[qview] & ~(1u << idx));
-        QuantizerConfigure(qview, quant_scale[qview], mask);
+        q_engine[qview].EditMask(idx, dir>0);
       }
     }
   }
@@ -184,24 +179,53 @@ namespace HS {
         CONFIG_DUMMY, // past this point goes full screen
     };
 
+    int px, py, pw, ph;
+
+    /*
+    MENU_POPUP,
+    CLOCK_POPUP,
+    PRESET_POPUP,
+    QUANTIZER_POPUP,
+    MESSAGE_POPUP,
+    */
     if (popup_type == MENU_POPUP) {
-      graphics.clearRect(73, 25, 54, 38);
-      graphics.drawFrame(74, 26, 52, 36);
+      px = 73;
+      py = 25;
+      pw = 54;
+      ph = 38;
     } else if (popup_type == QUANTIZER_POPUP) {
-      graphics.clearRect(20, 23, 88, 28);
-      graphics.drawFrame(21, 24, 86, 26);
-      graphics.setPrintPos(26, 28);
+      px = 20;
+      py = 23;
+      pw = 88;
+      ph = 28;
+    } else if (popup_type == MESSAGE_POPUP) {
+      px = 16;
+      py = 23;
+      pw = 96;
+      ph = 18;
     } else {
-      graphics.clearRect(23, 23, 82, 18);
-      graphics.drawFrame(24, 24, 80, 16);
-      graphics.setPrintPos(28, 28);
+      px = 23;
+      py = 23;
+      pw = 82;
+      ph = 18;
     }
 
+    graphics.clearRect(px, py, pw, ph);
+    graphics.drawFrame(px+1, py+1, pw-2, ph-2);
+    graphics.setPrintPos(px+5, py+5);
+
     switch (popup_type) {
+      default:
+      case MESSAGE_POPUP:
+        gfxPrint(OC::Strings::err_msg[msg_idx]);
+        break;
       case MENU_POPUP:
         gfxPrint(78, 30, "Load");
         gfxPrint(78, 40, config_cursor == AUTO_SAVE ? "(auto)" : "Save");
-        gfxPrint(78, 50, "Config");
+        gfxIcon(78, 50, ZAP_ICON);
+        gfxIcon(86, 50, ZAP_ICON);
+        gfxIcon(94, 50, ZAP_ICON);
+        //gfxPrint(78, 50, "????");
 
         switch (config_cursor) {
           case LOAD_PRESET:
@@ -209,11 +233,12 @@ namespace HS {
             gfxIcon(104, 30 + (config_cursor-LOAD_PRESET)*10, LEFT_ICON);
             break;
           case AUTO_SAVE:
-            if (blink)
-              gfxIcon(114, 40, auto_save_enabled ? CHECK_ON_ICON : CHECK_OFF_ICON );
+            if (auto_save_enabled)
+              gfxInvert(78, 40, 37, 8);
+            gfxIcon(116, 40, LEFT_ICON);
             break;
           case CONFIG_DUMMY:
-            gfxIcon(115, 50, RIGHT_ICON);
+            gfxIcon(104, 50, LEFT_ICON);
             break;
           default: break;
         }
@@ -233,23 +258,24 @@ namespace HS {
         break;
       case QUANTIZER_POPUP:
       {
-        const int root = (next_ch > -1) ? next_root_note : root_note[qview];
-        const int octave = (next_ch > -1) ? next_octave : q_octave[qview];
+        auto &q = q_engine[qview];
+        const int root = (next_ch > -1) ? next_root_note : q.root_note;
+        const int octave = (next_ch > -1) ? next_octave : q.octave;
         graphics.print("Q");
         graphics.print(qview + 1);
         graphics.print(":");
-        graphics.print(OC::scale_names_short[ quant_scale[qview] ]);
+        graphics.print(OC::scale_names_short[ q.scale ]);
         graphics.print(" ");
         graphics.print(OC::Strings::note_names[ root ]);
         if (octave >= 0) graphics.print("+");
         graphics.print(octave);
 
         // scale mask
-        const size_t scale_size = OC::Scales::GetScale( quant_scale[qview] ).num_notes;
+        const size_t scale_size = q.Size();
         for (size_t i = 0; i < scale_size; ++i) {
           const int x = 24 + i*5;
 
-          if (q_mask[qview] >> i & 1)
+          if (q.mask >> i & 1)
             gfxRect(x, 40, 4, 4);
           else
             gfxFrame(x, 40, 4, 4);
@@ -264,7 +290,13 @@ namespace HS {
             gfxIcon(22 + (q_edit-4)*5, 44, UP_BTN_ICON);
 
           gfxInvert(20, 23, 88, 28);
+
+          // context clues at top/bottom of screen
+          gfxFooter("L:cursor     R:adjust");
+          graphics.clearRect(0, 0, 128, 10);
+          gfxHeader("A:Oct+         B:Oct-");
         }
+
         break;
       }
     }
@@ -281,43 +313,6 @@ namespace HS {
   }
 
 } // namespace HS
-
-#ifdef ARDUINO_TEENSY41
-void OC::AudioDSP::DrawAudioSetup() {
-  for (int ch = 0; ch < 2; ++ch)
-  {
-    int mod_target = AMP_LEVEL;
-    switch (mode[ch]) {
-      default:
-      case PASSTHRU:
-      case VCA_MODE:
-      case LPG_MODE:
-        break;
-      case VCF_MODE:
-        mod_target = FILTER_CUTOFF;
-        break;
-      case WAVEFOLDER:
-        mod_target = WAVEFOLD_MOD;
-        break;
-    }
-
-    // Channel mode
-    gfxPrint(8 + 82*ch, 15, "Mode");
-    gfxPrint(8 + 82*ch, 25, mode_names[ mode[ch] ]);
-
-    // Modulation assignment
-    gfxPrint(8 + 82*ch, 35, "Map");
-    gfxPrint(8 + 82*ch, 45, OC::Strings::cv_input_names_none[ mod_map[ch][mod_target] + 1 ] );
-
-    // cursor
-    gfxIcon(120*ch, 25 + audio_cursor[ch]*20, ch ? LEFT_ICON : RIGHT_ICON);
-  }
-
-  // Reverb params (size, damping, level?)
-  // careful, because level is also feedback...
-}
-#endif
-
 
 //////////////// Hemisphere-like graphics methods for easy porting
 ////////////////////////////////////////////////////////////////////////////////
@@ -348,13 +343,29 @@ void gfxPrint(int x_adv, int num) { // Print number with character padding
     gfxPrint(num);
 }
 
+void gfxPrint(int x, int y, HS::QuantEngine &q_eng, bool overlay = true) {
+  if (overlay) {
+    graphics.clearRect(x - 2, y - 2, 29, 22);
+    gfxFrame(x - 1, y - 2, 27, 21, true);
+  }
+
+  gfxPrint(x, y, OC::scale_names_short[q_eng.scale]);
+  gfxPrint(
+    (q_eng.octave == 0 ? x + 6 : x),
+    y + 10,
+    OC::Strings::note_names_unpadded[q_eng.root_note]
+  );
+  if (q_eng.octave != 0) {
+    gfxPrint(x + 12, y + 10, q_eng.octave);
+  }
+}
+void gfxPrintScale(int x, int y, int qsel) {
+  gfxPrint(x, y, HS::q_engine[qsel]);
+}
+
 /* Convert CV value to voltage level and print  to two decimal places */
 void gfxPrintVoltage(int cv) {
-#ifdef NORTHERNLIGHT
-    int v = (cv * 120) / (12 << 7);
-#else
-    int v = (cv * 100) / (12 << 7);
-#endif
+    int v = (cv * (NorthernLightModular? 120 : 100)) / (12 << 7);
     bool neg = v < 0 ? 1 : 0;
     if (v < 0) v = -v;
     int wv = v / 100; // whole volts
@@ -365,6 +376,43 @@ void gfxPrintVoltage(int cv) {
     if (dv < 10) gfxPrint("0");
     gfxPrint(dv);
     gfxPrint("V");
+}
+
+void gfxPrintFreqFromPitch(int16_t pitch) {
+  uint32_t num = ComputePhaseIncrement(pitch);
+  uint32_t denom = 0xffffffff / 16666;
+  bool swap = num < denom;
+  if (swap) {
+    uint32_t t = num;
+    num = denom;
+    denom = t;
+  }
+  int int_part = num / denom;
+  int digits = 0;
+  if (int_part < 10)
+    digits = 1;
+  else if (int_part < 100)
+    digits = 2;
+  else if (int_part < 1000)
+    digits = 3;
+  else
+    digits = 4;
+
+  gfxPrint(int_part);
+  gfxPrint(".");
+
+  num %= denom;
+  while (digits < 4) {
+    num *= 10;
+    gfxPrint(num / denom);
+    num %= denom;
+    digits++;
+  }
+  if (swap) {
+    gfxPrint("s");
+  } else {
+    gfxPrint("Hz");
+  }
 }
 
 void gfxPixel(int x, int y) {
@@ -410,8 +458,9 @@ void gfxBitmap(int x, int y, int w, const uint8_t *data) {
 }
 
 // Like gfxBitmap, but always 8x8
-void gfxIcon(int x, int y, const uint8_t *data) {
-    gfxBitmap(x, y, 8, data);
+void gfxIcon(int x, int y, const uint8_t *data, bool clearfirst) {
+  if (clearfirst) graphics.clearRect(x, y, 8, 8);
+  gfxBitmap(x, y, 8, data);
 }
 
 void gfxHeader(const char *str, const uint8_t *icon) {
@@ -422,5 +471,16 @@ void gfxHeader(const char *str, const uint8_t *icon) {
   }
   gfxPrint(x, 1, str);
   gfxLine(0, 10, 127, 10);
-  gfxLine(0, 11, 127, 11);
+  //gfxLine(0, 11, 127, 11);
+}
+
+void gfxFooter(const char *str, const uint8_t *icon) {
+  graphics.clearRect(0, 54, 128, 10);
+  gfxLine(0, 54, 127, 54);
+  int x = 1;
+  if (icon) {
+    gfxIcon(x, 1, icon);
+    x += 8;
+  }
+  gfxPrint(x, 56, str);
 }

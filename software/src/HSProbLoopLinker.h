@@ -18,85 +18,100 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#pragma once
+
 #ifndef PROB_LOOP_LINKER_H_
 #define PROB_LOOP_LINKER_H_
 
-class ProbLoopLinker {
-  static ProbLoopLinker *instance;
-  bool trig_q[4] = {0, 0, 0, 0};
-  uint32_t registered[2]; // { Div, Melo }
-  bool isLooping;
-  int loopStep;
-  bool reseed;
+struct ProbLoopLinker {
+    static ProbLoopLinker *instance;
+    uint16_t seed;
+    int loopStep;
+    bool trig_q[4] = {0, 0, 0, 0};
+    bool registered[2]; // { Div, Melo }
+    bool isLooping;
+    bool regenerate;
 
     uint32_t last_advance_tick = 0; // To prevent double-advancing
 
     ProbLoopLinker() {
       isLooping = false;
       loopStep = 0;
-      reseed = false;
+      regenerate = false;
       registered[0] = 0; // Div
       registered[1] = 0; // Melo
     }
 
-public:
-    static ProbLoopLinker *get() {
+    static ProbLoopLinker &get() {
         if (!instance) instance = new ProbLoopLinker;
-        return instance;
+        return *instance;
     }
 
     void RegisterDiv(HEM_SIDE hemisphere) {
-      registered[0] = OC::CORE::ticks;
+      registered[0] = true;
+    }
+    void RegisterMelo(HEM_SIDE hemisphere) {
+      registered[1] = true;
     }
 
-    void RegisterMelo(HEM_SIDE hemisphere) {
-      registered[1] = OC::CORE::ticks;
+    void UnloadDiv(HEM_SIDE hemisphere) {
+      registered[0] = false;
+      isLooping = false;
+    }
+    void UnloadMelo(HEM_SIDE hemisphere) {
+      registered[1] = false;
     }
 
     bool IsLinked() {
-      uint32_t t = OC::CORE::ticks;
-      return ((t - registered[0] < 160)
-              && (t - registered[1] < 160));
+      return (registered[0] && registered[1]);
     }
 
     void Trigger(int ch) {
-    	trig_q[ch] = true;
+        trig_q[ch] = true;
     }
 
     bool TrigPop(int ch) {
-    	if (IsLinked() && trig_q[ch]) {
-    		trig_q[ch] = false;
-    		return true;
-    	}
-    	return false;
+        if (IsLinked() && trig_q[ch]) {
+            trig_q[ch] = false;
+            return true;
+        }
+        return false;
     }
 
     void SetLooping(bool _isLooping) {
-    	isLooping = _isLooping;
+        isLooping = _isLooping;
     }
 
     bool IsLooping() {
-    	return isLooping;
+        return isLooping;
     }
 
     void SetLoopStep(int _loopStep) {
-    	loopStep = _loopStep;
+        loopStep = _loopStep;
     }
 
     int GetLoopStep() {
-    	return loopStep;
+        return loopStep;
     }
 
-    void Reseed() {
-    	reseed = true;
+    void SetSeed(uint16_t _seed) {
+        seed = _seed;
     }
 
-    bool ShouldReseed() {
-    	if (reseed) {
-    		reseed = false;
-    		return true;
-    	}
-    	return false;
+    uint16_t GetSeed() {
+        return seed;
+    }
+
+    void TriggerRegeneration() {
+        regenerate = true;
+    }
+
+    bool ShouldRegenerate() {
+        if (regenerate) {
+            regenerate = false;
+            return true;
+        }
+        return false;
     }
 
 };

@@ -26,7 +26,7 @@ layout: default
  * (new in v1.8.3) Shred-on-Reset toggle, per channel
     - Highlighted means that channel will be randomized on Reset
 
-_Note: Due to memory limitations, generated sequences cannot be saved. However, all parameters will be saved and new sequences will be generated from those settings on power up._
+As of v1.11, sequence seeds are now saved, which means they will regenerate the same sequence on preset load or power cycle!
 
 ### Credits
 Copied/Adapted from [Shredder](https://github.com/benirose/O_C-BenisphereSuite/wiki/Shredder) by benirose

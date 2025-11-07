@@ -21,6 +21,20 @@ extern bool I2S2_Audio_ADC;
 extern bool I2S2_Audio_DAC;
 extern bool I2C_Expansion;
 extern bool MIDI_Uses_Serial8;
+extern bool SDcard_Ready;
+#ifdef ARDUINO_TEENSY41
+extern bool DAC_20Vpp;
+#else
+static constexpr bool DAC_20Vpp = false;
+#endif
+
+#ifdef NORTHERNLIGHT
+static constexpr bool NorthernLightModular = true;
+#elif !defined(ARDUINO_TEENSY41)
+static constexpr bool NorthernLightModular = false;
+#else
+extern bool NorthernLightModular;
+#endif
 
 // OLED CS is active low
 #define OLED_CS_ACTIVE LOW
@@ -79,6 +93,7 @@ void inline pinMode(uint8_t pin, uint8_t mode) {
 
 void Pinout_Detect();
 void SetFlipMode(bool flip_180);
+float GetIDVoltage();
 
 }
 

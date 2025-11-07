@@ -28,16 +28,25 @@ public:
 
     void Start() { }
 
+    void Unload() {
+        HS::clock_m.Modulate(0, 0);
+    }
+
     void Controller() {
         // Check the clock so that the little Metronome icon animates while
         // Metronome is selected
         Clock(0);
 
+        // CV inputs modulate Tempo and Swing amount
+        HS::clock_m.Modulate(SemitoneIn(0), SemitoneIn(1));
+
         // Outputs
         if (HS::clock_m.IsRunning()) {
             if (HS::clock_m.Tock(hemisphere*2)) {
-                ClockOut(0);
-                if (HS::clock_m.EndOfBeat(hemisphere)) ClockOut(1);
+              ClockOut(0);
+            }
+            if (HS::clock_m.EndOfBeat(hemisphere) || HS::clock_m.Tock(hemisphere*2 + 1)) {
+              ClockOut(1);
             }
         }
     }
@@ -46,12 +55,17 @@ public:
         DrawInterface();
     }
 
-    void OnButtonPress() { }
+    void OnButtonPress() {
+      ++cursor %= 2;
+    }
 
     void OnEncoderMove(int direction) {
-        HS::clock_m.SetTempoBPM(clock_m.GetTempo() + direction);
+      if (cursor)
+        HS::clock_m.SetMultiply(HS::clock_m.GetMultiply(io_offset) + direction, io_offset);
+      else
+        HS::clock_m.SetTempoBPM(HS::clock_m.GetTempo() + direction);
     }
-        
+
     uint64_t OnDataRequest() {
         return 0;
     }
@@ -62,10 +76,10 @@ public:
 protected:
   void SetHelp() {
     //                    "-------" <-- Label size guide
-    help[HELP_DIGITAL1] = "";
+    help[HELP_DIGITAL1] = "Clock";
     help[HELP_DIGITAL2] = "";
-    help[HELP_CV1]      = "";
-    help[HELP_CV2]      = "";
+    help[HELP_CV1]      = "Tempo";
+    help[HELP_CV2]      = "Swing";
     help[HELP_OUT1]     = "Mult";
     help[HELP_OUT2]     = "Beat";
     help[HELP_EXTRA1] = "Set: Tempo";
@@ -74,11 +88,26 @@ protected:
   }
 
 private:
+    uint8_t cursor = 0;
     void DrawInterface() {
         gfxIcon(1, 15, NOTE4_ICON);
         gfxPrint(9, 15, "= ");
-        gfxPrint(pad(100, HS::clock_m.GetTempo()), clock_m.GetTempo());
+        gfxPrint(pad(100, HS::clock_m.tempo), HS::clock_m.tempo);
         gfxPrint(" BPM");
+
+        gfxPrint(46, 25, HS::clock_m.shuffle);
+        gfxPrint("%");
+
+        int mult = HS::clock_m.GetMultiply(hemisphere*2);
+        if (0 != mult || 0 != cursor) { // hide if 0
+            gfxPrint(1, 55, (mult >= 0) ? "x" : "/");
+            gfxPrint( (mult >= 0) ? mult : 1 - mult );
+        }
+
+        if (cursor)
+          gfxIcon(1, 46, DOWN_ICON);
+        else
+          gfxIcon(1, 24, UP_ICON);
 
         DrawMetronome();
     }
@@ -104,5 +133,5 @@ private:
         else gfxLine(29,50,37,32);
     }
 
-    
+
 };

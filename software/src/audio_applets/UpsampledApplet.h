@@ -1,0 +1,155 @@
+#pragma once
+
+#include "HSicons.h"
+#include "HemisphereAudioApplet.h"
+#include "Audio/InterpolatingStream.h"
+#include <Audio.h>
+
+template <AudioChannels Channels>
+class UpsampledApplet : public HemisphereAudioApplet {
+public:
+  const char* applet_name() override {
+    return "Upsampled";
+  }
+
+  void Start() override {
+    interp_stream.Acquire();
+    interp_stream.Method(static_cast<InterpolationMethod>(method));
+
+    for (int c = 0; c < Channels; c++) {
+      PatchCable(interp_stream, 0, mixer[c], 0);
+      PatchCable(input_stream, c, mixer[c], 1);
+      PatchCable(mixer[c], 0, output_stream, c);
+      mixer[c].gain(0, 1.0f);
+      mixer[c].gain(1, 1.0f);
+    }
+  }
+
+  void Unload() override {
+    interp_stream.Release();
+    AllowRestart();
+  }
+
+  void Controller() override {
+    int16_t in = input.In();
+    // 0.001 should put cutoff at ~2.7Hz for SR of 16666
+    ONE_POLE(lp, in, 0.001f);
+
+    if (ac_couple) in -= lp;
+
+    const float scalar = -31267.0f / HEMISPHERE_MAX_CV;
+    interp_stream.Push(Clip16((gain_cv.InF(0.0f) + dbToScalar(gain)) * scalar * in));
+  }
+
+  void View() override {
+    gfxPrint(1, 15, "Source:");
+    gfxStartCursor();
+    gfxPrint(input);
+    gfxEndCursor(cursor == 0, false, input.InputName());
+
+    gfxPrint(1, 25, "Interp:");
+    gfxStartCursor();
+    switch (method) {
+      case INTERPOLATION_ZOH:
+        gfxPrint("ZOH");
+        break;
+      case INTERPOLATION_LINEAR:
+        gfxPrint("Lin");
+        break;
+      case INTERPOLATION_HERMITE:
+      default:
+        gfxPrint("Spl");
+        break;
+    }
+    gfxEndCursor(cursor == 1);
+
+    gfxPrint(1, 35, "Lvl:");
+    gfxStartCursor();
+    gfxPrintDb(gain);
+    gfxEndCursor(cursor == 2);
+    gfxStartCursor();
+    gfxPrint(gain_cv);
+    gfxEndCursor(cursor == 3, false, gain_cv.InputName());
+
+    gfxPrint(1, 45, "AC:    ");
+    gfxStartCursor();
+    gfxPrintIcon(ac_couple ? CHECK_ON_ICON : CHECK_OFF_ICON);
+    gfxEndCursor(cursor == 4);
+
+    gfxDisplayInputMapEditor();
+  }
+
+  void OnButtonPress() override {
+    if (CheckEditInputMapPress(
+          cursor,
+          IndexedInput(0, input),
+          IndexedInput(3, gain_cv)
+    )) return;
+
+    if (cursor == 4) {
+      ac_couple = !ac_couple;
+    } else {
+      CursorToggle();
+    }
+  }
+
+  void OnEncoderMove(int direction) override {
+    if (!EditMode()) {
+      MoveCursor(cursor, direction, 4);
+      return;
+    }
+    if(EditSelectedInputMap(direction)) return;
+
+    switch (cursor) {
+      case 0:
+        input.ChangeSource(direction);
+        break;
+      case 1:
+        method = constrain(method + direction, 0, 2);
+        interp_stream.Method(static_cast<InterpolationMethod>(method));
+        break;
+      case 2:
+        gain += direction;
+        CONSTRAIN(gain, LVL_MIN_DB, LVL_MAX_DB);
+        break;
+      case 3:
+        gain_cv.ChangeSource(direction);
+        break;
+    }
+  }
+  void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
+    data[0] = PackPackables(pack(gain), pack<1>(ac_couple), pack<2>(method));
+    data[1] = PackPackables(input, gain_cv);
+  }
+
+  void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
+    UnpackPackables(data[0], pack(gain), pack<1>(ac_couple), pack<2>(method));
+    UnpackPackables(data[1], input, gain_cv);
+    CONSTRAIN(gain, LVL_MIN_DB, LVL_MAX_DB);
+    CONSTRAIN(method, 0, 2);
+  }
+
+  AudioStream* InputStream() override {
+    return &input_stream;
+  }
+  AudioStream* OutputStream() override {
+    return &output_stream;
+  };
+
+protected:
+  void SetHelp() override {}
+
+private:
+  AudioPassthrough<Channels> input_stream;
+  InterpolatingStream<> interp_stream;
+  AudioMixer<2> mixer[Channels];
+  AudioPassthrough<Channels> output_stream;
+
+  float lp = 0.0f;
+  int cursor = 0;
+  CVInputMap input;
+  int8_t gain = -1; // dB
+  CVInputMap gain_cv;
+  uint8_t method = INTERPOLATION_HERMITE;
+  boolean ac_couple = 0;
+};

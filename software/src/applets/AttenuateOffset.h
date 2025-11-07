@@ -39,7 +39,7 @@ public:
     void Controller() {
         mix_final = mix || Gate(1);
         int prevSignal = 0;
-        
+
         ForEachChannel(ch)
         {
             int signal = Proportion(level[ch], ATTENOFF_MAX_LEVEL, In(ch)) + (offset[ch] * ATTENOFF_INCREMENTS);
@@ -83,7 +83,7 @@ public:
             level[ch] = constrain(level[ch] + direction, -ATTENOFF_MAX_LEVEL*2, ATTENOFF_MAX_LEVEL*2);
         }
     }
-        
+
     uint64_t OnDataRequest() {
         uint64_t data = 0;
         Pack(data, PackLocation {0,9}, offset[0] + 256);
@@ -95,11 +95,13 @@ public:
     }
 
     void OnDataReceive(uint64_t data) {
-        offset[0] = Unpack(data, PackLocation {0,9}) - 256;
-        offset[1] = Unpack(data, PackLocation {10,9}) - 256;
-        level[0] = Unpack(data, PackLocation {19,8}) - ATTENOFF_MAX_LEVEL*2;
-        level[1] = Unpack(data, PackLocation {27,8}) - ATTENOFF_MAX_LEVEL*2;
-        mix = Unpack(data, PackLocation {35,1});
+        int min = -HEMISPHERE_MAX_CV / ATTENOFF_INCREMENTS;
+        int max = HEMISPHERE_MAX_CV / ATTENOFF_INCREMENTS;
+        offset[0] = constrain((Unpack(data, PackLocation {0,9}) - 256), min, max);
+        offset[1] = constrain((Unpack(data, PackLocation {10,9}) - 256), min, max);
+        level[0] = constrain((Unpack(data, PackLocation {19,8}) - ATTENOFF_MAX_LEVEL*2), -ATTENOFF_MAX_LEVEL*2, ATTENOFF_MAX_LEVEL*2);
+        level[1] = constrain((Unpack(data, PackLocation {27,8}) - ATTENOFF_MAX_LEVEL*2), -ATTENOFF_MAX_LEVEL*2, ATTENOFF_MAX_LEVEL*2);
+        mix = constrain(Unpack(data, PackLocation {35,1}), false, true);
     }
 
 protected:
@@ -115,14 +117,14 @@ protected:
     help[HELP_EXTRA2] = "  +/-200% attenuvert";
     //                  "---------------------" <-- Extra text size guide
   }
-    
+
 private:
     int cursor;
     int level[2];
     int offset[2];
     bool mix = false;
     bool mix_final = false;
-    
+
     void DrawInterface() {
         ForEachChannel(ch)
         {
@@ -144,7 +146,7 @@ private:
             }
         } else {
             gfxCursor(12, 23 + cursor * 10, 37);
-        }    
+        }
     }
 
 };

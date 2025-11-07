@@ -95,8 +95,8 @@ public:
     }
 
     void OnDataReceive(uint64_t data) {
-        operation[0] = Unpack(data, PackLocation {0, 8});
-        operation[1] = Unpack(data, PackLocation {8, 8});
+        operation[0] = constrain(Unpack(data, PackLocation {0, 8}), 0, HEMISPHERE_NUMBER_OF_CALC - 1);
+        operation[1] = constrain(Unpack(data, PackLocation {8, 8}), 0, HEMISPHERE_NUMBER_OF_CALC - 1);
     }
 
 protected:
@@ -123,7 +123,7 @@ private:
     int operation[2];
     int selected;
     bool rand_clocked[2];
-    
+
     void DrawSelector()
     {
         ForEachChannel(ch)

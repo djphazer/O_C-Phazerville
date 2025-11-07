@@ -12,6 +12,7 @@ namespace DEBUG {
 
   void Init();
 
+  extern debug::AveragedCycles LOOP_cycles;
   extern debug::AveragedCycles ISR_cycles;
   extern debug::AveragedCycles UI_cycles;
   extern debug::AveragedCycles MENU_draw_cycles;

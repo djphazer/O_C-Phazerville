@@ -126,7 +126,7 @@ public:
         if (OC::CORE::ticks - last_clock > HEM_DRUMMAP_AUTO_RESET_TICKS && step != 0) {
             Reset();
         }
-        
+
     }
 
     void View() {
@@ -193,13 +193,13 @@ public:
           value_animation = HEM_DRUMMAP_VALUE_ANIMATION_TICKS;
         }
     }
-        
+
     uint64_t OnDataRequest() {
         uint64_t data = 0;
-        Pack(data, PackLocation {0,8}, fill[0]); 
-        Pack(data, PackLocation {8,8}, fill[1]); 
-        Pack(data, PackLocation {16,8}, x); 
-        Pack(data, PackLocation {24,8}, y); 
+        Pack(data, PackLocation {0,8}, fill[0]);
+        Pack(data, PackLocation {8,8}, fill[1]);
+        Pack(data, PackLocation {16,8}, x);
+        Pack(data, PackLocation {24,8}, y);
         Pack(data, PackLocation {32,8}, chaos);
         Pack(data, PackLocation {40,8}, mode[0]);
         Pack(data, PackLocation {48,8}, mode[1]);
@@ -213,9 +213,10 @@ public:
         x = Unpack(data, PackLocation {16,8});
         y = Unpack(data, PackLocation {24,8});
         chaos = Unpack(data, PackLocation {32,8});
-        mode[0] = Unpack(data, PackLocation {40,8});
-        mode[1] = Unpack(data, PackLocation {48,8});
-        cv_mode = Unpack(data, PackLocation {56,8});
+
+        mode[0] = constrain(Unpack(data, PackLocation {40,8}), 0, 2);
+        mode[1] = constrain(Unpack(data, PackLocation {48,8}), 0, 3);
+        cv_mode = constrain(Unpack(data, PackLocation {56,8}), 0, 2);
         Reset();
     }
 
@@ -246,10 +247,10 @@ private:
     int value_animation = 0;
     int knob_accel = 256;
     uint32_t last_clock;
-    
+
     // settings
     int8_t mode[2] = {0, 1};
-    int fill[2] = {128, 128}; 
+    int fill[2] = {128, 128};
     int _fill[2] = {128, 128};
     int x = 0;
     int _x = 0;
@@ -274,12 +275,12 @@ private:
       uint8_t quad_x = x << 2;
       uint8_t quad_y = y << 2;
       // return U8Mix(U8Mix(a, b, x << 2), U8Mix(c, d, x << 2), y << 2);
-      // U8Mix returns b * x + a * (255 - x) >> 8 
+      // U8Mix returns b * x + a * (255 - x) >> 8
       uint8_t ab_fade = (b * quad_x + a * (255 - quad_x)) >> 8;
       uint8_t cd_fade = (d * quad_x + c * (255 - quad_x)) >> 8;
       return (cd_fade * quad_y + ab_fade * (255 - quad_y)) >> 8;
     }
-    
+
     void DrawInterface() {
         // output selection
         char outlabel[] = { (char)('A' + io_offset), ':', '\0' };
@@ -313,13 +314,13 @@ private:
             gfxPrint(32,25,"F");
             DrawSlider(40,25,20,_fill[1], MAX_VAL, cursor == 3);
         }
-        
+
         // x & y
         gfxPrint(1,35,"X");
         DrawSlider(9,35,20,_x, MAX_VAL, cursor == 4);
         gfxPrint(32,35,"Y");
         DrawSlider(40,35,20,_y, MAX_VAL, cursor == 5);
-        
+
         // chaos
         gfxPrint(1,45,"CHAOS");
         DrawSlider(32,45,28,_chaos, MAX_VAL, cursor == 6);
@@ -330,7 +331,7 @@ private:
         // cursor for non-knobs
         if (cursor <= 1)
             gfxCursor(14+cursor*31,23,16); // Part A / B
-        
+
         // display value for knobs
         if (cursor == 7) {
           // cv input assignment

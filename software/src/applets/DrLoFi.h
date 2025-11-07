@@ -70,7 +70,7 @@ public:
                 cv = cv >> depth;
                 cv = cv << depth;
 
-                // int dt = dt_pct * length / 100; //convert delaytime to length in samples 
+                // int dt = dt_pct * length / 100; //convert delaytime to length in samples
                 head_w = (head + length + dt_pct*length/100) % length; //have to add the extra length to keep modulo positive in case delaytime is neg
 
                 // mix input into the buffer ahead, respecting feedback
@@ -127,10 +127,10 @@ public:
     }
 
     void OnDataReceive(uint64_t data) {
-        dt_pct = Unpack(data, PackLocation {0,7});
-        feedback = Unpack(data, PackLocation {7,7});
-        rate = Unpack(data, PackLocation {14,5});
-        depth = Unpack(data, PackLocation {19,4});
+        dt_pct = constrain(Unpack(data, PackLocation {0,7}), 0, 99);
+        feedback = constrain(Unpack(data, PackLocation {7,7}), 0, 125);
+        rate = constrain(Unpack(data, PackLocation {14,5}), 1, 32);
+        depth = constrain(Unpack(data, PackLocation {19,4}), 0, 13);
     }
 
 protected:
@@ -161,7 +161,7 @@ private:
     int cursor; //for gui
 
     uint8_t* lofi_pcm_buffer;
-    
+
     void DrawWaveform() {
         int inc = rate_mod/2 + 1;
         int pos = head - (inc * 31) - random(1,3); // Try to center the head
@@ -175,7 +175,7 @@ private:
             if (pos >= length) pos -= length;
         }
     }
-    
+
     void DrawSelector()
     {
         if (cursor < 2) {

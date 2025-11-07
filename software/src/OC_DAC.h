@@ -18,21 +18,20 @@ static inline void dac8568_raw_write(uint32_t data) {
   LPSPI4_TDR = data; // assume writes always at pace SPI FIFO can absorb
 }
 static inline void dac8568_set_channel(uint32_t channel, uint32_t data) {
-  data = 0xFFFF - data;
   dac8568_raw_write(0x03000000 | ((channel & 0x07) << 20) | ((data & 0xFFFF) << 4));
 }
 #endif
 extern void SPI_init();
 
-typedef int DAC_CHANNEL;
+using DAC_CHANNEL = int;
 
 extern DAC_CHANNEL DAC_CHANNEL_A, DAC_CHANNEL_B, DAC_CHANNEL_C, DAC_CHANNEL_D;
 #if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
 extern DAC_CHANNEL DAC_CHANNEL_E, DAC_CHANNEL_F, DAC_CHANNEL_G, DAC_CHANNEL_H;
-static constexpr int DAC_CHANNEL_LAST = 8;
-#else
-static constexpr int DAC_CHANNEL_LAST = 4;
 #endif
+
+// backward compat [deprecated]
+static constexpr int DAC_CHANNEL_LAST = DAC_CHANNEL_COUNT;
 
 enum OutputVoltageScaling {
   VOLTAGE_SCALING_1V_PER_OCT,    // 0
@@ -53,19 +52,27 @@ public:
   static constexpr size_t kHistoryDepth = 8;
   static constexpr uint16_t MAX_VALUE = 65535; // DAC fullscale 
 
-  #ifdef NORTHERNLIGHT
-    static constexpr int kOctaveZero = 0;
-  #elif defined(VOR) 
-    static int kOctaveZero;
+#if defined(ARDUINO_TEENSY41) || defined(VOR)
+  static int kOctaveZero;
+#elif defined(NORTHERNLIGHT)
+  static constexpr int kOctaveZero = 0;
+#else
+  static constexpr int kOctaveZero = 3;
+#endif
+  #if defined(VOR)
     static constexpr int VBiasUnipolar = 3900;   // onboard DAC @ Vref 1.2V (internal), 1.75x gain
     static constexpr int VBiasBipolar = 2000;    // onboard DAC @ Vref 1.2V (internal), 1.75x gain
     static constexpr int VBiasAsymmetric = 2760; // onboard DAC @ Vref 1.2V (internal), 1.75x gain
-  #else
-    static constexpr int kOctaveZero = 3;
   #endif
 
   struct CalibrationData {
-    uint16_t calibrated_octaves[DAC_CHANNEL_LAST][OCTAVES + 1];
+    // -3V to +6V or 0V to +10V
+    uint16_t calibrated_octaves[DAC_CHANNEL_COUNT][OCTAVES + 1];
+
+    // TODO: -10V to +10V for updated hardware
+    //uint16_t calibrated_octaves[DAC_CHANNEL_COUNT][2*OCTAVES + 1];
+    // An alternate approach would be to store 16-bit values for one channel,
+    // and 8-bit offsets for all other channels
   };
 
   static void Init(CalibrationData *calibration_data, bool flip180 = false);
@@ -88,7 +95,7 @@ public:
   static void init_Vbias();
   
   static void set_all(uint32_t value) {
-    for (int i = 0; i < DAC_CHANNEL_LAST; ++i)
+    for (int i = 0; i < DAC_CHANNEL_COUNT; ++i)
       values_[i] = USAT16(value);
   }
 
@@ -119,17 +126,20 @@ public:
   //
   // @return DAC output value
   static int32_t pitch_to_dac(DAC_CHANNEL channel, int32_t pitch, int32_t octave_offset) {
-    pitch += (kOctaveZero + octave_offset) * 12 << 7;
-    
-    CONSTRAIN(pitch, 0, (120 << 7));
+    const int interval_size = 12*(1+DAC_20Vpp) << 7;
+    const int max_pitch = OCTAVES * interval_size;
 
-    const int32_t octave = pitch / (12 << 7);
-    const int32_t fractional = pitch - octave * (12 << 7);
+    pitch += (kOctaveZero + octave_offset) * interval_size;
+    
+    CONSTRAIN(pitch, 0, max_pitch);
+
+    const int32_t octave = pitch / interval_size;
+    const int32_t fractional = pitch - octave * interval_size;
 
     int32_t sample = calibration_data_->calibrated_octaves[channel][octave];
     if (fractional) {
       int32_t span = calibration_data_->calibrated_octaves[channel][octave + 1] - sample;
-      sample += (fractional * span) / (12 << 7);
+      sample += (fractional * span) / interval_size;
     }
 
     return sample;
@@ -142,9 +152,11 @@ public:
   }
   
   static int32_t pitch_to_scaled_voltage_dac(DAC_CHANNEL channel, int32_t pitch, int32_t octave_offset, uint8_t voltage_scaling) {
-    pitch += (octave_offset * 12) << 7;
+    const int interval_size = 12*(1+DAC_20Vpp) << 7;
+    const int max_pitch = OCTAVES * interval_size;
 
- 
+    pitch += (octave_offset * interval_size);
+
     switch (voltage_scaling) {
       case VOLTAGE_SCALING_1V_PER_OCT:    // 1V/oct
           // do nothing
@@ -174,17 +186,17 @@ public:
           break;
     }
 
-    pitch += (kOctaveZero * 12) << 7;
-   
-    CONSTRAIN(pitch, 0, (120 << 7));
+    pitch += (kOctaveZero * interval_size);
 
-    const int32_t octave = pitch / (12 << 7);
-    const int32_t fractional = pitch - octave * (12 << 7);
+    CONSTRAIN(pitch, 0, max_pitch);
+
+    const int32_t octave = pitch / interval_size;
+    const int32_t fractional = pitch - octave * interval_size;
 
     int32_t sample = calibration_data_->calibrated_octaves[channel][octave];
     if (fractional) {
       int32_t span = calibration_data_->calibrated_octaves[channel][octave + 1] - sample;
-      sample += (fractional * span) / (12 << 7);
+      sample += (fractional * span) / interval_size;
     }
 
     return sample;
@@ -213,12 +225,12 @@ public:
 
   // Set integer voltage value, where 0 = 0V, 1 = 1V
   static void set_octave(DAC_CHANNEL channel, int v) {
-    set(channel, calibration_data_->calibrated_octaves[channel][kOctaveZero + v]);
+    set(channel, get_octave_offset(channel, v));
   }
 
   // Set all channels to integer voltage value, where 0 = 0V, 1 = 1V
   static void set_all_octave(int v) {
-    for (int i = 0; i < DAC_CHANNEL_LAST; ++i)
+    for (int i = 0; i < DAC_CHANNEL_COUNT; ++i)
       set_octave(DAC_CHANNEL(i), v);
   }
 
@@ -227,32 +239,50 @@ public:
   }
 
   static uint32_t get_octave_offset(DAC_CHANNEL channel, int octave) {
-    return calibration_data_->calibrated_octaves[channel][kOctaveZero + octave];
+    const int base_oct = kOctaveZero + octave/(1+DAC_20Vpp);
+    int cv = calibration_data_->calibrated_octaves[channel][base_oct];
+    if (DAC_20Vpp && (octave & 1)) {
+      // odd-numbered octaves are halfway between
+      const int neighbor = base_oct + (octave % 2);
+      cv = (cv + calibration_data_->calibrated_octaves[channel][neighbor]) / 2;
+    }
+    return cv;
   }
 
   static void Update() {
     #if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
       if (DAC8568_Uses_SPI) {
-        dac8568_set_channel(0, values_[DAC_CHANNEL_A]);
-        dac8568_set_channel(1, values_[DAC_CHANNEL_B]);
-        dac8568_set_channel(2, values_[DAC_CHANNEL_C]);
-        dac8568_set_channel(3, values_[DAC_CHANNEL_D]);
-        dac8568_set_channel(4, values_[DAC_CHANNEL_E]);
-        dac8568_set_channel(5, values_[DAC_CHANNEL_F]);
-        dac8568_set_channel(6, values_[DAC_CHANNEL_G]);
-        dac8568_set_channel(7, values_[DAC_CHANNEL_H]);
+        if (NorthernLightModular) {
+          dac8568_set_channel(0, values_[0]);
+          dac8568_set_channel(1, values_[1]);
+          dac8568_set_channel(2, values_[2]);
+          dac8568_set_channel(3, values_[3]);
+          dac8568_set_channel(4, values_[4]);
+          dac8568_set_channel(5, values_[5]);
+          dac8568_set_channel(6, values_[6]);
+          dac8568_set_channel(7, values_[7]);
+        } else {
+          dac8568_set_channel(0, MAX_VALUE - values_[0]);
+          dac8568_set_channel(1, MAX_VALUE - values_[1]);
+          dac8568_set_channel(2, MAX_VALUE - values_[2]);
+          dac8568_set_channel(3, MAX_VALUE - values_[3]);
+          dac8568_set_channel(4, MAX_VALUE - values_[4]);
+          dac8568_set_channel(5, MAX_VALUE - values_[5]);
+          dac8568_set_channel(6, MAX_VALUE - values_[6]);
+          dac8568_set_channel(7, MAX_VALUE - values_[7]);
+        }
       } else {
     #endif
-        set8565_CHA(values_[DAC_CHANNEL_A]);
-        set8565_CHB(values_[DAC_CHANNEL_B]);
-        set8565_CHC(values_[DAC_CHANNEL_C]);
-        set8565_CHD(values_[DAC_CHANNEL_D]);
+        set8565_CHA(values_[0]);
+        set8565_CHB(values_[1]);
+        set8565_CHC(values_[2]);
+        set8565_CHD(values_[3]);
     #if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
       }
     #endif
 
     size_t tail = history_tail_;
-    for (int i = 0; i < DAC_CHANNEL_LAST; ++i)
+    for (int i = 0; i < DAC_CHANNEL_COUNT; ++i)
       history_[i][tail] = values_[i];
     history_tail_ = (tail + 1) % kHistoryDepth;
   }
@@ -273,10 +303,10 @@ public:
 
 private:
   static CalibrationData *calibration_data_;
-  static uint32_t values_[DAC_CHANNEL_LAST];
-  static uint16_t history_[DAC_CHANNEL_LAST][kHistoryDepth];
+  static uint32_t values_[DAC_CHANNEL_COUNT];
+  static uint16_t history_[DAC_CHANNEL_COUNT][kHistoryDepth];
   static volatile size_t history_tail_;
-  static uint8_t DAC_scaling[DAC_CHANNEL_LAST];
+  static uint8_t DAC_scaling[DAC_CHANNEL_COUNT];
 };
 
 }; // namespace OC

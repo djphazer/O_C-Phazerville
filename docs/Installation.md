@@ -16,7 +16,7 @@ There are a few ways of getting the firmware onto your module:
 * [Method B](#method-b): install the Arduino IDE and the Teensyduino add-on and compile the code yourself.
 * [Method C](#method-c): install PlatformIO and compile the code yourself.
 * Either way, you’ll need: a micro-usb cable (make sure this isn’t for charging only, but data transfer).
-* NB: the following steps assume that you have cut the usb trace. see here.
+* NB: the following steps assume that you have cut the usb trace. see [here](https://ornament-and-cri.me/build-it/#cut_trace) for an example of the Teensy 3.2.
 
 ## Method A
 uploading the HEX file
@@ -38,7 +38,7 @@ uploading the HEX file
 - (you should briefly see a progress bar as the firmware is uploaded)
 - click the reboot icon or choose Operation > Reboot
 
-Your O+C should now run the updated firmware (resp. come to life, if newly built). If this is a newly built module, proceed to [Calibration](https://ornament-and-cri.me/calibration/) (just updating the firmware doesn’t require re-calibration)
+Your O+C should now run the updated firmware (resp. come to life, if newly built). If this is a newly built module, proceed to [Calibration](Setup-About#calibration-routine) (just updating the firmware doesn’t require re-calibration)
 
 ## Method B
 Compiling the firmware with Arduino IDE + Teensyduino
@@ -81,4 +81,4 @@ pio run -e pewpewpew -t upload
 
 ## Calibrate
 
-If this is a newly built module, proceed to [Calibration](https://ornament-and-cri.me/calibration/) after installation. Just updating the firmware doesn’t require re-calibration - the calibration values are not overwritten when you install new versions of the firmware.
+If this is a newly built module, proceed to [Calibration](Setup-About#calibration-routine) after installation. Just updating the firmware doesn’t require re-calibration - the calibration values are not overwritten when you install new versions of the firmware.

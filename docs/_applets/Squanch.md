@@ -18,6 +18,7 @@ layout: default
 
 ### UI Parameters
 * Pitch shift for each output, in scale degrees
+* Note Wrap range for each output, in scale degrees
 * Scale
 * Root
 

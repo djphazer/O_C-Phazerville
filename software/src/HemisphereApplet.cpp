@@ -3,68 +3,139 @@
 HS::IOFrame HS::frame;
 HS::ClockManager HS::clock_m;
 
-int HemisphereApplet::cursor_countdown[APPLET_SLOTS];
+int HemisphereApplet::cursor_countdown[APPLET_CURSOR_COUNT];
+int16_t HemisphereApplet::cursor_start_x;
+int16_t HemisphereApplet::cursor_start_y;
 const char* HemisphereApplet::help[HELP_LABEL_COUNT];
+HS::EncoderEditor HemisphereApplet::enc_edit[APPLET_CURSOR_COUNT];
 
-void HemisphereApplet::BaseController() {
-    // I moved the IO-related stuff to the parent HemisphereManager app.
-    // The IOFrame gets loaded before calling Controllers, and outputs are handled after.
-    // -NJM
+void HemisphereApplet::BaseStart(const HEM_SIDE hemisphere_) {
+    SetDisplaySide(hemisphere_);
+    ResetCursor();
+    CancelEdit();
 
-    // Cursor countdowns. See CursorBlink(), ResetCursor(), gfxCursor()
-    if (--cursor_countdown[hemisphere] < -HEMISPHERE_CURSOR_TICKS) cursor_countdown[hemisphere] = HEMISPHERE_CURSOR_TICKS;
-
-    Controller();
+    // Maintain previous app state by skipping Start
+    if (!applet_started) {
+        applet_started = true;
+        Start();
+        ForEachChannel(ch) {
+            Out(ch, 0, true); // reset outputs
+        }
+    }
 }
-
-void HemisphereApplet::BaseView(bool full_screen) {
+void HemisphereApplet::BaseView(bool full_screen, bool parked) {
     //if (HS::select_mode == hemisphere)
     gfxHeader(applet_name(), (HS::ALWAYS_SHOW_ICONS || full_screen) ? applet_icon() : nullptr);
     // If active, draw the full screen view instead of the application screen
-    if (full_screen) this->DrawFullScreen();
+    if (full_screen) {
+      if (parked)
+        this->DrawFullScreen();
+      else
+        DrawConfigHelp();
+    }
     else this->View();
 }
 
-/*
- * Has the specified Digital input been clocked this cycle?
- *
- * If physical is true, then logical clock types (master clock forwarding and metronome) will
- * not be used.
- *
- * You DON'T usually want to call this more than once per tick for each channel!
- * It modifies state by eating boops and updating cycle_ticks. -NJM
- */
-bool HemisphereApplet::Clock(int ch, bool physical) {
-    bool clocked = 0;
-    bool useTock = (!physical && HS::clock_m.IsRunning());
+void HemisphereApplet::DrawConfigHelp() {
+    for (int i=0; i<HELP_LABEL_COUNT; ++i) help[i] = "";
+    SetHelp();
+    const bool clockrun = HS::clock_m.IsRunning();
 
-#ifdef ARDUINO_TEENSY41
-    const size_t virt_chan = (ch + io_offset) % 8;
-#else
-    const size_t virt_chan = (ch + io_offset) % 4;
-#endif
+    for (int ch = 0; ch < 2; ++ch) {
+      int y = 14;
+      const int mult = clockrun ? HS::clock_m.GetMultiply(ch + io_offset) : 0;
 
-    const int trmap = trigger_mapping[ch + io_offset];
-    const int offset = OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_LAST;
-
-    // clock triggers
-    if (useTock && HS::clock_m.GetMultiply(virt_chan) != 0)
-        clocked = HS::clock_m.Tock(virt_chan);
-    else if (trmap > 0) {
-      if (trmap <= offset)
-        clocked = frame.clocked[ trmap - 1 ];
-      else {
-        clocked = frame.clockout_q[ trmap - 1 - offset ];
-        frame.clockout_q[ trmap - 1 - offset ] = false;
+      graphics.setPrintPos(ch*64, y);
+      if (mult != 0) { // Multipliers
+        graphics.print( (mult > 0) ? "x" : "/" );
+        graphics.print( (mult > 0) ? mult : 1 - mult );
+      } else { // Trigger mapping
+        graphics.print( HS::trigmap[ch + io_offset].InputName() );
       }
+      graphics.invertRect(ch*64, y - 1, 19, 9);
+
+      graphics.setPrintPos(ch*64 + 20, y);
+      graphics.print( help[HELP_DIGITAL1 + ch] );
+
+      y += 10;
+
+      graphics.setPrintPos(ch*64, y);
+      graphics.print( cvmap[ch+io_offset].InputName() );
+      graphics.invertRect(ch*64, y - 1, 19, 9);
+
+      graphics.setPrintPos(ch*64 + 20, y);
+      graphics.print( help[HELP_CV1 + ch] );
+
+      y += 10;
+
+      graphics.setPrintPos(6 + ch*64, y);
+      graphics.print( OC::Strings::capital_letters[ ch + io_offset ] );
+      graphics.invertRect(ch*64, y - 1, 19, 9);
+
+      graphics.setPrintPos(ch*64 + 20, y);
+      graphics.print( help[HELP_OUT1 + ch] );
     }
 
-    // Try to eat a boop
-    clocked = clocked || clock_m.Beep(virt_chan);
+    graphics.setPrintPos(0, 45);
+    graphics.print( help[HELP_EXTRA1] );
+    graphics.setPrintPos(0, 55);
+    graphics.print( help[HELP_EXTRA2] );
+}
 
-    if (clocked) {
-        frame.cycle_ticks[io_offset + ch] = OC::CORE::ticks - frame.last_clock[io_offset + ch];
-        frame.last_clock[io_offset + ch] = OC::CORE::ticks;
+// seems weird to put this here, but alas, it worketh
+void HS::IOFrame::Load() {
+    gate_high[0] = OC::DigitalInputs::read_immediate<OC::DIGITAL_INPUT_1>();
+    gate_high[1] = OC::DigitalInputs::read_immediate<OC::DIGITAL_INPUT_2>();
+    gate_high[2] = OC::DigitalInputs::read_immediate<OC::DIGITAL_INPUT_3>();
+    gate_high[3] = OC::DigitalInputs::read_immediate<OC::DIGITAL_INPUT_4>();
+    for (int i = 0; i < ADC_CHANNEL_COUNT; ++i) {
+        // Set CV inputs
+        inputs[i] = OC::ADC::raw_pitch_value(ADC_CHANNEL(i));
+
+        // calculate gates/clocks for all ADC inputs as well
+        gate_high[OC::DIGITAL_INPUT_LAST + i] = inputs[i] > GATE_THRESHOLD;
+
+        if (abs(inputs[i] - last_cv[i]) > HEMISPHERE_CHANGE_THRESHOLD) {
+            changed_cv[i] = 1;
+            last_cv[i] = inputs[i];
+        } else changed_cv[i] = 0;
     }
-    return clocked;
+
+    // Handle clock pulse timing
+    for (int i = 0; i < DAC_CHANNEL_COUNT; ++i) {
+        if (clock_countdown[i] > 0) {
+            if (--clock_countdown[i] == 0) Out(i, 0);
+        }
+    }
+    for (int i = 0; i < MIDIMAP_MAX; ++i) {
+        MIDIMapping& m = MIDIState.mapping[i];
+        if (m.trigout_countdown > 0) {
+            if (--m.trigout_countdown == 0) m.output = 0;
+        }
+    }
+
+    // pre-calculate clock triggers
+    for (int ch = 0; ch < APPLET_SLOTS * 2; ++ch) {
+      bool result = 0;
+      const size_t virt_chan = (ch) % (APPLET_SLOTS * 2);
+
+      // clock triggers
+      // TODO: implement div/mult within DigitalInputMap and get rid of
+      //       this call to clock_m
+      if (clock_m.IsRunning() && clock_m.GetMultiply(virt_chan) != 0)
+          result = clock_m.Tock(virt_chan);
+      else {
+          result = trigmap[ch].Clock();
+      }
+
+      // Try to eat a boop
+      result = result || clock_m.Beep(virt_chan);
+
+      if (result) {
+          cycle_ticks[ch] = OC::CORE::ticks - last_clock[ch];
+          last_clock[ch] = OC::CORE::ticks;
+      }
+
+      clocked[ch] = result;
+    }
 }

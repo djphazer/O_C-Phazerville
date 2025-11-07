@@ -3,7 +3,7 @@ layout: default
 ---
 # Scale Editor
 
-*Scale Editor* is a standalone application for editing and managing user-defined microtonal scales, and importing scales from the internal scale library, or via system exclusive. A web-based Scala-to-Hemisphere Suite converter [~~is available~~](http://www.beigemaze.com/scala), which can generate system exclusive files from Scala documents. [Video demo](https://www.youtube.com/watch?v=UKX79rkSdIQ)
+*Scale Editor* is a standalone application for editing and managing user-defined microtonal scales, and importing scales from the internal scale library, or via system exclusive. (A web-based Scala-to-Hemisphere Suite converter was previously available...) [Video demo](https://www.youtube.com/watch?v=UKX79rkSdIQ)
 
 ### I/O
 
@@ -57,10 +57,4 @@ You may initiate a MIDI system exclusive dump of the current scale by long-press
 To restore a scale from a sysex dump, simply initiate the dump from the computer while Scale Editor is running. The received scale will be placed into the currently-selected scale.
 
 ## Scala Format Import
-With the help of a web-based tool (http://www.beigemaze.com/scala), you can bring Scala scales into Scale Editor. Upload (or paste) your Scala into the tool, and download the SysEx file. See "System Exclusive" (above) for how to send the file to Scale Editor.
-
-For your convenience, sysex files for about 3000 scales from the Scala Scale Archive are available here, along with the original Scala files and instructions:
-
-[http://beigemaze.com/downloads/HS_Scala_Archive.zip](http://beigemaze.com/downloads/HS_Scala_Archive.zip) (TODO: broken!)
-
-These scales are distributed with the kind permission of Manuel Op de Coul
+There was previously a web-based tool and an archive of SysEx files converted from the Scala Scale Archive... the Beige Maze website is now defunct. If anyone can recover these, please file an Issue on GitHub.

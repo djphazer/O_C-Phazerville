@@ -53,3 +53,76 @@ struct ClkDivMult {
   }
 };
 
+template <size_t NUM_STEPS = 5>
+struct DivSequence {
+  int step_index = -1;
+  int clock_count = 0;
+  ClkDivMult divmult[NUM_STEPS]; // separate DividerMultiplier for each step
+  uint16_t muted = 0x0; // bitmask
+  uint32_t last_clock = 0;
+
+  int Get(int s) {
+    return divmult[s].steps;
+  }
+  void Set(int s, int div) {
+    divmult[s].Set(div);
+  }
+  void ToggleStep(int idx) {
+    muted ^= (0x01 << idx);
+  }
+  void SetMute(int idx, bool set = true) {
+    muted = (muted & ~(0x01 << idx)) | ((set & 0x01) << idx);
+  }
+  bool Muted(int idx) {
+    return (muted >> idx) & 0x01;
+  }
+  bool StepActive(int idx) {
+    return divmult[idx].steps != 0 && !Muted(idx);
+  }
+  bool Poke(bool clocked = 0) {
+    if (step_index < 0) {
+      // reset case
+      if (clocked) {
+          step_index = 0;
+          divmult[step_index].last_clock = last_clock;
+          last_clock = OC::CORE::ticks;
+          return divmult[step_index].Tick(true) && StepActive(step_index);
+      }
+      return false; // reset and not ready
+    }
+
+    bool trigout = divmult[step_index].Tick(clocked);
+
+    if (clocked)
+    {
+      if (divmult[step_index].steps < 0 || ++clock_count >= divmult[step_index].steps)
+      {
+        // special case to proceed to next step
+        clock_count = 0;
+
+        size_t i = 0;
+        do {
+            ++step_index %= NUM_STEPS;
+            ++i;
+        } while (!StepActive(step_index) && i < NUM_STEPS);
+
+        if (StepActive(step_index)) {
+          divmult[step_index].Reset();
+          divmult[step_index].last_clock = last_clock;
+          trigout = divmult[step_index].Tick(true);
+        }
+      }
+
+      last_clock = OC::CORE::ticks;
+    }
+
+
+    return trigout;
+  }
+  void Reset() {
+    step_index = -1;
+    clock_count = 0;
+    for (auto &d : divmult) d.Reset();
+  }
+
+};

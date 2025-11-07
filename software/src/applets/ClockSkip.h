@@ -64,7 +64,7 @@ public:
         }
         p_mod[cursor] = p[cursor] = constrain(p[cursor] + direction, 0, 100);
     }
-        
+
     uint64_t OnDataRequest() {
         uint64_t data = 0;
         Pack(data, PackLocation {0,7}, p[0]);
@@ -73,8 +73,8 @@ public:
     }
 
     void OnDataReceive(uint64_t data) {
-        p_mod[0] = p[0] = Unpack(data, PackLocation {0,7});
-        p_mod[1] = p[1] = Unpack(data, PackLocation {7,7});
+        p_mod[0] = p[0] = constrain(Unpack(data, PackLocation {0,7}), 0, 100);
+        p_mod[1] = p[1] = constrain(Unpack(data, PackLocation {7,7}), 0, 100);
     }
 
 protected:
@@ -96,7 +96,7 @@ private:
     int16_t p_mod[2];
     int trigger_countdown[2];
     int cursor;
-    
+
     void DrawSelector()
     {
         ForEachChannel(ch)
@@ -106,8 +106,8 @@ private:
             if (p[ch] != p_mod[ch]) gfxIcon(31*ch, 22, CV_ICON);
             if (ch == cursor) gfxCursor(0 + (31 * ch), 23, 30);
         }
-    }    
-    
+    }
+
     void DrawIndicator()
     {
         ForEachChannel(ch)

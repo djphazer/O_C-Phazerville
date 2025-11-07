@@ -163,9 +163,8 @@ public:
     }
   }
 
-  void OnButtonPress() {
-    isEditing = !isEditing;
-  }
+  //void OnButtonPress() { }
+
   void AuxButton() {
     if (cursor == QUANT)
       HS::QuantizerEdit(qselect);
@@ -177,11 +176,11 @@ public:
       stepmode = !stepmode;
     }
 
-    isEditing = false;
+    CancelEdit();
   }
 
   void OnEncoderMove(int direction) {
-    if (!isEditing) {
+    if (!EditMode()) {
       MoveCursor(cursor, direction, INTERVAL_START + length - 1);
       return;
     }

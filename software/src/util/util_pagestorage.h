@@ -86,9 +86,9 @@ public:
   static const size_t PAGES = LENGTH / PAGESIZE;
 
   // throw compiler error if no pages
-  typedef bool CHECK_PAGES[PAGES > 0 ? 1 : -1 ];
+  static_assert(PAGES > 0, "PageStorage - no pages!");
   // throw compiler error if OOB
-  typedef bool CHECK_BASEADDR[BASE_ADDR + LENGTH > STORAGE::LENGTH ? -1 : 1];
+  static_assert(BASE_ADDR + LENGTH <= STORAGE::LENGTH, "PageStorage - out of bounds!");
 
   /**
    * @return index of page in storage; only valid after ::load
@@ -115,7 +115,7 @@ public:
   bool Load(DATA_TYPE &data) {
 
     page_index_ = -1;
-    memset(&page_, 0, sizeof(page_));
+    page_ = {}; //memset(&page_, 0, sizeof(page_));
     page_.header.generation = -1;
     page_data next_page;
     for (size_t i = 0; i < PAGES; ++i) {
@@ -140,6 +140,7 @@ public:
       }
 
       page_index_ = i;
+      //page_ = next_page;
       memcpy(&page_, &next_page, sizeof(page_));
     }
     
@@ -148,6 +149,7 @@ public:
       page_.header.size = sizeof(DATA_TYPE);
       return false;
     } else {
+      //data = page_.data;
       memcpy(&data, &page_.data, sizeof(DATA_TYPE));
       return true;
     }

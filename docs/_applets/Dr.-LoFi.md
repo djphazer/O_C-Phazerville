@@ -5,7 +5,7 @@ layout: default
 
 ![Screenshot 2024-06-13 14-42-25](https://github.com/djphazer/O_C-Phazerville/assets/109086194/bb9699a5-1411-4107-9e2c-4c6e0a2df9c8)
 
-(Formerly called LoFi Echo)
+(Formerly called LoFi Echo, LoFi Tape)
 
 **Dr. LoFi** is a friend of Dr. Crusher, who built a digital delay line using LoFi Tape.
 It still provides sample rate and bit depth reduction for CV or audio signals, along with a feedback loop with configurable delay and depth.
@@ -20,9 +20,9 @@ It still provides sample rate and bit depth reduction for CV or audio signals, a
 
 ### UI Parameters
 * Delay Time - set to 0 for passthru with digital distortion
-* Feedback
+* Feedback Amount (%)
 * Rate Reduction - 1 is fastest (16.6khz); higher is slower / lower sampling rate
-  - some smoothing is applied as rate reduction increases
+  - some smoothing is applied as rate reduction increases, like a low-pass filter
 * Bit Depth Reduction - 0 is full-range (sampled at 12-bit); higher truncates more bits
 
 ### Notes

@@ -252,7 +252,11 @@ SETTINGS_DECLARE(PolyLfo, POLYLFO_SETTING_LAST) {
   { 0, 0, 127, "B AM by A", NULL, settings::STORAGE_TYPE_U8 },
   { 0, 0, 127, "C AM by B", NULL, settings::STORAGE_TYPE_U8 },
   { 0, 0, 127, "D AM by C", NULL, settings::STORAGE_TYPE_U8 }, 
+#ifdef ARDUINO_TEENSY41
+  { 0, 0, 6, "CV8: DEST", cv4_destinations, settings::STORAGE_TYPE_U8 },
+#else
   { 0, 0, 6, "CV4: DEST", cv4_destinations, settings::STORAGE_TYPE_U8 },
+#endif
   { 3, 0, 5, "TR4: MULT", tr4_multiplier, settings::STORAGE_TYPE_U4 }, 
 #ifdef VOR
   { 0, 0, 2, "VBias", OC::Strings::VOR_offsets, settings::STORAGE_TYPE_U4 }, 

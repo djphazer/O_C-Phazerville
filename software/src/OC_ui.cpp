@@ -26,19 +26,6 @@ namespace OC {
 
 Ui ui;
 
-// Runtime aliases for UI remapping
-#if defined(NLM_hOC) || defined(NLM_cardOC)
-// hack to swap Hemisphere left/right just for hOC/cOC
-UiControl CONTROL_BUTTON_A = CONTROL_BUTTON_DOWN;
-UiControl CONTROL_BUTTON_B = CONTROL_BUTTON_UP;
-#else
-UiControl CONTROL_BUTTON_A = CONTROL_BUTTON_UP;
-UiControl CONTROL_BUTTON_B = CONTROL_BUTTON_DOWN;
-#endif
-UiControl CONTROL_BUTTON_X = CONTROL_BUTTON_UP2;
-UiControl CONTROL_BUTTON_Y = CONTROL_BUTTON_DOWN2;
-UiControl CONTROL_BUTTON_Z = CONTROL_BUTTON_M;
-
 void Ui::Init() {
   ticks_ = 0;
   set_screensaver_timeout(SCREENSAVER_TIMEOUT_S);
@@ -64,6 +51,7 @@ void Ui::Init() {
   button_ignore_mask_ = 0;
   screensaver_ = false;
   preempt_screensaver_ = false;
+  jump_to_menu_ = false;
 
   encoder_right_.Init(OC_GPIO_ENC_PINMODE);
   encoder_left_.Init(OC_GPIO_ENC_PINMODE);
@@ -89,6 +77,7 @@ void Ui::set_screensaver_timeout(uint32_t seconds) {
 }
 
 void FASTRUN Ui::_Poke() {
+  screensaver_ = false;
   event_queue_.Poke();
 }
 
@@ -174,19 +163,28 @@ UiMode Ui::DispatchEvents(const App *app) {
             app->HandleButtonEvent(event);
         break;
       case UI::EVENT_BUTTON_LONG_PRESS:
-        if (OC::CONTROL_BUTTON_UP == event.control) {
-          if (!preempt_screensaver_) screensaver_ = true;
+        if (OC::CONTROL_BUTTON_UP == event.control && !preempt_screensaver_) {
           SetButtonIgnoreMask(); // ignore release
+          screensaver_ = true;
         }
-        else if (OC::CONTROL_BUTTON_R == event.control)
-          return UI_MODE_APP_SETTINGS;
+        //else if (event.control == OC::CONTROL_BUTTON_R) {
+          // only if holding both encoders...
+          //if (event.mask == (OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_R))
+          //jump_to_menu_ = true;
+        //}
         else
           app->HandleButtonEvent(event);
         break;
       case UI::EVENT_BUTTON_LONG_RELEASE:
-        app->HandleButtonEvent(event);
+        if (event.control == OC::CONTROL_BUTTON_R)
+          jump_to_menu_ = true;
+        else
+          app->HandleButtonEvent(event);
         break;
       case UI::EVENT_ENCODER:
+        // if either encoder is turned while held down, ignore release/long-press
+        if (event.mask & (OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_R))
+          SetButtonIgnoreMask();
         app->HandleEncoderEvent(event);
         break;
       default:
@@ -201,7 +199,11 @@ UiMode Ui::DispatchEvents(const App *app) {
 
   if (screensaver_)
     return UI_MODE_SCREENSAVER;
-  else
+  else if (jump_to_menu_) {
+    SetButtonIgnoreMask(); // ignore release
+    jump_to_menu_ = false;
+    return UI_MODE_APP_SETTINGS;
+  } else
     return UI_MODE_MENU;
 }
 
@@ -209,8 +211,7 @@ UiMode Ui::Splashscreen(bool &reset_settings) {
 
   UiMode mode = UI_MODE_MENU;
 
-  unsigned long start = millis();
-  unsigned long now = start;
+  elapsedMillis timeout = 0;
   do {
 
     mode = UI_MODE_MENU;
@@ -226,12 +227,10 @@ UiMode Ui::Splashscreen(bool &reset_settings) {
        read_immediate(CONTROL_BUTTON_UP) && read_immediate(CONTROL_BUTTON_DOWN);
     #endif
 
-    now = millis();
-
     GRAPHICS_BEGIN_FRAME(true);
 
     menu::DefaultTitleBar::Draw();
-    graphics.print(OC::Strings::NAME);
+    graphics.print( NorthernLightModular? OC::Strings::NAME_NLM : OC::Strings::NAME);
     weegfx::coord_t y = menu::CalcLineY(0);
 
     graphics.setPrintPos(menu::kIndentDx, y + menu::kTextDy);
@@ -264,13 +263,13 @@ UiMode Ui::Splashscreen(bool &reset_settings) {
     };
 
     static int pick = 0;
-    if (now % 50 == 0) pick = random(6);
+    if (timeout % 50 == 0) pick = random(6);
     // pew pew?
     for (int i = 0; i < 124; i+=8)
       graphics.drawBitmap8(i, 56, 8, iconroulette[pick]);
 
     // chargin mah lazerrrr
-    weegfx::coord_t w = (now-start)*128 / (SPLASHSCREEN_DELAY_MS/6);
+    weegfx::coord_t w = timeout * 128 / SPLASHSCREEN_DELAY_MS;
     w %= 256;
     if (w > 128) w = 256 - w;
     graphics.invertRect(0, 56, w, 8);
@@ -281,7 +280,26 @@ UiMode Ui::Splashscreen(bool &reset_settings) {
 
     GRAPHICS_END_FRAME();
 
-  } while (now - start < SPLASHSCREEN_DELAY_MS);
+  } while (timeout < SPLASHSCREEN_DELAY_MS);
+
+  do {
+    GRAPHICS_BEGIN_FRAME(true);
+    for (int i=0; i<128; ++i) {
+      graphics.drawBitmap8(i*8%128 + random(2), i/16*8 + random(2), 8, ZAP_ICON);
+    }
+
+    graphics.clearRect(27, 22, 74, 22);
+    graphics.setPrintPos(28, 23);
+    graphics.print(" Welcome to");
+    graphics.setPrintPos(28, 33);
+    graphics.print("Phazerville!");
+    //graphics.print(OC::Strings::RELEASE_NAME);
+
+    while (event_queue_.available())
+      (void)event_queue_.PullEvent();
+    GRAPHICS_END_FRAME();
+    delay(5);
+  } while (timeout < SPLASHSCREEN_DELAY_MS*3/2);
 
   SetButtonIgnoreMask();
   return mode;
