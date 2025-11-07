@@ -90,7 +90,7 @@ void HS::IOFrame::Load() {
     gate_high[3] = OC::DigitalInputs::read_immediate<OC::DIGITAL_INPUT_4>();
     for (int i = 0; i < ADC_CHANNEL_COUNT; ++i) {
         // Set CV inputs
-        inputs[i] = OC::ADC::pitch_value(ADC_CHANNEL(i));
+        inputs[i] = OC::ADC::raw_pitch_value(ADC_CHANNEL(i));
 
         // calculate gates/clocks for all ADC inputs as well
         gate_high[OC::DIGITAL_INPUT_LAST + i] = inputs[i] > GATE_THRESHOLD;

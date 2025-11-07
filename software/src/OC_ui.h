@@ -17,28 +17,28 @@ struct App;
 
 // UI::Event::control is uint16_t, but we only have 6 controls anyway.
 // So we can helpfully make things into bitmasks, which seems useful.
-enum UiControl : uint16_t {
-  CONTROL_BUTTON_UP   = 1 << 0,
-  CONTROL_BUTTON_DOWN = 1 << 1,
+enum UiControl {
+  CONTROL_BUTTON_UP   = 0x1,
+  CONTROL_BUTTON_DOWN = 0x2,
   /* Reverse the left and right buttons if Hemisphere Suite is installed on the left-hand
    * side of a Northern Light 2OC 4U module.
    */
 #ifdef NORTHERNLIGHT_2OC_LEFTSIDE
-  CONTROL_BUTTON_L    = 1 << 3,
-  CONTROL_BUTTON_R    = 1 << 2,
+  CONTROL_BUTTON_L    = 0x8,
+  CONTROL_BUTTON_R    = 0x4,
 #else
-  CONTROL_BUTTON_L    = 1 << 2,
-  CONTROL_BUTTON_R    = 1 << 3,
+  CONTROL_BUTTON_L    = 0x4,
+  CONTROL_BUTTON_R    = 0x8,
 #endif
 
   // not all of these are present on all hardware...
   // but it probably doesn't hurt to include in the enum
-  CONTROL_BUTTON_M     = 1 << 4,
-  CONTROL_BUTTON_UP2   = 1 << 5,
-  CONTROL_BUTTON_DOWN2 = 1 << 6,
+  CONTROL_BUTTON_M     = 0x10,
+  CONTROL_BUTTON_UP2   = 0x20,
+  CONTROL_BUTTON_DOWN2 = 0x40,
 
-  CONTROL_ENCODER_L   = 1 << 8,
-  CONTROL_ENCODER_R   = 1 << 9,
+  CONTROL_ENCODER_L   = 0x100,
+  CONTROL_ENCODER_R   = 0x200,
 
 #if defined(VOR)
   CONTROL_BUTTON_LAST = 5,

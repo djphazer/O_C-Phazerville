@@ -210,32 +210,6 @@ static void debug_menu_adc() {
 }
 
 #ifdef ARDUINO_TEENSY41
-static void debug_menu_adc_noise() {
-  static debug::AveragedCycles chan[ADC_CHANNEL_COUNT];
-  static elapsedMillis timeout;
-
-  const bool reset = timeout > 5000;
-  if (reset) timeout = 0;
-
-  for (int i = 0; i < 4; ++i) {
-    if (reset) {
-      chan[i].Reset();
-      chan[i+4].Reset();
-    }
-    chan[i].push(ADC::raw_value(ADC_CHANNEL(i)));
-    chan[i+4].push(ADC::raw_value(ADC_CHANNEL(i+4)));
-
-    uint32_t diff1 = chan[i].max_value() - chan[i].min_value();
-    uint32_t diff2 = chan[i+4].max_value() - chan[i+4].min_value();
-
-    graphics.setPrintPos(2, 12 + 10*i);
-    graphics.printf("C%d %5lu C%d %5lu", i+1, diff1, i+5, diff2);
-  }
-
-  graphics.setPrintPos(2, 52);
-  graphics.print("(5 sec reset)");
-}
-
 static void debug_menu_adc_value() {
   graphics.setPrintPos(2, 12);
   graphics.printf("C1 %5ld C5 %5ld", ADC::value(ADC_CHANNEL_1), ADC::value(ADC_CHANNEL_5));
@@ -301,7 +275,6 @@ static const DebugMenu debug_menus[] = {
   { " ADC (raw)", debug_menu_adc },
 #ifdef ARDUINO_TEENSY41
   { " ADC (value)", debug_menu_adc_value },
-  { " ADC (noise)", debug_menu_adc_noise },
   { " AUDIO", debug_menu_audio },
 #endif
 #ifdef POLYLFO_DEBUG  

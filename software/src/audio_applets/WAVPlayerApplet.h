@@ -62,10 +62,6 @@ public:
     AllowRestart();
   }
 
-  void Reset() override {
-    playstop_cv.Reset();
-  }
-
   void Controller() {
     djfilter_mod = constrain(djfilter + djfilter_cv.InRescaled(128), -64, 64);
     SetFilter(filter_on * djfilter_mod);

@@ -135,7 +135,6 @@ public:
     float GetTempoFloat() {
       return 1000000.0f / ticks_per_beat;
     }
-    uint32_t GetTempoTicks() {return ticks_per_beat;}
     uint32_t GetCycleTicks(int ch = 0) {
       if (tocks_per_beat[ch] > 0) return ticks_per_beat / tocks_per_beat[ch];
       if (tocks_per_beat[ch] < 0) return ticks_per_beat * (1 - tocks_per_beat[ch]);
@@ -204,10 +203,7 @@ public:
                     next_tock_tick += shuffle * ticks_per_beat / 100 / static_cast<uint32_t>(tocks_per_beat[ch]);
 
                 tock[ch] = now >= next_tock_tick;
-                if (tock[ch]) {
-                  ++count[ch]; // increment multiplier counter
-                  if (1 == count[ch]) beatsync = 1;
-                }
+                if (tock[ch]) ++count[ch]; // increment multiplier counter
 
                 beatsync = beatsync || (count[ch] > tocks_per_beat[ch]); // multiplier has been exceeded
                 reset = reset && (count[ch] > tocks_per_beat[ch]);

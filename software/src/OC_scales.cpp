@@ -33,23 +33,6 @@ const Scale &Scales::GetScale(int index) {
     return braids::scales[index - SCALE_USER_COUNT];
 }
 
-void Scales::SaveToScala(Scale &scale, File &file) {
-  file.print("O_C User Scale\n");
-
-  file.printf("%d\n", scale.num_notes);
-
-  for (size_t i = 0; i < scale.num_notes; ++i) {
-    int cents = scale.notes[i] * 100 / 128;
-    int decimal = (scale.notes[i] * 100 * 10000 / 128) % 10000;
-    file.printf("%d.%05d\n", cents, decimal);
-  }
-
-  // TA-DA!! it's that easy.
-}
-void Scales::LoadScala(Scale &scale, File &file) {
-  // TODO:
-}
-
 const char* const scale_names_short[] = {
     "USR1",
     "USR2",

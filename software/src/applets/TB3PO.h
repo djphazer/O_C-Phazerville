@@ -104,37 +104,36 @@ class TB_3PO: public HemisphereApplet {
 
       //StartADCLag();
 
-      int step_pv = step;
-
       // step advance if reset not held
-      if (!reset_flag && !Gate(1)) {
+      if (!reset_flag && !Gate(1))
+      {
+        int step_pv = step;
+
         step = get_next_step(step);
+
+        if (step_is_slid(step_pv)) {
+          slide_start_cv = get_pitch_for_step(step_pv);
+
+          // TODO: Consider just gliding from whereever it is?
+          curr_pitch_cv = slide_start_cv;
+
+          slide_end_cv = get_pitch_for_step(step);
+        } else {
+          curr_pitch_cv = get_pitch_for_step(step);
+          slide_start_cv = curr_pitch_cv;
+          slide_end_cv = curr_pitch_cv;
+        }
+
+        if (step_is_gated(step) || step_is_slid(step_pv)) {
+          // 3V or 6V for accent
+          curr_gate_cv = (1+step_is_accent(step)) * HEMISPHERE_3V_CV;
+
+          uint32_t gate_time = (cycle_time / 2); // multiplier of 2
+          gate_off_tick = this_tick + gate_time;
+        }
+
+        curr_step_semitone = get_semitone_for_step(step);
       }
-
-      if (step_is_slid(step_pv)) {
-        // Glide from previous step pitch
-        //slide_start_cv = get_pitch_for_step(step_pv);
-        //curr_pitch_cv = slide_start_cv;
-
-        // Start glide from whereever we are
-        slide_start_cv = curr_pitch_cv;
-
-        slide_end_cv = get_pitch_for_step(step);
-      } else {
-        curr_pitch_cv = get_pitch_for_step(step);
-        slide_start_cv = curr_pitch_cv;
-        slide_end_cv = curr_pitch_cv;
-      }
-
-      if (step_is_gated(step) || step_is_slid(step_pv)) {
-        // 3V or 6V for accent
-        curr_gate_cv = (1 + step_is_accent(step)) * HEMISPHERE_3V_CV;
-
-        uint32_t gate_time = (cycle_time / 2); // multiplier of 2
-        gate_off_tick = this_tick + gate_time;
-      }
-
-      curr_step_semitone = get_semitone_for_step(step);
       reset_flag = 0;
     }
 
@@ -294,7 +293,6 @@ class TB_3PO: public HemisphereApplet {
 
     // Reset step position
     step = 0;
-    reset_flag = 1;
   }
 
 protected:

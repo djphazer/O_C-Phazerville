@@ -40,7 +40,6 @@
 #include "applets/ClockSetup.h"
 #endif
 #include "applets/ClockSkip.h"
-#include "applets/Combin8.h"
 #include "applets/Compare.h"
 #include "applets/DivSeq.h"
 #include "applets/DivSeq10.h"
@@ -158,7 +157,6 @@ AppletRegistry reg{
     DeclareApplet<ClockDivider>{6, 0x04},
     DeclareApplet<ClkToGate>{78, 0x04},
     DeclareApplet<ClockSkip>{28, 0x04},
-    DeclareApplet<Combin8>{82, 0x10},
     DeclareApplet<Compare>{30, 0x10},
     DeclareApplet<Cumulus>{5, 0x40},
     DeclareApplet<CVRecV2>{24, 0x02},

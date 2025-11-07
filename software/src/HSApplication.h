@@ -263,7 +263,9 @@ public:
             break;
           }
           case DIGITAL_INPUT_MAP: {
-            std::get<DigitalInputMap*>(selected_input_map)->div_mult.Adjust(direction);
+            int8_t& div
+              = std::get<DigitalInputMap*>(selected_input_map)->division;
+            div = constrain(div + direction, -64, 64);
             break;
           }
           default:
@@ -287,11 +289,9 @@ public:
           }
           case DIGITAL_INPUT_MAP: {
             gfxPos(32 - 4 * 6 / 2, 2);
-            DigitalInputMap* map = std::get<DigitalInputMap*>(selected_input_map);
-            int8_t div = map->div_mult.steps;
-            if (map->source < 0) graphics.print(1 + 3*(2 + map->source)); // "1" or "4"
-            if (div > 0) graphics.printf("/%2d", div);
-            else graphics.printf("x%2d", -div);
+            int8_t div = std::get<DigitalInputMap*>(selected_input_map)->division;
+            if (div < 0) graphics.printf("/%3d", -div + 1);
+            else graphics.printf("X%3d", div + 1);
             break;
           }
           default:

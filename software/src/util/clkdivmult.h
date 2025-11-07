@@ -1,7 +1,7 @@
 #pragma once
 
-static constexpr int CLOCKDIV_MAX = 64;
-static constexpr int CLOCKDIV_MIN = -24;
+static constexpr int CLOCKDIV_MAX = 63;
+static constexpr int CLOCKDIV_MIN = -16;
 
 struct ClkDivMult {
   int8_t steps = 1; // positive for division, negative for multiplication
@@ -12,9 +12,6 @@ struct ClkDivMult {
 
   void Set(int s) {
     steps = constrain(s, CLOCKDIV_MIN, CLOCKDIV_MAX);
-  }
-  void Adjust(int dir) {
-    Set(steps - dir); // reversed direction
   }
   bool Tick(bool clocked = 0) {
     if (steps == 0) return false;

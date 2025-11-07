@@ -96,8 +96,6 @@ public:
       if (!success) // fallback load from LFS
         PhzConfig::load_config(bank_filename);
 
-      LoadGlobals();
-
       // Version flag - for future reconfigurations...
       //  - This can be used to migrate old data after breaking changes to the schema
       //  - Right now, its existence indicates v1.10.1+
@@ -142,7 +140,6 @@ public:
         FILTERMASK2_KEY = 101,
 
         PC_CHANNEL_KEY  = 110,
-        PRESET_JUMP_KEY = 111,
 
         MIDI_MAPS_KEY   = 150, // + 0..32
 
@@ -154,14 +151,6 @@ public:
 
         VERSION_KEY = 0xFFFF
     };
-
-    void DeletePreset(int id) {
-        uint16_t preset_key = id << 11;
-        // non-global values are all 0-99 in the enum
-        for (int i = 0; i < 100; ++i) {
-          PhzConfig::deleteKey(preset_key | i);
-        }
-    }
 
     void StoreToPreset(int id) {
         // preset id is upper 5 bits - 32 presets per bank
@@ -215,9 +204,6 @@ public:
         PhzConfig::setValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
 
         PhzConfig::setValue(PC_CHANNEL_KEY, HS::frame.MIDIState.pc_channel);
-
-        data = PackPackables(jump_trig_);
-        PhzConfig::setValue(PRESET_JUMP_KEY, data);
 
         // Global quantizer settings
         for (size_t qslot = 0; qslot < QUANT_CHANNEL_COUNT; ++qslot) {
@@ -338,22 +324,11 @@ public:
           HS::frame.output_slew[i] = Unpack(data, PackLocation{i*8, 8});
         }
 
-        //LoadGlobals();
-
-        audio_app.LoadPreset(id);
-        PokePopup(PRESET_POPUP);
-    }
-    void LoadGlobals() {
-        // applet filtering
+        // applet filtering is actually just global
         PhzConfig::getValue(FILTERMASK1_KEY, HS::hidden_applets[0]);
         PhzConfig::getValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
 
-        uint64_t data = 0;
-        if (PhzConfig::getValue(PC_CHANNEL_KEY, data))
-          HS::frame.MIDIState.pc_channel = (uint8_t)data;
-
-        if (PhzConfig::getValue(PRESET_JUMP_KEY, data))
-          UnpackPackables(data, jump_trig_);
+        if (PhzConfig::getValue(PC_CHANNEL_KEY, data)) HS::frame.MIDIState.pc_channel = (uint8_t) data;
 
         // Global quantizer settings
         for (size_t qslot = 0; qslot < QUANT_CHANNEL_COUNT; ++qslot) {
@@ -388,6 +363,9 @@ public:
             OC::user_patterns[i].notes[step] = Unpack(data, PackLocation{(step & 0x3)*16, 16});
           }
         }
+
+        audio_app.LoadPreset(id);
+        PokePopup(PRESET_POPUP);
     }
     void ProcessQueue() {
       if (queued_preset >= 0) {
@@ -402,14 +380,6 @@ public:
       }
       else
         LoadFromPreset(id);
-    }
-    void JumpToNextPreset() {
-      int next_id = preset_id + 1;
-      while (!isValidPreset(next_id) && next_id != preset_id) {
-        ++next_id %= QUAD_PRESET_COUNT;
-      }
-      if (next_id != preset_id)
-        QueuePresetLoad(next_id);
     }
 
     // does not modify the preset, only the quad_manager
@@ -431,7 +401,7 @@ public:
         HS::IOFrame &f = HS::frame;
         int load_slot = -1;
 
-        while (timeout < 60 && device.read()) {
+        while (timeout < 40 && device.read()) {
             const uint8_t message = device.getType();
             const uint8_t data1 = device.getData1();
             const uint8_t data2 = device.getData2();
@@ -456,28 +426,15 @@ public:
         }
     }
 
-    void mainloop() {
+    void Controller() {
         timeout = 0;
         // top-level MIDI-to-CV handling - alters frame outputs
         ProcessMIDI(usbMIDI, usbHostMIDI, MIDI1);
         ProcessMIDI(usbHostMIDI, usbMIDI, MIDI1);
         ProcessMIDI(MIDI1, usbMIDI, usbHostMIDI);
-    }
-    void Controller() {
+
         // Clock Setup applet handles internal clock duties
         ClockSetup_instance.Controller();
-        // ^ this will process the queue and load presets
-
-        // this might be triggered by the internal clock...
-        if (jump_trig_.Clock() && !HS::clock_m.auto_reset) {
-          JumpToNextPreset();
-          // ^ this will sometimes queue a preset load
-
-          // The paradox is we need to process the clock first, in case jump_trig needs it,
-          // but then jump_trig will queue another preset load,
-          // so we have to process the queue again.
-          if (jump_trig_.source < 0) ProcessQueue();
-        }
 
         // execute Applets
         for (int h = 0; h < APPLET_SLOTS; h++)
@@ -487,9 +444,9 @@ public:
 
             active_applet[h]->Controller();
         }
+        HS::clock_m.auto_reset = false;
         audio_app.Controller();
         HemisphereApplet::ProcessCursors();
-        HS::clock_m.auto_reset = false;
     }
 
     void DrawFullScreen() {
@@ -583,11 +540,6 @@ public:
             // the popup will linger when moving onto the Config Dummy
             break;
 
-          case MIDI_MAPS_PAGE:
-            DrawMidiMaps();
-            draw_applets = false;
-            break;
-
           case INPUT_SETTINGS:
             DrawInputMappings();
             draw_applets = false;
@@ -611,8 +563,6 @@ public:
         }
         if (HS::q_edit)
           PokePopup(QUANTIZER_POPUP);
-        else if (HS::midi_edit)
-          PokePopup(MIDI_POPUP);
 
         if (draw_applets) {
           if (view_state == AUDIO_SETUP) {
@@ -697,12 +647,6 @@ public:
                 break;
             case 1:
             case 2:
-              if (!clock_m.IsRunning() && CheckEditInputMapPress(
-                    zoom_cursor,
-                    IndexedInput(1, trigmap[zoom_slot*2]),
-                    IndexedInput(2, trigmap[zoom_slot*2+1])
-                  ))
-                break;
             case 5:
             case 6:
             default:
@@ -790,10 +734,6 @@ public:
           HS::QEditEncoderMove(h, event.value);
           return;
         }
-        if (HS::midi_edit) {
-          HS::MEditEncoderMove(h, event.value);
-          return;
-        }
 
         if (config_page > HIDE_CONFIG || preset_cursor) {
             ConfigEncoderAction(h, event.value);
@@ -830,7 +770,7 @@ public:
                   if (clock_m.IsRunning()) // && clock_m.GetMultiply(chan))
                   {
                     clock_m.SetMultiply(clock_m.GetMultiply(chan) + event.value, chan);
-                  } else if (!EditSelectedInputMap(event.value))
+                  } else
                     HS::trigmap[chan].ChangeSource(event.value);
                   break;
                 }
@@ -865,8 +805,7 @@ public:
       if (config_cursor <= CONFIG_DUMMY) config_page = LOADSAVE_POPUP;
       else if (config_cursor < TRIGMAP1) config_page = CONFIG_SETTINGS;
       else if (config_cursor < QUANT1) config_page = INPUT_SETTINGS;
-      else if (config_cursor < MIDIMAP1) config_page = QUANTIZER_SETTINGS;
-      else if (config_cursor < SHOWHIDELIST) config_page = MIDI_MAPS_PAGE;
+      else if (config_cursor < SHOWHIDELIST) config_page = QUANTIZER_SETTINGS;
       else config_page = LAST_PAGE;
     }
     void ToggleConfigMenu() {
@@ -906,14 +845,12 @@ public:
     void ExitFullScreen() {
       view_state = APPLETS;
       isEditing = false;
-      ClearEditInputMap();
       select_mode = -1;
     }
     void SetFullScreen(HEM_SIDE hemisphere) {
       SwitchToSlot(hemisphere);
       view_state = APPLET_FULLSCREEN;
       isEditing = false;
-      ClearEditInputMap();
       select_mode = -1;
     }
     void ToggleFullScreen() {
@@ -977,22 +914,6 @@ public:
             break;
           }
 
-          if (HS::midi_edit) {
-            if (event.control == OC::CONTROL_BUTTON_A) {
-              mview = constrain(mview - 1, 0, MIDIMAP_MAX-1);
-              config_cursor = MIDIMAP1 + mview;
-            } else if (event.control == OC::CONTROL_BUTTON_B) {
-              mview = constrain(mview + 1, 0, MIDIMAP_MAX-1);
-              config_cursor = MIDIMAP1 + mview;
-            } else {
-              HS::midi_edit = 0;
-              HS::popup_tick = 0;
-              select_mode = -1;
-            }
-            OC::ui.SetButtonIgnoreMask();
-            break;
-          }
-
           if (event.control == OC::CONTROL_BUTTON_Z)
           {
               // Z-button - Zap the CLOCK!!
@@ -1014,7 +935,6 @@ public:
               if (CheckButtonCombos(event)) {
                 select_mode = -1;
                 isEditing = false;
-                ClearEditInputMap();
                 OC::ui.SetButtonIgnoreMask(); // ignore release and long-press
               } else {
                 HEM_SIDE slot = ButtonToSlot(event);
@@ -1087,15 +1007,13 @@ private:
     int next_applet_index[4]; // queued from UI thread, handled by Controller
     uint64_t clock_data, global_data, applet_data[4]; // cache of applet data
     bool view_slot[2] = {0, 0}; // Two applets on each side, only one visible at a time
-    int config_cursor = LOAD_PRESET;
+    int config_cursor = 0;
 
     int select_mode = -1;
     HEM_SIDE zoom_slot; // Which of the hemispheres (if any) is in fullscreen/help mode
     int zoom_cursor; // 0=select; 1,2=trigmap; 3,4=cvmap; 5,6=outmode
     uint32_t click_tick; // Measure time between clicks for double-click
     int first_click; // The first button pushed of a double-click set, to see if the same one is pressed
-
-    DigitalInputMap jump_trig_;
 
     // Button combos can cause multiple triggers if the buttons are pressed
     // close enough together. Each press will have its own event with both
@@ -1124,7 +1042,6 @@ private:
       CONFIG_SETTINGS,
       INPUT_SETTINGS,
       QUANTIZER_SETTINGS,
-      MIDI_MAPS_PAGE,
       SHOWHIDE_APPLETS,
 
       LAST_PAGE = SHOWHIDE_APPLETS
@@ -1132,7 +1049,6 @@ private:
     int config_page = HIDE_CONFIG;
 
     enum QuadrantsConfigCursor {
-        DELETE_PRESET,
         LOAD_PRESET, SAVE_PRESET,
         AUTO_SAVE,
         CONFIG_DUMMY, // past this point goes full screen
@@ -1140,7 +1056,6 @@ private:
         SCREENSAVER_MODE,
         CURSOR_MODE,
         PRESET_BANK_NUM,
-        PRESET_JUMP_TRIG,
         MIDI_PC_CHANNEL,
 
         // Input Remapping
@@ -1153,20 +1068,10 @@ private:
         QUANT1, QUANT2, QUANT3, QUANT4,
         QUANT5, QUANT6, QUANT7, QUANT8,
 
-        // MIDI Mappings
-        MIDIMAP1, MIDIMAP2, MIDIMAP3, MIDIMAP4,
-        MIDIMAP5, MIDIMAP6, MIDIMAP7, MIDIMAP8,
-        MIDIMAP9, MIDIMAP10, MIDIMAP11, MIDIMAP12,
-        MIDIMAP13, MIDIMAP14, MIDIMAP15, MIDIMAP16,
-        MIDIMAP17, MIDIMAP18, MIDIMAP19, MIDIMAP20,
-        MIDIMAP21, MIDIMAP22, MIDIMAP23, MIDIMAP24,
-        MIDIMAP25, MIDIMAP26, MIDIMAP27, MIDIMAP28,
-        MIDIMAP29, MIDIMAP30, MIDIMAP31, MIDIMAP32,
-
         // Applet visibility (dummy position)
         SHOWHIDELIST,
 
-        MAX_CURSOR = MIDIMAP32
+        MAX_CURSOR = QUANT8
     };
 
     void ConfigEncoderAction(int h, int dir) {
@@ -1175,12 +1080,13 @@ private:
             config_page += dir;
             config_page = constrain(config_page, LOADSAVE_POPUP, LAST_PAGE);
 
-            const int cursorpos[] = { 0, LOAD_PRESET, TRIG_LENGTH, TRIGMAP1, QUANT1, MIDIMAP1, SHOWHIDELIST };
+            const int cursorpos[] = { 0, LOAD_PRESET, TRIG_LENGTH, TRIGMAP1, QUANT1, SHOWHIDELIST };
             config_cursor = cursorpos[config_page];
           } else if (config_page == SHOWHIDE_APPLETS) {
             showhide_cursor.Scroll(dir);
           } else { // move cursor
-            config_cursor = constrain(config_cursor + dir, LOAD_PRESET, MAX_CURSOR);
+            config_cursor += dir;
+            config_cursor = constrain(config_cursor, 0, MAX_CURSOR);
 
             SetConfigPageFromCursor();
           }
@@ -1200,8 +1106,7 @@ private:
         case TRIGMAP2:
         case TRIGMAP3:
         case TRIGMAP4:
-            if (!EditSelectedInputMap(dir))
-              HS::trigmap[config_cursor-TRIGMAP1].ChangeSource(dir);
+            HS::trigmap[config_cursor-TRIGMAP1].ChangeSource(dir);
             break;
         case CVMAP1:
         case CVMAP2:
@@ -1214,8 +1119,7 @@ private:
         case TRIGMAP6:
         case TRIGMAP7:
         case TRIGMAP8:
-            if (!EditSelectedInputMap(dir))
-              HS::trigmap[config_cursor-TRIGMAP5 + 4].ChangeSource(dir);
+            HS::trigmap[config_cursor-TRIGMAP5 + 4].ChangeSource(dir);
             break;
         case CVMAP5:
         case CVMAP6:
@@ -1227,10 +1131,6 @@ private:
         case TRIG_LENGTH:
             HS::trig_length = (uint32_t) constrain( int(HS::trig_length + dir), 1, 127);
             break;
-        case PRESET_JUMP_TRIG:
-            if (!EditSelectedInputMap(dir))
-              jump_trig_.ChangeSource(dir);
-            break;
         case PRESET_BANK_NUM:
             bank_num = constrain(bank_num + dir, 0, 99);
             break;
@@ -1241,11 +1141,10 @@ private:
         case SCREENSAVER_MODE:
             HS::screensaver_mode = constrain(HS::screensaver_mode + dir, 0, SCREENSAVER_MODE_COUNT - 1);
             break;
-        case DELETE_PRESET:
         case LOAD_PRESET:
         case SAVE_PRESET:
             if (h == 0) {
-              config_cursor = constrain(config_cursor + dir, DELETE_PRESET, SAVE_PRESET);
+              config_cursor = constrain(config_cursor + dir, LOAD_PRESET, SAVE_PRESET);
             } else {
               preset_cursor = constrain(preset_cursor + dir, 1, QUAD_PRESET_COUNT);
             }
@@ -1267,17 +1166,10 @@ private:
             }
 
             // Save or Load on button push
-            switch (config_cursor) {
-              case DELETE_PRESET:
-                DeletePreset(preset_cursor - 1);
-                return; // don't close menu
-                break;
-              case SAVE_PRESET:
-                StoreToPreset(preset_cursor - 1);
-                break;
-              case LOAD_PRESET:
+            if (config_cursor == SAVE_PRESET)
+                StoreToPreset(preset_cursor-1);
+            else {
                 QueuePresetLoad(preset_cursor - 1);
-                break;
             }
 
             preset_cursor = 0; // deactivate preset selection
@@ -1288,7 +1180,7 @@ private:
         }
 
         switch (config_cursor) {
-          case CONFIG_DUMMY:
+        case CONFIG_DUMMY:
             // reset input mappings to defaults
             HS::Init();
             // randomize all applets
@@ -1298,133 +1190,89 @@ private:
 #ifdef PEWPEWPEW
               // load random data !!!
               // this will expose critical bugs in data validation ;)
-              HS::available_applets[index].instance[ch]->OnDataReceive(
-                uint64_t(random()) << 32 | (uint64_t)random()
-              );
+              HS::available_applets[index].instance[ch]->OnDataReceive(uint64_t(random()) << 32 | (uint64_t)random());
 #endif
             }
             break;
 
-          case DELETE_PRESET:
-          case SAVE_PRESET:
-          case LOAD_PRESET:
+        case SAVE_PRESET:
+        case LOAD_PRESET:
             preset_cursor = preset_id + 1;
             break;
 
-          case AUTO_SAVE:
+        case AUTO_SAVE:
             HS::auto_save_enabled = !HS::auto_save_enabled;
             break;
 
-          case QUANT1:
-          case QUANT2:
-          case QUANT3:
-          case QUANT4:
-          case QUANT5:
-          case QUANT6:
-          case QUANT7:
-          case QUANT8:
+        case QUANT1:
+        case QUANT2:
+        case QUANT3:
+        case QUANT4:
+        case QUANT5:
+        case QUANT6:
+        case QUANT7:
+        case QUANT8:
             HS::QuantizerEdit(config_cursor - QUANT1);
             break;
 
-          case CVMAP1:
-          case CVMAP2:
-          case CVMAP3:
-          case CVMAP4:
-          case CVMAP5:
-          case CVMAP6:
-          case CVMAP7:
-          case CVMAP8:
-            if (CheckEditInputMapPress(
-                  config_cursor,
-                  IndexedInput(CVMAP1, cvmap[0]),
-                  IndexedInput(CVMAP2, cvmap[1]),
-                  IndexedInput(CVMAP3, cvmap[2]),
-                  IndexedInput(CVMAP4, cvmap[3]),
-                  IndexedInput(CVMAP5, cvmap[4]),
-                  IndexedInput(CVMAP6, cvmap[5]),
-                  IndexedInput(CVMAP7, cvmap[6]),
-                  IndexedInput(CVMAP8, cvmap[7])
-                ))
-              break;
-          case TRIGMAP1:
-          case TRIGMAP2:
-          case TRIGMAP3:
-          case TRIGMAP4:
-          case TRIGMAP5:
-          case TRIGMAP6:
-          case TRIGMAP7:
-          case TRIGMAP8:
-            if (CheckEditInputMapPress(
-                  config_cursor,
-                  IndexedInput(TRIGMAP1, trigmap[0]),
-                  IndexedInput(TRIGMAP2, trigmap[1]),
-                  IndexedInput(TRIGMAP3, trigmap[2]),
-                  IndexedInput(TRIGMAP4, trigmap[3]),
-                  IndexedInput(TRIGMAP5, trigmap[4]),
-                  IndexedInput(TRIGMAP6, trigmap[5]),
-                  IndexedInput(TRIGMAP7, trigmap[6]),
-                  IndexedInput(TRIGMAP8, trigmap[7])
-                ))
-              break;
-          case TRIG_LENGTH:
-          case MIDI_PC_CHANNEL:
-          case SCREENSAVER_MODE:
+        case CVMAP1:
+        case CVMAP2:
+        case CVMAP3:
+        case CVMAP4:
+        case CVMAP5:
+        case CVMAP6:
+        case CVMAP7:
+        case CVMAP8:
+          if (CheckEditInputMapPress(
+                config_cursor,
+                IndexedInput(CVMAP1, cvmap[0]),
+                IndexedInput(CVMAP2, cvmap[1]),
+                IndexedInput(CVMAP3, cvmap[2]),
+                IndexedInput(CVMAP4, cvmap[3]),
+                IndexedInput(CVMAP5, cvmap[4]),
+                IndexedInput(CVMAP6, cvmap[5]),
+                IndexedInput(CVMAP7, cvmap[6]),
+                IndexedInput(CVMAP8, cvmap[7])
+              ))
+            break;
+        case TRIGMAP1:
+        case TRIGMAP2:
+        case TRIGMAP3:
+        case TRIGMAP4:
+        case TRIGMAP5:
+        case TRIGMAP6:
+        case TRIGMAP7:
+        case TRIGMAP8:
+        case TRIG_LENGTH:
+        case MIDI_PC_CHANNEL:
+        case SCREENSAVER_MODE:
             isEditing = !isEditing;
             break;
 
-          case PRESET_JUMP_TRIG:
-            if (!CheckEditInputMapPress(
-                  config_cursor, IndexedInput(PRESET_JUMP_TRIG, jump_trig_)
-                ))
-              isEditing ^= 1;
-            break;
-
-          case PRESET_BANK_NUM:
+        case PRESET_BANK_NUM:
             isEditing = !isEditing;
             if (!isEditing) SetBank(bank_num);
             break;
 
-          case CURSOR_MODE:
+        case CURSOR_MODE:
             HS::cursor_wrap = !HS::cursor_wrap;
             break;
 
-          case SHOWHIDELIST:
+        case SHOWHIDELIST:
             if (h == 0) // left encoder inverts selection
             {
               HS::hidden_applets[0] = ~HS::hidden_applets[0];
               HS::hidden_applets[1] = ~HS::hidden_applets[1];
-            } else // right encoder toggles current
+            }
+            else // right encoder toggles current
               HS::showhide_applet(showhide_cursor.cursor_pos());
             break;
-          default: {
-            // I'm not going to paste 32 different MIDI cursor positions so it's just the default :P
-            int midx = constrain(config_cursor - MIDIMAP1, 0, 31);
-            HS::MidiMapEdit(midx);
-            break;
-          }
+        default: break;
         }
     }
 
-    void DrawMidiMaps() {
-      const int w = 16;
-      const int h = 13;
-      CVInputMap cv_;
-      gfxHeader("<    MIDI Maps     >");
-      for (size_t midx = 0; midx < MIDIMAP_MAX; ++midx) {
-        cv_.SetMidiMap(midx);
-        int x = 1 + (midx%8)*w;
-        int y = 12 + (midx/8)*h;
-        gfxPos(x, y);
-        gfxPrint(cv_);
-        //gfxIcon(x, y, PhzIcons::midiIn);
-        //graphics.printf("M%d", midx+1);
-      }
-      int curx = 9 + ((config_cursor - MIDIMAP1)%8)*w;
-      int cury = 12 + ((config_cursor - MIDIMAP1)/8)*h;
-      gfxIcon(curx, cury, LEFT_ICON);
-    }
     void DrawInputMappings() {
-        gfxHeader("<  Input Mapping    >");
+        gfxHeader("<  Input Mapping  >");
         gfxIcon(25, 13, TR_ICON); gfxIcon(89, 13, TR_ICON);
         gfxIcon(25, 26, CV_ICON); gfxIcon(89, 26, CV_ICON);
         gfxIcon(25, 39, TR_ICON); gfxIcon(89, 39, TR_ICON);
@@ -1454,7 +1302,7 @@ private:
         gfxDisplayInputMapEditor();
     }
     void DrawQuantizerConfig() {
-        gfxHeader("<  Quantizer Setup  >");
+        gfxHeader("<  Quantizer Setup");
 
         for (int ch=0; ch<4; ++ch) {
           const int x = 8 + ch*32;
@@ -1518,20 +1366,6 @@ private:
 
         gfxPrint(1, 45, "Preset Bank#  ");
         gfxPrint(bank_num);
-        gfxPrint("   ");
-
-        int x = graphics.getPrintPosX();
-        gfxPrint(jump_trig_);
-        if (config_cursor == PRESET_JUMP_TRIG) {
-          int y = graphics.getPrintPosY();
-          int w = strlen(jump_trig_.InputName()) * 6 + 2;
-          CONSTRAIN(x, 3, 126-w);
-
-          graphics.clearRect(x - 2, y - 1, w + 3, 12);
-          gfxFrame(x - 1, y - 1, w + 1, 11);
-          gfxPrint(x, y + 1, jump_trig_.InputName());
-          if (EditMode()) gfxInvert(x - 1, y - 1, w + 1, 11);
-        }
 
         const uint8_t pc_ch = HS::frame.MIDIState.pc_channel;
         gfxPrint(1, 55, "MIDI-PC Ch:   ");
@@ -1563,8 +1397,6 @@ private:
             gfxIcon(2, 1, LEFT_ICON);
             break;
         }
-
-        gfxDisplayInputMapEditor();
     }
 
     bool isValidPreset(int id) {
@@ -1578,8 +1410,7 @@ private:
         return HS::available_applets[idx].instance[h];
     }
     void DrawPresetSelector() {
-        const char * const hdrtxt[] = { "DEL!", "Load", "Save", "???" };
-        gfxHeader(hdrtxt[config_cursor]);
+        gfxHeader((config_cursor == SAVE_PRESET) ? "Save" : "Load");
         gfxPrint(30, 1, "Preset: Bank# ");
         gfxPrint(bank_num);
         if (!SDcard_Ready) gfxInvert(78, 0, 30, 9);
@@ -1667,7 +1498,6 @@ void QUADRANTS_handleAppEvent(OC::AppEvent event) {
 }
 
 void QUADRANTS_loop() {
-  quad_manager.mainloop();
   audio_app.mainloop();
 } // Essentially deprecated in favor of ISR
 

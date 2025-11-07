@@ -116,7 +116,6 @@ public:
     }
     void CancelEdit() {
       enc_edit[hemisphere].isEditing = false;
-      ClearEditInputMap();
     }
 
     template<typename T>
@@ -250,45 +249,20 @@ public:
 
     //////////////// Offset graphics methods
     ////////////////////////////////////////////////////////////////////////////////
-    void gfxCursor(int x, int y, int w, const char *str) {
-      gfxCursor(x, y, w, 9, str);
-    }
-    void gfxCursor(int x, int y, int w, int h = 9, const char *str = nullptr) {
-      // assumes standard text height for highlighting
+    void gfxCursor(int x, int y, int w, int h = 9) { // assumes standard text height for highlighting
       if (EditMode()) {
         gfxInvert(x, y - h, w, h);
-        if (str) {
-          const int box_w = strlen(str)*6 + 4;
-          const int box_x = min(x, 63 - box_w);
-          const int box_y = (y > (63 - h - 2)) ? y - 2*h - 2 : y;
-
-          gfxClear(box_x, box_y, box_w, h+3);
-          gfxFrame(box_x+1, box_y, box_w, h+2);
-          gfxPrint(box_x+2, box_y+2, str);
-        }
       } else if (CursorBlink()) {
         gfxLine(x, y, x + w - 1, y);
         gfxPixel(x, y-1);
         gfxPixel(x + w - 1, y-1);
       }
     }
-    void gfxSpicyCursor(int x, int y, int w, const char *str) {
-      gfxSpicyCursor(x, y, w, 9, str);
-    }
-    void gfxSpicyCursor(int x, int y, int w, int h = 9, const char *str = nullptr) {
+    void gfxSpicyCursor(int x, int y, int w, int h = 9) {
       if (EditMode()) {
         if (CursorBlink())
           gfxFrame(x, y - h, w, h, true);
         gfxInvert(x, y - h, w, h);
-        if (str) {
-          const int box_w = strlen(str)*6 + 4;
-          const int box_x = min(x, 63 - box_w);
-          const int box_y = (y > (63 - h - 2)) ? y - 2*h - 2 : y;
-
-          gfxClear(box_x, box_y, box_w, h+3);
-          gfxFrame(box_x+1, box_y, box_w, h+2);
-          gfxPrint(box_x+2, box_y+2, str);
-        }
       } else {
         gfxLine(x - CursorBlink(), y, x + w - 1, y, 2);
         gfxPixel(x, y-1);
@@ -384,13 +358,11 @@ public:
     void gfxEndCursor(bool selected, bool spicy = false, const char *str = nullptr) {
         if (selected) {
           if (str) {
-            const int w = strlen(str)*6 + 2;
-            const int x = constrain(gfxGetPrintPosX() - w, 0, 63 - w);
-            gfxClear(x - 2, cursor_start_y-1, w + 3, 12);
-            gfxFrame(x - 1, cursor_start_y-1, w + 1, 11, spicy);
-            gfxPrint(x, cursor_start_y+1, str);
+            gfxClear(cursor_start_x - 14, cursor_start_y-1, 24, 10);
+            gfxFrame(cursor_start_x - 13, cursor_start_y-1, 22, 10, spicy);
+            gfxPrint(cursor_start_x - 11, cursor_start_y+1, str);
             if (EditMode())
-              gfxInvert(x - 1, cursor_start_y-1, w + 1, 11);
+              gfxInvert(cursor_start_x - 14, cursor_start_y-1, 24, 10);
           } else {
             int16_t w = gfxGetPrintPosX() - cursor_start_x;
             int16_t y = gfxGetPrintPosY() + 8;
@@ -551,7 +523,9 @@ public:
             break;
           }
           case DIGITAL_INPUT_MAP: {
-            std::get<DigitalInputMap*>(selected_input_map)->div_mult.Adjust(direction);
+            int8_t& div
+              = std::get<DigitalInputMap*>(selected_input_map)->division;
+            div = constrain(div + direction, -64, 64);
             break;
           }
           default:
@@ -575,11 +549,9 @@ public:
           }
           case DIGITAL_INPUT_MAP: {
             gfxPos(32 - 4 * 6 / 2, 2);
-            DigitalInputMap* map = std::get<DigitalInputMap*>(selected_input_map);
-            int8_t div = map->div_mult.steps;
-            if (map->source < 0) graphics.print(1 + 3*(2 + map->source)); // "1" or "4"
-            if (div > 0) graphics.printf("/%2d", div);
-            else graphics.printf("x%2d", -div);
+            int8_t div = std::get<DigitalInputMap*>(selected_input_map)->division;
+            if (div < 0) graphics.printf("/%3d", -div + 1);
+            else graphics.printf("X%3d", div + 1);
             break;
           }
           default:

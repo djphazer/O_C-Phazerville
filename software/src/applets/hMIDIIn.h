@@ -158,7 +158,9 @@ public:
                 break;
             case hMIDIIn_A_OUTPUT_MODE:
             case hMIDIIn_B_OUTPUT_MODE:
-                map.AdjustFunction(direction);
+                map.function = constrain(map.function + direction, 0, HEM_MIDI_MAX_FUNCTION);
+                if (map.function == HEM_MIDI_CC_OUT)
+                  map.function_cc = -1; // auto-learn MIDI CC
                 frame.MIDIState.UpdateMidiChannelFilter();
                 break;
             case hMIDIIn_A_POLY_VOICE:

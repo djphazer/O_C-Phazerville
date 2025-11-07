@@ -88,7 +88,6 @@ namespace HS {
     MENU_POPUP,
     CLOCK_POPUP, PRESET_POPUP,
     QUANTIZER_POPUP,
-    MIDI_POPUP,
     MESSAGE_POPUP,
 
     POPUP_TYPE_COUNT
@@ -189,15 +188,10 @@ namespace HS {
     }
   };
 
-  struct DigitalInputMap;
-  struct CVInputMap;
-
   extern uint32_t popup_tick; // for button feedback
   extern PopupType popup_type;
   extern uint8_t qview; // which quantizer's setting is shown in popup
   extern int q_edit;
-  extern int midi_edit;
-  extern uint8_t mview;
   extern ErrMsgIndex msg_idx;
 
   // input quantizers, because sometimes we need hysteresis
@@ -238,9 +232,7 @@ namespace HS {
   void NudgeOctave(int ch, int dir);
   void NudgeScale(int ch, int dir);
   void QuantizerEdit(int ch);
-  void MidiMapEdit(int ch);
   void QEditEncoderMove(bool rightenc, int dir);
-  void MEditEncoderMove(bool rightenc, int dir);
   void DrawPopup(const int config_cursor = 0, const int preset_id = 0, const bool blink = 0);
   void ToggleClockRun();
   void PokePopup(PopupType pop, ErrMsgIndex err = NO_ERROR);
@@ -279,9 +271,6 @@ void gfxPrint(int num);
 void gfxPrint(int x_adv, int num);
 void gfxPrintVoltage(int cv);
 void gfxPrintFreqFromPitch(int16_t pitch);
-void gfxPrintIcon(const uint8_t *data, int16_t w = 8);
-void gfxPrint(HS::DigitalInputMap &map);
-void gfxPrint(HS::CVInputMap &map);
 void gfxPixel(int x, int y);
 void gfxFrame(int x, int y, int w, int h, bool dotted = false);
 void gfxRect(int x, int y, int w, int h);

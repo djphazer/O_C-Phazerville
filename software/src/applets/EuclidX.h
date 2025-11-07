@@ -84,7 +84,7 @@ public:
             ForEachChannel(cv_ch) {
                 switch (cv_dest[cv_ch] - ch * LENGTH2) { // this is dumb, but efficient
                 case LENGTH1:
-                    Modulate(actual_length[ch], cv_ch, 2, 32);
+                    Modulate(actual_length[ch], ch, 2, 32);
 
                     if (actual_beats[ch] > actual_length[ch])
                         actual_beats[ch] = actual_length[ch];
@@ -95,13 +95,13 @@ public:
 
                     break;
                 case BEATS1:
-                    Modulate(actual_beats[ch], cv_ch, 0, actual_length[ch]);
+                    Modulate(actual_beats[ch], ch, 0, actual_length[ch]);
                     break;
                 case OFFSET1:
-                    Modulate(actual_offset[ch], cv_ch, 0, actual_length[ch] + padding[ch]);
+                    Modulate(actual_offset[ch], ch, 0, actual_length[ch] + padding[ch]);
                     break;
                 case PADDING1:
-                    Modulate(actual_padding[ch], cv_ch, 0, 32 - actual_length[ch]);
+                    Modulate(actual_padding[ch], ch, 0, 32 - actual_length[ch]);
                     if (actual_offset[ch] >= actual_length[ch] + actual_padding[ch])
                         actual_offset[ch] = actual_length[ch] + actual_padding[ch] - 1;
                     break;
@@ -311,7 +311,7 @@ private:
         case BEATS1:
         case OFFSET1:
         case PADDING1:
-            gfxCursor(f * spacing, y, 13, cv_labels[cursor]);
+            gfxCursor(f * spacing, y, 13);
             break;
 
         case CV_DEST1:
@@ -321,7 +321,7 @@ private:
             gfxCursor(0, 19 + (cursor - CV_DEST1)*5, 11, 7);
             break;
         case GATE_MODE:
-            gfxCursor(pad_left + 1 * spacing - 1, 23, 10, gate_mode? "Gate":"Trig");
+            gfxCursor(pad_left + 1 * spacing - 1, 23, 10);
             break;
         }
     }

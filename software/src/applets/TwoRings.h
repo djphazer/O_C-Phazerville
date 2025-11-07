@@ -574,8 +574,8 @@ private:
 
         // TODO: generalize this as a cursor LUT for all applets
         switch ((TM2Cursor)cursor) {
-            case LENGTH: gfxSpicyCursor(11, 23, 13, "Length"); break;
-            case PROB:   gfxSpicyCursor(35, 23, 19, "Prob"); break;
+            case LENGTH: gfxSpicyCursor(11, 23, 13); break;
+            case PROB:   gfxSpicyCursor(35, 23, 19); break;
             case QUANT_A:
             case QUANT_B: {
               const int ch = (cursor-QUANT_A);
@@ -587,19 +587,16 @@ private:
               break;
             }
 
-            case RANGE:  gfxCursor(10, 43, 13, "Range"); break;
-            case SLEW:   gfxCursor(44, 43, 19, "Slew"); break;
+            case RANGE:  gfxCursor(10, 43, 13); break;
+            case SLEW:   gfxCursor(44, 43, 19); break;
 
-            // TODO: mode labels array
             case CVMODE1:
             case CVMODE2:
-                gfxCursor(14 + 34*(cursor-CVMODE1), 33, 10, cvmode_names[cvmode[cursor-CVMODE1]]);
+                gfxCursor(14 + 34*(cursor-CVMODE1), 33, 10);
                 break;
 
-            case OUT_A:
-            case OUT_B:
-                gfxCursor(14 + 34*(cursor-OUT_A), 43, 10, outmode_names[outmode[cursor-OUT_A]]);
-                break;
+            case OUT_A:  gfxCursor(14, 43, 10); break;
+            case OUT_B:  gfxCursor(48, 43, 10); break;
 
             default: break;
         }
