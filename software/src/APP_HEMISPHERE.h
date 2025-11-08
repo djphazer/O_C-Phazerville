@@ -46,6 +46,11 @@
 #include "hemisphere_audio_config.h"
 #endif
 
+#ifdef ENABLE_APP_CALIBR8OR
+// We depend on Calibr8or to save quantizer settings
+#include "APP_CALIBR8OR.h"
+#endif
+
 void HS::DrawAppletList(bool blink) {
   const size_t LineH = 12;
 
@@ -239,10 +244,7 @@ public:
 
 };
 
-// 4 extra presets for global data... it's a dirty hack for T32,
-// if you're willing to hoard most of the EEPROM space just for Hemisphere.
-// This pretty much kills Custom Builds.
-HemispherePreset hem_presets[HEM_NR_OF_PRESETS + 4];
+HemispherePreset hem_presets[HEM_NR_OF_PRESETS + 1];
 HemispherePreset *hem_active_preset = 0;
 #endif
 
@@ -287,21 +289,6 @@ public:
 #else
         if (!hem_active_preset)
             LoadFromPreset(0);
-
-        // Restore global quantizer settings
-        for (size_t qslot = 0; qslot < QUANT_CHANNEL_COUNT; ++qslot) {
-          uint64_t data = hem_presets[HEM_NR_OF_PRESETS + 1 + (qslot/3)].GetData(HEM_SIDE(qslot));
-          if (data == 0) break; // don't load blanks
-          auto &q = q_engine[qslot];
-          UnpackPackables(data,
-              q.scale,
-              q.octave,
-              q.root_note,
-              q.mask
-              );
-          q.Reconfig();
-        }
-
 #endif
     }
     void Suspend() {
@@ -347,6 +334,11 @@ public:
 
         // initiate actual EEPROM save - ONLY if necessary!
         if (doSave && !skip_eeprom) {
+#ifdef ENABLE_APP_CALIBR8OR
+          // call Calibr8or so it remembers quantizer settings
+          // this also takes care of the EEPROM save
+          Calibr8or_instance.SavePreset();
+#else
           // initiate actual EEPROM save
           OC::CORE::app_isr_enabled = false;
           //OC::draw_save_message(32);
@@ -355,6 +347,7 @@ public:
           OC::CORE::app_isr_enabled = true;
 
           PokePopup(HS::MESSAGE_POPUP, HS::PRESET_SAVED);
+#endif
         }
     }
 #endif
@@ -1550,7 +1543,7 @@ static constexpr size_t HEMISPHERE_storageSize() {
 #ifdef __IMXRT1062__
     return 0;
 #else
-    return HemispherePreset::storageSize() * (HEM_NR_OF_PRESETS + 4);
+    return HemispherePreset::storageSize() * (HEM_NR_OF_PRESETS + 1);
 #endif
 }
 
@@ -1564,20 +1557,8 @@ static size_t HEMISPHERE_save(void *storage) {
 
     hem_presets[HEM_NR_OF_PRESETS].SetGlobals(HS::frame.MIDIState.pc_channel);
 
-    // Global quantizer settings
-    for (size_t qslot = 0; qslot < QUANT_CHANNEL_COUNT; ++qslot) {
-      auto &q = q_engine[qslot];
-      uint64_t data = PackPackables(
-          q.scale,
-          q.octave,
-          q.root_note,
-          q.mask);
-      // dirty haxxx
-      hem_presets[HEM_NR_OF_PRESETS + 1 + (qslot/3)].SetData(HEM_SIDE(qslot), data);
-    }
-
     size_t used = 0;
-    for (int i = 0; i < HEM_NR_OF_PRESETS + 4; ++i) {
+    for (int i = 0; i <= HEM_NR_OF_PRESETS; ++i) {
         used += hem_presets[i].Save(static_cast<char*>(storage) + used);
     }
     return used;
@@ -1589,7 +1570,7 @@ static size_t HEMISPHERE_restore(const void *storage) {
     return 0;
 #else
     size_t used = 0;
-    for (int i = 0; i < HEM_NR_OF_PRESETS + 4; ++i) {
+    for (int i = 0; i <= HEM_NR_OF_PRESETS; ++i) {
         used += hem_presets[i].Restore(static_cast<const char*>(storage) + used);
     }
 
