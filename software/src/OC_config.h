@@ -59,7 +59,13 @@ static constexpr unsigned long SETTINGS_SAVE_TIMEOUT_MS = 1000;
 #else
 // T3.2 - 4 channels, 11 octaves
 #define EEPROM_CALIBRATIONDATA_END 128
+
+#ifdef NO_HEMISPHERE
+#define EEPROM_GLOBALSETTINGS_END 960
+#else
 #define EEPROM_GLOBALSETTINGS_END 1060
+#endif
+
 #endif
 
 #define EEPROM_GLOBALSETTINGS_START EEPROM_CALIBRATIONDATA_END

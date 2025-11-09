@@ -62,7 +62,9 @@
 #include "applets/Logic.h"
 #include "applets/LowerRenz.h"
 #include "applets/Metronome.h"
+#ifdef __IMXRT1062__
 #include "applets/MidiLoop.h"
+#endif
 #include "applets/MultiScale.h"
 #include "applets/Palimpsest.h"
 #include "applets/Pigeons.h"
@@ -143,7 +145,9 @@ AppletRegistry reg{
     DeclareApplet<ADEG>{34, 0x01},
     DeclareApplet<ASR>{47, 0x09},
     DeclareApplet<AttenuateOffset>{56, 0x10},
+#ifdef PEWPEWPEW
     DeclareApplet<Binary>{41, 0x41},
+#endif
     DeclareApplet<BitBeat>{79, 0x01},
     DeclareApplet<BootsNCat>{55, 0x80},
     DeclareApplet<Brancher>{4, 0x14},
@@ -152,8 +156,10 @@ AppletRegistry reg{
     DeclareApplet<Button>{65, 0x10},
     DeclareApplet<Calculate>{12, 0x10},
     DeclareApplet<Calibr8>{88, 0x10},
+#ifdef PEWPEWPEW
     DeclareApplet<Carpeggio>{32, 0x0a},
     DeclareApplet<Chordinator>{64, 0x08},
+#endif
     DeclareApplet<ClockDivider>{6, 0x04},
     DeclareApplet<ClkToGate>{78, 0x04},
     DeclareApplet<ClockSkip>{28, 0x04},
@@ -178,16 +184,22 @@ AppletRegistry reg{
     DeclareApplet<EnvFollow>{42, 0x11},
     DeclareApplet<EnvSeq>{91, 0x02},
     DeclareApplet<EuclidX>{15, 0x02},
+#ifdef PEWPEWPEW
     DeclareApplet<GameOfLife>{22, 0x01},
+#endif
     DeclareApplet<GateDelay>{29, 0x04},
     DeclareApplet<GatedVCA>{17, 0x50},
     DeclareApplet<Logic>{10, 0x44},
     DeclareApplet<LowerRenz>{21, 0x01},
     DeclareApplet<Metronome>{50, 0x04},
+#ifdef __IMXRT1062__
     DeclareApplet<MidiLoop>{81, 0x20},
+#endif
     DeclareApplet<hMIDIIn>{150, 0x20},
     DeclareApplet<hMIDIOut>{27, 0x20},
+#ifdef PEWPEWPEW
     DeclareApplet<MultiScale>{73, 0x08},
+#endif
     DeclareApplet<Palimpsest>{20, 0x02},
     DeclareApplet<Pigeons>{71, 0x02},
     DeclareApplet<PolyDiv>{72, 0x06},
@@ -204,7 +216,9 @@ AppletRegistry reg{
     DeclareApplet<SeqPlay7>{76, 0x02},
     DeclareApplet<SequenceX>{14, 0x02},
     DeclareApplet<ShiftGate>{48, 0x45},
+#ifdef PEWPEWPEW
     DeclareApplet<ShiftReg>{77, 0x45},
+#endif
     DeclareApplet<Shredder>{58, 0x01},
     DeclareApplet<Shuffle>{36, 0x04},
     DeclareApplet<Slew>{19, 0x01},
@@ -215,14 +229,16 @@ AppletRegistry reg{
     DeclareApplet<SwitchSeq>{38, 0x10},
     DeclareApplet<TB_3PO>{60, 0x02},
     DeclareApplet<TLNeuron>{13, 0x40},
+#ifdef PEWPEWPEW
     DeclareApplet<Trending>{37, 0x40},
+#endif
     DeclareApplet<TrigSeq>{11, 0x06},
     DeclareApplet<TrigSeq16>{25, 0x06},
     DeclareApplet<Tuner>{39, 0x80},
     DeclareApplet<TwoRings>{18, 0x02},
     DeclareApplet<VectorEG>{52, 0x01},
     DeclareApplet<VectorLFO>{49, 0x01},
-    DeclareApplet<VectorMod>{53, 0x01},
+    //DeclareApplet<VectorMod>{53, 0x01}, // awkward middle child
     DeclareApplet<VectorMorph>{54, 0x01},
     DeclareApplet<Voltage>{43, 0x10},
 #ifdef PEWPEWPEW
