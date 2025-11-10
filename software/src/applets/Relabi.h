@@ -85,8 +85,7 @@ public:
        RelabiManager * manager = RelabiManager::get();
        manager->RegisterRelabi(hemisphere);
        linked = manager->IsLinked();
-       int wave1;
-       int wave2;
+
        uint8_t clkCalc;
 
 
@@ -116,11 +115,9 @@ public:
 
               // Linked: Receive lfo values from RelabiManager to display on right
               manager->ReadValues(sample[0], sample[1], sample[2]);
-              wave1 = (static_cast<float>(sample[2]));
-              wave2 = (static_cast<float>(sample[3]));
-              bool receivedGateStates[4];
+              bool receivedGateStates[3];
               manager->ReadGates(receivedGateStates);
-              for (int i = 0; i < 4; i++) {
+              for (int i = 0; i < 3; i++) {
                   gateState[i] = receivedGateStates[i];           
               }
 
@@ -197,20 +194,12 @@ public:
               
               // CV1 outputs LFO1 // CV2 outputs LFO2
 
-                  wave1 = (static_cast<float>(sample[0]) + HEMISPHERE_3V_CV /*+ HEMISPHERE_CENTER_CV + HEMISPHERE_3V_CV*/); 
-                  wave2 = (static_cast<float>(sample[1]) + HEMISPHERE_3V_CV/*+ HEMISPHERE_CENTER_CV + HEMISPHERE_3V_CV*/);
-                  
+
               }
       }
           
 
-        //   if (!bipolar) {
-        //       wave1 = wave1 + HEMISPHERE_CENTER_CV + HEMISPHERE_3V_CV;
-        //       wave2 = wave2 + HEMISPHERE_CENTER_CV + HEMISPHERE_3V_CV;
-        //      } else {
-        //       wave1 = wave1;
-        //       wave2 = wave2;
-        //      }
+
         int outputA;
         int outputB;
 
@@ -388,32 +377,58 @@ void DrawVUMetersLeft() {
 
 
 void PrintScaledFloat(int x, int y, float value) {
-    // Clamp the value to a safe range
+    // Clamp value to 0..150
     if (value < 0.0f) value = 0.0f;
     if (value > 150.0f) value = 150.0f;
 
-   // Break the value into whole and fractional parts
-   int whole = (int)value;                  // Integer part
-   int fract = (int)((value - whole) * 100 + 0.5f); // Fractional part, rounded
+    char buf[12]; // enough for "150\0" or "99.9\0"
 
-   // Remove trailing zeros from the fractional part
-   if (fract == 0) {
-       // Display just the whole number if fract is zero
-       char buf[12];
-       snprintf(buf, sizeof(buf), "%d", whole);
-       gfxPrint(x, y, buf);
-   } else if (fract % 10 == 0) {
-       // Display with one decimal place if fract ends with zero
-       char buf[12];
-       snprintf(buf, sizeof(buf), "%d.%d", whole, fract / 10);
-       gfxPrint(x, y, buf);
-   } else {
-       // Display with two decimal places
-       char buf[12];
-       snprintf(buf, sizeof(buf), "%d.%02d", whole, fract);
-       gfxPrint(x, y, buf);
-   }
+    if (value >= 100.0f) {
+        // 3-digit number, no fraction
+        int whole = static_cast<int>(value + 0.5f);
+        snprintf(buf, sizeof(buf), "%3d", whole); // "100", "150"
+    } else {
+        // Show up to 2-digit whole + 1 decimal
+        int scaled = static_cast<int>(value * 10 + 0.5f); // round to 1 decimal
+        int whole = scaled / 10;
+        int frac = scaled % 10;
+        snprintf(buf, sizeof(buf), "%u.%u", whole, frac); // always "X.Y" or "XX.Y"
+    }
+
+    gfxPrint(x, y, buf);
 }
+
+
+
+
+
+// void PrintScaledFloat(int x, int y, float value) {
+//     // Clamp the value to a safe range
+//     if (value < 0.0f) value = 0.0f;
+//     if (value > 150.0f) value = 150.0f;
+
+//    // Break the value into whole and fractional parts
+//    int whole = (int)value;                  // Integer part
+//    int fract = (int)((value - whole) * 100 + 0.5f); // Fractional part, rounded
+
+//    // Remove trailing zeros from the fractional part
+//    if (fract == 0) {
+//        // Display just the whole number if fract is zero
+//        char buf[12];
+//        snprintf(buf, sizeof(buf), "%d", whole);
+//        gfxPrint(x, y, buf);
+//    } else if (fract % 10 == 0) {
+//        // Display with one decimal place if fract ends with zero
+//        char buf[12];
+//        snprintf(buf, sizeof(buf), "%d.01%d", whole, fract / 10);
+//        gfxPrint(x, y, buf);
+//    } else {
+//        // Display with two decimal places
+//        char buf[12];
+//        snprintf(buf, sizeof(buf), "%d.%02d", whole, fract);
+//        gfxPrint(x, y, buf);
+//    }
+// }
 
 
 
@@ -554,7 +569,7 @@ void OnEncoderMove(int direction) {
 
 uint64_t OnDataRequest() {
     uint64_t data = 0;
-    int pos = 0; // bit offset
+    uint8_t pos = 0; // bit offset
 
     // 1) freqKnob[3], 6 bits each → 18 bits total
     for (int i = 0; i < 3; i++) {
@@ -604,7 +619,7 @@ uint64_t OnDataRequest() {
 }
 
 void OnDataReceive(uint64_t data) {
-    int pos = 0; // bit offset
+    uint8_t pos = 0; // bit offset
 
     // 1) freqKnob[3]
     for (int i = 0; i < 3; i++) {

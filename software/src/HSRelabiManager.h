@@ -45,7 +45,7 @@ class RelabiManager {
         registered[RIGHT_HEMISPHERE] = 0;
 
         // Initialize gate states
-        for (uint8_t i = 0; i < 4; i++) {
+        for (uint8_t i = 0; i < 3; i++) {
             gateStates[i] = false;
         }
     }
