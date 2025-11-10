@@ -97,7 +97,7 @@ public:
           ch.delaystream.feedback(tap, 0.0f);
         }
       } else {
-        ch.input_mixer.gain(0, 1.0f);
+        //ch.input_mixer.gain(0, 1.0f);
         for (int tap = 0; tap < 9; tap++) {
           ch.delaystream.feedback(tap, tap < taps ? fb : 0.0f);
         }
@@ -116,14 +116,24 @@ public:
         );
       }
     }
+
     float dry_gain, wet_gain;
     EqualPowerFade(
       dry_gain, wet_gain, constrain(0.01f * wet + wet_cv.InF(), 0.0f, 1.0f)
     );
 
-    for (auto& ch : channels) {
-      ch.wet_dry_mixer.gain(WD_WET_CH, wet_gain);
-      ch.wet_dry_mixer.gain(WD_DRY_CH, dry_gain);
+    if (send_mode) {
+      for (auto& ch : channels) {
+        ch.wet_dry_mixer.gain(WD_WET_CH, 1.0f);
+        ch.wet_dry_mixer.gain(WD_DRY_CH, 1.0f);
+        ch.input_mixer.gain(0, wet_gain);
+      }
+    } else {
+      for (auto& ch : channels) {
+        ch.wet_dry_mixer.gain(WD_WET_CH, wet_gain);
+        ch.wet_dry_mixer.gain(WD_DRY_CH, dry_gain);
+        ch.input_mixer.gain(0, 1.0f);
+      }
     }
   }
 
@@ -191,10 +201,10 @@ public:
     // if (frozen) gfxInvert(54, 25, 8, 8);
     // if (cursor == FREEZE) gfxCursor(54, 32, 8);
 
-    gfxPrint(1, 35, "Wet:");
+    gfxPrint(1, 35, send_mode?"Snd:":"Wet:");
     gfxStartCursor(param_right_x - 4 * 6, 35);
     graphics.printf("%3d%%", wet);
-    gfxEndCursor(cursor == WET);
+    gfxEndCursor(cursor == WET, true);
 
     gfxStartCursor();
     gfxPrint(wet_cv);
@@ -212,6 +222,10 @@ public:
     gfxDisplayInputMapEditor();
   }
 
+  void AuxButton() override {
+    if (cursor == WET) send_mode ^= 1;
+    CancelEdit();
+  }
   void OnButtonPress() override {
     if (CheckEditInputMapPress(
           cursor,
@@ -274,19 +288,16 @@ public:
         delay_time_cv.ChangeSource(direction);
         break;
       case TIME_MOD:
-        delay_mod_type += direction;
-        CONSTRAIN(delay_mod_type, 0, 1);
+        delay_mod_type = constrain(delay_mod_type + direction, 0, 1);
         break;
       case FEEDBACK:
-        feedback += direction;
-        CONSTRAIN(feedback, Channels == STEREO ? -100 : 0, 100);
+        feedback = constrain(feedback + direction, Channels == STEREO ? -100 : 0, 100);
         break;
       case FEEDBACK_CV:
         feedback_cv.ChangeSource(direction);
         break;
       case WET:
-        wet += direction;
-        CONSTRAIN(wet, 0, 100);
+        wet = constrain(wet + direction, 0, 100);
         break;
       case WET_CV:
         wet_cv.ChangeSource(direction);
@@ -302,7 +313,7 @@ public:
 
 #define DELAY_PARAMS \
   delay_time, pack<3>(time_units), ratio, pack<1>(delay_mod_type), feedback, \
-    wet, pack<4>(taps)
+    wet, pack<4>(taps), pack<1>(send_mode)
 
   void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
     data[0] = PackPackables(DELAY_PARAMS);
@@ -420,7 +431,8 @@ private:
   uint32_t clock_count = 0;
   float clock_base_secs = 0.0f;
 
-  boolean frozen = false;
+  bool send_mode = false;
+  bool frozen = false;
 
   int16_t knob_accel = 0;
   elapsedMillis millis_since_turn;
