@@ -38,33 +38,26 @@ public:
    }
 
    void Start() {
-       // freq[0] = 120;
-       // freq[1] = 360;
-       // freq[2] = 600;
-       // freq[3] = 840;
        freqKnob[0] = 30; // 3 Hz
-       freqKnob[1] = 50; // 5 Hz
-       freqKnob[2] = 70; // 7 Hz
-       //freqKnob[3] = 42; // 4.2 Hz
-    //    xmodoffset = 0; // 0%
+       freqKnob[1] = 34; // 5 Hz
+       freqKnob[2] = 38; // 7 Hz
        freqKnobMul = 1; // 
        freqKnobDiv = 0; //
        freqMul = freqMulMap[freqKnobMul];
        freqDiv = freqDivMap[freqKnobDiv];
-    //    bipolar = true;
     
 
       for (int i = 0; i < 3; i++) {
           
           float freqFloat = DecodeFreq(freqKnob[i]); 
-          xmodKnob[i] = 0; // 0%
+          xmodKnob[i] = 1; // 20%
           phaseKnob[i] = 0; // 0%
           threshKnob[i] = 3; // 0%
           xmod[i] = xmodKnob[i] * 20;
           phase[i] = phaseKnob[i] * 12.5;
           thresh[i] = (threshKnob[i] * 28) - 84;
 
-          // Optionally set oscillator or do whatever else you want:
+          // Set oscillator to sine wave
           osc[i] = WaveformManager::VectorOscillatorFromWaveform(35);
           osc[i].SetFrequency(freqFloat);
 
@@ -133,23 +126,21 @@ public:
 
           } else {
 
-              cvIn = (In(0))/51.15;
-              cvIn2 = (In(1))/51.15;
+              cvIn = (In(0) - 24551) / 6553; //center 0V at 0 and scale -3..+3
+              cvIn2 = (In(1) - 24551) / 6553;
 
-              float normalizedCV = ((cvIn / 100.0) + 1.0) / 2.0;
-              cvIn = 10000.0 * normalizedCV; //set range for cvIn to be 0 to 10000
-              
-              float normalizedCV2 = ((cvIn2 / 100.0) + 1.0) / 2.0;
-              cvIn2 = 10000.0 * normalizedCV2; //set range for cvIn to be 0 to 10000
+
+            float normalizedCV = (cvIn / 3.0f); // -1..1 incoming fm amount
+            float normalizedCV2 = (cvIn2 / 3.0f); // -1..1 incoming xmod amount
+            normalizedCV = powf(10.0f, normalizedCV * 2); // 0.01..100
+            float fModCV = constrain(normalizedCV, 0.01f, 100.0f); 
+            float xModCV = constrain(normalizedCV2, 0.0f, 1.0f);
               
               
 
               // frequency modulation:
               for (uint8_t lfo = 0; lfo < 3; lfo++) {
                   osc[lfo].SetScale(HEMISPHERE_3V_CV);
-
-              // Use freqKnobMul and freqKnobDiv to adjust frequency
-              float globalFreqFactor = static_cast<float>(freqMul) / static_cast<float>(freqDiv);
 
 
               // Calculate gate outputs based on thresholds
@@ -161,27 +152,27 @@ public:
                   gateState[lfo] = false;
               }
 
-              // Normalize the CV input to a range between 0 and 1
-              float normalizedCV = static_cast<float>(cvIn) / 2500.0; // Adjust divisor if needed based on CV range
 
               // Incorporate CV2 with cross-modulation
-              float xmodCombo = xmod[lfo] +  (cvIn2 / 100) - 50;
-            //   float xmodCombo = xmodplus +  xmod[lfo] +  (cvIn2 / 100) - 50;
+              float xmodCombo = xmod[lfo] +  xModCV * 100; //0..140 + -100..100 = -100..240
+              // Previously
+              // float xmodCombo = xmod[lfo] +  (cvIn2 / 100) - 50; //???!
 
               // Calculate cross-frequency modulation factor
               float crossFreqMod = (static_cast<float>(xmodCombo) / 100.0) * (static_cast<float>(sample[(lfo + 2) % 3]) / HEMISPHERE_3V_CV);
 
 
               // Combine base frequency, cross-modulation, and CV input
-              float modulatedFreq = normalizedCV * globalFreqFactor * (DecodeFreq(freqKnob[lfo]) + ((DecodeFreq(freqKnob[lfo])) * crossFreqMod));
+              float modulatedFreq = fModCV * (DecodeFreq(freqKnob[lfo]) + ((DecodeFreq(freqKnob[lfo])) * crossFreqMod));
 
-              // float modulatedFreq = freq[lfo] + (freq[lfo] * crossFreqMod * normalizedCV);
+              // Scale frequency by global freqMul and freqDiv amounts.
+              modulatedFreq = modulatedFreq * freqMul / freqDiv;
 
               // Ensure the frequency stays within valid bounds
-              modulatedFreq = constrain(modulatedFreq, 0.01, 15000.0); // Example: limit to 1 Hz to 20 kHz
+              // modulatedFreq = constrain(modulatedFreq, 0.01, 15000.0);
 
               // Set the modulated frequency to the oscillator
-              osc[lfo].SetFrequency(modulatedFreq * 1500);
+              osc[lfo].SetFrequency(modulatedFreq * 300000); // VectorOscillator uses centiHertz.
 
               // Update sample
               sample[lfo] = osc[lfo].Next();

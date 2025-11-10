@@ -26,8 +26,7 @@ class RelabiManager {
     int lfo1;
     int lfo2;
     int lfo3;
-    int lfo4;
-    bool gateStates[4];
+    bool gateStates[3];
     uint8_t leftOn;
     uint8_t rightOn;
     bool linked;
@@ -83,14 +82,14 @@ public:
         value3 = lfo3;
     }
 
-    void WriteGates(bool gates[4]) {
-        for (int i = 0; i < 4; i++) {
+    void WriteGates(bool gates[3]) {
+        for (int i = 0; i < 3; i++) {
             gateStates[i] = gates[i];
         }
     }
 
-    void ReadGates(bool gates[4]) const {
-        for (int i = 0; i < 4; i++) {
+    void ReadGates(bool gates[3]) const {
+        for (int i = 0; i < 3; i++) {
             gates[i] = gateStates[i];
         }
     }
