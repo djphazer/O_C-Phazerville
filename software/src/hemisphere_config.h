@@ -67,6 +67,7 @@
 #include "applets/PolyDiv.h"
 #include "applets/ProbabilityDivider.h"
 #include "applets/ProbabilityMelody.h"
+#include "applets/Relabi.h"
 #include "applets/ResetClock.h"
 #include "applets/RndWalk.h"
 #include "applets/RunglBook.h"
@@ -185,6 +186,7 @@ AppletRegistry reg{
     DeclareApplet<PolyDiv>{72, 0x06},
     DeclareApplet<ProbabilityDivider>{59, 0x04},
     DeclareApplet<ProbabilityMelody>{62, 0x04},
+    DeclareApplet<Relabi>{89, 0x01},
     DeclareApplet<ResetClock>{70, 0x14},
     DeclareApplet<RndWalk>{69, 0x01},
     DeclareApplet<RunglBook>{44, 0x01},
