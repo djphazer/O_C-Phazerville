@@ -1,10 +1,5 @@
 #pragma once
 
-#include "HSicons.h"
-#include "HemisphereAudioApplet.h"
-#include "Audio/InterpolatingStream.h"
-#include <Audio.h>
-
 template <AudioChannels Channels>
 class UpsampledApplet : public HemisphereAudioApplet {
 public:

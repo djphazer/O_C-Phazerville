@@ -12,10 +12,6 @@
  *
  */
 
-#include "Audio/AudioPassthrough.h"
-#include "CVInputMap.h"
-#include "HemisphereAudioApplet.h"
-#include "OC_gpio.h"
 #include <TeensyVariablePlayback.h>
 
 template <AudioChannels Channels>

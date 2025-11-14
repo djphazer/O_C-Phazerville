@@ -1,9 +1,3 @@
-#include "HSUtils.h"
-#include "HemisphereAudioApplet.h"
-#include "dsputils.h"
-#include "Audio/AudioPassthrough.h"
-#include <Audio.h>
-
 template <AudioChannels Channels>
 class LadderApplet : public HemisphereAudioApplet {
 

@@ -21,7 +21,7 @@
 #ifndef HS_VECTOR_OSCILLATOR
 #define HS_VECTOR_OSCILLATOR
 
-#include "util/util_math.h"
+#include "../util/util_math.h"
 
 namespace HS {
 

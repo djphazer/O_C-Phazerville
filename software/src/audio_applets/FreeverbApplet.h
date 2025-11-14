@@ -1,12 +1,4 @@
-#include "HSUtils.h"
-#include "HemisphereAudioApplet.h"
-#include "dsputils.h"
-#include "dsputils_arm.h"
-#include "synth_waveform.h"
-#include "Audio/AudioMixer.h"
-#include "Audio/AudioPassthrough.h"
-#include "Audio/InterpolatingStream.h"
-#include <Audio.h>
+#include <synth_waveform.h>
 
 class ReverbApplet : public HemisphereAudioApplet {
     public:

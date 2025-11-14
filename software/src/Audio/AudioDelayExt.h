@@ -2,9 +2,9 @@
 
 #include "AudioBuffer.h"
 #include "AudioParam.h"
-#include "dsputils.h"
-#include "dsputils_arm.h"
-#include "util/util_macros.h"
+#include "../dsputils.h"
+#include "../dsputils_arm.h"
+#include "../util/util_macros.h"
 #include <Audio.h>
 #include <cstdint>
 

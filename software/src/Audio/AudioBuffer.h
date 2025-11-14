@@ -1,6 +1,6 @@
 #pragma once
 
-#include "dsputils.h"
+#include "../dsputils.h"
 #include <Audio.h>
 #include <smalloc.h>
 

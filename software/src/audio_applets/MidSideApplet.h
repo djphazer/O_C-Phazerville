@@ -1,9 +1,5 @@
 #pragma once
 
-#include "HSUtils.h"
-#include "HemisphereAudioApplet.h"
-#include "Audio/AudioMixer.h"
-#include "Audio/AudioPassthrough.h"
 class MidSideApplet : public HemisphereAudioApplet {
 public:
   const char* applet_name() override {

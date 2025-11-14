@@ -31,8 +31,8 @@
 
 #if !defined(KINETISL)
 
-#include "Arduino.h"
-#include "AudioStream.h"
+#include <Arduino.h>
+#include <AudioStream.h>
 
 #define MIN_DB	-110.0f
 #define MAX_DB	0.0f

@@ -1,13 +1,7 @@
 #pragma once
 
-#include "HSUtils.h"
-#include "HemisphereAudioApplet.h"
-#include "dsputils.h"
-#include "dsputils_arm.h"
-#include "Audio/AudioPassthrough.h"
-#include "Audio/AudioVCA.h"
-#include "Audio/InterpolatingStream.h"
-#include <Audio.h>
+#include "../Audio/AudioVCA.h"
+#include "../Audio/InterpolatingStream.h"
 
 template <AudioChannels Channels>
 class VcaApplet : public HemisphereAudioApplet {

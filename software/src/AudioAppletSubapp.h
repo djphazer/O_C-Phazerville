@@ -7,8 +7,12 @@
 #include "PhzConfig.h"
 #include "UI/ui_events.h"
 #include "util/util_tuples.h"
-#include <Audio.h>
-#include <cstdint>
+#include "dsputils_arm.h"
+#include "Audio/AudioMixer.h"
+#include "Audio/AudioPassthrough.h"
+#include "Audio/AudioVCA.h"
+#include "Audio/InterpolatingStream.h"
+
 
 #define ForEachSide(ch) for (HEM_SIDE ch : {LEFT_HEMISPHERE, RIGHT_HEMISPHERE})
 

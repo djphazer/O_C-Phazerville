@@ -1,11 +1,5 @@
 #pragma once
 
-#include "AudioIO.h"
-#include "HSUtils.h"
-#include "PackingUtils.h"
-#include "HemisphereAudioApplet.h"
-#include <Audio.h>
-
 template <AudioChannels Channels>
 class InputApplet : public HemisphereAudioApplet {
 public:

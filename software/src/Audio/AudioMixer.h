@@ -1,8 +1,7 @@
 #pragma once
 
 #include "AudioParam.h"
-#include "arm_math.h"
-#include "dsputils.h"
+#include <arm_math.h>
 #include <Audio.h>
 
 template <size_t NumChannels>

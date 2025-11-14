@@ -1,13 +1,6 @@
 #pragma once
 
-#include "HSicons.h"
-#include "HemisphereAudioApplet.h"
-#include "dsputils.h"
-#include "dsputils_arm.h"
-#include "Audio/AudioDelayExt.h"
-#include "Audio/AudioMixer.h"
-#include "Audio/AudioPassthrough.h"
-#include <Audio.h>
+#include "../Audio/AudioDelayExt.h"
 
 extern "C" uint8_t external_psram_size;
 

@@ -593,6 +593,6 @@ struct IOFrame {
 
 extern IOFrame frame;
 
-#include <CVInputMap.h>
+#include "CVInputMap.h"
 
 } // namespace HS

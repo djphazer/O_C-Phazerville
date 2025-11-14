@@ -1,15 +1,5 @@
 #pragma once
 
-#include "HSUtils.h"
-#include "HemisphereAudioApplet.h"
-#include "dspinst.h"
-#include "dsputils_arm.h"
-#include "Audio/AudioMixer.h"
-#include "Audio/AudioPassthrough.h"
-#include "Audio/AudioVCA.h"
-#include "Audio/InterpolatingStream.h"
-#include <Audio.h>
-
 class CrosspanApplet : public HemisphereAudioApplet {
 public:
   const char* applet_name() override {

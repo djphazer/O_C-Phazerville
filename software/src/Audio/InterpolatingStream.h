@@ -1,7 +1,7 @@
 #pragma once
 
-#include "OC_config.h"
-#include "dsputils.h"
+#include "../OC_config.h"
+#include "../dsputils.h"
 #include <Audio.h>
 
 enum InterpolationMethod {

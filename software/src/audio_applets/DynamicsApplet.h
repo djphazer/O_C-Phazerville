@@ -1,7 +1,4 @@
-#include "HSUtils.h"
-#include "HemisphereAudioApplet.h"
 #include "../Audio/effect_dynamics.h"
-#include <cstdint>
 
 template <AudioChannels Channels>
 class DynamicsApplet : public HemisphereAudioApplet {

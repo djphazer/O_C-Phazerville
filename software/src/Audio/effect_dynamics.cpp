@@ -28,8 +28,8 @@
 #if defined(ARDUINO_TEENSY41)
 
 #include "effect_dynamics.h"
-#include "utility/dspinst.h"
-#include "utility/sqrt_integer.h"
+#include <utility/dspinst.h>
+#include <utility/sqrt_integer.h>
 
 /*
 static float analyse_rms(int16_t *data) {

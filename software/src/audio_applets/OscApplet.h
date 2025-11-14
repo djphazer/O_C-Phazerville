@@ -1,13 +1,4 @@
-#include "HSUtils.h"
-#include "HemisphereAudioApplet.h"
-#include "dsputils.h"
-#include "dsputils_arm.h"
-#include "hemisphere_audio_config.h"
 #include "synth_waveform.h"
-#include "Audio/AudioMixer.h"
-#include "Audio/AudioPassthrough.h"
-#include "Audio/InterpolatingStream.h"
-#include <Audio.h>
 
 class OscApplet : public HemisphereAudioApplet {
 public:

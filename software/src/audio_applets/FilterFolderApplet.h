@@ -1,6 +1,3 @@
-#include "HSUtils.h"
-#include "HemisphereAudioApplet.h"
-
 template <AudioChannels Channels>
 class FilterFolderApplet : public HemisphereAudioApplet {
 
