@@ -1,5 +1,6 @@
 #pragma once
 
+#include "src/Audio/filter_variable2.h"
 #include "AudioAppletSubapp.h"
 #include "audio_applets/CrosspanApplet.h"
 #include "audio_applets/DelayApplet.h"

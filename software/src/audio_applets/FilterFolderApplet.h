@@ -1,3 +1,5 @@
+#include "../src/Audio/filter_variable2.h"
+
 template <AudioChannels Channels>
 class FilterFolderApplet : public HemisphereAudioApplet {
 
@@ -199,7 +201,7 @@ private:
 
   struct FilterFolder {
     AudioEffectWaveFolder folder;
-    AudioFilterStateVariable filter;
+    AudioFilterStateVariable2 filter;
     AudioSynthWaveformDc drive;
     AudioMixer4 mixer;
 

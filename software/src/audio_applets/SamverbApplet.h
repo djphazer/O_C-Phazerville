@@ -168,7 +168,7 @@ class BungverbApplet : public HemisphereAudioApplet {
         AudioPassthrough<MONO> input;
 
         AudioEffectReverbSchroeder* reverb;
-        AudioFilterStateVariable filter;
+        AudioFilterStateVariable2 filter;
 
         AudioMixer<2> dry_wet_mixer;
 

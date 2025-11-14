@@ -26,7 +26,7 @@
 #if defined(ARDUINO_TEENSY41)
 
 #include <Arduino.h>
-#include "filter_variable.h"
+#include "filter_variable2.h"
 #include "utility/dspinst.h"
 
 // State Variable Filter (Chamberlin) with 2X oversampling
@@ -49,7 +49,7 @@
 
 #if defined(__ARM_ARCH_7EM__)
 
-void AudioFilterStateVariable::update_fixed(const int16_t *in,
+void AudioFilterStateVariable2::update_fixed(const int16_t *in,
 	int16_t *lp, int16_t *bp, int16_t *hp)
 {
 	const int16_t *end = in + AUDIO_BLOCK_SAMPLES;
@@ -111,7 +111,7 @@ void AudioFilterStateVariable::update_fixed(const int16_t *in,
 }
 
 
-void AudioFilterStateVariable::update_variable(const int16_t *in,
+void AudioFilterStateVariable2::update_variable(const int16_t *in,
 	const int16_t *ctl, int16_t *lp, int16_t *bp, int16_t *hp)
 {
 	const int16_t *end = in + AUDIO_BLOCK_SAMPLES;
@@ -216,7 +216,7 @@ void AudioFilterStateVariable::update_variable(const int16_t *in,
 }
 
 
-void AudioFilterStateVariable::update(void)
+void AudioFilterStateVariable2::update(void)
 {
 	audio_block_t *input_block=NULL, *control_block=NULL;
 	audio_block_t *lowpass_block=NULL, *bandpass_block=NULL, *highpass_block=NULL;
@@ -274,7 +274,7 @@ void AudioFilterStateVariable::update(void)
 
 #elif defined(KINETISL)
 
-void AudioFilterStateVariable::update(void)
+void AudioFilterStateVariable2::update(void)
 {
 	audio_block_t *block;
 

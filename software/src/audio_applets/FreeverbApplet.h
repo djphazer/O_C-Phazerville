@@ -166,7 +166,7 @@ class ReverbApplet : public HemisphereAudioApplet {
         AudioPassthrough<MONO> input;
 
         AudioEffectFreeverb* reverb;
-        AudioFilterStateVariable filter;
+        AudioFilterStateVariable2 filter;
 
         AudioMixer<2> dry_wet_mixer;
 

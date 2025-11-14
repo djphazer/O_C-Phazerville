@@ -347,7 +347,7 @@ private:
 
   AudioPassthrough<Channels> input;
   AudioPlaySdResmp      wavplayer;
-  AudioFilterStateVariable hpfilter[2];
+  AudioFilterStateVariable2 hpfilter[2];
   AudioMixer4           mixer[2];
   AudioPassthrough<Channels> output;
 

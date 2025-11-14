@@ -1,4 +1,4 @@
-#include "../Audio/effect_dynamics.h"
+#include "../src/Audio/effect_dynamics.h"
 
 template <AudioChannels Channels>
 class DynamicsApplet : public HemisphereAudioApplet {

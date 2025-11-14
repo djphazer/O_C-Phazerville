@@ -24,8 +24,7 @@
  * THE SOFTWARE.
  */
 
-#ifndef filter_variable_h_
-#define filter_variable_h_
+#pragma once
 
 #include <Arduino.h>     // github.com/PaulStoffregen/cores/blob/master/teensy4/Arduino.h
 #include <AudioStream.h> // github.com/PaulStoffregen/cores/blob/master/teensy4/AudioStream.h
@@ -33,10 +32,10 @@
 //#define AVG_OUTPUTS
 #define OVERSAMPLE_4X
 
-class AudioFilterStateVariable: public AudioStream
+class AudioFilterStateVariable2: public AudioStream
 {
 public:
-	AudioFilterStateVariable() : AudioStream(2, inputQueueArray) {
+	AudioFilterStateVariable2() : AudioStream(2, inputQueueArray) {
 		frequency(1000);
 		octaveControl(1.0); // default values
 		resonance(0.707);
@@ -91,5 +90,3 @@ private:
 	int32_t state_bandpass;
 	audio_block_t *inputQueueArray[2];
 };
-
-#endif
