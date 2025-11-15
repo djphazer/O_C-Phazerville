@@ -178,8 +178,8 @@ public:
     }
 
     // --- CV Output methods
-    void Out(int ch, int value, int octave = 0) {
-        frame.Out( (DAC_CHANNEL)(ch + io_offset), value + (octave * (12 << 7)));
+    void Out(int ch, int value) {
+        frame.Out( (DAC_CHANNEL)(ch + io_offset), value);
     }
 
     // TODO: rework or delete
@@ -195,7 +195,7 @@ public:
         frame.ClockOut( (DAC_CHANNEL)(io_offset + ch), ticks);
     }
     void GateOut(int ch, bool high) {
-        Out(ch, 0, (high ? PULSE_VOLTAGE : 0));
+        Out(ch, (high ? PULSE_VOLTAGE : 0)*(ONE_OCTAVE));
     }
 
     // Quantizer helpers

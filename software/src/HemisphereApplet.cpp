@@ -19,7 +19,7 @@ void HemisphereApplet::BaseStart(const HEM_SIDE hemisphere_) {
         applet_started = true;
         Start();
         ForEachChannel(ch) {
-            Out(ch, 0, true); // reset outputs
+            Out(ch, 0); // reset outputs
         }
     }
 }
