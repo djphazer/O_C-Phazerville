@@ -63,6 +63,25 @@ public:
             q_engine[i].Configure( (i<4)? OC::Scales::SCALE_SEMI : i-4, 0xffff);
         }
         */
+        //bank_filename[16] = "BANK_000.DAT";
+        bank_num = 0;
+        preset_id = -1;
+        queued_preset = -1;
+        preset_cursor = 0;
+
+        //HemisphereApplet *active_applet[4]; // Pointers to actual applets
+        view_slot[0] = 0;
+        view_slot[1] = 0;
+        config_cursor = LOAD_PRESET;
+
+        select_mode = -1;
+        zoom_slot = HEM_SIDE(0);
+        zoom_cursor = 0;
+        click_tick = 0;
+        first_click = -1;
+
+        mask = 0;
+        last_mask = 0;
 
         SetApplet(HEM_SIDE(0), HS::get_applet_index_by_id(18)); // DualTM
         SetApplet(HEM_SIDE(1), HS::get_applet_index_by_id(15)); // EuclidX
