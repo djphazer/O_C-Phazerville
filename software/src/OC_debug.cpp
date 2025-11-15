@@ -92,9 +92,10 @@ static void debug_menu_ram() {
   graphics.printf("HEAP  %7d (%dKB)", heap, heap >> 10);
 
 #if ARDUINO_TEENSY41
-  char *derp = extmem_malloc(1);
+  char *derp = (char*)extmem_malloc(1);
   //auto psram = _extram_start + (external_psram_size << 20) - _extram_end;
   auto psram = _extram_start + (external_psram_size << 20) - derp;
+  if (external_psram_size == 0) psram = 0;
   graphics.setPrintPos(2, 32);
   graphics.printf("PSRAM %7d (%dKB)", psram, psram >> 10);
   extmem_free(derp);
@@ -149,9 +150,21 @@ static void debug_menu_version()
 #else
   graphics.print(" PROD");
 #endif
-#ifdef USB_SERIAL
+  if (DAC_20Vpp) graphics.print(", 20Vpp");
+
   graphics.setPrintPos(2, 42);
-  graphics.print("USB_SERIAL");
+  graphics.print("usb=");
+#if defined(USB_MIDI) || defined (USB_MIDI_AUDIO_SERIAL)
+  graphics.print("MIDI");
+#endif
+#if defined(USB_AUDIO) || defined (USB_MIDI_AUDIO_SERIAL)
+  graphics.print("+Audio");
+#endif
+#ifdef USB_MTPDISK
+  graphics.print("+MTP");
+#endif
+#ifdef USB_SERIAL
+  graphics.print("+Serial");
 #endif
 
 #ifdef __IMXRT1062__
@@ -270,6 +283,9 @@ static void debug_menu_audio() {
   graphics.setPrintPos(2, 22);
   graphics.printf("Max CPU %2d.%02d%%", int(whole), part);
 
+  graphics.setPrintPos(2, 32);
+  graphics.printf("Rate: %lu Hz", uint32_t(AUDIO_SAMPLE_RATE));
+
   graphics.setPrintPos(2, 42);
   graphics.printf("PSRAM: %2u MB", external_psram_size);
 }
@@ -290,43 +306,43 @@ struct DebugMenu {
 };
 
 static const DebugMenu debug_menus[] = {
-  { " CORE", debug_menu_core },
+  { "CORE", debug_menu_core },
 #ifdef __IMXRT1062__
-  { " RAM (free)", debug_menu_ram },
+  { "RAM (free)", debug_menu_ram },
 #else
-  { " RAM", debug_menu_ram },
+  { "RAM", debug_menu_ram },
 #endif
-  { " VERS", debug_menu_version },
-  { " GFX", debug_menu_gfx },
-  { " ADC (raw)", debug_menu_adc },
+  { "VERS", debug_menu_version },
+  { "GFX", debug_menu_gfx },
+  { "ADC (raw)", debug_menu_adc },
 #ifdef ARDUINO_TEENSY41
-  { " ADC (value)", debug_menu_adc_value },
-  { " ADC (noise)", debug_menu_adc_noise },
-  { " AUDIO", debug_menu_audio },
+  { "ADC (value)", debug_menu_adc_value },
+  { "ADC (noise)", debug_menu_adc_noise },
+  { "AUDIO", debug_menu_audio },
 #endif
 #ifdef POLYLFO_DEBUG  
-  { " POLYLFO", POLYLFO_debug },
+  { "POLYLFO", POLYLFO_debug },
 #endif // POLYLFO_DEBUG
 #ifdef ENVGEN_DEBUG  
-  { " ENVGEN", ENVGEN_debug },
+  { "ENVGEN", ENVGEN_debug },
 #endif // ENVGEN_DEBUG
 #ifdef BBGEN_DEBUG  
-  { " BBGEN", BBGEN_debug },
+  { "BBGEN", BBGEN_debug },
 #endif // BBGEN_DEBUG
 #ifdef BYTEBEATGEN_DEBUG  
-  { " BYTEBEATGEN", BYTEBEATGEN_debug },
+  { "BYTEBEATGEN", BYTEBEATGEN_debug },
 #endif // BYTEBEATGEN_DEBUG
 #ifdef H1200_DEBUG  
-  { " H1200", H1200_debug },
+  { "H1200", H1200_debug },
 #endif // H1200_DEBUG
 #ifdef QQ_DEBUG  
-  { " QQ", QQ_debug },
+  { "QQ", QQ_debug },
 #endif // QQ_DEBUG
 #ifdef ASR_DEBUG  
-  { " ASR", ASR_debug },
+  { "ASR", ASR_debug },
 #endif // ASR_DEBUG
 #ifdef PEWPEWPEW
-  { " ", debug_menu_pewpewpew },
+  { "PEW PEW PEW!", debug_menu_pewpewpew },
 #endif
 };
 
@@ -348,7 +364,7 @@ void Ui::DebugStats() {
 
     GRAPHICS_BEGIN_FRAME(false);
       graphics.setPrintPos(2, 2);
-      graphics.printf("%d/%u", current_menu_index + 1, ARRAY_SIZE(debug_menus));
+      graphics.printf("%d/%u ", current_menu_index + 1, ARRAY_SIZE(debug_menus));
       graphics.print(current_menu.title);
       current_menu.display_fn();
     GRAPHICS_END_FRAME();
