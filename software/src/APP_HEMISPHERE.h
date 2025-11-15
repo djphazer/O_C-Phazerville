@@ -255,7 +255,20 @@ void ReceiveManagerSysEx();
 class HemisphereManager : public HSApplication {
 public:
     void Start() {
-        //select_mode = -1; // Not selecting
+        select_mode = -1; // Not selecting
+        preset_id = -1;
+        queued_preset = -1;
+        preset_cursor = 0;
+        my_applet[0] = next_applet[0] = -1;
+        my_applet[1] = next_applet[1] = -1;
+
+        config_cursor = 0;
+        config_page = 0;
+        dummy_count = 0;
+
+        zoom_cursor = 0;
+        click_tick = 0;
+        first_click = -1;
 
         zoom_slot = -1;
         clock_setup = 0;
@@ -604,8 +617,9 @@ public:
 
     // does not modify the preset, only the manager
     void SetApplet(HEM_SIDE hemisphere, int index) {
-        //if (my_applet[hemisphere]) // TODO: special case for first load?
-        HS::available_applets[my_applet[hemisphere]].instance[hemisphere]->Unload();
+        // special case guard for first load
+        if (my_applet[hemisphere] >= 0 && my_applet[hemisphere] < HEMISPHERE_AVAILABLE_APPLETS)
+          HS::available_applets[my_applet[hemisphere]].instance[hemisphere]->Unload();
         next_applet[hemisphere] = my_applet[hemisphere] = index;
         HS::available_applets[index].instance[hemisphere]->BaseStart(hemisphere);
     }
