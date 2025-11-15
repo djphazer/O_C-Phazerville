@@ -86,7 +86,6 @@ If you're coming from any of the other Hemisphere forks, note that many of the a
 * [Metronome](Metronome) - internal clock tempo control + multiplier output
 * [MIDI In](MIDI-Input) - from USB to CV
 * [MIDI Out](MIDI-Out) - from CV to USB
-* [MixerBal](Mixer-Balance) - basic CV mixer
 * [MultiScale](MultiScale) - like ScaleDuet, but with 4 scale masks
 * [Palimpsest](Palimpsest) - accent sequencer
 * [Pigeons](Pigeons) - dual Fibonacci-style melody generator
@@ -126,6 +125,7 @@ If you're coming from any of the other Hemisphere forks, note that many of the a
 * [VectorMorph](VectorMorph) - Dual (or linked) phase scrubbing along a library of bipolar and unipolar shapes
 * [Voltage](Voltage) - static output CV
 * [WTVCO](WTVCO) - WaveTable Voltage Controlled Oscillator
+* [Xfader](Xfader) - basic CV mixer, with gate-controllable fader (formerly Mixer:Bal)
 
 ***
 
@@ -145,7 +145,7 @@ If you're coming from any of the other Hemisphere forks, note that many of the a
 | **Envelope Generator**       | [ADSR](ADSR-EG), [AD EG](AD-EG), [VectorEG](VectorEG)                                                                                                                                 | [Piqued](Piqued), [Dialectic Ping Pong](Dialectic-Ping-Pong)                                                          |
 | **LFO**                      | [Ebb & LFO](Ebb-&-LFO), [LowerRenz](LowerRenz), [VectorLFO](VectorLFO)                                                                                                                       | [Quadraturia](Quadraturia)                                                                            |
 | **MIDI**                     | [MIDI In](MIDI-Input), [MIDI Out](MIDI-Out) _(See also: [Auto MIDI Output](Hemisphere-General-Settings#auto-midi-output))_                                                                                                                                           | [Captain MIDI](Captain-MIDI)                                                                           |
-| **Mixer**                    | [MixerBal](Mixer-Balance)                                                                                                                                                          |                                                                                          |
+| **Mixer**                    | [XFader](XFader)                                                                                                                                                          |                                                                                          |
 | **Modulation Source**        | [GameOfLife](GameOfLife), [Stairs](Stairs), [VectorMod](VectorMod), [VectorMorph](VectorMorph)                                                                                                                          | [Low-rents](Low-rents), [Pong](Pong)                                                                                   |
 | **Performance Utility**      | [Button2](Button2)                                                                                                                                                           |  [Scenery](Scenery)                                                                                        |
 | **Pitch Sequencer**          | [Carpeggio](Carpeggio), [TwoRings](TwoRings), [Enigma Jr.](Enigma-Jr), [Pigeons](Pigeons), [ProbMeloD](ProbMeloD), [Seq32](Seq32), [SeqPlay7](SeqPlay7), [SequenceX](SequenceX), [Shredder](Shredder), [Strum](Strum), [SwitchSeq](Switch-Seq), [TB-3PO](TB-3PO) | [Enigma](Enigma), [The Darkest Timeline](The-Darkest-Timeline), [Automatonnetz](Automatonnetz), [Sequins](Sequins), [Acid Curds](Acid-Curds), [Passencore](Passencore) |
