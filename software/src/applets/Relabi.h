@@ -25,7 +25,6 @@
 // SOFTWARE.
 
 #include "../HSRelabiManager.h"
-#include "../PhzIcons.h"
 #include "../vector_osc/HSVectorOscillator.h"
 #include "../vector_osc/WaveformManager.h"
 
@@ -63,8 +62,7 @@ public:
     outputAssign[0] = 0; // Default outputs to LFOs 1..4
     outputAssign[1] = 1;
     outputAssign[2] = 2;
-    outputAssign[3]
-      = 6; // Defaults final output to stepped CV derived from gates 0-2.
+    outputAssign[3] = 6; // Defaults final output to stepped CV derived from gates 0-2.
   }
 
   void Controller() {
@@ -428,15 +426,7 @@ public:
   //    }
   // }
 
-  void OnButtonPress() {
-    if (!EditMode()) {
-      // Enter EditMode on button press
-      isEditing = true;
-    } else {
-      // Exit EditMode on button press
-      isEditing = false;
-    }
-  }
+  //void OnButtonPress() { }
 
   void OnEncoderMove(int direction) {
     // Determine how many parameters we have based on linkage and hemisphere
@@ -692,7 +682,6 @@ protected:
 private:
   static constexpr int pow10_lut[] = {1, 10, 100, 1000};
   int cursor; // 0=Freq A; 1=Cross Mod A; 2=Phase A; 3=Freq B; 4=Cross Mod B; etc.
-  bool isEditing = false; // Indicates if the user is editing a parameter
   uint8_t modal_edit_mode = 2;
   VectorOscillator osc[3];
   constexpr static uint8_t ch = 3;
@@ -803,9 +792,6 @@ private:
   bool linked;
   //    bool bipolar;
   bool gateState[4] = {false, false, false, false};
-  bool EditMode() {
-    return isEditing;
-  };
 
   float DecodeFreq(uint8_t index) {
     // 0 => 0.0 Hz, 29 => 2.9Hz, 63 => 18.5 Hz
