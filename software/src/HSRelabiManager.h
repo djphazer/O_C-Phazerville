@@ -25,19 +25,9 @@ class RelabiManager {
   int lfo2;
   int lfo3;
   bool gateStates[3];
-  uint8_t leftOn;
-  uint8_t rightOn;
-  bool linked;
   uint32_t registered[2];
-  uint32_t lastRegistered[2];
-  uint8_t hemRelabi;
-  uint8_t linkedFreqMultiplier;
-  uint8_t linkedFreqDivider;
 
   RelabiManager() {
-    leftOn = 0;
-    rightOn = 0;
-    linked = false;
     registered[LEFT_HEMISPHERE] = 0;
     registered[RIGHT_HEMISPHERE] = 0;
 
@@ -48,14 +38,16 @@ class RelabiManager {
   }
 
 public:
-  static RelabiManager* get() {
+  static RelabiManager& get() {
     if (!instance) instance = new RelabiManager;
-    return instance;
+    return *instance;
   }
 
-  void RegisterRelabi(bool hemisphere) {
-    hemRelabi = hemisphere;
-    registered[hemisphere] = OC::CORE::ticks;
+  void Register(int hemisphere) {
+    registered[hemisphere & 1] = OC::CORE::ticks;
+  }
+  void Unload(int hemisphere) {
+    registered[hemisphere & 1] = 0;
   }
 
   bool IsLinked() {
