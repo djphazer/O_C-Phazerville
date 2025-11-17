@@ -70,6 +70,7 @@ public:
     RelabiManager* manager = RelabiManager::get();
     manager->RegisterRelabi(hemisphere);
     linked = manager->IsLinked();
+    const bool link_follow = (linked && (hemisphere & 1));
 
     uint8_t clkCalc;
 
@@ -99,7 +100,7 @@ public:
 
     if (clkDiv == clkCalc) {
 
-      if (linked && hemisphere == RIGHT_HEMISPHERE) {
+      if (link_follow) {
 
         // Linked: Receive lfo values from RelabiManager to display on right
         manager->ReadValues(sample[0], sample[1], sample[2]);
@@ -185,7 +186,7 @@ public:
     int outputB;
 
     // Set outputs based on assignments
-    if (linked && hemisphere == RIGHT_HEMISPHERE) {
+    if (link_follow) {
       outputA = GetOutputValue(outputAssign[2]);
       outputB = GetOutputValue(outputAssign[3]);
     } else {
@@ -203,7 +204,7 @@ public:
   }
 
   void View() {
-    if (linked && hemisphere == RIGHT_HEMISPHERE) {
+    if (linked && (hemisphere & 1)) {
       gfxPrint(1, 55, "C:");
       DrawOutputOption(13, 55, outputAssign[2]); // OUT3
 
@@ -213,17 +214,18 @@ public:
       DrawVUMetersRight();
 
       // Highlight selected parameter
-      switch (selectedParam) {
-        // case 0: HighlightParameter(2, 35, 14); break; // MULT
-        // case 1: HighlightParameter(22, 35, 14); break; // DIV
+      switch (cursor) {
         case 0:
-          HighlightParameter(2, 63, 30);
+          gfxCursor(2, 63, 30);
           break; // OUT3
         case 1:
-          HighlightParameter(32, 63, 30);
+          gfxCursor(32, 63, 30);
           break; // OUT4
       }
-    } else if (currentPage == 0) {
+      return;
+    }
+
+    if (currentPage == 0) {
       // Page 1: Main parameters for non-linked or left hemisphere
       gfxPrint(1, 15, "LFO");
       gfxPrint(21, 15, selectedChannel + 1);
@@ -242,21 +244,21 @@ public:
       gfxPrint(32, 55, thresh[selectedChannel]);
 
       // Highlight selected parameter
-      switch (selectedParam) {
+      switch (cursor) {
         case 0:
-          HighlightParameter(1, 23, 30);
+          gfxCursor(1, 23, 30);
           break; // OSC
         case 1:
-          HighlightParameter(2, 43, 30);
+          gfxCursor(2, 43, 30);
           break; // FREQ
         case 2:
-          HighlightParameter(32, 43, 30);
+          gfxCursor(32, 43, 30);
           break; // XMOD
         case 3:
-          HighlightParameter(2, 63, 30);
+          gfxCursor(2, 63, 30);
           break; // PHAS
         case 4:
-          HighlightParameter(32, 63, 30);
+          gfxCursor(32, 63, 30);
           break; // THRS
       }
       DrawVUMetersLeft();
@@ -284,20 +286,20 @@ public:
       DrawOutputOption(43, 55, outputAssign[1]); // OUT2
 
       // Highlight selected parameter (use your original locations)
-      switch (selectedParam) {
+      switch (cursor) {
         case 5:
-          HighlightParameter(1, 44, 14);
+          gfxCursor(1, 44, 14);
           break; // MULT
         case 6:
-          HighlightParameter(22, 44, 14);
+          gfxCursor(22, 44, 14);
           break; // DIV
-          //   case 7: HighlightParameter(36, 44, 20); break; // ALLMOD
-          //   case 8: HighlightParameter(1, 54, 35); break; // POL
+          //   case 7: gfxCursor(36, 44, 20); break; // ALLMOD
+          //   case 8: gfxCursor(1, 54, 35); break; // POL
         case 7:
-          HighlightParameter(2, 63, 30);
+          gfxCursor(2, 63, 30);
           break; // OUT1
         case 8:
-          HighlightParameter(32, 63, 30);
+          gfxCursor(32, 63, 30);
           break; // OUT2
       }
     }
@@ -307,45 +309,17 @@ public:
     if (assign < 3) {
       // LFO output
       gfxBitmap(x, y, 8, WAVEFORM_ICON);
-      const uint8_t* subscript = (assign == 0) ? SUP_ONE
-        : (assign == 1)                        ? SUB_TWO
-                                               : SUP_THREE;
-      gfxBitmap(x + 9, y, 3, subscript);
+      gfxPrint(x + 9, y, assign + 1);
     } else if (assign < 6) {
       // Gate output
       gfxBitmap(x, y, 8, GATE_ICON);
-      const uint8_t* subscript = (assign == 3) ? SUP_ONE
-        : (assign == 4)                        ? SUB_TWO
-                                               : SUP_THREE;
-      gfxBitmap(x + 9, y, 3, subscript);
+      gfxPrint(x + 9, y, assign - 2);
     } else if (assign == 6) {
       // Gate Combo output
       gfxBitmap(x, y, 8, STAIRS_ICON);
     } else if (assign == 7) {
       // All Gates to Triggers output
       gfxBitmap(x, y, 8, CLOCK_ICON);
-    }
-  }
-
-  // A helper method to highlight parameters depending on EditMode
-  // If editing, invert rectangle; if not editing, draw a blinking cursor line
-  void HighlightParameter(int x, int y, int w) {
-    // y is the baseline where we normally draw the parameter text
-    // We'll highlight the line above it (like in original code)
-    // and depending on EditMode, invert or draw a line
-
-    if (EditMode()) {
-      // Editing: invert the rectangular area to show a highlight
-      gfxInvert(x, y - 9, w, 9); // 9 is line height
-    } else {
-      // Not editing: show a blinking cursor line
-      // The Hemisphere system already uses CursorBlink() internally,
-      // so this will only draw the line half the time for blinking effect.
-      if (CursorBlink()) {
-        gfxLine(x, y, x + w - 1, y);
-        gfxPixel(x, y - 1);
-        gfxPixel(x + w - 1, y - 1);
-      }
     }
   }
 
@@ -375,56 +349,23 @@ public:
 
   void PrintScaledFloat(int x, int y, float value) {
     // Clamp value to 0..150
-    if (value < 0.0f) value = 0.0f;
-    if (value > 150.0f) value = 150.0f;
+    CONSTRAIN(value, 0.0f, 150.0f);
 
     char buf[12]; // enough for "150\0" or "99.9\0"
 
+    gfxPos(x, y);
     if (value >= 100.0f) {
       // 3-digit number, no fraction
       int whole = static_cast<int>(value + 0.5f);
-      snprintf(buf, sizeof(buf), "%3d", whole); // "100", "150"
+      graphics.printf("%3d", whole); // "100", "150"
     } else {
       // Show up to 2-digit whole + 1 decimal
       int scaled = static_cast<int>(value * 10 + 0.5f); // round to 1 decimal
       int whole = scaled / 10;
       int frac = scaled % 10;
-      snprintf(
-        buf, sizeof(buf), "%u.%u", whole, frac
-      ); // always "X.Y" or "XX.Y"
+      graphics.printf("%u.%u", whole, frac); // always "X.Y" or "XX.Y"
     }
-
-    gfxPrint(x, y, buf);
   }
-
-  // void PrintScaledFloat(int x, int y, float value) {
-  //     // Clamp the value to a safe range
-  //     if (value < 0.0f) value = 0.0f;
-  //     if (value > 150.0f) value = 150.0f;
-
-  //    // Break the value into whole and fractional parts
-  //    int whole = (int)value;                  // Integer part
-  //    int fract = (int)((value - whole) * 100 + 0.5f); // Fractional part,
-  //    rounded
-
-  //    // Remove trailing zeros from the fractional part
-  //    if (fract == 0) {
-  //        // Display just the whole number if fract is zero
-  //        char buf[12];
-  //        snprintf(buf, sizeof(buf), "%d", whole);
-  //        gfxPrint(x, y, buf);
-  //    } else if (fract % 10 == 0) {
-  //        // Display with one decimal place if fract ends with zero
-  //        char buf[12];
-  //        snprintf(buf, sizeof(buf), "%d.01%d", whole, fract / 10);
-  //        gfxPrint(x, y, buf);
-  //    } else {
-  //        // Display with two decimal places
-  //        char buf[12];
-  //        snprintf(buf, sizeof(buf), "%d.%02d", whole, fract);
-  //        gfxPrint(x, y, buf);
-  //    }
-  // }
 
   //void OnButtonPress() { }
 
@@ -432,122 +373,119 @@ public:
     // Determine how many parameters we have based on linkage and hemisphere
     // linked && RIGHT_HEMISPHERE: 2 parameters (0 and 1)
     // otherwise: adjust for both pages (parameters 0–7)
-    int max_param = (linked && hemisphere == RIGHT_HEMISPHERE) ? 1 : 8;
+    const bool link_follow = (linked && (hemisphere & 1));
+    int max_param = link_follow ? 1 : 8;
 
     if (!EditMode()) {
       // Not editing: move the cursor through the available parameters
-      selectedParam
-        = (selectedParam + direction + max_param + 1) % (max_param + 1);
+      MoveCursor(cursor, direction, max_param);
 
       // Determine the current page based on the selected parameter
-      if (selectedParam <= 4) {
+      if (cursor <= 4) {
         currentPage = 0; // Page 0: Main parameters
       } else {
         currentPage = 1; // Page 1: THRES, OUT1, OUT2
       }
-    } else {
-      // Editing: adjust parameters based on the current page and selected
-      // parameter
-      if (currentPage == 0) {
-        // Page 0: Main parameters
-        if (linked && hemisphere == RIGHT_HEMISPHERE) {
-          // Linked and RIGHT Hemisphere: Only global frequency multiplier or
-          // divider
-          switch (selectedParam) {
-            case 0: // OUT3 assignment
-              outputAssign[2] = (outputAssign[2] + direction + 8) % 8;
-              break;
-            case 1: // OUT4 assignment
-              outputAssign[3] = (outputAssign[3] + direction + 8) % 8;
-              break;
-          }
-        } else {
-          // Not linked or LEFT Hemisphere: Full parameter set (0–4)
-          switch (selectedParam) {
-            case 0: // Cycle through OSC selection
-              selectedChannel = (selectedChannel + direction + 3) % 3;
-              break;
+      return;
+    }
 
-            case 1: // FREQ
-            {
-              // Step A: move the index by +1 or -1
-              // Because freqKnob[] is uint8_t, we can do modulo arithmetic:
-              int16_t temp = freqKnob[selectedChannel] + direction;
-              if (temp < 0) temp += 64; // wrap downward
-              else if (temp > 63) temp -= 64; // wrap upward
-
-              freqKnob[selectedChannel] = (uint8_t)temp;
-
-              // Step B: decode to float frequency
-              float freqVal = DecodeFreq(freqKnob[selectedChannel]);
-
-              // Store to freqFixed so the Controller() loop picks up the new
-              // freq freqFixed[selectedChannel] = (uint16_t)(freqVal+ 0.5f);
-
-              // Step C: set oscillator frequency
-              osc[selectedChannel].SetFrequency(freqVal);
-
-              break;
-            }
-
-            case 2: // XMOD (0–100) scaling
-              xmodKnob[selectedChannel] += direction;
-              xmodKnob[selectedChannel] = (xmodKnob[selectedChannel] + 8) % 8;
-              xmod[selectedChannel] = xmodKnob[selectedChannel] * 20;
-              break;
-
-            case 3: // PHAS (0–100)
-              phaseKnob[selectedChannel] += direction;
-              phaseKnob[selectedChannel] = (phaseKnob[selectedChannel] + 8) % 8;
-              phase[selectedChannel] = phaseKnob[selectedChannel] * 12.5;
-              break;
-
-            case 4: // THRS adjustment
-              // Correctly wrap around using (current + direction + total) %
-              // total
-              threshKnob[selectedChannel]
-                = (threshKnob[selectedChannel] + direction + 7) % 7;
-              thresh[selectedChannel] = (threshKnob[selectedChannel] * 28) - 84;
-              break;
-          }
+    // Editing: adjust parameters based on the current page and cursor
+    if (currentPage == 0) {
+      // Page 0: Main parameters
+      if (link_follow) {
+        // Linked and RIGHT Hemisphere: Only global frequency multiplier or
+        // divider
+        switch (cursor) {
+          case 0: // OUT3 assignment
+            outputAssign[2] = (outputAssign[2] + direction + 8) % 8;
+            break;
+          case 1: // OUT4 assignment
+            outputAssign[3] = (outputAssign[3] + direction + 8) % 8;
+            break;
         }
-      } else if (currentPage == 1) {
-        // Page 1: THRES, OUT1, OUT2
-        switch (selectedParam) {
+      } else {
+        // Not linked or LEFT Hemisphere: Full parameter set (0–4)
+        switch (cursor) {
+          case 0: // Cycle through OSC selection
+            selectedChannel = (selectedChannel + direction + 3) % 3;
+            break;
 
-          case 5: // Global frequency multiplier
-            freqKnobMul += direction;
-            freqKnobMul = freqKnobMul + 8;
-            freqKnobMul = freqKnobMul % 8;
-            freqMul = freqMulMap[freqKnobMul];
+          case 1: // FREQ
+          {
+            // Step A: move the index by +1 or -1
+            // Because freqKnob[] is uint8_t, we can do modulo arithmetic:
+            int16_t temp = freqKnob[selectedChannel] + direction;
+            if (temp < 0) temp += 64; // wrap downward
+            else if (temp > 63) temp -= 64; // wrap upward
+
+            freqKnob[selectedChannel] = (uint8_t)temp;
+
+            // Step B: decode to float frequency
+            float freqVal = DecodeFreq(freqKnob[selectedChannel]);
+
+            // Store to freqFixed so the Controller() loop picks up the new
+            // freq freqFixed[selectedChannel] = (uint16_t)(freqVal+ 0.5f);
+
+            // Step C: set oscillator frequency
+            osc[selectedChannel].SetFrequency(freqVal);
+
             break;
-          case 6: // Global frequency divider
-            freqKnobDiv += direction;
-            freqKnobDiv = freqKnobDiv + 8;
-            freqKnobDiv = freqKnobDiv % 8;
-            freqDiv = freqDivMap[freqKnobDiv];
+          }
+
+          case 2: // XMOD (0–100) scaling
+            xmodKnob[selectedChannel] += direction;
+            xmodKnob[selectedChannel] = (xmodKnob[selectedChannel] + 8) % 8;
+            xmod[selectedChannel] = xmodKnob[selectedChannel] * 20;
             break;
-            //   case 7: // Global cross modulation offset
-            //       xmodoffset += direction;
-            //       xmodoffset = (xmodoffset + 8) % 8;
-            //       xmodplus = xmodoffset * 20;
-            //       break;
-            //   case 8: // POLARITY (+ or +-)
-            //       bipolar = (bipolar + direction + 2) % 2;
-            //       break;
-          case 7: // OUT1 assignment
-            outputAssign[0] = (outputAssign[0] + direction + 8) % 8;
+
+          case 3: // PHAS (0–100)
+            phaseKnob[selectedChannel] += direction;
+            phaseKnob[selectedChannel] = (phaseKnob[selectedChannel] + 8) % 8;
+            phase[selectedChannel] = phaseKnob[selectedChannel] * 12.5;
             break;
-          case 8: // OUT2 assignment
-            outputAssign[1] = (outputAssign[1] + direction + 8) % 8;
+
+          case 4: // THRS adjustment
+            // Correctly wrap around using (current + direction + total) %
+            // total
+            threshKnob[selectedChannel]
+              = (threshKnob[selectedChannel] + direction + 7) % 7;
+            thresh[selectedChannel] = (threshKnob[selectedChannel] * 28) - 84;
             break;
         }
       }
+    } else if (currentPage == 1) {
+      // Page 1: THRES, OUT1, OUT2
+      switch (cursor) {
+
+        case 5: // Global frequency multiplier
+          freqKnobMul += direction;
+          freqKnobMul = freqKnobMul + 8;
+          freqKnobMul = freqKnobMul % 8;
+          freqMul = freqMulMap[freqKnobMul];
+          break;
+        case 6: // Global frequency divider
+          freqKnobDiv += direction;
+          freqKnobDiv = freqKnobDiv + 8;
+          freqKnobDiv = freqKnobDiv % 8;
+          freqDiv = freqDivMap[freqKnobDiv];
+          break;
+          //   case 7: // Global cross modulation offset
+          //       xmodoffset += direction;
+          //       xmodoffset = (xmodoffset + 8) % 8;
+          //       xmodplus = xmodoffset * 20;
+          //       break;
+          //   case 8: // POLARITY (+ or +-)
+          //       bipolar = (bipolar + direction + 2) % 2;
+          //       break;
+        case 7: // OUT1 assignment
+          outputAssign[0] = (outputAssign[0] + direction + 8) % 8;
+          break;
+        case 8: // OUT2 assignment
+          outputAssign[1] = (outputAssign[1] + direction + 8) % 8;
+          break;
+      }
     }
   }
-
-  // uint64_t OnDataRequest() {}
-  // void OnDataReceive(uint64_t data) {}
 
   uint64_t OnDataRequest() {
     uint64_t data = 0;
@@ -658,7 +596,7 @@ public:
 
 protected:
   void SetHelp() {
-    if (linked && hemisphere == RIGHT_HEMISPHERE) {
+    if (linked && (hemisphere & 1)) {
       help[HELP_DIGITAL1] = "";
       help[HELP_DIGITAL2] = "";
       help[HELP_CV1] = "";
@@ -672,6 +610,7 @@ protected:
       help[HELP_DIGITAL2] = "Phase";
       help[HELP_CV1] = "AllFreq";
       help[HELP_CV2] = "AllXmod";
+      // TODO: use outputAssign for actual output labels
       help[HELP_OUT1] = "LFO 1";
       help[HELP_OUT2] = "LFO 2";
       help[HELP_EXTRA1] = "Set: Frq/XFM/Phs/Thrs";
@@ -681,7 +620,6 @@ protected:
 
 private:
   static constexpr int pow10_lut[] = {1, 10, 100, 1000};
-  int cursor; // 0=Freq A; 1=Cross Mod A; 2=Phase A; 3=Freq B; 4=Cross Mod B; etc.
   uint8_t modal_edit_mode = 2;
   VectorOscillator osc[3];
   constexpr static uint8_t ch = 3;
@@ -705,7 +643,7 @@ private:
   // uint8_t selectedXmod;
 
   int selectedChannel = 0;
-  int selectedParam = 0;
+  int cursor = 0;
   int sample[ch];
   float outFreq[ch];
   // uint8_t freqKnob[4];
