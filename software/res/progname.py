@@ -27,6 +27,10 @@ for item in defines:
     if item[0] == 'OC_VERSION_EXTRA':
         extras += item[1].strip('"')
 
+if "USB_AUDIO" in defines:
+    extras += "+audio"
+if "USB_MTPDISK" in defines:
+    extras += "+MTP"
 if "VOR" in defines:
     extras += "+VOR"
 if "FLIP_180" in defines:
