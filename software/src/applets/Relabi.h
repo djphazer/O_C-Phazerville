@@ -41,53 +41,42 @@ public:
     freqKnob[2] = 38; // 7 Hz
     freqKnobMul = 1; //
     freqKnobDiv = 0; //
-    freqMul = freqMulMap[freqKnobMul];
-    freqDiv = freqDivMap[freqKnobDiv];
 
     for (int i = 0; i < 3; i++) {
 
-      float freqFloat = DecodeFreq(freqKnob[i]);
       xmodKnob[i] = 1; // 20%
       phaseKnob[i] = 0; // 0%
       threshKnob[i] = 3; // 0%
-      xmod[i] = xmodKnob[i] * 20;
-      phase[i] = phaseKnob[i] * 12.5;
-      thresh[i] = (threshKnob[i] * 28) - 84;
 
       // Set oscillator to sine wave
       osc[i] = WaveformManager::VectorOscillatorFromWaveform(35);
-      osc[i].SetFrequency(freqFloat);
+      osc[i].SetFrequency( DecodeFreq(freqKnob[i]) );
     }
 
     outputAssign[0] = 0; // Default outputs to LFOs 1..4
     outputAssign[1] = 1;
     outputAssign[2] = 2;
     outputAssign[3] = 6; // Defaults final output to stepped CV derived from gates 0-2.
+
+    //manager.Register(hemisphere);
+  }
+  void Unload() {
+    manager.Unload(hemisphere);
   }
 
   void Controller() {
+    manager.Register(hemisphere);
 
-    RelabiManager* manager = RelabiManager::get();
-    manager->RegisterRelabi(hemisphere);
-    linked = manager->IsLinked();
+    linked = manager.IsLinked();
     const bool link_follow = (linked && (hemisphere & 1));
 
-    uint8_t clkCalc;
-
-    if (LEFT_HEMISPHERE) {
-      clkCalc = 1;
-    }
-    if (RIGHT_HEMISPHERE) {
-      clkCalc = 3;
-    }
-
-    if (Clock(0) && oldClock == 0) { // Rising edge detected on TRIG1 input
+    if (Clock(0)) { // Rising edge detected on TRIG1 input
       for (uint8_t pcount = 0; pcount < 3; pcount++) {
         // Get the total number of segments in the waveform
         // byte totalSegments = osc[pcount].GetSegment(0).Segments(); // Use first segment's TOC
 
         // Calculate phase position based on phase percentage (0–100)
-        // int setPhase = round((phase[pcount] / 100.0) * totalSegments);
+        // int setPhase = round((phase(pcount) / 100.0) * totalSegments);
 
         // Reset the phase of the oscillator
         // osc[pcount].SetPhase(setPhase);
@@ -95,25 +84,17 @@ public:
       }
     }
 
-    //}
-    oldClock = Clock(0);
-
+    // only calculate on certain ticks, to avoid excessive ISR processing
+    uint8_t clkCalc = (hemisphere & 1)? 3 : 1;
     if (clkDiv == clkCalc) {
 
       if (link_follow) {
-
-        // Linked: Receive lfo values from RelabiManager to display on right
-        manager->ReadValues(sample[0], sample[1], sample[2]);
-        bool receivedGateStates[3];
-        manager->ReadGates(receivedGateStates);
-        for (int i = 0; i < 3; i++) {
-          gateState[i] = receivedGateStates[i];
-        }
-
+        // Linked as Follower: Receive lfo values from RelabiManager to display on right
+        manager.ReadValues(sample[0], sample[1], sample[2]);
+        manager.ReadGates(gateState);
       } else {
-
-        cvIn = (In(0) - 24551) / 6553; // center 0V at 0 and scale -3..+3
-        cvIn2 = (In(1) - 24551) / 6553;
+        float cvIn = (In(0) - 24551) / 6553; // center 0V at 0 and scale -3..+3
+        float cvIn2 = (In(1) - 24551) / 6553;
 
         float normalizedCV = (cvIn / 3.0f); // -1..1 incoming fm amount
         float normalizedCV2 = (cvIn2 / 3.0f); // -1..1 incoming xmod amount
@@ -126,18 +107,18 @@ public:
           osc[lfo].SetScale(HEMISPHERE_3V_CV);
 
           // Calculate gate outputs based on thresholds
-          if (sample[lfo] >= (thresh[lfo] * HEMISPHERE_MAX_CV) / 200) {
+          if (sample[lfo] >= (thresh(lfo) * HEMISPHERE_MAX_CV) / 200) {
             // Gate is high
             gateState[lfo] = true;
-          } else if (sample[lfo] < (thresh[lfo] * HEMISPHERE_MAX_CV) / 200) {
+          } else if (sample[lfo] < (thresh(lfo) * HEMISPHERE_MAX_CV) / 200) {
             // Signal is below or equal to the threshold, clear the gate
             gateState[lfo] = false;
           }
 
           // Incorporate CV2 with cross-modulation
-          float xmodCombo = xmod[lfo] + xModCV * 100; // 0..140 + -100..100 = -100..240
+          float xmodCombo = xmod(lfo) + xModCV * 100; // 0..140 + -100..100 = -100..240
           // Previously
-          // float xmodCombo = xmod[lfo] +  (cvIn2 / 100) - 50; //???!
+          // float xmodCombo = xmod(lfo) +  (cvIn2 / 100) - 50; //???!
 
           // Calculate cross-frequency modulation factor
           float crossFreqMod = (static_cast<float>(xmodCombo) / 100.0)
@@ -148,7 +129,7 @@ public:
                + ((DecodeFreq(freqKnob[lfo])) * crossFreqMod));
 
           // Scale frequency by global freqMul and freqDiv amounts.
-          modulatedFreq = modulatedFreq * freqMul / freqDiv;
+          modulatedFreq = modulatedFreq * freqMulMap[freqKnobMul] / freqDivMap[freqKnobDiv];
 
           // Ensure the frequency stays within valid bounds
           // modulatedFreq = constrain(modulatedFreq, 0.01, 15000.0);
@@ -160,25 +141,14 @@ public:
 
           // Update sample
           sample[lfo] = osc[lfo].Next();
-
-          // Store the display frequency for visualization
-          displayFreq[lfo] = modulatedFreq;
         }
 
-        if (manager->IsLinked() && hemisphere == LEFT_HEMISPHERE) {
-
-          // Linked: Send lfo values to RelabiManager
-          manager->WriteValues(sample[0], sample[1], sample[2]);
-          // Linked: Send gate values to RelabiManager
-          manager->WriteGates(gateState);
+        if (linked) {
+          // we're inside the "else" clause of (link_follow) so this must be the leader
+          // Leader is Linked: Send lfo values and gates to RelabiManager
+          manager.WriteValues(sample[0], sample[1], sample[2]);
+          manager.WriteGates(gateState);
         }
-
-        if (manager->IsLinked() && hemisphere == RIGHT_HEMISPHERE) {
-          manager->ReadValues(sample[0], sample[1], sample[2]);
-          manager->ReadGates(gateState);
-        }
-
-        // CV1 outputs LFO1 // CV2 outputs LFO2
       }
     }
 
@@ -196,11 +166,7 @@ public:
     Out(0, outputA);
     Out(1, outputB);
 
-    // Out(0, wave1);
-    // Out(1, wave2);
-
-    clkDiv++;
-    clkDiv = clkDiv % 32;
+    ++clkDiv %= 32;
   }
 
   void View() {
@@ -225,6 +191,7 @@ public:
       return;
     }
 
+    int currentPage = (cursor > 4);
     if (currentPage == 0) {
       // Page 1: Main parameters for non-linked or left hemisphere
       gfxPrint(1, 15, "LFO");
@@ -235,13 +202,13 @@ public:
       PrintScaledFloat(2, 35, fDisplay);
 
       gfxPrint(31, 26, "XFM");
-      gfxPrint(32, 35, xmod[selectedChannel]);
+      gfxPrint(32, 35, xmod(selectedChannel));
 
       gfxPrint(1, 46, "PHAS");
-      gfxPrint(2, 55, phase[selectedChannel]);
+      gfxPrint(2, 55, phase(selectedChannel));
 
       gfxPrint(31, 46, "THRS");
-      gfxPrint(32, 55, thresh[selectedChannel]);
+      gfxPrint(32, 55, thresh(selectedChannel));
 
       // Highlight selected parameter
       switch (cursor) {
@@ -268,16 +235,10 @@ public:
 
       gfxPrint(1, 15, "ALL LFOs");
       gfxPrint(2, 25, "FREQx ");
-      gfxPrint(1, 35, freqMul);
+      gfxPrint(1, 35, freqMulMap[freqKnobMul]);
 
       gfxPrint(16, 35, "/");
-      gfxPrint(22, 35, freqDiv);
-
-      //   gfxPrint(36, 26,  "XFM");
-      //   gfxPrint(37, 35, xmodplus); // ALL CROSS_MODULATION
-
-      //   gfxPrint(1, 46, "POL");
-      //   gfxPrint(20, 46, bipolar ? "+-" : "+ ");
+      gfxPrint(22, 35, freqDivMap[freqKnobDiv]);
 
       gfxPrint(1, 55, "A:");
       DrawOutputOption(13, 55, outputAssign[0]); // OUT1
@@ -287,20 +248,18 @@ public:
 
       // Highlight selected parameter (use your original locations)
       switch (cursor) {
-        case 5:
+        case 5: // MULT
           gfxCursor(1, 44, 14);
-          break; // MULT
-        case 6:
+          break;
+        case 6: // DIV
           gfxCursor(22, 44, 14);
-          break; // DIV
-          //   case 7: gfxCursor(36, 44, 20); break; // ALLMOD
-          //   case 8: gfxCursor(1, 54, 35); break; // POL
-        case 7:
+          break;
+        case 7: // OUT1
           gfxCursor(2, 63, 30);
-          break; // OUT1
-        case 8:
+          break;
+        case 8: // OUT2
           gfxCursor(32, 63, 30);
-          break; // OUT2
+          break;
       }
     }
   }
@@ -379,35 +338,33 @@ public:
     if (!EditMode()) {
       // Not editing: move the cursor through the available parameters
       MoveCursor(cursor, direction, max_param);
-
-      // Determine the current page based on the selected parameter
-      if (cursor <= 4) {
-        currentPage = 0; // Page 0: Main parameters
-      } else {
-        currentPage = 1; // Page 1: THRES, OUT1, OUT2
-      }
       return;
     }
 
     // Editing: adjust parameters based on the current page and cursor
+
+    // Determine the current page based on cursor position
+    // Page 0: Main parameters
+    // Page 1: THRES, OUT1, OUT2
+    int currentPage = (cursor > 4);
+
     if (currentPage == 0) {
       // Page 0: Main parameters
       if (link_follow) {
-        // Linked and RIGHT Hemisphere: Only global frequency multiplier or
-        // divider
+        // Linked and RIGHT side: Only global frequency multiplier or divider
         switch (cursor) {
           case 0: // OUT3 assignment
-            outputAssign[2] = (outputAssign[2] + direction + 8) % 8;
+            outputAssign[2] = constrain(outputAssign[2] + direction, 0, 7);
             break;
           case 1: // OUT4 assignment
-            outputAssign[3] = (outputAssign[3] + direction + 8) % 8;
+            outputAssign[3] = constrain(outputAssign[3] + direction, 0, 7);
             break;
         }
       } else {
         // Not linked or LEFT Hemisphere: Full parameter set (0–4)
         switch (cursor) {
           case 0: // Cycle through OSC selection
-            selectedChannel = (selectedChannel + direction + 3) % 3;
+            selectedChannel = constrain(selectedChannel + direction, 0, 2);
             break;
 
           case 1: // FREQ
@@ -433,23 +390,15 @@ public:
           }
 
           case 2: // XMOD (0–100) scaling
-            xmodKnob[selectedChannel] += direction;
-            xmodKnob[selectedChannel] = (xmodKnob[selectedChannel] + 8) % 8;
-            xmod[selectedChannel] = xmodKnob[selectedChannel] * 20;
+            xmodKnob[selectedChannel] = constrain(xmodKnob[selectedChannel] + direction, 0, 7);
             break;
 
           case 3: // PHAS (0–100)
-            phaseKnob[selectedChannel] += direction;
-            phaseKnob[selectedChannel] = (phaseKnob[selectedChannel] + 8) % 8;
-            phase[selectedChannel] = phaseKnob[selectedChannel] * 12.5;
+            phaseKnob[selectedChannel] = constrain(phaseKnob[selectedChannel] + direction, 0, 7);
             break;
 
           case 4: // THRS adjustment
-            // Correctly wrap around using (current + direction + total) %
-            // total
-            threshKnob[selectedChannel]
-              = (threshKnob[selectedChannel] + direction + 7) % 7;
-            thresh[selectedChannel] = (threshKnob[selectedChannel] * 28) - 84;
+            threshKnob[selectedChannel] = constrain(threshKnob[selectedChannel] + direction, 0, 6);
             break;
         }
       }
@@ -458,30 +407,16 @@ public:
       switch (cursor) {
 
         case 5: // Global frequency multiplier
-          freqKnobMul += direction;
-          freqKnobMul = freqKnobMul + 8;
-          freqKnobMul = freqKnobMul % 8;
-          freqMul = freqMulMap[freqKnobMul];
+          freqKnobMul = constrain(freqKnobMul + direction, 0, 7);
           break;
         case 6: // Global frequency divider
-          freqKnobDiv += direction;
-          freqKnobDiv = freqKnobDiv + 8;
-          freqKnobDiv = freqKnobDiv % 8;
-          freqDiv = freqDivMap[freqKnobDiv];
+          freqKnobDiv = constrain(freqKnobDiv + direction, 0, 7);
           break;
-          //   case 7: // Global cross modulation offset
-          //       xmodoffset += direction;
-          //       xmodoffset = (xmodoffset + 8) % 8;
-          //       xmodplus = xmodoffset * 20;
-          //       break;
-          //   case 8: // POLARITY (+ or +-)
-          //       bipolar = (bipolar + direction + 2) % 2;
-          //       break;
         case 7: // OUT1 assignment
-          outputAssign[0] = (outputAssign[0] + direction + 8) % 8;
+          outputAssign[0] = constrain(outputAssign[0] + direction, 0, 7);
           break;
         case 8: // OUT2 assignment
-          outputAssign[1] = (outputAssign[1] + direction + 8) % 8;
+          outputAssign[1] = constrain(outputAssign[1] + direction, 0, 7);
           break;
       }
     }
@@ -489,185 +424,100 @@ public:
 
   uint64_t OnDataRequest() {
     uint64_t data = 0;
-    uint8_t pos = 0; // bit offset
-
-    // 1) freqKnob[3], 6 bits each → 18 bits total
-    for (int i = 0; i < 3; i++) {
-      Pack(data, PackLocation{pos, 6}, freqKnob[i]);
-      pos += 6;
+    for (size_t i = 0; i < 3; i++) {
+      // 1) freqKnob[3], 6 bits each → 18 bits total
+      Pack(data, PackLocation{0 + i*6, 6}, freqKnob[i]);
+      // 2) xmodKnob[3], 3 bits each → 9 bits total
+      Pack(data, PackLocation{18 + i*3, 3}, xmodKnob[i]);
+      // 3) phaseKnob[3], 3 bits each → 9 bits total
+      Pack(data, PackLocation{27 + i*3, 3}, phaseKnob[i]);
+      // 4) threshKnob[3], 3 bits each → 9 bits total
+      Pack(data, PackLocation{36 + i*3, 3}, threshKnob[i]);
     }
-
-    // 2) xmodKnob[3], 3 bits each → 9 bits total
-    for (int i = 0; i < 3; i++) {
-      Pack(data, PackLocation{pos, 3}, xmodKnob[i]);
-      pos += 3;
-    }
-
-    // 3) phaseKnob[3], 3 bits each → 9 bits total
-    for (int i = 0; i < 3; i++) {
-      Pack(data, PackLocation{pos, 3}, phaseKnob[i]);
-      pos += 3;
-    }
-
-    // 4) threshKnob[3], 3 bits each → 9 bits total
-    for (int i = 0; i < 3; i++) {
-      Pack(data, PackLocation{pos, 3}, threshKnob[i]);
-      pos += 3;
-    }
-
     // 5) freqKnobMul → 3 bits
-    Pack(data, PackLocation{pos, 3}, freqKnobMul);
-    pos += 3;
-
-    // 6) freqKnobDiv → 4 bits
-    Pack(data, PackLocation{pos, 3}, freqKnobDiv);
-    pos += 3;
-
-    // // 7) xmodoffset → 3 bits
-    // Pack(data, PackLocation{pos, 3}, xmodoffset);
-    //     pos += 3;
-
+    Pack(data, PackLocation{45, 3}, freqKnobMul);
+    // 6) freqKnobDiv → 3 bits
+    Pack(data, PackLocation{48, 3}, freqKnobDiv);
     // 7) outputAssign → 3 bits each → 12 bits
-    for (int i = 0; i < 4; i++) {
-      Pack(data, PackLocation{pos, 3}, outputAssign[i]);
-      pos += 3;
+    for (size_t i = 0; i < 4; i++) {
+      Pack(data, PackLocation{51 + i*3, 3}, outputAssign[i]);
     }
-
     return data;
   }
 
   void OnDataReceive(uint64_t data) {
-    uint8_t pos = 0; // bit offset
-
-    // 1) freqKnob[3]
-    for (int i = 0; i < 3; i++) {
-      freqKnob[i] = Unpack(data, PackLocation{pos, 6});
-      pos += 6;
+    for (size_t i = 0; i < 3; i++) {
+      freqKnob[i] = Unpack(data, PackLocation{0 + i*6, 6});
+      xmodKnob[i] = Unpack(data, PackLocation{18 + i*3, 3});
+      phaseKnob[i] = Unpack(data, PackLocation{27 + i*3, 3});
+      threshKnob[i] = Unpack(data, PackLocation{36 + i*3, 3});
     }
 
-    // 2) xmodKnob[4]
-    for (int i = 0; i < 3; i++) {
-      xmodKnob[i] = Unpack(data, PackLocation{pos, 3});
-      pos += 3;
-    }
+    freqKnobMul = Unpack(data, PackLocation{45, 3});
+    freqKnobDiv = Unpack(data, PackLocation{48, 3});
 
-    // 3) phaseKnob[4]
-    for (int i = 0; i < 3; i++) {
-      phaseKnob[i] = Unpack(data, PackLocation{pos, 3});
-      pos += 3;
-    }
-
-    // 4) threshKnob[4]
-    for (int i = 0; i < 3; i++) {
-      threshKnob[i] = Unpack(data, PackLocation{pos, 3});
-      pos += 3;
-    }
-
-    // 5) freqKnobMul
-    freqKnobMul = Unpack(data, PackLocation{pos, 3});
-    pos += 3;
-
-    // 6) freqKnobDiv
-    freqKnobDiv = Unpack(data, PackLocation{pos, 3});
-    pos += 3;
-
-    // // 7) xmodoffset
-    // xmodoffset = Unpack(data, PackLocation{pos, 3});
-    // pos += 3;
-
-    // 7) outputAssign
-    for (int i = 0; i < 4; i++) {
-      outputAssign[i] = Unpack(data, PackLocation{pos, 3});
-      pos += 3;
-    }
-
-    freqMul = freqMulMap[freqKnobMul];
-    freqDiv = freqDivMap[freqKnobDiv];
-    //    bipolar = true;
-
-    for (int i = 0; i < 3; i++) {
-
-      // float freqFloat = DecodeFreq(freqKnob[i]);
-      xmod[i] = xmodKnob[i] * 20;
-      phase[i] = phaseKnob[i] * 12.5;
-      thresh[i] = (threshKnob[i] * 28) - 84;
+    for (size_t i = 0; i < 4; i++) {
+      outputAssign[i] = Unpack(data, PackLocation{51 + i*3, 3});
     }
   }
 
 protected:
   void SetHelp() {
+    help[HELP_DIGITAL1] = "Reset";
+    help[HELP_DIGITAL2] = "";
     if (linked && (hemisphere & 1)) {
-      help[HELP_DIGITAL1] = "";
-      help[HELP_DIGITAL2] = "";
       help[HELP_CV1] = "";
       help[HELP_CV2] = "";
-      help[HELP_OUT1] = "C";
-      help[HELP_OUT2] = "D";
-      help[HELP_EXTRA1] = "";
-      help[HELP_EXTRA2] = "";
+      help[HELP_OUT1] = GetOutputLabel(outputAssign[2]);
+      help[HELP_OUT2] = GetOutputLabel(outputAssign[3]);
     } else {
-      help[HELP_DIGITAL1] = "Reset";
-      help[HELP_DIGITAL2] = "Phase";
       help[HELP_CV1] = "AllFreq";
       help[HELP_CV2] = "AllXmod";
-      // TODO: use outputAssign for actual output labels
-      help[HELP_OUT1] = "LFO 1";
-      help[HELP_OUT2] = "LFO 2";
-      help[HELP_EXTRA1] = "Set: Frq/XFM/Phs/Thrs";
-      help[HELP_EXTRA2] = "";
+      help[HELP_OUT1] = GetOutputLabel(outputAssign[0]);
+      help[HELP_OUT2] = GetOutputLabel(outputAssign[1]);
     }
+    help[HELP_EXTRA1] = "Set: Frq/XFM/Phs/Thrs";
+    help[HELP_EXTRA2] = "";
   }
 
 private:
-  static constexpr int pow10_lut[] = {1, 10, 100, 1000};
-  uint8_t modal_edit_mode = 2;
+  constexpr static int CHAN_COUNT = 3;
+  constexpr static int numParams = 5;
+  const int freqMulMap[8] = {0, 1, 2, 3, 4, 6, 8, 12};
+  const int freqDivMap[8] = {1, 2, 3, 4, 8, 12, 16, 32};
+
+  RelabiManager& manager = RelabiManager::get();
   VectorOscillator osc[3];
-  constexpr static uint8_t ch = 3;
-  constexpr static uint8_t numParams = 5;
-  uint8_t selectedOsc;
 
   // parameters to be saved and loaded
-  // float freq[ch]; // in centihertz
-  uint8_t freqKnob[ch]; // 18 bits (6 each) // Each 0..19.5
-  uint8_t xmodKnob[ch]; // 9 bits (3 each) // Each 0..140%
-  int8_t phaseKnob[ch]; // 9 bits (3 each) // Each 0..87%
-  int8_t
-    threshKnob[ch]; // 9 bits (3 each) // Thresholds for each LFO (-84%..84%)
+  uint8_t freqKnob[CHAN_COUNT]; // 18 bits (6 each) // Each 0..19.5
+  uint8_t xmodKnob[CHAN_COUNT]; // 9 bits (3 each) // Each 0..140%
+  int8_t phaseKnob[CHAN_COUNT]; // 9 bits (3 each) // Each 0..87%
+  int8_t threshKnob[CHAN_COUNT]; // 9 bits (3 each) // Thresholds for each LFO (-84%..84%)
   uint8_t freqKnobMul; // 3 bits // All freqs x 0..14
   uint8_t freqKnobDiv; // 3 bits // All freqs / 1, 2, 3, 4, 8, 16, 32, 64
   //    uint8_t xmodoffset; // 3 bits // All xmod + 0..140%
   uint8_t outputAssign[4]; // 12 bits (3 each) // Output assignments for A and B
                            // (0-7 for LFO1-LFO4, GATE1-GATE4)
 
-  //    uint8_t xmodplus;
-  // uint8_t selectedXmod;
-
   int selectedChannel = 0;
   int cursor = 0;
-  int sample[ch];
-  float outFreq[ch];
-  // uint8_t freqKnob[4];
-  float cvIn;
-  float cvIn2;
-  uint8_t xmod[ch];
-  uint8_t phase[ch];
-  int8_t thresh[ch];
-  uint8_t countLimit = 0;
-  uint8_t freqMul;
-  uint32_t freqDiv;
-  // int waveform_number[4];
-  int ones(int n) {
-    return (n / 100);
-  }
-  int hundredths(int n) {
-    return (n % 100);
-  }
-  int valueToDisplay;
+  int sample[CHAN_COUNT];
+
+  const uint8_t xmod(int idx) const { return xmodKnob[idx] * 20; }
+  const uint8_t phase(int idx) const { return phaseKnob[idx] * 12.5; }
+  const int8_t thresh(int idx) const { return (threshKnob[idx] * 28) - 84; }
+
   // Pulse state and duration management
   bool triggerActive = false; // Tracks whether the pulse is currently active
   uint32_t triggerStartTime = 0; // Tracks the start time of the pulse
-  bool previousGateState[3]
-    = {false, false, false}; // Stores the previous state of the gates
+
+  uint8_t clkDiv = 0; // clkDiv allows us to calculate every other tick to save cycles
+
+  bool linked;
+  //    bool bipolar;
+  bool gateState[4] = {false, false, false, false};
+  bool previousGateState[3] = {false, false, false}; // Stores the previous state of the gates
 
   int GetOutputValue(uint8_t assign) {
     if (assign < 3) {
@@ -716,22 +566,7 @@ private:
     }
   }
 
-  uint8_t clkDiv = 0; // clkDiv allows us to calculate every other tick to save cycles
-  uint8_t clkDivDisplay = 0; // clkDivDisplay allows us to update the display fewer times per second
-  uint8_t oldClock = 0;
-  float displayFreq[ch];
-  // uint8_t freqLinkMul;
-  // uint8_t freqLinkDiv;
-  uint8_t mulLink;
-  uint8_t divLink;
-  const int freqMulMap[8] = {0, 1, 2, 3, 4, 6, 8, 12};
-  const int freqDivMap[8] = {1, 2, 3, 4, 8, 12, 16, 32};
-  uint8_t currentPage = 0; // 0 = main page, 1 = threshold/output page
-  bool linked;
-  //    bool bipolar;
-  bool gateState[4] = {false, false, false, false};
-
-  float DecodeFreq(uint8_t index) {
+  constexpr float DecodeFreq(uint8_t index) {
     // 0 => 0.0 Hz, 29 => 2.9Hz, 63 => 18.5 Hz
     if (index < 30) {
       return index * 0.1f;
@@ -740,7 +575,7 @@ private:
     }
   }
 
-  uint8_t EncodeFreq(float f) {
+  constexpr uint8_t EncodeFreq(float f) {
     // clamp to 0..25.5
     if (f < 0.0f) f = 0.0f;
     if (f > 25.5f) f = 25.5f;
@@ -766,7 +601,4 @@ private:
         return "???";
     }
   }
-
-  const uint8_t SUP_THREE[3] = {0x09, 0x0D, 0x06}; // Superscript "3"
-  const uint8_t SUB_FOUR[3] = {0x30, 0x20, 0xF0}; // Subscript "4"
 };

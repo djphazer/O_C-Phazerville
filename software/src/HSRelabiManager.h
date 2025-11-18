@@ -38,13 +38,16 @@ class RelabiManager {
   }
 
 public:
-  static RelabiManager* get() {
+  static RelabiManager& get() {
     if (!instance) instance = new RelabiManager;
-    return instance;
+    return *instance;
   }
 
-  void RegisterRelabi(bool hemisphere) {
-    registered[hemisphere] = OC::CORE::ticks;
+  void Register(int hemisphere) {
+    registered[hemisphere & 1] = OC::CORE::ticks;
+  }
+  void Unload(int hemisphere) {
+    registered[hemisphere & 1] = 0;
   }
 
   bool IsLinked() {
