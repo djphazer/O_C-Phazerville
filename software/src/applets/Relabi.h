@@ -43,7 +43,6 @@ public:
     freqKnobDiv = 0; //
 
     for (int i = 0; i < 3; i++) {
-
       xmodKnob[i] = 1; // 20%
       phaseKnob[i] = 0; // 0%
       threshKnob[i] = 3; // 0%
@@ -58,6 +57,8 @@ public:
     outputAssign[2] = 2;
     outputAssign[3] = 6; // Defaults final output to stepped CV derived from gates 0-2.
 
+    // This could simplify registration, but requires AllowRestart()
+    // ...which means params would be reset to defaults every time you switch away and come back.
     //manager.Register(hemisphere);
   }
   void Unload() {
@@ -84,8 +85,9 @@ public:
       }
     }
 
-    // only calculate on certain ticks, to avoid excessive ISR processing
+    // stagger calculations between ticks, to avoid excessive ISR processing
     uint8_t clkCalc = (hemisphere & 1)? 3 : 1;
+    ++clkDiv %= 4;
     if (clkDiv == clkCalc) {
 
       if (link_follow) {
@@ -152,21 +154,15 @@ public:
       }
     }
 
-    int outputA;
-    int outputB;
-
+    bool trigout = GateStateChanged();
     // Set outputs based on assignments
-    if (link_follow) {
-      outputA = GetOutputValue(outputAssign[2]);
-      outputB = GetOutputValue(outputAssign[3]);
-    } else {
-      outputA = GetOutputValue(outputAssign[0]);
-      outputB = GetOutputValue(outputAssign[1]);
+    ForEachChannel(ch) {
+      int assign = outputAssign[ch + link_follow*2];
+      if (assign == 7) { // trigger out
+        if (trigout) ClockOut(ch);
+      } else
+        Out(ch, GetOutputValue(assign));
     }
-    Out(0, outputA);
-    Out(1, outputB);
-
-    ++clkDiv %= 32;
   }
 
   void View() {
@@ -504,20 +500,16 @@ private:
   int cursor = 0;
   int sample[CHAN_COUNT];
 
-  const uint8_t xmod(int idx) const { return xmodKnob[idx] * 20; }
-  const uint8_t phase(int idx) const { return phaseKnob[idx] * 12.5; }
-  const int8_t thresh(int idx) const { return (threshKnob[idx] * 28) - 84; }
-
-  // Pulse state and duration management
-  bool triggerActive = false; // Tracks whether the pulse is currently active
-  uint32_t triggerStartTime = 0; // Tracks the start time of the pulse
-
   uint8_t clkDiv = 0; // clkDiv allows us to calculate every other tick to save cycles
 
   bool linked;
   //    bool bipolar;
-  bool gateState[4] = {false, false, false, false};
+  bool gateState[3] = {false, false, false};
   bool previousGateState[3] = {false, false, false}; // Stores the previous state of the gates
+
+  const uint8_t xmod(int idx) const { return xmodKnob[idx] * 20; }
+  const uint8_t phase(int idx) const { return phaseKnob[idx] * 12.5; }
+  const int8_t thresh(int idx) const { return (threshKnob[idx] * 28) - 84; }
 
   int GetOutputValue(uint8_t assign) {
     if (assign < 3) {
@@ -533,37 +525,20 @@ private:
         | (gateState[2] ? 1 : 0) << 2; // Bit 2
       const int scaleFactor = HEMISPHERE_MAX_CV / 7;
       return gateCombo * scaleFactor;
-    } else if (assign == 7) {
-      // Generate a momentary pulse when any gate changes state
-      uint32_t currentTime = OC::CORE::ticks; // Get the current tick count
-
-      // Detect if any gate state has changed
-      bool gateChanged = false;
-      for (int i = 0; i < 3; i++) {
-        if (gateState[i] != previousGateState[i]) {
-          gateChanged = true;
-          previousGateState[i] = gateState[i]; // Update the previous state
-        }
-      }
-
-      if (gateChanged) {
-        // Start the pulse if a gate change is detected
-        triggerActive = true;
-        triggerStartTime = currentTime;
-        return HEMISPHERE_MAX_CV; // Output high voltage
-      }
-
-      // Check if the pulse duration has elapsed (e.g., 50ms)
-      if (triggerActive && (currentTime - triggerStartTime < 50)) {
-        return HEMISPHERE_MAX_CV; // Keep high voltage during the pulse
-      } else {
-        // End the pulse
-        triggerActive = false;
-        return 0; // Return to 0V
-      }
-    } else {
-      return 0; // Default output
     }
+    return 0; // Default output
+  }
+
+  const bool GateStateChanged() {
+    // Generate a momentary trigger pulse when any gate changes state
+    bool gateChanged = false;
+    for (int i = 0; i < 3; i++) {
+      if (gateState[i] != previousGateState[i]) {
+        gateChanged = true;
+        previousGateState[i] = gateState[i]; // Update the previous state
+      }
+    }
+    return gateChanged;
   }
 
   constexpr float DecodeFreq(uint8_t index) {
