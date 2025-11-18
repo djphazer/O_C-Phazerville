@@ -95,11 +95,8 @@ public:
         manager.ReadValues(sample[0], sample[1], sample[2]);
         manager.ReadGates(gateState);
       } else {
-        float cvIn = (In(0) - 24551) / 6553; // center 0V at 0 and scale -3..+3
-        float cvIn2 = (In(1) - 24551) / 6553;
-
-        float normalizedCV = (cvIn / 3.0f); // -1..1 incoming fm amount
-        float normalizedCV2 = (cvIn2 / 3.0f); // -1..1 incoming xmod amount
+        float normalizedCV = InF(0, HEMISPHERE_3V_CV); // -1..1 incoming fm amount
+        float normalizedCV2 = InF(1, HEMISPHERE_3V_CV); // -1..1 incoming xmod amount
         normalizedCV = powf(10.0f, normalizedCV * 2); // 0.01..100
         float fModCV = constrain(normalizedCV, 0.01f, 100.0f);
         float xModCV = constrain(normalizedCV2, 0.0f, 1.0f);
@@ -123,7 +120,7 @@ public:
           // float xmodCombo = xmod(lfo) +  (cvIn2 / 100) - 50; //???!
 
           // Calculate cross-frequency modulation factor
-          float crossFreqMod = (static_cast<float>(xmodCombo) / 100.0)
+          float crossFreqMod = (xmodCombo / 100.0)
             * (static_cast<float>(sample[(lfo + 2) % 3]) / HEMISPHERE_3V_CV);
 
           // Combine base frequency, cross-modulation, and CV input
@@ -154,7 +151,9 @@ public:
       }
     }
 
+    // A momentary trigger pulse when any gate changes state
     bool trigout = GateStateChanged();
+
     // Set outputs based on assignments
     ForEachChannel(ch) {
       int assign = outputAssign[ch + link_follow*2];
@@ -530,7 +529,6 @@ private:
   }
 
   const bool GateStateChanged() {
-    // Generate a momentary trigger pulse when any gate changes state
     bool gateChanged = false;
     for (int i = 0; i < 3; i++) {
       if (gateState[i] != previousGateState[i]) {

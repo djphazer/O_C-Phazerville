@@ -145,11 +145,9 @@ public:
       return cvmap[ch + io_offset].In();
     }
 
-#ifdef __IMXRT1062__
-    float InF(int ch) {
-        return static_cast<float>(In(ch)) / HEMISPHERE_MAX_INPUT_CV;
+    float InF(int ch, int max = HEMISPHERE_MAX_INPUT_CV) {
+        return static_cast<float>(In(ch)) / max;
     }
-#endif
 
     // Apply small center detent to input, so it reads zero before a threshold
     int DetentedIn(int ch) {
