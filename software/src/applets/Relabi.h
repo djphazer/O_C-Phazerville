@@ -31,6 +31,8 @@
 class Relabi : public HemisphereApplet {
 
 public:
+  static constexpr int PROCESS_TICKS = 4;
+
   const char* applet_name() {
     return "Relabi";
   }
@@ -49,7 +51,8 @@ public:
 
       // Set oscillator to sine wave
       osc[i] = WaveformManager::VectorOscillatorFromWaveform(35);
-      osc[i].SetFrequency( DecodeFreq(freqKnob[i]) );
+      osc[i].SetFrequency( DecodeFreq(freqKnob[i]) * 100 * PROCESS_TICKS );
+      osc[i].SetScale(HEMISPHERE_3V_CV);
     }
 
     outputAssign[0] = 0; // Default outputs to LFOs 1..4
@@ -87,7 +90,7 @@ public:
 
     // stagger calculations between ticks, to avoid excessive ISR processing
     uint8_t clkCalc = (hemisphere & 1)? 3 : 1;
-    ++clkDiv %= 4;
+    ++clkDiv %= PROCESS_TICKS;
     if (clkDiv == clkCalc) {
 
       if (link_follow) {
@@ -103,8 +106,6 @@ public:
 
         // frequency modulation:
         for (uint8_t lfo = 0; lfo < 3; lfo++) {
-          osc[lfo].SetScale(HEMISPHERE_3V_CV);
-
           // Calculate gate outputs based on thresholds
           if (sample[lfo] >= (thresh(lfo) * HEMISPHERE_MAX_CV) / 200) {
             // Gate is high
@@ -124,18 +125,18 @@ public:
             * (static_cast<float>(sample[(lfo + 2) % 3]) / HEMISPHERE_3V_CV);
 
           // Combine base frequency, cross-modulation, and CV input
-          float modulatedFreq = fModCV * (DecodeFreq(freqKnob[lfo])
-               + ((DecodeFreq(freqKnob[lfo])) * crossFreqMod));
+          float freq = DecodeFreq(freqKnob[lfo]);
+          freq = fModCV * (freq + (freq * crossFreqMod));
 
           // Scale frequency by global freqMul and freqDiv amounts.
-          modulatedFreq = modulatedFreq * freqMulMap[freqKnobMul] / freqDivMap[freqKnobDiv];
+          freq = freq * freqMulMap[freqKnobMul] / freqDivMap[freqKnobDiv];
 
           // Ensure the frequency stays within valid bounds
-          // modulatedFreq = constrain(modulatedFreq, 0.01, 15000.0);
+          // freq = constrain(freq, 0.01, 15000.0);
 
           // Set the modulated frequency to the oscillator
           osc[lfo].SetFrequency(
-            modulatedFreq * 300000
+            freq * 100 * PROCESS_TICKS
           ); // VectorOscillator uses centiHertz.
 
           // Update sample
@@ -363,26 +364,8 @@ public:
             break;
 
           case 1: // FREQ
-          {
-            // Step A: move the index by +1 or -1
-            // Because freqKnob[] is uint8_t, we can do modulo arithmetic:
-            int16_t temp = freqKnob[selectedChannel] + direction;
-            if (temp < 0) temp += 64; // wrap downward
-            else if (temp > 63) temp -= 64; // wrap upward
-
-            freqKnob[selectedChannel] = (uint8_t)temp;
-
-            // Step B: decode to float frequency
-            float freqVal = DecodeFreq(freqKnob[selectedChannel]);
-
-            // Store to freqFixed so the Controller() loop picks up the new
-            // freq freqFixed[selectedChannel] = (uint16_t)(freqVal+ 0.5f);
-
-            // Step C: set oscillator frequency
-            osc[selectedChannel].SetFrequency(freqVal);
-
+            freqKnob[selectedChannel] = constrain(freqKnob[selectedChannel] + direction, 0, 63);
             break;
-          }
 
           case 2: // XMOD (0–100) scaling
             xmodKnob[selectedChannel] = constrain(xmodKnob[selectedChannel] + direction, 0, 7);
