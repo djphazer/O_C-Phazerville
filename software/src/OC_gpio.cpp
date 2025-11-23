@@ -16,6 +16,7 @@ uint8_t but_top=5, but_bot=4, but_mid=9, but_top2=255, but_bot2=255;
 uint8_t OC_GPIO_DEBUG_PIN1=24, OC_GPIO_DEBUG_PIN2=25;
 bool ADC33131D_Uses_FlexIO=false;
 bool OLED_Uses_SPI1=false;
+bool Large_OLED=false;
 bool DAC8568_Uses_SPI=false;
 #if !defined(NORTHERNLIGHT) && defined(ARDUINO_TEENSY41)
 bool NorthernLightModular=false;
@@ -29,6 +30,7 @@ bool flip_mode = false;
 bool SDcard_Ready = false;
 #ifdef ARDUINO_TEENSY41
 bool DAC_20Vpp = false;
+bool CalSynthXL = false;
 #endif
 
 float OC::GetIDVoltage() {
@@ -38,6 +40,9 @@ float OC::GetIDVoltage() {
 FLASHMEM
 void OC::SetFlipMode(bool flip_180) {
   flip_mode = flip_180;
+
+  if (CalSynthXL) return; // TODO:
+
   if (flip_180) {
     // reversed
     if (id_voltage >= 0.05f) {
@@ -142,6 +147,7 @@ void OC::Pinout_Detect() {
   const int cents = f % 1000;
   Serial.printf("ID voltage (pin A17) = %1d.%03d\n", value, cents);
 
+  // Defaults for all ORN8 hardware
   if (id_voltage >= 0.05f) { // && id_voltage < 0.15f) {
     //CV1 = 255;
     //CV2 = 255;               // CV inputs with ADC33131D
@@ -178,12 +184,54 @@ void OC::Pinout_Detect() {
     MIDI_Uses_Serial8 = true;     // pins 34=IN, 35=OUT
   }
 
-  DAC_20Vpp = (id_voltage >= 0.11 && id_voltage <= 0.15);
+  // any HW_ID significantly higher than the reference design will use +/-10V at the outputs
+  DAC_20Vpp = (id_voltage >= 0.11 && id_voltage <= 0.35);
   if (DAC_20Vpp) {
     DAC::kOctaveZero = 5;
     HS::octave_max = 10;
   }
 
+  // 0.4v for Serge variant from NLM, or others that want -5v to +5v output range
+  if (id_voltage >= 0.35 && id_voltage <= 0.45) {
+    DAC::kOctaveZero = 5;
+    HS::octave_max = 5;
+  }
+
+  // 0.3v for CalSynth and 0.5v for NLM both need slower SPI clock for larger screens
+  Large_OLED = (id_voltage >= 0.25);
+
+  CalSynthXL = (id_voltage >= 0.25 && id_voltage <= 0.35);
+  if (CalSynthXL) {
+    // remap buttons and I/O here
+    but_top  = 29; // 'A'
+    but_top2 = 28; // 'X'
+    but_bot  = 14; // 'B'
+    but_bot2 = 15; // 'Y'
+    but_mid  = 20; // 'Z'
+    // TODO: flip_mode?
+
+    // Input index
+    ADC_CHANNEL_1 = 0;
+    ADC_CHANNEL_2 = 1;
+    ADC_CHANNEL_3 = 2;
+    ADC_CHANNEL_4 = 3;
+    ADC_CHANNEL_5 = 4;
+    ADC_CHANNEL_6 = 5;
+    ADC_CHANNEL_7 = 6;
+    ADC_CHANNEL_8 = 7;
+
+    // Output index
+    DAC_CHANNEL_A = 0;
+    DAC_CHANNEL_B = 1;
+    DAC_CHANNEL_C = 2;
+    DAC_CHANNEL_D = 3;
+    DAC_CHANNEL_E = 4;
+    DAC_CHANNEL_F = 5;
+    DAC_CHANNEL_G = 6;
+    DAC_CHANNEL_H = 7;
+  }
+
+  // 0.5v for Northern Light - unipolar Buchla format
   NorthernLightModular = NorthernLightModular || (id_voltage >= 0.45f);
   if (NorthernLightModular) {
     DAC::kOctaveZero = 0;

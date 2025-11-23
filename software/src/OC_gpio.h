@@ -7,7 +7,7 @@
 // Controls can be remapped, and flip_180 is a calibration flag.
 // Teensy 4.1 has different pinouts depending on voltage at pin 41/A17
 
-//extern uint8_t CV1, CV2, CV3, CV4;
+// extern uint8_t CV1, CV2, CV3, CV4;
 extern uint8_t TR1, TR2, TR3, TR4;
 extern uint8_t OLED_DC, OLED_RST, OLED_CS;
 extern uint8_t DAC_CS, DAC_RST;
@@ -16,6 +16,7 @@ extern uint8_t but_top, but_bot, but_mid, but_top2, but_bot2;
 extern uint8_t OC_GPIO_DEBUG_PIN1, OC_GPIO_DEBUG_PIN2;
 extern bool ADC33131D_Uses_FlexIO;
 extern bool OLED_Uses_SPI1;
+extern bool Large_OLED;
 extern bool DAC8568_Uses_SPI;
 extern bool I2S2_Audio_ADC;
 extern bool I2S2_Audio_DAC;
@@ -24,8 +25,10 @@ extern bool MIDI_Uses_Serial8;
 extern bool SDcard_Ready;
 #ifdef ARDUINO_TEENSY41
 extern bool DAC_20Vpp;
+extern bool CalSynthXL;
 #else
 static constexpr bool DAC_20Vpp = false;
+static constexpr bool CalSynthXL = false;
 #endif
 
 #ifdef NORTHERNLIGHT
@@ -47,16 +50,16 @@ extern bool NorthernLightModular;
 /* local copy of pinMode (cf. cores/pins_teensy.c), using faster slew rate */
 // TODO: is this necessary? -NJM
 
-namespace OC { 
-  
-void inline pinMode(uint8_t pin, uint8_t mode) {
-  
+namespace OC {
+
+  void inline pinMode(uint8_t pin, uint8_t mode) {
+
 #if defined(__MK20DX256__)
-    volatile uint32_t *config;
-  
+    volatile uint32_t* config;
+
     if (pin >= CORE_NUM_DIGITAL) return;
     config = portConfigRegister(pin);
-  
+
     if (mode == OUTPUT || mode == OUTPUT_OPENDRAIN) {
   #ifdef KINETISK
       *portModeRegister(pin) = 1;
@@ -66,10 +69,10 @@ void inline pinMode(uint8_t pin, uint8_t mode) {
       /* use fast slew rate for output */
       *config = PORT_PCR_DSE | PORT_PCR_MUX(1);
       if (mode == OUTPUT_OPENDRAIN) {
-          *config |= PORT_PCR_ODE;
+        *config |= PORT_PCR_ODE;
       } else {
-          *config &= ~PORT_PCR_ODE;
-                  }
+        *config &= ~PORT_PCR_ODE;
+      }
     } else {
   #ifdef KINETISK
       *portModeRegister(pin) = 0;
@@ -91,9 +94,9 @@ void inline pinMode(uint8_t pin, uint8_t mode) {
 #endif
   }
 
-void Pinout_Detect();
-void SetFlipMode(bool flip_180);
-float GetIDVoltage();
+  void Pinout_Detect();
+  void SetFlipMode(bool flip_180);
+  float GetIDVoltage();
 
 }
 

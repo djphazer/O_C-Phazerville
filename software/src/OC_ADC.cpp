@@ -93,8 +93,17 @@ static PROGMEM const uint8_t adc2_pin_to_channel[] = {
 {
   if (flip180) {
 #if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
-    ADC_CHANNEL_1=7, ADC_CHANNEL_2=6, ADC_CHANNEL_3=5, ADC_CHANNEL_4=4;
-    ADC_CHANNEL_5=3, ADC_CHANNEL_6=2, ADC_CHANNEL_7=1, ADC_CHANNEL_8=0;
+    ADC_CHANNEL temp1 = ADC_CHANNEL_1, temp2 = ADC_CHANNEL_2,
+                temp3 = ADC_CHANNEL_3, temp4 = ADC_CHANNEL_4;
+
+    ADC_CHANNEL_1 = ADC_CHANNEL_8;
+    ADC_CHANNEL_2 = ADC_CHANNEL_7;
+    ADC_CHANNEL_3 = ADC_CHANNEL_6;
+    ADC_CHANNEL_4 = ADC_CHANNEL_5;
+    ADC_CHANNEL_5 = temp4;
+    ADC_CHANNEL_6 = temp3;
+    ADC_CHANNEL_7 = temp2;
+    ADC_CHANNEL_8 = temp1;
 #else
     ADC_CHANNEL_1=3, ADC_CHANNEL_2=2, ADC_CHANNEL_3=1, ADC_CHANNEL_4=0;
 #endif
