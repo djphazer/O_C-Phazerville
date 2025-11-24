@@ -205,7 +205,7 @@ void SH1106_128x64_Driver::Flush() {
 #elif defined(__IMXRT1062__)
   // The same scenario as above can occur with the ISR-driven transfer
   if (sendpage_state) { 
-    SERIAL_PRINTLN("display wait / frame drop");
+    //SERIAL_PRINTLN("display wait / frame drop");
   }
 #endif
 }

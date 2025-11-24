@@ -55,7 +55,34 @@ MIDIDevice_BigBuffer usbHostMIDI(thisUSB);
 MIDI_CREATE_INSTANCE(HardwareSerial, Serial8, MIDI1);
 #include "AudioIO.h"
 #include "usb_desc.h"
-#endif
+#include "Wire.h"
+
+void ScanI2C() {
+  noInterrupts();
+
+  Serial.println("...Scanning i2c addresses...");
+  uint8_t error;
+  for (uint8_t address = 1; address < 127; address++) {
+    // The i2c_scanner uses the return value of
+    // the Write.endTransmisstion to see if
+    // a device did acknowledge to the address.
+    Wire.beginTransmission(address);
+    error = Wire.endTransmission();
+
+    if (error == 0) {
+      Serial.print("I2C device found at address 0x");
+      if (address < 16) Serial.print("0");
+      Serial.println(address, HEX);
+    } else if (error == 4) {
+      Serial.print("Unknown error at address 0x");
+      if (address < 16) Serial.print("0");
+      Serial.println(address, HEX);
+    } //else { Serial.print("Nothing happened at address 0x"); }
+  }
+
+  interrupts();
+}
+#endif // ARDUINO_TEENSY41
 
 #endif // __IMXRT1062__
 
@@ -158,6 +185,10 @@ void setup() {
   OC::calibration_load();
   OC::SetFlipMode(OC::calibration_data.flipcontrols());
 
+#if defined(ARDUINO_TEENSY41)
+  Wire.begin();
+  Wire.setClock(100000);
+#endif
   OC::DigitalInputs::Init();
 
   OC::ADC::Init(&OC::calibration_data.adc, OC::calibration_data.flipcontrols());
@@ -334,6 +365,9 @@ void FASTRUN loop() {
             Serial.printf("'D' = Toggle Display Redraw [%s]\n", OC::CORE::display_update_enabled ? "ON" : "OFF");
             Serial.printf("'L' = Toggle App Loop [%s]\n", OC::CORE::app_loop_enabled ? "ON" : "OFF");
 #if defined(__IMXRT1062__)
+#if defined(ARDUINO_TEENSY41)
+            Serial.println("'i' = scan all i2c addresses");
+#endif
             Serial.println("'l' = list all files in flash (LittleFS)");
             Serial.println("'s' = list all files on SD card");
             Serial.println("'C' = clear/reset default Config file");
@@ -355,6 +389,11 @@ void FASTRUN loop() {
             break;
 
 #if defined(__IMXRT1062__)
+#if defined(ARDUINO_TEENSY41)
+          case 'i':
+            ScanI2C();
+            break;
+#endif
           case 'C':
             Serial.println("Resetting Config File!!");
             PhzConfig::clear_config();
