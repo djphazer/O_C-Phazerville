@@ -30,7 +30,7 @@
 #include "OC_strings.h"
 #include "util/util_settings.h"
 #include "OC_autotuner.h"
-#include "src/drivers/FreqMeasure/OC_FreqMeasure.h"
+// #include "src/drivers/FreqMeasure/OC_FreqMeasureMulti.h"
 
 // 
 static constexpr double kAaboveMidCtoC0 = 0.03716272234383494188492;
@@ -250,13 +250,13 @@ public:
     for (auto &channel : channels_)
       channel.Update();
 
-    if (FreqMeasure.available()) {
+    if (autotuner.freq_measure.available()) {
       // average several readings together
-      freq_sum_ = freq_sum_ + FreqMeasure.read();
+      freq_sum_ = freq_sum_ + autotuner.freq_measure.read();
       freq_count_ = freq_count_ + 1;
       
       if (milliseconds_since_last_freq_ > 750) {
-        frequency_ = FreqMeasure.countToFrequency(freq_sum_ / freq_count_);
+        frequency_ = autotuner.freq_measure.countToFrequency(freq_sum_ / freq_count_);
         freq_sum_ = 0;
         freq_count_ = 0;
         milliseconds_since_last_freq_ = 0;
@@ -377,7 +377,7 @@ void REFS_handleAppEvent(OC::AppEvent event) {
   switch (event) {
     case OC::APP_EVENT_RESUME:
       references_app.ui.cursor.set_editing(false);
-      FreqMeasure.begin();
+      // this.freq_meas.begin();
       references_app.autotuner.Close();
       break;
     case OC::APP_EVENT_SUSPEND:

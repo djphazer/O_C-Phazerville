@@ -29,7 +29,7 @@
 #include "HSApplication.h"
 #include "HSMIDI.h"
 #include "util/util_settings.h"
-#include "src/drivers/FreqMeasure/OC_FreqMeasure.h"
+// #include "src/drivers/FreqMeasure/OC_FreqMeasure.h"
 #include "HemisphereApplet.h"
 
 static const int NR_OF_SCENE_PRESETS = 4;
@@ -164,7 +164,7 @@ public:
 
 	void Start() {
         // make sure to turn this off, just in case
-        FreqMeasure.end();
+        // FreqMeasure.end();
         OC::DigitalInputs::reInit();
 	}
 	

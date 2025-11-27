@@ -34,7 +34,7 @@
 #include "OC_scales.h"
 #include "OC_autotuner.h"
 #include "SegmentDisplay.h"
-#include "src/drivers/FreqMeasure/OC_FreqMeasure.h"
+// #include "src/drivers/FreqMeasure/OC_FreqMeasureMulti.h"
 #include "HemisphereApplet.h"
 #ifdef ARDUINO_TEENSY41
 #include "applets/ClockSetupT4.h"
@@ -63,7 +63,7 @@ struct Cal8ChannelConfig {
     DAC_CHANNEL chan_;
     DAC_CHANNEL get_channel() { return chan_; }
     void ExitAutotune() {
-        FreqMeasure.end();
+        // FreqMeasure.end();
         OC::DigitalInputs::reInit();
     }
 };
@@ -221,7 +221,7 @@ public:
         segment.Init(SegmentSize::BIG_SEGMENTS);
 
         // make sure to turn this off, just in case
-        FreqMeasure.end();
+        // FreqMeasure.end();
         OC::DigitalInputs::reInit();
 
         // This initializes the global HS Quantizers
@@ -463,7 +463,7 @@ public:
         if (preset_select) return;
 
         if (edit_mode) {
-            FreqMeasure.begin();
+            // FreqMeasure.begin();
             autotuner.Open(&channel[sel_chan]);
             return;
         }

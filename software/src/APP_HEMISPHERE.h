@@ -29,7 +29,7 @@
 #include "OC_ui.h"
 
 #include "OC_patterns.h"
-#include "src/drivers/FreqMeasure/OC_FreqMeasure.h"
+// #include "src/drivers/FreqMeasure/OC_FreqMeasureMulti.h"
 
 #include "HemisphereApplet.h"
 #include "HSApplication.h"

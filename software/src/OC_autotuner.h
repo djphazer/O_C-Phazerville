@@ -5,6 +5,7 @@
 #include "OC_autotune.h"
 #include "OC_options.h"
 #include "OC_visualfx.h"
+#include "src/drivers/FreqMeasure/OC_FreqMeasureMulti.h"
 
 // autotune constants:
 #ifdef VOR
@@ -105,7 +106,7 @@ template <typename Owner>
 class Autotuner {
 
 public:
-
+  FreqMeasureMulti freq_measure;
   void Init() {
     owner_ = nullptr;
     cursor_pos_ = 0;
@@ -267,9 +268,9 @@ private:
       error_ = true;
     }
     
-    if (FreqMeasure.available()) {
+    if (freq_measure.available()) {
       
-      auto_freq_sum_ = auto_freq_sum_ + FreqMeasure.read();
+      auto_freq_sum_ = auto_freq_sum_ + freq_measure.read();
       auto_freq_count_ = auto_freq_count_ + 1;
 
       // take more time as we're converging toward the target frequency
@@ -278,7 +279,7 @@ private:
       if (ticks_since_last_freq_ > _wait) {
 
         // store frequency, reset, and poke ui to preempt screensaver:
-        auto_frequency_ = uint32_t(FreqMeasure.countToFrequency(auto_freq_sum_ / auto_freq_count_) * 1000);
+        auto_frequency_ = uint32_t(freq_measure.countToFrequency(auto_freq_sum_ / auto_freq_count_) * 1000);
         history_.Push(auto_frequency_);
         auto_freq_sum_ = 0;
         ready_ = true;
@@ -782,14 +783,22 @@ private:
       data_select_ = 0x00;
     cursor_pos_ = 0x0;
     run_status_ = AT_OFF;
+
+    #if defined(ARDUINO_TEENSY41)
+      freq_measure.begin(TUNER_PIN);
+    #else
+      freq_measure.begin(TUNER_PIN, FREQMEASUREMULTI_FALLING);
+    #endif
   }
   
   template <typename Owner>
   void Autotuner<Owner>::Close() {
+    freq_measure.end();
     ui.SetButtonIgnoreMask();
     owner_->ExitAutotune();
     owner_ = nullptr;
   }
+  
 }; // namespace OC
 
 #endif // OC_AUTOTUNER_H

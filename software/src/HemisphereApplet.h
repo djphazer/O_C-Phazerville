@@ -35,7 +35,7 @@
 #include "OC_digital_inputs.h"
 #include "OC_DAC.h"
 #include "OC_ADC.h"
-#include "src/drivers/FreqMeasure/OC_FreqMeasure.h"
+#include "src/drivers/FreqMeasure/OC_FreqMeasureMulti.h"
 #include "util/util_math.h"
 #include "bjorklund.h"
 #include "HSicons.h"
