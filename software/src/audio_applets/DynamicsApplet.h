@@ -95,7 +95,7 @@ public:
         limit_threshold = constrain(limit_threshold + direction, -100, 0);
         break;
       case OUT_GAIN:
-        makeupgain = constrain(makeupgain + direction, -1, 60);
+        makeupgain = constrain(makeupgain + direction, -1, 30);
         break;
 
       default:
@@ -111,6 +111,7 @@ public:
   }
   void OnDataReceive(uint64_t data) {
     UnpackPackables(data, gate_threshold, comp_threshold, limit_threshold, makeupgain);
+    SetParams();
   }
 
   AudioStream* InputStream() override {
