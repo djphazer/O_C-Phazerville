@@ -440,7 +440,7 @@ void gfxPrintScale(int x, int y, int qsel) {
   gfxPrint(x, y, HS::q_engine[qsel]);
 }
 
-void gfxPrintIcon(const uint8_t *data, int16_t w = 8) {
+void gfxPrintIcon(const uint8_t *data, int16_t w) {
     gfxIcon(graphics.getPrintPosX(), graphics.getPrintPosY(), data);
     gfxPos(graphics.getPrintPosX() + w, graphics.getPrintPosY());
 }
