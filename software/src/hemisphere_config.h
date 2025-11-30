@@ -50,7 +50,7 @@
 #endif
 #include "applets/EbbAndLfo.h"
 #include "applets/EnigmaJr.h"
-//#include "applets/EnsOscKey.h"
+#include "applets/EnsOscKey.h"
 #include "applets/EnvFollow.h"
 #include "applets/EuclidX.h"
 #include "applets/GameOfLife.h"
@@ -169,6 +169,7 @@ AppletRegistry reg{
 #endif
     DeclareApplet<EbbAndLfo>{7, 0x01},
     DeclareApplet<EnigmaJr>{45, 0x02},
+    DeclareApplet<EnsOscKey>{35, 0x08},
     DeclareApplet<EnvFollow>{42, 0x11},
     DeclareApplet<EuclidX>{15, 0x02},
     DeclareApplet<GameOfLife>{22, 0x01},
