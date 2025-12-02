@@ -84,7 +84,14 @@ public:
     data[1] = PackPackables(modesel_, level, level_cv);
   }
   void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
-    UnpackPackables(data[1], modesel_, level, level_cv);
+    if (data[0] != 0) {
+      // backward compat
+      bool mixtomono;
+      UnpackPackables(data[0], pack<4>(modesel_), pack(level), pack<1>(mixtomono), level_cv);
+      if (mixtomono || modesel_ == 2) modesel_ = MIXED;
+    } else {
+      UnpackPackables(data[1], modesel_, level, level_cv);
+    }
     UpdateMix();
   }
 
