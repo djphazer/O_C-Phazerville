@@ -25,6 +25,7 @@ public:
     set_taps(taps);
     MAX_DELAY_SECS = channels[0].delaystream.MAX_DELAY_SECS;
     MIN_DELAY_SECS = channels[0].delaystream.MIN_DELAY_SECS;
+    clock_source.source = -2; // CLK1
   }
 
   void Unload() {
@@ -159,14 +160,17 @@ public:
       case CLOCK:
         gfxStartCursor();
         gfxPrint(clock_source);
+        if (clock_source.source < 0)
+          gfxPrint(1 + 3*(clock_source.source==-1));
         gfxEndCursor(cursor == CLOCK_SOURCE);
-        gfxPrint(" ");
+        if (clock_source.source >= 0)
+          gfxPrint(" ");
 
         gfxStartCursor();
         if (ratio < 0) {
-          graphics.printf("X %d", -ratio + 1);
+          graphics.printf("x%d", -ratio + 1);
         } else {
-          graphics.printf("/ %d", ratio + 1);
+          graphics.printf("/%d", ratio + 1);
         }
         gfxEndCursor(cursor == TIME);
 
@@ -233,8 +237,13 @@ public:
   void OnEncoderMove(int direction) override {
     if (!EditMode()) {
       MoveCursor(cursor, direction, CURSOR_LENGTH - 1);
+      // cursor position 0 is the clock source, which is hidden if not using
+      // clocked time units... so we try to skip over it for cursor wrap mode,
+      // otherwise just increment. smh my head.
       if (cursor == CLOCK_SOURCE && time_units != CLOCK)
         MoveCursor(cursor, direction, CURSOR_LENGTH - 1);
+      if (cursor == CLOCK_SOURCE && time_units != CLOCK)
+        ++cursor;
       return;
     }
     if (EditSelectedInputMap(direction)) return;
