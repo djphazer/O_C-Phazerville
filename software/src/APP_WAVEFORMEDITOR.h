@@ -32,9 +32,7 @@
 class WaveformEditor : public HSApplication, public SystemExclusiveHandler {
 public:
     void Start() {
-        if (!WaveformManager::Validate()) {
-            WaveformManager::Setup();
-        }
+        WaveformManager::Validate();
         test_freq[0] = 100;    // Test 0: LFO
         test_freq[1] = 44000;  // Test 1: Audio-Rate
         test_freq[2] = 50;     // Test 2: Bi-polar one-shot modulation
