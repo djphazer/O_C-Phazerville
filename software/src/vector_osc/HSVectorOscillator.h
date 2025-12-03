@@ -175,7 +175,7 @@ public:
     }
 
 private:
-    VOSegment segments[12]; // Array of segments in this Oscillator
+    VOSegment segments[HS::VO_MAX_SEGMENTS]; // Array of segments in this Oscillator
     uint8_t segment_count = 0; // Number of segments
     int total_time = 0; // Sum of time values for all segments
     bool eoc = 1; // The most recent tick's next() read was the end of a cycle

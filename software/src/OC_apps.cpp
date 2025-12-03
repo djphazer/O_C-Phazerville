@@ -638,7 +638,6 @@ void Init(bool reset_settings) {
       memcpy(user_patterns, global_settings.user_patterns, sizeof(user_patterns));
 #ifdef ENABLE_APP_CHORDS
       memcpy(user_chords, global_settings.user_chords, sizeof(user_chords));
-      Chords::Validate();
 #else
       memcpy(HS::user_turing_machines, global_settings.user_turing_machines, sizeof(HS::user_turing_machines));
 #endif
@@ -648,7 +647,6 @@ void Init(bool reset_settings) {
       memcpy(auto_calibration_data, global_settings.auto_calibration_data, sizeof(auto_calibration_data));
       DAC::choose_calibration_data(); // either use default data, or auto_calibration_data
       DAC::restore_scaling(global_settings.DAC_scaling); // recover output scaling settings
-      Scales::Validate();
     }
 #endif
 
@@ -666,7 +664,12 @@ void Init(bool reset_settings) {
     }
   }
 
-  // Validate user_turing_machines
+  // Validation to guard against junk data
+  Chords::Validate();
+  Scales::Validate();
+#ifndef NO_HEMISPHERE
+  WaveformManager::Validate();
+#endif
   for (int i = 0; i < HS::TURING_MACHINE_COUNT; ++i) {
     HS::user_turing_machines[i].Validate();
   }
