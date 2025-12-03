@@ -63,12 +63,12 @@ namespace WaveformManager {
      * in the list.
      */
     uint8_t static GetNextWaveform(uint8_t waveform_number, int direction) {
-        int new_number = waveform_number + direction;
+        int new_number = constrain(waveform_number + direction, 0, HS::WAVEFORM_LIBRARY_COUNT + 31);
         uint8_t count = WaveformCount();
-        if (new_number < 0) new_number = 0;
-        if (new_number == count) new_number = 32; // Move from last user waveform to first library waveform
-        if (new_number <= 31 && new_number >= count) new_number = count - 1; // Move from first library waveform to last user waveform
-        if (new_number >= (HS::WAVEFORM_LIBRARY_COUNT + 32)) new_number = HS::WAVEFORM_LIBRARY_COUNT + 31;
+        // mind the gap
+        while (new_number <= 31 && new_number >= count) {
+          new_number += direction;
+        }
         return new_number;
     }
 
