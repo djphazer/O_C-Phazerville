@@ -689,7 +689,7 @@ public:
         HS::IOFrame &f = HS::frame;
         int load_slot = -1;
 
-        while (device.read()) {
+        while (timeout < 60 && device.read()) {
             const uint8_t message = device.getType();
             const uint8_t data1 = device.getData1();
             const uint8_t data2 = device.getData2();
@@ -718,7 +718,8 @@ public:
         }
     }
 
-    void Controller() {
+    void mainloop() {
+        timeout = 0;
         // top-level MIDI-to-CV handling - alters frame outputs
 #if defined(__IMXRT1062__)
   #if defined(ARDUINO_TEENSY41)
@@ -732,7 +733,9 @@ public:
 #else
         ProcessMIDI(usbMIDI);
 #endif
+    }
 
+    void Controller() {
         // Clock Setup applet handles internal clock duties
         ClockSetup_instance.Controller();
         // ^ this will process the queue and load presets
@@ -1245,6 +1248,8 @@ private:
     int first_click; // The first button pushed of a double-click set, to see if the same one is pressed
 
     DigitalInputMap jump_trig_;
+
+    elapsedMicros timeout = 0;
 
     // State machine
     enum HEMView {
@@ -1787,7 +1792,9 @@ void HEMISPHERE_handleAppEvent(OC::AppEvent event) {
     }
 }
 
-void HEMISPHERE_loop() {} // Essentially deprecated in favor of ISR
+void HEMISPHERE_loop() {
+    manager.mainloop();
+}
 
 void HEMISPHERE_menu() {
     manager.View();
