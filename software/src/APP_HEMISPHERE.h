@@ -823,6 +823,8 @@ public:
 
         if (HS::q_edit)
           PokePopup(QUANTIZER_POPUP);
+        else if (HS::midi_edit)
+          PokePopup(MIDI_POPUP);
 
         if (draw_applets) {
           if (zoom_slot > -1) {
@@ -1089,6 +1091,10 @@ public:
           HS::QEditEncoderMove(h, event.value);
           return;
         }
+        if (HS::midi_edit) {
+          HS::MEditEncoderMove(h, event.value);
+          return;
+        }
 
         if (view_state == CONFIG_MENU) {
           ConfigEncoderAction(h, event.value);
@@ -1196,11 +1202,30 @@ public:
               else {
                 HS::q_edit = 0;
                 HS::popup_tick = 0;
+                select_mode = -1;
               }
 
               OC::ui.SetButtonIgnoreMask();
               break;
             }
+
+            if (HS::midi_edit) {
+              if (event.control == OC::CONTROL_BUTTON_A) {
+                mview = constrain(mview - 1, 0, MIDIMAP_MAX-1);
+                //config_cursor = MIDIMAP1 + mview;
+              } else if (event.control == OC::CONTROL_BUTTON_B) {
+                mview = constrain(mview + 1, 0, MIDIMAP_MAX-1);
+                //config_cursor = MIDIMAP1 + mview;
+              } else {
+                // TODO: auto-learn from Z button
+                HS::midi_edit = 0;
+                HS::popup_tick = 0;
+                select_mode = -1;
+              }
+              OC::ui.SetButtonIgnoreMask();
+              break;
+            }
+
             // most button-down events fall through here
         case UI::EVENT_BUTTON_PRESS:
 
