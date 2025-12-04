@@ -197,8 +197,8 @@ struct DigitalInputMap {
     }
   }
   char const* InputName() const {
-    if (source == -1) return "CLK4";
-    if (source == -2) return "CLK1";
+    if (source == -1) return "CL4";
+    if (source == -2) return "CL1";
     if (source > OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_LAST + DAC_CHANNEL_LAST)
       return OC::Strings::cv_input_names_none[source - OC::DIGITAL_INPUT_LAST];
     return OC::Strings::trigger_input_names_none[source];
