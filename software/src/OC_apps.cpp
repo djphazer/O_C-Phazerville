@@ -31,6 +31,7 @@
 #include "OC_patterns.h"
 #include "enigma/TuringMachine.h"
 #include "src/drivers/FreqMeasure/OC_FreqMeasure.h"
+#include "util/util_misc.h"
 #include "util/util_pagestorage.h"
 #include "util/EEPROMStorage.h"
 #include "PhzConfig.h"
@@ -517,11 +518,15 @@ int index_of(uint16_t id) {
 FLASHMEM
 void Init(bool reset_settings) {
 
+  SERIAL_PRINTLN("[App Initializations]");
+
   Scales::Init();
   AUTOTUNE::Init();
   HS::Init();
-  for (auto &app : available_apps)
+  for (auto &app : available_apps) {
+    SERIAL_PRINTLN("Starting App: %s", app.name);
     app.Init();
+  }
 
   HS::frame.Init();
 
