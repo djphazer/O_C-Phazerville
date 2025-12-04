@@ -378,6 +378,7 @@ public:
         FILTERMASK2_KEY = 101,
 
         PC_CHANNEL_KEY = 110,
+        PRESET_JUMP_KEY = 111,
 
         MIDI_MAPS_KEY  = 150, // + 0..32
 
@@ -439,6 +440,9 @@ public:
         PhzConfig::setValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
 
         PhzConfig::setValue(PC_CHANNEL_KEY, HS::frame.MIDIState.pc_channel);
+
+        data = PackPackables(jump_trig_);
+        PhzConfig::setValue(PRESET_JUMP_KEY, data);
 
         // Global quantizer settings
         for (size_t qslot = 0; qslot < QUANT_CHANNEL_COUNT; ++qslot) {
@@ -552,6 +556,9 @@ public:
 
         if (PhzConfig::getValue(PC_CHANNEL_KEY, data)) HS::frame.MIDIState.pc_channel = (uint8_t) data;
 
+        if (PhzConfig::getValue(PRESET_JUMP_KEY, data))
+          UnpackPackables(data, jump_trig_);
+
         for (size_t qslot = 0; qslot < QUANT_CHANNEL_COUNT; ++qslot) {
           if (!PhzConfig::getValue(Q_ENGINE_KEY + qslot, data))
               break;
@@ -614,6 +621,45 @@ public:
         queued_preset = -1;
       }
     }
+    void QueuePresetLoad(int slot) {
+      if (HS::clock_m.IsRunning()) {
+        queued_preset = slot;
+        HS::clock_m.BeatSync([this]() { ProcessQueue(); });
+      } else
+        LoadFromPreset(slot);
+    }
+    void JumpToNextPreset() {
+      int next_id = preset_id + 1;
+      while (!isValidPreset(next_id) && next_id != preset_id) {
+        ++next_id %= HEM_NR_OF_PRESETS;
+      }
+      if (next_id != preset_id)
+        QueuePresetLoad(next_id);
+    }
+#ifdef __IMXRT1062__
+#else
+    // T32 hacks for extra settings
+    void StoreExtras() {
+      // store hidden applet mask in secret preset
+      hem_presets[HEM_NR_OF_PRESETS].SetData(HEM_SIDE(0), HS::hidden_applets[0]);
+      hem_presets[HEM_NR_OF_PRESETS].SetData(HEM_SIDE(1), HS::hidden_applets[1]);
+
+      hem_presets[HEM_NR_OF_PRESETS].SetGlobals(HS::frame.MIDIState.pc_channel);
+
+      uint64_t data = PackPackables(jump_trig_);
+      hem_presets[HEM_NR_OF_PRESETS].SetClockData(data);
+    }
+    void LoadExtras() {
+      HS::hidden_applets[0] = hem_presets[HEM_NR_OF_PRESETS].GetData(HEM_SIDE(0));
+      HS::hidden_applets[1] = hem_presets[HEM_NR_OF_PRESETS].GetData(HEM_SIDE(1));
+
+      HS::frame.MIDIState.pc_channel =
+        constrain((int)hem_presets[HEM_NR_OF_PRESETS].GetGlobals(), 0, 17);
+
+      uint64_t data = hem_presets[HEM_NR_OF_PRESETS].GetClockData();
+      UnpackPackables(data, jump_trig_);
+    }
+#endif
 
     // does not modify the preset, only the manager
     void SetApplet(HEM_SIDE hemisphere, int index) {
@@ -641,6 +687,7 @@ public:
     void ProcessMIDI(T1 &device) {
 #endif
         HS::IOFrame &f = HS::frame;
+        int load_slot = -1;
 
         while (device.read()) {
             const uint8_t message = device.getType();
@@ -654,15 +701,7 @@ public:
 
             if (message == usbMIDI.ProgramChange
             && (device.getChannel() == f.MIDIState.pc_channel || f.MIDIState.pc_channel == f.MIDIState.PC_OMNI)) {
-                uint8_t slot = device.getData1();
-                if (slot < HEM_NR_OF_PRESETS) {
-                  if (HS::clock_m.IsRunning()) {
-                    queued_preset = slot;
-                    HS::clock_m.BeatSync( [this](){ ProcessQueue(); } );
-                  }
-                  else
-                    LoadFromPreset(slot);
-                }
+                load_slot = device.getData1();
                 //continue;
             }
 
@@ -673,6 +712,9 @@ public:
             dev3.send((midi::MidiType)message, data1, data2, device.getChannel());
   #endif
 #endif
+        }
+        if (load_slot >= 0 && load_slot < HEM_NR_OF_PRESETS) {
+            QueuePresetLoad(load_slot);
         }
     }
 
@@ -693,6 +735,18 @@ public:
 
         // Clock Setup applet handles internal clock duties
         ClockSetup_instance.Controller();
+        // ^ this will process the queue and load presets
+
+        // this might be triggered by the internal clock...
+        if (jump_trig_.Clock() && !HS::clock_m.auto_reset) {
+          JumpToNextPreset();
+          // ^ this will sometimes queue a preset load
+
+          // The paradox is we need to process the clock first, in case jump_trig needs it,
+          // but then jump_trig will queue another preset load,
+          // so we have to process the queue again.
+          if (jump_trig_.source < 0) ProcessQueue();
+        }
 
         // execute Applets
         for (int h = 0; h < 2; h++)
@@ -1190,6 +1244,8 @@ private:
     uint32_t click_tick; // Measure time between clicks for double-click
     int first_click; // The first button pushed of a double-click set, to see if the same one is pressed
 
+    DigitalInputMap jump_trig_;
+
     // State machine
     enum HEMView {
       APPLETS,
@@ -1213,6 +1269,7 @@ private:
         CURSOR_MODE,
         AUTO_MIDI,
         MIDI_PC_CHANNEL,
+        PRESET_JUMP_TRIG,
 
         // Global Quantizers: 4x(Scale, Root, Octave, Mask?)
         QUANT1, QUANT2, QUANT3, QUANT4,
@@ -1284,6 +1341,10 @@ private:
             HS::frame.MIDIState.pc_channel =
               constrain(HS::frame.MIDIState.pc_channel + dir, 0, 17);
             break;
+        case PRESET_JUMP_TRIG:
+            if (!EditSelectedInputMap(dir))
+              jump_trig_.ChangeSource(dir);
+            break;
         case SCREENSAVER_MODE:
             HS::screensaver_mode = constrain(HS::screensaver_mode + dir, 0, SCREENSAVER_MODE_COUNT - 1);
             break;
@@ -1318,10 +1379,7 @@ private:
               StoreToPreset(preset_cursor - 1);
               break;
             case LOAD_PRESET:
-              if (HS::clock_m.IsRunning()) {
-                queued_preset = preset_cursor - 1;
-                HS::clock_m.BeatSync([this]() { ProcessQueue(); });
-              } else LoadFromPreset(preset_cursor - 1);
+              QueuePresetLoad(preset_cursor - 1);
               break;
           }
 
@@ -1393,6 +1451,13 @@ private:
         default:
             isEditing = !isEditing;
             break;
+
+        case PRESET_JUMP_TRIG:
+          if (!CheckEditInputMapPress(
+                config_cursor, IndexedInput(PRESET_JUMP_TRIG, jump_trig_)
+              ))
+            isEditing ^= 1;
+          break;
 
         case CURSOR_MODE:
             HS::cursor_wrap = !HS::cursor_wrap;
@@ -1521,6 +1586,21 @@ private:
         else if (pc_ch <= 16) gfxPrint(pc_ch);
         else gfxPrint("Off");
 
+        // Preset jump trigger mapping
+        int x = 118;
+        int y = 54;
+        gfxPos(x, y);
+        gfxPrint(jump_trig_);
+        if (config_cursor == PRESET_JUMP_TRIG) {
+          int w = strlen(jump_trig_.InputName()) * 6 + 2;
+          CONSTRAIN(x, 3, 126-w);
+
+          graphics.clearRect(x - 2, y - 1, w + 3, 12);
+          gfxFrame(x - 1, y - 1, w + 1, 11);
+          gfxPrint(x, y + 1, jump_trig_.InputName());
+          if (EditMode()) gfxInvert(x - 1, y - 1, w + 1, 11);
+        }
+
         switch (config_cursor) {
         case CVMAP1:
         case CVMAP2:
@@ -1551,6 +1631,8 @@ private:
             gfxIcon(2, 1, LEFT_ICON);
             break;
         }
+
+        gfxDisplayInputMapEditor();
     }
 
     bool isValidPreset(int id) {
@@ -1661,11 +1743,7 @@ static size_t HEMISPHERE_save(void *storage) {
 #ifdef __IMXRT1062__
     return 0;
 #else
-    // store hidden applet mask in secret preset
-    hem_presets[HEM_NR_OF_PRESETS].SetData(HEM_SIDE(0), HS::hidden_applets[0]);
-    hem_presets[HEM_NR_OF_PRESETS].SetData(HEM_SIDE(1), HS::hidden_applets[1]);
-
-    hem_presets[HEM_NR_OF_PRESETS].SetGlobals(HS::frame.MIDIState.pc_channel);
+    manager.StoreExtras();
 
     size_t used = 0;
     for (int i = 0; i < HEM_NR_OF_PRESETS + 1; ++i) {
@@ -1684,11 +1762,7 @@ static size_t HEMISPHERE_restore(const void *storage) {
         used += hem_presets[i].Restore(static_cast<const char*>(storage) + used);
     }
 
-    HS::hidden_applets[0] = hem_presets[HEM_NR_OF_PRESETS].GetData(HEM_SIDE(0));
-    HS::hidden_applets[1] = hem_presets[HEM_NR_OF_PRESETS].GetData(HEM_SIDE(1));
-
-    HS::frame.MIDIState.pc_channel =
-      constrain((int)hem_presets[HEM_NR_OF_PRESETS].GetGlobals(), 0, 17);
+    manager.LoadExtras();
 
     return used;
 #endif
