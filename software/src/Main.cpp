@@ -235,6 +235,8 @@ void setup() {
 
   if (start_cal)
     OC::start_calibration();
+
+  SERIAL_PRINTLN("[End of setup()]");
 }
 
 /*  ---------    main loop  --------  */
