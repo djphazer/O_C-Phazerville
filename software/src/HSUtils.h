@@ -204,7 +204,7 @@ namespace HS {
 #elif defined(NORTHERNLIGHT)
   static constexpr int octave_max = 10;
 #else
-  static constexpr int octave_max = 6;
+  static constexpr int octave_max = 5;
 #endif
 
   extern int select_mode;

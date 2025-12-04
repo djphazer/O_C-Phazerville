@@ -57,7 +57,7 @@ public:
 #elif defined(NORTHERNLIGHT)
   static constexpr int kOctaveZero = 0;
 #else
-  static constexpr int kOctaveZero = 3;
+  static constexpr int kOctaveZero = 5;
 #endif
   #if defined(VOR)
     static constexpr int VBiasUnipolar = 3900;   // onboard DAC @ Vref 1.2V (internal), 1.75x gain
