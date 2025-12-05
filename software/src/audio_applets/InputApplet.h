@@ -41,6 +41,7 @@ public:
 
       mixer[i].gain(2, 1.0); // passthru
     }
+    UpdateMix();
   }
   void Unload() override {
     for (int i = 0; i < Channels; ++i) {
@@ -206,7 +207,7 @@ private:
   AudioPassthrough<Channels> output;
   AudioAnalyzePeak peakmeter[2];
 
-  int8_t modesel_ = MIXED;
+  int8_t modesel_ = DUAL;
   int8_t level = 0;
   CVInputMap level_cv;
 
