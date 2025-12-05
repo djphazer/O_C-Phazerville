@@ -1396,6 +1396,8 @@ private:
       for (int i = 0; i < 100; ++i) {
         PhzConfig::deleteKey(preset_key | i);
       }
+#else
+      hem_presets[id].SetAppletId(0, 0);
 #endif
     }
     void ConfigButtonPush(int h) {
