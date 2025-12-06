@@ -1436,8 +1436,8 @@ private:
         int y = 12 + (midx/8)*h;
         gfxPos(x, y);
         gfxPrint(cv_);
-        //gfxIcon(x, y, PhzIcons::midiIn);
-        //graphics.printf("M%d", midx+1);
+        if (frame.MIDIState.mapping[midx].function > 0)
+          gfxInvert(x, y, 9, 9);
       }
       int curx = 9 + ((config_cursor - MIDIMAP1)%8)*w;
       int cury = 12 + ((config_cursor - MIDIMAP1)/8)*h;
