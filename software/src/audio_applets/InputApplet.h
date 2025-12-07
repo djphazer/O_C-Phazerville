@@ -90,6 +90,7 @@ public:
       bool mixtomono;
       UnpackPackables(data[0], pack<4>(modesel_), pack(level), pack<1>(mixtomono), level_cv);
       if (mixtomono || modesel_ == 2) modesel_ = MIXED;
+      CONSTRAIN(modesel_, 0, MODE_COUNT - 1);
     } else {
       UnpackPackables(data[1], modesel_, level, level_cv);
     }
