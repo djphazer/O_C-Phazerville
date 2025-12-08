@@ -252,7 +252,7 @@ public:
   static void Update() {
     #if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
       if (DAC8568_Uses_SPI) {
-        if (NorthernLightModular) {
+        if (DAC_is_inverted) {
           dac8568_set_channel(0, values_[0]);
           dac8568_set_channel(1, values_[1]);
           dac8568_set_channel(2, values_[2]);
