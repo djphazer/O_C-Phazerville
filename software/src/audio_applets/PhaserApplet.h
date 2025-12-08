@@ -28,15 +28,15 @@ public:
       return;
     }
 
-    phaser->setDepth(depth + depth_cv.InF());
-    phaser->setFeedback(feedback + feedback_cv.InF());
+    phaser->setDepth(0.01f * depth + depth_cv.InF());
+    phaser->setFeedback(0.01f * feedback + feedback_cv.InF());
 
-    float freq
-      = powf(10.f, 3.f * constrain(rate + rate_cv.InF(), 0.0f, 1.f) - 2.f);
-    phaser->setRate(freq);
+    // rate * rate == centihertz
+    float rate_mod = constrain(rate + rate_cv.InF() * MAX_RATE, 1, MAX_RATE);
+    rate_mod *= rate_mod;
+    phaser->setRate(0.01f * rate_mod);
 
-    float m
-      = constrain(static_cast<float>(mix) * 0.01f + mix_cv.InF(), 0.0f, 1.0f);
+    float m = constrain(static_cast<float>(mix) * 0.01f + mix_cv.InF(), 0.0f, 1.0f);
 
     dry_wet_mixer.gain(0, m);
     dry_wet_mixer.gain(1, 1.0f - m);
@@ -47,9 +47,9 @@ public:
       gfxPrint(1, 15, "Out Of RAM !!!");
       return;
     };
-    gfxPrint(1, 15, "Depth: ");
+    gfxPrint(1, 15, "Depth:");
     gfxStartCursor();
-    graphics.printf("%3d%%", depth); // KEEP THIS WAY?
+    graphics.printf("%3d%%", depth);
     gfxEndCursor(cursor == DEPTH);
 
     gfxStartCursor();
@@ -58,16 +58,17 @@ public:
 
     gfxPrint(1, 25, "Feed:");
     gfxStartCursor();
-    graphics.printf("%3d%%", feedback); // KEEP THIS WAY?
+    graphics.printf("%3d%%", feedback);
     gfxEndCursor(cursor == FEED);
 
     gfxStartCursor();
     gfxPrint(feedback_cv);
     gfxEndCursor(cursor == FEED_CV, false, feedback_cv.InputName());
 
-    gfxPrint(1, 35, "Rate:");
+    gfxPrint(1, 35, "Hz:");
     gfxStartCursor();
-    graphics.printf("%3d%%", rate); // KEEP THIS WAY?
+    int rmod = rate * rate;
+    graphics.printf("%2d.%02d", rmod / 100, rmod % 100);
     gfxEndCursor(cursor == RATE);
 
     gfxStartCursor();
@@ -87,19 +88,13 @@ public:
   }
 
   void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
-    // TO DO
-    data[0] = PackPackables(mix, damp);
-    data[1] = PackPackables(decay_time_cv, damp_cv, mix_cv);
-    data[2] = PackPackables(cutoff, cutoff_cv);
-    data[3] = PackPackables(decay_time);
+    data[0] = PackPackables(mix, depth, feedback, rate);
+    data[1] = PackPackables(mix_cv, depth_cv, feedback_cv, rate_cv);
   }
 
   void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
-    // TO DO
-    UnpackPackables(data[0], mix, damp);
-    UnpackPackables(data[1], decay_time_cv, damp_cv, mix_cv);
-    UnpackPackables(data[2], cutoff, cutoff_cv);
-    UnpackPackables(data[3], decay_time);
+    UnpackPackables(data[0], mix, depth, feedback, rate);
+    UnpackPackables(data[1], mix_cv, depth_cv, feedback_cv, rate_cv);
   }
 
   void OnButtonPress() override {
@@ -124,19 +119,19 @@ public:
 
     switch (cursor) {
       case DEPTH:
-        depth = constrain(decay_time + (direction * 0.1), 0, 20); // TO DO
+        depth = constrain(depth + direction, 0, 100);
         break;
       case DEPTH_CV:
         depth_cv.ChangeSource(direction);
         break;
       case FEED:
-        feedback = constrain(damp + direction, 1, 99); // TO DO
+        feedback = constrain(feedback + direction, 1, 99);
         break;
       case FEED_CV:
         feedback_cv.ChangeSource(direction);
         break;
       case RATE:
-        rate = constrain(cutoff + direction * 50, 0, 17500); // TO DO
+        rate = constrain(rate + direction, 1, MAX_RATE);
         break;
       case RATE_CV:
         rate_cv.ChangeSource(direction);
@@ -174,16 +169,18 @@ private:
     MIX_CV
   };
 
+  static constexpr int MAX_RATE = 100;
+
   int8_t cursor = DEPTH;
   AudioPassthrough<MONO> input;
 
   AudioEffectPhazer* phaser;
   AudioMixer<2> dry_wet_mixer;
 
-  int8_t mix = 50;
-  float depth = 0.5f; // KEEP THIS WAY?
-  float feedback = 0.5f; // KEEP THIS WAY?
-  float rate = 0.5f; // KEEP THIS WAY?
+  uint8_t mix = 50; // 0 to 100 %
+  uint8_t depth = 50; // 0 to 100%
+  uint8_t feedback = 50; // 1 to 99 %
+  uint16_t rate = 1; // squared, centi-Hz
 
   CVInputMap mix_cv;
   CVInputMap depth_cv;
