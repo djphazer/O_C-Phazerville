@@ -18,7 +18,6 @@ public:
     reset();
   }
 
-  //
   void setDepth(float depth0To1) {
     if (depth0To1 < 0.f) depth0To1 = 0.f;
     else if (depth0To1 > 1.f) depth0To1 = 1.f;
@@ -28,7 +27,6 @@ public:
     __enable_irq();
   }
 
-  //
   void setFeedback(float feedback0To1) {
     if (feedback0To1 < 0.f) feedback0To1 = 0.f;
     else if (feedback0To1 > 0.99f) feedback0To1 = 0.99f;
@@ -38,13 +36,12 @@ public:
     __enable_irq();
   }
 
-  //
+  // input in Hz, from 0.01 to 100
   void setRate(float rate) {
-    if (rate < 0.01f) rate = 0.01f;
-    else if (rate > 10.f) rate = 10.f;
+    CONSTRAIN(rate, 0.01f, 100.0f);
 
     __disable_irq();
-    rateFactor = rate * 8.f / (float)sr;
+    rateFactor = rate / AUDIO_SAMPLE_RATE_EXACT;
     __enable_irq();
   }
 
@@ -90,7 +87,7 @@ public:
         float frequency = powf(10.f, lfo * (logMax - logMin) + logMin);
 
         // all-pass filters variables part 1
-        float g = tanf(M_PI * frequency / (float)sr);
+        float g = tanf(M_PI * frequency / AUDIO_SAMPLE_RATE_EXACT);
         float G = g / (1.f + g);
         P = 2.f * G - 1.f;
         Q = 2.f * (1.f - G);
@@ -123,7 +120,7 @@ public:
         y = ap;
       }
 
-      s1[0] = P2[0] * (x + alpha * y) + Q2 * s1[0];
+      s1[0] = P2 * (x + alpha * y) + Q2 * s1[0];
 
       // updates
       updateCounter++;
@@ -150,7 +147,6 @@ private:
   volatile float rateFactor = 0.f;
 
   // internal variables
-  static constexpr int sr = AUDIO_SAMPLE_RATE;
   float P, Q, P2, Q2;
   float coeffin, coeffs[6];
   float alpha;
