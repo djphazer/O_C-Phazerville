@@ -18,6 +18,7 @@ bool ADC33131D_Uses_FlexIO=false;
 bool OLED_Uses_SPI1=false;
 bool Large_OLED=false;
 bool DAC8568_Uses_SPI=false;
+bool DAC_is_inverted = false;
 #if !defined(NORTHERNLIGHT) && defined(ARDUINO_TEENSY41)
 bool NorthernLightModular=false;
 #endif
@@ -195,6 +196,8 @@ void OC::Pinout_Detect() {
   if (id_voltage >= 0.35 && id_voltage <= 0.45) {
     DAC::kOctaveZero = 5;
     HS::octave_max = 5;
+
+    DAC_is_inverted = true;
   }
 
   // 0.3v for CalSynth and 0.5v for NLM both need slower SPI clock for larger screens
@@ -236,6 +239,7 @@ void OC::Pinout_Detect() {
   if (NorthernLightModular) {
     DAC::kOctaveZero = 0;
     HS::octave_max = 10;
+    DAC_is_inverted = true;
   }
 }
 #endif
