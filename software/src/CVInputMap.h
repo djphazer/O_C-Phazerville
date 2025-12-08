@@ -78,7 +78,7 @@ struct CVInputMap {
   }
 
   void Unpack(uint16_t data) {
-    source = data & 0xFF;
+    source = constrain(data & 0xFF, 0, NUM_CV_INPUTS - 1);
     attenuversion = extract_value<int8_t>(data >> 8);
   }
 };
