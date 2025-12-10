@@ -34,10 +34,10 @@
 #include <Arduino.h>
 #include <AudioStream.h>
 
-#define MIN_DB	-110.0f
+#define MIN_DB	-90.0f
 #define MAX_DB	0.0f
 
-#define MIN_T	0.03f  //Roughly 1 block
+#define MIN_T	0.003f
 #define MAX_T	4.00f
 
 #define RATIO_OFF		1.0f
@@ -91,7 +91,7 @@ public:
 	//attack and release are in seconds
 	//ratio is expressed as x:1 i.e. 1 for no compression, 60 for brickwall limiting
 	//Set kneeWidth to 0 for hard knee
-	void compression(float threshold = -40.0f, float attack = MIN_T, float release = 0.5f, float ratio = 35.0f, float kneeWidth = 6.0f) {
+	void compression(float threshold = -40.0f, float attack = 0.05f, float release = 0.5f, float ratio = 35.0f, float kneeWidth = 6.0f) {
 
 		compEnabled = threshold < MAX_DB;
 
