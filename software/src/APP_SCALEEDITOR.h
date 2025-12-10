@@ -272,9 +272,9 @@ private:
     }
 
     void ChangeImport(int direction) {
-        current_import_scale += direction;
-        if (current_import_scale == OC::Scales::NUM_SCALES) current_import_scale = 0;
-        if (current_import_scale < 0) current_import_scale = OC::Scales::NUM_SCALES - 1;
+      current_import_scale = constrain(
+        current_import_scale + direction, 0, OC::Scales::NUM_SCALES - 1
+      );
     }
 
     void ChangeLength(int direction) {
