@@ -8,10 +8,10 @@ public:
     //IN_GAIN,
     GATE_THRESH,
     COMP_THRESH,
-    LIMIT_THRESH,
     OUT_GAIN,
+    LIMIT_THRESH,
 
-    MAX_CURSOR = OUT_GAIN
+    MAX_CURSOR = LIMIT_THRESH
   };
 
   const char* applet_name() {
@@ -57,26 +57,35 @@ public:
 
     gfxPrint(label_x, 15, "Gate:");
     gfxStartCursor();
-    graphics.printf("%3ddB", gate_threshold);
+    if (gate_threshold < LVL_MIN_DB)
+      graphics.printf("off");
+    else
+      graphics.printf("%3ddB", gate_threshold);
     gfxEndCursor(cursor == GATE_THRESH);
 
     gfxPrint(label_x, 25, "Comp:");
     gfxStartCursor();
-    graphics.printf("%3ddB", comp_threshold);
+    if (comp_threshold >= 0)
+      graphics.printf("off");
+    else
+      graphics.printf("%3ddB", comp_threshold);
     gfxEndCursor(cursor == COMP_THRESH);
 
-    gfxPrint(label_x, 35, "Lim: ");
-    gfxStartCursor();
-    graphics.printf("%3ddB", limit_threshold);
-    gfxEndCursor(cursor == LIMIT_THRESH);
-
-    gfxPrint(label_x, 45, "MakeUp:");
-    gfxStartCursor(label_x, 55);
+    gfxPrint(label_x, 35, "MakeUp:");
+    gfxStartCursor(label_x, 45);
     if (makeupgain < 0)
       gfxPrint("auto");
     else
-      graphics.printf("%3ddB", makeupgain);
+      graphics.printf("+%3ddB", makeupgain);
     gfxEndCursor(cursor == OUT_GAIN);
+
+    gfxPrint(label_x, 55, "Lim: ");
+    gfxStartCursor();
+    if (limit_threshold >= 0)
+      graphics.printf("off");
+    else
+      graphics.printf("%3ddB", limit_threshold);
+    gfxEndCursor(cursor == LIMIT_THRESH);
   }
 
   void OnEncoderMove(int direction) {
@@ -86,13 +95,14 @@ public:
     }
     switch (cursor) {
       case GATE_THRESH:
-        gate_threshold = constrain(gate_threshold + direction, -100, 0);
+        gate_threshold
+          = constrain(gate_threshold + direction, LVL_MIN_DB - 1, 0);
         break;
       case COMP_THRESH:
-        comp_threshold = constrain(comp_threshold + direction, -100, 0);
+        comp_threshold = constrain(comp_threshold + direction, LVL_MIN_DB - 1, 0);
         break;
       case LIMIT_THRESH:
-        limit_threshold = constrain(limit_threshold + direction, -100, 0);
+        limit_threshold = constrain(limit_threshold + direction, LVL_MIN_DB - 1, 0);
         break;
       case OUT_GAIN:
         makeupgain = constrain(makeupgain + direction, -1, 30);
@@ -137,8 +147,8 @@ private:
   // for reference, from effect_dynamics.h:
   //void gate(float threshold = -50.0f, float attack = MIN_T, float release = 0.3f, float hysterisis = 6.0f)
   //void compression(float threshold = -40.0f, float attack = MIN_T, float release = 0.5f, float ratio = 35.0f, float kneeWidth = 6.0f)
-  //void limit(float threshold = -3.0f, float attack = MIN_T, float release = MIN_T)
   //void makeupGain(float gain = 0.0f)
+  //void limit(float threshold = -3.0f, float attack = MIN_T, float release = MIN_T)
 
   AudioPassthrough<Channels> input;
   std::array<AudioEffectDynamics, Channels> complimit;
