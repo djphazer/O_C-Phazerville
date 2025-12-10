@@ -21,6 +21,8 @@
 // SOFTWARE.
 
 #include "OC_core.h"
+#include "OC_gpio.h"
+#include "OC_scales.h"
 #include "OC_ui.h"
 #include "OC_apps.h"
 #include "OC_menus.h"
@@ -275,6 +277,7 @@ void save_global_settings() {
   PhzConfig::setValue(METADATA_KEY, data);
 
   // User Scales
+  char filename[] = "000.SCL";
   for (size_t i = 0; i < Scales::SCALE_USER_COUNT; ++i) {
     PhzConfig::setValue(USER_SCALES_KEY | (i << 4) | SCALE_METADATA, uint64_t(user_scales[i].span) << 16 | user_scales[i].num_notes);
     data = 0;
@@ -286,6 +289,16 @@ void save_global_settings() {
         PhzConfig::setValue(USER_SCALES_KEY | (i << 4) | (SCALE_NOTEDATA + (nn >> 2)), data);
         data = 0;
       }
+    }
+
+    if (SDcard_Ready) {
+      filename[2] = char('0' + i);
+      SD.remove(filename);
+      File file = SD.open(filename, FILE_WRITE_BEGIN);
+      if (file) {
+        Scales::SaveToScala(user_scales[i], file);
+      }
+      file.close();
     }
   }
 
@@ -551,6 +564,21 @@ void Init(bool reset_settings) {
 
   if (!reset_settings) {
 #ifdef __IMXRT1062__
+    bool scala_file_loaded[Scales::SCALE_USER_COUNT] = {false};
+
+    // User Scales
+    char filename[] = "000.SCL";
+    for (size_t i = 0; i < Scales::SCALE_USER_COUNT; ++i) {
+      if (SDcard_Ready && SD.exists(filename)) {
+        filename[2] = char('0' + i);
+        File file = SD.open(filename);
+        if (file) {
+          Scales::LoadScala(user_scales[i], file);
+          scala_file_loaded[i] = true;
+        }
+        file.close();
+      }
+    }
     PhzConfig::load_config(); // use default config file
 
     // Metadata
@@ -564,8 +592,9 @@ void Init(bool reset_settings) {
 
       // User Scales
       for (size_t i = 0; i < Scales::SCALE_USER_COUNT; ++i) {
-        if (!PhzConfig::getValue(USER_SCALES_KEY | (i << 4) | SCALE_METADATA, data))
-          break;
+        if (scala_file_loaded[i] ||
+            !PhzConfig::getValue(USER_SCALES_KEY | (i << 4) | SCALE_METADATA, data))
+            continue;
 
         user_scales[i].span = (data >> 16) & 0xffff;
         user_scales[i].num_notes = data & 0x00ff;
