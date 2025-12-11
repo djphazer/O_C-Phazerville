@@ -1,4 +1,4 @@
-// Copyright (c) 2018, Jason Justian
+// Copyright (c) 2024, Parker Jones
 // Alessio Degani, 2025: Added octave selector, quantized Pitch and Chord output
 //
 // Based on Braids Quantizer, Copyright 2015 Émilie Gillet.
@@ -30,7 +30,6 @@
 // mixolydian: I(0), ii(2), iii(dim)(4), IV(5), v(7), vi(9), VII(10)
 // aeolian (minor):  i(0), ii(dim)(2), III(3), iv(5), v(7), VI(8), VII(10)
 
-#define ONE_VOLT HSAPPLICATION_5V / 5
 class EnsOscKey : public HemisphereApplet {
 public:
 
@@ -51,7 +50,7 @@ public:
     }
 
     int voltageToCode(int voltageIn) {
-        return (int)(((float)voltageIn / 2.0 - 0.25) * ONE_VOLT);
+        return (int)(((float)voltageIn / 2.0 - 0.25) * ONE_OCTAVE);
     }
 
     int determineInterval(int scale, int rootNote, int currentNote) {
@@ -208,7 +207,7 @@ public:
             int semitone = (quantized / 128) % 12;
             int output_voltage = determineInterval(scale, root, semitone);
             
-            Out(0, quantized + (ONE_VOLT*(octave+octaveCv)));
+            Out(0, quantized + (ONE_OCTAVE*(octave+octaveCv)));
             Out(1, output_voltage);
             last_note = quantized;
         }
