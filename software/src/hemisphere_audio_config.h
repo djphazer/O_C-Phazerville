@@ -18,6 +18,7 @@
 #include "audio_applets/FreeverbApplet.h"
 #include "audio_applets/SamverbApplet.h"
 #include "audio_applets/PhaserApplet.h"
+#include "audio_applets/ThreeBandz.h"
 
 const size_t NUM_SLOTS = 5;
 
@@ -46,6 +47,7 @@ DMAMEM std::tuple<
   CrosspanApplet,
   MidSideApplet,
   DynamicsApplet<STEREO>,
+  ThreeBandzApplet,
   InputApplet<STEREO>,
   DelayApplet<STEREO>,
   LadderApplet<STEREO>,
