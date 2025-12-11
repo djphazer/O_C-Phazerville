@@ -193,7 +193,7 @@ private:
   CVInputMap pitch_cv;
   int16_t res = 75;
   CVInputMap res_cv;
-  int16_t fold = 6; // 0% is mute, 6% is dry
+  int16_t fold = 6; // 0% is mute, 6% is dry, max 400% but could go higher
   CVInputMap fold_cv;
   int8_t amplevel = 0;
   CVInputMap amp_cv;
@@ -211,8 +211,8 @@ private:
       drive.amplitude(foldF);
       for (int i = 0; i < 4; ++i) {
         float chanlvl = (i == modesel || (modesel > 3 && (i==1 || i==3))) * level;
-        if (i==1) chanlvl *= dbToScalar(tilt) / 2;
-        if (i==3) chanlvl *= -dbToScalar(-tilt) / 2;
+        if (i==1) chanlvl *= dbToScalar(tilt);
+        if (i==3) chanlvl *= -dbToScalar(-tilt);
         mixer.gain(i, chanlvl);
       }
     }
