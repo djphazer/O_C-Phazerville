@@ -3,15 +3,15 @@ layout: default
 ---
 # Brancher
 
-![Screenshot 2024-06-13 14-22-47](https://github.com/djphazer/O_C-Phazerville/assets/109086194/2d8ccf00-5b5a-4458-bf21-f141d0709aa5)
+![Brancher screenshot](images/Brancher.png)
 
-**Brancher** is a Bernoulli Gate, inspired by Mutable Instruments Branches. It sends incoming gate or clock to one of two outputs, based on a selected probability.
+**Brancher** is a Bernoulli Gate, inspired by Mutable Instruments Branches. It sends incoming gate or clock from the first Trig input to one of two outputs, based on a selected probability. The second Trig input can be used to flip-flop the outputs as on/off gates - one stays high until another trigger flips it.
 
 ### I/O
 
 |        |                1/3                 |    2/4     |
 | ------ | :--------------------------------: | :--------: |
-| TRIG   | Signal (clock or gate) for routing | No effect  |
+| TRIG   | Signal (clock or gate) for routing | Flip-Flop Clock  |
 | CV INs |  Probability modulation (bipolar)  | No effect  |
 | OUTs   |             Output A/C             | Output B/D |
 
