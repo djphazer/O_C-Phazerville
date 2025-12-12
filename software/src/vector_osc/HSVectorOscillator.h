@@ -125,11 +125,11 @@ public:
         eoc = 0;
     }
 
-    void Reset() {
+    void Reset(uint32_t newphase = 0) {
         segment_index = 0;
         segment_time = 0;
         segment_start_level = (segments[segment_count - 1].level - 128) * 256;
-        phase = 0;
+        phase = newphase;
         sustained = 0;
         eoc = !cycle;
     }
