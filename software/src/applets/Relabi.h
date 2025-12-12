@@ -77,16 +77,11 @@ public:
     if (Clock(0)) { // Rising edge detected on TRIG1 input
       for (uint8_t pcount = 0; pcount < 3; pcount++) {
         // Get the total number of segments in the waveform
-        // byte totalSegments = osc[pcount].GetSegment(0).Segments(); // Use first segment's TOC
-
+        uint8_t totalSegments = osc[pcount].GetSegment(0).Segments(); // Use first segment's TOC
         // Calculate phase position based on phase percentage (0–100)
-        // int setPhase = round((phase(pcount) / 100.0) * totalSegments);
-
+        int setPhase = round((phase(pcount) / 100.0) * totalSegments);
         // Reset the phase of the oscillator
-        // osc[pcount].SetPhase(setPhase);
-
-        // This requires modification to VectorOscillator to support phase reset.
-        osc[pcount].Reset();
+        osc[pcount].Reset(setPhase);
       }
     }
 
