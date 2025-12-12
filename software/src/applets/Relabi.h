@@ -84,6 +84,8 @@ public:
 
         // Reset the phase of the oscillator
         // osc[pcount].SetPhase(setPhase);
+
+        // This requires modification to VectorOscillator to support phase reset.
         osc[pcount].Reset();
       }
     }
@@ -448,14 +450,15 @@ protected:
       help[HELP_CV2] = "";
       help[HELP_OUT1] = GetOutputLabel(outputAssign[2]);
       help[HELP_OUT2] = GetOutputLabel(outputAssign[3]);
+      help[HELP_EXTRA2] = "Set: OutC/OutD";
     } else {
       help[HELP_CV1] = "AllFreq";
       help[HELP_CV2] = "AllXmod";
       help[HELP_OUT1] = GetOutputLabel(outputAssign[0]);
       help[HELP_OUT2] = GetOutputLabel(outputAssign[1]);
+      help[HELP_EXTRA1] = "Set: Frq/XFM/Phs/Thrs";
+      help[HELP_EXTRA2] = "P2: Mul/Div/OutA/OutB";
     }
-    help[HELP_EXTRA1] = "Set: Frq/XFM/Phs/Thrs";
-    help[HELP_EXTRA2] = "";
   }
 
 private:
@@ -553,8 +556,10 @@ private:
         return "GAT2";
       case 5:
         return "GAT3";
+      case 6:
+        return "STEP";
       default:
-        return "???";
+        return "TRIG";
     }
   }
 };
