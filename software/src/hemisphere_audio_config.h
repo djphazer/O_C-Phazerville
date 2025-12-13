@@ -22,6 +22,8 @@
 
 const size_t NUM_SLOTS = 5;
 
+HemisphereAudioApplet::ReverbFactory HemisphereAudioApplet::verb_factory;
+
 DMAMEM std::tuple<InputApplet<MONO>, HandSawApplet, UpsampledApplet<MONO>, OscApplet, WavPlayerApplet<MONO>>
     mono_input_pool[2];
 DMAMEM std::tuple<InputApplet<STEREO>, WavPlayerApplet<STEREO>, UpsampledApplet<STEREO>>

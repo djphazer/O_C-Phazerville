@@ -6,15 +6,19 @@ class BungverbApplet : public HemisphereAudioApplet {
             return "Bungverb";
         }
         void Start() override {
-            if (!reverb && OC::CORE::FreeRam() > (int)sizeof(AudioEffectReverbSchroeder)) {
-              reverb = new AudioEffectReverbSchroeder();
+            if (!reverb) {
+              reverb = GetBungverb();
             }
             PatchCable(input, 0, dry_wet_mixer, 1);
             if (!reverb) return;
-            filter.frequency(15000);
             PatchCable(input, 0, *reverb, 0);
             PatchCable(*reverb, 0, filter, 0);
             PatchCable(filter, 0, dry_wet_mixer, 0);
+        }
+        void Unload() override {
+          if (reverb) ReleaseBungverb(reverb);
+          reverb = nullptr;
+          AllowRestart();
         }
 
         void Controller() override {
