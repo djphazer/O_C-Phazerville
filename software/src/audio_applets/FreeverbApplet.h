@@ -6,15 +6,19 @@ class ReverbApplet : public HemisphereAudioApplet {
             return "Reverb";
         }
         void Start() override {
-            if (!reverb && OC::CORE::FreeRam() > (int)sizeof(AudioEffectFreeverb)) {
-              reverb = new AudioEffectFreeverb();
+            if (!reverb) {
+              reverb = GetFreeverb();
             }
             PatchCable(input, 0, dry_wet_mixer, 1);
             if (!reverb) return;
             PatchCable(input, 0, *reverb, 0);
             PatchCable(*reverb, 0, filter, 0);
             PatchCable(filter, 0, dry_wet_mixer, 0);
-            filter.frequency(15000);
+        }
+        void Unload() override {
+          if (reverb) ReleaseFreeverb(reverb);
+          reverb = nullptr;
+          AllowRestart();
         }
 
         void Controller() override {

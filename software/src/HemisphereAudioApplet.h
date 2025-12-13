@@ -2,6 +2,7 @@
 
 #include "HemisphereApplet.h"
 #include "dsputils.h"
+#include "Audio/effect_reverb_schroeder.h"
 #include <AudioStream.h>
 
 // For ascii strings of 9 characters or less, will just be the ascii bits
@@ -24,6 +25,63 @@ enum AudioChannels : uint8_t {
 
 class HemisphereAudioApplet : public HemisphereApplet {
 public:
+
+  struct ReverbFactory {
+    static constexpr int MAX_VERBS = 8;
+    AudioEffectReverbSchroeder* bungverbs[MAX_VERBS];
+    AudioEffectFreeverb* freeverbs[MAX_VERBS];
+
+    uint8_t bungverb_mask = 0, freeverb_mask = 0; // flags for in-use
+
+    AudioEffectFreeverb* getFreeverb() {
+      for (int i = 0; i<MAX_VERBS; ++i) {
+        if (freeverb_mask & (1 << i)) continue;
+
+        if (!freeverbs[i]
+            && OC::CORE::FreeRam() > (int)sizeof(AudioEffectFreeverb)) {
+          freeverbs[i] = new AudioEffectFreeverb();
+        }
+        if (freeverbs[i]) {
+          freeverb_mask |= (1 << i);
+          return freeverbs[i];
+        }
+      }
+      return nullptr;
+    }
+    void releaseFreeverb(AudioEffectFreeverb *verb) {
+      for (int i = 0; i<MAX_VERBS; ++i) {
+        if (freeverbs[i] == verb) {
+          freeverb_mask &= ~(1 << i);
+        }
+      }
+    }
+
+    AudioEffectReverbSchroeder* getBungverb() {
+      for (int i = 0; i<MAX_VERBS; ++i) {
+        if (bungverb_mask & (1 << i)) continue;
+
+        if (!bungverbs[i]
+            && OC::CORE::FreeRam() > (int)sizeof(AudioEffectReverbSchroeder)) {
+          bungverbs[i] = new AudioEffectReverbSchroeder();
+        }
+        if (bungverbs[i]) {
+          bungverb_mask |= (1 << i);
+          return bungverbs[i];
+        }
+      }
+      return nullptr;
+    }
+    void releaseBungverb(AudioEffectReverbSchroeder *verb) {
+      for (int i = 0; i<MAX_VERBS; ++i) {
+        if (bungverbs[i] == verb) {
+          bungverb_mask &= ~(1 << i);
+        }
+      }
+    }
+  };
+
+  static ReverbFactory verb_factory;
+
   static const uint_fast8_t CONFIG_SIZE = 4;
   static const uint_fast8_t MAX_CABLES = 32;
 
@@ -80,6 +138,20 @@ public:
     }
 
     cables[cable_count++].connect(source, s_ch, dest, d_ch);
+  }
+
+  AudioEffectReverbSchroeder *GetBungverb() {
+    return verb_factory.getBungverb();
+  }
+  void ReleaseBungverb(AudioEffectReverbSchroeder* verb) {
+    verb_factory.releaseBungverb(verb);
+  }
+
+  AudioEffectFreeverb *GetFreeverb() {
+    return verb_factory.getFreeverb();
+  }
+  void ReleaseFreeverb(AudioEffectFreeverb* verb) {
+    verb_factory.releaseFreeverb(verb);
   }
 
   void Disconnect() {
