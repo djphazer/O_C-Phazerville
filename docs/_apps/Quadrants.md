@@ -16,22 +16,26 @@ This quick-reference diagram shows how to navigate between various screens and f
 ### Controls
 
 Some controls are exclusive to new hardware with 5 buttons + 2 encoders:
-* Press **A/B/X/Y** - switch corresponding applet into view (NW, NE, SW, SE)
-* Double-click **A/B/X/Y** - view applet full-screen or help/config
-  - adjust input mappings for triggers/CV, or clock trigger multipliers if Clock is running
-  - switch loaded applet
-* Press **Z** - Start/Stop/Arm the Clock
-* Press **A + Y** or **X + B** - Overview
-* Press **A + X** - Load Preset shortcut
-* Press **B + Y** - Input Mapping Config shortcut
-* Press **X + Y** - Audio DSP subsystem
+| Button | Action |
+| ------ | ------ |
+| Press **A/B/X/Y** | switch corresponding applet into view (NW, NE, SW, SE) |
+| Double-click **A/B/X/Y** | view applet full-screen or help/config<br>- adjust input mappings for triggers/CV, or clock trigger multipliers if Clock is running<br>- switch loaded applet |
+| Press **Z** | Start/Stop/Arm the Clock |
+| Press **A + Y** or **X + B** | Overview |
+| Press **A + X** | Load Preset shortcut |
+| Press **B + Y** | Input Mapping Config shortcut |
+| Press **X + Y** | Audio DSP subsystem<br>- use A or B to jump back out |
 
 Other controls are identical to Hemispheres:
-* Press **A + B** - Clock Setup
-* Long-press **A** - Invoke Screensaver (global)
-* Long-press **B** - Config menu (presets, general settings, input mapping, quantizers, etc)
+| Button | Action |
+| ------ | ------ |
+| Press **A + B** | Clock Setup |
+| Long-press **A** | Invoke Screensaver (global) |
+| Long-press **B** | Config menu (presets, general settings, input mapping, quantizers, etc) |
 
-The encoders behave intuitively in split-screen views - rotate to move the corresponding Left/Right cursor, push to select or toggle editing. In full-screen views, rotating **Left Encoder** typically switches pages or makes coarse adjustments; **Right Encoder** moves the cursor, or makes fine adjustments; push either Encoder button to select or toggle editing.
+The encoders behave intuitively in split-screen views - rotate to move the corresponding Left/Right cursor, push to select or toggle editing.
+
+In full-screen views, rotating **Left Encoder** typically switches pages or makes coarse adjustments; **Right Encoder** moves the cursor, or makes fine adjustments; push either Encoder button to select or toggle editing.
 
 ### Input Mapping
 
@@ -46,22 +50,30 @@ The inputs, however, can be completely reassigned, allowing triggers to be deriv
 ![Audio Applet Overview](images/AudioAppletOverview.png)
 
 Using the dedicated onboard audio codec hardware, the new Audio subsystem provides customizable sound generation and effects processing chains in-the-box!
-Audio DSP is applet-based, like CV applets, but with a few differences.
-The AudioDSP is divided into two channels of 5 slots each.
-The left channel goes to the left output, the right channel goes to the right output.
+
+Audio DSP is applet-based, like CV applets, but with a few differences. The UI is divided into two channels of 5 slots each. The left channel goes to the left output, the right channel goes to the right output.
+
 Audio in each channel is processed from top to bottom, with each applet receiving the output of the previous one.
+
 Applet slots can either be dual mono, where you have two independent applets, or stereo, where you have a single applet that processes both channels.
-The first slot is a dedicated for sound sources, though you can also inject sound sources later on in the chain as well.
+
+The first slot is dedicated for sound sources, though you can also inject sound sources later on in the chain as well.
+
 The animated bars above and below the slots indicate audio level before and after that slot.
 
 Check the sidebar navigation for details about each Audio Applet.
 
 #### Controls
 
-* Rotate the **Left Encoder** to select an applet in the left channel or the **Right Encoder** to select an applet in the right channel.
-* Press the **Encoder** to highlight the selected applet in that channel. Once highlighted, rotate the encoder to change which applet is present in that slot. Press the encoder again to edit the applet's parameters.
-* Press **A/B** to close an applet's editor if open, or return to CV applet view if no applet's editor is open.
-* To switch a slot between dual mono and stereo, select that slot with both encoders and press them simultaneously.
+| Button / Encoder | Action |
+| ---------------- | ------ |
+| Rotate the **Left Encoder** | move left arrow cursor to select an applet slot in the left channel |
+| Rotate the **Right Encoder** | move right arrow cursor to select an applet slot in the right channel |
+|                               | (stereo applets can be accessed from either side) |
+| Press the **Encoder** | Select the applet slot.<br>- while highlighted, rotate the Encoder to change which applet to load in the slot<br>- Press the Encoder again to confirm any change and/or view and interact with the applet<br>- A or B button to jump back out |
+| Press **A** or **B** | close an applet's editor if open, or return to CV applet view from the audio slots |
+
+To switch a slot between dual mono and stereo, select that slot with both cursors and press both encoders simultaneously.
 
 ### Preset Storage
 
