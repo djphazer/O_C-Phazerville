@@ -5,7 +5,7 @@ nav_order: 2
 
 # Installation
 
-**Phazerville Suite** is free, open-source software (firmware) for the Ornament + Crime module. The licenses under which the software is released permit anyone to freely install and use the firmware on copies of the module, to modify it, and to provide copies to others. Third-party module manufacturers who re-use portions of the O+C software in their modules or devices should ensure that they meet the obligations imposed by the licenses under which the O+C source code is released - details are [here](https://ornament-and-cri.me/licensing/).
+**Phazerville Suite** is free, open-source software (firmware) for the Ornament + Crime module by mxmxmx and its ORN8 derivatives. The licenses under which the software is released permit anyone to freely install and use the firmware on copies of the module, to modify it, and to provide copies to others. Third-party module manufacturers who re-use portions of the O+C software in their modules or devices should ensure that they meet the obligations imposed by the licenses under which the O+C source code is released - details are [here](https://ornament-and-cri.me/licensing/).
 
 ## Firmware upload methods
 _NB/FAQ: just updating the firmware (on a calibrated module) doesn’t require re-calibration — the calibration values are not overwritten when you install new versions of the firmware. Newly built modules, on the other hand, must be calibrated in order to function properly._
@@ -14,7 +14,7 @@ There are a few ways of getting the firmware onto your module:
 
 * [Method A](#method-a): upload a pre-compiled HEX file. this is easy and quick!
 * [Method B](#method-b): install the Arduino IDE and the Teensyduino add-on and compile the code yourself.
-* [Method C](#method-c): install PlatformIO and compile the code yourself.
+* [Method C](#method-c): install PlatformIO and compile the code yourself. (_recommended!_)
 * Either way, you’ll need: a micro-usb cable (make sure this isn’t for charging only, but data transfer).
 * NB: the following steps assume that you have cut the usb trace. see [here](https://ornament-and-cri.me/build-it/#cut_trace) for an example of the Teensy 3.2.
 
@@ -26,6 +26,7 @@ uploading the HEX file
 
 ### step 2): download the binary HEX file
 - download the latest released version of the firmware image file (.hex) from [the Releases page](https://github.com/djphazer/O_C-Phazerville/releases)
+- read carefully to select the correct file for your hardware variant!
 
 ### step 3): open the HEX file in the Teensy Loader
 - open the HEX file in the Teensy Loader application
@@ -54,7 +55,7 @@ Compiling the firmware with Arduino IDE + Teensyduino
 
 ### step 3): compile
 - Once the libraries and source code for the firmware are in place, you should be able to compile it. Open the file called `src.ino`. Now make sure you:
-1. select "Teensy 3.2/3.1" in `Tools > Board`
+1. select "Teensy 3.2/3.1" (or Teensy 4.0, 4.1, accordingly) in `Tools > Board`
 2. select "MIDI" in `Tools > USB Type`
 3. select "120 MHz (overclock)" in `Tools > CPU Speed`
 4. select "Smallest Code" in `Tools > Optimize`
@@ -74,7 +75,7 @@ Compiling the firmware with PlatformIO
 - Navigate to the `software/` directory in the source code. From there, you can use PlatformIO to Build the desired configuration and Upload via USB to your module.
 - For example, in the terminal, I type:
 ```
-pio run -e pewpewpew -t upload
+pio run -e T32 -t upload
 ```
 - In VSCode or other IDE plugins, you'll see commands labeled "Build" and "Upload" under "General" for the various build targets.
 - Have a look inside `platformio.ini` for alternative build configurations - VOR, flipped screen, Teensy 4.x, etc. - and to customize various app flags.
