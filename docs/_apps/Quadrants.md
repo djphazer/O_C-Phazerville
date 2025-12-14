@@ -16,6 +16,7 @@ This quick-reference diagram shows how to navigate between various screens and f
 ### Controls
 
 Some controls are exclusive to new hardware with 5 buttons + 2 encoders:
+
 | Button | Action |
 | ------ | ------ |
 | Press **A/B/X/Y** | switch corresponding applet into view (NW, NE, SW, SE) |
@@ -27,6 +28,7 @@ Some controls are exclusive to new hardware with 5 buttons + 2 encoders:
 | Press **X + Y** | Audio DSP subsystem<br>- use A or B to jump back out |
 
 Other controls are identical to Hemispheres:
+
 | Button | Action |
 | ------ | ------ |
 | Press **A + B** | Clock Setup |
