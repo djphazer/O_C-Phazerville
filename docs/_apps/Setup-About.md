@@ -1,12 +1,15 @@
 ---
 layout: default
 ---
-# Setup / About
+# Setup / About / Calibration
 
 ![Setup/About Screenshot](images/Setup_About.png)
 
-* Press the LEFT encoder to enter the Calibration routine
-* Press the RIGHT encoder to reset calibration / settings to defaults - press RIGHT again to confirm (LEFT to cancel)
+This screen shows some crucial info about your specific hardware and firmware.
+* Press the LEFT Encoder to enter the Calibration routine
+* Rotate the LEFT Encoder for a one-way ticket to "Reflash" mode
+* Press the RIGHT Encoder to reset calibration & all settings to defaults - press RIGHT again to confirm (LEFT to cancel)
+* Long-Press the RIGHT Encoder to get back to the main App Menu
 
 ### Flipped Screen / Controls
 _(new in v1.8.3)_
@@ -50,7 +53,7 @@ Horizontal pixel offset for centering the display.
 ![DAC Calibration minimum](images/cal_dac1.png)
 ![DAC Calibration maximum](images/cal_dac2.png)
 
-DAC calibration tends to be very linear. You only need to calibrate two values, low and high, and the firmware will interpolate in between. The low/high values are not necessarily the minimum/maximum for your hardware.
+DAC calibration tends to be very linear. You only need to calibrate two values, low and high, and the firmware will interpolate in between and beyond. The low/high values are not necessarily the minimum/maximum for your hardware.
 
 For each output:
 * Measure the voltage with a precision multimeter
@@ -80,3 +83,5 @@ Timeout for the screensaver or blank screen
 Final step - save and adjust encoder direction
 * Press UP or DOWN (A or B) buttons to select encoder reversal for L, R, both (LR), or neither (normal)
 * Select "Yes" to save and "No" to cancel; press the RIGHT encoder to exit
+
+To verify proper calibration in Hemispheres/Quadrants, use the **Voltage** applet for outputs and **Scope** applet for inputs.
