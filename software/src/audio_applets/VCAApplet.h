@@ -126,6 +126,10 @@ public:
     rectify = Unpack(d, {62, 1});
     invert = Unpack(d, {63, 1});
     UnpackPackables(data[1], level_cv, shape_cv);
+
+    SetLevel(level);
+    SetBias(bias);
+    SetRectify(rectify);
   }
 
   AudioStream* InputStream() override {
