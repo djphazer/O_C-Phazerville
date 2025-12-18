@@ -1536,14 +1536,10 @@ private:
         gfxPrint(1, 35, "Cursor wrap:  ");
         gfxPrint(OC::Strings::off_on[HS::cursor_wrap]);
 
-        gfxPrint(1, 45, "Preset Bank#  ");
-        gfxPrint(bank_num);
-        gfxPrint("   ");
-
-        int x = graphics.getPrintPosX();
-        gfxPrint(jump_trig_);
         if (config_cursor == PRESET_JUMP_TRIG) {
-          int y = graphics.getPrintPosY();
+          int y = 45;
+          int x = 100;
+          gfxPrint(18, y, "Jump Trig:");
           int w = strlen(jump_trig_.InputName()) * 6 + 2;
           CONSTRAIN(x, 3, 126-w);
 
@@ -1551,6 +1547,13 @@ private:
           gfxFrame(x - 1, y - 1, w + 1, 11);
           gfxPrint(x, y + 1, jump_trig_.InputName());
           if (EditMode()) gfxInvert(x - 1, y - 1, w + 1, 11);
+
+          gfxIcon(x - 8, y, RIGHT_ICON);
+        } else {
+          gfxPrint(1, 45, "Preset Bank#  ");
+          gfxPrint(bank_num);
+          gfxPrint("  ");
+          gfxPrint(jump_trig_);
         }
 
         const uint8_t pc_ch = HS::frame.MIDIState.pc_channel;
