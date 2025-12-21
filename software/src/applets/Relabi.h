@@ -33,6 +33,17 @@ class Relabi : public HemisphereApplet {
 public:
   static constexpr int PROCESS_TICKS = 4;
 
+  enum RelabiCursor {
+    LFO1_FREQ, LFO1_XMOD, LFO1_PHASE, LFO1_THRESH,
+    LFO2_FREQ, LFO2_XMOD, LFO2_PHASE, LFO2_THRESH,
+    LFO3_FREQ, LFO3_XMOD, LFO3_PHASE, LFO3_THRESH,
+
+    FREQ_MULT, FREQ_DIV,
+    OUTMODE_A, OUTMODE_B,
+
+    MAX_CURSOR = OUTMODE_B
+  };
+
   const char* applet_name() {
     return "Relabi";
   }
@@ -191,49 +202,52 @@ public:
       return;
     }
 
-    int currentPage = (cursor > 4);
-    if (currentPage == 0) {
+    int currentPage = (cursor / 4);
+    if (currentPage < 3) {
       // Page 1: Main parameters for non-linked or left hemisphere
-      gfxPrint(1, 15, "LFO");
-      gfxPrint(21, 15, selectedChannel + 1);
+      gfxPrint(1, 13, "LFO");
+      gfxPrint(currentPage + 1);
 
       gfxPrint(1, 26, "FREQ");
-      float fDisplay = DecodeFreq(freqKnob[selectedChannel]);
+      float fDisplay = DecodeFreq(freqKnob[currentPage]);
       PrintScaledFloat(2, 35, fDisplay);
 
       gfxPrint(31, 26, "XFM");
-      gfxPrint(32, 35, xmod(selectedChannel));
+      gfxPrint(32, 35, xmod(currentPage));
 
       gfxPrint(1, 46, "PHAS");
-      gfxPrint(2, 55, phase(selectedChannel));
+      gfxPrint(2, 55, phase(currentPage));
 
       gfxPrint(31, 46, "THRS");
-      gfxPrint(32, 55, thresh(selectedChannel));
+      gfxPrint(32, 55, thresh(currentPage));
 
       // Highlight selected parameter
       switch (cursor) {
-        case 0:
-          gfxCursor(1, 23, 30);
-          break; // OSC
-        case 1:
-          gfxCursor(2, 43, 30);
-          break; // FREQ
-        case 2:
-          gfxCursor(32, 43, 30);
-          break; // XMOD
-        case 3:
-          gfxCursor(2, 63, 30);
-          break; // PHAS
-        case 4:
-          gfxCursor(32, 63, 30);
-          break; // THRS
+        case LFO1_FREQ:
+        case LFO2_FREQ:
+        case LFO3_FREQ:
+          gfxCursor(2, 43, 28);
+          break;
+        case LFO1_XMOD:
+        case LFO2_XMOD:
+        case LFO3_XMOD:
+          gfxCursor(32, 43, 28);
+          break;
+        case LFO1_PHASE:
+        case LFO2_PHASE:
+        case LFO3_PHASE:
+          gfxCursor(2, 63, 28);
+          break;
+        case LFO1_THRESH:
+        case LFO2_THRESH:
+        case LFO3_THRESH:
+          gfxCursor(32, 63, 28);
+          break;
       }
-      DrawVUMetersLeft();
-
-    } else if (currentPage == 1) {
+      gfxIcon(31 + 10*currentPage, 20, UP_BTN_ICON);
+    } else if (currentPage == 3) {
       // Page 2: Clock mult, Polarity, and Output page
-
-      gfxPrint(1, 15, "ALL LFOs");
+      gfxPrint(1, 13, "ALL");
       gfxPrint(2, 25, "FREQx ");
       gfxPrint(1, 35, freqMulMap[freqKnobMul]);
 
@@ -248,20 +262,22 @@ public:
 
       // Highlight selected parameter (use your original locations)
       switch (cursor) {
-        case 5: // MULT
+        case FREQ_MULT:
           gfxCursor(1, 44, 14);
           break;
-        case 6: // DIV
+        case FREQ_DIV:
           gfxCursor(22, 44, 14);
           break;
-        case 7: // OUT1
+        case OUTMODE_A:
           gfxCursor(2, 63, 30);
           break;
-        case 8: // OUT2
+        case OUTMODE_B:
           gfxCursor(32, 63, 30);
           break;
       }
+      gfxDottedLine(32, 24, 60, 24);
     }
+    DrawVUMetersLeft();
   }
 
   void DrawOutputOption(int x, int y, uint8_t assign) {
@@ -283,25 +299,25 @@ public:
   }
 
   void DrawVUMetersRight() {
-    int bar[3];
+    int bar;
     for (int i = 0; i < 3; ++i) {
       // Calculate bar height based on sample value (assuming bipolar -3V to +3V
       // range)
-      bar[i] = 14.0 * (sample[i] + HEMISPHERE_3V_CV) / HEMISPHERE_3V_CV;
+      bar = 14.0 * (sample[i] + HEMISPHERE_3V_CV) / HEMISPHERE_3V_CV;
 
       // Draw vertical bars (adjust x-position and width as needed)
-      gfxRect(2 + (20 * i), 42 - bar[i], 18, bar[i]);
+      gfxRect(2 + (20 * i), 42 - bar, 18, bar);
     }
   }
 
   void DrawVUMetersLeft() {
-    int bar[4];
+    int bar;
     for (int i = 0; i < 3; ++i) {
       // Calculate bar height based on sample value (assuming bipolar -3V to +3V
       // range) Smaller bars for left hemisphere
-      bar[i] = 4.0 * (sample[i] + HEMISPHERE_3V_CV) / HEMISPHERE_3V_CV;
-      gfxRect(
-        31 + (10 * i), 22 - bar[i], 9, bar[i]
+      bar = 5.0 * (sample[i] + HEMISPHERE_3V_CV) / HEMISPHERE_3V_CV;
+      gfxInvert(
+        31 + (10 * i), 22 - bar, 9, bar
       ); // Adjusted for smaller size
     }
   }
@@ -333,7 +349,7 @@ public:
     // linked && RIGHT_HEMISPHERE: 2 parameters (0 and 1)
     // otherwise: adjust for both pages (parameters 0–7)
     const bool link_follow = (linked && (hemisphere & 1));
-    int max_param = link_follow ? 1 : 8;
+    int max_param = link_follow ? 1 : MAX_CURSOR;
 
     if (!EditMode()) {
       // Not editing: move the cursor through the available parameters
@@ -343,64 +359,63 @@ public:
 
     // Editing: adjust parameters based on the current page and cursor
 
-    // Determine the current page based on cursor position
-    // Page 0: Main parameters
-    // Page 1: THRES, OUT1, OUT2
-    int currentPage = (cursor > 4);
-
-    if (currentPage == 0) {
-      // Page 0: Main parameters
-      if (link_follow) {
-        // Linked and RIGHT side: Only global frequency multiplier or divider
-        switch (cursor) {
-          case 0: // OUT3 assignment
-            outputAssign[2] = constrain(outputAssign[2] + direction, 0, 7);
-            break;
-          case 1: // OUT4 assignment
-            outputAssign[3] = constrain(outputAssign[3] + direction, 0, 7);
-            break;
-        }
-      } else {
-        // Not linked or LEFT Hemisphere: Full parameter set (0–4)
-        switch (cursor) {
-          case 0: // Cycle through OSC selection
-            selectedChannel = constrain(selectedChannel + direction, 0, 2);
-            break;
-
-          case 1: // FREQ
-            freqKnob[selectedChannel] = constrain(freqKnob[selectedChannel] + direction, 0, 63);
-            break;
-
-          case 2: // XMOD (0–100) scaling
-            xmodKnob[selectedChannel] = constrain(xmodKnob[selectedChannel] + direction, 0, 7);
-            break;
-
-          case 3: // PHAS (0–100)
-            phaseKnob[selectedChannel] = constrain(phaseKnob[selectedChannel] + direction, 0, 7);
-            break;
-
-          case 4: // THRS adjustment
-            threshKnob[selectedChannel] = constrain(threshKnob[selectedChannel] + direction, 0, 6);
-            break;
-        }
-      }
-    } else if (currentPage == 1) {
-      // Page 1: THRES, OUT1, OUT2
+    if (link_follow) {
+      // Linked and RIGHT side: Only two output modes
       switch (cursor) {
-
-        case 5: // Global frequency multiplier
-          freqKnobMul = constrain(freqKnobMul + direction, 0, 7);
+        case 0: // OUT3 assignment
+          outputAssign[2] = constrain(outputAssign[2] + direction, 0, 7);
           break;
-        case 6: // Global frequency divider
-          freqKnobDiv = constrain(freqKnobDiv + direction, 0, 7);
-          break;
-        case 7: // OUT1 assignment
-          outputAssign[0] = constrain(outputAssign[0] + direction, 0, 7);
-          break;
-        case 8: // OUT2 assignment
-          outputAssign[1] = constrain(outputAssign[1] + direction, 0, 7);
+        case 1: // OUT4 assignment
+          outputAssign[3] = constrain(outputAssign[3] + direction, 0, 7);
           break;
       }
+      return;
+    }
+
+    // Determine the current page based on cursor position
+    // Page 0, 1, 2: Main parameters for LFO1, LFO2, LFO3
+    // Page 3: THRES, OUT1, OUT2
+    int currentPage = (cursor / 4);
+
+    switch (cursor) {
+      // Page 0-2: Main parameters
+      case LFO1_FREQ:
+      case LFO2_FREQ:
+      case LFO3_FREQ:
+        freqKnob[currentPage] = constrain(freqKnob[currentPage] + direction, 0, 63);
+        break;
+
+      case LFO1_XMOD: // XMOD (0–100) scaling
+      case LFO2_XMOD:
+      case LFO3_XMOD:
+        xmodKnob[currentPage] = constrain(xmodKnob[currentPage] + direction, 0, 7);
+        break;
+
+      case LFO1_PHASE: // PHAS (0–100)
+      case LFO2_PHASE:
+      case LFO3_PHASE:
+        phaseKnob[currentPage] = constrain(phaseKnob[currentPage] + direction, 0, 7);
+        break;
+
+      case LFO1_THRESH:
+      case LFO2_THRESH:
+      case LFO3_THRESH:
+        threshKnob[currentPage] = constrain(threshKnob[currentPage] + direction, 0, 6);
+        break;
+
+      // Page 3: clock mult/div, OUT1, OUT2
+      case FREQ_MULT: // Global frequency multiplier
+        freqKnobMul = constrain(freqKnobMul + direction, 0, 7);
+        break;
+      case FREQ_DIV: // Global frequency divider
+        freqKnobDiv = constrain(freqKnobDiv + direction, 0, 7);
+        break;
+      case OUTMODE_A: // OUT1 assignment
+        outputAssign[0] = constrain(outputAssign[0] + direction, 0, 7);
+        break;
+      case OUTMODE_B: // OUT2 assignment
+        outputAssign[1] = constrain(outputAssign[1] + direction, 0, 7);
+        break;
     }
   }
 
@@ -483,7 +498,6 @@ private:
   uint8_t outputAssign[4]; // 12 bits (3 each) // Output assignments for A and B
                            // (0-7 for LFO1-LFO4, GATE1-GATE4)
 
-  int selectedChannel = 0;
   int cursor = 0;
   int sample[CHAN_COUNT];
 
