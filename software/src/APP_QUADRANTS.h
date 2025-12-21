@@ -138,6 +138,8 @@ public:
     }
 
     // lower 11 bits of PhzConfig KEY
+    // Audio applet data keys also use 11 bits, with the upper 3 being non-zero...
+    // - watch out for collisions, especially on Preset A (index 0)
     enum PresetDataKeys : uint16_t {
         APPLET_METADATA_KEY = 0, // applet ids
         CLOCK_DATA_KEY = 1,
@@ -166,12 +168,20 @@ public:
         MIDI_MAPS_KEY   = 150, // + 0..32
 
         // 200s = Quantizers
-        Q_ENGINE_KEY    = 200, // + slot number
+        Q_ENGINE_KEY    = 200, // + slot number (200 - 207)
 
-        // 300-500 = Sequences (aka Patterns)
+        // 256 = used by Audio Applets
+
+        // 300-428 = Sequences (aka Patterns)
         SEQUENCES_KEY   = 300, // + blob index
 
-        VERSION_KEY = 0xFFFF
+        // More ranges used by Audio Applet data:
+        // 512-522
+        // 768-778
+        // 1024+
+        // ... check AudioAppletSubapp to be sure!
+
+        VERSION_KEY = 0xFFFF // 65535
     };
 
     void DeletePreset(int id) {
@@ -180,6 +190,8 @@ public:
         for (int i = 0; i < 100; ++i) {
           PhzConfig::deleteKey(preset_key | i);
         }
+        // TODO:
+        //audio_app.deletePresetData(id);
     }
 
     void StoreToPreset(int id) {
