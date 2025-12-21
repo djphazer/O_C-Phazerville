@@ -468,6 +468,7 @@ public:
     for (uint_fast8_t i = 0; i < APPLET_CONFIG_SIZE; ++i) {
       // We default to 0, so may as well skip them to save space
       if (data[i]) PhzConfig::setValue(key + i, data[i]);
+      else PhzConfig::deleteKey(key + i); // clears old unused data
       Serial.printf(" | data[%u]=", i);
       Serial.print(data[i], HEX);
     }
