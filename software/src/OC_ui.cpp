@@ -14,6 +14,7 @@
 #include "OC_options.h"
 #include "PhzIcons.h"
 #include "src/drivers/display.h"
+#include "HSUtils.h"
 
 #ifdef VOR
 #include "VBiasManager.h"
@@ -261,8 +262,8 @@ UiMode Ui::Splashscreen(bool &reset_settings) {
     const uint8_t *iconroulette[] = {
       PhzIcons::clockDivider, PhzIcons::clockSkip,
       PhzIcons::clock_warp_A, PhzIcons::clock_warp_B,
-      PhzIcons::polyDiv,
-      ZAP_ICON
+      PhzIcons::snowflakeB,
+      PhzIcons::snowflakeA
     };
 
     static int pick = 0;
@@ -277,6 +278,8 @@ UiMode Ui::Splashscreen(bool &reset_settings) {
     if (w > 128) w = 256 - w;
     graphics.invertRect(0, 56, w, 8);
 
+    ZapScreensaver();
+
     /* fixes spurious button presses when booting ? */
     while (event_queue_.available())
       (void)event_queue_.PullEvent();
@@ -284,6 +287,24 @@ UiMode Ui::Splashscreen(bool &reset_settings) {
     GRAPHICS_END_FRAME();
 
   } while (now - start < SPLASHSCREEN_DELAY_MS);
+
+  do {
+    GRAPHICS_BEGIN_FRAME(true);
+    now = millis();
+    ZapScreensaver();
+
+    graphics.clearRect(27, 22, 74, 22);
+    graphics.setPrintPos(28, 23);
+    graphics.print(" Welcome to");
+    graphics.setPrintPos(28, 33);
+    graphics.print("Phazerville!");
+    //graphics.print(OC::Strings::RELEASE_NAME);
+
+    while (event_queue_.available())
+      (void)event_queue_.PullEvent();
+    GRAPHICS_END_FRAME();
+    delay(5);
+  } while (now - start < SPLASHSCREEN_DELAY_MS*3/2);
 
   SetButtonIgnoreMask();
   return mode;
