@@ -811,6 +811,9 @@ bool Ui::AppSettings(bool drawmenu) {
     vbias_m->DrawPopupPerhaps();
 #endif
 
+    // It's Snowing!!!
+    ZapScreensaver();
+
     return true;
   }
 

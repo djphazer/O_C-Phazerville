@@ -44,11 +44,11 @@ namespace HS {
   DigitalInputMap trigmap[ADC_CHANNEL_LAST];
   CVInputMap cvmap[ADC_CHANNEL_LAST];
   uint8_t trig_length = 10; // in ms, multiplier for HEMISPHERE_CLOCK_TICKS
-  uint8_t screensaver_mode = SCREEN_STARS; // ScreensaverMode
+  uint8_t screensaver_mode = SCREEN_ZAPS; // ScreensaverMode
   const char * const ssmodes[SCREENSAVER_MODE_COUNT] = {
     "[blank]",
     "Meters", "Scope",
-    "Zaps", "Stars", "Zips",
+    "Snow!", "Stars", "Zips",
   };
 
   OC::menu::ScreenCursor<5> showhide_cursor;
@@ -267,9 +267,9 @@ namespace HS {
       case MENU_POPUP:
         gfxPrint(78, 30, "Load");
         gfxPrint(78, 40, config_cursor == AUTO_SAVE ? "(auto)" : "Save");
-        gfxIcon(78, 50, ZAP_ICON);
+        gfxIcon(78, 50, PhzIcons::snowflakeA);
         gfxIcon(86, 50, ZAP_ICON);
-        gfxIcon(94, 50, ZAP_ICON);
+        gfxIcon(94, 50, PhzIcons::snowflakeB);
         //gfxPrint(78, 50, "????");
 
         switch (config_cursor) {
@@ -576,4 +576,91 @@ void gfxFooter(const char *str, const uint8_t *icon) {
     x += 8;
   }
   gfxPrint(x, 56, str);
+}
+
+// --- Phazerville Screensaver Library ---
+struct Zap {
+    int x = 12800;
+    int y = 6400;
+    int x_v = 6;
+    int y_v = 3;
+    uint16_t flip = 0;
+
+    void Flip() {
+      flip = random(0xffff);
+      Drift();
+    }
+    void Move(bool stars) {
+        if (stars) Move(6100, 2900);
+        else Move();
+    }
+    void Move(int target_x = -1, int target_y = -1) {
+        x += x_v;
+        y += y_v;
+        if (x > 12700 || x < 0 || y > 6300 || y < 0) {
+            if (target_x < 0 || target_y < 0) {
+                x = random(12700);
+                y = 0; // from the top
+                y_v = 5 + random(10); // only falling
+            } else {
+                x = target_x + random(400);
+                y = target_y + random(400);
+                CONSTRAIN(x, 0, 12700);
+                CONSTRAIN(y, 0, 6300);
+                y_v = random(31) - 15;
+            }
+
+            x_v = random(51) - 25;
+            if (x_v == 0) ++x_v;
+            if (y_v == 0) ++y_v;
+        }
+    }
+    void Drift() {
+      // Snow drifts randomly as it falls
+      x_v += random(3) - 1;
+      CONSTRAIN(x_v, -5, 5);
+    }
+};
+static constexpr int HOW_MANY_ZAPS = 30;
+Zap zaps[HOW_MANY_ZAPS];
+void ZapScreensaver(const uint8_t stars) {
+  static int frame_delay = 0;
+  static elapsedMillis timer = 0;
+  const uint8_t* flake_icon[] = {
+    PhzIcons::snowflakeA,
+    PhzIcons::snowflakeB,
+    PhzIcons::snowflakeC,
+    ZAP_ICON
+  };
+
+  if (stars == 0 && timer > 100) {
+    for (int i = 0; i < 10; i++) {
+      zaps[i].Flip();
+    }
+    timer = 0;
+  }
+  for (int i = 0; i < (stars ? HOW_MANY_ZAPS : 10); i++) {
+    if (frame_delay & 0x1) {
+      if (stars > 1) {
+        // Zips respawn from their previous sibling
+        if (0 == i) zaps[0].Move();
+        else zaps[i].Move(zaps[i-1].x, zaps[i-1].y);
+      } else
+        zaps[i].Move(stars == 1); // centered starfield
+    }
+
+    if (stars && frame_delay == 0) {
+      // accel
+      zaps[i].x_v *= 2;
+      zaps[i].y_v *= 2;
+    }
+
+    if (stars)
+      gfxPixel(zaps[i].x/100, zaps[i].y/100);
+    else {
+      const uint8_t idx = (zaps[i].flip % 3) + ((zaps[i].flip) > 0xFF00);
+      gfxIcon(zaps[i].x/100, zaps[i].y/100, flake_icon[idx]);
+    }
+  }
+  if (--frame_delay < 0) frame_delay = 100;
 }

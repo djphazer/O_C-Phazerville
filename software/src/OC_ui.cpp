@@ -14,6 +14,7 @@
 #include "OC_options.h"
 #include "PhzIcons.h"
 #include "src/drivers/display.h"
+#include "HSUtils.h"
 
 #ifdef VOR
 #include "VBiasManager.h"
@@ -258,8 +259,8 @@ UiMode Ui::Splashscreen(bool &reset_settings) {
     const uint8_t *iconroulette[] = {
       PhzIcons::clockDivider, PhzIcons::clockSkip,
       PhzIcons::clock_warp_A, PhzIcons::clock_warp_B,
-      PhzIcons::polyDiv,
-      ZAP_ICON
+      PhzIcons::snowflakeB,
+      PhzIcons::snowflakeA
     };
 
     static int pick = 0;
@@ -274,6 +275,8 @@ UiMode Ui::Splashscreen(bool &reset_settings) {
     if (w > 128) w = 256 - w;
     graphics.invertRect(0, 56, w, 8);
 
+    ZapScreensaver();
+
     /* fixes spurious button presses when booting ? */
     while (event_queue_.available())
       (void)event_queue_.PullEvent();
@@ -282,11 +285,18 @@ UiMode Ui::Splashscreen(bool &reset_settings) {
 
   } while (timeout < SPLASHSCREEN_DELAY_MS);
 
+  const uint8_t *flake_icon[] = {
+    PhzIcons::snowflakeA, PhzIcons::snowflakeB
+  };
+
   do {
     GRAPHICS_BEGIN_FRAME(true);
+    /*
     for (int i=0; i<128; ++i) {
-      graphics.drawBitmap8(i*8%128 + random(2), i/16*8 + random(2), 8, ZAP_ICON);
+      graphics.drawBitmap8(i*8%128 + random(2), i/16*8 + random(2), 8, flake_icon[random(2)]);
     }
+    */
+    ZapScreensaver();
 
     graphics.clearRect(27, 22, 74, 22);
     graphics.setPrintPos(28, 23);

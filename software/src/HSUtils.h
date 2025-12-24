@@ -335,3 +335,5 @@ constexpr int Proportion(const int numerator, const int denominator, const int m
  *              HEMISPHERE_MAX_CV   max_pixels
  */
 const int ProportionCV(const int cv_value, const int max_pixels, const int max_cv = HEMISPHERE_MAX_CV);
+
+void ZapScreensaver(const uint8_t stars = 0);
