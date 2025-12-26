@@ -1,5 +1,7 @@
 /*
  * WAV file player applet
+ *    by djphazer
+ *    based on TeensyVariablePlayback library by Nic Newdigate
  *
  * It looks in the root directory of the SD card for the
  * selected file, by number, in the format:
@@ -8,7 +10,11 @@
  *   002.WAV
  *   ...
  *
+ * All sampling rates should work, but they must be 16-bit.
+ *
  * Sync mode will automatically lock tempo with the internal clock.
+ *
+ * Use AuxButton (X or Y) for Play/Stop.
  *
  */
 
@@ -74,6 +80,10 @@ public:
       FileMatchTempo();
     else
       FileRate(0.01f * playrate + playrate_cv.InF(0.0f));
+
+    start_beat_mod = constrain(start_beat + start_beat_cv.SemitoneIn(), 0, 999);
+    if (wavplayer_ready)
+      wavplayer.setBeatStart(start_beat_mod);
 
     if (HS::clock_m.EndOfBeat() && FileIsPlaying()) {
       if (loop_length && loop_on) {
@@ -165,16 +175,7 @@ public:
     }
 
     y += 10;
-    if (cursor == FILTER_PARAM) {
-      if (EditMode()) {
-        if (djfilter > 0) gfxPrint(36, y, "HPF");
-        else if (djfilter < 0) gfxPrint(36, y, "LPF");
-        else gfxPrint(40, y, "X");
-      } else {
-        gfxIcon(49, y, RIGHT_ICON);
-        gfxIcon(56, y, (filter_on) ? SLEW_ICON : PhzIcons::tuner);
-      }
-    } else if (FileIsPlaying()) {
+    if (FileIsPlaying()) {
       uint32_t tmilli = GetFileTime();
       uint32_t tsec = tmilli / 1000;
       uint32_t tmin = tsec / 60;
@@ -184,10 +185,21 @@ public:
       gfxPos(1, y);
       graphics.printf("%02lu:%02lu.%03lu", tmin, tsec, tmilli);
     }
+    if (cursor == FILTER_PARAM) {
+      if (EditMode()) {
+        const int x = 45;
+        gfxClear(x, y, 18, 10);
+        if (djfilter > 0) gfxPrint(x, y, "HPF");
+        else if (djfilter < 0) gfxPrint(x, y, "LPF");
+        else gfxPrint(x+6, y, "X");
+      } else {
+        gfxIcon(49, y, RIGHT_ICON, true);
+        gfxIcon(56, y, (filter_on) ? SLEW_ICON : PhzIcons::tuner, true);
+      }
+    }
 
     y += 10;
-    gfxPrint(1, y, "Lvl:");
-    gfxStartCursor();
+    gfxStartCursor(1, y);
     graphics.printf("%3ddB", level);
     gfxEndCursor(cursor == LEVEL);
     gfxStartCursor();
@@ -195,6 +207,7 @@ public:
     gfxEndCursor(cursor == LEVEL_CV, false, level_cv.InputName());
 
     y += 10;
+
     if (tempo_sync) {
       gfxPrint(1, y, "Sync:");
     } else {
@@ -208,14 +221,26 @@ public:
     gfxEndCursor(cursor == PLAYRATE_CV, false, playrate_cv.InputName());
 
     y += 10;
-    gfxPrint(1, y, "Loop:");
-    gfxStartCursor();
-    graphics.printf("%2u", loop_length);
-    gfxEndCursor(cursor == LOOP_LENGTH);
+    if (cursor <= START_BEAT_CV) {
+      gfxIcon(1, y, PULSES_ICON);
+      gfxStartCursor(11, y);
+      graphics.printf("%3u", ((cursor==START_BEAT && EditMode())?start_beat:start_beat_mod) + 1);
+      gfxEndCursor(cursor == START_BEAT);
+      if (start_beat_mod != start_beat) gfxIcon(30, y, CV_ICON);
 
-    gfxIcon(52, y, loop_on ? CHECK_ON_ICON : CHECK_OFF_ICON);
-    if (cursor == LOOP_ENABLE)
-      gfxFrame(51, y-1, 10, 10);
+      gfxStartCursor(40, y);
+      gfxPrint(start_beat_cv);
+      gfxEndCursor(cursor == START_BEAT_CV, false, start_beat_cv.InputName());
+    } else {
+      gfxIcon(1, y, LOOP_ICON);
+      gfxStartCursor(10, y);
+      graphics.printf("%2u", loop_length);
+      gfxEndCursor(cursor == LOOP_LENGTH);
+
+      gfxIcon(50, y, loop_on ? CHECK_ON_ICON : CHECK_OFF_ICON);
+      if (cursor == LOOP_ENABLE)
+        gfxIcon(42, y, RIGHT_ICON, true);
+    }
 
     gfxDisplayInputMapEditor();
   }
@@ -234,7 +259,8 @@ public:
           IndexedInput(PLAYSTOP_GATE_CV, playstop_cv),
           IndexedInput(FILTER_CV, djfilter_cv),
           IndexedInput(LEVEL_CV, level_cv),
-          IndexedInput(PLAYRATE_CV, playrate_cv)
+          IndexedInput(PLAYRATE_CV, playrate_cv),
+          IndexedInput(START_BEAT_CV, start_beat_cv)
     )) return;
 
     if (LOOP_ENABLE == cursor) {
@@ -275,6 +301,12 @@ public:
       case PLAYRATE_CV:
         playrate_cv.ChangeSource(direction);
         break;
+      case START_BEAT:
+        start_beat = constrain(start_beat + direction, 0, 999);
+        break;
+      case START_BEAT_CV:
+        start_beat_cv.ChangeSource(direction);
+        break;
       case LOOP_LENGTH:
         loop_length = constrain(loop_length + direction, 0, 128);
         break;
@@ -287,12 +319,14 @@ public:
     uint8_t filenum = (uint8_t)wavplayer_select;
     data[0] = PackPackables(level, level_cv, int8_t(playrate), playrate_cv, filenum, djfilter);
     data[1] = PackPackables(playrate, djfilter_cv, playstop_cv, loop_length);
+    data[2] = PackPackables(start_beat, start_beat_cv);
   }
   void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
     int8_t old_playrate;
     uint8_t filenum;
     UnpackPackables(data[0], level, level_cv, old_playrate, playrate_cv, filenum, djfilter);
     UnpackPackables(data[1], playrate, djfilter_cv, playstop_cv, loop_length);
+    UnpackPackables(data[2], start_beat, start_beat_cv);
     if (playrate == 0) playrate = old_playrate;
     if (loop_length == 0) loop_length = 8;
     ChangeToFile(filenum);
@@ -318,6 +352,8 @@ private:
     LEVEL_CV,
     PLAYRATE,
     PLAYRATE_CV,
+    START_BEAT,
+    START_BEAT_CV,
     LOOP_LENGTH,
     LOOP_ENABLE,
 
@@ -356,10 +392,14 @@ private:
   bool wavplayer_playtrig = false;
   bool wavplayer_ready = false;
   uint16_t wavplayer_select = 1;
+  uint16_t start_beat = 0;
+  uint16_t start_beat_mod = 0;
   uint8_t loop_length = 8;
   int8_t loop_count = 0;
   bool loop_on = false;
   bool syncloopstart = false;
+
+  CVInputMap start_beat_cv;
 
   // SD file player functions
   void FileLoad() {
@@ -379,7 +419,7 @@ private:
   void ToggleFilePlayer() {
     if (wavplayer.isPlaying()) {
       wavplayer.stop();
-      wavplayer.setPlayStart(play_start_sample);
+      //wavplayer.setPlayStart(play_start_sample);
       loop_on = false;
     } else if (SDcard_Ready) {
       StartPlaying();
@@ -396,7 +436,7 @@ private:
       loop_on = true;
       loop_count = 0;
     } else {
-      wavplayer.setPlayStart(play_start_sample);
+      //wavplayer.setPlayStart(play_start_sample);
       loop_on = false;
     }
   }
