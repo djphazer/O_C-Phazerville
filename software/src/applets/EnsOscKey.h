@@ -36,6 +36,7 @@ public:
     const char* applet_name() { // Maximum 10 characters
         return "EnsOscKey";
     }
+    const uint8_t* applet_icon() { return PhzIcons::scaleDuet; }
 
     void Start() {
         cursor = 0;

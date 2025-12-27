@@ -47,6 +47,7 @@ public:
   const char* applet_name() {
     return "Relabi";
   }
+  const uint8_t* applet_icon() { return PhzIcons::ebb_n_Flow; }
 
   void Start() {
     freqKnob[0] = 30; // 3 Hz

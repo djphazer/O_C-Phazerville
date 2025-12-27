@@ -1,8 +1,6 @@
 #pragma once
 // -- This entire header is meant to be included once in HSIOFrame.h
 
-#include "bjorklund.h"
-#include "util/clkdivmult.h"
 const int NUM_CV_INPUTS = CVMAP_MAX + 1;
 //const int NUM_CV_INPUTS = ADC_CHANNEL_LAST * 2 + 1;
 // We *could* reuse HS::input_quant for inputs, but easier to just do it

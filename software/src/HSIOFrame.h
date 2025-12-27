@@ -20,6 +20,8 @@
 #include "HSicons.h"
 #include "HSClockManager.h"
 #include "util/util_macros.h"
+#include "util/clkdivmult.h"
+#include "src/extern/bjorklund.h"
 
 namespace HS {
 

@@ -506,11 +506,11 @@ void gfxPrintIcon(const uint8_t *data, int16_t w) {
     gfxIcon(graphics.getPrintPosX(), graphics.getPrintPosY(), data);
     gfxPos(graphics.getPrintPosX() + w, graphics.getPrintPosY());
 }
-void gfxPrint(HS::DigitalInputMap &map) {
+void gfxPrint(const HS::DigitalInputMap &map) {
   gfxPrintIcon(map.Icon());
   if (map.Gate()) gfxInvert(graphics.getPrintPosX()-8, graphics.getPrintPosY(), 8, 8);
 }
-void gfxPrint(HS::CVInputMap &map) {
+void gfxPrint(const HS::CVInputMap &map) {
   gfxPrintIcon(map.Icon());
   const int xpos = graphics.getPrintPosX() - 1;
   const int ypos = graphics.getPrintPosY() + 4;
