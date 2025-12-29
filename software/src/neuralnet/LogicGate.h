@@ -24,7 +24,7 @@
 // 0-7 are inputs, 8-13 are neuron outputs, 14 is ON and 15 is OFF
 #define LG_MAX_SOURCE 15
 
-enum LogicGateType {
+enum LogicGateType : uint8_t {
     NONE,
 
     // Unary
@@ -51,9 +51,9 @@ const char* const gate_name[12] = {
 
 const char* const source_name[16] = {
     "Dig1", "Dig2", "Dig3", "Dig4",
-	"CV 1", "CV 2", "CV 3", "CV 4",
+    "CV 1", "CV 2", "CV 3", "CV 4",
     "Neu1", "Neu2", "Neu3", "Neu4", "Neu5", "Neu6",
-	"ON", "OFF"
+    "ON", "OFF"
 };
 
 const uint8_t NN_LOGIC_ICON[12][16] = {
@@ -81,16 +81,16 @@ public:
     uint16_t source_state; // Source bitfield, for display purposes
 
     // General attributes
-    int type;
-    int source1;
-    int source2;
-    int source3;
+    uint8_t type;
+    uint8_t source1;
+    uint8_t source2;
+    uint8_t source3;
 
     // Threshold Logic Neuron attributes
-    int weight1;
-    int weight2;
-    int weight3;
-    int threshold;
+    int8_t weight1;
+    int8_t weight2;
+    int8_t weight3;
+    int8_t threshold;
 
     /* Set the state based on gate type and source valutes */
     bool Calculate(uint16_t source_state_) {
@@ -117,7 +117,7 @@ public:
         return state;
     }
 
-    bool SourceValue(byte s) {
+    bool SourceValue(uint8_t s) {
         bool v = 0;
         if (s == 0) v = source_value(source1);
         if (s == 1) v = source_value(source2);
@@ -127,8 +127,8 @@ public:
 
 
     /* How many cursor positions does this LogicGate use? */
-    byte NumParam() {
-        byte max;
+    uint8_t NumParam() {
+        uint8_t max;
         switch (type) {
             case LogicGateType::NONE:
                 max = 1; // When there's no type, the only parameter is the type
@@ -148,7 +148,7 @@ public:
         return max;
     }
 
-    void UpdateValue(byte cursor, int direction) {
+    void UpdateValue(uint8_t cursor, int direction) {
         if (cursor == 0) {
             type = constrain(type + direction, LogicGateType::NONE, LogicGateType::TL_NEURON);
             state = 0; // Reset when changing type
@@ -170,11 +170,12 @@ public:
         }
     }
 
-    void PrintParamNameAt(byte x, byte y, byte cursor) {
+    void PrintParamNameAt(uint8_t x, uint8_t y, uint8_t cursor) {
         if (cursor < 4) { // Other cursors are handled in the left-hand pane
-            graphics.setPrintPos(x, y);
-            if (cursor == 0) graphics.print("Type");
-            if (cursor > 0 && cursor < 4) {
+            gfxPos(x, y);
+            if (cursor == 0)
+              graphics.print("Type");
+            else {
                 if (type == LogicGateType::D_FLIPFLOP) {
                     if (cursor == 1) graphics.print("Data");
                     if (cursor == 2) graphics.print("Clock");
@@ -194,7 +195,7 @@ public:
         }
     }
 
-    void PrintValueAt(byte x, byte y, byte cursor) {
+    void PrintValueAt(uint8_t x, uint8_t y, uint8_t cursor) {
         if (cursor < 4) {
             graphics.setPrintPos(x, y);
             if (cursor == 0) graphics.print(gate_name[type]);
@@ -204,15 +205,14 @@ public:
         }
     }
 
-    void DrawSmallAt(byte x, byte y, bool show_name) {
+    void DrawSmallAt(uint8_t x, uint8_t y, bool show_name) {
         if (show_name) {
-            graphics.setPrintPos(x, y);
-            graphics.print(gate_name[type]);
+            gfxPrint(x, y, gate_name[type]);
         }
         graphics.drawBitmap8(x + 4, y + 10, 16, NN_LOGIC_ICON[type]);
     }
 
-    void DrawInputs(byte n) {
+    void DrawInputs(uint8_t n) {
         if (type > LogicGateType::NONE) draw_line_from(source1, n);
         if (type >= LogicGateType::AND) draw_line_from(source2, n);
         if (type == LogicGateType::TL_NEURON) draw_line_from(source3, n);
@@ -257,11 +257,11 @@ private:
         return (v > threshold);
     }
 
-    void draw_line_from(byte source, byte n) {
-        byte fx;
-        byte fy;
-        byte tx = ((n / 2) * 32) + 28;
-        byte ty = ((n % 2) * 24) + 29;
+    void draw_line_from(uint8_t source, uint8_t n) {
+        uint8_t fx;
+        uint8_t fy;
+        uint8_t tx = ((n / 2) * 32) + 28;
+        uint8_t ty = ((n % 2) * 24) + 29;
         if (source < 8) {
             // Physical input sources
             fx = ((source / 4) * 6) + 4;
@@ -274,7 +274,7 @@ private:
             fy = ((source % 2) * 24) + 29;
             graphics.drawLine(fx, fy, tx, ty);
         } else {
-        		// 14 and 15 are TRUE and FALSE and are not drawn
+            // 14 and 15 are TRUE and FALSE and are not drawn
         }
     }
 };
