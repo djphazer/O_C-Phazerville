@@ -42,7 +42,7 @@ public:
     void Start() {
         for (int ch = 0; ch < 16; ch++) output_neuron[ch] = ch % 4;
     }
-    
+
     void Resume() {
         LoadFromEEPROMStage();
     }
@@ -52,26 +52,26 @@ public:
         uint16_t tmp_source_state = source_state; // Set temporary state for this cycle
 
         // Check inputs
-        for (byte i = 0; i < 8; i++)
+        for (uint8_t i = 0; i < 8; i++)
         {
             bool set = (i < 4) ? Gate(i) : (In(i - 4) > HSAPPLICATION_3V);
             tmp_source_state = SetSource(tmp_source_state, i, set);
             input_state[i] = set; // For display
         }
-        
+
         // Process neurons
-        for (byte n = 0; n < 6; n++)
+        for (uint8_t n = 0; n < 6; n++)
         {
-            byte ix = (setup * 6) + n;
+            uint8_t ix = (setup * 6) + n;
             bool set = neuron[ix].Calculate(tmp_source_state);
             tmp_source_state = SetSource(tmp_source_state, 8 + n, set);
         }
-        
+
         // Set outputs based on assigned neuron's last state
-        for (byte o = 0; o < 4; o++)
+        for (uint8_t o = 0; o < 4; o++)
         {
-            byte ix = (setup * 4) + o;
-            byte n = output_neuron[ix] + (setup * 6);
+            uint8_t ix = (setup * 4) + o;
+            uint8_t n = output_neuron[ix] + (setup * 6);
             bool set = neuron[n].state;
             Out(o, set * HSAPPLICATION_5V);
         }
@@ -89,13 +89,13 @@ public:
 
     /* Send the current setup via SysEx */
     void OnSendSysEx() {
-        byte V[39];
+        uint8_t V[39];
         int ix = 0;
 
         ix = 0;
-        for (byte n = 0; n < 6; n++)
+        for (uint8_t n = 0; n < 6; n++)
         {
-            byte ni = (setup * 6) + n;
+            uint8_t ni = (setup * 6) + n;
 
             // Encode a neuron
             V[ix++] = (neuron[ni].type << 4) | neuron[ni].source1;
@@ -107,7 +107,7 @@ public:
         }
 
         // Encode the output assignments
-        byte o = (setup * 4);
+        uint8_t o = (setup * 4);
         V[ix++] = (output_neuron[o] << 4) | output_neuron[o + 1];
         V[ix++] = (output_neuron[o + 2] << 4) | output_neuron[o + 3];
 
@@ -120,15 +120,15 @@ public:
     void OnReceiveSysEx() {
         // Since only one Setup is coming, use the currently-selected setup to determine
         // where to stash it.
-        byte V[39];
+        uint8_t V[39];
         if (ExtractSysExData(V, 'N')) {
             int ix = 0;
-            byte b = 0;
+            uint8_t b = 0;
 
             // Decode neurons
-            for (byte n = 0; n < 6; n++)
+            for (uint8_t n = 0; n < 6; n++)
             {
-                byte ni = (setup * 6) + n;
+                uint8_t ni = (setup * 6) + n;
                 b = V[ix++]; // Type and source 1
                 neuron[ni].type = (b >> 4) & 0x0f;
                 neuron[ni].source1 = b & 0x0f;
@@ -144,7 +144,7 @@ public:
             }
 
             // Decode output assignments
-            byte o = (setup * 4);
+            uint8_t o = (setup * 4);
             b = V[ix++]; // Output 1 and 2
             output_neuron[o] = (b >> 4) & 0x0f;
             output_neuron[o + 1] = b & 0x0f;
@@ -160,10 +160,10 @@ public:
         if (source == target) {
             OnSendSysEx();
         } else {
-            for (byte n = 0; n < 6; n++)
+            for (uint8_t n = 0; n < 6; n++)
                 memcpy(&neuron[(target * 6) + n], &neuron[(source * 6) + n], sizeof(neuron[(source * 6) + n]));
 
-            for (byte o = 0; o < 4; o++)
+            for (uint8_t o = 0; o < 4; o++)
                 output_neuron[(target * 4) + 0] = output_neuron[(source * 4) + o];
 
             setup = target;
@@ -190,7 +190,7 @@ public:
         }
         cursor++;
         if (selected < 6) {
-            byte ix = (setup * 6) + selected;
+            uint8_t ix = (setup * 6) + selected;
             if (cursor >= neuron[ix].NumParam()) cursor = 0;
         } else {
             if (cursor >= 4) cursor = 0;
@@ -228,28 +228,28 @@ public:
 
     void OnRightEncoderMove(int direction) {
         if (selected < 6) {
-            byte ix = (setup * 6) + selected;
+            uint8_t ix = (setup * 6) + selected;
             neuron[ix].UpdateValue(cursor, direction);
         } else {
-            byte ix = (setup * 4) + cursor;
+            uint8_t ix = (setup * 4) + cursor;
             output_neuron[ix] = constrain(output_neuron[ix] + direction, 0, 5);
         }
     }
 
 private:
     // Screen and edit states
-    byte cursor = 0; // Cursor on the neuron select screen
-    int selected = 0; // 0-5, which neuron is currently selected
-    int setup = 0; // 0-3, which set is currently selectd
+    uint8_t cursor = 0; // Cursor on the neuron select screen
+    uint8_t selected = 0; // 0-5, which neuron is currently selected
+    uint8_t setup = 0; // 0-3, which set is currently selectd
     bool screen = 0; // 0 = selector screen, 1 = edit screen
     bool copy_mode = 0; // Copy mode on/off
     bool all_connections = 0; // Connections for all neurons shown instead of just selected
-    int copy_setup_target; // Which setup is being copied TO?
-    
+    uint8_t copy_setup_target; // Which setup is being copied TO?
+
     LogicGate neuron[24]; // Four sets of six neurons
-    int output_neuron[16]; // Four sets of four output assignments
+    uint8_t output_neuron[16]; // Four sets of four output assignments
     bool input_state[8];
-    
+
     // Source state is passed to each neuron for use in its logic gate calculation.
     // The value is a bitfield, with each bit indicating the value of a source's most-
     // recent result:
@@ -265,23 +265,23 @@ private:
         if (screen) DrawEditScreen();
         else DrawSelectorScreen();
     }
-    
+
     void DrawSelectorScreen() {
         // Draw the neurons
-        byte offset_ix = setup * 6;
-        for (byte n = 0; n < 6; n++)
+        uint8_t offset_ix = setup * 6;
+        for (uint8_t n = 0; n < 6; n++)
         {
-            byte ix = offset_ix + n;
+            uint8_t ix = offset_ix + n;
 
             // Neurons are arranged in a 3x2 grid, top to bottom, left to right, like this:
             //     135
             //     246
-            byte cell_x = n / 2;
-            byte cell_y = n % 2;
-            byte x = (cell_x * 32) + 24;
-            byte y = (cell_y * 24) + 16;
+            uint8_t cell_x = n / 2;
+            uint8_t cell_y = n % 2;
+            uint8_t x = (cell_x * 32) + 24;
+            uint8_t y = (cell_y * 24) + 16;
             neuron[ix].DrawSmallAt(x + 1, y, (selected == n && CursorBlink()));
-            
+
             if (selected == n || all_connections) {
                 neuron[ix].DrawInputs(n);
             }
@@ -289,69 +289,69 @@ private:
 
         // Draw the inputs
         gfxPrint(0, 16, "DV");
-        for (byte i = 0; i < 8; i++)
+        for (uint8_t i = 0; i < 8; i++)
         {
             // Inputs are arranged in a 2x4 grid, top to bottom, left to right, like this:
             //     15
             //     26
             //     37
             //     48
-            byte cell_x = i / 4;
-            byte cell_y = i % 4;
-            byte x = (cell_x * 6);
-            byte y = (cell_y * 10) + 24;
+            uint8_t cell_x = i / 4;
+            uint8_t cell_y = i % 4;
+            uint8_t x = (cell_x * 6);
+            uint8_t y = (cell_y * 10) + 24;
             gfxPrint(x, y, cell_y + 1);
-            
+
             if (input_state[i]) gfxInvert(x, y, 6, 8);
         }
-        
+
         // Draw outputs
-        byte x = 120;
-        for (byte o = 0; o < 4; o++)
+        uint8_t x = 120;
+        for (uint8_t o = 0; o < 4; o++)
         {
             // Outputs are arranged top to bottom
-            byte y = (o * 12) + 16;
+            uint8_t y = (o * 12) + 16;
             char out_name[2] = {static_cast<char>(o + 'A'), '\0'};
             gfxPrint(x, y, out_name);
-            
+
             if (ViewOut(o)) gfxInvert(x, y, 6, 8);
 
             // Draw line to the output if selected
-            byte ix = (setup * 4) + o;
+            uint8_t ix = (setup * 4) + o;
             if (output_neuron[ix] == selected || all_connections) {
                 if (neuron[(setup * 6) + output_neuron[ix]].type > LogicGateType::NONE) {
-                    byte fx = ((output_neuron[ix] / 2) * 32) + 45;
-                    byte fy = ((output_neuron[ix] % 2) * 24) + 29;
-                    byte ty = (o * 12) + 20;
+                    uint8_t fx = ((output_neuron[ix] / 2) * 32) + 45;
+                    uint8_t fy = ((output_neuron[ix] % 2) * 24) + 29;
+                    uint8_t ty = (o * 12) + 20;
                     gfxDottedLine(fx, fy, 120, ty, 4);
                 }
             }
         }
         if (selected == 6 && CursorBlink()) gfxLine(118, 16, 118, 60);
     }
-    
+
     void DrawEditScreen() {
         if (selected < 6) {
             // Draw the neuron header
             gfxPrint(0, 15, "#");
             gfxPrint(selected + 1);
-            for (byte n = 0; n < 6; n++)
+            for (uint8_t n = 0; n < 6; n++)
             {
-                byte cell_x = n / 2;
-                byte cell_y = n % 2;
-                byte x = (cell_x * 8) + 40;
-                byte y = (cell_y * 5) + 15;
+                uint8_t cell_x = n / 2;
+                uint8_t cell_y = n % 2;
+                uint8_t x = (cell_x * 8) + 40;
+                uint8_t y = (cell_y * 5) + 15;
                 if (n == selected) gfxRect(x, y, 6, 4);
                 else gfxFrame(x, y, 6, 4);
             }
 
             // Draw the editor for a neuron
-            byte ix = (setup * 6) + selected;
-            byte p = neuron[ix].NumParam(); // Number of parameters for this neuron
-            for (byte c = 0; c < p; c++)
+            uint8_t ix = (setup * 6) + selected;
+            uint8_t p = neuron[ix].NumParam(); // Number of parameters for this neuron
+            for (uint8_t c = 0; c < p; c++)
             {
                 if (c < 4) { // This is the right-hand pane, so only show first four parameters
-                    byte y = (c * 10) + 25;
+                    uint8_t y = (c * 10) + 25;
                     neuron[ix].PrintParamNameAt(0, y, c);
                     neuron[ix].PrintValueAt(38, y, c);
                     if (c == cursor) gfxCursor(39, y + 8, 23);
@@ -361,14 +361,14 @@ private:
         } else {
             // Draw the Output Assign editor
             gfxPrint(0, 15, "Assign Outputs");
-            for (byte o = 0; o < 4; o++)
+            for (uint8_t o = 0; o < 4; o++)
             {
-                byte y = (o * 10) + 25;
+                uint8_t y = (o * 10) + 25;
                 gfxPrint(0, y, "Output ");
                 char out_name[2] = {static_cast<char>(o + 'A'), '\0'};
                 gfxPrint(out_name);
 
-                byte ix = (setup * 4) + o;
+                uint8_t ix = (setup * 4) + o;
                 gfxPrint(64, y, "Neuron ");
                 gfxPrint(output_neuron[ix] + 1);
 
@@ -380,42 +380,35 @@ private:
     void DrawCopyScreen() {
         gfxHeader("Copy");
 
-        graphics.setPrintPos(8, 28);
-        graphics.print("Setup ");
-        graphics.print(setup + 1);
-        graphics.print(" -");
-        graphics.setPrintPos(58, 28);
-        graphics.print("> ");
+        gfxPos(8, 28);
+        graphics.printf("Setup %d -", setup + 1);
+
+        gfxPrint(58, 28, "> ");
         if (setup == copy_setup_target) graphics.print("SysEx");
         else {
-            graphics.print("Setup ");
-            graphics.print(copy_setup_target + 1);
+            graphics.printf("Setup %d", copy_setup_target + 1);
         }
 
-        graphics.setPrintPos(0, 55);
-        graphics.print("[CANCEL]");
-
-        graphics.setPrintPos(90, 55);
-        graphics.print(setup == copy_setup_target ? "[DUMP]" : "[COPY]");
+        gfxPrint(0, 55, "[CANCEL]");
+        gfxPrint(90, 55, setup == copy_setup_target ? "[DUMP]" : "[COPY]");
     }
 
-    void LoadSetup(byte setup_) {
-            cursor = 0;
-            if (selected < 6) selected = 0;
-            setup = setup_;
+    void LoadSetup(uint8_t setup_) {
+        cursor = 0;
+        if (selected < 6) selected = 0;
+        setup = setup_;
     }
-    
-    uint16_t SetSource(uint16_t source_state, byte b, bool v)
-    {
+
+    uint16_t SetSource(uint16_t source_state, uint8_t b, bool v) {
         if (v) source_state |= (0x01 << b);
         else source_state &= ~(0x01 << b);
         return source_state;
     }
-    
+
     /* The system settings are just bytes. Move them into the instance variables here */
     void LoadFromEEPROMStage() {
-        byte ix = 0;
-        for (byte n = 0; n < 24; n++)
+        uint8_t ix = 0;
+        for (uint8_t n = 0; n < 24; n++)
         {
             neuron[n].type = values_[ix++];
             neuron[n].source1 = values_[ix++];
@@ -432,13 +425,13 @@ private:
             if (neuron[n].weight3 == -128) neuron[n].weight3 = 0;
             if (neuron[n].threshold == -128) neuron[n].threshold = 0;
         }
-        for (byte o = 0; o < 16; o++) output_neuron[o] = values_[ix++];
-            
+        for (uint8_t o = 0; o < 16; o++) output_neuron[o] = values_[ix++];
+
     }
-    
+
     void SaveToEEPROMStage() {
-        byte ix = 0;
-        for (byte n = 0; n < 24; n++)
+        uint8_t ix = 0;
+        for (uint8_t n = 0; n < 24; n++)
         {
             values_[ix++] = neuron[n].type;
             values_[ix++] = neuron[n].source1;
@@ -449,21 +442,21 @@ private:
             values_[ix++] = neuron[n].weight3 + 128;
             values_[ix++] = neuron[n].threshold + 128;
         }
-        for (byte o = 0; o < 16; o++) values_[ix++] = output_neuron[o];
+        for (uint8_t o = 0; o < 16; o++) values_[ix++] = output_neuron[o];
     }
 
-    void DrawLarge(byte ix) {
+    void DrawLarge(uint8_t ix) {
         if (neuron[ix].type == LogicGateType::TL_NEURON) DrawTLNeuron(ix);
         else DrawLogicGate(ix);
     }
-    
+
     //////// LOGIC GATE EDIT SCREEN REPRESENTATIONS
-    void DrawTLNeuron(byte ix) {
+    void DrawTLNeuron(uint8_t ix) {
         // Draw Dendrites
         int dendrite_weight[3] = {neuron[ix].weight1, neuron[ix].weight2, neuron[ix].weight3};
         for (int d = 0; d < 3; d++)
         {
-            byte indent = d == 1 ? 4 : 0;
+            uint8_t indent = d == 1 ? 4 : 0;
             int weight = dendrite_weight[d];
             gfxCircle(73 + indent, 22 + (16 * d), 8); // Dendrite
             gfxPrint((weight < 0 ? 66 : 72) + indent , 19 + (16 * d), weight);
@@ -478,15 +471,15 @@ private:
         if (threshold < 0) x -= 5; // Pull back if a sign is necessary
         gfxPrint(x, 34, threshold);
         if (cursor == 7 && CursorBlink()) gfxCircle(112, 38, 11);
-        
+
         int r = 0;
         if (neuron[ix].state) {
-        		if (random(1, 100) > 60) r = random(0, 3) - 1;
+            if (random(1, 100) > 60) r = random(0, 3) - 1;
         }
         gfxCircle(112, 38, 12 + (r * 2));
     }
-    
-    void DrawLogicGate(byte ix) {
+
+    void DrawLogicGate(uint8_t ix) {
         if (neuron[ix].type != LogicGateType::NONE) {
             DrawInputs(ix);
             DrawBody(ix);
@@ -495,7 +488,7 @@ private:
         }
     }
 
-    void DrawInputs(byte ix) {
+    void DrawInputs(uint8_t ix) {
         if (neuron[ix].type == LogicGateType::NOT) {
             gfxDottedLine(64, 36, 76, 36, neuron[ix].SourceValue(0) ? 1 : 3);
         } else {
@@ -504,15 +497,16 @@ private:
         }
     }
 
-    void DrawBody(byte ix) {
-        if (neuron[ix].type == LogicGateType::NOT) {
+    void DrawBody(uint8_t ix) {
+      switch(neuron[ix].type) {
+        case LogicGateType::NOT:
             gfxLine(76, 20, 76, 52);
             gfxLine(76, 20, 108, 36);
             gfxLine(76, 52, 108, 36);
-        }
-        if (neuron[ix].type == LogicGateType::AND
-         || neuron[ix].type == LogicGateType::NAND
-        ) {
+            break;
+
+        case LogicGateType::AND:
+        case LogicGateType::NAND:
             gfxLine(76, 20, 76, 52);
             gfxLine(76, 20, 96, 20);
             gfxLine(96, 20, 103, 26);
@@ -521,27 +515,24 @@ private:
             gfxLine(76, 52, 96, 52);
             gfxLine(96, 52, 103, 46);
             gfxLine(103, 46, 108, 40);
-        }
-        if (neuron[ix].type == LogicGateType::OR
-         || neuron[ix].type == LogicGateType::NOR
-         || neuron[ix].type == LogicGateType::XOR
-         || neuron[ix].type == LogicGateType::XNOR
-        ) {
+            break;
+
+        case LogicGateType::XOR:
+        case LogicGateType::XNOR:
+            gfxLine(70, 20, 74, 36);
+            gfxLine(70, 52, 74, 36);
+        case LogicGateType::OR:
+        case LogicGateType::NOR:
             gfxLine(76, 20, 96, 20);
             gfxLine(96, 20, 108, 36);
             gfxLine(76, 52, 96, 52);
             gfxLine(96, 52, 108, 36);
             gfxLine(76, 20, 80, 36);
             gfxLine(76, 52, 80, 36);
+            break;
 
-            if (neuron[ix].type == LogicGateType::XOR
-             || neuron[ix].type == LogicGateType::XNOR
-            ) {
-                gfxLine(70, 20, 74, 36);
-                gfxLine(70, 52, 74, 36);
-            }
-        }
-        if (neuron[ix].type == LogicGateType::D_FLIPFLOP || neuron[ix].type == LogicGateType::T_FLIPFLOP) {
+        case LogicGateType::D_FLIPFLOP:
+        case LogicGateType::T_FLIPFLOP:
             gfxLine(76, 20, 76, 52);
             gfxLine(76, 20, 108, 20);
             gfxLine(76, 52, 108, 52);
@@ -549,8 +540,9 @@ private:
             gfxLine(76, 40, 84, 44);
             gfxLine(76, 48, 84, 44);
             gfxPrint(78, 25, neuron[ix].type == LogicGateType::D_FLIPFLOP ? "D" : "T");
-        }
-        if (neuron[ix].type == LogicGateType::LATCH) {
+            break;
+
+        case LogicGateType::LATCH:
             gfxLine(76, 28, 84, 28); // Lines to NOR gates
             gfxLine(76, 44, 84, 44);
             gfxBitmap(84, 27, 16, NN_LOGIC_ICON[6]);
@@ -559,11 +551,11 @@ private:
             gfxLine(108, 30, 108, 36);
             gfxLine(102, 30, 84, 40); // Line from Reset to Set in
             gfxLine(100, 42, 84, 32); // Line from Set to Reset in
-
-        }
+            break;
+      }
     }
 
-    void DrawNegation(byte ix) {
+    void DrawNegation(uint8_t ix) {
         if (neuron[ix].type == LogicGateType::NOT
          || neuron[ix].type == LogicGateType::NAND
          || neuron[ix].type == LogicGateType::NOR
@@ -575,12 +567,12 @@ private:
         }
     }
 
-    void DrawOutput(byte ix) {
-		int y = 0;
-    		if (neuron[ix].state) {
-    			// Shimmer
-    			if (random(1, 100) > 60) y = random(0, 3) - 1;
-    		}
+    void DrawOutput(uint8_t ix) {
+        int y = 0;
+        if (neuron[ix].state) {
+          // Shimmer
+          if (random(1, 100) > 60) y = random(0, 3) - 1;
+        }
         gfxDottedLine(116, 36 + (y * 2), 127, 36 + (y * 2), neuron[ix].state ? 1 : 3);
     }
 };
