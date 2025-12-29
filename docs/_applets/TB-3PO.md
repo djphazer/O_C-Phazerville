@@ -26,6 +26,8 @@ layout: default
 * Quantizer select
   - AuxButton for popup editor
 * Pattern Length
+  - AuxButton to disable pitch glides and tied notes
+* Hold pitch
 
 ## Seed
 The seed parameter controls the random pattern generation. This is done deterministically, which means for the same seed you'll get the same patterns, based on the other controls.
@@ -72,6 +74,11 @@ While this parameter is highlighted for editing, press the AuxButton (select but
 ## Pattern Length
 Sets the length of the pattern from 1-32 steps. This doesn't alter the pattern apart from setting the loop point.
 
+## Hold pitch
+When enabled, the pitch CV is held at the last gated step's pitch when steps are not gated. When a step is gated, the pitch updates to that step's pitch. When disabled, the pitch updates on every step (or glides when slides are active).
+
+Toggle hold pitch mode by turning the encoder or pressing the AuxButton (select button) when the parameter is selected.
+
 ## Step Settings
 Like on the TB-303, each step can have Gate, Accent, Glide, +octave or -octave set on it. TB-3PO chooses these values randomly based on the seed and some 303-like rules. Gates emulate the TB-303 by going high for 50% of the detected clock rate, unless they have slide set. In this case they stay high through the next step, when an exponential, fixed-time glide to the next step's pitch is engaged. Accent steps output the gate at 5v instead of 3v, which may be useful with a secondary VCA to punch them a bit.
 
@@ -86,6 +93,8 @@ Like on the TB-303, each step can have Gate, Accent, Glide, +octave or -octave s
   - A note-with-arrow icon indicates a step that has Slide active
   - A wiggly waveform icon shows that an active exponential pitch bend is occurring to reach the current step's pitch
   - UP and DOWN arrows indicate if the current step is transposed up or down by one octave, respectively
+  - "-" Indicates that hold pitch mode is active and the current step is not gated, so the pitch is being held from the previous gated step
+- An "H" indicator shows hold pitch mode. When hold pitch is active, the "H" is framed 
 
 ## Credits
 Authored by Logarhythm1, with various modifications by djphazer
