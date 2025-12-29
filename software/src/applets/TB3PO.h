@@ -41,9 +41,9 @@ class TB_3PO: public HemisphereApplet {
 
     enum TB3POCursor {
       LOCK_SEED, DIGIT1, DIGIT2, DIGIT3, DIGIT4,
-      DENSITY, QSELECT, TRANS_MODE, LENGTH,
+      DENSITY, QSELECT, TRANS_MODE, LENGTH, HOLD_PITCH,
 
-      MAX_CURSOR = LENGTH
+      MAX_CURSOR = HOLD_PITCH
     };
 
     const char * applet_name() { // Maximum 10 characters
@@ -120,7 +120,8 @@ class TB_3PO: public HemisphereApplet {
         slide_start_cv = curr_pitch_cv;
 
         slide_end_cv = get_pitch_for_step(step);
-      } else {
+      } else if (!hold_pitch || step_is_gated(step)) {
+        // No glide but new pitch
         curr_pitch_cv = get_pitch_for_step(step);
         slide_start_cv = curr_pitch_cv;
         slide_end_cv = curr_pitch_cv;
@@ -196,6 +197,9 @@ class TB_3PO: public HemisphereApplet {
     if (cursor == LENGTH) {
       no_slides ^= 1;
     }
+    if (cursor == HOLD_PITCH) {
+      hold_pitch ^= 1;
+    }
     CancelEdit();
   }
 
@@ -249,6 +253,9 @@ class TB_3PO: public HemisphereApplet {
     case LENGTH: // pattern length
       num_steps = constrain(num_steps + direction, 1, 32);
       break;
+    case HOLD_PITCH:
+      hold_pitch ^= 1;
+      break;
     } //switch
   } //OnEncoderMove
 
@@ -270,6 +277,8 @@ class TB_3PO: public HemisphereApplet {
 
     Pack(data, PackLocation { 48, 4 }, qselect);
 
+    Pack(data, PackLocation { 52, 1 }, hold_pitch);
+
     return data;
   }
 
@@ -285,6 +294,8 @@ class TB_3PO: public HemisphereApplet {
     CONSTRAIN(qselect, 0, QUANT_CHANNEL_COUNT - 1);
 
     set_quantizer_scale();
+
+    hold_pitch = Unpack(data, PackLocation { 52, 1 });
 
     CONSTRAIN(density_encoder, 0, 14); // Internally just positive
     density = density_encoder;
@@ -318,6 +329,7 @@ private:
 
   int lock_seed; // If 1, the seed won't randomize (and manual editing is enabled)
   bool no_slides = false;
+  bool hold_pitch = false;
   bool transpose_in_semitones = false;
 
   uint16_t seed; // The random seed that deterministically builds the sequence
@@ -697,6 +709,10 @@ private:
     gfxPrint(1 + pad(10, display_step), 47, display_step); // Pad x enough to hold width steady
     gfxPrint("/");
     gfxPrint(num_steps);
+    gfxPrint(32, 47, "H"); // Indicate hold pitch mode
+    if (hold_pitch) {
+      gfxFrame(31, 45, 9, 11, true);
+    }
 
     // Show octave icons
     if (step_is_oct_down(step)) {
@@ -738,6 +754,9 @@ private:
     if (no_slides) {
       gfxPrint(42, 46, "X");
     }
+    if (hold_pitch && !step_is_gated(step)) {
+      gfxPrint(42, 46, "-");
+    }
 
     // Show that the "slide circuit" is actively
     // sliding the pitch (one step after the slid step)
@@ -774,6 +793,10 @@ private:
     case LENGTH:
       gfxSpicyCursor(20, 54, 12, 8);
       gfxIcon(33, 47, LEFT_ICON, true);
+      break;
+    case HOLD_PITCH:
+      gfxSpicyCursor(31, 55, 9, 8);
+      gfxIcon(41, 47, LEFT_ICON);
       break;
     }
   }
