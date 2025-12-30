@@ -29,6 +29,7 @@
 #include "audio_applets/ModalResonatorApplet.h"
 #include "audio_applets/WAVRecorderApplet.h"
 #include "audio_applets/WTVCOApplet.h"
+#include "audio_applets/HarmOscApplet.h"
 
 const size_t NUM_SLOTS = 5;
 
@@ -39,6 +40,7 @@ DMAMEM std::tuple<
   PassthruApplet<MONO>,
   InputApplet<MONO>,
   HandSawApplet,
+  HarmOscApplet,
   UpsampledApplet<MONO>,
   OscApplet,
   FMDrumApplet,
@@ -60,6 +62,7 @@ DMAMEM std::tuple<
   InputApplet<MONO>,
   OscApplet,
   HandSawApplet,
+  HarmOscApplet,
   FMDrumApplet,
   WavPlayerApplet<MONO>,
   OneShotPlayerApplet<MONO>,
