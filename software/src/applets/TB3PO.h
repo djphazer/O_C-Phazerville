@@ -182,8 +182,9 @@ class TB_3PO: public HemisphereApplet {
   void OnButtonPress() override {
     if (cursor == TRANS_MODE) {
       transpose_in_semitones ^= 1;
-    }
-    else
+    } else if (cursor == HOLD_PITCH) {
+      hold_pitch ^= 1;
+    } else
       CursorToggle();
   }
 
@@ -196,9 +197,6 @@ class TB_3PO: public HemisphereApplet {
     }
     if (cursor == LENGTH) {
       no_slides ^= 1;
-    }
-    if (cursor == HOLD_PITCH) {
-      hold_pitch ^= 1;
     }
     CancelEdit();
   }
@@ -252,9 +250,6 @@ class TB_3PO: public HemisphereApplet {
       break;
     case LENGTH: // pattern length
       num_steps = constrain(num_steps + direction, 1, 32);
-      break;
-    case HOLD_PITCH:
-      hold_pitch ^= 1;
       break;
     } //switch
   } //OnEncoderMove
@@ -329,7 +324,7 @@ private:
 
   int lock_seed; // If 1, the seed won't randomize (and manual editing is enabled)
   bool no_slides = false;
-  bool hold_pitch = false;
+  bool hold_pitch = true;
   bool transpose_in_semitones = false;
 
   uint16_t seed; // The random seed that deterministically builds the sequence
@@ -709,9 +704,8 @@ private:
     gfxPrint(1 + pad(10, display_step), 47, display_step); // Pad x enough to hold width steady
     gfxPrint("/");
     gfxPrint(num_steps);
-    gfxPrint(32, 47, "H"); // Indicate hold pitch mode
     if (hold_pitch) {
-      gfxFrame(31, 45, 9, 11, true);
+      gfxPrint(32, 47, "H"); // Indicate hold pitch mode
     }
 
     // Show octave icons
@@ -795,8 +789,8 @@ private:
       gfxIcon(33, 47, LEFT_ICON, true);
       break;
     case HOLD_PITCH:
-      gfxSpicyCursor(31, 55, 9, 8);
-      gfxIcon(41, 47, LEFT_ICON);
+      gfxFrame(31, 45, 9, 11, true);
+      gfxIcon(41, 47, LEFT_ICON, true);
       break;
     }
   }
