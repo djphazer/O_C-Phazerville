@@ -165,7 +165,9 @@ AppletRegistry reg{
     DeclareApplet<DrLoFi>{16, 0x80},
     DeclareApplet<DrumMap>{57, 0x02},
     DeclareApplet<DualQuant>{9, 0x08},
+#ifdef PEWPEWPEW
     DeclareApplet<OffsetQuant>{90, 0x08},
+#endif
 #if !defined(CUSTOM_BUILD) || defined(PEWPEWPEW)
     DeclareApplet<DuoTET>{63, 0x08},
 #endif

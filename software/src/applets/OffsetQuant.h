@@ -20,8 +20,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#define OCTAVE_1 (12 << 7)
-
 // #define OFFSET_QUANT_MAX_CV_INPUT (9216 + NorthernLightModular*(4*12<<7)) // 6V or 10V
 
 // just 20/24 simplifies to 5/6, but we want _just_ over 5v. 
@@ -46,7 +44,7 @@ public:
     const char* applet_name() { // Maximum 10 characters
         return "OffQuant";
     }
-    const uint8_t* applet_icon() { return PhzIcons::offsetQuantizer; }
+    const uint8_t* applet_icon() { return PhzIcons::dualQuantizer; }
 
     void Start() {
         cursor = 0;
@@ -76,16 +74,16 @@ public:
                         offset = pitch;
                         break;
                     case RANGE_0_2:
-                        offset = Proportion(pitch, OFFSET_QUANT_MAX_CV_INPUT, 2 * OCTAVE_1);
+                        offset = Proportion(pitch, OFFSET_QUANT_MAX_CV_INPUT, 2 * ONE_OCTAVE);
                         break;
                     case RANGE_1_3:
-                        offset = Proportion(pitch, OFFSET_QUANT_MAX_CV_INPUT, 2 * OCTAVE_1) + (1 * OCTAVE_1);
+                        offset = Proportion(pitch, OFFSET_QUANT_MAX_CV_INPUT, 2 * ONE_OCTAVE) + (1 * ONE_OCTAVE);
                         break;
                     case RANGE_2_4:
-                        offset = Proportion(pitch, OFFSET_QUANT_MAX_CV_INPUT, 2 * OCTAVE_1) + (2 * OCTAVE_1);
+                        offset = Proportion(pitch, OFFSET_QUANT_MAX_CV_INPUT, 2 * ONE_OCTAVE) + (2 * ONE_OCTAVE);
                         break;
                     case RANGE_3_5:
-                        offset = Proportion(pitch, OFFSET_QUANT_MAX_CV_INPUT, 2 * OCTAVE_1) + (3 * OCTAVE_1);
+                        offset = Proportion(pitch, OFFSET_QUANT_MAX_CV_INPUT, 2 * ONE_OCTAVE) + (3 * ONE_OCTAVE);
                         break;
                     case RANGE_LAST: // Should not happen
                         break;
