@@ -128,7 +128,7 @@ struct DigitalInputMap {
       case CLOCK: {
         if (!clock_m.IsRunning()) return false;
 
-        uint32_t ticks_since_beat = OC::CORE::ticks - clock_m.beat_tick;
+        uint32_t ticks_since_beat = OC::CORE::ticks - clock_m.BeatTick();
         uint32_t tpb = clock_m.GetTempoTicks();
         int mult = (source == -2) ? 1 : ppqn;
 
