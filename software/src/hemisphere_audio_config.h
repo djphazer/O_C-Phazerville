@@ -24,9 +24,19 @@ const size_t NUM_SLOTS = 5;
 
 HemisphereAudioApplet::ReverbFactory HemisphereAudioApplet::verb_factory;
 
-DMAMEM std::tuple<InputApplet<MONO>, HandSawApplet, UpsampledApplet<MONO>, OscApplet, WavPlayerApplet<MONO>>
+DMAMEM std::tuple<
+  InputApplet<MONO>,
+  PassthruApplet<MONO>,
+  HandSawApplet,
+  UpsampledApplet<MONO>,
+  OscApplet,
+  WavPlayerApplet<MONO>>
     mono_input_pool[2];
-DMAMEM std::tuple<InputApplet<STEREO>, WavPlayerApplet<STEREO>, UpsampledApplet<STEREO>>
+DMAMEM std::tuple<
+  InputApplet<STEREO>,
+  PassthruApplet<STEREO>,
+  WavPlayerApplet<STEREO>,
+  UpsampledApplet<STEREO>>
     stereo_input_pool;
 DMAMEM std::tuple<
   PassthruApplet<MONO>,
@@ -43,7 +53,7 @@ DMAMEM std::tuple<
   BungverbApplet,
   DynamicsApplet<MONO>,
   UpsampledApplet<MONO>>
-  mono_processors_pool[2][NUM_SLOTS - 1];
+    mono_processors_pool[2][NUM_SLOTS - 1];
 DMAMEM std::tuple<
   PassthruApplet<STEREO>,
   CrosspanApplet,
@@ -57,7 +67,7 @@ DMAMEM std::tuple<
   FilterFolderApplet<STEREO>,
   WavPlayerApplet<STEREO>,
   UpsampledApplet<STEREO>>
-  stereo_processors_pool[NUM_SLOTS - 1];
+    stereo_processors_pool[NUM_SLOTS - 1];
 
 // Helper to extract the tuple type from an array... thanks ChatGPT...
 template <typename ArrayType>
