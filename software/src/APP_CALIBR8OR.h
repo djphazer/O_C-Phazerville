@@ -218,8 +218,6 @@ public:
 
 
     void Start() {
-        segment.Init(SegmentSize::BIG_SEGMENTS);
-
         // make sure to turn this off, just in case
         FreqMeasure.end();
         OC::DigitalInputs::reInit();
@@ -630,7 +628,7 @@ public:
 
     int trigger_flash[DAC_CHANNEL_LAST];
 
-    SegmentDisplay segment;
+    SegmentDisplay segment{SegmentSize::BIG_SEGMENTS};
     Cal8ChannelConfig channel[DAC_CHANNEL_LAST];
 
     void DrawPresetSelector() {

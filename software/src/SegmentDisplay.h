@@ -37,7 +37,10 @@ struct Segment {
 
 class SegmentDisplay {
 public:
-    void Init(uint8_t segment_size) {
+    static constexpr uint8_t digit[10] = {
+      0x3f, 0x06, 0x5b, 0x4f, 0x66, 0x6d, 0x7d, 0x07, 0x7f, 0x67
+    };
+    SegmentDisplay(uint8_t segment_size) {
         size = segment_size;
 
         if (size == SegmentSize::BIG_SEGMENTS) {
@@ -57,9 +60,6 @@ public:
             segment[5] = {PixO{1,0}, PixO{1,1}, PixO{1,2}, PixO{0,0}, PixO{0,0}, PixO{0,0}, 3};
             segment[6] = {PixO{1,2}, PixO{2,2}, PixO{3,2}, PixO{0,0}, PixO{0,0}, PixO{0,0}, 3};
         }
-
-        uint8_t digits[] = {0x3f, 0x06, 0x5b, 0x4f, 0x66, 0x6d, 0x7d, 0x07, 0x7f, 0x67};
-        memcpy(&digit, &digits, sizeof(digits));
     }
 
     void SetPosition(uint8_t x, uint8_t y) {
@@ -140,12 +140,8 @@ public:
 private:
     Segment segment[7];
     uint8_t size;
-    uint8_t digit[10];
     uint8_t x_pos;
     uint8_t y_pos;
-    int decimal;
-
-
 
     uint8_t DigitWidth() {
         return (size == SegmentSize::BIG_SEGMENTS ? 10 : 4);

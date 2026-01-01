@@ -31,9 +31,7 @@ public:
     }
     const uint8_t* applet_icon() { return PhzIcons::binaryCounter; }
 
-    void Start() {
-        segment.Init(SegmentSize::BIG_SEGMENTS);
-    }
+    void Start() { }
 
     void Controller() {
         bit[0] = Gate(0);
@@ -63,7 +61,7 @@ public:
 
     void OnEncoderMove(int direction) {
     }
-        
+
     uint64_t OnDataRequest() {
         uint64_t data = 0;
         return data;
@@ -90,8 +88,8 @@ private:
     bool bit[4];
     const int CVal = HEMISPHERE_MAX_CV / 4; // One-fourth of the count
     const int B0Val = HEMISPHERE_MAX_CV / 15; // Votage of Bit 0
-    SegmentDisplay segment;
-    
+    SegmentDisplay segment{SegmentSize::BIG_SEGMENTS};
+
     void DrawDisplay() {
         segment.SetPosition(11 + (hemisphere * 64), 32);
         for (int b = 0; b < 4; b++)

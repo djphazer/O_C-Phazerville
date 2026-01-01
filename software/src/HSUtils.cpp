@@ -1,5 +1,7 @@
 #include <Arduino.h>
+#include "HSClockManager.h"
 #include "OC_core.h"
+#include "SegmentDisplay.h"
 #include "tideslite.h"
 #include "OC_gpio.h"
 #include "HSUtils.h"
@@ -49,6 +51,7 @@ namespace HS {
     "[blank]",
     "Meters", "Scope",
     "Snow!", "Stars", "Zips",
+    "Beats",
   };
 
   OC::menu::ScreenCursor<5> showhide_cursor;
@@ -663,4 +666,22 @@ void ZapScreensaver(const uint8_t stars) {
     }
   }
   if (--frame_delay < 0) frame_delay = 100;
+}
+
+void BeatCounterScreensaver() {
+  static SegmentDisplay digits{BIG_SEGMENTS};
+  const int y = 27;
+
+  if (HS::clock_m.IsRunning()) {
+    gfxIcon(60, 10, HS::clock_m.Cycle() ? METRO_L_ICON : METRO_R_ICON);
+  }
+
+  // 4-bar phrases
+  digits.PrintWhole(12, y, HS::clock_m.beat_count / 16 + 1, 100);
+  gfxRect(48, y+8, 3, 3);
+  // bars (measures)
+  digits.PrintDigit(64, y, HS::clock_m.beat_count / 4 % 4 + 1);
+  gfxRect(80, y+8, 3, 3);
+  // beats
+  digits.PrintDigit(96, y, HS::clock_m.beat_count % 4 + 1);
 }
