@@ -21,6 +21,7 @@
 
 #pragma once
 
+#include "HSUtils.h"
 #include "OC_DAC.h"
 #include "OC_core.h"
 #include "OC_digital_inputs.h"
@@ -1722,6 +1723,9 @@ void QUADRANTS_screensaver() {
         break;
     case SCREEN_METERS: // Meters
         quad_manager.BaseScreensaver(true); // show note names
+        break;
+    case SCREEN_BEATS:
+        BeatCounterScreensaver();
         break;
     default: break; // blank screen
     }

@@ -1840,6 +1840,9 @@ void HEMISPHERE_screensaver() {
     case SCREEN_METERS: // Meters
         manager.BaseScreensaver(true); // show note names
         break;
+    case SCREEN_BEATS:
+        BeatCounterScreensaver();
+        break;
     default: break; // blank screen
     }
 }

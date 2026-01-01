@@ -36,7 +36,6 @@ public:
     void Start() {
         cv[0] = new int16_t[CVREC_MAX_STEP];
         cv[1] = new int16_t[CVREC_MAX_STEP];
-        segment.Init(SegmentSize::BIG_SEGMENTS);
     }
 
     void Controller() {
@@ -164,7 +163,7 @@ protected:
 
 private:
     int cursor; // 0=Start 1=End 2=Smooth 3=Record Mode
-    SegmentDisplay segment;
+    SegmentDisplay segment{SegmentSize::BIG_SEGMENTS};
 
     int16_t* cv[2];
     simfloat rise[2];
