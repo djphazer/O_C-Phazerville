@@ -81,9 +81,6 @@ public:
 
   void Controller() {
     AudioNoInterrupts();
-    // Call Controller instead of BaseController so we don't trigger
-    // cursor_countdown multiple times. This is a stupid hack and we should do
-    // something smarter.
     for (size_t i = 0; i < Slots; i++) {
       if (IsStereo(i)) {
         get_selected_stereo_applet(i).Controller();
@@ -516,8 +513,6 @@ private:
   int cursor[2]; // selected slot for each side
   // candidate applet for each side, referenced by index into applets arrays
   int candidate[2];
-
-  int cursor_countdown;
 
   HemisphereAudioApplet& get_mono_applet(
     HEM_SIDE side, size_t slot, size_t ix

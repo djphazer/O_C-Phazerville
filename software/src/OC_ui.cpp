@@ -285,15 +285,12 @@ UiMode Ui::Splashscreen(bool &reset_settings) {
 
   } while (timeout < SPLASHSCREEN_DELAY_MS);
 
-  const uint8_t *flake_icon[] = {
-    PhzIcons::snowflakeA, PhzIcons::snowflakeB
-  };
-
   do {
     GRAPHICS_BEGIN_FRAME(true);
     /*
+    const uint8_t *flake_icon[] = { PhzIcons::snowflakeA, PhzIcons::snowflakeB, ZAP_ICON };
     for (int i=0; i<128; ++i) {
-      graphics.drawBitmap8(i*8%128 + random(2), i/16*8 + random(2), 8, flake_icon[random(2)]);
+      graphics.drawBitmap8(i*8%128 + random(2), i/16*8 + random(2), 8, flake_icon[random(3)]);
     }
     */
     ZapScreensaver();
