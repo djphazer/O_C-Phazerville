@@ -465,8 +465,6 @@ private:
                 gfxPrint(14, y, values[i]);
             }
 
-            if (cursor == i) gfxCursor(14, y + 8, 19);
-
             // Show CV assignment indicators
             if (cv_assignments[current_page][i][0]) {
                 gfxBitmap(10, y, 3, SUP_ONE);
@@ -493,9 +491,6 @@ private:
                 // Display parameter value
                 gfxPrint(44, y, param_values[i]);
 
-                // Draw cursor if this parameter is selected
-                if (cursor == param_idx) gfxCursor(46, y + 8, 18);
-
                 // Show CV assignment indicators
                 if (cv_assignments[current_page][param_idx][0]) {
                     gfxBitmap(43, y, 3, SUP_ONE);
@@ -507,9 +502,6 @@ private:
                 // Draw loop mode
                 gfxIcon(34, y, LOOP_ICON);
                 gfxPrint(45, y, OC::Strings::no_yes[loopmode[current_page]]);
-
-                // Draw cursor if loop mode is selected
-                if (cursor == LOOPMODE) gfxCursor(46, y + 8, 18);
 
                 // Show CV assignment indicators
                 if (cv_assignments[current_page][LOOPMODE][0]) {
@@ -570,14 +562,12 @@ private:
             gfxLine(end_x, BAR_Y - 1, end_x, BAR_Y + BAR_HEIGHT);
         }
 
-        // Print loop start/end values and draw cursors
+        // Print loop start/end values
         gfxIcon(1, BAR_Y - 10, LEFT_ICON);
         gfxPrint(13, BAR_Y - 10, loopstart[current_page]);
-        if (cursor == LOOPSTART) gfxCursor(13, BAR_Y - 10 + 8, 19);
 
         gfxIcon(34, BAR_Y - 10, RIGHT_ICON);
         gfxPrint(44, BAR_Y - 10, loopend[current_page]);
-        if (cursor == LOOPEND) gfxCursor(45, BAR_Y - 10 + 8, 19);
 
         // CV assignment indicators for loop start/end
         if (cv_assignments[current_page][LOOPSTART][0]) {
@@ -591,6 +581,33 @@ private:
         }
         if (cv_assignments[current_page][LOOPEND][1]) {
             gfxBitmap(42, BAR_Y - 10, 3, SUB_TWO);
+        }
+
+        // Draw cursors last, for labels overlay
+        switch (cursor) {
+          case EQUATION:
+            gfxCursor(14, 20, 19, OC::Strings::bytebeat_equation_names[values[0]]);
+            break;
+
+          case SPEED:
+          case PITCH:
+          case STEPMODE:
+            gfxCursor(14, 20 + 9*cursor, 19, param_names[cursor]);
+            break;
+
+          case PARAM0:
+          case PARAM1:
+          case PARAM2:
+          case LOOPMODE:
+            gfxCursor(46, 20 + 9*(cursor - PARAM0), 18, param_names[cursor]);
+            break;
+
+          case LOOPSTART:
+          case LOOPEND:
+            gfxCursor(13 + (cursor - LOOPSTART)*32, BAR_Y - 10 + 8, 19, param_names[cursor]);
+            break;
+
+          default: break;
         }
     }
 
