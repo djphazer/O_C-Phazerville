@@ -15,10 +15,11 @@ layout: default
 | CV INs | Env. A Release | Env. B Release |
 | OUTs   |             Envelope A             |             Envelope B              |
 
-Note that CV inputs modulate the release stage over a range of about -2.5 volts to about 2.5 volts. There is a small center detent in the middle of the range, at which point no modification will be made.
+_Caveat:_ ADSR envelopes require a proper Gate signal to activate and hold high the sustain stage. As such, internal clock triggers and trigger input multiplication/division will not affect it. However, you can potentially assign the output signal from another applet. If you need an envelope that responds to simple rising edge triggers - either physical or virtual - try [AD-EG](AD-EG) instead.
+
+The CV inputs modulate the release stage over a range of about -3 volts to about 3 volts. There is a small center detent in the middle of the range, at which point no modification will be made.
 
 ### UI Parameters
-Push encoder to advance cursor; turn to adjust.
 * Channel A: Attack duration
 * Channel A: Decay duration
 * Channel A: Sustain level
