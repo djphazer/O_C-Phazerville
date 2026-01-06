@@ -22,7 +22,8 @@
 
 const size_t NUM_SLOTS = 5;
 
-HemisphereAudioApplet::ReverbFactory HemisphereAudioApplet::verb_factory;
+Factory<AudioEffectReverbSchroeder, 8> HemisphereAudioApplet::bung_factory;
+Factory<AudioEffectFreeverb, 8> HemisphereAudioApplet::verb_factory;
 
 DMAMEM std::tuple<
   InputApplet<MONO>,

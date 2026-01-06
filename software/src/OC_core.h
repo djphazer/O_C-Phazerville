@@ -43,4 +43,32 @@ namespace OC {
   };
 }; // namespace OC
 
+template <typename T, size_t max_instances>
+struct Factory {
+  std::array<T*, max_instances> pool;
+  uint16_t mask = 0;
+
+  T* get() {
+    for (int i = 0; i < max_instances; ++i) {
+      if (mask & (1 << i)) continue;
+
+      if (!pool[i] && OC::CORE::FreeRam() > (int)sizeof(T) + 1000) { // 1KB of padding to be safe
+        pool[i] = new T();
+      }
+      if (pool[i]) {
+        mask |= (1 << i);
+        return pool[i];
+      }
+    }
+    return nullptr;
+  }
+  void release(T* instance) {
+    for (int i = 0; i < max_instances; ++i) {
+      if (pool[i] == instance) {
+        mask &= ~(1 << i);
+      }
+    }
+  }
+};
+
 #endif // OC_CORE_H_
