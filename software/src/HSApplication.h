@@ -113,7 +113,7 @@ public:
             if (trig) gfxIcon(4 + w*ch, 0, CLOCK_ICON);
 
             // input
-            int height = ProportionCV(HS::frame.inputs[ch], h);
+            int height = ProportionCV(HS::frame.In(ch), h);
             int y = constrain(h - height, 0, h);
             const int w_ = (w - 4) / 2;
             gfxFrame(2 + (w * ch), y, w_, abs(height));
@@ -181,7 +181,7 @@ public:
     }
 
     // Buffered I/O functions for use in Views
-    int ViewIn(int ch) const {return frame.inputs[ch];}
+    int ViewIn(int ch) const {return frame.In(ch);}
     int ViewOut(int ch) const {return frame.ViewOut(ch);}
     uint32_t ClockCycleTicks(int ch) const {return frame.cycle_ticks[ch];}
 

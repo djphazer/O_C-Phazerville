@@ -145,7 +145,7 @@ public:
     }
 
     // Buffered I/O functions
-    int ViewIn(int ch) const {return frame.inputs[io_offset + ch];}
+    int ViewIn(int ch) const {return frame.In(io_offset + ch);}
     int ViewOut(int ch) const {return frame.ViewOut(io_offset + ch);}
     uint32_t ClockCycleTicks(int ch) const {
       if (clock_m.IsRunning() && clock_m.GetMultiply(io_offset + ch) != 0)

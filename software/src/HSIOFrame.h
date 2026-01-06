@@ -508,7 +508,7 @@ struct IOFrame {
 
     // physical input state cache
     bool gate_high[OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_COUNT];
-    int inputs[ADC_CHANNEL_COUNT];
+    //int inputs[ADC_CHANNEL_COUNT];
 
     // output value cache, countdowns
     SlewedValue outputs[DAC_CHANNEL_COUNT]; // now with Extra Precision!
@@ -523,6 +523,11 @@ struct IOFrame {
     /* MIDI message queue/cache */
     MIDIFrame MIDIState;
 
+    OC::IOFrame* current_ioframe;
+    OC::IOFrame* GetLatestIOFrame() const {
+      return current_ioframe;
+    }
+
     void Init() {
       MIDIState.Init();
       for (int i = 0; i < DAC_CHANNEL_COUNT; ++i) {
@@ -533,6 +538,10 @@ struct IOFrame {
     const int ViewOut(DAC_CHANNEL ch) const { return outputs[ch].get(output_atten[ch]); }
 
     // --- Soft IO ---
+    int In(int ch) {
+      return current_ioframe->cv.pitch_values[ch];
+    }
+
     void Out(DAC_CHANNEL channel, int value, bool override = false) {
       outputs[channel].set(value, override);
     }

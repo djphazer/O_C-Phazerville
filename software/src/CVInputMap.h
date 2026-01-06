@@ -26,7 +26,7 @@ struct CVInputMap {
 
   int RawIn() const {
     return source <= ADC_CHANNEL_LAST
-      ? frame.inputs[source - 1]
+      ? frame.In(source - 1)
       : (source - ADC_CHANNEL_LAST <= DAC_CHANNEL_LAST)
         ? frame.ViewOut(source - 1 - ADC_CHANNEL_LAST)
         : frame.MIDIState.mapping[source - ADC_CHANNEL_LAST - DAC_CHANNEL_LAST - 1].output;

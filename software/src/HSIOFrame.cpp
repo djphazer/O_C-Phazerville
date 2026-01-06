@@ -366,6 +366,8 @@ void HS::MIDIFrame::Send(const SlewedValue *outvals) {
 }
 
 void HS::IOFrame::Load(OC::IOFrame *ioframe) {
+    current_ioframe = ioframe; // cache that ish
+
     auto triggers = ioframe->digital_inputs.triggered();
 
     // TODO: configurable clock sync input
@@ -379,15 +381,15 @@ void HS::IOFrame::Load(OC::IOFrame *ioframe) {
 
     for (int i = 0; i < ADC_CHANNEL_COUNT; ++i) {
         // Set CV inputs
-        inputs[i] = ioframe->cv.pitch_values[i];
+        const int input = ioframe->cv.pitch_values[i];
 
         // calculate gates/clocks for all ADC inputs as well
-        gate_high[OC::DIGITAL_INPUT_LAST + i] = inputs[i] > GATE_THRESHOLD;
+        gate_high[OC::DIGITAL_INPUT_LAST + i] = input > GATE_THRESHOLD;
 
         // some calculations for change detection
-        if (abs(inputs[i] - last_cv[i]) > HEMISPHERE_CHANGE_THRESHOLD) {
+        if (abs(input - last_cv[i]) > HEMISPHERE_CHANGE_THRESHOLD) {
             changed_cv[i] = 1;
-            last_cv[i] = inputs[i];
+            last_cv[i] = input;
         } else changed_cv[i] = 0;
     }
 
