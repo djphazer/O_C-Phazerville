@@ -21,6 +21,11 @@
 
 #pragma once
 
+#ifdef USB_GAMEPAD
+#include <USBHost_t36.h>
+#include "HSGamepad.h"
+#endif
+
 // per bank file
 static constexpr int QUAD_PRESET_COUNT = 32;
 static constexpr int PRESET_FILE_REVISION = 1;
@@ -167,6 +172,8 @@ public:
         // 1024+
         // ... check AudioAppletSubapp to be sure!
 
+        GAMEPAD_MAPS_KEY = 600,
+
         VERSION_KEY = 0xFFFF // 65535
     };
 
@@ -284,6 +291,14 @@ public:
           data = PackPackables(frame.MIDIState.mapping[midx]);
           PhzConfig::setValue(MIDI_MAPS_KEY + midx, data);
         }
+
+#ifdef USB_GAMEPAD
+        // Global Gamepad Maps
+        for (size_t gpx = 0; gpx < GAMEPAD_MAP_MAX; ++gpx) {
+            data = PackPackables(frame.GamepadState.mapping[gpx]);
+            PhzConfig::setValue(GAMEPAD_MAPS_KEY + gpx, data);
+        }
+#endif
 
         // User Patterns aka Sequences
         for (size_t i = 0; i < OC::Patterns::PATTERN_USER_COUNT; ++i) {
@@ -572,6 +587,9 @@ public:
         ProcessMIDI(usbHostMIDI[0]);
         ProcessMIDI(usbHostMIDI[1]);
         ProcessMIDI(MIDI1);
+#ifdef USB_GAMEPAD
+        ProcessGamepad(joystick);
+#endif
     }
     void Controller() {
         // Clock Setup applet handles internal clock duties

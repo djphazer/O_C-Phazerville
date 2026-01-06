@@ -55,6 +55,10 @@ MIDIDevice_BigBuffer usbHostMIDI[2] {
   MIDIDevice_BigBuffer(thisUSB),
   MIDIDevice_BigBuffer(thisUSB)
 };
+#ifdef USB_GAMEPAD
+USBHIDParser hid1(thisUSB);
+JoystickController joystick(thisUSB);
+#endif
 MIDI_CREATE_INSTANCE(HardwareSerial, Serial8, MIDI1);
 #include "AudioIO.h"
 #include "usb_desc.h"

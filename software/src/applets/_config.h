@@ -68,6 +68,9 @@ using namespace HS;
 #endif
 #include "GateDelay.h"
 #include "GatedVCA.h"
+#ifdef USB_GAMEPAD
+#include "JoyStyx.h"
+#endif
 #include "DrLoFi.h"
 #include "Logic.h"
 #include "LowerRenz.h"
@@ -178,6 +181,9 @@ constexpr Registry reg = Registry<HemisphereApplet, HS::APPLET_SLOTS  // unused 
     , DeclareApplet<EnvSeq, 91, CAT_SEQUENCER>
     , DeclareApplet<EuclidO, 83, CAT_SEQUENCER>
     , DeclareApplet<EuclidX, 15, CAT_SEQUENCER>
+#ifdef USB_GAMEPAD
+    , DeclareApplet<JoyStyx, 66, CAT_MODULATOR>
+#endif
 #ifdef PEWPEWPEW
     , DeclareApplet<GameOfLife, 22, CAT_MODULATOR>
 #endif
