@@ -15,11 +15,12 @@ struct CVInputMap {
     TYPE_INTERNAL = (7 << 5), // for noise, LFOs, S&H, etc.
   };
 
-  static constexpr SourceType ordered_types[5] = {
+  static constexpr SourceType ordered_types[6] = {
     TYPE_NONE,
     TYPE_ADC,
     TYPE_DAC,
     TYPE_MIDI,
+    TYPE_HID,  // #ifdef USB_GAMEPAD
     TYPE_INTERNAL,
   };
 
@@ -64,6 +65,8 @@ public:
         return 2 * APPLET_CURSOR_COUNT;
       case TYPE_MIDI:
         return MIDIMAP_MAX;
+      case TYPE_HID:  // #ifdef USB_GAMEPAD
+        return GAMEPAD_MAP_MAX;
       case TYPE_INTERNAL:
         return 1;
     }
@@ -79,6 +82,9 @@ public:
 
       case TYPE_MIDI:
         return frame.MIDIState.mapping[index()].ViewOut();
+
+      case TYPE_HID:  // #ifdef USB_GAMEPAD
+        return frame.GamepadState.mapping[index()].output;
 
       case TYPE_INTERNAL:
         // noise source
@@ -141,6 +147,10 @@ public:
     CONSTRAIN(midx, 0, channel_count(TYPE_MIDI) - 1);
     source = TYPE_MIDI | (midx & 0x1f);
   }
+  void SetHIDMap(uint8_t hidx) {
+    CONSTRAIN(hidx, 0, channel_count(TYPE_HID) - 1);
+    source = TYPE_HID | (hidx & 0x1f);
+  }
   void SetInput(uint8_t idx) {
     CONSTRAIN(idx, 0, channel_count(TYPE_ADC) - 1);
     source = TYPE_ADC | (idx & 0x1f);
@@ -171,6 +181,7 @@ public:
         break;
 
       case TYPE_MIDI:
+      case TYPE_HID:
       case TYPE_ADC:
         ++idx;
         if (idx / 10)
@@ -196,6 +207,8 @@ public:
         return MOD_ICON;
       case TYPE_MIDI:
         return PhzIcons::midiIn;
+      case TYPE_HID:
+        return PhzIcons::gamepad;
 
       case TYPE_ADC:
         if (index() < 8)
@@ -220,10 +233,12 @@ public:
     if (source && (source >> 5) < 2) {
       if (source <= ADC_CHANNEL_COUNT)
         SetInput(source - 1); // CV input
-      else if (source <= DAC_CHANNEL_COUNT + ADC_CHANNEL_COUNT)
+      else if (source <= ADC_CHANNEL_COUNT + DAC_CHANNEL_COUNT)
         SetOutput(source - ADC_CHANNEL_COUNT - 1); // DAC output
-      else // if (source <= DAC_CHANNEL_COUNT + ADC_CHANNEL_COUNT + MIDIMAP_MAX)
+      else if (source <= ADC_CHANNEL_COUNT + DAC_CHANNEL_COUNT + MIDIMAP_MAX)
         SetMidiMap(source - ADC_CHANNEL_COUNT - DAC_CHANNEL_COUNT - 1);
+      else
+        SetHIDMap(source - ADC_CHANNEL_COUNT - DAC_CHANNEL_COUNT - MIDIMAP_MAX - 1);
     }
     // enforce constrain for presets saved with v2.0-alpha
     if (source_type() == TYPE_INTERNAL) SetInternal(index());
@@ -247,17 +262,17 @@ struct DigitalInputMap {
     TYPE_ADC = (3 << 5),
     TYPE_DAC = (4 << 5),
     TYPE_MIDI_MAP = (5 << 5),
-
-    RESERVED = (6 << 5),
+    TYPE_HID_MAP = (6 << 5),  // RESERVED = (6 << 5),
     TYPE_INTERNAL = (7 << 5), // -1 and -2 fall here
   };
 
-  static constexpr DigitalSourceType ordered_types[6] = {
+  static constexpr DigitalSourceType ordered_types[7] = {
     TYPE_NONE,
     TYPE_DIGITAL_INPUT,
     TYPE_ADC,
     TYPE_DAC,
     TYPE_MIDI_MAP,
+    TYPE_HID_MAP,
     TYPE_INTERNAL,
   };
 
@@ -320,6 +335,10 @@ public:
     CONSTRAIN(midx, 0, channel_count(TYPE_MIDI_MAP) - 1);
     source = TYPE_MIDI_MAP | (midx & 0x1f);
   }
+  void SetHIDMap(uint8_t hidx) {
+    CONSTRAIN(hidx, 0, channel_count(TYPE_HID_MAP) - 1);
+    source = TYPE_HID_MAP | (hidx & 0x1f);
+  }
   void SetClockSource(uint8_t idx) {
     CONSTRAIN(idx, 0, channel_count(TYPE_INTERNAL) - 1);
     source = TYPE_INTERNAL | (idx & 0x1f);
@@ -353,6 +372,8 @@ public:
         return frame.ViewOut(index()) > GATE_THRESHOLD;
       case TYPE_MIDI_MAP:
         return frame.MIDIState.mapping[index()].ViewOut() > GATE_THRESHOLD;
+      case TYPE_HID_MAP:
+        return frame.GamepadState.mapping[index()].output > GATE_THRESHOLD;
       case TYPE_NONE:
       default:
         return false;
@@ -387,6 +408,8 @@ public:
         return (clkcount & 1) ? METRO_L_ICON : METRO_R_ICON;
       case TYPE_MIDI_MAP:
         return PhzIcons::midiIn;
+      case TYPE_HID_MAP:
+        return PhzIcons::gamepad;
 
       case TYPE_DIGITAL_INPUT:
         if (index() < 4)
@@ -407,7 +430,7 @@ public:
   }
   char const* InputName() const {
     static char in_label[] = "T 1";
-    const char type[] = {' ', '-', 'T', 'C', '#', 'M', '?', '*'};
+    const char type[] = {' ', '-', 'T', 'C', '#', 'M', 'G', '*'};
     const char* clktype[] = {"CL1", "CL4", "RUN", "RST"};
 
     if (!source) return " - ";
@@ -425,6 +448,7 @@ public:
 
       case TYPE_DIGITAL_INPUT:
       case TYPE_ADC:
+      case TYPE_HID_MAP:
       case TYPE_MIDI_MAP:
         ++idx;
         if (idx / 10)
@@ -458,8 +482,10 @@ public:
         SetInput(source - DIGITAL_INPUT_COUNT - 1);
       else if (source < 1 + DIGITAL_INPUT_COUNT + ADC_CHANNEL_COUNT + DAC_CHANNEL_COUNT)
         SetOutput(source - DIGITAL_INPUT_COUNT - ADC_CHANNEL_COUNT - 1);
-      else
+      else if (source < 1 + DIGITAL_INPUT_COUNT + ADC_CHANNEL_COUNT + DAC_CHANNEL_COUNT + MIDIMAP_MAX)
         SetMidiMap(source - DIGITAL_INPUT_COUNT - ADC_CHANNEL_COUNT - DAC_CHANNEL_COUNT - 1);
+      else
+        SetHIDMap(source - DIGITAL_INPUT_COUNT - ADC_CHANNEL_COUNT - DAC_CHANNEL_COUNT - MIDIMAP_MAX - 1);
     }
 
     // migrate old clock sources -1 and -2
@@ -509,6 +535,8 @@ public:
         return 2 * APPLET_CURSOR_COUNT;
       case TYPE_MIDI_MAP:
         return MIDIMAP_MAX;
+      case TYPE_HID_MAP:
+        return GAMEPAD_MAP_MAX;
     }
   }
 };
