@@ -33,6 +33,7 @@
 #include "util/util_trigger_delay.h"
 #include "util/util_turing.h"
 #include "util/util_integer_sequences.h"
+#include "util/util_math.h"
 #include "peaks_bytebeat.h"
 #include "braids_quantizer.h"
 #include "braids_quantizer_scales.h"
@@ -41,6 +42,7 @@
 #include "OC_scales.h"
 #include "OC_scale_edit.h"
 #include "OC_strings.h"
+#include "HSIOFrame.h"
 
 // unsigned long LAST_REDRAW_TIME = 0;
 extern uint_fast8_t MENU_REDRAW;
@@ -71,6 +73,8 @@ enum ChannelSetting {
   CHANNEL_SETTING_TRANSPOSE,
   CHANNEL_SETTING_OCTAVE,
   CHANNEL_SETTING_FINE,
+  CHANNEL_SETTING_SLEW,
+  CHANNEL_SETTING_SLEW_CV_SOURCE,
   CHANNEL_SETTING_TURING_LENGTH,
   CHANNEL_SETTING_TURING_PROB,
   CHANNEL_SETTING_TURING_MODULUS,
@@ -140,6 +144,7 @@ enum QQ_CV_DEST {
   QQ_DEST_OCTAVE,
   QQ_DEST_TRANSPOSE,
   QQ_DEST_MASK,
+  //QQ_DEST_SLEW,
   QQ_DEST_LAST
 };
 
@@ -232,6 +237,15 @@ public:
 
   int get_fine() const {
     return values_[CHANNEL_SETTING_FINE];
+  }
+
+  uint8_t get_slew() const {
+    if (get_slew_cv_source())
+      return constrain(values_[CHANNEL_SETTING_SLEW] + ((OC::ADC::value(get_slew_cv_source() - 1) + 15) >> 5), 0, 100);
+    return values_[CHANNEL_SETTING_SLEW];
+  }
+  uint8_t get_slew_cv_source() const {
+    return values_[CHANNEL_SETTING_SLEW_CV_SOURCE];
   }
 
   uint8_t get_aux_cv_dest() const {
@@ -402,7 +416,6 @@ public:
 
     channel_index_ = source;
     force_update_ = true;
-    instant_update_ = false;
     last_scale_ = -1;
     last_mask_ = 0;
     last_sample_ = 0;
@@ -430,10 +443,6 @@ public:
 
   void force_update() {
     force_update_ = true;
-  }
-
-  void instant_update() {
-    instant_update_ = !instant_update_;
   }
 
   inline void Update(uint32_t triggers, DAC_CHANNEL dac_channel) {
@@ -867,9 +876,11 @@ public:
     if (changed) {
       MENU_REDRAW = 1;
       last_sample_ = continuous ? temp_sample : sample;
+      output_.set(sample + get_fine());
     }
 
-    OC::DAC::set(dac_channel, sample + get_fine());
+    output_.push(get_slew());
+    OC::DAC::set(dac_channel, output_.get());
 
     if (triggered || (continuous && changed)) {
       scrolling_history_.Push(history_sample);
@@ -1029,6 +1040,8 @@ public:
     *settings++ = CHANNEL_SETTING_OCTAVE;
     *settings++ = CHANNEL_SETTING_TRANSPOSE;
     *settings++ = CHANNEL_SETTING_FINE;
+    *settings++ = CHANNEL_SETTING_SLEW;
+    *settings++ = CHANNEL_SETTING_SLEW_CV_SOURCE;
     *settings++ = CHANNEL_SETTING_OCTAVE_CONSTRAINT;
     if (get_octave_constraint()) {
       *settings++ = CHANNEL_SETTING_OCTAVE_CONSTRAINT_LEN;
@@ -1088,10 +1101,10 @@ public:
 
 private:
   bool force_update_;
-  bool instant_update_;
   int last_scale_;
   uint16_t last_mask_;
   int32_t last_sample_;
+  SlewedValue output_;
   uint8_t clock_;
   bool int_seq_reset_;
   int8_t continuous_offset_;
@@ -1140,7 +1153,7 @@ const char* const channel_input_sources[CHANNEL_SOURCE_LAST] = {
 };
 
 const char* const aux_cv_dest[5] = {
-  "-", "root", "oct", "trns", "mask"
+  "-", "root", "oct", "trns", "mask" //, "slew"
 };
 
 // TOTAL EEPROM SIZE: 4 * 40 bytes
@@ -1156,27 +1169,29 @@ SETTINGS_DECLARE(QuantizerChannel, CHANNEL_SETTING_LAST) {
   { 0, -5, 7, "Transpose", NULL, settings::STORAGE_TYPE_I8 },
   { 0, -4, 4, "Octave", NULL, settings::STORAGE_TYPE_I8 },
   { 0, -999, 999, "Fine", NULL, settings::STORAGE_TYPE_I16 },
+  { 0, 0, 100, "Slew", NULL, settings::STORAGE_TYPE_U8 },
+  { 0, 0, ADC_CHANNEL_COUNT, "Slew CV", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
   { 16, 1, 32, "LFSR length", NULL, settings::STORAGE_TYPE_U8 },
   { 128, 0, 255, "LFSR prb", NULL, settings::STORAGE_TYPE_U8 },
   { 24, 2, 121, "LFSR modulus", NULL, settings::STORAGE_TYPE_U8 },
   { 12, 1, 120, "LFSR range", NULL, settings::STORAGE_TYPE_U8 },
-  { 0, 0, 4, "LFSR prb CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "LFSR mod CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "LFSR rng CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "LFSR prb CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "LFSR mod CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "LFSR rng CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
   { 128, 1, 255, "Logistic r", NULL, settings::STORAGE_TYPE_U8 },
   { 12, 1, 120, "Logistic range", NULL, settings::STORAGE_TYPE_U8 },
-  { 0, 0, 4, "Log r   CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "Log rng CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "Log r   CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "Log rng CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
   { 0, 0, 15, "Bytebeat eqn", OC::Strings::bytebeat_equation_names, settings::STORAGE_TYPE_U8 },
   { 12, 1, 120, "Bytebeat rng", NULL, settings::STORAGE_TYPE_U8 },
   { 8, 1, 255, "Bytebeat P0", NULL, settings::STORAGE_TYPE_U8 },
   { 12, 1, 255, "Bytebeat P1", NULL, settings::STORAGE_TYPE_U8 },
   { 14, 1, 255, "Bytebeat P2", NULL, settings::STORAGE_TYPE_U8 },
-  { 0, 0, 4, "Bb eqn CV src", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "Bb rng CV src", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "Bb P0  CV src", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "Bb P1  CV src", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "Bb P2  CV src", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "Bb eqn CV src", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "Bb rng CV src", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "Bb P0  CV src", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "Bb P1  CV src", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "Bb P2  CV src", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
   { 0, 0, 11, "IntSeq", OC::Strings::integer_sequence_names, settings::STORAGE_TYPE_U4 },
   { 24, 2, 121, "IntSeq modul.", NULL, settings::STORAGE_TYPE_U8 },
   { 12, 1, 120, "IntSeq range", NULL, settings::STORAGE_TYPE_U8 },
@@ -1187,10 +1202,10 @@ SETTINGS_DECLARE(QuantizerChannel, CHANNEL_SETTING_LAST) {
   { 0, 0, 255, "IntSeq FS prob", NULL, settings::STORAGE_TYPE_U8 },
   { 0, 0, 5, "IntSeq FS rng", NULL, settings::STORAGE_TYPE_U4 },
   { 1, 1, kIntSeqLen - 1, "Fractal stride", NULL, settings::STORAGE_TYPE_U8 },
-  { 0, 0, 4, "IntSeq CV   >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "IntSeq mod CV", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "IntSeq rng CV", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "F. stride CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "IntSeq CV   >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "IntSeq mod CV", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "IntSeq rng CV", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "F. stride CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
   { 0, 0, 4, "IntSeq reset", OC::Strings::trigger_input_names_none, settings::STORAGE_TYPE_U4 },
   { braids::OCTAVE_CONSTRAINT_OFF, braids::OCTAVE_CONSTRAINT_OFF, braids::OCTAVE_CONSTRAINT_LAST - 1, "Oct constraint", OC::Strings::octave_constraint, settings::STORAGE_TYPE_U4 },
   { 0, 0, 4, "Oct constraint len", NULL, settings::STORAGE_TYPE_U4 },
