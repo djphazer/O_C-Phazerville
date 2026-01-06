@@ -362,8 +362,8 @@ protected:
   void SetHelp() {}
 
   void set_taps(size_t t) {
+    CONSTRAIN(t, 1, 8);
     taps = t;
-    CONSTRAIN(taps, 1, 8);
     float tap_gain = EQUAL_POWER_EQUAL_MIX[taps];
     for (auto& ch : channels) {
       for (int i = 0; i < taps; i++) ch.taps_mixer.gain(i, tap_gain);
