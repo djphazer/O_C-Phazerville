@@ -18,6 +18,7 @@
 #include "OC_digital_inputs.h"
 #include "HSicons.h"
 #include "HSClockManager.h"
+#include "util/util_macros.h"
 
 namespace HS {
 
@@ -69,6 +70,9 @@ struct MIDIMapSettings {
   uint8_t range_low, range_high;
 };
 struct MIDIMapping : public MIDIMapSettings {
+  MIDIMapping() {}
+  ~MIDIMapping() {}
+
   static constexpr size_t Size = 64; // Make this compatible with Packable
 
   // state
@@ -118,7 +122,7 @@ struct MIDIMapping : public MIDIMapSettings {
     dac_polyvoice = constrain(dac_polyvoice + dir, 0, DAC_CHANNEL_COUNT - 1);
   }
   void AdjustTranspose(int dir) {
-    transpose = constrain(transpose + dir, -24, 24);
+    transpose = constrain(transpose + dir, -48, 48);
   }
   void AdjustRangeLow(int dir) {
     range_low = constrain(range_low + dir, 0, range_high);
@@ -138,6 +142,8 @@ struct MIDIMapping : public MIDIMapSettings {
     if (range_low == 0 && range_high == 0) range_high = 127;
     if (range_high < range_low) range_high = range_low;
   }
+
+  DISALLOW_COPY_AND_ASSIGN(MIDIMapping);
 };
 
 // Lets PackingUtils know this is Packable as is.
@@ -185,7 +191,8 @@ struct MIDIFrame {
         mapping[ch].range_high = 127;
       }
       for (int ch = 0; ch < ADC_CHANNEL_COUNT; ++ch) {
-        outmap[ch].function = HEM_MIDI_NOOP;
+        outmap[ch].function = (ch & 1) ? HEM_MIDI_GATE_OUT : HEM_MIDI_NOTE_OUT;
+        outmap[ch].function_cc = ch + 1;
         outmap[ch].transpose = 0;
         outmap[ch].output = 0;
         outmap[ch].range_low = 0;
@@ -400,36 +407,10 @@ struct MIDIFrame {
     }
 
     // MIDI output stuff
-    int outchan[DAC_CHANNEL_COUNT] = {
-        0, 0, 1, 1,
-#ifdef ARDUINO_TEENSY41
-        2, 2, 3, 3,
-#endif
-    };
-    int outchan_last[DAC_CHANNEL_COUNT] = {
-        0, 0, 1, 1,
-#ifdef ARDUINO_TEENSY41
-        2, 2, 3, 3,
-#endif
-    };
-    int outfn[DAC_CHANNEL_COUNT] = {
-        HEM_MIDI_NOTE_OUT, HEM_MIDI_GATE_OUT,
-        HEM_MIDI_NOTE_OUT, HEM_MIDI_GATE_OUT,
-#ifdef ARDUINO_TEENSY41
-        HEM_MIDI_NOTE_OUT, HEM_MIDI_GATE_OUT,
-        HEM_MIDI_NOTE_OUT, HEM_MIDI_GATE_OUT,
-#endif
-    };
-    uint8_t outccnum[DAC_CHANNEL_COUNT] = {
-        1, 1, 1, 1,
-#ifdef ARDUINO_TEENSY41
-        5, 6, 7, 8,
-#endif
-    };
+    int outchan_last[DAC_CHANNEL_COUNT];
     uint8_t current_note[16]; // note number, per MIDI channel
     uint8_t current_ccval[DAC_CHANNEL_COUNT]; // level 0 - 127, per DAC channel
     int note_countdown[DAC_CHANNEL_COUNT];
-    int inputs[DAC_CHANNEL_COUNT]; // CV to be translated
     int last_cv[DAC_CHANNEL_COUNT];
     bool clocked[DAC_CHANNEL_COUNT];
     bool gate_high[DAC_CHANNEL_COUNT];

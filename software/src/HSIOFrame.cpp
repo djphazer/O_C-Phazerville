@@ -278,22 +278,22 @@ void HS::MIDIFrame::ProcessMIDIMsg(const MIDIMessage msg) {
 void HS::MIDIFrame::Send(const int *outvals) {
     // first pass - calculate things and turn off notes
     for (int i = 0; i < DAC_CHANNEL_COUNT; ++i) {
-        const uint8_t midi_ch = outchan[i];
+        const uint8_t midi_ch = outmap[i].channel;
 
-        inputs[i] = outvals[i];
-        gate_high[i] = inputs[i] > (12 << 7);
+        int input = outvals[i];
+        gate_high[i] = input > (12 << 7);
         clocked[i] = (gate_high[i] && last_cv[i] < (12 << 7));
-        if (abs(inputs[i] - last_cv[i]) > HEMISPHERE_CHANGE_THRESHOLD) {
+        if (abs(input - last_cv[i]) > HEMISPHERE_CHANGE_THRESHOLD) {
             changed_cv[i] = 1;
-            last_cv[i] = inputs[i];
+            last_cv[i] = input;
         } else changed_cv[i] = 0;
 
-        switch (outfn[i]) {
+        switch (outmap[i].function) {
             case HEM_MIDI_NOTE_OUT:
                 if (changed_cv[i]) {
                     // a note has changed, turn the last one off first
                     SendNoteOff(outchan_last[i]);
-                    current_note[midi_ch] = MIDIQuantizer::NoteNumber( inputs[i] );
+                    current_note[midi_ch] = MIDIQuantizer::NoteNumber( input );
                 }
                 break;
 
@@ -304,10 +304,11 @@ void HS::MIDIFrame::Send(const int *outvals) {
 
             case HEM_MIDI_CC_OUT:
             {
-                const uint8_t newccval = ProportionCV(abs(inputs[i]), 127);
-                if (newccval != current_ccval[i])
-                    SendCC(midi_ch, outccnum[i], newccval);
-                current_ccval[i] = newccval;
+                const uint8_t newccval = ProportionCV(abs(input), 127);
+                if (newccval != current_ccval[i]) {
+                  SendCC(midi_ch, outmap[i].function_cc, newccval);
+                  current_ccval[i] = newccval;
+                }
                 break;
             }
         }
@@ -323,17 +324,17 @@ void HS::MIDIFrame::Send(const int *outvals) {
         const int chA = i*2;
         const int chB = chA + 1;
 
-        if (outfn[chB] == HEM_MIDI_GATE_OUT) {
+        if (outmap[chB].function == HEM_MIDI_GATE_OUT) {
             if (clocked[chB]) {
-                SendNoteOn(outchan[chB]);
+                SendNoteOn(outmap[chB].channel);
                 // no countdown
-                outchan_last[chB] = outchan[chB];
+                outchan_last[chB] = outmap[chB].channel;
             }
-        } else if (outfn[chA] == HEM_MIDI_NOTE_OUT) {
+        } else if (outmap[chA].function == HEM_MIDI_NOTE_OUT) {
             if (changed_cv[chA]) {
-                SendNoteOn(outchan[chA]);
+                SendNoteOn(outmap[chA].channel);
                 note_countdown[chA] = HEMISPHERE_CLOCK_TICKS * trig_length;
-                outchan_last[chA] = outchan[chA];
+                outchan_last[chA] = outmap[chA].channel;
             }
         }
     }
