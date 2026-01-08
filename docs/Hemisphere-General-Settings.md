@@ -16,26 +16,28 @@ This sets the pulse width (in milliseconds, approximate) for applets that genera
 ***
 
 ### Screensaver
-Options are:
+Some are decorative, and some are informative. Options are:
 * [blank]
-* Meters
-* Scope
-* Zips (or "Stars" in Teensy 4.x builds)
+* Meters - useful for visualizing all inputs/outputs
+* Zaps (or Snow!)
+* Scope - visualizes outputs
+* Zips
+* Stars
 
 ***
 
 ### Cursor Wrap
-As of v1.7, the Legacy cursor mode (press encoder to step to next parameter, rotate to edit) has been removed, and been replaced by a **modal** cursor:
+As of v1.7, the cursor behavior from Hemisphere/Benisphere Suite (press encoder to step to next parameter, rotate to edit) has been removed, and been replaced by a **modal** cursor:
 * rotate encoder to move cursor
 * push to toggle editing mode
 * rotate to edit parameter
 * push again to untoggle editing mode
 
-Setting the cursor configuration to **"modal + wrap"** will allow infinite looping scrolling: the cursor will wrap from the last parameter to the first, and vice versa.
+This config option determines whether the cursor loops around or stops:
+* **on** will allow infinite looping scrolling: the cursor will wrap from the last parameter to the first, and vice versa.
+* **off** will prevent looped scrolling, terminating at the beginning and end of the parameter list.
 
-Setting the cursor to simply **"modal"** will prevent looped scrolling, terminating at the beginning and end of the parameter list.
-
-_Note: Some applets (eg. Button2) override the default cursor behaviour, usually to enable different functionality when scrolling CW versus CCW._
+_Note: Some applets (eg. Button2) may not conform to the modal cursor behaviour. Simple on/off toggle options can typically be switched with just a button push, no edit mode._
 
 ***
 
@@ -44,7 +46,7 @@ Preset changes can be triggered with MIDI Program Change messages. This setting 
 
 ### Preset Jump Trigger
 _New in v1.12!_
-Hiding next to the MIDI PC setting is a Trigger Input mapping that can be used to load the next Preset in sequence. Just like any other [Input Mapping](Hemisphere-Input-Mapping), it can be assigned to any of the physical input jacks, applet outputs A, B, C, etc., or MIDI Maps. It is triggered when the selected input goes high (above a certain threshold, typically 1.5V). If the Clock is running, the preset load action synchronizes to the next Beat.
+Hiding next to the MIDI PC setting is a Trigger Input mapping that can be used to load the next Preset in sequence. Just like any other [Input Mapping](Hemisphere-Input-Mapping), it can be assigned to any of the physical input jacks, applet outputs A, B, C, etc., MIDI Maps, or internal Clock. It is triggered when the selected input goes high (above a certain threshold, typically 1.5V). If the Clock is running, the preset load action synchronizes to the next Beat.
 
 ***
 
