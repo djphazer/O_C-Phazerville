@@ -23,6 +23,8 @@
 #ifndef UTIL_MATH_H_
 #define UTIL_MATH_H_
 
+#include "util_macros.h"
+
 // Woo. Funky macro magic to avoid dividing by non-power-of-two.
 // Essentially a quick fixed-point calculation, but only valid up to 2^exp
 
@@ -84,6 +86,38 @@ struct SmoothedValue {
 
   void set(T value) {
     value_ = value;
+  }
+};
+
+struct SlewedValue {
+  static constexpr int EXTRA_PRECISION = 4;
+  int target_, value_;
+
+  void set(int val, bool override = false) {
+    target_ = val << EXTRA_PRECISION;
+    if (override) value_ = target_;
+  }
+
+  void push(uint8_t slew) {
+    if (slew) {
+      int diff = target_ - value_;
+      int delta = 1;
+      if (slew <= 50)
+        delta += 250 - 4 * slew;
+      else
+        delta += 100 - slew;
+      CONSTRAIN(delta, 0, abs(diff));
+      if (diff < 0) delta = -delta;
+      value_ += delta;
+    } else
+      value_ = target_;
+  }
+
+  int get() const {
+    return value_ >> EXTRA_PRECISION;
+  }
+  int get_target() const {
+    return target_ >> EXTRA_PRECISION;
   }
 };
 

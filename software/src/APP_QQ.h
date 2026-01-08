@@ -33,6 +33,7 @@
 #include "util/util_trigger_delay.h"
 #include "util/util_turing.h"
 #include "util/util_integer_sequences.h"
+#include "util/util_math.h"
 #include "peaks_bytebeat.h"
 #include "braids_quantizer.h"
 #include "braids_quantizer_scales.h"
@@ -875,25 +876,11 @@ public:
     if (changed) {
       MENU_REDRAW = 1;
       last_sample_ = continuous ? temp_sample : sample;
-      output_target_ = (sample + get_fine()) << HS::IOFrame::EXTRA_PRECISION;
+      output_.set(sample + get_fine());
     }
 
-    // Slew calculations, copied from HS::IOFrame
-    uint8_t slew = get_slew();
-    if (slew) {
-      int diff = output_target_ - output_;
-      int delta = 1;
-      if (slew <= 50)
-        delta += 250 - 4 * slew;
-      else
-        delta += 100 - slew;
-      CONSTRAIN(delta, 0, abs(diff));
-      if (diff < 0) delta = -delta;
-      output_ += delta;
-    } else
-      output_ = output_target_;
-
-    OC::DAC::set(dac_channel, output_ >> HS::IOFrame::EXTRA_PRECISION);
+    output_.push(get_slew());
+    OC::DAC::set(dac_channel, output_.get());
 
     if (triggered || (continuous && changed)) {
       scrolling_history_.Push(history_sample);
@@ -1117,7 +1104,7 @@ private:
   int last_scale_;
   uint16_t last_mask_;
   int32_t last_sample_;
-  int output_, output_target_;
+  SlewedValue output_;
   uint8_t clock_;
   bool int_seq_reset_;
   int8_t continuous_offset_;

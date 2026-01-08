@@ -185,8 +185,8 @@ public:
     void SmoothedOut(int ch, int value, int kSmoothing) const {
       if (OC::CORE::ticks % kSmoothing == 0) {
         DAC_CHANNEL channel = (DAC_CHANNEL)(ch + io_offset);
-        value = (frame.outputs_target[channel] * (kSmoothing - 1) + value) / kSmoothing;
-        frame.outputs_target[channel] = value;
+        value = (frame.outputs[channel].get_target() * (kSmoothing - 1) + value) / kSmoothing;
+        frame.outputs[channel].set(value);
       }
     }
     void ClockOut(const int ch, const int ticks = HEMISPHERE_CLOCK_TICKS * trig_length) {

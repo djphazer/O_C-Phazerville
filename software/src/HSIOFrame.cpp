@@ -275,12 +275,12 @@ void HS::MIDIFrame::ProcessMIDIMsg(const MIDIMessage msg) {
     }
 }
 
-void HS::MIDIFrame::Send(const int *outvals) {
+void HS::MIDIFrame::Send(const SlewedValue *outvals) {
     // first pass - calculate things and turn off notes
     for (int i = 0; i < DAC_CHANNEL_COUNT; ++i) {
         const uint8_t midi_ch = outmap[i].channel;
 
-        int input = outvals[i];
+        int input = outvals[i].get();
         gate_high[i] = input > (12 << 7);
         clocked[i] = (gate_high[i] && last_cv[i] < (12 << 7));
         if (abs(input - last_cv[i]) > HEMISPHERE_CHANGE_THRESHOLD) {

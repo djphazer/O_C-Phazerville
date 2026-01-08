@@ -435,7 +435,7 @@ struct MIDIFrame {
     }
 
     void ProcessMIDIMsg(const MIDIMessage msg);
-    void Send(const int *outvals);
+    void Send(const SlewedValue *outvals);
 
     void SendAfterTouch(const uint8_t midi_ch, uint8_t val) {
         usbMIDI.sendAfterTouch(val, midi_ch + 1);
@@ -482,8 +482,6 @@ struct MIDIFrame {
 // shared IO Frame, updated every tick
 // this will allow chaining applets together, multiple stages of processing
 struct IOFrame {
-    static constexpr int EXTRA_PRECISION = 4;
-
     // settings
     bool autoMIDIOut = false;
     uint8_t clockskip[DAC_CHANNEL_COUNT] = {0};
@@ -497,9 +495,7 @@ struct IOFrame {
     int inputs[ADC_CHANNEL_COUNT];
 
     // output value cache, countdowns
-    int outputs[DAC_CHANNEL_COUNT]; // now with Extra Precision!
-    int output_diff[DAC_CHANNEL_COUNT];
-    int outputs_target[DAC_CHANNEL_COUNT];
+    SlewedValue outputs[DAC_CHANNEL_COUNT]; // now with Extra Precision!
     int clock_countdown[DAC_CHANNEL_COUNT];
     int adc_lag_countdown[ADC_CHANNEL_COUNT]; // Time between a clock event and an ADC read event
     // calculated values
@@ -515,13 +511,11 @@ struct IOFrame {
       MIDIState.Init();
     }
 
-    const int ViewOut(DAC_CHANNEL ch) const { return outputs[ch] >> EXTRA_PRECISION; }
+    const int ViewOut(DAC_CHANNEL ch) const { return outputs[ch].get(); }
 
     // --- Soft IO ---
     void Out(DAC_CHANNEL channel, int value, bool override = false) {
-        output_diff[channel] += value - outputs_target[channel];
-        outputs_target[channel] = value;
-        if (override) outputs[channel] = value << EXTRA_PRECISION;
+      outputs[channel].set(value, override);
     }
     void ClockOut(DAC_CHANNEL ch, const int pulselength = HEMISPHERE_CLOCK_TICKS * trig_length) {
         // short circuit if skip probability is zero to avoid consuming random numbers
@@ -550,21 +544,8 @@ struct IOFrame {
         };
 
         for (int i = 0; i < DAC_CHANNEL_COUNT; ++i) {
-          const int target = outputs_target[i] << EXTRA_PRECISION;
-          if (output_slew[i]) {
-            int diff = target - outputs[i];
-            int delta = 1;
-            if (output_slew[i] <= 50)
-              delta += 250 - 4*output_slew[i];
-            else
-              delta += 100 - output_slew[i];
-            CONSTRAIN(delta, 0, abs(diff));
-            if (diff < 0) delta = -delta;
-            outputs[i] += delta;
-          } else
-            outputs[i] = target;
-
-          OC::DAC::set_pitch_scaled(chan[i], outputs[i] >> EXTRA_PRECISION, 0);
+          outputs[i].push(output_slew[i]);
+          OC::DAC::set_pitch_scaled(chan[i], outputs[i].get(), 0);
         }
         // oh no, this is certainly broken now...
         if (autoMIDIOut) MIDIState.Send(outputs);
