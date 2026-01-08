@@ -106,7 +106,7 @@ public:
         {
             if (notenames) {
                 // approximate notes being output
-                gfxPrint(2 + w*ch, 55, midi_note_numbers[MIDIQuantizer::NoteNumber(HS::frame.outputs[ch])] );
+                gfxPrint(2 + w*ch, 55, midi_note_numbers[MIDIQuantizer::NoteNumber(HS::frame.outputs[ch].get())] );
             }
 
             // trigger/gate indicators
@@ -120,7 +120,7 @@ public:
             gfxFrame(2 + (w * ch), y, w_, abs(height));
 
             // output
-            height = ProportionCV(HS::frame.outputs[ch], h);
+            height = ProportionCV(HS::frame.outputs[ch].get(), h);
             y = constrain(h - height, 0, h);
             gfxInvert(3 + w_ + (w * ch), y, w_, abs(height));
 
@@ -138,7 +138,7 @@ public:
     int In(int ch) {
         const int c = cvmapping[ch];
         if (!c) return 0;
-        return (c <= ADC_CHANNEL_LAST) ? frame.inputs[c - 1] : frame.outputs[c - 1 - ADC_CHANNEL_LAST];
+        return (c <= ADC_CHANNEL_LAST) ? frame.inputs[c - 1] : frame.outputs[c - 1 - ADC_CHANNEL_LAST].get();
     }
 
     // Apply small center detent to input, so it reads zero before a threshold
@@ -173,7 +173,7 @@ public:
         if (!t) return false;
         return (t <= offset)
           ? frame.gate_high[t - 1]
-          : (frame.outputs[t - 1 - offset] > GATE_THRESHOLD);
+          : (frame.outputs[t - 1 - offset].get() > GATE_THRESHOLD);
     }
 
     void GateOut(int ch, bool high) {
@@ -212,7 +212,7 @@ public:
 
     // Buffered I/O functions for use in Views
     int ViewIn(int ch) {return frame.inputs[ch];}
-    int ViewOut(int ch) {return frame.outputs[ch];}
+    int ViewOut(int ch) {return frame.outputs[ch].get();}
     uint32_t ClockCycleTicks(int ch) {return frame.cycle_ticks[ch];}
 
     /* ADC Lag: There is a small delay between when a digital input can be read and when an ADC can be

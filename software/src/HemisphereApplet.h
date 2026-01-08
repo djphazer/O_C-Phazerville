@@ -196,7 +196,7 @@ public:
 
     // Buffered I/O functions
     int ViewIn(int ch) {return frame.inputs[io_offset + ch];}
-    int ViewOut(int ch) {return frame.outputs[io_offset + ch];}
+    int ViewOut(int ch) {return frame.outputs[io_offset + ch].get();}
     uint32_t ClockCycleTicks(int ch) {
       if (clock_m.IsRunning() && clock_m.GetMultiply(io_offset + ch) != 0)
           return clock_m.GetCycleTicks(io_offset + ch);
@@ -209,7 +209,7 @@ public:
     int In(const int ch) {
         const int c = cvmapping[ch + io_offset];
         if (!c) return 0;
-        return (c <= ADC_CHANNEL_LAST) ? frame.inputs[c - 1] : frame.outputs[c - 1 - ADC_CHANNEL_LAST];
+        return (c <= ADC_CHANNEL_LAST) ? frame.inputs[c - 1] : frame.outputs[c - 1 - ADC_CHANNEL_LAST].get();
     }
 
     #ifdef ARDUINO_TEENSY41
@@ -248,7 +248,7 @@ public:
         const int t = trigger_mapping[ch + io_offset];
         const int offset = OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_LAST;
         if (!t) return false;
-        return (t <= offset) ? frame.gate_high[t - 1] : (frame.outputs[t - 1 - offset] > GATE_THRESHOLD);
+        return (t <= offset) ? frame.gate_high[t - 1] : (frame.outputs[t - 1 - offset].get() > GATE_THRESHOLD);
     }
     void Out(int ch, int value, int octave = 0) {
         frame.Out( (DAC_CHANNEL)(ch + io_offset), value + (octave * (12 << 7)));
@@ -257,8 +257,8 @@ public:
     void SmoothedOut(int ch, int value, int kSmoothing) {
       if (OC::CORE::ticks % kSmoothing == 0) {
         DAC_CHANNEL channel = (DAC_CHANNEL)(ch + io_offset);
-        value = (frame.outputs_smooth[channel] * (kSmoothing - 1) + value) / kSmoothing;
-        frame.outputs[channel] = frame.outputs_smooth[channel] = value;
+        value = (frame.outputs[channel].get_target() * (kSmoothing - 1) + value) / kSmoothing;
+        frame.outputs[channel].set(value, true);
       }
     }
     void ClockOut(const int ch, const int ticks = HEMISPHERE_CLOCK_TICKS * trig_length) {

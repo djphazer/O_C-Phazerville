@@ -651,16 +651,6 @@ public:
         }
         HS::clock_m.auto_reset = false;
 
-#ifdef ARDUINO_TEENSY41
-        // auto-trigger outputs E..H
-        for (int ch = 0; ch < 4; ++ch) {
-          if (abs(HS::frame.output_diff[ch]) > HEMISPHERE_CHANGE_THRESHOLD)
-          {
-            HS::frame.ClockOut(DAC_CHANNEL(ch + 4));
-            HS::frame.output_diff[ch] = 0;
-          }
-        }
-#endif
         HemisphereApplet::ProcessCursors();
     }
 

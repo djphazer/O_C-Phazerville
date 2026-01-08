@@ -540,12 +540,12 @@ struct MIDIFrame {
         }
     }
 
-    void Send(const int *outvals) {
+    void Send(const SlewedValue *outvals) {
         // first pass - calculate things and turn off notes
         for (int i = 0; i < DAC_CHANNEL_LAST; ++i) {
             const uint8_t midi_ch = outchan[i];
 
-            inputs[i] = outvals[i];
+            inputs[i] = outvals[i].get();
             gate_high[i] = inputs[i] > (12 << 7);
             clocked[i] = (gate_high[i] && last_cv[i] < (12 << 7));
             if (abs(inputs[i] - last_cv[i]) > HEMISPHERE_CHANGE_THRESHOLD) {
@@ -652,13 +652,13 @@ struct MIDIFrame {
 // shared IO Frame, updated every tick
 // this will allow chaining applets together, multiple stages of processing
 struct IOFrame {
+    // settings
     bool autoMIDIOut = false;
     bool clocked[OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_LAST];
     bool gate_high[OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_LAST];
     int inputs[ADC_CHANNEL_LAST];
-    int outputs[DAC_CHANNEL_LAST];
-    int output_diff[DAC_CHANNEL_LAST];
-    int outputs_smooth[DAC_CHANNEL_LAST];
+    SlewedValue outputs[DAC_CHANNEL_LAST];
+    uint8_t output_slew[DAC_CHANNEL_LAST] = {0};
     int clock_countdown[DAC_CHANNEL_LAST];
     uint8_t clockskip[DAC_CHANNEL_LAST] = {0};
     bool clockout_q[DAC_CHANNEL_LAST]; // for loopback
@@ -671,20 +671,20 @@ struct IOFrame {
     /* MIDI message queue/cache */
     MIDIFrame MIDIState;
 
-    // --- Soft IO ---
-    void Out(DAC_CHANNEL channel, int value) {
-        // rising edge detection for trigger loopback
-        if (value > GATE_THRESHOLD && outputs[channel] < GATE_THRESHOLD)
-            clockout_q[channel] = true;
+    const int ViewOut(DAC_CHANNEL ch) const { return outputs[ch].get(); }
 
-        output_diff[channel] += value - outputs[channel];
-        outputs[channel] = value;
+    // --- Soft IO ---
+    void Out(DAC_CHANNEL channel, int value, bool override = false) {
+      // rising edge detection for trigger loopback
+      if (value > GATE_THRESHOLD && outputs[channel].get() < GATE_THRESHOLD)
+        clockout_q[channel] = true;
+      outputs[channel].set(value, override);
     }
     void ClockOut(DAC_CHANNEL ch, const int pulselength = HEMISPHERE_CLOCK_TICKS * HS::trig_length) {
         // short circuit if skip probability is zero to avoid consuming random numbers
         if (0 == clockskip[ch] || random(100) >= clockskip[ch]) {
             clock_countdown[ch] = pulselength;
-            outputs[ch] = PULSE_VOLTAGE * (12 << 7);
+            outputs[ch].set(PULSE_VOLTAGE * (12 << 7));
             clockout_q[ch] = true;
         }
     }
@@ -719,7 +719,7 @@ struct IOFrame {
 
             // Handle clock pulse timing
             if (clock_countdown[i] > 0) {
-                if (--clock_countdown[i] == 0) outputs[i] = 0;
+                if (--clock_countdown[i] == 0) outputs[i].set(0);
             }
         }
 
@@ -763,8 +763,10 @@ struct IOFrame {
           DAC_CHANNEL_E, DAC_CHANNEL_F, DAC_CHANNEL_G, DAC_CHANNEL_H,
 #endif
         };
-        for (int i = 0; i < DAC_CHANNEL_LAST; ++i) {
-            OC::DAC::set_pitch_scaled(chan[i], outputs[i], 0);
+
+        for (int i = 0; i < DAC_CHANNEL_COUNT; ++i) {
+          outputs[i].push(output_slew[i]);
+          OC::DAC::set_pitch_scaled(chan[i], outputs[i].get(), 0);
         }
         if (autoMIDIOut) MIDIState.Send(outputs);
     }

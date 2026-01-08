@@ -17,7 +17,7 @@ struct CVInputMap {
   int RawIn() {
     return source <= ADC_CHANNEL_LAST
       ? frame.inputs[source - 1]
-      : frame.outputs[source - 1 - ADC_CHANNEL_LAST];
+      : frame.ViewOut(source - 1 - ADC_CHANNEL_LAST);
   }
 
   int In(int default_value = 0) {
@@ -107,7 +107,7 @@ struct DigitalInputMap {
       case DIGITAL_INPUT:
         return frame.gate_high[digital_input_index()];
       case CV_OUTPUT:
-        return frame.outputs[cv_output_index()] > GATE_THRESHOLD;
+        return frame.ViewOut(cv_output_index()) > GATE_THRESHOLD;
       case NONE:
       default:
         return false;
