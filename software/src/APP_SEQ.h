@@ -1851,24 +1851,9 @@ public:
   }
 
   void update_main_channel(DAC_CHANNEL &dacChannel) {
-    int32_t _output_target = OC::DAC::pitch_to_scaled_voltage_dac(dacChannel, get_step_pitch(), 0, OC::DAC::get_voltage_scaling(dacChannel)) << HS::IOFrame::EXTRA_PRECISION;
-
-    // Slew calculations, copied from HS::IOFrame
-    uint8_t slew = get_slew();
-    if (slew) {
-      int diff = _output_target - output_;
-      int delta = 1;
-      if (slew <= 50)
-        delta += 250 - 4 * slew;
-      else
-        delta += 100 - slew;
-      CONSTRAIN(delta, 0, abs(diff));
-      if (diff < 0) delta = -delta;
-      output_ += delta;
-    } else
-      output_ = _output_target;
-
-    OC::DAC::set(dacChannel, output_ >> HS::IOFrame::EXTRA_PRECISION);
+    output_.set(OC::DAC::pitch_to_scaled_voltage_dac(dacChannel, get_step_pitch(), 0, OC::DAC::get_voltage_scaling(dacChannel)));
+    output_.push(get_slew());
+    OC::DAC::set(dacChannel, output_.get());
   }
 
   void update_aux_channel(DAC_CHANNEL &dacChannel)
@@ -1958,7 +1943,7 @@ private:
   uint8_t prev_playmode_;
   bool pending_sync_;
 
-  int output_;
+  SlewedValue output_;
 
   util::TriggerDelay<OC::kMaxTriggerDelayTicks> trigger_delay_;
   util::Arpeggiator arpeggiator_;
