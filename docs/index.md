@@ -5,7 +5,7 @@ nav_order: 1
 
 # Phazerville Suite
 #### _Note from the Mayor:_
-> Thanks for checking out my firmware. I've basically tried to hoard all the notable Apps and Applets in one repo! All the full-screen apps from [Hemisphere Suite](https://github.com/Chysn/O_C-HemisphereSuite/wiki) are here, plus all of the [stock O&C firmware](https://ornament-and-cri.me/user-manual-v1_3/) apps and a few new ones, albeit in limited combinations depending on which .hex file you grabbed from the [Release page](https://github.com/djphazer/O_C-Phazerville/releases).
+> Thanks for checking out my firmware! I've made efforts to hoard all the notable [Apps and Applets](App-and-Applet-Index) in one repo! All the full-screen Apps from [Hemisphere Suite](https://github.com/Chysn/O_C-HemisphereSuite/wiki) are here, plus all of the [stock O&C firmware](https://ornament-and-cri.me/user-manual-v1_3/) Apps, and a few new ones, albeit in limited combinations depending on which hardware variant you have... see the [Build Choices](Build-Choices) page for details.
 > 
 > Want to roll your own mix of Apps? You can request a **Custom Build** for Teensy 3.2 with a simple bot command on [this discussion post](https://github.com/djphazer/O_C-Phazerville/discussions/38).
 > 
@@ -16,53 +16,40 @@ nav_order: 1
 ![Various O_C modules running the firmware](images/three_criminals.jpg)
 
 ## Key Features:
-* Support for next-gen [Teensy 4.1-based "O.R.N.8" hardware](https://github.com/PaulStoffregen/O_C_T41) using [Quadrants](Quadrants) App
+* Support for next-gen [Teensy 4.1-based "O.R.N.8" hardware](https://github.com/PaulStoffregen/O_C_T41) using [**Quadrants**](Quadrants) App
+    * includes Audio Applet subsystem for DSP effects, synths, and samplers.
 * Support for Teensy 4.0 on original O_C hardware
-* More Apps fit into the original Teensy 3.2 (you can even [choose your own App selection](https://github.com/djphazer/O_C-Phazerville/discussions/38))
+* More Apps can fit into the original Teensy 3.2 ([choose your own App selection](https://github.com/djphazer/O_C-Phazerville/discussions/38))
 * Many new and improved [Hemisphere Applets](App-and-Applet-Index#hemisphere-applets)
-* New full screen apps: [Scenery](Scenery), [Calibr8or](Calibr8or), and [Passencore](Passencore)
+* New full screen apps: [Scenery](Scenery) and [Calibr8or](Calibr8or)
 * New UI features, codebase optimizations, and QoL improvements
-    * [Hemisphere Presets](Hemisphere-Presets) — with auto save and loading via MIDI program changes
+    * [Hemisphere Presets](Hemisphere-Presets) — with auto-save and loading via MIDI Program Changes
     * [Trigger and CV Input re-mapping](Hemisphere-Input-Mapping) (including internal routing)
-    * [Internal clock improvements](Clock-Setup): swing, per-channel multiplication / division, manual performance triggers
-    * [Global per-channel quantization](Hemisphere-Quantizer-Setup) (with pop-up editor and performance transposition)
-    * Intuitive MIDI or CV clock sync
-    * Experimental [automatic USB MIDI Out](Hemisphere-General-Settings#auto-midi-output)
+    * [Internal Clock improvements](Clock-Setup): sync to external CV or MIDI clock, swing, per-channel multiplication / division
+    * [Multiple Quantizer Engines](Hemisphere-Quantizer-Setup) (with pop-up editor and performance transposition)
+    * [Expanded MIDI Input](MIDI-Input) options for MIDI-to-CV, including polyphony
 
 ***
 
 ## Quick Links
 
-You can find links to documentation for (almost) every single O_C function on this page, or on the sidebar.
+You can find documentation for (almost) every single O_C function on this page, or on the sidebar. Use the Search bar at the top for quick lookups.
 
-**[Full PDF Manual 𝌆](https://drive.google.com/file/d/1QP3Erpp_vNS32l7JN_-60KhtBQsRg5HM/view)** compiled by Saverio Paiella (July 22, 2024)
+↯ [Download a **Release**](https://github.com/djphazer/O_C-Phazerville/releases)
 
-↯ [Download a **Release**](https://github.com/djphazer/O_C-Phazerville/releases) or ᛃ [Request a **Custom Build**](https://github.com/djphazer/O_C-Phazerville/discussions/38).
+ᛃ [Request a **Custom Build**](https://github.com/djphazer/O_C-Phazerville/discussions/38).
 
 ⧉ **[Index of all Apps and Applets](App-and-Applet-Index)**
 
 #### Installation
 * [Firmware update procedure](Installation)
-* [Build choices](Build-Choices)
-* [Saving state](Saving-State)
-* [Troubleshooting](Troubleshooting)
-
-#### Hemisphere docs:
-
-* [Gestures / Button combos](Hemisphere-Gestures)
-* [Clock Setup](Clock-Setup)
-* [Config Menu](Hemisphere-Config)
-    * [Save / Load Presets](Hemisphere-Presets)
-    * [General Settings](Hemisphere-General-Settings)
-    * [Quantizer Set-Up](Hemisphere-Quantizer-Setup)
-    * [Input Mapping](Hemisphere-Input-Mapping)
-    * [Applet Filtering](Hemisphere-Applet-Filtering)
+* [Calibration info](Setup-About#calibration-routine)
 
 ***
 
 ## New to Ornament and Crime?
 
-**_Ornament and Crime_** is a Polymorphic CV Generator — a swiss army knife of modular control voltage. It can perform as an _excellent_ sequencer, envelope generator, quantizer, MIDI-to-CV and/or CV-to-MIDI interface, and [much more](App-and-Applet-Index#apps-and-applets-by-function) via its many apps and applets.
+**_Ornament and Crime_** is a Polymorphic CV Generator — a swiss army knife of modular control voltage. It can perform as an _excellent_ sequencer, envelope generator, quantizer, MIDI-to-CV and/or CV-to-MIDI interface, and [much more](App-and-Applet-Index#apps-and-applets-by-function) via its many Apps and Applets.
 
 **_o_C_** is a **collaborative open-source project** originated by [Patrick Dowling, mxmxmx, and Tim Churches](https://ornament-and-cri.me/), and extended by many contributors (special thanks to [Chysn](https://github.com/Chysn/O_C-HemisphereSuite) for the original Hemisphere Suite). The **_Phazerville_** firmware optimizes the code base so that more apps can fit on the original hardware (which come in many flavours, for Eurorack and otherwise — _See [Build Choices](Build-Choices)_), and paves the way for the next generation of hardware on the Teensy 4.1 platform.
 
