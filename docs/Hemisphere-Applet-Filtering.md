@@ -1,17 +1,13 @@
 ---
 layout: default
-parent: Hemisphere Config
+parent: Config
 nav_order: 5
 ---
 # Applet Filtering
 
-## Page 4: Applet Filtering
-
-The fourth and final full-screen page in the [config menu](Hemisphere-Config) is for Applet Filtering.
+The final full-screen page in the [config menu](Hemisphere-Config) is for hiding Applets.
 
 Are you tired of scrolling past applets you never use? Now you can hide them with this filter!
-
-_This setting is now saved in v1.8._
 
 ![Applet List screenshot](images/AppletList.png)
 

@@ -1,15 +1,15 @@
 ---
 layout: default
-title: Hemisphere Config
+title: Config
 nav_order: 7
 has_children: true
 has_toc: false
 ---
-# Hemisphere Config
+# Config
 
-Long-press DOWN button to enter the Hemisphere Configuration menu. Short-press UP or DOWN button to exit.
+From within Hemispheres (or Quadrants), long-press DOWN (or B) button to enter the Configuration menu. Short-press UP or DOWN (or A/B/X/Y) buttons to exit.
 
-As of v1.7.1, the config menu is split into several pages. Rotate LEFT encoder to jump to different pages. Use RIGHT encoder to move the cursor and push to edit.
+Rotate LEFT encoder to jump to different pages. Use RIGHT encoder to move the cursor and push to edit.
 
 * **Floating Menu:** [Presets](Hemisphere-Presets)<br>
 [![Screenshot 2024-06-13 14-10-47](https://github.com/djphazer/O_C-Phazerville/assets/109086194/c1413c95-627c-40d2-88ff-79b00829f31b)](Hemisphere-Presets)
