@@ -39,6 +39,7 @@
 #include "extern/dspinst.h"
 #include "util/util_arp.h"
 #include "peaks_multistage_envelope.h"
+#include "HSIOFrame.h"
 
 using OC::DUMMY;
 
@@ -161,7 +162,9 @@ enum SEQ_ChannelSetting {
   SEQ_CHANNEL_SETTING_SEQUENCE_ARP_DIRECTION,
   SEQ_CHANNEL_SETTING_SEQUENCE_ARP_RANGE,
   SEQ_CHANNEL_SETTING_BROWNIAN_PROBABILITY,
+  SEQ_CHANNEL_SETTING_SLEW,
   // cv sources
+  SEQ_CHANNEL_SETTING_SLEW_CV,
   SEQ_CHANNEL_SETTING_MULT_CV_SOURCE,
   SEQ_CHANNEL_SETTING_TRANSPOSE_CV_SOURCE,
   SEQ_CHANNEL_SETTING_PULSEWIDTH_CV_SOURCE,
@@ -766,6 +769,15 @@ public:
 
   int get_cv_input_range() const {
     return values_[SEQ_CHANNEL_SETTING_SEQUENCE_PLAYMODE_CV_RANGES];
+  }
+
+  uint8_t get_slew() const {
+    if (get_slew_cv_source())
+      return constrain(values_[SEQ_CHANNEL_SETTING_SLEW] + ((OC::ADC::value(get_slew_cv_source() - 1) + 15) >> 5), 0, 100);
+    return values_[SEQ_CHANNEL_SETTING_SLEW];
+  }
+  uint8_t get_slew_cv_source() const {
+    return values_[SEQ_CHANNEL_SETTING_SLEW_CV];
   }
 
   void Init(SEQ_ChannelTriggerSource trigger_source, uint8_t id) {
@@ -1652,27 +1664,27 @@ public:
 
       case PARAMETERS: {
 
-          *settings++ = SEQ_CHANNEL_SETTING_SCALE;
-          *settings++ = SEQ_CHANNEL_SETTING_SCALE_MASK;
-          *settings++ = SEQ_CHANNEL_SETTING_SEQUENCE;
+         *settings++ = SEQ_CHANNEL_SETTING_SCALE;
+         *settings++ = SEQ_CHANNEL_SETTING_SCALE_MASK;
+         *settings++ = SEQ_CHANNEL_SETTING_SEQUENCE;
 
-          switch (get_sequence()) {
+         switch (get_sequence()) {
 
-            case 0:
-              *settings++ = SEQ_CHANNEL_SETTING_MASK1;
-            break;
-            case 1:
-              *settings++ = SEQ_CHANNEL_SETTING_MASK2;
-            break;
-            case 2:
-              *settings++ = SEQ_CHANNEL_SETTING_MASK3;
-            break;
-            case 3:
-              *settings++ = SEQ_CHANNEL_SETTING_MASK4;
-            break;
-            default:
-            break;
-          }
+           case 0:
+             *settings++ = SEQ_CHANNEL_SETTING_MASK1;
+           break;
+           case 1:
+             *settings++ = SEQ_CHANNEL_SETTING_MASK2;
+           break;
+           case 2:
+             *settings++ = SEQ_CHANNEL_SETTING_MASK3;
+           break;
+           case 3:
+             *settings++ = SEQ_CHANNEL_SETTING_MASK4;
+           break;
+           default:
+           break;
+         }
 
          *settings++ = SEQ_CHANNEL_SETTING_SEQUENCE_PLAYMODE;
 
@@ -1690,6 +1702,7 @@ public:
 
          *settings++ = SEQ_CHANNEL_SETTING_OCTAVE;
          *settings++ = SEQ_CHANNEL_SETTING_ROOT;
+         *settings++ = SEQ_CHANNEL_SETTING_SLEW;
          // aux output:
          *settings++ = SEQ_CHANNEL_SETTING_MODE;
 
@@ -1785,6 +1798,7 @@ public:
 
          *settings++ = SEQ_CHANNEL_SETTING_OCTAVE_CV_SOURCE;
          *settings++ = SEQ_CHANNEL_SETTING_ROOT_CV_SOURCE;
+         *settings++ = SEQ_CHANNEL_SETTING_SLEW_CV;
          *settings++ = SEQ_CHANNEL_SETTING_DUMMY; // = mode
 
          switch (get_aux_mode()) {
@@ -1837,8 +1851,9 @@ public:
   }
 
   void update_main_channel(DAC_CHANNEL &dacChannel) {
-    int32_t _output = OC::DAC::pitch_to_scaled_voltage_dac(dacChannel, get_step_pitch(), 0, OC::DAC::get_voltage_scaling(dacChannel));
-    OC::DAC::set(dacChannel, _output);
+    output_.set(OC::DAC::pitch_to_scaled_voltage_dac(dacChannel, get_step_pitch(), 0, OC::DAC::get_voltage_scaling(dacChannel)));
+    output_.push(get_slew());
+    OC::DAC::set(dacChannel, output_.get());
   }
 
   void update_aux_channel(DAC_CHANNEL &dacChannel)
@@ -1928,6 +1943,8 @@ private:
   uint8_t prev_playmode_;
   bool pending_sync_;
 
+  SlewedValue output_;
+
   util::TriggerDelay<OC::kMaxTriggerDelayTicks> trigger_delay_;
   util::Arpeggiator arpeggiator_;
 
@@ -1968,7 +1985,7 @@ const char* const arp_range[] = {
   "1", "2", "3", "4"
 };
 
-// TOTAL EEPROM SIZE: 2 * 54 bytes
+// TOTAL EEPROM SIZE: 2 * 56 bytes
 SETTINGS_DECLARE(SEQ_Channel, SEQ_CHANNEL_SETTING_LAST) {
 
   { 0, 0, 4, "aux. mode", modes, settings::STORAGE_TYPE_U4 },
@@ -1999,25 +2016,27 @@ SETTINGS_DECLARE(SEQ_Channel, SEQ_CHANNEL_SETTING_LAST) {
   { 0, 0, 3, "direction", arp_directions, settings::STORAGE_TYPE_U4 },
   { 0, 0, 3, "arp.range", arp_range, settings::STORAGE_TYPE_U8 },
   { 64, 0, 255, "-->brown prob", NULL, settings::STORAGE_TYPE_U8 },
+  { 0, 0, 100, "slew", NULL, settings::STORAGE_TYPE_U8 },
   // cv sources
-  { 0, 0, 4, "mult/div CV ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "transpose   ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "--> pw      ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "octave  +/- ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "root    +/- ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "--> aux +/- ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "sequence #  ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "mask rotate ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "direction   ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "arp.range   ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "direction   ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "-->brwn.prb ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "seq.length  ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "att dur  ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "dec dur  ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "sus lvl  ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "rel dur  ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-  { 0, 0, 4, "env loops ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U8 },
+  { 0, 0, ADC_CHANNEL_COUNT, "slew CV     ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "mult/div CV ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "transpose   ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "--> pw      ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "octave  +/- ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "root    +/- ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "--> aux +/- ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "sequence #  ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "mask rotate ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "direction   ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "arp.range   ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "direction   ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "-->brwn.prb ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "seq.length  ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "att dur  ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "dec dur  ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "sus lvl  ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "rel dur  ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+  { 0, 0, ADC_CHANNEL_COUNT, "env loops ->", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U8 },
   { 0, 0, 1, "-", NULL, settings::STORAGE_TYPE_U4 }, // DUMMY, use to store update behaviour
   // envelope parameters
   { 128, 0, 255, "--> att dur", NULL, settings::STORAGE_TYPE_U8 },
