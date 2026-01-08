@@ -37,7 +37,7 @@ namespace OC {
     };
 
     static const int PATTERN_NONE = -1;
-    static const int NUM_PATTERNS_PER_CHAN = PATTERN_USER_COUNT / 2;
+    static const int NUM_PATTERNS_PER_CHAN = 4;
 
     static const int kMin = kMinPatternLength;
     static const int kMax = kMaxPatternLength;
