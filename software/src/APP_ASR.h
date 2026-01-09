@@ -65,6 +65,8 @@ enum ASRSettings {
   ASR_SETTING_BUFFER_LENGTH,
   ASR_SETTING_CV_SOURCE,
   ASR_SETTING_CV4_DESTINATION,
+  ASR_SETTING_SLEW,
+  ASR_SETTING_SLEW_CV,
   ASR_SETTING_TURING_LENGTH,
   ASR_SETTING_TURING_PROB,
   ASR_SETTING_TURING_CV_SOURCE,
@@ -191,6 +193,15 @@ public:
 
   uint8_t get_cv4_destination() const {
     return values_[ASR_SETTING_CV4_DESTINATION];
+  }
+
+  uint8_t get_slew() const {
+    if (get_slew_cv_source())
+      return constrain(values_[ASR_SETTING_SLEW] + ((OC::ADC::value(get_slew_cv_source() - 1) + 15) >> 5), 0, 100);
+    return values_[ASR_SETTING_SLEW];
+  }
+  uint8_t get_slew_cv_source() const {
+    return values_[ASR_SETTING_SLEW_CV];
   }
 
   uint8_t get_turing_length() const {
@@ -397,6 +408,8 @@ public:
 
     *settings++ = ASR_SETTING_CV4_DESTINATION;
     *settings++ = ASR_SETTING_CV_SOURCE;
+    *settings++ = ASR_SETTING_SLEW;
+    *settings++ = ASR_SETTING_SLEW_CV;
 
     switch (get_cv_source()) {
       case ASR_CHANNEL_SOURCE_TURING:
@@ -702,8 +715,11 @@ public:
          }
 
         // ... and write to DAC
-        for (int i = 0; i < NUM_ASR_CHANNELS; ++i)
-          OC::DAC::set(static_cast<DAC_CHANNEL>(i), _asr_buffer[i]);
+        for (int i = 0; i < NUM_ASR_CHANNELS; ++i) {
+          outputs[i].set(_asr_buffer[i]);
+          outputs[i].push(slew_amount);
+          OC::DAC::set(static_cast<DAC_CHANNEL>(i), outputs[i].get());
+        }
 
         MENU_REDRAW = 0x1;
       }
@@ -727,6 +743,8 @@ private:
   int8_t TR2_state_;
   int last_scale_;
   uint16_t last_mask_;
+  uint8_t slew_amount = 0;
+  SlewedValue outputs[NUM_ASR_CHANNELS];
   braids::Quantizer quantizer_;
   OC::DigitalInputDisplay clock_display_;
   util::TriggerDelay<OC::kMaxTriggerDelayTicks> trigger_delay_;
@@ -768,6 +786,8 @@ SETTINGS_DECLARE(ASRApp, ASR_SETTING_LAST) {
   { 4, 4, ASR_HOLD_BUF_SIZE - 1, "hold (buflen)", NULL, settings::STORAGE_TYPE_U8 },
   { 0, 0, ASR_CHANNEL_SOURCE_LAST -1, "CV source", asr_input_sources, settings::STORAGE_TYPE_U4 },
   { 0, 0, ASR_DEST_LAST - 1, "CV4 dest. ->", asr_cv4_destinations, settings::STORAGE_TYPE_U4 },
+  { 0, 0, 100, "Slew", NULL, settings::STORAGE_TYPE_U8 },
+  { 0, 0, ADC_CHANNEL_COUNT, "Slew CV", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
   { 16, 1, 32, "> LFSR length", NULL, settings::STORAGE_TYPE_U8 },
   { 128, 0, 255, "> LFSR p", NULL, settings::STORAGE_TYPE_U8 },
   { 0, 0, 3, "> LFSR CV1", OC::Strings::TM_aux_cv_destinations, settings::STORAGE_TYPE_U8 }, // ??
