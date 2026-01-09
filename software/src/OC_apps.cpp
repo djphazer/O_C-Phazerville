@@ -69,7 +69,9 @@ namespace menu = OC::menu;
 #include "APP_ENIGMA.h"
 #include "APP_NeuralNetwork.h"
 #include "APP_SCALEEDITOR.h"
+#ifndef NO_HEMISPHERE
 #include "APP_WAVEFORMEDITOR.h"
+#endif
 #include "APP_PONGGAME.h"
 #ifndef __IMXRT1062__
 #include "APP_Backup.h"
@@ -164,7 +166,9 @@ static constexpr OC::App available_apps[] = {
   DECLARE_APP('N','N', "Neural Net", NeuralNetwork),
   #endif
   DECLARE_APP('S','C', "Scale Editor", SCALEEDITOR),
+#ifndef NO_HEMISPHERE
   DECLARE_APP('W','A', "Waveform Editor", WaveformEditor),
+#endif
   #ifdef ENABLE_APP_PONG
   DECLARE_APP('P','O', "Pong", PONGGAME),
   #endif
@@ -203,7 +207,9 @@ struct GlobalSettings {
 #else
   HS::TuringMachine user_turing_machines[HS::TURING_MACHINE_COUNT];
 #endif
+#ifndef NO_HEMISPHERE
   HS::VOSegment user_waveforms[HS::VO_SEGMENT_COUNT];
+#endif
   OC::Autotune_data auto_calibration_data[DAC_CHANNEL_LAST];
 #endif
 };
@@ -353,7 +359,9 @@ void save_global_settings() {
 #else
   memcpy(global_settings.user_turing_machines, HS::user_turing_machines, sizeof(HS::user_turing_machines));
 #endif
+#ifndef NO_HEMISPHERE
   memcpy(global_settings.user_waveforms, HS::user_waveforms, sizeof(HS::user_waveforms));
+#endif
   memcpy(global_settings.auto_calibration_data, OC::auto_calibration_data, sizeof(OC::auto_calibration_data));
   // scaling settings:
   global_settings.DAC_scaling = OC::DAC::store_scaling();
@@ -633,7 +641,9 @@ void Init(bool reset_settings) {
 #else
       memcpy(HS::user_turing_machines, global_settings.user_turing_machines, sizeof(HS::user_turing_machines));
 #endif
+#ifndef NO_HEMISPHERE
       memcpy(HS::user_waveforms, global_settings.user_waveforms, sizeof(HS::user_waveforms));
+#endif
       memcpy(auto_calibration_data, global_settings.auto_calibration_data, sizeof(auto_calibration_data));
       DAC::choose_calibration_data(); // either use default data, or auto_calibration_data
       DAC::restore_scaling(global_settings.DAC_scaling); // recover output scaling settings
