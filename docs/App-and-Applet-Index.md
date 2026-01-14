@@ -76,6 +76,7 @@ If you're coming from any of the other Hemisphere forks, note that many of the a
 * [Enigma Jr.](Enigma-Jr) - compact player of curated shift registers
 * [EnvFollow](Envelope-Follower) - follows or ducks based on incoming audio
   - added Speed control
+* [EnvSeq](EnvSeq) - envelope sequencer
 * [EuclidX](EuclidX) - Euclidean pattern generator (replacement for [AnnularFusion](https://github.com/Chysn/O_C-HemisphereSuite/wiki/Annular-Fusion-Euclidean-Drummer))
 * [GameOfLife](GameOfLife) - experimental cellular automaton modulation source
 * [GateDelay](Gate-Delay) - simple gate delay
@@ -143,7 +144,7 @@ If you're coming from any of the other Hemisphere forks, note that many of the a
 | **Drums / Synth Voice**      | [BitBeat](BitBeat), [BootsNCat](BootsNCat), [BugCrack](BugCrack), [WTVCO](WTVCO)     | [Viznutcracker, sweet!](Viznutcracker-sweet)     |
 | **Effect**                   | [Dr. LoFi](Dr.-LoFi)    |                      |
 | **Envelope Follower**        | [EnvFollow](Envelope-Follower), [Slew](Slew)   |                 |
-| **Envelope Generator**       | [ADSR](ADSR-EG), [AD EG](AD-EG), [Ebb & LFO](Ebb-&-LFO), [VectorEG](VectorEG)                                                                                                                                 | [Piqued](Piqued), [Dialectic Ping Pong](Dialectic-Ping-Pong)                                                          |
+| **Envelope Generator**       | [ADSR](ADSR-EG), [AD EG](AD-EG), [Ebb & LFO](Ebb-&-LFO), [EnvSeq](EnvSeq), [VectorEG](VectorEG)  | [Piqued](Piqued), [Dialectic Ping Pong](Dialectic-Ping-Pong) |
 | **LFO**                      | [Ebb & LFO](Ebb-&-LFO), [LowerRenz](LowerRenz), [VectorLFO](VectorLFO)                                                                                                                       | [Quadraturia](Quadraturia)                                                                            |
 | **MIDI**                     | [MIDI In](MIDI-Input), [MIDI Out](MIDI-Out) _(See also: [Auto MIDI Output](Hemisphere-General-Settings#auto-midi-output))_                                                                                                                                           | [Captain MIDI](Captain-MIDI)                                                                           |
 | **Mixer**                    | [AttenOff](AttenOff), [Calculate](Calculate), [Squanch](Squanch), [Xfader](Xfader) |    |
