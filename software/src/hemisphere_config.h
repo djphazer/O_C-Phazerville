@@ -53,6 +53,7 @@
 #include "applets/EnigmaJr.h"
 #include "applets/EnsOscKey.h"
 #include "applets/EnvFollow.h"
+#include "applets/EnvSeq.h"
 #include "applets/EuclidX.h"
 #include "applets/GameOfLife.h"
 #include "applets/GateDelay.h"
@@ -175,6 +176,7 @@ AppletRegistry reg{
     DeclareApplet<EnigmaJr>{45, 0x02},
     DeclareApplet<EnsOscKey>{35, 0x08},
     DeclareApplet<EnvFollow>{42, 0x11},
+    DeclareApplet<EnvSeq>{91, 0x02},
     DeclareApplet<EuclidX>{15, 0x02},
 #ifdef PEWPEWPEW
     DeclareApplet<GameOfLife>{22, 0x01},
