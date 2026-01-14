@@ -44,12 +44,25 @@ public:
     }
 
     void Controller() {
-        // Input 1 is frequency modulation for channel 1
-        osc[0].SetPhaseIncrement(ComputePhaseIncrement(pitch[0] + In(0)));
+        int mix_level = 0;
 
-        // Input 2 determines signal 1's level on the B/D output mix
-        int mix_level = DetentedIn(1);
-        mix_level = constrain(mix_level, -HEMISPHERE_MAX_CV, HEMISPHERE_MAX_CV);
+        if (modshape) {
+          // Inputs 1 & 2 change shape (only on Clock?)
+          ForEachChannel(ch) {
+            int wave = WaveformManager::GetNextWaveform(waveform_number[ch], SemitoneIn(ch));
+            if (wave_mod[ch] != wave) {
+              wave_mod[ch] = wave;
+              SwitchWaveform(ch, wave_mod[ch]);
+            }
+          }
+        } else {
+          // Input 1 is frequency modulation for channel 1
+          osc[0].SetPhaseIncrement(ComputePhaseIncrement(pitch[0] + In(0)));
+
+          // Input 2 determines signal 1's level on the B/D output mix
+          mix_level = DetentedIn(1);
+          mix_level = constrain(mix_level, -HEMISPHERE_MAX_CV, HEMISPHERE_MAX_CV);
+        }
 
         int signal = 0; // Declared here because the first channel's output is used in the second channel; see below
         ForEachChannel(ch)
@@ -82,6 +95,12 @@ public:
 
     void View() {
         DrawInterface();
+    }
+
+    void AuxButton() {
+      if (cursor & 1) { // waveform
+        modshape = !modshape;
+      }
     }
 
     // void OnButtonPress() { }
@@ -136,8 +155,8 @@ protected:
         //                    "-------" <-- Label size guide
         help[HELP_DIGITAL1] = "Sync 1";
         help[HELP_DIGITAL2] = "Sync 2";
-        help[HELP_CV1]      = "FM 1";
-        help[HELP_CV2]      = "1->2Mix";
+        help[HELP_CV1]      = modshape ? "Shape" : "FM 1";
+        help[HELP_CV2]      = modshape ? "Shape" : "1->2Mix";
         help[HELP_OUT1]     = "Ch1 LFO";
         help[HELP_OUT2]     = "Ch2 LFO";
         help[HELP_EXTRA1] = "";
@@ -151,11 +170,12 @@ private:
 
     // Settings
     int waveform_number[2];
+    int wave_mod[2];
     int16_t pitch[2];
+    bool modshape = false;
 
     int8_t knob_accel = 0;
     elapsedMillis millis_since_turn;
-    
 
     void DrawInterface() {
         byte c = cursor;
@@ -170,10 +190,12 @@ private:
         gfxPos(10, 15);
         gfxPrintFreqFromPitch(pitch[ch]);
 
+        gfxIcon(56, 15, modshape? DOWN_ICON : LEFT_ICON);
+
         DrawWaveform(ch);
 
         if (c == 0) gfxCursor(8, 23, 55);
-        if (c == 1 && (EditMode() || CursorBlink()) ) gfxFrame(0, 24, 63, 40);
+        if (c == 1 && (EditMode() || CursorBlink()) ) gfxFrame(0, 24, 63, 40, true);
     }
 
     void DrawWaveform(byte ch) {
@@ -200,7 +222,6 @@ private:
 
     void SwitchWaveform(byte ch, int waveform) {
         osc[ch] = WaveformManager::VectorOscillatorFromWaveform(waveform);
-        waveform_number[ch] = waveform;
         osc[ch].SetPhaseIncrement(ComputePhaseIncrement(pitch[ch]));
         if (OC::DAC::kOctaveZero == 0) {
           osc[ch].Offset(HEMISPHERE_MAX_CV/2);

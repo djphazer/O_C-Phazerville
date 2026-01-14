@@ -47,11 +47,12 @@ namespace WaveformManager {
       for (uint8_t i = 7; i < 64; i++) HS::user_waveforms[i] = VOSegment {0x00, 0xff};
     }
 
-    uint8_t static WaveformCount() {
-        uint8_t count = 0;
-        for (uint8_t i = 0; i < HS::VO_SEGMENT_COUNT; i++)
-        {
-            if (HS::user_waveforms[i].IsTOC()) count++;
+    uint8_t static WaveformCount(bool refresh = false) {
+        static uint8_t count = 0;
+        if (refresh || count == 0) {
+          for (uint8_t i = 0; i < HS::VO_SEGMENT_COUNT; i++) {
+              if (HS::user_waveforms[i].IsTOC()) count++;
+          }
         }
         return count;
     }
@@ -192,6 +193,7 @@ namespace WaveformManager {
             HS::user_waveforms[ix] = VOSegment {0x02, 0xff}; // TOC entry: 2 steps
             HS::user_waveforms[ix + 1] = VOSegment {0xff, 0x01}; // First segment of triangle
             HS::user_waveforms[ix + 2] = VOSegment {0x00, 0x01}; // Second segment of triangle
+            WaveformCount(true);
         }
     }
 
@@ -212,6 +214,7 @@ namespace WaveformManager {
             {
                 HS::user_waveforms[i] = VOSegment {0x00, 0xff};
             }
+            WaveformCount(true);
         }
     }
 };
