@@ -30,26 +30,37 @@ public:
     }
     const uint8_t* applet_icon() { return PhzIcons::vectorLFO; }
 
-    static constexpr int min_freq = 8;
-    static constexpr int max_freq = 100000;
-
     void Start() {
         ForEachChannel(ch)
         {
             pitch[ch] = 0;
-            waveform_number[ch] = 0;
+            wave_mod[ch] = waveform_number[ch] = 0;
             SwitchWaveform(ch, 0);
             Out(ch, 0);
         }
     }
 
     void Controller() {
-        // Input 1 is frequency modulation for channel 1
-        osc[0].SetPhaseIncrement(ComputePhaseIncrement(pitch[0] + In(0)));
+        int mix_level = 0;
 
-        // Input 2 determines signal 1's level on the B/D output mix
-        int mix_level = DetentedIn(1);
-        mix_level = constrain(mix_level, -HEMISPHERE_MAX_CV, HEMISPHERE_MAX_CV);
+        if (modshape) {
+          // Inputs 1 & 2 change shape (only on Clock?)
+          ForEachChannel(ch) {
+            uint8_t wave = WaveformManager::GetNextWaveform(waveform_number[ch], SemitoneIn(ch));
+            if (wave_mod[ch] != wave) {
+              wave_mod[ch] = wave;
+              SwitchWaveform(ch, wave_mod[ch]);
+            }
+          }
+        } else {
+          // Input 1 is frequency modulation for channel 1
+          pitch_mod[0] = pitch[0] + In(0);
+          osc[0].SetPhaseIncrement(ComputePhaseIncrement(pitch_mod[0]));
+
+          // Input 2 determines signal 1's level on the B/D output mix
+          mix_level = DetentedIn(1);
+          mix_level = constrain(mix_level, -HEMISPHERE_MAX_CV, HEMISPHERE_MAX_CV);
+        }
 
         int signal = 0; // Declared here because the first channel's output is used in the second channel; see below
         ForEachChannel(ch)
@@ -84,6 +95,18 @@ public:
         DrawInterface();
     }
 
+    void AuxButton() {
+      modshape = cursor & 1;
+      if (!modshape) {
+        ForEachChannel(ch) {
+          wave_mod[ch] = waveform_number[ch];
+          SwitchWaveform(ch, waveform_number[ch]);
+        }
+      } else
+        pitch_mod[0] = pitch[0];
+      CancelEdit();
+    }
+
     // void OnButtonPress() { }
 
     void OnEncoderMove(int direction) {
@@ -91,9 +114,8 @@ public:
             MoveCursor(cursor, direction, 3);
             return;
         }
-        byte c = cursor;
-        byte ch = cursor < 2 ? 0 : 1;
-        if (ch) c -= 2;
+        const uint8_t c = cursor & 1;
+        const uint8_t ch = cursor >> 1;
 
         if (c == 1) { // Waveform
             waveform_number[ch] = WaveformManager::GetNextWaveform(waveform_number[ch], direction);
@@ -106,7 +128,7 @@ public:
             int new_accel = knob_accel + direction - direction * (millis_since_turn / 20);
             knob_accel = constrain(new_accel, -120, 120);
             if (direction * knob_accel <= 0) knob_accel = direction;
-            pitch[ch] = constrain(
+            pitch_mod[ch] = pitch[ch] = constrain(
                 pitch[ch] + knob_accel,
                 -32768 - HEMISPHERE_MIN_CV,
                 ComputePitch(0x7fffffff) // nyquist
@@ -122,13 +144,17 @@ public:
         Pack(data, PackLocation {6,6}, waveform_number[1]);
         Pack(data, PackLocation {12,16}, pitch[0]);
         Pack(data, PackLocation {28,16}, pitch[1]);
+        Pack(data, PackLocation {44, 1}, modshape);
         return data;
     }
     void OnDataReceive(uint64_t data) {
         pitch[0] = Unpack(data, PackLocation {12,16});
         pitch[1] = Unpack(data, PackLocation {28,16});
-        SwitchWaveform(0, Unpack(data, PackLocation {0,6}));
-        SwitchWaveform(1, Unpack(data, PackLocation {6,6}));
+        waveform_number[0] = Unpack(data, PackLocation {0,6});
+        waveform_number[1] = Unpack(data, PackLocation {6,6});
+        SwitchWaveform(0, waveform_number[0]);
+        SwitchWaveform(1, waveform_number[1]);
+        modshape = Unpack(data, PackLocation {44, 1});
     }
 
 protected:
@@ -136,8 +162,8 @@ protected:
         //                    "-------" <-- Label size guide
         help[HELP_DIGITAL1] = "Sync 1";
         help[HELP_DIGITAL2] = "Sync 2";
-        help[HELP_CV1]      = "FM 1";
-        help[HELP_CV2]      = "1->2Mix";
+        help[HELP_CV1]      = modshape ? "Shape" : "FM 1";
+        help[HELP_CV2]      = modshape ? "Shape" : "1->2Mix";
         help[HELP_OUT1]     = "Ch1 LFO";
         help[HELP_OUT2]     = "Ch2 LFO";
         help[HELP_EXTRA1] = "";
@@ -150,17 +176,18 @@ private:
     VectorOscillator osc[2];
 
     // Settings
-    int waveform_number[2];
+    uint8_t waveform_number[2];
+    uint8_t wave_mod[2];
     int16_t pitch[2];
+    int16_t pitch_mod[2];
+    bool modshape = false;
 
     int8_t knob_accel = 0;
     elapsedMillis millis_since_turn;
-    
 
     void DrawInterface() {
-        byte c = cursor;
-        byte ch = cursor < 2 ? 0 : 1;
-        if (ch) c -= 2;
+        const uint8_t c = cursor & 1;
+        const uint8_t ch = cursor >> 1;
 
         // Show channel output
         gfxPos(1, 15);
@@ -168,25 +195,28 @@ private:
         gfxInvert(1, 14, 7, 9);
 
         gfxPos(10, 15);
-        gfxPrintFreqFromPitch(pitch[ch]);
+        gfxPrintFreqFromPitch(pitch_mod[ch]);
+        if (pitch[ch] != pitch_mod[ch]) gfxIcon(56, 10, CV_ICON);
+
+        gfxIcon(56, 15, modshape? DOWN_ICON : LEFT_ICON);
 
         DrawWaveform(ch);
 
-        if (c == 0) gfxCursor(8, 23, 55);
-        if (c == 1 && (EditMode() || CursorBlink()) ) gfxFrame(0, 24, 63, 40);
+        if (c == 0) gfxSpicyCursor(8, 23, 55);
+        if (c == 1 && (EditMode() || CursorBlink()) ) gfxFrame(0, 24, 63, 40, true);
     }
 
-    void DrawWaveform(byte ch) {
+    void DrawWaveform(uint8_t ch) {
         uint16_t total_time = osc[ch].TotalTime();
         VOSegment seg = osc[ch].GetSegment(osc[ch].SegmentCount() - 1);
-        byte prev_x = 0; // Starting coordinates
-        byte prev_y = 63 - Proportion(seg.level, 255, 38);
-        for (byte i = 0; i < osc[ch].SegmentCount(); i++)
+        uint8_t prev_x = 0; // Starting coordinates
+        uint8_t prev_y = 63 - Proportion(seg.level, 255, 38);
+        for (uint8_t i = 0; i < osc[ch].SegmentCount(); i++)
         {
             seg = osc[ch].GetSegment(i);
-            byte y = 63 - Proportion(seg.level, 255, 38);
-            byte seg_x = Proportion(seg.time, total_time, 62);
-            byte x = prev_x + seg_x;
+            uint8_t y = 63 - Proportion(seg.level, 255, 38);
+            uint8_t seg_x = Proportion(seg.time, total_time, 62);
+            uint8_t x = prev_x + seg_x;
             x = constrain(x, 0, 62);
             y = constrain(y, 25, 62);
             gfxLine(prev_x, prev_y, x, y);
@@ -198,9 +228,8 @@ private:
         gfxDottedLine(0, 44, 63, 44, 8);
     }
 
-    void SwitchWaveform(byte ch, int waveform) {
+    void SwitchWaveform(uint8_t ch, uint8_t waveform) {
         osc[ch] = WaveformManager::VectorOscillatorFromWaveform(waveform);
-        waveform_number[ch] = waveform;
         osc[ch].SetPhaseIncrement(ComputePhaseIncrement(pitch[ch]));
         if (OC::DAC::kOctaveZero == 0) {
           osc[ch].Offset(HEMISPHERE_MAX_CV/2);
