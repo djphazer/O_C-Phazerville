@@ -43,7 +43,7 @@ public:
 
     void Resume() {
         segment_number = 0;
-        waveform_count = WaveformManager::WaveformCount();
+        waveform_count = WaveformManager::WaveformCount(true);
         segments_remaining = WaveformManager::SegmentsRemaining();
         SwitchWaveform(waveform_number);
     }

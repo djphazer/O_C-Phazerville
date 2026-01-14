@@ -91,7 +91,7 @@ public:
 
     /* Update an existing segment */
     void SetSegment(uint8_t ix, HS::VOSegment segment) {
-        ix = constrain(ix, 0, segment_count - 1);
+        CONSTRAIN(ix, 0, segment_count - 1);
         change_total_time(-segments[ix].time); // subtract
         memcpy(&segments[ix], &segment, sizeof(segments[ix]));
         change_total_time(segments[ix].time); // add
@@ -99,7 +99,7 @@ public:
     }
 
     HS::VOSegment GetSegment(uint8_t ix) {
-        ix = constrain(ix, 0, segment_count - 1);
+        CONSTRAIN(ix, 0, segment_count - 1);
         return segments[ix];
     }
 
