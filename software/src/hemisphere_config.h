@@ -144,7 +144,9 @@ AppletRegistry reg{
     DeclareApplet<AttenuateOffset>{56, 0x10},
     DeclareApplet<Binary>{41, 0x41},
     DeclareApplet<BitBeat>{79, 0x01},
+#ifdef PEWPEWPEW
     DeclareApplet<BootsNCat>{55, 0x80},
+#endif
     DeclareApplet<Brancher>{4, 0x14},
     DeclareApplet<BugCrack>{51, 0x80},
     DeclareApplet<Burst>{31, 0x04},
@@ -174,7 +176,9 @@ AppletRegistry reg{
     DeclareApplet<EnsOscKey>{35, 0x08},
     DeclareApplet<EnvFollow>{42, 0x11},
     DeclareApplet<EuclidX>{15, 0x02},
+#ifdef PEWPEWPEW
     DeclareApplet<GameOfLife>{22, 0x01},
+#endif
     DeclareApplet<GateDelay>{29, 0x04},
     DeclareApplet<GatedVCA>{17, 0x50},
     DeclareApplet<Logic>{10, 0x44},
@@ -183,7 +187,9 @@ AppletRegistry reg{
     DeclareApplet<MidiLoop>{81, 0x20},
     DeclareApplet<hMIDIIn>{150, 0x20},
     DeclareApplet<hMIDIOut>{27, 0x20},
+#ifdef PEWPEWPEW
     DeclareApplet<MultiScale>{73, 0x08},
+#endif
     DeclareApplet<Palimpsest>{20, 0x02},
     DeclareApplet<Pigeons>{71, 0x02},
     DeclareApplet<PolyDiv>{72, 0x06},
@@ -200,7 +206,9 @@ AppletRegistry reg{
     DeclareApplet<SeqPlay7>{76, 0x02},
     DeclareApplet<SequenceX>{14, 0x02},
     DeclareApplet<ShiftGate>{48, 0x45},
+#ifdef PEWPEWPEW
     DeclareApplet<ShiftReg>{77, 0x45},
+#endif
     DeclareApplet<Shredder>{58, 0x01},
     DeclareApplet<Shuffle>{36, 0x04},
     DeclareApplet<Slew>{19, 0x01},
