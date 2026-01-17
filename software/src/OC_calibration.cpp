@@ -276,16 +276,7 @@ const CalibrationStep calibration_steps[CALIBRATION_STEP_LAST] = {
     { V_BIAS_ASYMMETRIC, "0.000V: asym.", "--> 0.000V", default_help_r, default_footer, CALIBRATE_VBIAS_ASYMMETRIC, 0, nullptr, 0, 4095 },
   #endif
 
-  { CV_OFFSET_0, "ADC CV1", "ADC value at 0V", default_help_r, default_footer, CALIBRATE_ADC_OFFSET, ADC_CHANNEL_1, nullptr, 0, 4095 },
-  { CV_OFFSET_1, "ADC CV2", "ADC value at 0V", default_help_r, default_footer, CALIBRATE_ADC_OFFSET, ADC_CHANNEL_2, nullptr, 0, 4095 },
-  { CV_OFFSET_2, "ADC CV3", "ADC value at 0V", default_help_r, default_footer, CALIBRATE_ADC_OFFSET, ADC_CHANNEL_3, nullptr, 0, 4095 },
-  { CV_OFFSET_3, "ADC CV4", "ADC value at 0V", default_help_r, default_footer, CALIBRATE_ADC_OFFSET, ADC_CHANNEL_4, nullptr, 0, 4095 },
-#ifdef ARDUINO_TEENSY41
-  { CV_OFFSET_4, "ADC CV5", "ADC value at 0V", default_help_r, default_footer, CALIBRATE_ADC_OFFSET, ADC_CHANNEL_5, nullptr, 0, 4095 },
-  { CV_OFFSET_5, "ADC CV6", "ADC value at 0V", default_help_r, default_footer, CALIBRATE_ADC_OFFSET, ADC_CHANNEL_6, nullptr, 0, 4095 },
-  { CV_OFFSET_6, "ADC CV7", "ADC value at 0V", default_help_r, default_footer, CALIBRATE_ADC_OFFSET, ADC_CHANNEL_7, nullptr, 0, 4095 },
-  { CV_OFFSET_7, "ADC CV8", "ADC value at 0V", default_help_r, default_footer, CALIBRATE_ADC_OFFSET, ADC_CHANNEL_8, nullptr, 0, 4095 },
-#endif
+  { ADC_OFFSETS, "ADC input 0V offset", "", long_press_hint, default_footer, CALIBRATE_ADC_OFFSET, 0, nullptr, 0, 4095 },
 
   #if defined(NORTHERNLIGHT) && !defined(IO_10V)
     { ADC_PITCH_C2, "ADC cal. octave #1", "CV1: Input 1.2V", long_press_hint, default_footer, CALIBRATE_ADC_1V, 0, nullptr, 0, 0 },
