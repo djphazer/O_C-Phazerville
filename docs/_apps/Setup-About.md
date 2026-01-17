@@ -46,10 +46,12 @@ To change pages:
 To edit the current page parameter:
 * Rotate the RIGHT encoder
 
+#### Center Display
 ![Center Display](images/cal_screen.png)
 
 Horizontal pixel offset for centering the display.
 
+#### DAC Calibration
 ![DAC Calibration minimum](images/cal_dac1.png)
 ![DAC Calibration maximum](images/cal_dac2.png)
 
@@ -62,26 +64,37 @@ For each output:
 
 After completing initial calibration, you can re-enter later and select "Start Fresh? No" to edit every individual DAC point for fine-tuning.
 
+#### ADC 0V Offset
 ![ADC Offset](images/cal_adc1.png)
 
-ADC bias offset at 0v - with nothing patched to the CV inputs, verify that all values are around zero (-1 < > +1), making adjustments with the RIGHT encoder.
+This adjusts the zero bias offset for each ADC input. With nothing connected to the inputs, the value should read around `0` (-1 < > +1).
 
+The zero offset is determined automatically when you arrive at each page. You can re-zero using Long-press DOWN (or B), or fine-tune it manually with the RIGHT encoder.
+
+#### ADC Scaling
 ![ADC Scaling 1v](images/cal_adc2.png)
 ![ADC Scaling 3v](images/cal_adc3.png)
 
-Scaling for the CV inputs:
+To calibrate scaling for the CV inputs:
 * Connect DAC A to CV1
     - on OCP hardware, make sure the attenuator is fully open (CW)
 * Long-press DOWN (or B) button to set each point (1v and 3v)
 
+#### Screensaver Timeout
 ![Screen Blank](images/cal_screenblank.png)
 
-Timeout for the screensaver or blank screen
+Sets the inactivity timeout in minutes for the screensaver or blank screen to appear
 
+#### Complete and Save?
 ![Calibration complete](images/cal_complete.png)
 
-Final step - save and adjust encoder direction
-* Press UP or DOWN (A or B) buttons to select encoder reversal for L, R, both (LR), or neither (normal)
+Final step - save and optionally adjust encoder direction
+* Press UP or DOWN (A or B) buttons to cycle through encoder reversal for L, R, both (LR), or neither (normal)
 * Select "Yes" to save and "No" to cancel; press the RIGHT encoder to exit
 
-To verify proper calibration in Hemispheres/Quadrants, use the **Voltage** applet for outputs and **Scope** applet for inputs.
+## Hardware Validation
+To verify proper calibration in Hemispheres/Quadrants, use the **Voltage** applet for outputs and **Scope** applet for inputs. You can also utilize the Meters screensaver in **Calibr8or** to quickly verify all CV inputs and Trigger inputs.
+
+To verify MIDI hardware, use Quadrants, connect another device to each available interface, and **Start the Clock** on one device, verifying that it is received and forwarded out all other interfaces.
+
+To verify Audio hardware, simply use Quadrants and send audio into each input - it will be passed through to the corresponding output by default.
