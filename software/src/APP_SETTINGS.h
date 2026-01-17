@@ -149,10 +149,11 @@ public:
         #endif
 
         case CALIBRATE_ADC_OFFSET: // set ADC zero-point offset
-          if (calstate.used_defaults) // start fresh? auto-cal
-            calstate.encoder_value = OC::ADC::smoothed_raw_value(static_cast<ADC_CHANNEL>(next_step->index));
-          else
-            calstate.encoder_value = OC::calibration_data.adc.offset[next_step->index];
+          if (calstate.used_defaults) { // start fresh? auto-cal
+            for (int i = 0; i < ADC_CHANNEL_COUNT; ++i) {
+              OC::calibration_data.adc.offset[i] = OC::ADC::smoothed_raw_value(static_cast<ADC_CHANNEL>(i));
+            }
+          }
 
           #ifdef VOR
           DAC::set_Vbias(DAC::VBiasUnipolar);
@@ -243,7 +244,6 @@ public:
         break;
         #endif
         case CALIBRATE_ADC_OFFSET:
-          OC::calibration_data.adc.offset[step->index] = calstate.encoder_value;
           DAC::set_all_octave(0);
           break;
         case CALIBRATE_ADC_1V:
@@ -356,10 +356,11 @@ public:
         break;
 
       case CALIBRATE_ADC_OFFSET:
-        graphics.print(step->message);
-        gfxPos(kValueX, y + 2);
-        graphics.print((int)OC::ADC::value(static_cast<ADC_CHANNEL>(step->index)), 5);
-        menu::DrawEditIcon(kValueX, y, calstate.encoder_value, step->min, step->max);
+        for (int i = 0; i < ADC_CHANNEL_COUNT; ++i) {
+          gfxPos(1 + i%4*32, y + 10*(i/4));
+          graphics.printf("%3d", (int)OC::ADC::value(static_cast<ADC_CHANNEL>(i)));
+        }
+        y += 10;
         break;
 
       case CALIBRATE_DISPLAY:
@@ -519,9 +520,11 @@ public:
                 default: break;
               }
 
-              // long-press to set ADC zero-point offset
+              // long-press to re-set ADC zero-point offset
               if (CALIBRATE_ADC_OFFSET == step->calibration_type) {
-                calstate.encoder_value = OC::ADC::smoothed_raw_value(static_cast<ADC_CHANNEL>(step->index));
+                for (int i = 0; i < ADC_CHANNEL_COUNT; ++i) {
+                  OC::calibration_data.adc.offset[i] = OC::ADC::smoothed_raw_value(static_cast<ADC_CHANNEL>(i));
+                }
               }
 
               // long-press DOWN to auto-scale DAC values on current channel
