@@ -557,12 +557,6 @@ public:
 
         auto &q = q_engine[sel_chan];
         preset_modified = 1;
-        if (HS::q_edit) {
-            // Scale Select
-            HS::NudgeScale(sel_chan, direction);
-            q.quantizer.Requantize();
-            return;
-        }
 
         if (!edit_mode) { // Octave jump
           q.octave += direction;
@@ -587,12 +581,6 @@ public:
         }
 
         preset_modified = 1;
-        if (HS::q_edit) {
-            // Root Note
-            HS::SetRootNote(sel_chan, HS::GetRootNote(sel_chan) + direction);
-            q_engine[sel_chan].quantizer.Requantize();
-            return;
-        }
 
         if (!edit_mode) {
             SetTranspose(sel_chan, channel[sel_chan].transpose + direction);
