@@ -561,7 +561,11 @@ public:
 
     /* Pressing the select button after highlighting a parameter for editing
      * can invoke a secondary action here. By default, it just cancels editing. */
-    // void AuxButton() { }
+    void AuxButton() {
+        if (cursor > EnvSeqCursor::STEP_VIEW) {
+          step_select = !step_select;
+        }
+    }
 
     void OnEncoderMove(int direction) {
         if (linked_cursor < MAX_LINKED_CURSOR) {
@@ -638,6 +642,10 @@ public:
             return;
         }
 
+        if (cursor > EnvSeqCursor::STEP_VIEW && step_select) {
+          step_view = constrain(step_view + direction, 0, MAX_NUM_STEPS - 1);
+          return;
+        }
         switch (cursor) {
         case EnvSeqCursor::MOD1_MODE:
             mod1_mode = (ModulationMode)constrain(mod1_mode + direction, 0, ModulationMode::MAX_MODULATION_MODE - 1);
@@ -792,6 +800,7 @@ private:
     bool random_retrigger_fades = false; // Whether to randomize the retrigger fade flag for each step
     
     bool reset_flag = false; // Prevent stepping forward after a reset
+    bool step_select = false; // toggle for switching step_view while editing params
     int8_t step = -1; // Current step
     int8_t step_view = 0; // Viewed step for cursor
     Step steps[MAX_NUM_STEPS]; // Steps of the envelope sequence
@@ -871,8 +880,7 @@ private:
         if (DetentedIn(0)) {
             gfxPrintIcon(MOD_ICON);
         }
-        gfxPos(10, y);
-        gfxPrint(mod2_mode_string(linked_data[0].modulation.mode));
+        gfxPrint(10, y, mod2_mode_string(linked_data[0].modulation.mode));
         gfxEndCursor(linked_cursor == LinkedCursor::LINKED_MOD1_MODE);
 
         y += 10;
@@ -880,8 +888,7 @@ private:
         if (DetentedIn(1)) {
             gfxPrintIcon(MOD_ICON);
         }
-        gfxPos(10, y);
-        gfxPrint(mod2_mode_string(linked_data[1].modulation.mode));
+        gfxPrint(10, y, mod2_mode_string(linked_data[1].modulation.mode));
         gfxEndCursor(linked_cursor == LinkedCursor::LINKED_MOD2_MODE);
 
         y += 10;
@@ -917,6 +924,10 @@ private:
 
         if (cursor >= EnvSeqCursor::STEP_VIEW) {
             draw_step_view();
+            if (step_select && EditMode()) {
+              gfxIcon(25, 15, LEFT_ICON, true);
+              gfxFrame(10, 14, 14, 11, true);
+            }
             return;
         }
 
@@ -927,8 +938,7 @@ private:
         if (DetentedIn(0)) {
             gfxPrintIcon(MOD_ICON);
         }
-        gfxPos(10, y);
-        gfxPrint(mod1_mode_string(mod1_mode));
+        gfxPrint(10, y, mod1_mode_string(mod1_mode));
         gfxEndCursor(cursor == EnvSeqCursor::MOD1_MODE);
 
         if (can_link) {
@@ -942,8 +952,7 @@ private:
         if (DetentedIn(1)) {
             gfxPrintIcon(MOD_ICON);
         }
-        gfxPos(10, y);
-        gfxPrint(mod2_mode_string(mod2_mode));
+        gfxPrint(10, y, mod2_mode_string(mod2_mode));
         gfxEndCursor(cursor == EnvSeqCursor::MOD2_MODE);
 
         y += 10;
@@ -987,24 +996,24 @@ private:
     }
 
     void draw_step_view() {
-        if (cursor >= EnvSeqCursor::STEP_TRIGGERS) {
-            draw_step_view_page3();
-            return;
-        } else if (cursor >= EnvSeqCursor::STEP_WAVEFORM_NUMBER) {
-            draw_step_view_page2();
-            return;
-        }
-
         const Step& s = steps[step_view];
         uint8_t display_step = step_view + 1;
-        uint8_t y = 5;
+        uint8_t y = 15;
 
-        y += 10;
         gfxIcon(0, y, PhzIcons::stairs);
         gfxStartCursor(10, y);
         gfxPrint(10 + pad(10, display_step), y, display_step);
         gfxPos(22, y);
         gfxEndCursor(cursor == EnvSeqCursor::STEP_VIEW);
+
+        if (cursor >= EnvSeqCursor::STEP_TRIGGERS) {
+          draw_step_view_page3();
+          return;
+        }
+        if (cursor >= EnvSeqCursor::STEP_WAVEFORM_NUMBER) {
+          draw_step_view_page2();
+          return;
+        }
 
         y += 10;
         gfxPrint(0, y, "Off");
@@ -1028,9 +1037,8 @@ private:
 
     void draw_step_view_page2() {
         const Step& s = steps[step_view];
-        uint8_t y = 5;
+        uint8_t y = 25;
 
-        y += 10;
         gfxIcon(0, y, WAVEFORM_ICON);
         gfxStartCursor(10, y);
         gfxPrint(s.waveform_number + 1);
@@ -1040,20 +1048,18 @@ private:
         gfxIcon(0, y, OFFSET_ICON);
         gfxStartCursor(10, y);
         gfxPrint(10 + pad(100, s.waveform_offset), y, s.waveform_offset);
-        gfxPos(28, y);
         gfxPrint("%");
         gfxEndCursor(cursor == EnvSeqCursor::STEP_WAVEFORM_OFFSET);
 
         y += 10;
         gfxIcon(0, y, s.waveform_revert ? CHECK_ON_ICON : CHECK_OFF_ICON);
         gfxStartCursor(10, y);
-        gfxPrint("Revert");
+        gfxPrint("Rev");
         gfxEndCursor(cursor == EnvSeqCursor::STEP_WAVEFORM_REVERT);
 
-        y += 10;
-        gfxIcon(0, y, s.waveform_invert ? CHECK_ON_ICON : CHECK_OFF_ICON);
-        gfxStartCursor(10, y);
-        gfxPrint("Invert");
+        gfxIcon(30, y, s.waveform_invert ? CHECK_ON_ICON : CHECK_OFF_ICON);
+        gfxStartCursor(40, y);
+        gfxPrint("Inv");
         gfxEndCursor(cursor == EnvSeqCursor::STEP_WAVEFORM_INVERT);
 
         y += 10;
@@ -1066,9 +1072,8 @@ private:
 
     void draw_step_view_page3() {
         const Step& s = steps[step_view];
-        uint8_t y = 5;
+        uint8_t y = 25;
 
-        y += 10;
         gfxIcon(0, y, GATE_ICON);
         gfxStartCursor(10, y);
         gfxPrint(s.triggers + 1);
@@ -1082,7 +1087,6 @@ private:
         gfxIcon(0, y, LENGTH_ICON);
         gfxStartCursor(10, y);
         gfxPrint(10 + pad(100, s.length), y, s.length);
-        gfxPos(28, y);
         gfxPrint("%");
         gfxEndCursor(cursor == EnvSeqCursor::STEP_LENGTH);
 
@@ -1090,7 +1094,6 @@ private:
         gfxIcon(0, y, RANDOM_ICON);
         gfxStartCursor(10, y);
         gfxPrint(10 + pad(100, s.probability), y, s.probability);
-        gfxPos(28, y);
         gfxPrint("%");
         gfxEndCursor(cursor == EnvSeqCursor::STEP_PROBABILITY);
 
@@ -1098,13 +1101,12 @@ private:
         gfxIcon(0, y, GAUGE_ICON);
         gfxStartCursor(10, y);
         gfxPrint(10 + pad(100, s.retrigger_fade), y, s.retrigger_fade);
-        gfxPos(28, y);
         gfxPrint("%");
         gfxEndCursor(cursor == EnvSeqCursor::STEP_RETRIGGER_FADE);
 
-        y += 10;
-        gfxIcon(0, y, s.mod_mark ? CHECK_ON_ICON : CHECK_OFF_ICON);
-        gfxStartCursor(10, y);
+        //y += 10;
+        gfxIcon(55, y, s.mod_mark ? CHECK_ON_ICON : CHECK_OFF_ICON);
+        gfxStartCursor(40, y-10);
         gfxPrint("Mod2");
         gfxEndCursor(cursor == EnvSeqCursor::STEP_MOD_MARK);
     }
