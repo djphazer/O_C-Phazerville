@@ -267,7 +267,9 @@ public:
         DrawSelector();
     }
 
-    // void DrawFullScreen() { }
+    void DrawFullScreen() {
+        DrawSequence();
+    }
     // void OnButtonPress() { }
 
     void AuxButton() {
@@ -605,6 +607,30 @@ private:
         }
     }
 
+    // for full screen visual of the full thing
+    void DrawSequence() {
+        const int ii = (len_mod <= 16) ? 16 : 32;
+        const int w = 128;
+        for (int b = 0; b < ii; ++b)
+        {
+            int r = reg[0] | (reg[0]<<len_mod);
+            int v = Proportion((r >> b) & 0xff, 0xff, 16);
+            graphics.drawRect((w-2) - (w/ii * b) - 32/ii, 15, 64/ii, v);
+
+            r = reg[1] | (reg[1]<<len_mod);
+            v = Proportion((r >> b) & 0xff, 0xff, 16);
+            graphics.drawRect((w-2) - (w/ii * b) - 32/ii, 63-v, 64/ii, v);
+        }
+
+        // I'm sure these two can be combined with more math.
+        if (len_mod < 16) {
+          const int x_ = 8 * (16 - len_mod);
+          gfxDottedLine(x_, 14, x_, 63);
+        } else if (len_mod > 16 && len_mod < 32) {
+          const int x_ = 4 * (32 - len_mod) - 1;
+          gfxDottedLine(x_, 14, x_, 63);
+        }
+    }
     void DrawIndicator() {
         gfxLine(0, 45, 63, 45);
         gfxLine(0, 62, 63, 62);
