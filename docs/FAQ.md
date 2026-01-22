@@ -21,6 +21,10 @@ A: Long-press the Right Encoder while on the main App Menu to save _Global Setti
 
 A: There's a quick gesture to toggle it (A+B or UP+DOWN) right inside the [**Setup / About**](Setup-About) App. After saving, a power cycle is required.
 
+## Q: What is AuxButton?
+
+A: In Hemispheres/Quadrants, after pressing the encoder button to _highlight an applet parameter for editing_, the corresponding select button (UP or DOWN on O_C, or A/B/X/Y on ORN8) invokes a _secondary action_ in some places, often indicated by a dotted line cursor instead of a solid line. This contextual override provides additional UI actions with a very limited set of controls. See also: [**UI Gestures**](Hemisphere-Gestures)
+
 <hr>
 
 ## Q: How do I calibrate the hardware? <a id='calibration'>
