@@ -533,7 +533,7 @@ public:
       } else {
         active_applet[zoom_slot]->BaseView(true, zoom_cursor < 0);
         // Applets 3 and 4 get inverted titles
-        if (zoom_slot > 1) gfxInvert(1 + (zoom_slot%2)*64, 1, 63, 10);
+        if (zoom_slot > 1) gfxInvert(0 + (zoom_slot%2)*64, 0, 63, 10);
 
         gfxDisplayInputMapEditor();
       }
@@ -670,7 +670,7 @@ public:
                 active_applet[slot]->BaseView();
 
                 // Applets 3 and 4 get inverted titles
-                if (slot > 1) gfxInvert(1 + h*64, 1, 63, 10);
+                if (slot > 1) gfxInvert(0 + h*64, 0, 63, 10);
             }
 
             // vertical separator

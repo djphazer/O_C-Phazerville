@@ -1067,6 +1067,7 @@ public:
           if (applet->EditMode()) {
             // select button becomes aux button while editing a param
             applet->AuxButton();
+            click_tick = 0;
           } else {
             if (hemisphere == select_mode) select_mode = -1; // Exit Select Mode if same button is pressed
             else select_mode = hemisphere;
