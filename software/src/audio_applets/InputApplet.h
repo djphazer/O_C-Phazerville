@@ -62,10 +62,10 @@ public:
 #endif
     };
     gfxPrint(3, 15, txt[modesel_]);
-    if (cursor == CHANNEL_MODE) gfxCursor(3, 23, 31);
+    if (cursor == CHANNEL_MODE) gfxCursor(3, 23, 31, "Mode");
     gfxPrint(1, 45, "Lvl:");
     gfxPrintDb(level);
-    if (cursor == IN_LEVEL) gfxCursor(26, 53, 26);
+    if (cursor == IN_LEVEL) gfxCursor(26, 53, 30, "Gain");
     gfxStartCursor();
     gfxPrint(level_cv);
     gfxEndCursor(cursor == LEVEL_CV, false, level_cv.InputName());
