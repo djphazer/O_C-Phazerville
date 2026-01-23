@@ -582,7 +582,7 @@ private:
             case QUANT_A:
             case QUANT_B: {
               const int ch = (cursor-QUANT_A);
-              gfxSpicyCursor(12 + 27 * ch, 33, 13);
+              gfxSpicyCursor(12 + 27 * ch, 33, 13, "Q-engine");
               gfxIcon(25 + 5 * ch, 25, ch ? RIGHT_ICON : LEFT_ICON);
               if (EditMode()) {
                 gfxPrint(20, 35, HS::GetQuantEngine(qselect[ch]));
@@ -593,15 +593,14 @@ private:
             case RANGE:  gfxCursor(10, 43, 13, "Range"); break;
             case SLEW:   gfxCursor(44, 43, 19, "Slew"); break;
 
-            // TODO: mode labels array
             case CVMODE1:
             case CVMODE2:
-                gfxCursor(14 + 34*(cursor-CVMODE1), 33, 10, cvmode_names[cvmode[cursor-CVMODE1]]);
+                gfxCursor(14 + 34*(cursor-CVMODE1), 33, 10, "In Mode", cvmode_names[cvmode[cursor-CVMODE1]]);
                 break;
 
             case OUT_A:
             case OUT_B:
-                gfxCursor(14 + 34*(cursor-OUT_A), 43, 10, outmode_names[outmode[cursor-OUT_A]]);
+                gfxCursor(14 + 34*(cursor-OUT_A), 43, 10, "OutMode", outmode_names[outmode[cursor-OUT_A]]);
                 break;
 
             default: break;
