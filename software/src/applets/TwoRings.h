@@ -298,6 +298,7 @@ public:
     void OnEncoderMove(int direction) {
         if (!EditMode()) {
             MoveCursor(cursor, direction, LAST_SETTING);
+            SetAux(cursor == PROB || cursor == LENGTH || cursor == QUANT_A || cursor == QUANT_B);
             return;
         }
 
