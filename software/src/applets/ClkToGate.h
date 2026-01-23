@@ -29,6 +29,9 @@ public:
     PARAM_PER_CHAN = 3,
     LAST_SETTING = SKIP2
   };
+  static constexpr const char * const cur_labels[PARAM_PER_CHAN] = {
+    "GtLength", "+/-Range", "SkipProb"
+  };
 
     const char* applet_name() {
         return "Clk2Gate";
@@ -179,6 +182,6 @@ private:
         int param = cursor % PARAM_PER_CHAN;
         int cur_x = param ? (12 + (param-1) * 31) : 12;
         int cur_y = 24 + cursor / PARAM_PER_CHAN * 26 + (param?10:0);
-        gfxCursor(cur_x, cur_y, 19);
+        gfxCursor(cur_x, cur_y, 19, cur_labels[param]);
     }
 };
