@@ -318,10 +318,10 @@ private:
         case CV_DEST2:
             gfxBitmap(0, 13 + (cursor - CV_DEST1)*5, 8, CV_ICON);
             gfxBitmap(8, 15, 3, (cursor - CV_DEST1)? SUB_TWO : SUP_ONE);
-            gfxCursor(0, 19 + (cursor - CV_DEST1)*5, 11, 7);
+            gfxCursor(0, 19 + (cursor - CV_DEST1)*5, 11, 7, "CV Dest");
             break;
         case GATE_MODE:
-            gfxCursor(pad_left + 1 * spacing - 1, 23, 10, gate_mode? "Gate":"Trig");
+            gfxCursor(pad_left + 1 * spacing - 1, 23, 10, gate_mode? "Gates":"Triggers");
             break;
         }
     }
