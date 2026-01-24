@@ -143,7 +143,9 @@ AppletRegistry reg{
     DeclareApplet<ADEG>{34, 0x01},
     DeclareApplet<ASR>{47, 0x09},
     DeclareApplet<AttenuateOffset>{56, 0x10},
+#ifdef PEWPEWPEW
     DeclareApplet<Binary>{41, 0x41},
+#endif
     DeclareApplet<BitBeat>{79, 0x01},
 #ifdef PEWPEWPEW
     DeclareApplet<BootsNCat>{55, 0x80},
@@ -168,7 +170,9 @@ AppletRegistry reg{
     DeclareApplet<DrLoFi>{16, 0x80},
     DeclareApplet<DrumMap>{57, 0x02},
     DeclareApplet<DualQuant>{9, 0x08},
+#ifdef PEWPEWPEW
     DeclareApplet<OffsetQuant>{90, 0x08},
+#endif
 #if !defined(CUSTOM_BUILD) || defined(PEWPEWPEW)
     DeclareApplet<DuoTET>{63, 0x08},
 #endif
@@ -184,7 +188,9 @@ AppletRegistry reg{
     DeclareApplet<GateDelay>{29, 0x04},
     DeclareApplet<GatedVCA>{17, 0x50},
     DeclareApplet<Logic>{10, 0x44},
+#ifdef PEWPEWPEW
     DeclareApplet<LowerRenz>{21, 0x01},
+#endif
     DeclareApplet<Metronome>{50, 0x04},
     DeclareApplet<MidiLoop>{81, 0x20},
     DeclareApplet<hMIDIIn>{150, 0x20},
@@ -221,7 +227,9 @@ AppletRegistry reg{
     DeclareApplet<SwitchSeq>{38, 0x10},
     DeclareApplet<TB_3PO>{60, 0x02},
     DeclareApplet<TLNeuron>{13, 0x40},
+#ifdef PEWPEWPEW
     DeclareApplet<Trending>{37, 0x40},
+#endif
     DeclareApplet<TrigSeq>{11, 0x06},
     DeclareApplet<TrigSeq16>{25, 0x06},
     DeclareApplet<Tuner>{39, 0x80},
