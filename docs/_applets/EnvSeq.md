@@ -5,37 +5,21 @@ layout: default
 
 ![EnvSeq screenshot](images/EnvSeq.png)
 
-**EnvSeq** is a clocked envelope sequencer. Each step outputs a configurable curve (ramp/exp/triangle/flat/VOSC), with per-step level (Scale), offset, probability (chance to play), duration in clocks, optional retriggers (repeating the curve within the step), and per-step length (time-warp of the curve inside the step).
+**EnvSeq** is a clocked envelope sequencer. Each step outputs a configurable shape (ramp/exp/log/triangle/flat/VOSC), with per-step level (Amp), offset, probability (chance to play), duration in clocks, optional retriggers (repeating the shape within the step) with fade, and per-step length (time-warp of the shape inside the step).
 
 ### I/O
 
 |        | 1/3 | 2/4 |
 | ------ | :-: | :-: |
-| TRIG   | Clock | Reset (or Trigger when `TR2` is enabled) |
+| TRIG   | Clock (timebase) | Reset (or step trigger when `TR2` is enabled) |
 | CV INs | Mod 1 (per `Mod1` mode) | Mod 2 (per `Mod2` mode) |
 | OUTs   | Envelope CV | Assignable (`Out2` mode) |
 
 ### UI Controls
-* Select `Mod1` mode (how CV1 is applied)
-* Select `Mod2` mode (how CV2 is applied)
-* Select `Out2` mode (what output 2 does)
-* Randomize step parameters
-  - Select what parameters to randomize
-* Toggle `TR2` trigger mode (use TR2 as a step trigger instead of reset)
-* Set number of steps (1–32)
-* Manual Reset (restarts on next clock)
-* Init (restore default step settings)
-* Edit per-step parameters (Step view pages)
-  - Step edit selector
-  - Curve
-  - Offset
-  - Scale (level)
-  - VOSC waveform, offset, invert/revert, and option
-  - Probability (0-100%)
-  - Number of triggers (1-8)
-  - Number of clocks the step lasts (1-8)
-  - Length of curve inside the step (1-200%)
-  - Mark step as modulated by CV2 (when CV2 is `ModMark`)
+EnvSeq has two screens:
+
+- **Main screen**: Mod1 mode, Mod2 mode, Out2 mode, Randomizer, TR2 mode, number of steps, Reset, Init.
+- **Step screen**: Step number, shape (waveform), and per-step parameters (offset, amp, VOSC options, probability, triggers, clocks, length, retrigger fade, Mod2 mark).
 
 ## Mod1 (CV1) modes
 `Mod1` defines how CV1 is sampled/applied:
@@ -50,7 +34,7 @@ layout: default
 
 | Mode    | Description                                                                                 |
 |---------|--------------------------------------------------------------------------------------------|
-| Length  | CV2 modulates the **Length** parameter (time-warp of the curve within the step, bipolar, 1-200%)           |
+| Length  | CV2 modulates the **Length** parameter (time-warp of the shape within the step, bipolar, 1-200%)           |
 | RetrgFd | CV2 modulates the **Retrigger Fade** percent (bipolar, 0–100%). |
 | Mod     | CV2 is added to the output CV for all steps.                                               |
 | ModMark | CV2 is added to the output CV only on steps marked with `Mod2` in the step editor.         |
@@ -63,8 +47,8 @@ Output 2 can mirror or complement the main envelope output:
 |-----------|-------------|
 | Cpy       | Copy of Out1 (same envelope CV) |
 | CpyInvO   | Inverted copy of Out1, mirrored around the step’s Offset |
-| CpyInv    | Inverted copy of Out1, mirrored around 0V |
-| CpyInv0   | Inverted copy of Out1, mirrored around 0V (explicit 0V center) |
+| CpyInv    | Inverted copy of Out1, mirrored around the midpoint of the amp |
+| CpyInv0   | Inverted copy of Out1, mirrored around 0V |
 | CpyAbv0   | Absolute-value copy of Out1 (always above 0V) |
 | HStart    | Holds the step’s start CV value until the next step begins |
 | Step      | Short gate at each new (played) step |
@@ -72,97 +56,108 @@ Output 2 can mirror or complement the main envelope output:
 | Seq       | Short gate at the start of the sequence (on wraparound) |
 
 Notes:
-- Gates are only generated for steps whose Curve is not `None`.
+- Gates are only generated for steps whose Shape is not `None`.
 - Gate pulse length is fixed (short trigger-style), not proportional to the incoming clock.
 
-## Step editor
+## Step screen
 After the main page items, the cursor enters per-step editing. The **viewed step** (the one you edit) is independent from the **currently playing step** shown on the main page.
 
-### Page 1 (shape/level)
-
-#### Step
+### Step number
 Select which step number you’re editing.
 
-#### Curve
+### Shape
 Shape for the step:
 - `None`: silent step (outputs 0V and generates no gates)
 - `Zero`: outputs 0V but still counts as an active step (gates can be generated)
-- `Flat`: constant level (Scale)
-- `RampUp`: 0 → Scale
-- `RampDown`: Scale → 0
-- `ExpUp`: exponential-like 0 → Scale
-- `ExpDown`: exponential-like Scale → 0
-- `LogUp`: logarithmic-like 0 → Scale
-- `LogDown`: logarithmic-like Scale → 0
-- `Triangle`: 0 → Scale → 0
+- `Flat`: constant level (Amp)
+- `ExpDw`: exponential-like Amp → 0
+- `ExpUp`: exponential-like 0 → Amp
+- `RampDw`: Amp → 0
+- `RampUp`: 0 → Amp
+- `LogDw`: logarithmic-like Amp → 0
+- `LogUp`: logarithmic-like 0 → Amp
+- `Triang`: 0 → Amp → 0
 - `VOSC`: vector-oscillator waveform driven by step progress
 
-#### Off (Offset)
+### Parameters
+
+#### Offset
 DC offset added to the step output (and used as the center point for `CpyInvO`).
 
-#### Scl (Scale)
-Amplitude of the step’s curve (how “high” the envelope goes).
+#### Amplitude
+Bipolar amplitude of the step’s shape; negative values invert the shape.
 
-### Page 2 (VOSC options)
+#### Waveform number (WaveNr)
+Number of the waveform from the VOSC oscillator. Applies only when the Shape is set to `VOSC`.
 
-These apply when the Curve is set to `VOSC`.
-
-#### Waveform
-Selects the waveform to use.
-
-#### Offset (%)
-Shifts the waveform relative to the step offset (0–100% of the step scale).
+#### Waveform offset (WaveOff)
+Shifts the waveform relative to the step offset (0–100% of the step amp). Applies only when the Shape is set to `VOSC`.
 
 #### Revert
-Runs the waveform phase backwards.
+Runs the waveform phase backwards. Applies only when the Shape is set to `VOSC`.
 
 #### Invert
-Flips the waveform vertically.
+Flips the waveform vertically. Applies only when the Shape is set to `VOSC`.
 
 #### Option
-Post-process the waveform:
-- `None`
-- `FoldUp`
-- `FoldDwn`
-- `ZeroUp`
-- `ZeroDwn`
+Post-process the waveform. Applies only when the Shape is set to `VOSC`.
 
-### Page 3 (time/trigger/prob/mod-mark)
+#### VOSC parameters
+These apply when the Shape is set to `VOSC`.
 
-#### Trg (Triggers)
-Sets how many times (1-8) the curve restarts within the step.
+- `None`: no post-processing.
+- `FoldUp`: reflect upward the values below waveform offset.
+- `FoldDw`: reflect downward the values above waveform offset.
+- `ZeroUp`: zero out values above waveform offset.
+- `ZeroDw`: zero out values below waveform offset.
 
-#### Clk (Clocks)
+#### Triggers
+Sets how many times (1-8) the shape restarts within the step.
+
+#### Clocks
 How many incoming clocks (1-8) this step lasts.
 
-#### Len (Length)
-Time-warp of the curve progression within the step (1–200%).
-- <100%: curve reaches the end early and then holds its final value for the remainder of the step.
-- >100%: curve progresses more slowly (may not reach the end before the step completes).
+#### Length
+Time-warp of the shape progression within the step (1–200%).
+- <100%: shape reaches the end early and then holds its final value for the remainder of the step.
+- >100%: shape progresses more slowly (may not reach the end before the step completes).
 - If `Mod2` mode is `Length`, CV2 scales this per-step value.
 
-#### Probability
+#### Probability (Prob)
 Chance (0–100%) that this step will be played when the sequence reaches it.
 
-#### Retrigger Fade
+#### Retrigger Fade (Fade Lvl)
 Sets the target level (0–100%) for the **last** retrigger within the step. Earlier retriggers are scaled down proportionally between full level and this target.
 
-#### Mod2 (mark)
+#### Mod Mark
 Marks this step as eligible for Mod2 when `Mod2` mode is `ModMark`.
 
 ## Random
 Selecting `Random` on the main page opens a checklist-style randomizer for step parameters:
 
 - `Ofs`: randomize step Offsets
-- `Scl`: randomize step Scales
-- `Crv`: randomize step Curves
-- `Osc`: allow randomizing VOSC waveforms when Curve is `VOSC`
+- `Amp`: randomize step Amplitudes
+- `Shp`: randomize step Shapes
+- `Osc`: allow randomizing VOSC waveforms when Shape is `VOSC`
 - `Len`: randomize step Lengths
 - `Trg`: randomize step Triggers (occasionally)
 - `Clk`: randomize step Clocks (occasionally)
 - `Mod`: randomize step Mod2 marks
 
 Select `RND` to apply randomization and return to the main view.
+
+## TR2
+When enabled, TR2 (input 2) **replaces TR1** as the step-advance trigger. TR1 still provides the clock timebase for step length. When disabled, TR1 advances steps and TR2 acts as Reset.
+
+## Linking (paired hemispheres)
+When both hemispheres run **EnvSeq**, you can link them to add two extra modulation inputs and two extra outputs.
+
+- **Link is enabled from the right hemisphere.** On the right EnvSeq main screen, select `Link` to enter the linked view.
+- The right hemisphere becomes a **linked control panel**: it no longer runs its own sequence.
+- **Mod3 / Mod4**: the right hemisphere’s CV inputs become two additional modulation sources. Each has its own Mod mode (same list as Mod2).
+- **Out3 / Out4**: the right hemisphere’s outputs become two additional Out modes (same list as Out2).
+- The **left hemisphere** continues to run the sequence and computes the actual CV/gate values for Out3/Out4.
+- Select **Unlink** on the right to return to normal operation.
 
 ## Credits
 Authored by Daniel Gorgan
