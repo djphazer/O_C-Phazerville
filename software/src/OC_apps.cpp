@@ -543,7 +543,9 @@ void Init(bool reset_settings) {
     app.Init();
   }
 
+#ifndef NO_HEMISPHERE
   HS::showhide_cursor.Init(0, HEMISPHERE_AVAILABLE_APPLETS - 1);
+#endif
   HS::frame.Init();
 
   global_settings.current_app_id = DEFAULT_APP_ID;
