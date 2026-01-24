@@ -326,8 +326,6 @@ public:
     // Clamp value to 0..150
     CONSTRAIN(value, 0.0f, 150.0f);
 
-    char buf[12]; // enough for "150\0" or "99.9\0"
-
     gfxPos(x, y);
     if (value >= 100.0f) {
       // 3-digit number, no fraction
