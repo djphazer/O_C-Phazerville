@@ -150,12 +150,12 @@ public:
     size_t y = 13;
     gfxStartCursor(1, y);
     gfxPrintfn(1, y, 0, "%03u", GetFileNum());
-    gfxEndCursor(cursor == FILE_NUM);
+    gfxEndCursor(cursor == FILE_NUM, "FileSel");
 
     gfxIcon(22, y, FileIsPlaying() ? PLAY_ICON : STOP_ICON);
     gfxStartCursor(30, y-1);
     gfxPrint(playstop_cv);
-    gfxEndCursor(cursor == PLAYSTOP_GATE_CV, false, playstop_cv.InputName());
+    gfxEndCursor(cursor == PLAYSTOP_GATE_CV, false, playstop_cv.InputName(), "PlayTrig");
 
     if (wavplayer_ready)
       gfxPrint(37, y, GetFileBPM());
@@ -165,7 +165,7 @@ public:
     // filter mod
     gfxStartCursor(56, y);
     gfxPrint(djfilter_cv);
-    gfxEndCursor(cursor == FILTER_CV, false, djfilter_cv.InputName());
+    gfxEndCursor(cursor == FILTER_CV, false, djfilter_cv.InputName(), "FilterCV");
 
     // filter meter at the top
     if (filter_on) {
@@ -187,6 +187,7 @@ public:
     }
     if (cursor == FILTER_PARAM) {
       if (EditMode()) {
+        SetLabel("Filter");
         const int x = 45;
         gfxClear(x, y, 18, 10);
         if (djfilter > 0) gfxPrint(x, y, "HPF");
@@ -201,10 +202,10 @@ public:
     y += 10;
     gfxStartCursor(1, y);
     graphics.printf("%3ddB", level);
-    gfxEndCursor(cursor == LEVEL);
+    gfxEndCursor(cursor == LEVEL, "Gain");
     gfxStartCursor();
     gfxPrint(level_cv);
-    gfxEndCursor(cursor == LEVEL_CV, false, level_cv.InputName());
+    gfxEndCursor(cursor == LEVEL_CV, false, level_cv.InputName(), "Gain CV");
 
     y += 10;
 
@@ -218,24 +219,24 @@ public:
     gfxEndCursor(cursor == PLAYRATE, true);
     gfxStartCursor();
     gfxPrint(playrate_cv);
-    gfxEndCursor(cursor == PLAYRATE_CV, false, playrate_cv.InputName());
+    gfxEndCursor(cursor == PLAYRATE_CV, false, playrate_cv.InputName(), "Rate CV");
 
     y += 10;
     if (cursor <= START_BEAT_CV) {
       gfxIcon(1, y, PULSES_ICON);
       gfxStartCursor(11, y);
       graphics.printf("%3u", ((cursor==START_BEAT && EditMode())?start_beat:start_beat_mod) + 1);
-      gfxEndCursor(cursor == START_BEAT);
+      gfxEndCursor(cursor == START_BEAT, "StartBeat");
       if (start_beat_mod != start_beat) gfxIcon(30, y, CV_ICON);
 
       gfxStartCursor(40, y);
       gfxPrint(start_beat_cv);
-      gfxEndCursor(cursor == START_BEAT_CV, false, start_beat_cv.InputName());
+      gfxEndCursor(cursor == START_BEAT_CV, false, start_beat_cv.InputName(), "Start CV");
     } else {
       gfxIcon(1, y, LOOP_ICON);
       gfxStartCursor(10, y);
       graphics.printf("%2u", loop_length);
-      gfxEndCursor(cursor == LOOP_LENGTH);
+      gfxEndCursor(cursor == LOOP_LENGTH, "LoopBeats");
 
       gfxIcon(50, y, loop_on ? CHECK_ON_ICON : CHECK_OFF_ICON);
       if (cursor == LOOP_ENABLE)
