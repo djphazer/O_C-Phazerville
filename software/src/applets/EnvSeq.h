@@ -936,7 +936,7 @@ private:
             gfxPrintIcon(MOD_ICON);
         }
         gfxPrint(10, y, mod1_mode_string(mod1_mode));
-        gfxEndCursor(cursor == EnvSeqCursor::MOD1_MODE);
+        gfxEndCursor(cursor == EnvSeqCursor::MOD1_MODE, "Mod1 Mode");
 
         if (can_link) {
             gfxStartCursor(54, y);
@@ -950,13 +950,13 @@ private:
             gfxPrintIcon(MOD_ICON);
         }
         gfxPrint(10, y, mod2_mode_string(mod2_mode));
-        gfxEndCursor(cursor == EnvSeqCursor::MOD2_MODE);
+        gfxEndCursor(cursor == EnvSeqCursor::MOD2_MODE, "Mod2 Mode");
 
         y += 10;
         gfxStartCursor(0, y);
         gfxPrintIcon(output2_mode_icon(output2_mode));
         gfxPrint(output2_mode_string(output2_mode));
-        gfxEndCursor(cursor == EnvSeqCursor::OUTPUT2_MODE);
+        gfxEndCursor(cursor == EnvSeqCursor::OUTPUT2_MODE, "Out2 Mode");
     
         y += 10;
         gfxStartCursor(0, y);
@@ -981,7 +981,7 @@ private:
         gfxStartCursor(28, y);
         gfxPrint(28 + pad(10, num_steps), y, num_steps);
         gfxPos(40, y);
-        gfxEndCursor(cursor == EnvSeqCursor::NUM_STEPS);
+        gfxEndCursor(cursor == EnvSeqCursor::NUM_STEPS, "Steps");
 
         gfxStartCursor(44, y);
         gfxPrintIcon(RESET_ICON);
@@ -1001,7 +1001,7 @@ private:
         gfxStartCursor(10, y);
         gfxPrint(10 + pad(10, display_step), y, display_step);
         gfxPos(22, y);
-        gfxEndCursor(cursor == EnvSeqCursor::STEP_VIEW);
+        gfxEndCursor(cursor == EnvSeqCursor::STEP_VIEW, "Edit Step");
 
         if (cursor >= EnvSeqCursor::STEP_TRIGGERS) {
           draw_step_view_page3();
@@ -1016,20 +1016,20 @@ private:
         gfxPrint(0, y, "Off");
         gfxStartCursor(18, y);
         gfxPrintVoltage(s.offset * OFFSET_SCALE_INCREMENT);
-        gfxEndCursor(cursor == EnvSeqCursor::STEP_OFFSET);
+        gfxEndCursor(cursor == EnvSeqCursor::STEP_OFFSET, "Offset");
 
         y += 10;
         gfxPrint(0, y, "Scl");
         gfxStartCursor(18, y);
         gfxPrintVoltage(s.scale * OFFSET_SCALE_INCREMENT);
-        gfxEndCursor(cursor == EnvSeqCursor::STEP_SCALE);
+        gfxEndCursor(cursor == EnvSeqCursor::STEP_SCALE, "Amp");
 
         y += 10;
         gfxIcon(0, y, WAVEFORM_ICON);
         gfxStartCursor(10, y);
         gfxPrint(10, y, curve_string(s.curve));
         gfxPos(63, y);
-        gfxEndCursor(cursor == EnvSeqCursor::STEP_CURVE);
+        gfxEndCursor(cursor == EnvSeqCursor::STEP_CURVE, "Shape");
     }
 
     void draw_step_view_page2() {
@@ -1039,14 +1039,14 @@ private:
         gfxIcon(0, y, WAVEFORM_ICON);
         gfxStartCursor(10, y);
         gfxPrint(s.waveform_number + 1);
-        gfxEndCursor(cursor == EnvSeqCursor::STEP_WAVEFORM_NUMBER);
+        gfxEndCursor(cursor == EnvSeqCursor::STEP_WAVEFORM_NUMBER, "WaveSel");
 
         y += 10;
         gfxIcon(0, y, OFFSET_ICON);
         gfxStartCursor(10, y);
         gfxPrint(10 + pad(100, s.waveform_offset), y, s.waveform_offset);
         gfxPrint("%");
-        gfxEndCursor(cursor == EnvSeqCursor::STEP_WAVEFORM_OFFSET);
+        gfxEndCursor(cursor == EnvSeqCursor::STEP_WAVEFORM_OFFSET, "Offset");
 
         y += 10;
         gfxIcon(0, y, s.waveform_revert ? CHECK_ON_ICON : CHECK_OFF_ICON);
@@ -1064,7 +1064,7 @@ private:
         gfxStartCursor(10, y);
         gfxPrint(10, y, option_string(s.waveform_option));
         gfxPos(63, y);
-        gfxEndCursor(cursor == EnvSeqCursor::STEP_WAVEFORM_OPTION);
+        gfxEndCursor(cursor == EnvSeqCursor::STEP_WAVEFORM_OPTION, "VOsc Opt");
     }
 
     void draw_step_view_page3() {
@@ -1074,32 +1074,32 @@ private:
         gfxIcon(0, y, GATE_ICON);
         gfxStartCursor(10, y);
         gfxPrint(s.triggers + 1);
-        gfxEndCursor(cursor == EnvSeqCursor::STEP_TRIGGERS);
+        gfxEndCursor(cursor == EnvSeqCursor::STEP_TRIGGERS, "Trigs");
         gfxIcon(22, y, CLOCK_ICON);
         gfxStartCursor(32, y);
         gfxPrint(s.clocks + 1);
-        gfxEndCursor(cursor == EnvSeqCursor::STEP_CLOCKS);
+        gfxEndCursor(cursor == EnvSeqCursor::STEP_CLOCKS, "ClkDiv");
 
         y += 10;
         gfxIcon(0, y, LENGTH_ICON);
         gfxStartCursor(10, y);
         gfxPrint(10 + pad(100, s.length), y, s.length);
         gfxPrint("%");
-        gfxEndCursor(cursor == EnvSeqCursor::STEP_LENGTH);
+        gfxEndCursor(cursor == EnvSeqCursor::STEP_LENGTH, "Length");
 
         y += 10;
         gfxIcon(0, y, RANDOM_ICON);
         gfxStartCursor(10, y);
         gfxPrint(10 + pad(100, s.probability), y, s.probability);
         gfxPrint("%");
-        gfxEndCursor(cursor == EnvSeqCursor::STEP_PROBABILITY);
+        gfxEndCursor(cursor == EnvSeqCursor::STEP_PROBABILITY, "Prob");
 
         y += 10;
         gfxIcon(0, y, GAUGE_ICON);
         gfxStartCursor(10, y);
         gfxPrint(10 + pad(100, s.retrigger_fade), y, s.retrigger_fade);
         gfxPrint("%");
-        gfxEndCursor(cursor == EnvSeqCursor::STEP_RETRIGGER_FADE);
+        gfxEndCursor(cursor == EnvSeqCursor::STEP_RETRIGGER_FADE, "Fade Lvl");
 
         //y += 10;
         gfxIcon(55, y, s.mod_mark ? CHECK_ON_ICON : CHECK_OFF_ICON);
