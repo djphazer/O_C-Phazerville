@@ -509,10 +509,39 @@ public:
     }
 
     void OnButtonPress() {
-        if (random_cursor == RandomCursor::RANDOM_APPLY) {
+        switch (random_cursor) {
+          case RandomCursor::RANDOM_APPLY:
             // Randomize the steps and return to the main view
             randomize_steps();
             random_cursor = RandomCursor::MAX_RANDOM_CURSOR;
+            return;
+
+          case RandomCursor::RANDOM_OFFSETS:
+            random_offsets = !random_offsets;
+            return;
+          case RandomCursor::RANDOM_SCALES:
+            random_scales = !random_scales;
+            return;
+          case RandomCursor::RANDOM_CURVES:
+            random_curves = !random_curves;
+            return;
+          case RandomCursor::RANDOM_VOSC:
+            random_vosc = !random_vosc;
+            return;
+          case RandomCursor::RANDOM_LENGTHS:
+            random_lengths = !random_lengths;
+            return;
+          case RandomCursor::RANDOM_TRIGGERS:
+            random_triggers = !random_triggers;
+            return;
+          case RandomCursor::RANDOM_CLOCKS:
+            random_clocks = !random_clocks;
+            return;
+          case RandomCursor::RANDOM_MOD_MARKS:
+            random_mod_marks = !random_mod_marks;
+            return;
+          case RandomCursor::RANDOM_RETRIGGER_FADES:
+            random_retrigger_fades = !random_retrigger_fades;
             return;
         }
 
@@ -529,34 +558,44 @@ public:
             return;
         }
 
-        if (cursor == EnvSeqCursor::LINK) {
+        switch (cursor) {
+          case EnvSeqCursor::LINK:
             // Link and open linked view
             manager.SetLink(hemisphere, true);
             linked_cursor = LinkedCursor::UNLINK;
             return;
-        }
 
-        if (cursor == EnvSeqCursor::RANDOM) {
+          case EnvSeqCursor::RANDOM:
             // Open random view
             random_cursor = RandomCursor::RANDOM_APPLY;
             return;
-        }
 
-        if (cursor == EnvSeqCursor::TRIGGER2) {
+          case EnvSeqCursor::TRIGGER2:
             trigger2 = !trigger2;
             return;
-        }
 
-        if (cursor == EnvSeqCursor::RESET) {
+          case EnvSeqCursor::RESET:
             Reset();
             return;
-        }
-        if (cursor == EnvSeqCursor::INIT) {
+          case EnvSeqCursor::INIT:
             init_steps();
             return;
-        }
 
-        CursorToggle();
+          case EnvSeqCursor::STEP_WAVEFORM_REVERT:
+            steps[step_view].waveform_revert
+              = !steps[step_view].waveform_revert;
+            return;
+          case EnvSeqCursor::STEP_WAVEFORM_INVERT:
+            steps[step_view].waveform_invert
+              = !steps[step_view].waveform_invert;
+            return;
+          case EnvSeqCursor::STEP_MOD_MARK:
+            steps[step_view].mod_mark = !steps[step_view].mod_mark;
+            return;
+
+          default:
+            CursorToggle();
+        }
     }
 
     /* Pressing the select button after highlighting a parameter for editing
@@ -594,42 +633,8 @@ public:
         }
 
         if (random_cursor < MAX_RANDOM_CURSOR) {
-            if (!EditMode()) {
-                // Going past the available options will return to the main view.
-                MoveCursor(random_cursor, direction, RandomCursor::MAX_RANDOM_CURSOR);
-                return;
-            }
-
-            switch (random_cursor) {
-            case RandomCursor::RANDOM_OFFSETS:
-                random_offsets = !random_offsets;
-                break;
-            case RandomCursor::RANDOM_SCALES:
-                random_scales = !random_scales;
-                break;
-            case RandomCursor::RANDOM_CURVES:
-                random_curves = !random_curves;
-                break;
-            case RandomCursor::RANDOM_VOSC:
-                random_vosc = !random_vosc;
-                break;
-            case RandomCursor::RANDOM_LENGTHS:
-                random_lengths = !random_lengths;
-                break;
-            case RandomCursor::RANDOM_TRIGGERS:
-                random_triggers = !random_triggers;
-                break;
-            case RandomCursor::RANDOM_CLOCKS:
-                random_clocks = !random_clocks;
-                break;
-            case RandomCursor::RANDOM_MOD_MARKS:
-                random_mod_marks = !random_mod_marks;
-                break;
-            case RandomCursor::RANDOM_RETRIGGER_FADES:
-                random_retrigger_fades = !random_retrigger_fades;
-                break;
-            }
-            
+            // Going past the available options will return to the main view.
+            MoveCursor(random_cursor, direction, RandomCursor::MAX_RANDOM_CURSOR);
             return;
         }
 
@@ -646,6 +651,7 @@ public:
           step_view = constrain(step_view + direction, 0, MAX_NUM_STEPS - 1);
           return;
         }
+
         switch (cursor) {
         case EnvSeqCursor::MOD1_MODE:
             mod1_mode = (ModulationMode)constrain(mod1_mode + direction, 0, ModulationMode::MAX_MODULATION_MODE - 1);
@@ -677,12 +683,6 @@ public:
         case EnvSeqCursor::STEP_WAVEFORM_OFFSET:
             steps[step_view].waveform_offset = (uint8_t)constrain(steps[step_view].waveform_offset + direction, 0, 100);
             break;
-        case EnvSeqCursor::STEP_WAVEFORM_REVERT:
-            steps[step_view].waveform_revert = !steps[step_view].waveform_revert;
-            break;
-        case EnvSeqCursor::STEP_WAVEFORM_INVERT:
-            steps[step_view].waveform_invert = !steps[step_view].waveform_invert;
-            break;
         case EnvSeqCursor::STEP_WAVEFORM_OPTION:
             steps[step_view].waveform_option = (Option)constrain(steps[step_view].waveform_option + direction, 0, Option::MAX_OPTIONS - 1);
             break;
@@ -700,9 +700,6 @@ public:
             break;
         case EnvSeqCursor::STEP_RETRIGGER_FADE:
             steps[step_view].retrigger_fade = (uint8_t)constrain(steps[step_view].retrigger_fade + direction, 0, 100);
-            break;
-        case EnvSeqCursor::STEP_MOD_MARK:
-            steps[step_view].mod_mark = !steps[step_view].mod_mark;
             break;
         }
     }
