@@ -81,14 +81,26 @@ namespace OC {
 #endif
   };
 
-  const char * const cv_input_names_none[] = { " - ", "CV1", "CV2", "CV3", "CV4",
-#ifdef ARDUINO_TEENSY41
-    "CV5", "CV6", "CV7", "CV8",
-#endif
+  const char * const cv_input_names_none[] = {
+    " - ",
+    // inputs
+    "C 1", "C 2", "C 3", "C 4",
+    "C 5", "C 6", "C 7", "C 8",
+    "C 9", "C10", "C11", "C12",
+    "C13", "C14", "C15", "C16",
+    "C17", "C18", "C19", "C20",
+    "C21", "C22", "C23", "C24",
+    "C25", "C26", "C27", "C28",
+    "C29", "C30", "C31", "C32",
+    // outputs
     "A", "B", "C", "D",
-#ifdef ARDUINO_TEENSY41
     "E", "F", "G", "H",
-#endif
+    "I", "J", "K", "L",
+    "M", "N", "O", "P",
+    "Q", "R", "S", "T",
+    "U", "V", "W", "X",
+    "Y", "Z", "a", "b",
+    "c", "d", "e", "f",
     // Midi Maps in MIDIFrame::mapping[]
     "M 1","M 2","M 3","M 4",
     "M 5","M 6","M 7","M 8",

@@ -47,7 +47,7 @@
 
 // per bank file
 static constexpr int QUAD_PRESET_COUNT = 32;
-static constexpr int PRESET_FILE_REVISION = 0;
+static constexpr int PRESET_FILE_REVISION = 1;
 
 using namespace HS;
 
@@ -124,7 +124,7 @@ public:
       //  - Right now, its existence indicates v1.10.1+
       uint64_t data = 0;
       bool version_key_present = PhzConfig::getValue(VERSION_KEY, data);
-      //int preset_file_revision = version_key_present? data : 0;
+      int preset_file_revision = version_key_present? data : 0;
 
       // Data migration to protect against a bug in v1.10
       // This can be removed later, when we're sure no one is still using broken preset files...
@@ -133,6 +133,10 @@ public:
           PhzConfig::deleteKey((i << 11) | (CVMAP_KEY + 1));
           PhzConfig::deleteKey((i << 11) | (TRIGMAP_KEY + 1));
         }
+      }
+      if (preset_file_revision < 1) {
+        // migrations from v1.x to v2.0
+        // - CVInputMap sources got remapped
       }
 
       // update version key after all data migrations

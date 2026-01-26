@@ -28,7 +28,7 @@ namespace HS {
 static constexpr int GATE_THRESHOLD = 15 << 7; // 1.25 volts
 #if defined(__IMXRT1062__)
 static constexpr int MIDIMAP_MAX = 32;
-static constexpr int IO_CHANNEL_COUNT = 16; // virtual inputs and outputs
+static constexpr int IO_CHANNEL_COUNT = 32; // virtual inputs and outputs
 #else
 static constexpr int MIDIMAP_MAX = 8;
 #endif
@@ -539,7 +539,9 @@ struct IOFrame {
 
     // --- Soft IO ---
     int In(int ch) {
-      return current_ioframe->cv.pitch_values[ch];
+      if (ch < ADC_CHANNEL_COUNT)
+        return current_ioframe->cv.pitch_values[ch];
+      return 0;
     }
 
     void Out(DAC_CHANNEL channel, int value, bool override = false) {

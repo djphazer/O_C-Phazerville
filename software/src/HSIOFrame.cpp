@@ -439,7 +439,7 @@ void HS::IOFrame::Send(OC::IOFrame *ioframe) {
       DAC_CHANNEL_E, DAC_CHANNEL_F, DAC_CHANNEL_G, DAC_CHANNEL_H,
 #endif
     };
-    for (int i = 0; i < DAC_CHANNEL_COUNT; ++i) {
+    for (int i = 0; i < IO_CHANNEL_COUNT; ++i) {
 
       /*
        * envelope output!
@@ -467,7 +467,8 @@ void HS::IOFrame::Send(OC::IOFrame *ioframe) {
        */
 
       outputs[i].push(output_slew[i]);
-      ioframe->outputs.set_pitch_value(chan[i], outputs[i].get(output_atten[i]));
+      if (i < DAC_CHANNEL_COUNT)
+        ioframe->outputs.set_pitch_value(chan[i], outputs[i].get(output_atten[i]));
     }
 
     if (autoMIDIOut) MIDIState.Send(outputs);
