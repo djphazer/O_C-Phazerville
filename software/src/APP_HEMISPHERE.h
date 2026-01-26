@@ -820,6 +820,10 @@ public:
                 gfxPrint(x, y+10, "Slew=");
                 gfxPrint(HS::frame.output_slew[zoom_slot*2 + zoom_cursor-5]);
                 gfxPrint("%");
+
+                gfxPrint(x, y+20, "Skip=");
+                gfxPrint(HS::frame.clockskip[zoom_slot*2 + zoom_cursor-5]);
+                gfxPrint("%");
               }
             } else {
               if (CursorBlink()) {
@@ -1107,7 +1111,10 @@ public:
                 break;
               case 5:
               case 6:
-                HS::frame.NudgeSlew(zoom_slot*2 + zoom_cursor - 5, event.value);
+                if (h == LEFT_HEMISPHERE)
+                  HS::frame.NudgeSkip(zoom_slot*2 + zoom_cursor - 5, event.value);
+                else
+                  HS::frame.NudgeSlew(zoom_slot*2 + zoom_cursor - 5, event.value);
                 break;
               default:
                 isEditing = false;
