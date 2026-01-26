@@ -8,8 +8,13 @@ const int NUM_CV_INPUTS = CVMAP_MAX + 1;
 inline std::array<util::SemitoneQuantizer, NUM_CV_INPUTS> cv_semitone_quants;
 
 struct CVInputMap {
-  // TODO: rework source into 3 bits for type, 5 bits for index
-  int8_t source = 0;
+  enum SourceType {
+    TYPE_ADC = (0 << 5),
+    TYPE_DAC = (1 << 5),
+    TYPE_MIDI = (2 << 5),
+  };
+
+  uint8_t source = 0; // 3 bits type | 5 bits index
   int8_t attenuversion = 60; // 60 is 100%
                              // max range is +/- 127 (448%)
 
@@ -24,12 +29,25 @@ struct CVInputMap {
     }
   }
 
+  SourceType source_type() const {
+    return (SourceType)(source & (0x7 << 5)); // upper 3 bits
+  }
+
   int RawIn() const {
-    return source <= ADC_CHANNEL_LAST
-      ? frame.In(source - 1)
-      : (source - ADC_CHANNEL_LAST <= DAC_CHANNEL_LAST)
-        ? frame.ViewOut(source - 1 - ADC_CHANNEL_LAST)
-        : frame.MIDIState.mapping[source - ADC_CHANNEL_LAST - DAC_CHANNEL_LAST - 1].output;
+    const uint8_t index = source & 0x1f; // lower 5 bits
+    switch (source_type()) {
+      // just because 0 means disabled - ADC count starts at 1
+      case TYPE_ADC:
+        return frame.In(index - 1);
+
+      case TYPE_DAC:
+        return frame.ViewOut(index);
+        break;
+
+      case TYPE_MIDI:
+        return frame.MIDIState.mapping[index].output;
+        break;
+    }
   }
 
   int In(int default_value = 0) const {
@@ -40,7 +58,7 @@ struct CVInputMap {
   float InF(float default_value = 0.0f) const {
     if (!source) return default_value;
     return 0.001f * Atten(attenuversion) * static_cast<float>(RawIn())
-      / static_cast<float>((source <= ADC_CHANNEL_LAST)?HEMISPHERE_MAX_INPUT_CV:HEMISPHERE_MAX_CV);
+      / static_cast<float>((source_type() == TYPE_ADC)?HEMISPHERE_MAX_INPUT_CV:HEMISPHERE_MAX_CV);
   }
 
   int SemitoneIn(int default_value = 0) {
@@ -48,7 +66,7 @@ struct CVInputMap {
   }
 
   int InRescaled(int max_value) const {
-    return Proportion(In(), (source <= ADC_CHANNEL_LAST)?HEMISPHERE_MAX_INPUT_CV:HEMISPHERE_MAX_CV, max_value);
+    return Proportion(In(), (source_type() == TYPE_ADC)?HEMISPHERE_MAX_INPUT_CV:HEMISPHERE_MAX_CV, max_value);
   }
 
   void ChangeSource(int dir) {

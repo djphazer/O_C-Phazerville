@@ -28,11 +28,12 @@ namespace HS {
 static constexpr int GATE_THRESHOLD = 15 << 7; // 1.25 volts
 #if defined(__IMXRT1062__)
 static constexpr int MIDIMAP_MAX = 32;
+static constexpr int IO_CHANNEL_COUNT = 16; // virtual inputs and outputs
 #else
 static constexpr int MIDIMAP_MAX = 8;
 #endif
-static constexpr int TRIGMAP_MAX = OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_COUNT + DAC_CHANNEL_COUNT + MIDIMAP_MAX;
-static constexpr int CVMAP_MAX = ADC_CHANNEL_COUNT + DAC_CHANNEL_COUNT + MIDIMAP_MAX;
+static constexpr int TRIGMAP_MAX = DIGITAL_INPUT_COUNT + IO_CHANNEL_COUNT + IO_CHANNEL_COUNT + MIDIMAP_MAX;
+static constexpr int CVMAP_MAX = IO_CHANNEL_COUNT + IO_CHANNEL_COUNT + MIDIMAP_MAX;
 
 struct MIDIFrame;
 struct IOFrame;
@@ -499,26 +500,25 @@ struct IOFrame {
     // settings
     bool autoMIDIOut = false;
     bool synctrig = false;
-    uint8_t clockskip[DAC_CHANNEL_COUNT] = {0};
-    int8_t output_slew[DAC_CHANNEL_COUNT] = {0};
-    int8_t output_atten[DAC_CHANNEL_COUNT]; // -126 (-200%) to 126 (+200%), 63 is 100%
+    uint8_t clockskip[IO_CHANNEL_COUNT] = {0};
+    int8_t output_slew[IO_CHANNEL_COUNT] = {0};
+    int8_t output_atten[IO_CHANNEL_COUNT]; // -126 (-200%) to 126 (+200%), 63 is 100%
 
     // pre-calculated clocks, subject to trigger mapping
-    bool clocked[OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_COUNT];
+    bool clocked[OC::DIGITAL_INPUT_LAST + IO_CHANNEL_COUNT];
 
     // physical input state cache
-    bool gate_high[OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_COUNT];
-    //int inputs[ADC_CHANNEL_COUNT];
+    bool gate_high[OC::DIGITAL_INPUT_LAST + IO_CHANNEL_COUNT];
 
     // output value cache, countdowns
-    SlewedValue outputs[DAC_CHANNEL_COUNT]; // now with Extra Precision!
-    int clock_countdown[DAC_CHANNEL_COUNT];
-    int adc_lag_countdown[ADC_CHANNEL_COUNT]; // Time between a clock event and an ADC read event
+    SlewedValue outputs[IO_CHANNEL_COUNT]; // now with Extra Precision!
+    int clock_countdown[IO_CHANNEL_COUNT];
+    int adc_lag_countdown[IO_CHANNEL_COUNT]; // Time between a clock event and an ADC read event
     // calculated values
-    uint32_t last_clock[ADC_CHANNEL_COUNT]; // Tick number of the last clock observed by the child class
-    uint32_t cycle_ticks[ADC_CHANNEL_COUNT]; // Number of ticks between last two clocks
-    bool changed_cv[ADC_CHANNEL_COUNT]; // Has the input changed by more than 1/8 semitone since the last read?
-    int last_cv[ADC_CHANNEL_COUNT]; // For change detection
+    uint32_t last_clock[IO_CHANNEL_COUNT]; // Tick number of the last clock observed by the child class
+    uint32_t cycle_ticks[IO_CHANNEL_COUNT]; // Number of ticks between last two clocks
+    bool changed_cv[IO_CHANNEL_COUNT]; // Has the input changed by more than 1/8 semitone since the last read?
+    int last_cv[IO_CHANNEL_COUNT]; // For change detection
 
     /* MIDI message queue/cache */
     MIDIFrame MIDIState;

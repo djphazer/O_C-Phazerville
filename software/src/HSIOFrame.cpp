@@ -394,7 +394,7 @@ void HS::IOFrame::Load(OC::IOFrame *ioframe) {
     }
 
     // Handle clock pulse timing
-    for (int i = 0; i < DAC_CHANNEL_COUNT; ++i) {
+    for (int i = 0; i < IO_CHANNEL_COUNT; ++i) {
         if (clock_countdown[i] > 0) {
             if (--clock_countdown[i] == 0) Out(i, 0);
         }
