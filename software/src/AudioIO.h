@@ -4,7 +4,7 @@
 
 namespace OC {
   namespace AudioIO {
-    const int AUDIO_MEMORY = 128;
+    const int AUDIO_MEMORY = 256;
     AudioStream& InputStream(int interface = 0);
     AudioStream& OutputStream();
     void Init();
