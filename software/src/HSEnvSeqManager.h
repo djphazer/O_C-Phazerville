@@ -23,7 +23,7 @@ public:
     enum ModulationMode : uint8_t {
         LENGTH = 0, // Modulate the step length
         STEP_SEL = 1, // Modulate the step selector
-        RETRIGGER_FADE = 2, // Modulate the retrigger fade
+        RETRIGGER_LEVEL = 2, // Modulate the retrigger level
         MOD = 3, // Modulate all steps
         MOD_MARK = 4, // Modulate marked steps ONLY
 
@@ -32,14 +32,12 @@ public:
 
     enum OutputMode : uint8_t {
         COPY = 0, // Output the same CV as CV1
-        COPY_INV = 1, // Output the inverse of CV1, centered at the middle of the scale
-        COPY_INV0 = 2, // Output the inverse of CV1, centered at 0
-        COPY_INVO = 3, // Output the inverse of CV1, centered at the step offset
-        COPY_ABOVE0 = 4, // Output the CV1 always above 0, inverted if necessary
-        CV_STEP_START = 5, // Output the step CV start value and hold it until next step
-        GATE_STEP = 6, // Output a gate at each playing step
-        GATE_STEP_INCL_RETRIGGERS = 7, // Output a gate at each playing step, including retriggers
-        GATE_SEQUENCE = 8, // Output a gate at the start of the sequence
+        INV = 1, // Output the inverse of CV1, centered at the amplitude center
+        INVO = 2, // Output the inverse of CV1, centered at the waveform offset
+        CV_STEP_START = 3, // Output the step CV start value and hold it until next step
+        GATE_STEP = 4, // Output a gate at each playing step
+        GATE_STEP_INCL_RETRIGGERS = 5, // Output a gate at each playing step, including retriggers
+        GATE_SEQUENCE = 6, // Output a gate at the start of the sequence
 
         MAX_OUTPUT_MODE,
     };
@@ -63,8 +61,8 @@ public:
     struct LinkedState {
         bool linked = false;
         LinkedData data[2] = {
-            LinkedData{modulation: Modulation{mode: ModulationMode::MOD_MARK, output_mode: OutputMode::COPY_INV}},
-            LinkedData{modulation: Modulation{mode: ModulationMode::STEP_SEL, output_mode: OutputMode::CV_STEP_START}},
+            LinkedData{Modulation{ModulationMode::MOD_MARK, OutputMode::INV}, Output{}},
+            LinkedData{Modulation{ModulationMode::STEP_SEL, OutputMode::CV_STEP_START}, Output{}},
         };
     };
 

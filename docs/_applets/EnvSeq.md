@@ -5,7 +5,7 @@ layout: default
 
 ![EnvSeq screenshot](images/EnvSeq.png)
 
-**EnvSeq** is a clocked envelope sequencer. Each step outputs a configurable shape (ramp/exp/log/triangle/flat/VOSC), with per-step level (Amp), offset, probability (chance to play), duration in clocks, optional retriggers (repeating the shape within the step) with fade, and per-step length (time-warp of the shape inside the step).
+**EnvSeq** is a clocked envelope sequencer. Each step outputs a configurable shape (ramp/exp/log/flat/VOSC), with per-step level (Amp), offset, probability (chance to play), duration in clocks, optional retriggers (repeating the shape within the step) with fade, and per-step length (time-warp of the shape inside the step).
 
 ### I/O
 
@@ -35,7 +35,7 @@ EnvSeq has two screens:
 | Mode    | Description                                                                                 |
 |---------|--------------------------------------------------------------------------------------------|
 | Length  | CV2 modulates the **Length** parameter (time-warp of the shape within the step, bipolar, 1-200%)           |
-| RetrgFd | CV2 modulates the **Retrigger Fade** percent (bipolar, 0–100%). |
+| RetrgLv | CV2 modulates the **Retrigger Level** (-15..15). Negative values fade in (0%→100%), positive values fade out (100%→0%), 0 = no fade. |
 | Mod     | CV2 is added to the output CV for all steps.                                               |
 | ModMark | CV2 is added to the output CV only on steps marked with `Mod2` in the step editor.         |
 | StepSel | CV2 selects the **next played step** (unipolar **0–5V** mapped across the active `num_steps`). The selection is **sampled on the clock** when advancing steps. Step **Probability is ignored** in this mode, but multi-clock steps (`Clk`) are still honored (the current step holds until its clocks are done). |
@@ -46,17 +46,15 @@ Output 2 can mirror or complement the main envelope output:
 | Out2 Mode | Description |
 |-----------|-------------|
 | Cpy       | Copy of Out1 (same envelope CV) |
-| CpyInvO   | Inverted copy of Out1, mirrored around the step’s Offset |
-| CpyInv    | Inverted copy of Out1, mirrored around the midpoint of the amp |
-| CpyInv0   | Inverted copy of Out1, mirrored around 0V |
-| CpyAbv0   | Absolute-value copy of Out1 (always above 0V) |
+| Inv       | Mirrored copy of Out1 within the step’s amplitude range (vertical flip). |
+| InvO      | Mirrored copy of Out1 around the step’s waveform offset (0–100% of amp). |
 | HStart    | Holds the step’s start CV value until the next step begins |
 | Step      | Short gate at each new (played) step |
 | StepTrg   | Short gate at each new (played) step and retriggers within a step |
 | Seq       | Short gate at the start of the sequence (on wraparound) |
 
 Notes:
-- Gates are only generated for steps whose Shape is not `None`.
+- Gates are only generated for steps whose Shape is neither `Hold` nor `Zero`.
 - Gate pulse length is fixed (short trigger-style), not proportional to the incoming clock.
 
 ## Step screen
@@ -67,8 +65,8 @@ Select which step number you’re editing.
 
 ### Shape
 Shape for the step:
-- `None`: silent step (outputs 0V and generates no gates)
-- `Zero`: outputs 0V but still counts as an active step (gates can be generated)
+- `Hold`: silent step (holds the previous step’s output CV and generates no gates)
+- `Zero`: outputs 0V but still counts as an active step (no gates generated)
 - `Flat`: constant level (Amp)
 - `ExpDw`: exponential-like Amp → 0
 - `ExpUp`: exponential-like 0 → Amp
@@ -76,13 +74,12 @@ Shape for the step:
 - `RampUp`: 0 → Amp
 - `LogDw`: logarithmic-like Amp → 0
 - `LogUp`: logarithmic-like 0 → Amp
-- `Triang`: 0 → Amp → 0
 - `VOSC`: vector-oscillator waveform driven by step progress
 
 ### Parameters
 
 #### Offset
-DC offset added to the step output (and used as the center point for `CpyInvO`).
+DC offset added to the step output (and used as the center point for `InvO`).
 
 #### Amplitude
 Bipolar amplitude of the step’s shape; negative values invert the shape.
@@ -126,8 +123,11 @@ Time-warp of the shape progression within the step (1–200%).
 #### Probability (Prob)
 Chance (0–100%) that this step will be played when the sequence reaches it.
 
-#### Retrigger Fade (Fade Lvl)
-Sets the target level (0–100%) for the **last** retrigger within the step. Earlier retriggers are scaled down proportionally between full level and this target.
+#### Retrigger Level (Fade Lvl)
+Sets the retrigger fade behavior in the range -15..15:
+- `-15`: fade in from 0% to 100% across retriggers
+- `0`: no fade (all retriggers at 100%)
+- `+15`: fade out from 100% to 0% across retriggers
 
 #### Mod Mark
 Marks this step as eligible for Mod2 when `Mod2` mode is `ModMark`.

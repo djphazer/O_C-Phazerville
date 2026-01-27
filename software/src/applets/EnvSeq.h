@@ -55,7 +55,7 @@ public:
         STEP_PARAM_CLOCKS,
         STEP_PARAM_LENGTH,
         STEP_PARAM_PROBABILITY,
-        STEP_PARAM_RETRIGGER_FADE,
+        STEP_PARAM_RETRIGGER_LEVEL,
         STEP_PARAM_MOD_MARK,
 
         MAX_STEP_PARAM_CURSOR,
@@ -63,7 +63,7 @@ public:
     static constexpr const char* const step_param_names[MAX_STEP_PARAM_CURSOR] = {
         "Offset", "Amplitude", "WaveNr", "WaveOff", "Revert",
         "Invert", "Option", "Triggers", "Clocks",
-        "Length", "Prob", "Fade Lvl", "Mod Mark",
+        "Length", "Prob", "RetrigLvl", "Mod Mark",
     };
 
     enum LinkedCursor {
@@ -81,7 +81,7 @@ public:
         RANDOM_SHAPES, RANDOM_VOSC,
         RANDOM_LENGTHS, RANDOM_TRIGGERS,
         RANDOM_CLOCKS, RANDOM_MOD_MARKS,
-        RANDOM_RETRIGGER_FADES, RANDOM_APPLY,
+        RANDOM_RETRIGGER_LEVELS, RANDOM_APPLY,
 
         MAX_RANDOM_CURSOR,
     };
@@ -97,7 +97,7 @@ public:
 
     // Shape types for step transitions
     enum Shape : uint8_t {
-        NONE = 0,
+        HOLD = 0,
         ZERO = 1,
         FLAT = 2,
         EXP_DOWN = 3,
@@ -106,8 +106,7 @@ public:
         RAMP_UP = 6,
         LOG_DOWN = 7,
         LOG_UP = 8,
-        TRIANGLE = 9,
-        VOSC = 10,
+        VOSC = 9,
 
         MAX_SHAPE,
     };
@@ -127,18 +126,18 @@ public:
         int16_t offset; // Scaled step offset CV (by OFFSET_SCALE_INCREMENT)
         int16_t amp; // Scaled step amp CV (by OFFSET_SCALE_INCREMENT)
         int waveform_number; // Waveform number (VOSC only)
-        uint8_t waveform_offset; // Offset where the envelope offset is on the waveform (0..100) in 1% steps (VOSC only)
         bool waveform_revert; // Reverts the waveform (VOSC only)
         bool waveform_invert; // Inverts the waveform (VOSC only)
         uint8_t length; // Length 1-200% of envelope duration for this step
-        uint8_t probability; // Probability 0-100% of this step being played
-        uint8_t retrigger_fade; // Retrigger fade (last retrigger gets to this level)
         bool mod_mark; // Whether this step is marked for modulation
 
         Shape shape : 4; // Shape for the step
+        uint8_t waveform_offset : 7; // Offset where the envelope offset is on the waveform (0..100) in 1% steps (VOSC only)
         Option waveform_option : 3; // Option for the waveform (VOSC only)
         uint8_t triggers : 3; // Number of times to trigger the step (0-7)
         uint8_t clocks : 3; // Number of clocks this step lasts for (0-7)
+        uint8_t probability : 7; // Probability 0-100% of this step being played
+        int8_t retrigger_level : 5; // Retrigger level (-15..15). -15: fade in 0->100, 0: no fade, 15: fade out 100->0
     };
 
     const char* applet_name() {
@@ -231,46 +230,8 @@ public:
             return;
         }
 
-        int mod1_cv = DetentedIn(0);
-        if (new_step) {
-            // Store the modulation input value for step and sequence start
-            mod_cv_step = mod1_cv;
-            if (sequence_restarted) {
-                mod_cv_seq = mod1_cv;
-            }
-        }
-
-        // Apply the modulation mode
-        if (mod1_mode == ModulationMode::HOLD_STEP_START) {
-            mod1_cv = mod_cv_step;
-        } else if (mod1_mode == ModulationMode::HOLD_SEQ_START) {
-            mod1_cv = mod_cv_seq;
-        }
-
-        const EnvSeqManager::LinkedData *linked_data = manager.GetLinkedData(hemisphere);
-        int16_t cv_out = 0;
-        Step s = steps[step];
-        const int16_t amp_cv = s.amp * OFFSET_SCALE_INCREMENT;
-        const uint32_t total_step_ticks = (s.clocks + 1) * clock_ticks;
-        const uint32_t step_end_tick = step_start_tick + total_step_ticks;
-        const uint16_t raw_step_progress = this_tick >= step_end_tick ? 65535 : Proportion(this_tick - step_start_tick, total_step_ticks, 65535);
-        
-        // Effective step length (1-200%) with CV scaling
-        EnvSeqManager::Output length_mod = get_modulation(EnvSeqManager::ModulationMode::LENGTH, true);
-        uint16_t effective_length = s.length;
-        if (length_mod.is_cv) {
-            effective_length = effective_step_length(effective_length, length_mod.cv);
-        }
-
-        // Map the step length (1-200%) into the shape progression: <100% speeds the shape up, >100% slows it down
-        step_progress = raw_step_progress;
-        if (effective_length != 100) {
-            uint32_t scaled = (static_cast<uint32_t>(raw_step_progress) * 100) / effective_length;
-            if (scaled > 65535) {
-                scaled = 65535;
-            }
-            step_progress = static_cast<uint16_t>(scaled);
-        }
+        const Step& s = steps[step];
+        update_step_progress(this_tick);
 
         // Retrigger: restart the shape multiple times within the same step.
         bool retrig_edge = false;
@@ -288,34 +249,27 @@ public:
             }
         }
 
-        // Modulate the offset CV
-        int offset_cv = static_cast<int>(s.offset) * OFFSET_SCALE_INCREMENT + mod1_cv;
-        EnvSeqManager::Output modulation = get_modulation(EnvSeqManager::ModulationMode::MOD);
-        if (modulation.is_cv) {
-            offset_cv += modulation.cv;
-        }
-        if (s.mod_mark) {
-            modulation = get_modulation(EnvSeqManager::ModulationMode::MOD_MARK);
-            if (modulation.is_cv) {
-                offset_cv += modulation.cv;
-            }
-        }
+        const EnvSeqManager::LinkedData *linked_data = manager.GetLinkedData(hemisphere);
+        int offset_cv = get_offset_cv(get_mod1_cv(new_step, sequence_restarted));
+        int16_t amp_cv = s.amp * OFFSET_SCALE_INCREMENT; // CV scaled amplitude (not including offset or waveform offset)
+        const uint16_t amp_abs = abs(amp_cv);
+        const uint16_t amp_mag = amp_abs / 2;
 
+        int16_t cv = 0;
         bool use_vosc = true;
         switch (s.shape) {
-        case Shape::NONE:
+        case Shape::HOLD:
             use_vosc = false;
-            offset_cv = 0;
-            cv_out = 0;
+            offset_cv = amp_cv = 0;
+            cv = last_output_cv;
             break;
         case Shape::ZERO:
             use_vosc = false;
-            offset_cv = 0;
-            cv_out = 0;
+            offset_cv = amp_cv = cv = 0;
             break;
         case Shape::FLAT:
             use_vosc = false;
-            cv_out = amp_cv;
+            cv = amp_abs;
             break;
         case Shape::EXP_DOWN:
         case Shape::EXP_UP:
@@ -323,102 +277,115 @@ public:
         case Shape::RAMP_UP:
         case Shape::LOG_DOWN:
         case Shape::LOG_UP:
-        case Shape::TRIANGLE:
-            init_step_vosc_shape(s);
-            break;
         case Shape::VOSC:
-            // Keep user-selected waveform params for preview
+            // These shapes are handled by the VOSC oscillator
             break;
-        default:
+        case Shape::MAX_SHAPE:
             use_vosc = false;
             break;
         }
 
-        // Initialize the VOSC oscillator if needed
-        if ((new_step || osc_reinit) && use_vosc) {
-            osc_reinit = false;
-            osc = WaveformManager::VectorOscillatorFromWaveform(s.waveform_number);
-            osc.Sustain();
-            osc.Cycle(0);
-        }
-
         const bool is_positive = amp_cv >= 0;
+
+        uint16_t waveform_offset = 0;
         if (use_vosc) {
-            const uint16_t amp_abs = abs(amp_cv);
-            const uint16_t amp_mag = amp_abs / 2;
+            // Get the waveform parameters for the shape and overwrite them if needed
+            int number = s.waveform_number;
+            uint8_t offset = s.waveform_offset;
+            bool revert = s.waveform_revert;
+            bool invert = s.waveform_invert;
+            Option option = s.waveform_option;
+            apply_shape_params(s.shape, number, offset, revert, invert, option);
+
+            // Initialize the VOSC oscillator if needed
+            if (new_step || osc_reinit) {
+                osc_reinit = false;
+                osc = WaveformManager::VectorOscillatorFromWaveform(number);
+                osc.Sustain();
+                osc.Cycle(0);
+            }
             osc.SetScale(amp_mag);
     
-            // Drive the waveform by step progress (0..3600 tenths of a degree).
-            const int phase_deg_tenths = (static_cast<uint32_t>(s.waveform_revert ? 65535 - step_progress : step_progress) * 3600) / 65535;
-            cv_out = osc.Phase(phase_deg_tenths);
-            cv_out += amp_mag;
-    
-            uint16_t waveform_offset = Proportion(s.waveform_offset, 100, amp_abs);
-            if (s.waveform_offset != 0) {
-                cv_out -= waveform_offset;
-            }
+            // Drive the waveform by step_progress (0..3600 tenths of a degree).
+            const int phase_deg_tenths = (static_cast<uint32_t>(revert ? 65535 - step_progress : step_progress) * 3600) / 65535;
+            cv = osc.Phase(phase_deg_tenths);
+            cv += amp_mag;
+
+            // Set waveform offset based on amplitude
+            waveform_offset = Proportion(offset, 100, amp_abs);
     
             // Apply the waveform option
-            switch (s.waveform_option) {
+            switch (option) {
+            case Option::NO_OPTION:
+                break;
             case Option::FOLD_UP:
-                if (cv_out < 0) {
-                    cv_out = -cv_out;
+                if (cv < waveform_offset) {
+                    cv = 2 * waveform_offset - cv;
                 }
                 break;
             case Option::FOLD_DOWN:
-                if (cv_out > 0) {
-                    cv_out = -cv_out;
+                if (cv > waveform_offset) {
+                    cv = 2 * waveform_offset - cv;
                 }
                 break;
             case Option::ZERO_UP:
-                if (cv_out > 0) {
-                    cv_out = 0;
+                if (cv > waveform_offset) {
+                    cv = waveform_offset;
                 }
                 break;
             case Option::ZERO_DOWN:
-                if (cv_out < 0) {
-                    cv_out = 0;
+                if (cv < waveform_offset) {
+                    cv = waveform_offset;
                 }
                 break;
-            default:
+            case Option::MAX_OPTIONS:
                 break;
+            }
+
+            // Invert the CV if needed (vertical flip)
+            if (invert) {
+                cv = 2 * amp_mag - cv;
             }
         }
 
-        if (s.waveform_invert) {
-            cv_out = -cv_out;
-        }
-        if (s.shape != Shape::FLAT && !is_positive) {
-            cv_out = -cv_out;
-        }
-
-        // Retrigger fade: scale amplitude so the last retrigger reaches retrigger_fade%
+        // Retrigger level: scale amplitude across retriggers (-15..15)
         if (retrig_segments > 1) {
-            EnvSeqManager::Output fade_mod = get_modulation(EnvSeqManager::ModulationMode::RETRIGGER_FADE, true);
-            const int fade_target = constrain(
-                s.retrigger_fade + (fade_mod.is_cv ? Proportion(fade_mod.cv, HEMISPHERE_MAX_INPUT_CV, 100) : 0),
-                0,
-                100
+            EnvSeqManager::Output lvl_mod = get_modulation(EnvSeqManager::ModulationMode::RETRIGGER_LEVEL, true);
+            const int lvl = constrain(
+                s.retrigger_level + (lvl_mod.is_cv ? Proportion(lvl_mod.cv, HEMISPHERE_MAX_INPUT_CV, 15) : 0),
+                -15,
+                15
             );
-            const int fade_pct = 100 - ((100 - fade_target) * retrig_index) / (retrig_segments - 1);
-            cv_out = (static_cast<int32_t>(cv_out) * fade_pct) / 100;
+            int lvl_pct = 100;
+            if (lvl > 0) {
+                const int lvl_target = 100 - (lvl * 100) / 15;
+                lvl_pct = 100 - ((100 - lvl_target) * retrig_index) / (retrig_segments - 1);
+            } else if (lvl < 0) {
+                const int lvl_start = 100 - ((-lvl) * 100) / 15;
+                lvl_pct = lvl_start + ((100 - lvl_start) * retrig_index) / (retrig_segments - 1);
+            }
+            cv = (static_cast<int32_t>(cv) * lvl_pct) / 100;
         }
 
-        int cv = constrain(offset_cv + cv_out, HEMISPHERE_MIN_CV, HEMISPHERE_MAX_CV);
+        // Output the step CV value
+        const int output_cv = offset_cv + (is_positive ? cv : -cv);
+        Out(0, constrain(output_cv, HEMISPHERE_MIN_CV, HEMISPHERE_MAX_CV));
+
+        if (s.shape != Shape::HOLD) {
+            last_output_cv = output_cv;
+        }
+
         if (new_step) {
             // Store the current step CV start value
-            cv_step_start = cv;
+            cv_step_start = output_cv;
         }
-
-        // Output the current step CV value
-        Out(0, cv);
 
         // Output to CV2 and linked outputs
         const uint8_t output_count = manager.IsLinked(hemisphere) ? 3 : 1;
         for (uint8_t i = 0; i < output_count; i++) {
             EnvSeqManager::Output output = EnvSeqManager::Output{
-                is_cv: i == 0 ? output2.is_cv : linked_data[i - 1].output.is_cv,
-                cv: i == 0 ? output2.cv : linked_data[i - 1].output.cv,
+                i == 0 ? output2.is_cv : linked_data[i - 1].output.is_cv,
+                i == 0 ? output2.cv : linked_data[i - 1].output.cv,
             };
             bool do_gate = false;
             const bool was_cv = output.is_cv;
@@ -427,23 +394,15 @@ public:
             switch (output_mode) {
             case EnvSeqManager::OutputMode::COPY:
                 output.is_cv = true;
-                output.cv = cv;
+                output.cv = output_cv;
                 break;
-            case EnvSeqManager::OutputMode::COPY_INV:
+            case EnvSeqManager::OutputMode::INV:
                 output.is_cv = true;
-                output.cv = constrain(offset_cv + (amp_cv - cv_out), HEMISPHERE_MIN_CV, HEMISPHERE_MAX_CV);
+                output.cv = offset_cv + (is_positive ? (amp_abs - cv) : -(amp_abs - cv));
                 break;
-            case EnvSeqManager::OutputMode::COPY_INV0:
+            case EnvSeqManager::OutputMode::INVO:
                 output.is_cv = true;
-                output.cv = constrain(-cv, HEMISPHERE_MIN_CV, HEMISPHERE_MAX_CV);
-                break;
-            case EnvSeqManager::OutputMode::COPY_INVO:
-                output.is_cv = true;
-                output.cv = constrain(offset_cv - cv_out, HEMISPHERE_MIN_CV, HEMISPHERE_MAX_CV);
-                break;
-            case EnvSeqManager::OutputMode::COPY_ABOVE0:
-                output.is_cv = true;
-                output.cv = constrain(abs(cv_out), HEMISPHERE_MIN_CV, HEMISPHERE_MAX_CV);
+                output.cv = offset_cv + (is_positive ? (waveform_offset - cv) : -(waveform_offset - cv));
                 break;
             case EnvSeqManager::OutputMode::CV_STEP_START:
                 output.is_cv = true;
@@ -451,17 +410,17 @@ public:
                 break;
             case EnvSeqManager::OutputMode::GATE_STEP:
                 output.is_cv = false;
-                do_gate = new_step && s.shape != Shape::NONE;
+                do_gate = new_step && s.shape != Shape::HOLD && s.shape != Shape::ZERO;
                 break;
             case EnvSeqManager::OutputMode::GATE_STEP_INCL_RETRIGGERS:
                 output.is_cv = false;
-                do_gate = s.shape != Shape::NONE && (new_step || retrig_edge);
+                do_gate = s.shape != Shape::HOLD && s.shape != Shape::ZERO && (new_step || retrig_edge);
                 break;
             case EnvSeqManager::OutputMode::GATE_SEQUENCE:
                 output.is_cv = false;
-                do_gate = sequence_restarted && s.shape != Shape::NONE;
+                do_gate = sequence_restarted && s.shape != Shape::HOLD && s.shape != Shape::ZERO;
                 break;
-            default:
+            case EnvSeqManager::OutputMode::MAX_OUTPUT_MODE:
                 break;
             }
 
@@ -507,6 +466,7 @@ public:
             // Randomize the steps and return to the main view
             randomize_steps();
             random_cursor = RandomCursor::MAX_RANDOM_CURSOR;
+            osc_draw_reinit = true;
             return;
 
           case RandomCursor::RANDOM_OFFSETS:
@@ -533,8 +493,8 @@ public:
           case RandomCursor::RANDOM_MOD_MARKS:
             random_mod_marks = !random_mod_marks;
             return;
-          case RandomCursor::RANDOM_RETRIGGER_FADES:
-            random_retrigger_fades = !random_retrigger_fades;
+          case RandomCursor::RANDOM_RETRIGGER_LEVELS:
+            random_retrigger_levels = !random_retrigger_levels;
             return;
         }
 
@@ -641,6 +601,7 @@ public:
 
         if (cursor > EnvSeqCursor::STEP_VIEW && step_select) {
           step_view = constrain(step_view + direction, 0, MAX_NUM_STEPS - 1);
+          osc_draw_reinit = true;
           return;
         }
 
@@ -660,6 +621,7 @@ public:
             break;
         case EnvSeqCursor::STEP_VIEW:
             step_view = (uint8_t)constrain(step_view + direction, 0, MAX_NUM_STEPS - 1);
+            osc_draw_reinit = true;
             break;
         case EnvSeqCursor::STEP_SHAPE:
             steps[step_view].shape = (Shape)constrain(steps[step_view].shape + direction, 0, Shape::MAX_SHAPE - 1);
@@ -698,8 +660,8 @@ public:
             case StepParamCursor::STEP_PARAM_PROBABILITY:
                 steps[step_view].probability = (uint8_t)constrain(steps[step_view].probability + direction, 0, 100);
                 break;
-            case StepParamCursor::STEP_PARAM_RETRIGGER_FADE:
-                steps[step_view].retrigger_fade = (uint8_t)constrain(steps[step_view].retrigger_fade + direction, 0, 100);
+            case StepParamCursor::STEP_PARAM_RETRIGGER_LEVEL:
+                steps[step_view].retrigger_level = (int8_t)constrain(steps[step_view].retrigger_level + direction, -15, 15);
                 break;
             }
             break;
@@ -737,7 +699,7 @@ public:
         Pack(data, PackLocation {38, 1}, random_triggers);
         Pack(data, PackLocation {39, 1}, random_clocks);
         Pack(data, PackLocation {40, 1}, random_mod_marks);
-        Pack(data, PackLocation {41, 1}, random_retrigger_fades);
+        Pack(data, PackLocation {41, 1}, random_retrigger_levels);
 
         return data;
     }
@@ -766,7 +728,7 @@ public:
         random_triggers = Unpack(data, PackLocation {38, 1});
         random_clocks = Unpack(data, PackLocation {39, 1});
         random_mod_marks = Unpack(data, PackLocation {40, 1});
-        random_retrigger_fades = Unpack(data, PackLocation {41, 1});
+        random_retrigger_levels = Unpack(data, PackLocation {41, 1});
 
         Reset();
     }
@@ -804,7 +766,7 @@ private:
     bool random_triggers = false; // Whether to randomize the triggers flag for each step
     bool random_clocks = false; // Whether to randomize the clocks flag for each step
     bool random_mod_marks = false; // Whether to randomize the mod_mark flag for each step
-    bool random_retrigger_fades = false; // Whether to randomize the retrigger fade flag for each step
+    bool random_retrigger_levels = false; // Whether to randomize the retrigger levels flag for each step
     
     bool reset_flag = false; // Prevent stepping forward after a reset
     bool step_select = false; // Toggle for switching step_view while editing params
@@ -825,6 +787,7 @@ private:
     int16_t mod_cv_step = 0; // Value of the modulation input at step start
     int16_t mod_cv_seq = 0; // Value of the modulation input at sequence start
     int16_t cv_step_start = 0; // Value of the step CV start value
+    int16_t last_output_cv = 0; // Last output CV value (to use for Shape::HOLD steps)
 
     // Controller for linked applet
     void controller_linked() {
@@ -834,11 +797,81 @@ private:
         const EnvSeqManager::LinkedData *linked_data = manager.GetLinkedData(hemisphere);
         for (uint8_t i = 0; i < 2; i++) {
             if (linked_data[i].output.is_cv) {
-                Out(i, linked_data[i].output.cv);
+                Out(i, constrain(linked_data[i].output.cv, HEMISPHERE_MIN_CV, HEMISPHERE_MAX_CV));
             } else {
                 GateOut(i, linked_data[i].output.cv != 0);
             }
         }
+    }
+
+    // Get the modulation value for CV1
+    int get_mod1_cv(bool new_step, bool sequence_restarted) {
+        int cv = DetentedIn(0);
+        if (new_step) {
+            // Store the modulation input value for step and sequence start
+            mod_cv_step = cv;
+            if (sequence_restarted) {
+                mod_cv_seq = cv;
+            }
+        }
+
+        // Apply the modulation mode
+        if (mod1_mode == ModulationMode::HOLD_STEP_START) {
+            cv = mod_cv_step;
+        } else if (mod1_mode == ModulationMode::HOLD_SEQ_START) {
+            cv = mod_cv_seq;
+        }
+
+        return cv;
+    }
+
+    // Get the offset CV for the given step
+    int get_offset_cv(int mod1_cv) {
+        const Step& s = steps[step];
+        int cv = static_cast<int>(s.offset) * OFFSET_SCALE_INCREMENT + mod1_cv;
+
+        // Modulate the offset CV
+        EnvSeqManager::Output modulation = get_modulation(EnvSeqManager::ModulationMode::MOD);
+        if (modulation.is_cv) {
+            cv += modulation.cv;
+        }
+
+        if (s.mod_mark) {
+            // Modulate the offset CV for marked steps
+            modulation = get_modulation(EnvSeqManager::ModulationMode::MOD_MARK);
+            if (modulation.is_cv) {
+                cv += modulation.cv;
+            }
+        }
+
+        return cv;
+    }
+
+    // Update the step progress for the current step
+    void update_step_progress(uint32_t this_tick) {
+        const Step& s = steps[step];
+        const uint32_t total_step_ticks = (s.clocks + 1) * clock_ticks;
+        const uint32_t step_end_tick = step_start_tick + total_step_ticks;
+        step_progress = this_tick >= step_end_tick ? 65535 : Proportion(this_tick - step_start_tick, total_step_ticks, 65535);
+
+        // Effective step length (1-200%) with CV scaling
+        EnvSeqManager::Output length_mod = get_modulation(EnvSeqManager::ModulationMode::LENGTH, true);
+        uint16_t effective_length = s.length;
+        if (length_mod.is_cv) {
+            effective_length = effective_step_length(effective_length, length_mod.cv);
+        }
+
+        // Map the step length (1-200%) into the shape progression: <100% speeds the shape up, >100% slows it down
+        if (effective_length != 100) {
+            uint32_t scaled = (static_cast<uint32_t>(step_progress) * 100) / effective_length;
+            if (scaled > 65535) {
+                scaled = 65535;
+            }
+
+            step_progress = static_cast<uint16_t>(scaled);
+        }
+
+        return;
     }
 
     // Get the modulation value for the given modulation mode
@@ -881,6 +914,38 @@ private:
         const uint16_t eff = constrain(((length * cv_scale_pct) + 50) / 100, 1, 200);
 
         return eff;
+    }
+
+    // Apply the shape parameters to the values
+    void apply_shape_params(const Shape& shape, int& number, uint8_t& offset, bool& revert, bool& invert, Option& option) {
+        switch (shape) {
+        case Shape::EXP_DOWN:
+        case Shape::EXP_UP:
+            number = HS::Exponential;
+            offset = 0;
+            revert = shape == Shape::EXP_UP;
+            invert = false;
+            option = Option::NO_OPTION;
+            break;
+        case Shape::RAMP_DOWN:
+        case Shape::RAMP_UP:
+            number = HS::Sawtooth;
+            offset = 0;
+            revert = shape == Shape::RAMP_UP;
+            invert = false;
+            option = Option::NO_OPTION;
+            break;
+        case Shape::LOG_DOWN:
+        case Shape::LOG_UP:
+            number = HS::Logarithmic;
+            offset = 0;
+            revert = shape == Shape::LOG_UP;
+            invert = false;
+            option = Option::NO_OPTION;
+            break;
+        default:
+            break;
+        }
     }
 
     void draw_interface_linked() {
@@ -992,8 +1057,7 @@ private:
     }
 
     void draw_waveform() {
-        bool draw_vosc = true;
-        Step s = steps[step_view];
+        const Step& s = steps[step_view];
 
         const byte top = 25;
         const byte bottom = 51;
@@ -1009,8 +1073,9 @@ private:
             gfxDottedLine(0, offset_y, 63, offset_y);
         }
 
+        bool draw_vosc = true;
         switch (s.shape) {
-        case Shape::NONE:
+        case Shape::HOLD:
             draw_vosc = false;
             break;
         case Shape::ZERO:
@@ -1024,20 +1089,23 @@ private:
         case Shape::RAMP_UP:
         case Shape::LOG_DOWN:
         case Shape::LOG_UP:
-        case Shape::TRIANGLE:
-            init_step_vosc_shape(s);
-            break;
         case Shape::VOSC:
-            // Keep user-selected waveform params for preview
             break;
-        default:
+        case Shape::MAX_SHAPE:
             draw_vosc = false;
             break;
         }
 
+        int number = s.waveform_number;
+        uint8_t offset = s.waveform_offset;
+        bool revert = s.waveform_revert;
+        bool invert = s.waveform_invert;
+        Option option = s.waveform_option;
+        apply_shape_params(s.shape, number, offset, revert, invert, option);
+
         if (osc_draw_reinit) {
             osc_draw_reinit = false;
-            osc_draw = WaveformManager::VectorOscillatorFromWaveform(s.waveform_number);
+            osc_draw = WaveformManager::VectorOscillatorFromWaveform(number);
             osc_draw.Sustain();
             osc_draw.Cycle(0);
         }
@@ -1055,10 +1123,10 @@ private:
                 byte x = prev_x + seg_x;
                 x = constrain(x, 0, 63);
                 y = constrain(y, top, bottom);
-                const byte draw_prev_x = s.waveform_revert ? 63 - prev_x : prev_x;
-                const byte draw_x = s.waveform_revert ? 63 - x : x;
-                const byte draw_prev_y = s.waveform_invert ? mirror - prev_y : prev_y;
-                const byte draw_y = s.waveform_invert ? mirror - y : y;
+                const byte draw_prev_x = revert ? 63 - prev_x : prev_x;
+                const byte draw_x = revert ? 63 - x : x;
+                const byte draw_prev_y = invert ? mirror - prev_y : prev_y;
+                const byte draw_y = invert ? mirror - y : y;
                 gfxLine(draw_prev_x, draw_prev_y, draw_x, draw_y);
                 prev_x = x;
                 prev_y = y;
@@ -1161,13 +1229,22 @@ private:
             gfxPrint("%");
             if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(13, 63, 24, step_param_names[step_param_cursor]);
             break;
-        case StepParamCursor::STEP_PARAM_RETRIGGER_FADE:
+        case StepParamCursor::STEP_PARAM_RETRIGGER_LEVEL:
             gfxIcon(0, y, GAUGE_ICON);
             if (cursor == EnvSeqCursor::STEP_PARAM) gfxSpicyCursor(0, 63, 10, step_param_names[step_param_cursor]);
             gfxPos(13, y);
-            gfxPrint(s.retrigger_fade);
-            gfxPrint("%");
-            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(13, 63, 24, step_param_names[step_param_cursor]);
+            if (s.retrigger_level == 0) {
+                gfxPrint("no");
+            } else {
+                if (s.retrigger_level < 0) {
+                    gfxPrint("from ");
+                } else if (s.retrigger_level > 0) {
+                    gfxPrint("to ");
+                }
+
+                gfxPrint(abs(s.retrigger_level));
+            }
+            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(13, 63, 50, step_param_names[step_param_cursor]);
             break;
         case StepParamCursor::STEP_PARAM_MOD_MARK:
             gfxIcon(0, y, CHECK_ICON);
@@ -1218,9 +1295,9 @@ private:
         if (random_cursor == RandomCursor::RANDOM_MOD_MARKS) gfxSpicyCursor(41, y + 8, 18);
 
         y += 10;
-        gfxIcon(0, y, random_retrigger_fades ? CHECK_ON_ICON : CHECK_OFF_ICON);
+        gfxIcon(0, y, random_retrigger_levels ? CHECK_ON_ICON : CHECK_OFF_ICON);
         gfxPrint(10, y, "RFd");
-        if (random_cursor == RandomCursor::RANDOM_RETRIGGER_FADES) gfxSpicyCursor(10, y + 8, 18);
+        if (random_cursor == RandomCursor::RANDOM_RETRIGGER_LEVELS) gfxSpicyCursor(10, y + 8, 18);
 
         gfxIcon(31, y, RANDOM_ICON);
         gfxPrint(41, y, "RND");
@@ -1232,57 +1309,18 @@ private:
         for (uint8_t i = 0; i < MAX_NUM_STEPS; i++) {
             steps[i].offset = 0;
             steps[i].amp = amp;
-            steps[i].shape = Shape::RAMP_DOWN;
-            init_step_vosc(steps[i]);
+            steps[i].shape = Shape::EXP_DOWN;
+            steps[i].waveform_number = HS::Exponential;
+            steps[i].waveform_offset = 0;
+            steps[i].waveform_revert = false;
+            steps[i].waveform_invert = false;
+            steps[i].waveform_option = Option::NO_OPTION;
             steps[i].triggers = 0;
             steps[i].clocks = 0;
             steps[i].length = 100;
             steps[i].probability = 100;
-            steps[i].retrigger_fade = 100;
+            steps[i].retrigger_level = 0;
             steps[i].mod_mark = false;
-        }
-    }
-
-    // Initialize the VOSC waveform for the given step
-    void init_step_vosc(Step& s) {
-        s.waveform_number = HS::Sawtooth;
-        s.waveform_offset = 0;
-        s.waveform_revert = false;
-        s.waveform_invert = false;
-        s.waveform_option = Option::NO_OPTION;
-    }
-
-    // Initialize the VOSC waveform for the given shape. Used to keep some parameters constant.
-    void init_step_vosc_shape(Step& s) {
-        init_step_vosc(s);
-        switch (s.shape) {
-        case Shape::EXP_DOWN:
-            s.waveform_number = HS::Exponential;
-            break;
-        case Shape::EXP_UP:
-            s.waveform_revert = true;
-            s.waveform_number = HS::Exponential;
-            break;
-        case Shape::RAMP_DOWN:
-            s.waveform_number = HS::Sawtooth;
-            break;
-        case Shape::RAMP_UP:
-            s.waveform_number = HS::Ramp;
-            break;
-        case Shape::LOG_DOWN:
-            s.waveform_number = HS::Logarithmic;
-            break;
-        case Shape::LOG_UP:
-            s.waveform_revert = true;
-            s.waveform_number = HS::Logarithmic;
-            break;
-        case Shape::TRIANGLE:
-            s.waveform_number = HS::Triangle;
-            break;
-        case Shape::VOSC:
-            break;
-        default:
-            break;
         }
     }
 
@@ -1325,8 +1363,8 @@ private:
             if (random_mod_marks) {
                 steps[i].mod_mark = random(0, 2);
             }
-            if (random_retrigger_fades) {
-                steps[i].retrigger_fade = random(0, 101);
+            if (random_retrigger_levels) {
+                steps[i].retrigger_level = random(-15, 16);
             }
         }
     }
@@ -1412,8 +1450,8 @@ private:
             return "Length";
         case EnvSeqManager::ModulationMode::STEP_SEL:
             return "StepSel";
-        case EnvSeqManager::ModulationMode::RETRIGGER_FADE:
-            return "RetrgFd";
+        case EnvSeqManager::ModulationMode::RETRIGGER_LEVEL:
+            return "RetrgLv";
         case EnvSeqManager::ModulationMode::MOD:
             return "Mod";
         case EnvSeqManager::ModulationMode::MOD_MARK:
@@ -1431,14 +1469,10 @@ private:
         switch (mode) {
         case EnvSeqManager::OutputMode::COPY:
             return "Cpy";
-        case EnvSeqManager::OutputMode::COPY_INV:
-            return "CpyInv";
-        case EnvSeqManager::OutputMode::COPY_INV0:
-            return "CpyInv0";
-        case EnvSeqManager::OutputMode::COPY_INVO:
-            return "CpyInvO";
-        case EnvSeqManager::OutputMode::COPY_ABOVE0:
-            return "CpyAbv0";
+        case EnvSeqManager::OutputMode::INV:
+            return "Inv";
+        case EnvSeqManager::OutputMode::INVO:
+            return "InvO";
         case EnvSeqManager::OutputMode::CV_STEP_START:
             return "HStart";
         case EnvSeqManager::OutputMode::GATE_STEP:
@@ -1454,8 +1488,8 @@ private:
 
     const char* shape_string(Shape shape) {
         switch (shape) {
-        case Shape::NONE:
-            return "None";
+        case Shape::HOLD:
+            return "Hold";
         case Shape::ZERO:
             return "Zero";
         case Shape::FLAT:
@@ -1464,8 +1498,6 @@ private:
             return "RampUp";
         case Shape::RAMP_DOWN:
             return "RampDw";
-        case Shape::TRIANGLE:
-            return "Triang";
         case Shape::EXP_UP:
             return "ExpUp";
         case Shape::EXP_DOWN:
