@@ -21,7 +21,7 @@
 #include "../HSEnvSeqManager.h"
 #include "../vector_osc/HSVectorOscillator.h"
 #include "../vector_osc/WaveformManager.h"
-#include <cstdint>
+
 class EnvSeq : public HemisphereApplet {
 public:
     static constexpr int MAX_NUM_STEPS = 32;
@@ -192,6 +192,11 @@ public:
                     step_start_tick = this_tick;
                     step_clocks = 0;
                     last_retrig_index = 0;
+
+                    if (follow) {
+                      step_view = step;
+                      osc_draw_reinit = true;
+                    }
                 }
             }
         }
@@ -344,10 +349,7 @@ public:
         // Output to CV2 and linked outputs
         const uint8_t output_count = manager.IsLinked(hemisphere) ? 3 : 1;
         for (uint8_t i = 0; i < output_count; i++) {
-            EnvSeqManager::Output output = EnvSeqManager::Output{
-                i == 0 ? output2.is_cv : linked_data[i - 1].output.is_cv,
-                i == 0 ? output2.cv : linked_data[i - 1].output.cv,
-            };
+            EnvSeqManager::Output output = (i == 0) ? output2 : linked_data[i - 1].output;
             bool do_gate = false;
             const bool was_cv = output.is_cv;
             const EnvSeqManager::OutputMode output_mode = i == 0 ? output2_mode : linked_data[i - 1].modulation.output_mode;
@@ -526,6 +528,9 @@ public:
     void AuxButton() {
         if (cursor > EnvSeqCursor::STEP_VIEW) {
           step_select = !step_select;
+        }
+        if (cursor == EnvSeqCursor::STEP_VIEW) {
+          follow = !follow;
         }
     }
 
@@ -738,6 +743,7 @@ private:
     EnvSeqManager::OutputMode output2_mode = EnvSeqManager::OutputMode::GATE_STEP; // Mode for CV2 output
     EnvSeqManager::Output output2 = EnvSeqManager::Output{}; // Output for CV2
 
+    // bit set?
     bool random_offsets = true; // Whether to randomize step levels (offset)
     bool random_amps = true; // Whether to randomize step amplitudes
     bool random_shapes = true; // Whether to randomize step shapes
@@ -750,6 +756,7 @@ private:
     
     bool reset_flag = false; // Prevent stepping forward after a reset
     bool step_select = false; // Toggle for switching step_view while editing params
+    bool follow = false; // update step view on clock advance
     int8_t step = -1; // Current step
     int8_t step_view = 0; // Viewed step for cursor
     uint16_t step_progress = 0; // Progress of the current step
@@ -1036,9 +1043,9 @@ private:
     void draw_waveform() {
         const EnvSeqManager::Step& s = steps[step_view];
 
-        const byte top = 25;
-        const byte bottom = 51;
-        const byte mirror = top + bottom;
+        const uint8_t top = 25;
+        const uint8_t bottom = 51;
+        const uint8_t mirror = top + bottom;
 
         if (s.shape >= Shape::VOSC) {
             // Draw the waveform offset line
@@ -1078,22 +1085,22 @@ private:
         }
 
         if (draw_vosc) {
-            const byte segment_count = osc_draw.SegmentCount();
+            const uint8_t segment_count = osc_draw.SegmentCount();
             uint16_t total_time = osc_draw.TotalTime();
             VOSegment seg = osc_draw.GetSegment(segment_count - 1);
-            byte prev_x = 0; // Starting coordinates
-            byte prev_y = bottom - Proportion(seg.level, 255, 26);
-            for (byte i = 0; i < segment_count; i++) {
+            uint8_t prev_x = 0; // Starting coordinates
+            uint8_t prev_y = bottom - Proportion(seg.level, 255, 26);
+            for (int i = 0; i < segment_count; i++) {
                 seg = osc_draw.GetSegment(i);
-                byte y = bottom - Proportion(seg.level, 255, 26);
-                byte seg_x = Proportion(seg.time, total_time, 62);
-                byte x = prev_x + seg_x;
+                uint8_t y = bottom - Proportion(seg.level, 255, 26);
+                uint8_t seg_x = Proportion(seg.time, total_time, 62);
+                uint8_t x = prev_x + seg_x;
                 x = constrain(x, 0, 63);
                 y = constrain(y, top, bottom);
-                const byte draw_prev_x = revert ? 63 - prev_x : prev_x;
-                const byte draw_x = revert ? 63 - x : x;
-                const byte draw_prev_y = invert ? mirror - prev_y : prev_y;
-                const byte draw_y = invert ? mirror - y : y;
+                const uint8_t draw_prev_x = revert ? 63 - prev_x : prev_x;
+                const uint8_t draw_x = revert ? 63 - x : x;
+                const uint8_t draw_prev_y = invert ? mirror - prev_y : prev_y;
+                const uint8_t draw_y = invert ? mirror - y : y;
                 gfxLine(draw_prev_x, draw_prev_y, draw_x, draw_y);
                 prev_x = x;
                 prev_y = y;
@@ -1113,13 +1120,14 @@ private:
         uint8_t y = 15;
 
         gfxIcon(0, y, PhzIcons::stairs);
+        if (follow) gfxInvert(0, y, 8, 8);
         gfxPrint(10 + pad(10, display_step), y, display_step);
-        if (cursor == EnvSeqCursor::STEP_VIEW) gfxSpicyCursor(10, y + 8, 12, "Edit Step");
+        if (cursor == EnvSeqCursor::STEP_VIEW) gfxSpicyCursor(10, y + 8, 12, "Step#");
         gfxPrint(22, y, shape_string(s.shape));
         if (s.shape >= Shape::VOSC) {
             gfxPrint(46, y, s.shape - Shape::VOSC + 1);
         }
-        if (cursor == EnvSeqCursor::STEP_SHAPE) gfxSpicyCursor(22, y + 8, 41, "Shape");
+        if (cursor == EnvSeqCursor::STEP_SHAPE) gfxSpicyCursor(22, y + 8, 41, step_select?"Step#":"Shape");
 
         draw_waveform();
 
