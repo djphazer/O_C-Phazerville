@@ -233,10 +233,8 @@ private:
     }
 
     void DrawChannelPage() {
-        char out_label[] = {(char)('A' + io_offset + io_page), '\0' };
-        gfxPrint(1, 13, out_label);
-        gfxPrint(": ");
-        gfxPrint(OC::Strings::cv_input_names_none[ADC_CHANNEL_LAST + DAC_CHANNEL_LAST + map_index[io_page] + 1]);
+        gfxPrint(1, 13, OutputLabel(io_page));
+        graphics.printf(":  M%2d", map_index[io_page] + 1);
 
         // ------------------ //
         gfxLine(1, 22, 63, 22);
