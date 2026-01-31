@@ -45,7 +45,6 @@ public:
     enum StepParamCursor {
         STEP_PARAM_OFFSET,
         STEP_PARAM_AMP,
-        STEP_PARAM_WAVEFORM_NUMBER,
         STEP_PARAM_WAVEFORM_OFFSET,
         STEP_PARAM_WAVEFORM_REVERT,
         STEP_PARAM_WAVEFORM_INVERT,
@@ -61,7 +60,7 @@ public:
         MAX_STEP_PARAM_CURSOR,
     };
     static constexpr const char* const step_param_names[MAX_STEP_PARAM_CURSOR] = {
-        "Offset", "Amplitude", "WaveNr", "WaveOff", "Revert",
+        "Offset", "Amplitude", "WaveOff", "Revert",
         "Invert", "Option", "Triggers", "Clocks",
         "Length", "Prob", "RetrigLvl", "Mod Mark",
     };
@@ -107,8 +106,6 @@ public:
         LOG_DOWN = 7,
         LOG_UP = 8,
         VOSC = 9,
-
-        MAX_SHAPE,
     };
 
     enum Option : uint8_t {
@@ -123,15 +120,14 @@ public:
 
     // Single step of the envelope sequence
     struct Step {
+        uint16_t shape; // Shape for the step. 0..VOSC-1 is the enum value, >=VOSC is the VOSC waveform number.
         int16_t offset; // Scaled step offset CV (by OFFSET_SCALE_INCREMENT)
         int16_t amp; // Scaled step amp CV (by OFFSET_SCALE_INCREMENT)
-        int waveform_number; // Waveform number (VOSC only)
         bool waveform_revert; // Reverts the waveform (VOSC only)
         bool waveform_invert; // Inverts the waveform (VOSC only)
         uint8_t length; // Length 1-200% of envelope duration for this step
         bool mod_mark; // Whether this step is marked for modulation
 
-        Shape shape : 4; // Shape for the step
         uint8_t waveform_offset : 7; // Offset where the envelope offset is on the waveform (0..100) in 1% steps (VOSC only)
         Option waveform_option : 3; // Option for the waveform (VOSC only)
         uint8_t triggers : 3; // Number of times to trigger the step (0-7)
@@ -271,17 +267,8 @@ public:
             use_vosc = false;
             cv = amp_abs;
             break;
-        case Shape::EXP_DOWN:
-        case Shape::EXP_UP:
-        case Shape::RAMP_DOWN:
-        case Shape::RAMP_UP:
-        case Shape::LOG_DOWN:
-        case Shape::LOG_UP:
-        case Shape::VOSC:
-            // These shapes are handled by the VOSC oscillator
-            break;
-        case Shape::MAX_SHAPE:
-            use_vosc = false;
+        default:
+            // All other shapes are handled by the VOSC oscillator
             break;
         }
 
@@ -289,13 +276,12 @@ public:
 
         uint16_t waveform_offset = 0;
         if (use_vosc) {
-            // Get the waveform parameters for the shape and overwrite them if needed
-            int number = s.waveform_number;
+            // Prepare the parameters for the VOSC oscillator
             uint8_t offset = s.waveform_offset;
             bool revert = s.waveform_revert;
             bool invert = s.waveform_invert;
             Option option = s.waveform_option;
-            apply_shape_params(s.shape, number, offset, revert, invert, option);
+            uint16_t number = prepare_shape(s.shape, offset, revert, invert, option);
 
             // Initialize the VOSC oscillator if needed
             if (new_step || osc_reinit) {
@@ -623,10 +609,25 @@ public:
             step_view = (uint8_t)constrain(step_view + direction, 0, MAX_NUM_STEPS - 1);
             osc_draw_reinit = true;
             break;
-        case EnvSeqCursor::STEP_SHAPE:
-            steps[step_view].shape = (Shape)constrain(steps[step_view].shape + direction, 0, Shape::MAX_SHAPE - 1);
+        case EnvSeqCursor::STEP_SHAPE: {
+            int shape = steps[step_view].shape + direction;
+            if (shape < 0) {
+                shape = 0;
+            } else if (shape >= Shape::VOSC) {
+                if (steps[step_view].shape < Shape::VOSC) {
+                    // Entering into VOSC mode
+                    shape = get_nth_waveform(shape - Shape::VOSC);
+                } else {
+                    // Already in VOSC mode
+                    shape = WaveformManager::GetNextWaveform(steps[step_view].shape - Shape::VOSC, direction);
+                }
+                shape += Shape::VOSC;
+            }
+
+            steps[step_view].shape = shape;
             reinit = true;
             break;
+        }
         case EnvSeqCursor::STEP_PARAM:
             MoveCursor(step_param_cursor, direction, StepParamCursor::MAX_STEP_PARAM_CURSOR - 1);
             break;
@@ -637,10 +638,6 @@ public:
                 break;
             case StepParamCursor::STEP_PARAM_AMP:
                 steps[step_view].amp = (int16_t)constrain(steps[step_view].amp + direction, HEMISPHERE_MIN_CV / OFFSET_SCALE_INCREMENT, HEMISPHERE_MAX_CV / OFFSET_SCALE_INCREMENT);
-                break;
-            case StepParamCursor::STEP_PARAM_WAVEFORM_NUMBER:
-                steps[step_view].waveform_number = WaveformManager::GetNextWaveform(steps[step_view].waveform_number, direction);
-                reinit = true;
                 break;
             case StepParamCursor::STEP_PARAM_WAVEFORM_OFFSET:
                 steps[step_view].waveform_offset = (uint8_t)constrain(steps[step_view].waveform_offset + direction, 0, 100);
@@ -916,35 +913,32 @@ private:
         return eff;
     }
 
-    // Apply the shape parameters to the values
-    void apply_shape_params(const Shape& shape, int& number, uint8_t& offset, bool& revert, bool& invert, Option& option) {
+    // Prepare the shape parameters for the VOSC oscillator. Returns the waveform number.
+    uint16_t prepare_shape(const uint16_t& shape, uint8_t& offset, bool& revert, bool& invert, Option& option) {
         switch (shape) {
         case Shape::EXP_DOWN:
         case Shape::EXP_UP:
-            number = HS::Exponential;
             offset = 0;
             revert = shape == Shape::EXP_UP;
             invert = false;
             option = Option::NO_OPTION;
-            break;
+            return HS::Exponential;
         case Shape::RAMP_DOWN:
         case Shape::RAMP_UP:
-            number = HS::Sawtooth;
             offset = 0;
             revert = shape == Shape::RAMP_UP;
             invert = false;
             option = Option::NO_OPTION;
-            break;
+            return HS::Sawtooth;
         case Shape::LOG_DOWN:
         case Shape::LOG_UP:
-            number = HS::Logarithmic;
             offset = 0;
             revert = shape == Shape::LOG_UP;
             invert = false;
             option = Option::NO_OPTION;
-            break;
+            return HS::Logarithmic;
         default:
-            break;
+            return shape - Shape::VOSC;
         }
     }
 
@@ -1062,9 +1056,8 @@ private:
         const byte top = 25;
         const byte bottom = 51;
         const byte mirror = top + bottom;
-        // top=25, middle=38, bottom=51, span=26
 
-        if (s.shape == Shape::VOSC) {
+        if (s.shape >= Shape::VOSC) {
             // Draw the waveform offset line
             int offset_y = bottom - Proportion(s.waveform_offset, 100, 26);
             if (s.waveform_invert) {
@@ -1083,25 +1076,16 @@ private:
             draw_vosc = false;
             gfxLine(0, 38, 63, 38);
             break;
-        case Shape::EXP_DOWN:
-        case Shape::EXP_UP:
-        case Shape::RAMP_DOWN:
-        case Shape::RAMP_UP:
-        case Shape::LOG_DOWN:
-        case Shape::LOG_UP:
-        case Shape::VOSC:
-            break;
-        case Shape::MAX_SHAPE:
-            draw_vosc = false;
+        default:
+            // All other shapes are handled by the VOSC oscillator
             break;
         }
 
-        int number = s.waveform_number;
         uint8_t offset = s.waveform_offset;
         bool revert = s.waveform_revert;
         bool invert = s.waveform_invert;
         Option option = s.waveform_option;
-        apply_shape_params(s.shape, number, offset, revert, invert, option);
+        uint16_t number = prepare_shape(s.shape, offset, revert, invert, option);
 
         if (osc_draw_reinit) {
             osc_draw_reinit = false;
@@ -1147,8 +1131,11 @@ private:
 
         gfxIcon(0, y, PhzIcons::stairs);
         gfxPrint(10 + pad(10, display_step), y, display_step);
-        if (cursor == EnvSeqCursor::STEP_VIEW) gfxSpicyCursor(10, y + 8, 10, "Edit Step");
+        if (cursor == EnvSeqCursor::STEP_VIEW) gfxSpicyCursor(10, y + 8, 12, "Edit Step");
         gfxPrint(22, y, shape_string(s.shape));
+        if (s.shape >= Shape::VOSC) {
+            gfxPrint(46, y, s.shape - Shape::VOSC + 1);
+        }
         if (cursor == EnvSeqCursor::STEP_SHAPE) gfxSpicyCursor(22, y + 8, 41, "Shape");
 
         draw_waveform();
@@ -1168,12 +1155,6 @@ private:
             gfxPos(13, y);
             gfxPrintVoltage(s.amp * OFFSET_SCALE_INCREMENT);
             if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(13, 63, 50, step_param_names[step_param_cursor]);
-            break;
-        case StepParamCursor::STEP_PARAM_WAVEFORM_NUMBER:
-            gfxIcon(0, y, WAVEFORM_ICON);
-            if (cursor == EnvSeqCursor::STEP_PARAM) gfxSpicyCursor(0, 63, 10, step_param_names[step_param_cursor]);
-            gfxPrint(13, y, s.waveform_number + 1);
-            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(13, 63, 18, step_param_names[step_param_cursor]);
             break;
         case StepParamCursor::STEP_PARAM_WAVEFORM_OFFSET:
             gfxIcon(0, y, UP_DOWN_ICON);
@@ -1310,7 +1291,6 @@ private:
             steps[i].offset = 0;
             steps[i].amp = amp;
             steps[i].shape = Shape::EXP_DOWN;
-            steps[i].waveform_number = HS::Exponential;
             steps[i].waveform_offset = 0;
             steps[i].waveform_revert = false;
             steps[i].waveform_invert = false;
@@ -1344,12 +1324,10 @@ private:
             }
             if (random_shapes) {
                 // Randomize shape, but make sure VOSC is allowed
-                do {
-                    steps[i].shape = (Shape)random(0, Shape::MAX_SHAPE);
-                } while (steps[i].shape == Shape::VOSC && !random_vosc);
+                steps[i].shape = random(0, Shape::VOSC + (random_vosc ? 1 : 0));
             }
-            if (random_vosc && steps[i].shape == Shape::VOSC) {
-                steps[i].waveform_number = WaveformManager::GetNextWaveform(random(0, total_waveform_count), 1);
+            if (steps[i].shape == Shape::VOSC) {
+                steps[i].shape += get_nth_waveform(random(0, total_waveform_count));
             }
             if (random_lengths) {
                 steps[i].length = random(75, 151); // Randomize length only between 75% and 150%
@@ -1431,6 +1409,14 @@ private:
         return next_step;
     }
 
+    uint8_t get_nth_waveform(uint8_t n, uint8_t start_waveform = 0) const {
+        for (uint8_t i = 0; i < n; i++) {
+            start_waveform = WaveformManager::GetNextWaveform(start_waveform, 1);
+        }
+
+        return start_waveform;
+    }
+
     const char* mod1_mode_string(ModulationMode mode) {
         switch (mode) {
         case ModulationMode::MOD:
@@ -1486,7 +1472,7 @@ private:
         }
     }
 
-    const char* shape_string(Shape shape) {
+    const char* shape_string(uint16_t shape) {
         switch (shape) {
         case Shape::HOLD:
             return "Hold";
@@ -1506,10 +1492,8 @@ private:
             return "LogUp";
         case Shape::LOG_DOWN:
             return "LogDw";
-        case Shape::VOSC:
-            return "VOSC";
         default:
-            return "";
+            return "VOSC";
         }
     }
 

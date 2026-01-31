@@ -19,7 +19,7 @@ layout: default
 EnvSeq has two screens:
 
 - **Main screen**: Mod1 mode, Mod2 mode, Out2 mode, Randomizer, TR2 mode, number of steps, Reset, Init.
-- **Step screen**: Step number, shape (waveform), and per-step parameters (offset, amp, VOSC options, probability, triggers, clocks, length, retrigger fade, Mod2 mark).
+- **Step screen**: Step number, shape (VOSC waveform index included), and per-step parameters (offset, amp, VOSC options, probability, triggers, clocks, length, retrigger fade, Mod2 mark).
 
 ## Mod1 (CV1) modes
 `Mod1` defines how CV1 is sampled/applied:
@@ -74,7 +74,7 @@ Shape for the step:
 - `RampUp`: 0 → Amp
 - `LogDw`: logarithmic-like Amp → 0
 - `LogUp`: logarithmic-like 0 → Amp
-- `VOSC`: vector-oscillator waveform driven by step progress
+- `VOSC`: vector-oscillator waveform driven by step progress (shows a waveform number)
 
 ### Parameters
 
@@ -83,9 +83,6 @@ DC offset added to the step output (and used as the center point for `InvO`).
 
 #### Amplitude
 Bipolar amplitude of the step’s shape; negative values invert the shape.
-
-#### Waveform number (WaveNr)
-Number of the waveform from the VOSC oscillator. Applies only when the Shape is set to `VOSC`.
 
 #### Waveform offset (WaveOff)
 Shifts the waveform relative to the step offset (0–100% of the step amp). Applies only when the Shape is set to `VOSC`.
@@ -100,7 +97,7 @@ Flips the waveform vertically. Applies only when the Shape is set to `VOSC`.
 Post-process the waveform. Applies only when the Shape is set to `VOSC`.
 
 #### VOSC parameters
-These apply when the Shape is set to `VOSC`.
+These apply when the Shape is set to `VOSC`. The waveform number is selected as part of the Shape control.
 
 - `None`: no post-processing.
 - `FoldUp`: reflect upward the values below waveform offset.
@@ -138,7 +135,7 @@ Selecting `Random` on the main page opens a checklist-style randomizer for step 
 - `Ofs`: randomize step Offsets
 - `Amp`: randomize step Amplitudes
 - `Shp`: randomize step Shapes
-- `Osc`: allow randomizing VOSC waveforms when Shape is `VOSC`
+- `Osc`: allow randomizing VOSC waveform numbers when Shape is `VOSC`
 - `Len`: randomize step Lengths
 - `Trg`: randomize step Triggers (occasionally)
 - `Clk`: randomize step Clocks (occasionally)
