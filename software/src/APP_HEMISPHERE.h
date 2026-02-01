@@ -341,6 +341,8 @@ public:
 
         OUTSLEW_KEY = 7,
 
+        OUTATTEN_KEY = 8,
+
         APPLET_L_DATA_KEY = 10,
         APPLET_R_DATA_KEY = 11,
 
@@ -391,6 +393,11 @@ public:
           Pack(data, PackLocation{i*8, 8}, HS::frame.output_slew[i]);
         }
         PhzConfig::setValue(preset_key | OUTSLEW_KEY, data);
+        data = 0;
+        for (size_t i = 0; i < 8; ++i) {
+          Pack(data, PackLocation{i*8, 8}, HS::frame.output_atten[i] + 126);
+        }
+        PhzConfig::setValue(preset_key | OUTATTEN_KEY, data);
 
         data = 0;
         for (size_t h = 0; h < 2; h++)
@@ -517,6 +524,12 @@ public:
         for (size_t i = 0; i < DAC_CHANNEL_COUNT; ++i)
         {
           HS::frame.output_slew[i] = Unpack(data, PackLocation{i*8, 8});
+        }
+
+        const bool has_output_atten = PhzConfig::getValue(preset_key | OUTATTEN_KEY, data);
+        for (size_t i = 0; i < 8; ++i)
+        {
+          HS::frame.output_atten[i] = has_output_atten ? Unpack(data, PackLocation{i*8, 8}) - 126 : 63;
         }
 
         // --- Global stuff ---
@@ -816,13 +829,17 @@ public:
               if (zoom_cursor >= 5) {
                 gfxIcon(x + 18, y + 1, DOWN_ICON, true);
 
-                graphics.clearRect(0, y + 10, 127, 20);
+                graphics.clearRect(0, y + 10, 127, 30);
                 gfxPrint(x, y+10, "Slew=");
                 gfxPrint(HS::frame.output_slew[zoom_slot*2 + zoom_cursor-5]);
                 gfxPrint("%");
 
                 gfxPrint(x, y+20, "Skip=");
                 gfxPrint(HS::frame.clockskip[zoom_slot*2 + zoom_cursor-5]);
+                gfxPrint("%");
+
+                gfxPrint(x, y+30, "Atten=");
+                gfxPrint(Proportion(HS::frame.output_atten[zoom_slot*2 + zoom_cursor-5], 126, 200));
                 gfxPrint("%");
               }
             } else {

@@ -486,6 +486,7 @@ struct IOFrame {
     bool autoMIDIOut = false;
     uint8_t clockskip[DAC_CHANNEL_COUNT] = {0};
     int8_t output_slew[DAC_CHANNEL_COUNT] = {0};
+    int8_t output_atten[DAC_CHANNEL_COUNT] = {63}; // -126 (-200%) to 126 (+200%), 63 is 100%
 
     // pre-calculated clocks, subject to trigger mapping
     bool clocked[OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_COUNT];
@@ -531,6 +532,9 @@ struct IOFrame {
     void NudgeSlew(int ch, int dir) {
         output_slew[ch] = constrain(output_slew[ch] + dir, 0, 100);
     }
+    void NudgeAtten(int ch, int dir) {
+        output_atten[ch] = constrain(output_atten[ch] + dir, -126, 126);
+    }
 
     // --- Hard IO ---
     void Load();
@@ -545,7 +549,7 @@ struct IOFrame {
 
         for (int i = 0; i < DAC_CHANNEL_COUNT; ++i) {
           outputs[i].push(output_slew[i]);
-          OC::DAC::set_pitch_scaled(chan[i], outputs[i].get(), 0);
+          OC::DAC::set_pitch_scaled(chan[i], constrain(Proportion(output_atten[i], 63, outputs[i].get()), HEMISPHERE_MIN_CV, HEMISPHERE_MAX_CV), 0);
         }
         // oh no, this is certainly broken now...
         if (autoMIDIOut) MIDIState.Send(outputs);

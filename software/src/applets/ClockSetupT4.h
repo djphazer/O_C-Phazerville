@@ -62,7 +62,15 @@ public:
         OUTSLEW6,
         OUTSLEW7,
         OUTSLEW8,
-        LAST_SETTING = OUTSLEW8
+        OUTATTEN1,
+        OUTATTEN2,
+        OUTATTEN3,
+        OUTATTEN4,
+        OUTATTEN5,
+        OUTATTEN6,
+        OUTATTEN7,
+        OUTATTEN8,
+        LAST_SETTING = OUTATTEN8
     };
 
     const char* applet_name() {
@@ -235,6 +243,17 @@ public:
             HS::frame.NudgeSlew(cursor-OUTSLEW1, direction);
             break;
 
+        case OUTATTEN1:
+        case OUTATTEN2:
+        case OUTATTEN3:
+        case OUTATTEN4:
+        case OUTATTEN5:
+        case OUTATTEN6:
+        case OUTATTEN7:
+        case OUTATTEN8:
+            HS::frame.NudgeAtten(cursor-OUTATTEN1, direction);
+            break;
+
         case EXT_PPQN:
             HS::clock_m.SetClockPPQN(HS::clock_m.GetClockPPQN() + direction);
             break;
@@ -380,11 +399,11 @@ private:
       } else {
         // lower section
         graphics.clearRect(0, 41, 128, 23);
-        graphics.clearRect(0, 29, 52, 12); // label box
+        graphics.clearRect(0, 29, 58, 12); // label box
 
-        gfxLine(0, 30, 50, 30);
-        gfxLine(50, 30, 50, 41);
-        gfxPrint(0, 33, (cursor<OUTSLEW1) ? "TrigSkip" : "Out Slew");
+        gfxLine(0, 30, 56, 30);
+        gfxLine(56, 30, 56, 41);
+        gfxPrint(0, 33, (cursor<OUTSLEW1) ? "TrigSkip" : (cursor<OUTATTEN1) ? "Out Slew" : "Out Atten");
         gfxLine(0, 42, 127, 42);
         gfxDottedLine(0, 43, 127, 43);
       }
@@ -463,8 +482,17 @@ private:
               gfxPrint(23 + x, y, "%");
             }
         }
-      }
+      } else if (cursor <= OUTATTEN8) {
+        int y = 45;
+        for (int ch=0; ch<8; ++ch) {
+            const int x = (ch % 4) * 32;
+            if (ch == 4) y += 10;
+            const int atten = Proportion(HS::frame.output_atten[ch], 126, 200);
 
+            gfxPrint(1 + x + pad(1000, atten), y, atten);
+            gfxPrint(26 + x, y, "%");
+        }
+      }
         switch ((ClockSetupCursor)cursor) {
         case PLAY_STOP:
             gfxFrame(11, 0, 10, 10);
@@ -536,6 +564,21 @@ private:
           const int x_ = 1 + 32 * ((cursor-OUTSLEW1) % 4);
           const int y_ = 53 + ((cursor-OUTSLEW1) / 4 * 10);
           gfxCursor(x_, y_, 19);
+          break;
+        }
+
+        case OUTATTEN1:
+        case OUTATTEN2:
+        case OUTATTEN3:
+        case OUTATTEN4:
+        case OUTATTEN5:
+        case OUTATTEN6:
+        case OUTATTEN7:
+        case OUTATTEN8:
+        {
+          const int x_ = 1 + 32 * ((cursor-OUTATTEN1) % 4);
+          const int y_ = 53 + ((cursor-OUTATTEN1) / 4 * 10);
+          gfxCursor(x_, y_, 26);
           break;
         }
 

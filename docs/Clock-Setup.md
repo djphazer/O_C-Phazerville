@@ -29,6 +29,7 @@ The **Clock** configuration screens are accessed by dual-pressing both _UP+DOWN_
 * **OutSlew** - Slew amount applied to each output
   - triggers become decay envelopes, everything else is smoothed
   - also available on full-screen applet help/config screen
+* **OutAtten** - Output attenuation/amplification per channel (-200%..+200% range)
 
 ### Notes
 * Outgoing MIDI messages for Start, Stop, & Clock (at 24ppqn) are sent via USB automatically. An option to disable this is planned.
