@@ -66,11 +66,38 @@ public:
         };
     };
 
+    enum Option : uint8_t {
+        NO_OPTION = 0,
+        FOLD_UP = 1,
+        FOLD_DOWN = 2,
+        ZERO_UP = 3,
+        ZERO_DOWN = 4,
+
+        MAX_OPTIONS,
+    };
+    struct Step {
+        uint16_t shape; // Shape for the step. 0..VOSC-1 is the enum value, >=VOSC is the VOSC waveform number.
+        int16_t offset; // Scaled step offset CV (by OFFSET_SCALE_INCREMENT)
+        int16_t amp; // Scaled step amp CV (by OFFSET_SCALE_INCREMENT)
+        bool waveform_revert; // Reverts the waveform (VOSC only)
+        bool waveform_invert; // Inverts the waveform (VOSC only)
+        uint8_t length; // Length 1-200% of envelope duration for this step
+        bool mod_mark; // Whether this step is marked for modulation
+
+        uint8_t waveform_offset : 7; // Offset where the envelope offset is on the waveform (0..100) in 1% steps (VOSC only)
+        Option waveform_option : 3; // Option for the waveform (VOSC only)
+        uint8_t triggers : 3; // Number of times to trigger the step (0-7)
+        uint8_t clocks : 3; // Number of clocks this step lasts for (0-7)
+        uint8_t probability : 7; // Probability 0-100% of this step being played
+        int8_t retrigger_level : 5; // Retrigger level (-15..15). -15: fade in 0->100, 0: no fade, 15: fade out 100->0
+    };
+
 private:
     EnvSeqManager() = default;
     static EnvSeqManager* instance;
     bool registered[4] = {false, false, false, false};
     LinkedState linked_states[2] = {LinkedState{}, LinkedState{}};
+    Step* clipboard = nullptr;
 
 public:
     static EnvSeqManager& get() {
@@ -152,6 +179,27 @@ public:
         if (hemisphere % 2 == 0) {
             linked_states[hemisphere / 2].data[part % 2].output = output;
         }
+    }
+
+    // Copy a step to the clipboard
+    void CopyStep(const Step& step) {
+        if (clipboard) {
+            delete clipboard;
+        }
+
+        clipboard = new Step{step};
+    }
+
+    // Paste a step from the clipboard
+    void PasteStep(Step& step) {
+        if (clipboard) {
+            step = *clipboard;
+        }
+    }
+
+    // Check if there is a step in the clipboard
+    bool HasClipboard() const {
+        return clipboard != nullptr;
     }
 };
 

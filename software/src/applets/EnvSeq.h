@@ -56,6 +56,8 @@ public:
         STEP_PARAM_PROBABILITY,
         STEP_PARAM_RETRIGGER_LEVEL,
         STEP_PARAM_MOD_MARK,
+        STEP_PARAM_COPY,
+        STEP_PARAM_PASTE,
 
         MAX_STEP_PARAM_CURSOR,
     };
@@ -63,6 +65,7 @@ public:
         "Offset", "Amplitude", "WaveOff", "Revert",
         "Invert", "Option", "Triggers", "Clocks",
         "Length", "Prob", "RetrigLvl", "Mod Mark",
+        "Copy", "Paste",
     };
 
     enum LinkedCursor {
@@ -106,34 +109,6 @@ public:
         LOG_DOWN = 7,
         LOG_UP = 8,
         VOSC = 9,
-    };
-
-    enum Option : uint8_t {
-        NO_OPTION = 0,
-        FOLD_UP = 1,
-        FOLD_DOWN = 2,
-        ZERO_UP = 3,
-        ZERO_DOWN = 4,
-
-        MAX_OPTIONS,
-    };
-
-    // Single step of the envelope sequence
-    struct Step {
-        uint16_t shape; // Shape for the step. 0..VOSC-1 is the enum value, >=VOSC is the VOSC waveform number.
-        int16_t offset; // Scaled step offset CV (by OFFSET_SCALE_INCREMENT)
-        int16_t amp; // Scaled step amp CV (by OFFSET_SCALE_INCREMENT)
-        bool waveform_revert; // Reverts the waveform (VOSC only)
-        bool waveform_invert; // Inverts the waveform (VOSC only)
-        uint8_t length; // Length 1-200% of envelope duration for this step
-        bool mod_mark; // Whether this step is marked for modulation
-
-        uint8_t waveform_offset : 7; // Offset where the envelope offset is on the waveform (0..100) in 1% steps (VOSC only)
-        Option waveform_option : 3; // Option for the waveform (VOSC only)
-        uint8_t triggers : 3; // Number of times to trigger the step (0-7)
-        uint8_t clocks : 3; // Number of clocks this step lasts for (0-7)
-        uint8_t probability : 7; // Probability 0-100% of this step being played
-        int8_t retrigger_level : 5; // Retrigger level (-15..15). -15: fade in 0->100, 0: no fade, 15: fade out 100->0
     };
 
     const char* applet_name() {
@@ -226,7 +201,7 @@ public:
             return;
         }
 
-        const Step& s = steps[step];
+        const EnvSeqManager::Step& s = steps[step];
         update_step_progress(this_tick);
 
         // Retrigger: restart the shape multiple times within the same step.
@@ -280,7 +255,7 @@ public:
             uint8_t offset = s.waveform_offset;
             bool revert = s.waveform_revert;
             bool invert = s.waveform_invert;
-            Option option = s.waveform_option;
+            EnvSeqManager::Option option = s.waveform_option;
             uint16_t number = prepare_shape(s.shape, offset, revert, invert, option);
 
             // Initialize the VOSC oscillator if needed
@@ -302,29 +277,29 @@ public:
     
             // Apply the waveform option
             switch (option) {
-            case Option::NO_OPTION:
+            case EnvSeqManager::Option::NO_OPTION:
                 break;
-            case Option::FOLD_UP:
+            case EnvSeqManager::Option::FOLD_UP:
                 if (cv < waveform_offset) {
                     cv = 2 * waveform_offset - cv;
                 }
                 break;
-            case Option::FOLD_DOWN:
+            case EnvSeqManager::Option::FOLD_DOWN:
                 if (cv > waveform_offset) {
                     cv = 2 * waveform_offset - cv;
                 }
                 break;
-            case Option::ZERO_UP:
+            case EnvSeqManager::Option::ZERO_UP:
                 if (cv > waveform_offset) {
                     cv = waveform_offset;
                 }
                 break;
-            case Option::ZERO_DOWN:
+            case EnvSeqManager::Option::ZERO_DOWN:
                 if (cv < waveform_offset) {
                     cv = waveform_offset;
                 }
                 break;
-            case Option::MAX_OPTIONS:
+            case EnvSeqManager::Option::MAX_OPTIONS:
                 break;
             }
 
@@ -531,6 +506,16 @@ public:
             case StepParamCursor::STEP_PARAM_MOD_MARK:
                 steps[step_view].mod_mark = !steps[step_view].mod_mark;
                 return;
+            case StepParamCursor::STEP_PARAM_COPY:
+                manager.CopyStep(steps[step_view]);
+                return;
+            case StepParamCursor::STEP_PARAM_PASTE:
+                manager.PasteStep(steps[step_view]);
+                osc_draw_reinit = true;
+                if (step == step_view) {
+                    osc_reinit = true;
+                }
+                return;
             }
 
           default:
@@ -591,7 +576,6 @@ public:
           return;
         }
 
-        bool reinit = false;
         switch (cursor) {
         case EnvSeqCursor::MOD1_MODE:
             mod1_mode = (ModulationMode)constrain(mod1_mode + direction, 0, ModulationMode::MAX_MODULATION_MODE - 1);
@@ -625,11 +609,15 @@ public:
             }
 
             steps[step_view].shape = shape;
-            reinit = true;
+            reinit_osc();
             break;
         }
         case EnvSeqCursor::STEP_PARAM:
             MoveCursor(step_param_cursor, direction, StepParamCursor::MAX_STEP_PARAM_CURSOR - 1);
+            if (step_param_cursor == StepParamCursor::STEP_PARAM_PASTE && !manager.HasClipboard()) {
+                // No clipboard, set to copy cursor
+                step_param_cursor = StepParamCursor::STEP_PARAM_COPY;
+            }
             break;
         case EnvSeqCursor::STEP_PARAM_VALUE:
             switch (step_param_cursor) {
@@ -643,7 +631,7 @@ public:
                 steps[step_view].waveform_offset = (uint8_t)constrain(steps[step_view].waveform_offset + direction, 0, 100);
                 break;
             case StepParamCursor::STEP_PARAM_WAVEFORM_OPTION:
-                steps[step_view].waveform_option = (Option)constrain(steps[step_view].waveform_option + direction, 0, Option::MAX_OPTIONS - 1);
+                steps[step_view].waveform_option = (EnvSeqManager::Option)constrain(steps[step_view].waveform_option + direction, 0, EnvSeqManager::Option::MAX_OPTIONS - 1);
                 break;
             case StepParamCursor::STEP_PARAM_TRIGGERS:
                 steps[step_view].triggers = (uint8_t)constrain(steps[step_view].triggers + direction, 0, 7);
@@ -665,12 +653,7 @@ public:
         }
 
         // Reinitialize the VOSC oscillator if needed
-        if (reinit) {
-            osc_draw_reinit = true;
-            if (step == step_view) {
-                osc_reinit = true;
-            }
-        }
+        reinit_osc();
     }
 
     uint64_t OnDataRequest() {
@@ -770,7 +753,7 @@ private:
     int8_t step = -1; // Current step
     int8_t step_view = 0; // Viewed step for cursor
     uint16_t step_progress = 0; // Progress of the current step
-    Step steps[MAX_NUM_STEPS]; // Steps of the envelope sequence
+    EnvSeqManager::Step steps[MAX_NUM_STEPS]; // Steps of the envelope sequence
     VectorOscillator osc; // VOSC oscillator
     bool osc_reinit = true; // Whether to re-initialize the VOSC oscillator
     VectorOscillator osc_draw; // VOSC oscillator for drawing the waveform
@@ -824,7 +807,7 @@ private:
 
     // Get the offset CV for the given step
     int get_offset_cv(int mod1_cv) {
-        const Step& s = steps[step];
+        const EnvSeqManager::Step& s = steps[step];
         int cv = static_cast<int>(s.offset) * OFFSET_SCALE_INCREMENT + mod1_cv;
 
         // Modulate the offset CV
@@ -846,7 +829,7 @@ private:
 
     // Update the step progress for the current step
     void update_step_progress(uint32_t this_tick) {
-        const Step& s = steps[step];
+        const EnvSeqManager::Step& s = steps[step];
         const uint32_t total_step_ticks = (s.clocks + 1) * clock_ticks;
         const uint32_t step_end_tick = step_start_tick + total_step_ticks;
         step_progress = this_tick >= step_end_tick ? 65535 : Proportion(this_tick - step_start_tick, total_step_ticks, 65535);
@@ -914,28 +897,28 @@ private:
     }
 
     // Prepare the shape parameters for the VOSC oscillator. Returns the waveform number.
-    uint16_t prepare_shape(const uint16_t& shape, uint8_t& offset, bool& revert, bool& invert, Option& option) {
+    uint16_t prepare_shape(const uint16_t& shape, uint8_t& offset, bool& revert, bool& invert, EnvSeqManager::Option& option) {
         switch (shape) {
         case Shape::EXP_DOWN:
         case Shape::EXP_UP:
             offset = 0;
             revert = shape == Shape::EXP_UP;
             invert = false;
-            option = Option::NO_OPTION;
+            option = EnvSeqManager::Option::NO_OPTION;
             return HS::Exponential;
         case Shape::RAMP_DOWN:
         case Shape::RAMP_UP:
             offset = 0;
             revert = shape == Shape::RAMP_UP;
             invert = false;
-            option = Option::NO_OPTION;
+            option = EnvSeqManager::Option::NO_OPTION;
             return HS::Sawtooth;
         case Shape::LOG_DOWN:
         case Shape::LOG_UP:
             offset = 0;
             revert = shape == Shape::LOG_UP;
             invert = false;
-            option = Option::NO_OPTION;
+            option = EnvSeqManager::Option::NO_OPTION;
             return HS::Logarithmic;
         default:
             return shape - Shape::VOSC;
@@ -1051,7 +1034,7 @@ private:
     }
 
     void draw_waveform() {
-        const Step& s = steps[step_view];
+        const EnvSeqManager::Step& s = steps[step_view];
 
         const byte top = 25;
         const byte bottom = 51;
@@ -1084,7 +1067,7 @@ private:
         uint8_t offset = s.waveform_offset;
         bool revert = s.waveform_revert;
         bool invert = s.waveform_invert;
-        Option option = s.waveform_option;
+        EnvSeqManager::Option option = s.waveform_option;
         uint16_t number = prepare_shape(s.shape, offset, revert, invert, option);
 
         if (osc_draw_reinit) {
@@ -1125,7 +1108,7 @@ private:
     }
 
     void draw_step_view() {
-        const Step& s = steps[step_view];
+        const EnvSeqManager::Step& s = steps[step_view];
         uint8_t display_step = step_view + 1;
         uint8_t y = 15;
 
@@ -1233,6 +1216,18 @@ private:
             gfxIcon(13, y, s.mod_mark ? CHECK_ON_ICON : CHECK_OFF_ICON);
             if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(13, 63, 10, step_param_names[step_param_cursor]);
             break;
+        case StepParamCursor::STEP_PARAM_COPY:
+            gfxIcon(0, y, UP_ICON);
+            if (cursor == EnvSeqCursor::STEP_PARAM) gfxSpicyCursor(0, 63, 10, step_param_names[step_param_cursor]);
+            gfxPrint(13, y, step_param_names[step_param_cursor]);
+            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(13, 63, 50, step_param_names[step_param_cursor]);
+            break;
+        case StepParamCursor::STEP_PARAM_PASTE:
+            gfxIcon(0, y, DOWN_ICON);
+            if (cursor == EnvSeqCursor::STEP_PARAM) gfxSpicyCursor(0, 63, 10, step_param_names[step_param_cursor]);
+            gfxPrint(13, y, step_param_names[step_param_cursor]);
+            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(13, 63, 50, step_param_names[step_param_cursor]);
+            break;
         }
     }
 
@@ -1294,7 +1289,7 @@ private:
             steps[i].waveform_offset = 0;
             steps[i].waveform_revert = false;
             steps[i].waveform_invert = false;
-            steps[i].waveform_option = Option::NO_OPTION;
+            steps[i].waveform_option = EnvSeqManager::Option::NO_OPTION;
             steps[i].triggers = 0;
             steps[i].clocks = 0;
             steps[i].length = 100;
@@ -1417,6 +1412,13 @@ private:
         return start_waveform;
     }
 
+    void reinit_osc() {
+        osc_draw_reinit = true;
+        if (step == step_view) {
+            osc_reinit = true;
+        }
+    }
+
     const char* mod1_mode_string(ModulationMode mode) {
         switch (mode) {
         case ModulationMode::MOD:
@@ -1497,17 +1499,17 @@ private:
         }
     }
 
-    const char* option_string(Option option) {
+    const char* option_string(EnvSeqManager::Option option) {
         switch (option) {
-        case Option::NO_OPTION:
+        case EnvSeqManager::Option::NO_OPTION:
             return "None";
-        case Option::FOLD_UP:
+        case EnvSeqManager::Option::FOLD_UP:
             return "FoldUp";
-        case Option::FOLD_DOWN:
+        case EnvSeqManager::Option::FOLD_DOWN:
             return "FoldDw";
-        case Option::ZERO_UP:
+        case EnvSeqManager::Option::ZERO_UP:
             return "ZeroUp";
-        case Option::ZERO_DOWN:
+        case EnvSeqManager::Option::ZERO_DOWN:
             return "ZeroDw";
         default:
             return "";

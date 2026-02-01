@@ -19,7 +19,7 @@ layout: default
 EnvSeq has two screens:
 
 - **Main screen**: Mod1 mode, Mod2 mode, Out2 mode, Randomizer, TR2 mode, number of steps, Reset, Init.
-- **Step screen**: Step number, shape (VOSC waveform index included), and per-step parameters (offset, amp, VOSC options, probability, triggers, clocks, length, retrigger fade, Mod2 mark).
+- **Step screen**: Step number, shape (VOSC waveform index included), and per-step parameters (offset, amp, VOSC options, probability, triggers, clocks, length, retrigger fade, Mod2 mark, Copy/Paste).
 
 ## Mod1 (CV1) modes
 `Mod1` defines how CV1 is sampled/applied:
@@ -128,6 +128,9 @@ Sets the retrigger fade behavior in the range -15..15:
 
 #### Mod Mark
 Marks this step as eligible for Mod2 when `Mod2` mode is `ModMark`.
+
+#### Copy / Paste
+Copy the current step’s settings and paste them onto another step, even across hemispheres. Paste is only shown when the clipboard has data.
 
 ## Random
 Selecting `Random` on the main page opens a checklist-style randomizer for step parameters:
