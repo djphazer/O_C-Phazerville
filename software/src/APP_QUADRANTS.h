@@ -558,17 +558,13 @@ public:
         if (zoom_cursor >= 5) {
           gfxIcon(x + 18, y + 1, DOWN_ICON, true);
 
-          graphics.clearRect(0, y + 10, 127, 30);
+          graphics.clearRect(0, y + 10, 127, 20);
           gfxPrint(x, y+10, "Slew=");
           gfxPrint(HS::frame.output_slew[zoom_slot*2 + zoom_cursor-5]);
           gfxPrint("%");
 
           gfxPrint(x, y+20, "Skip=");
           gfxPrint(HS::frame.clockskip[zoom_slot*2 + zoom_cursor-5]);
-          gfxPrint("%");
-
-          gfxPrint(x, y+30, "Atten=");
-          gfxPrint(Proportion(HS::frame.output_atten[zoom_slot*2 + zoom_cursor-5], 126, 200));
           gfxPrint("%");
         }
       } else {
