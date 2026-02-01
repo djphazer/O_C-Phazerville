@@ -563,8 +563,8 @@ public:
           gfxPrint(HS::frame.output_slew[zoom_slot*2 + zoom_cursor-5]);
           gfxPrint("%");
 
-          gfxPrint(x, y+20, "Skip=");
-          gfxPrint(HS::frame.clockskip[zoom_slot*2 + zoom_cursor-5]);
+          gfxPrint(x, y+20, "Atten=");
+          gfxPrint(Proportion(HS::frame.output_atten[zoom_slot*2 + zoom_cursor-5], 126, 200));
           gfxPrint("%");
         }
       } else {
@@ -884,7 +884,7 @@ public:
                 case 5:
                 case 6:
                   if (h == LEFT_HEMISPHERE)
-                    HS::frame.NudgeSkip(zoom_slot*2 + zoom_cursor - 5, event.value);
+                    HS::frame.NudgeAtten(zoom_slot*2 + zoom_cursor - 5, event.value);
                   else
                     HS::frame.NudgeSlew(zoom_slot*2 + zoom_cursor - 5, event.value);
                   break;
