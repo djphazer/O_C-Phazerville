@@ -113,9 +113,7 @@ using namespace HS;
 #include "applets/VectorMod.h"
 #include "applets/VectorMorph.h"
 #include "applets/Voltage.h"
-#ifdef PEWPEWPEW
 #include "applets/WTVCO.h"
-#endif
 #include "applets/Xfader.h"
 #include "applets/hMIDIIn.h"
 #include "applets/hMIDIOut.h"
@@ -130,9 +128,7 @@ constexpr Registry reg = Registry<HemisphereApplet, 200 // max ID
     , DeclareApplet<ADEG, 34, 0x01>
     , DeclareApplet<MiniASR, 47, 0x09>
     , DeclareApplet<AttenuateOffset, 56, 0x10>
-#ifdef PEWPEWPEW
     , DeclareApplet<Binary, 41, 0x41>
-#endif
     , DeclareApplet<BitBeat, 79, 0x01>
     , DeclareApplet<BootsNCat, 55, 0x80>
     , DeclareApplet<Brancher, 4, 0x14>
@@ -220,9 +216,7 @@ constexpr Registry reg = Registry<HemisphereApplet, 200 // max ID
 //    , DeclareApplet<VectorMod, 53, 0x01> // awkward middle child
     , DeclareApplet<VectorMorph, 54, 0x01>
     , DeclareApplet<Voltage, 43, 0x10>
-#ifdef PEWPEWPEW
     , DeclareApplet<WTVCO, 67, 0x80>
-#endif
     , DeclareApplet<Xfader, 33, 0x10>
 >{};
 
