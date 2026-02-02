@@ -64,7 +64,7 @@ public:
 	}
 
 	void Release() {
-		delete samplesSquared;
+		delete[] samplesSquared;
 	}
 
 	//Sets the gate parameters.
@@ -186,6 +186,7 @@ private:
 	float aOneMinusLimitAttack;
 	float aLimitRelease;
 	const static unsigned int sampleBufferSize = AUDIO_SAMPLE_RATE / 10; // number of samples to use for running RMS calulation = 1/10th of a second
+	static constexpr float invSampleBufferSize = 1.0f / (float)sampleBufferSize;
 	uint64_t sumOfSamplesSquared = 0;
 	uint32_t* samplesSquared;
 	uint16_t sampleIndex = 0;

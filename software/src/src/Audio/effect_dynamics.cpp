@@ -86,15 +86,20 @@ float log2f_approx_coeff[4] = {1.23149591368684f, -4.11852516267426f, 6.02197014
 
 float log2f_approx(float X)
 {
-  float *C = &log2f_approx_coeff[0];
   float Y;
   float F;
   int E;
 
   // This is the approximation to log2()
-  F = frexpf(fabsf(X), &E);
+  // F = frexpf(fabsf(X), &E);
+  // Optimized frexp for positive X
+  union { float f; uint32_t i; } u = { X };
+  E = ((u.i >> 23) & 0xff) - 126;
+  u.i &= 0x7fffff;
+  u.i |= 0x3f000000;
+  F = u.f;
 
-  //  Y = C[0]*F*F*F + C[1]*F*F + C[2]*F + C[3] + E;
+  float *C = &log2f_approx_coeff[0];
   Y = *C++;
   Y *= F;
   Y += (*C++);
@@ -142,25 +147,29 @@ void AudioEffectDynamics::update(void) {
 		return;
 	}
 
+    const float log2_sampleBufferSize = log2f_approx((float)sampleBufferSize);
+    const float db_constant = 90.3089987f + 3.010299957f * log2_sampleBufferSize;
+
 	for (int i=0; i<AUDIO_BLOCK_SAMPLES; i++) {
 
-        unsigned int sampleIndexPlus1 = (sampleIndex + 1) % sampleBufferSize;
+        uint32_t nextSampleIndex = sampleIndex + 1;
+        if (nextSampleIndex >= sampleBufferSize) nextSampleIndex = 0;
 
-        uint32_t sampleToRemove = samplesSquared[sampleIndexPlus1];
-        sumOfSamplesSquared -= (sampleToRemove * sampleToRemove);
+        uint32_t sampleSquaredToRemove = samplesSquared[nextSampleIndex];
+        sumOfSamplesSquared -= sampleSquaredToRemove;
 
         int16_t sample = block->data[i];
-        samplesSquared[sampleIndex] = abs(sample);
-        uint32_t sampleSquared = sample * sample;
+        uint32_t sampleSquared = (uint32_t)(sample * sample);
+        samplesSquared[sampleIndex] = sampleSquared;
         sumOfSamplesSquared += sampleSquared;
 
-        sampleIndex = (sampleIndex + 1) % sampleBufferSize;
-
-        float rms = sqrt(sumOfSamplesSquared / float(sampleBufferSize)) / 32768.0;
+        sampleIndex = nextSampleIndex;
 
         //Compute block RMS level in Db
         float inputdb = MIN_DB;
-        if (rms > 0) inputdb = unitToDb(rms);
+        if (sumOfSamplesSquared > 0) {
+            inputdb = 3.010299957f * log2f_approx((float)sumOfSamplesSquared) - db_constant;
+        }
 
         //Gate
         if (gateEnabled) {
@@ -197,7 +206,7 @@ void AudioEffectDynamics::update(void) {
         float totalGain = gatedb + compdb + makeupdb + limitdb;
 
         float multiplier = dbToUnit(totalGain);
-        int result = sample * multiplier;
+        int32_t result = (int32_t)(sample * multiplier);
         block->data[i] = saturate16(result);
         //Apply gain to block
     }
