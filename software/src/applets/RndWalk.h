@@ -25,6 +25,10 @@
 #define MAX_STEP 255
 #define MAX_SMOOTH 255
 
+#define RECIP_MAX_RANGE (1.0f / MAX_RANGE)
+#define RECIP_MAX_STEP (1.0f / MAX_STEP)
+#define RECIP_LOG_MAX_SMOOTH_PLUS_1 0.18033688f
+
 #define HEM_1V 1536 //ADC value for 1 Volt
 #define HEM_1ST 128 //ADC value for 1 semitone
 #define HEM_HST 64 //ADC value for half semitone
@@ -43,8 +47,9 @@ public:
             // rndSeed[ch] = random(1, 255);
             currentVal[ch] = 0;
             currentOut[ch] = 0;
-            UpdateAlpha();
         }
+        UpdateAlpha();
+        UpdateMaxVal();
         cursor = 0;
     }
 
@@ -54,22 +59,11 @@ public:
         // for CV in read from In(0|1)
         // for CV out write to Out(0|1, value)
         // INPUT
-        int maxVal = HEMISPHERE_MAX_CV;
-        switch (cvRange) {
-            case 0:
-                maxVal = HEM_HST;
-                break;
-            case 1:
-                maxVal = HEM_1ST;
-                break;
-            case 2:
-                maxVal = HEM_1V;
-                break;
-            default:
-                break;
-        }
         int rangeCv = Proportion(In(0), HEMISPHERE_MAX_INPUT_CV, MAX_RANGE);
         int stepCv = Proportion(In(1), HEMISPHERE_MAX_INPUT_CV, MAX_STEP);
+
+        int rangeScaled = (int)((float)constrain(range + rangeCv, 0, MAX_RANGE) * RECIP_MAX_RANGE * max_val);
+        int stepLimit = constrain(step + stepCv, 0, MAX_STEP);
         
         ForEachChannel(ch) {
             // OUTPUT
@@ -80,12 +74,11 @@ public:
                     continue;
                 }
                 int randInt = random(0, 1000);
-                int randStep = (float)(random(1, constrain(step+stepCv, 0, MAX_STEP)))/MAX_STEP*maxVal/2;
-                int rangeScaled = (int)( ((float)constrain(range + rangeCv, 0, MAX_RANGE))/MAX_RANGE * maxVal);
+                int randStep = (float)random(1, stepLimit) * RECIP_MAX_STEP * max_val * 0.5f;
                 currentVal[ch] += randStep * (((randInt > PROB_UP) && (currentVal[ch] < rangeScaled)) -
                                               ((randInt < PROB_DN) && (currentVal[ch] > -rangeScaled)));
             }
-            currentOut[ch] = alpha*currentOut[ch] + (1-alpha)*(float)currentVal[ch];
+            currentOut[ch] = alpha * currentOut[ch] + one_minus_alpha * (float)currentVal[ch];
 
             Out(ch, constrain((int)currentOut[ch], -HEMISPHERE_MAX_CV, HEMISPHERE_MAX_CV));
         }
@@ -120,22 +113,9 @@ public:
             yClkDiv = constrain(yClkDiv + direction, 1, 32);
         } else if (cursor == 5) {
             cvRange = constrain(cvRange + direction, 0, 3);
-            int maxVal = HEMISPHERE_MAX_CV;
-            switch (cvRange) {
-                case 0:
-                    maxVal = HEM_HST;
-                    break;
-                case 1:
-                    maxVal = HEM_1ST;
-                    break;
-                case 2:
-                    maxVal = HEM_1V;
-                    break;
-                default:
-                    break;
-            }
+            UpdateMaxVal();
             ForEachChannel(ch) {
-                currentVal[ch] = currentVal[ch]%maxVal;
+                currentVal[ch] = currentVal[ch] % max_val;
             }
         }
 
@@ -160,6 +140,7 @@ public:
         smoothness = Unpack(data, PackLocation {21,8});
         cvRange = Unpack(data, PackLocation {29,2});
         UpdateAlpha();
+        UpdateMaxVal();
     }
 
 protected:
@@ -186,6 +167,8 @@ private:
     uint8_t cvRange = 3; // 2 bit
     uint8_t clkMod = 0; //not stored, used for clock division
     float alpha; // not stored, used for smoothing
+    float one_minus_alpha;
+    int max_val;
 
     // Runtime parameters
     // unsigned int rndSeed[2];
@@ -243,20 +226,7 @@ private:
         // gfxPrint(7, 38, currentVal[0]);
         // gfxPrint(7, 50, currentVal[1]);
 
-        int maxVal = HEMISPHERE_MAX_CV;
-        switch (cvRange) {
-            case 0:
-                maxVal = HEM_HST;
-                break;
-            case 1:
-                maxVal = HEM_1ST;
-                break;
-            case 2:
-                maxVal = HEM_1V;
-                break;
-            default:
-                break;
-        }
+        int maxVal = max_val;
         // gfxPrint(1, 47, currentVal[0]);
         // gfxPrint(1, 55, currentVal[1]);
         gfxPrint(1, 47, "x");
@@ -264,7 +234,7 @@ private:
         ForEachChannel(ch) {
             int w = 0;
             if (range > 0) {
-                w = (currentOut[ch]/((float)range/MAX_RANGE*maxVal))*31;
+                w = (currentOut[ch] / ((float)range * RECIP_MAX_RANGE * maxVal)) * 31.0f;
                 if (w > 31) {
                     w = 31;
                 }
@@ -281,9 +251,19 @@ private:
         
     }
 
+    void UpdateMaxVal() {
+        max_val = HEMISPHERE_MAX_CV;
+        switch (cvRange) {
+            case 0: max_val = HEM_HST; break;
+            case 1: max_val = HEM_1ST; break;
+            case 2: max_val = HEM_1V; break;
+            default: break;
+        }
+    }
+
     void UpdateAlpha() {
         // Use log mapping for better feeling
-        alpha = log(1+smoothness)/log(1+MAX_SMOOTH);
-        // alpha = (float)smoothness/(float)MAX_SMOOTH;
+        alpha = logf(1.0f + smoothness) * RECIP_LOG_MAX_SMOOTH_PLUS_1;
+        one_minus_alpha = 1.0f - alpha;
     }
 };
