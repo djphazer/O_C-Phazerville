@@ -417,16 +417,11 @@ public:
                 output2.cv = output.cv;
                 if (output2.is_cv) {
                     Out(1, output2.cv);
-                } else {
-                    GateOut(1, output2.cv != 0);
-                    if (output2.cv > 0) {
-                        output2.cv--;
-                    }
+                } else if (output2.cv > 0) {
+                    ClockOut(1, output2.cv);
+                    output2.cv = 0;
                 }
             } else {
-                if (!output.is_cv && output.cv > 0) {
-                    output.cv--;
-                }
                 manager.SetOutput(hemisphere, i - 1, output);
             }
         }
@@ -804,8 +799,9 @@ private:
         for (uint8_t i = 0; i < 2; i++) {
             if (linked_data[i].output.is_cv) {
                 Out(i, constrain(linked_data[i].output.cv, HEMISPHERE_MIN_CV, HEMISPHERE_MAX_CV));
-            } else {
-                GateOut(i, linked_data[i].output.cv != 0);
+            } else if (linked_data[i].output.cv > 0) {
+                ClockOut(i, linked_data[i].output.cv);
+                manager.ClearGateOutput(hemisphere, i);
             }
         }
     }

@@ -177,6 +177,13 @@ public:
         }
     }
 
+    // Clear the gate output for the applet (only the right applet can do it)
+    void ClearGateOutput(HEM_SIDE hemisphere, uint8_t part) {
+        if (hemisphere % 2 == 1 && !linked_states[(hemisphere - 1) / 2].data[part % 2].output.is_cv) {
+            linked_states[(hemisphere - 1) / 2].data[part % 2].output.cv = 0;
+        }
+    }
+
     // Set the output for the applet (only the left applet can do it)
     void SetOutput(HEM_SIDE hemisphere, uint8_t part, const Output& output) {
         if (hemisphere % 2 == 0) {
