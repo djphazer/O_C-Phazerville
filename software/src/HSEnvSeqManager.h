@@ -26,6 +26,7 @@ public:
         RETRIGGER_LEVEL = 2, // Modulate the retrigger level
         MOD = 3, // Modulate all steps
         MOD_MARK = 4, // Modulate marked steps ONLY
+        GATE_LENGTH = 5, // Modulate the gate length
 
         MAX_MODULATION_MODE,
     };
@@ -75,6 +76,7 @@ public:
 
         MAX_OPTIONS,
     };
+
     struct Step {
         uint16_t shape; // Shape for the step. 0..VOSC-1 is the enum value, >=VOSC is the VOSC waveform number.
         int16_t offset; // Scaled step offset CV (by OFFSET_SCALE_INCREMENT)
@@ -82,6 +84,7 @@ public:
         bool waveform_revert; // Reverts the waveform (VOSC only)
         bool waveform_invert; // Inverts the waveform (VOSC only)
         uint8_t length; // Length 1-200% of envelope duration for this step
+        uint8_t gate_length; // Length of the gate pulse. 0-155 is 1->1000ms. 156-255 is 1-100% of the step length (actual time before applying modulation to it). 205 is 50% (this is the default value).
         bool mod_mark; // Whether this step is marked for modulation
 
         uint8_t waveform_offset : 7; // Offset where the envelope offset is on the waveform (0..100) in 1% steps (VOSC only)

@@ -56,6 +56,7 @@ public:
         STEP_PARAM_PROBABILITY,
         STEP_PARAM_RETRIGGER_LEVEL,
         STEP_PARAM_MOD_MARK,
+        STEP_PARAM_GATE_LENGTH,
         STEP_PARAM_COPY,
         STEP_PARAM_PASTE,
 
@@ -65,7 +66,7 @@ public:
         "Offset", "Amplitude", "WaveOff", "Revert",
         "Invert", "Option", "Triggers", "Clocks",
         "Length", "Prob", "RetrigLvl", "Mod Mark",
-        "Copy", "Paste",
+        "GateLen", "Copy", "Paste",
     };
 
     enum LinkedCursor {
@@ -207,7 +208,9 @@ public:
         }
 
         const EnvSeqManager::Step& s = steps[step];
-        update_step_progress(this_tick);
+        const uint32_t total_step_ticks = update_step_progress(this_tick);
+        uint32_t trigger_start_tick = step_start_tick; // Tick when the current trigger segment started. Will be updated if triggers are used.
+        uint32_t total_trigger_ticks = total_step_ticks; // Number of ticks for the current trigger segment. Will be updated if triggers are used.
 
         // Retrigger: restart the shape multiple times within the same step.
         bool retrig_edge = false;
@@ -223,6 +226,10 @@ public:
             if (step_progress != 65535) {
                 step_progress = static_cast<uint16_t>(scaled);
             }
+
+            // Trigger is used, update the trigger start and total ticks
+            total_trigger_ticks = total_step_ticks / retrig_segments;
+            trigger_start_tick = step_start_tick + total_trigger_ticks * retrig_index;
         }
 
         const EnvSeqManager::LinkedData *linked_data = manager.GetLinkedData(hemisphere);
@@ -351,6 +358,7 @@ public:
         for (uint8_t i = 0; i < output_count; i++) {
             EnvSeqManager::Output output = (i == 0) ? output2 : linked_data[i - 1].output;
             bool do_gate = false;
+            uint32_t do_gate_ticks = 0;
             const bool was_cv = output.is_cv;
             const EnvSeqManager::OutputMode output_mode = i == 0 ? output2_mode : linked_data[i - 1].modulation.output_mode;
 
@@ -374,14 +382,23 @@ public:
             case EnvSeqManager::OutputMode::GATE_STEP:
                 output.is_cv = false;
                 do_gate = new_step && s.shape != Shape::HOLD && s.shape != Shape::ZERO;
+                if (do_gate) {
+                    do_gate_ticks = calculate_gate_ticks(this_tick, step_start_tick, total_step_ticks, s.gate_length);
+                }
                 break;
             case EnvSeqManager::OutputMode::GATE_STEP_INCL_RETRIGGERS:
                 output.is_cv = false;
                 do_gate = s.shape != Shape::HOLD && s.shape != Shape::ZERO && (new_step || retrig_edge);
+                if (do_gate) {
+                    do_gate_ticks = calculate_gate_ticks(this_tick, trigger_start_tick, total_trigger_ticks, s.gate_length);
+                }
                 break;
             case EnvSeqManager::OutputMode::GATE_SEQUENCE:
                 output.is_cv = false;
                 do_gate = sequence_restarted && s.shape != Shape::HOLD && s.shape != Shape::ZERO;
+                if (do_gate) {
+                    do_gate_ticks = calculate_gate_ticks(this_tick, step_start_tick, total_step_ticks, s.gate_length);
+                }
                 break;
             case EnvSeqManager::OutputMode::MAX_OUTPUT_MODE:
                 break;
@@ -389,7 +406,7 @@ public:
 
             if (!output.is_cv) {
                 if (do_gate) {
-                    output.cv = GATE_STOP_TICKS;
+                    output.cv = do_gate_ticks;
                 } else if (was_cv) {
                     output.cv = 0;
                 }
@@ -653,11 +670,13 @@ public:
             case StepParamCursor::STEP_PARAM_RETRIGGER_LEVEL:
                 steps[step_view].retrigger_level = (int8_t)constrain(steps[step_view].retrigger_level + direction, -15, 15);
                 break;
+            case StepParamCursor::STEP_PARAM_GATE_LENGTH:
+                steps[step_view].gate_length = (int8_t)constrain(steps[step_view].gate_length + direction, 0, 255);
+                break;
             }
             break;
         }
 
-        // Reinitialize the VOSC oscillator if needed
         reinit_osc();
     }
 
@@ -834,8 +853,8 @@ private:
         return cv;
     }
 
-    // Update the step progress for the current step
-    void update_step_progress(uint32_t this_tick) {
+    // Update the step progress for the current step. Returns the total step ticks.
+    uint32_t update_step_progress(uint32_t this_tick) {
         const EnvSeqManager::Step& s = steps[step];
         const uint32_t total_step_ticks = (s.clocks + 1) * clock_ticks;
         const uint32_t step_end_tick = step_start_tick + total_step_ticks;
@@ -858,7 +877,7 @@ private:
             step_progress = static_cast<uint16_t>(scaled);
         }
 
-        return;
+        return total_step_ticks;
     }
 
     // Get the modulation value for the given modulation mode
@@ -930,6 +949,42 @@ private:
         default:
             return shape - Shape::VOSC;
         }
+    }
+
+    // Calculate the number of ticks for the gate pulse.
+    uint32_t calculate_gate_ticks(uint32_t this_tick, uint32_t start_tick, uint32_t total_ticks, uint8_t gate_length) {
+        if (this_tick >= start_tick + total_ticks) {
+            return 0;
+        }
+
+        uint32_t gate_ticks = 0;
+        if (gate_length < 156) {
+            // 0-155 -> ~0.05..~1000ms, exponential curve
+            const uint32_t ms_x100 = 5 + (1000ULL * gate_length * gate_length) / 241;
+            gate_ticks = (ms_x100 * HEMISPHERE_CLOCK_TICKS + 50) / 100;
+        } else {
+            // 156-255 -> 1-100% of total_ticks
+            const uint32_t percent = gate_length - 155;
+            gate_ticks = (total_ticks * percent) / 100;
+            if (gate_ticks == 0) {
+                gate_ticks = 1;
+            }
+        }
+
+        EnvSeqManager::Output gate_length_mod = get_modulation(EnvSeqManager::ModulationMode::GATE_LENGTH);
+        if (gate_length_mod.is_cv) {
+            // Modulate gate ticks as 1-200% of the original gate ticks
+            const int cv_delta_pct = Proportion(gate_length_mod.cv, HEMISPHERE_MAX_INPUT_CV, 100); // -100..+100
+            const int cv_scale_pct = constrain(100 + cv_delta_pct, 1, 200);
+            gate_ticks = (gate_ticks * cv_scale_pct + 50) / 100;
+        }
+
+        const uint32_t remaining = (start_tick + total_ticks) - this_tick;
+        if (gate_ticks > remaining) {
+            gate_ticks = remaining;
+        }
+
+        return gate_ticks;
     }
 
     void draw_interface_linked() {
@@ -1224,6 +1279,18 @@ private:
             gfxIcon(13, y, s.mod_mark ? CHECK_ON_ICON : CHECK_OFF_ICON);
             if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(13, 63, 10, step_param_names[step_param_cursor]);
             break;
+        case StepParamCursor::STEP_PARAM_GATE_LENGTH:
+            gfxIcon(0, y, GATE_ICON);
+            if (cursor == EnvSeqCursor::STEP_PARAM) gfxSpicyCursor(0, 63, 10, step_param_names[step_param_cursor]);
+            gfxPos(13, y);
+            if (s.gate_length < 156) {
+                graphics.printf("%1d.%02dms", SPLIT_INT_DEC(0.05f + 10.0f*s.gate_length*s.gate_length/241.0f, 100));
+            } else {
+                gfxPrint(s.gate_length - 155);
+                gfxPrint("%");
+            }
+            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(13, 63, 50, step_param_names[step_param_cursor]);
+            break;
         case StepParamCursor::STEP_PARAM_COPY:
             gfxIcon(0, y, UP_ICON);
             if (cursor == EnvSeqCursor::STEP_PARAM) gfxSpicyCursor(0, 63, 10, step_param_names[step_param_cursor]);
@@ -1303,6 +1370,7 @@ private:
             steps[i].length = 100;
             steps[i].probability = 100;
             steps[i].retrigger_level = 0;
+            steps[i].gate_length = 205;
             steps[i].mod_mark = false;
         }
     }
@@ -1452,6 +1520,8 @@ private:
             return "Mod";
         case EnvSeqManager::ModulationMode::MOD_MARK:
             return "ModMark";
+        case EnvSeqManager::ModulationMode::GATE_LENGTH:
+            return "GateLen";
         default:
             return "";
         }

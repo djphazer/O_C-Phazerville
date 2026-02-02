@@ -39,6 +39,7 @@ EnvSeq has two screens:
 | Mod     | CV2 is added to the output CV for all steps.                                               |
 | ModMark | CV2 is added to the output CV only on steps marked with `Mod2` in the step editor.         |
 | StepSel | CV2 selects the **next played step** (unipolar **0–5V** mapped across the active `num_steps`). The selection is **sampled on the clock** when advancing steps. Step **Probability is ignored** in this mode, but multi-clock steps (`Clk`) are still honored (the current step holds until its clocks are done). |
+| GateLen | CV2 scales **Gate Length** (1–200% of the per-step gate length) for gate-based outputs. |
 
 ## Out2 modes
 Output 2 can mirror or complement the main envelope output:
@@ -55,7 +56,7 @@ Output 2 can mirror or complement the main envelope output:
 
 Notes:
 - Gates are only generated for steps whose Shape is neither `Hold` nor `Zero`.
-- Gate pulse length is fixed (short trigger-style), not proportional to the incoming clock.
+- Gate pulse length is set per step via **Gate Length** and can be modulated by `GateLen`.
 
 ## Step screen
 After the main page items, the cursor enters per-step editing. The **viewed step** (the one you edit) is independent from the **currently playing step** shown on the main page.
@@ -128,6 +129,12 @@ Sets the retrigger fade behavior in the range -15..15:
 
 #### Mod Mark
 Marks this step as eligible for Mod2 when `Mod2` mode is `ModMark`.
+
+#### Gate Length (GateLen)
+Sets the gate pulse length for gate-based outputs:
+- ~0.05–1000ms with an exponential curve
+- 1–100% of the step duration
+- If `Mod2` mode is `GateLen`, CV2 scales this length
 
 #### Copy / Paste
 Copy the current step’s settings and paste them onto another step, even across hemispheres. Paste is only shown when the clipboard has data.
