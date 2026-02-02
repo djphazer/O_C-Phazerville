@@ -318,7 +318,7 @@ public:
     // STOP playback to avoid SD card hangup on preset save
     wavplayer.stop();
     uint8_t filenum = (uint8_t)wavplayer_select;
-    data[0] = PackPackables(level, level_cv, int8_t(playrate), playrate_cv, filenum, djfilter);
+    data[0] = PackPackables(level, level_cv, uint8_t(tempo_sync), playrate_cv, filenum, djfilter);
     data[1] = PackPackables(playrate, djfilter_cv, playstop_cv, loop_length);
     data[2] = PackPackables(start_beat, start_beat_cv);
   }
@@ -329,6 +329,7 @@ public:
     UnpackPackables(data[1], playrate, djfilter_cv, playstop_cv, loop_length);
     UnpackPackables(data[2], start_beat, start_beat_cv);
     if (playrate == 0) playrate = old_playrate;
+    if (old_playrate) tempo_sync = true;
     if (loop_length == 0) loop_length = 8;
     ChangeToFile(filenum);
   }
