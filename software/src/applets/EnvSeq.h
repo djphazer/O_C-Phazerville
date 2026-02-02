@@ -240,7 +240,6 @@ public:
             trigger_start_tick = step_start_tick + total_trigger_ticks * retrig_index;
         }
 
-        const EnvSeqManager::LinkedData *linked_data = manager.GetLinkedData(hemisphere);
         int offset_cv = get_offset_cv(get_mod1_cv(new_step, sequence_restarted));
         int16_t amp_cv = s.amp * OFFSET_SCALE_INCREMENT; // CV scaled amplitude (not including offset or waveform offset)
         const uint16_t amp_abs = abs(amp_cv);
@@ -289,8 +288,7 @@ public:
     
             // Drive the waveform by step_progress (0..3600 tenths of a degree).
             const int phase_deg_tenths = (static_cast<uint32_t>(revert ? 65535 - step_progress : step_progress) * 3600) / 65535;
-            cv = osc.Phase(phase_deg_tenths);
-            cv += amp_mag;
+            cv = osc.Phase(phase_deg_tenths) + amp_mag;
 
             // Set waveform offset based on amplitude
             waveform_offset = Proportion(offset, 100, amp_abs);
@@ -361,13 +359,13 @@ public:
             cv_step_start = output_cv;
         }
 
+        EnvSeqManager::LinkedData *linked_data = manager.GetLinkedData(hemisphere);
+
         // Output to CV2 and linked outputs
         const uint8_t output_count = manager.IsLinked(hemisphere) ? 3 : 1;
         for (uint8_t i = 0; i < output_count; i++) {
-            EnvSeqManager::Output output = (i == 0) ? output2 : linked_data[i - 1].output;
+            EnvSeqManager::Output &output = (i == 0) ? output2 : linked_data[i - 1].output;
             bool do_gate = false;
-            uint32_t do_gate_ticks = 0;
-            const bool was_cv = output.is_cv;
             const EnvSeqManager::OutputMode output_mode = i == 0 ? output2_mode : linked_data[i - 1].modulation.output_mode;
 
             switch (output_mode) {
@@ -390,47 +388,29 @@ public:
             case EnvSeqManager::OutputMode::GATE_STEP:
                 output.is_cv = false;
                 do_gate = new_step && s.shape != Shape::HOLD && s.shape != Shape::ZERO;
-                if (do_gate) {
-                    do_gate_ticks = calculate_gate_ticks(this_tick, step_start_tick, total_step_ticks, s.gate_length);
-                }
+                output.cv = do_gate * calculate_gate_ticks(this_tick, step_start_tick, total_step_ticks, s.gate_length);
                 break;
             case EnvSeqManager::OutputMode::GATE_STEP_INCL_RETRIGGERS:
                 output.is_cv = false;
                 do_gate = s.shape != Shape::HOLD && s.shape != Shape::ZERO && (new_step || retrig_edge);
-                if (do_gate) {
-                    do_gate_ticks = calculate_gate_ticks(this_tick, trigger_start_tick, total_trigger_ticks, s.gate_length);
-                }
+                output.cv = do_gate * calculate_gate_ticks(this_tick, trigger_start_tick, total_trigger_ticks, s.gate_length);
                 break;
             case EnvSeqManager::OutputMode::GATE_SEQUENCE:
                 output.is_cv = false;
                 do_gate = sequence_restarted && s.shape != Shape::HOLD && s.shape != Shape::ZERO;
-                if (do_gate) {
-                    do_gate_ticks = calculate_gate_ticks(this_tick, step_start_tick, total_step_ticks, s.gate_length);
-                }
+                output.cv = do_gate * calculate_gate_ticks(this_tick, step_start_tick, total_step_ticks, s.gate_length);
                 break;
             case EnvSeqManager::OutputMode::MAX_OUTPUT_MODE:
                 break;
             }
 
-            if (!output.is_cv) {
-                if (do_gate) {
-                    output.cv = do_gate_ticks;
-                } else if (was_cv) {
+            if (i == 0) {
+                if (output.is_cv) {
+                    Out(1, output.cv);
+                } else if (output.cv > 0) {
+                    ClockOut(1, output.cv);
                     output.cv = 0;
                 }
-            }
-
-            if (i == 0) {
-                output2.is_cv = output.is_cv;
-                output2.cv = output.cv;
-                if (output2.is_cv) {
-                    Out(1, output2.cv);
-                } else if (output2.cv > 0) {
-                    ClockOut(1, output2.cv);
-                    output2.cv = 0;
-                }
-            } else {
-                manager.SetOutput(hemisphere, i - 1, output);
             }
         }
     }
@@ -815,13 +795,13 @@ private:
         manager.SetModulationCV(hemisphere, 0, In(0));
         manager.SetModulationCV(hemisphere, 1, In(1));
 
-        const EnvSeqManager::LinkedData *linked_data = manager.GetLinkedData(hemisphere);
+        EnvSeqManager::LinkedData *linked_data = manager.GetLinkedData(hemisphere);
         for (uint8_t i = 0; i < 2; i++) {
             if (linked_data[i].output.is_cv) {
                 Out(i, constrain(linked_data[i].output.cv, HEMISPHERE_MIN_CV, HEMISPHERE_MAX_CV));
             } else if (linked_data[i].output.cv > 0) {
                 ClockOut(i, linked_data[i].output.cv);
-                manager.ClearGateOutput(hemisphere, i);
+                linked_data[i].output.cv = 0;
             }
         }
     }

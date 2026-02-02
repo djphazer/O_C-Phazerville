@@ -120,24 +120,24 @@ public:
     void Unload(HEM_SIDE hemisphere) {
         registered[hemisphere] = false;
         SetLink(hemisphere, false);
-        if (hemisphere % 2 == 0) {
+        if (hemisphere & 1 == 0) {
             // Unloaded left applet
-            linked_states[hemisphere / 2].linked = false;
+            linked_states[hemisphere >> 1].linked = false;
         }
     }
 
     // Check if the applet can be linked to the other applet
     // The applet can be linked if it's in the right hemisphere and both applets are registered
     bool CanLink(HEM_SIDE hemisphere) {
-        return hemisphere % 2 == 1
+        return (hemisphere & 1)
             && registered[hemisphere]
             && registered[hemisphere - 1];
     }
 
     // Set the link state for the applet. Only the right applet can be linked
     void SetLink(HEM_SIDE hemisphere, bool value) {
-        if (hemisphere % 2 == 1) {
-            LinkedState& state = linked_states[(hemisphere - 1) / 2];
+        if (hemisphere & 1) {
+            LinkedState& state = linked_states[hemisphere >> 1];
             state.linked = value;
             if (!value) {
                 state.data[0] = LinkedData{};
@@ -147,47 +147,36 @@ public:
     }
 
     // Check if the applet is linked to the other applet
-    bool IsLinked(HEM_SIDE hemisphere) {
-        return linked_states[(hemisphere - hemisphere % 2) / 2].linked;
+    const bool IsLinked(HEM_SIDE hemisphere) const {
+        return linked_states[hemisphere >> 1].linked;
     }
 
     // Get the linked data for the applet
     const LinkedData* GetLinkedData(HEM_SIDE hemisphere) const {
-        return linked_states[(hemisphere - hemisphere % 2) / 2].data;
+        return linked_states[hemisphere >> 1].data;
+    }
+    LinkedData* GetLinkedData(HEM_SIDE hemisphere) {
+        return linked_states[hemisphere >> 1].data;
     }
 
     // Set the modulation mode for the applet (only the right applet can do it)
     void SetModulationMode(HEM_SIDE hemisphere, uint8_t part, const ModulationMode& mode) {
-        if (hemisphere % 2 == 1) {
-            linked_states[(hemisphere - 1) / 2].data[part % 2].modulation.mode = mode;
+        if (hemisphere & 1) {
+            linked_states[hemisphere >> 1].data[part & 1].modulation.mode = mode;
         }
     }
 
     // Set the modulation output mode for the applet (only the right applet can do it)
     void SetModulationOutputMode(HEM_SIDE hemisphere, uint8_t part, const OutputMode& output_mode) {
-        if (hemisphere % 2 == 1) {
-            linked_states[(hemisphere - 1) / 2].data[part % 2].modulation.output_mode = output_mode;
+        if (hemisphere & 1) {
+            linked_states[hemisphere >> 1].data[part & 1].modulation.output_mode = output_mode;
         }
     }
 
     // Set the modulation CV for the applet (only the right applet can do it)
     void SetModulationCV(HEM_SIDE hemisphere, uint8_t part, const int16_t& cv) {
-        if (hemisphere % 2 == 1) {
-            linked_states[(hemisphere - 1) / 2].data[part % 2].modulation.cv = cv;
-        }
-    }
-
-    // Clear the gate output for the applet (only the right applet can do it)
-    void ClearGateOutput(HEM_SIDE hemisphere, uint8_t part) {
-        if (hemisphere % 2 == 1 && !linked_states[(hemisphere - 1) / 2].data[part % 2].output.is_cv) {
-            linked_states[(hemisphere - 1) / 2].data[part % 2].output.cv = 0;
-        }
-    }
-
-    // Set the output for the applet (only the left applet can do it)
-    void SetOutput(HEM_SIDE hemisphere, uint8_t part, const Output& output) {
-        if (hemisphere % 2 == 0) {
-            linked_states[hemisphere / 2].data[part % 2].output = output;
+        if (hemisphere & 1) {
+            linked_states[hemisphere >> 1].data[part & 1].modulation.cv = cv;
         }
     }
 
