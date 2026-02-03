@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 #include "../HSEnvSeqManager.h"
+#include "../OC_menus.h"
 #include "../vector_osc/HSVectorOscillator.h"
 #include "../vector_osc/WaveformManager.h"
 
@@ -63,9 +64,9 @@ public:
         MAX_STEP_PARAM_CURSOR,
     };
     static constexpr const char* const step_param_names[MAX_STEP_PARAM_CURSOR] = {
-        "Offset", "Amplitude", "WaveOff", "Revert",
+        "Offset", "Amp", "WaveOff", "Revert",
         "Invert", "Option", "Triggers", "Clocks",
-        "Length", "Prob", "RetrigLvl", "Mod Mark",
+        "Length", "Prob", "RetrgLvl", "ModMark",
         "GateLen", "Copy", "Paste",
     };
 
@@ -80,11 +81,18 @@ public:
     };
 
     enum RandomCursor {
-        RANDOM_OFFSETS, RANDOM_AMPS,
-        RANDOM_SHAPES, RANDOM_VOSC,
-        RANDOM_LENGTHS, RANDOM_TRIGGERS,
-        RANDOM_CLOCKS, RANDOM_MOD_MARKS,
-        RANDOM_RETRIGGER_LEVELS, RANDOM_APPLY,
+        RANDOM_OFFSETS,
+        RANDOM_AMPS,
+        RANDOM_SHAPES,
+        RANDOM_VOSC,
+        RANDOM_LENGTHS,
+        RANDOM_TRIGGERS,
+        RANDOM_CLOCKS,
+        RANDOM_MOD_MARKS,
+        RANDOM_RETRIGGER_LEVELS,
+        RANDOM_GATE_LENGTHS,
+        RANDOM_APPLY,
+        RANDOM_CANCEL,
 
         MAX_RANDOM_CURSOR,
     };
@@ -436,41 +444,47 @@ public:
     }
 
     void OnButtonPress() {
-        switch (random_cursor) {
-          case RandomCursor::RANDOM_APPLY:
-            // Randomize the steps and return to the main view
-            randomize_steps();
-            random_cursor = RandomCursor::MAX_RANDOM_CURSOR;
-            osc_draw_reinit = true;
-            return;
-
-          case RandomCursor::RANDOM_OFFSETS:
-            random_offsets = !random_offsets;
-            return;
-          case RandomCursor::RANDOM_AMPS:
-            random_amps = !random_amps;
-            return;
-          case RandomCursor::RANDOM_SHAPES:
-            random_shapes = !random_shapes;
-            return;
-          case RandomCursor::RANDOM_VOSC:
-            random_vosc = !random_vosc;
-            return;
-          case RandomCursor::RANDOM_LENGTHS:
-            random_lengths = !random_lengths;
-            return;
-          case RandomCursor::RANDOM_TRIGGERS:
-            random_triggers = !random_triggers;
-            return;
-          case RandomCursor::RANDOM_CLOCKS:
-            random_clocks = !random_clocks;
-            return;
-          case RandomCursor::RANDOM_MOD_MARKS:
-            random_mod_marks = !random_mod_marks;
-            return;
-          case RandomCursor::RANDOM_RETRIGGER_LEVELS:
-            random_retrigger_levels = !random_retrigger_levels;
-            return;
+        if (random_menu_active) {
+            switch (random_menu_cursor.cursor_pos()) {
+            case RandomCursor::RANDOM_APPLY:
+                // Randomize the steps
+                randomize_steps();
+                osc_draw_reinit = true;
+                // No break so it falls through and returns to the main view
+            case RandomCursor::RANDOM_CANCEL:
+                random_menu_active = false;
+                return;
+            case RandomCursor::RANDOM_OFFSETS:
+                random_offsets = !random_offsets;
+                return;
+            case RandomCursor::RANDOM_AMPS:
+                random_amps = !random_amps;
+                return;
+            case RandomCursor::RANDOM_SHAPES:
+                random_shapes = !random_shapes;
+                return;
+            case RandomCursor::RANDOM_VOSC:
+                random_vosc = !random_vosc;
+                return;
+            case RandomCursor::RANDOM_LENGTHS:
+                random_lengths = !random_lengths;
+                return;
+            case RandomCursor::RANDOM_TRIGGERS:
+                random_triggers = !random_triggers;
+                return;
+            case RandomCursor::RANDOM_CLOCKS:
+                random_clocks = !random_clocks;
+                return;
+            case RandomCursor::RANDOM_MOD_MARKS:
+                random_mod_marks = !random_mod_marks;
+                return;
+            case RandomCursor::RANDOM_RETRIGGER_LEVELS:
+                random_retrigger_levels = !random_retrigger_levels;
+                return;
+            case RandomCursor::RANDOM_GATE_LENGTHS:
+                random_gate_lengths = !random_gate_lengths;
+                return;
+            }
         }
 
         if (linked_cursor == LinkedCursor::UNLINK) {
@@ -480,36 +494,38 @@ public:
             return;
         }
 
-        if (linked_cursor != LinkedCursor::MAX_LINKED_CURSOR || random_cursor != RandomCursor::MAX_RANDOM_CURSOR) {
+        if (linked_cursor != LinkedCursor::MAX_LINKED_CURSOR || random_menu_active) {
             // Keep other view open and toggle the cursor so it edits the current option
             CursorToggle();
             return;
         }
 
         switch (cursor) {
-          case EnvSeqCursor::LINK:
+        case EnvSeqCursor::LINK:
             // Link and open linked view
             manager.SetLink(hemisphere, true);
             linked_cursor = LinkedCursor::UNLINK;
             return;
 
-          case EnvSeqCursor::RANDOM:
+        case EnvSeqCursor::RANDOM:
             // Open random view
-            random_cursor = RandomCursor::RANDOM_APPLY;
+            random_menu_active = true;
+            random_menu_cursor.Init(0, RandomCursor::MAX_RANDOM_CURSOR - 1);
+            random_menu_cursor.Scroll(RandomCursor::RANDOM_APPLY);
             return;
 
-          case EnvSeqCursor::TRIGGER2:
+        case EnvSeqCursor::TRIGGER2:
             trigger2 = !trigger2;
             return;
 
-          case EnvSeqCursor::RESET:
+        case EnvSeqCursor::RESET:
             Reset();
             return;
-          case EnvSeqCursor::INIT:
+        case EnvSeqCursor::INIT:
             init_steps();
             return;
 
-          case EnvSeqCursor::STEP_PARAM_VALUE:
+        case EnvSeqCursor::STEP_PARAM_VALUE:
             switch (step_param_cursor) {
             case StepParamCursor::STEP_PARAM_WAVEFORM_REVERT:
                 steps[step_view].waveform_revert = !steps[step_view].waveform_revert;
@@ -533,16 +549,16 @@ public:
             }
 
           default:
-            CursorToggle();
+              CursorToggle();
         }
     }
 
     void AuxButton() {
         if (cursor > EnvSeqCursor::STEP_VIEW) {
-          step_select = !step_select;
+            step_select = !step_select;
         }
         if (cursor == EnvSeqCursor::STEP_VIEW) {
-          follow = !follow;
+            follow = !follow;
         }
     }
 
@@ -572,9 +588,8 @@ public:
             return;
         }
 
-        if (random_cursor < MAX_RANDOM_CURSOR) {
-            // Going past the available options will return to the main view.
-            MoveCursor(random_cursor, direction, RandomCursor::MAX_RANDOM_CURSOR);
+        if (random_menu_active) {
+            random_menu_cursor.Scroll(direction);
             return;
         }
 
@@ -588,9 +603,9 @@ public:
         }
 
         if (cursor > EnvSeqCursor::STEP_VIEW && step_select) {
-          step_view = constrain(step_view + direction, 0, MAX_NUM_STEPS - 1);
-          osc_draw_reinit = true;
-          return;
+            step_view = constrain(step_view + direction, 0, MAX_NUM_STEPS - 1);
+            osc_draw_reinit = true;
+            return;
         }
 
         switch (cursor) {
@@ -699,6 +714,7 @@ public:
         Pack(data, PackLocation {39, 1}, random_clocks);
         Pack(data, PackLocation {40, 1}, random_mod_marks);
         Pack(data, PackLocation {41, 1}, random_retrigger_levels);
+        Pack(data, PackLocation {42, 1}, random_gate_lengths);
 
         return data;
     }
@@ -728,6 +744,7 @@ public:
         random_clocks = Unpack(data, PackLocation {39, 1});
         random_mod_marks = Unpack(data, PackLocation {40, 1});
         random_retrigger_levels = Unpack(data, PackLocation {41, 1});
+        random_gate_lengths = Unpack(data, PackLocation {42, 1});
 
         Reset();
     }
@@ -747,7 +764,9 @@ protected:
     }
 
 private:
-    int8_t cursor = 0, step_param_cursor = 0, linked_cursor = MAX_LINKED_CURSOR, random_cursor = MAX_RANDOM_CURSOR;
+    int8_t cursor = 0, step_param_cursor = 0, linked_cursor = MAX_LINKED_CURSOR;
+    bool random_menu_active = false; // Whether the random menu is active
+    OC::menu::ScreenCursor<5> random_menu_cursor;
     EnvSeqManager& manager = EnvSeqManager::get();
 
     bool trigger2 = false; // Whether to trigger on TR2
@@ -767,6 +786,7 @@ private:
     bool random_clocks = false; // Whether to randomize the clocks flag for each step
     bool random_mod_marks = false; // Whether to randomize the mod_mark flag for each step
     bool random_retrigger_levels = false; // Whether to randomize the retrigger levels flag for each step
+    bool random_gate_lengths = false; // Whether to randomize the gate lengths flag for each step
     
     bool reset_flag = false; // Prevent stepping forward after a reset
     bool step_select = false; // Toggle for switching step_view while editing params
@@ -991,30 +1011,30 @@ private:
         if (DetentedIn(0)) {
             gfxIcon(0, y, MOD_ICON);
         }
-        gfxPrint(13, y, mod2_mode_string(linked_data[0].modulation.mode));
-        if (linked_cursor == LinkedCursor::LINKED_MOD1_MODE) gfxSpicyCursor(13, y + 8, 50, "Mod3 Mode");
+        gfxPrint(10, y, mod2_mode_string(linked_data[0].modulation.mode));
+        if (linked_cursor == LinkedCursor::LINKED_MOD1_MODE) gfxSpicyCursor(10, y + 8, 53, "Mod3 Mode");
 
         y += 10;
         if (DetentedIn(1)) {
             gfxIcon(0, y, MOD_ICON);
         }
-        gfxPrint(13, y, mod2_mode_string(linked_data[1].modulation.mode));
-        if (linked_cursor == LinkedCursor::LINKED_MOD2_MODE) gfxSpicyCursor(13, y + 8, 50, "Mod4 Mode");
+        gfxPrint(10, y, mod2_mode_string(linked_data[1].modulation.mode));
+        if (linked_cursor == LinkedCursor::LINKED_MOD2_MODE) gfxSpicyCursor(10, y + 8, 53, "Mod4 Mode");
 
         y += 10;
         gfxIcon(0, y, output2_mode_icon(linked_data[0].modulation.output_mode));
-        gfxPrint(13, y, output2_mode_string(linked_data[0].modulation.output_mode));
-        if (linked_cursor == LinkedCursor::LINKED_OUTPUT1_MODE) gfxSpicyCursor(13, y + 8, 50, "Out3 Mode");
+        gfxPrint(10, y, output2_mode_string(linked_data[0].modulation.output_mode));
+        if (linked_cursor == LinkedCursor::LINKED_OUTPUT1_MODE) gfxSpicyCursor(10, y + 8, 53, "Out3 Mode");
 
         y += 10;
         gfxIcon(0, y, output2_mode_icon(linked_data[1].modulation.output_mode));
-        gfxPrint(13, y, output2_mode_string(linked_data[1].modulation.output_mode));
-        if (linked_cursor == LinkedCursor::LINKED_OUTPUT2_MODE) gfxSpicyCursor(13, y + 8, 50, "Out4 Mode");
+        gfxPrint(10, y, output2_mode_string(linked_data[1].modulation.output_mode));
+        if (linked_cursor == LinkedCursor::LINKED_OUTPUT2_MODE) gfxSpicyCursor(10, y + 8, 53, "Out4 Mode");
 
         y += 10;
         gfxIcon(0, y, LINK_ICON);
-        gfxPrint(13, y, "Unlink");
-        if (linked_cursor == LinkedCursor::UNLINK) gfxSpicyCursor(13, y + 8, 50);
+        gfxPrint(10, y, "Unlink");
+        if (linked_cursor == LinkedCursor::UNLINK) gfxSpicyCursor(10, y + 8, 53);
     }
 
     void draw_interface() {
@@ -1024,7 +1044,7 @@ private:
             return;
         }
 
-        if (random_cursor < MAX_RANDOM_CURSOR) {
+        if (random_menu_active) {
             draw_random_view();
             return;
         }
@@ -1044,30 +1064,30 @@ private:
         if (DetentedIn(0)) {
             gfxIcon(0, y, MOD_ICON);
         }
-        gfxPrint(13, y, mod1_mode_string(mod1_mode));
-        if (cursor == EnvSeqCursor::MOD1_MODE) gfxSpicyCursor(13, y + 8, 40, "Mod1 Mode");
+        gfxPrint(10, y, mod1_mode_string(mod1_mode));
+        if (cursor == EnvSeqCursor::MOD1_MODE) gfxSpicyCursor(10, y + 8, 40, "Mod1 Mode");
 
         if (can_link) {
             gfxIcon(53, y, LINK_ICON);
-            if (cursor == EnvSeqCursor::LINK) gfxSpicyCursor(53, y + 8, 10);
+            if (cursor == EnvSeqCursor::LINK) gfxSpicyCursor(50, y + 8, 13);
         }
 
         y += 10;
         if (DetentedIn(1)) {
             gfxIcon(0, y, MOD_ICON);
         }
-        gfxPrint(13, y, mod2_mode_string(mod2_mode));
-        if (cursor == EnvSeqCursor::MOD2_MODE) gfxSpicyCursor(13, y + 8, 50, "Mod2 Mode");
+        gfxPrint(10, y, mod2_mode_string(mod2_mode));
+        if (cursor == EnvSeqCursor::MOD2_MODE) gfxSpicyCursor(10, y + 8, 53, "Mod2 Mode");
 
         y += 10;
         gfxIcon(0, y, output2_mode_icon(output2_mode));
-        gfxPrint(13, y, output2_mode_string(output2_mode));
-        if (cursor == EnvSeqCursor::OUTPUT2_MODE) gfxSpicyCursor(13, y + 8, 50, "Out2 Mode");
+        gfxPrint(10, y, output2_mode_string(output2_mode));
+        if (cursor == EnvSeqCursor::OUTPUT2_MODE) gfxSpicyCursor(10, y + 8, 53, "Out2 Mode");
     
         y += 10;
         gfxIcon(0, y, RANDOM_ICON);
-        gfxPrint(13, y, "Random");
-        if (cursor == EnvSeqCursor::RANDOM) gfxSpicyCursor(13, y + 8, 37);
+        gfxPrint(10, y, "Random");
+        if (cursor == EnvSeqCursor::RANDOM) gfxSpicyCursor(10, y + 8, 40);
 
         if (trigger2) {
             gfxIcon(50, y, TR_ICON);
@@ -1187,75 +1207,75 @@ private:
         case StepParamCursor::STEP_PARAM_OFFSET:
             gfxIcon(0, y, OFFSET_ICON);
             if (cursor == EnvSeqCursor::STEP_PARAM) gfxSpicyCursor(0, 63, 10, step_param_names[step_param_cursor]);
-            gfxPos(13, y);
+            gfxPos(10, y);
             gfxPrintVoltage(s.offset * OFFSET_SCALE_INCREMENT);
-            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(13, 63, 50, step_param_names[step_param_cursor]);
+            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(10, 63, 53, step_param_names[step_param_cursor]);
             break;
         case StepParamCursor::STEP_PARAM_AMP:
             gfxIcon(0, y, RANGE_ICON);
             if (cursor == EnvSeqCursor::STEP_PARAM) gfxSpicyCursor(0, 63, 10, step_param_names[step_param_cursor]);
-            gfxPos(13, y);
+            gfxPos(10, y);
             gfxPrintVoltage(s.amp * OFFSET_SCALE_INCREMENT);
-            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(13, 63, 50, step_param_names[step_param_cursor]);
+            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(10, 63, 53, step_param_names[step_param_cursor]);
             break;
         case StepParamCursor::STEP_PARAM_WAVEFORM_OFFSET:
             gfxIcon(0, y, UP_DOWN_ICON);
             if (cursor == EnvSeqCursor::STEP_PARAM) gfxSpicyCursor(0, 63, 10, step_param_names[step_param_cursor]);
-            gfxPos(13, y);
+            gfxPos(10, y);
             gfxPrint(s.waveform_offset);
             gfxPrint("%");
-            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(13, 63, 24, step_param_names[step_param_cursor]);
+            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(10, 63, 24, step_param_names[step_param_cursor]);
             break;
         case StepParamCursor::STEP_PARAM_WAVEFORM_REVERT:
             gfxIcon(0, y, LEFT_ICON);
             if (cursor == EnvSeqCursor::STEP_PARAM) gfxSpicyCursor(0, 63, 10, step_param_names[step_param_cursor]);
-            gfxIcon(13, y, s.waveform_revert ? CHECK_ON_ICON : CHECK_OFF_ICON);
-            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(13, 63, 10, step_param_names[step_param_cursor]);
+            gfxIcon(10, y, s.waveform_revert ? CHECK_ON_ICON : CHECK_OFF_ICON);
+            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(10, 63, 10, step_param_names[step_param_cursor]);
             break;
         case StepParamCursor::STEP_PARAM_WAVEFORM_INVERT:
             gfxIcon(0, y, DOWN_ICON);
             if (cursor == EnvSeqCursor::STEP_PARAM) gfxSpicyCursor(0, 63, 10, step_param_names[step_param_cursor]);
-            gfxIcon(13, y, s.waveform_invert ? CHECK_ON_ICON : CHECK_OFF_ICON);
-            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(13, 63, 10, step_param_names[step_param_cursor]);
+            gfxIcon(10, y, s.waveform_invert ? CHECK_ON_ICON : CHECK_OFF_ICON);
+            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(10, 63, 10, step_param_names[step_param_cursor]);
             break;
         case StepParamCursor::STEP_PARAM_WAVEFORM_OPTION:
             gfxPrint(2, y, "?");
             if (cursor == EnvSeqCursor::STEP_PARAM) gfxSpicyCursor(0, 63, 10, step_param_names[step_param_cursor]);
-            gfxPrint(13, y, option_string(s.waveform_option));
-            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(13, 63, 50, step_param_names[step_param_cursor]);
+            gfxPrint(10, y, option_string(s.waveform_option));
+            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(10, 63, 53, step_param_names[step_param_cursor]);
             break;
         case StepParamCursor::STEP_PARAM_TRIGGERS:
             gfxIcon(0, y, GATE_ICON);
             if (cursor == EnvSeqCursor::STEP_PARAM) gfxSpicyCursor(0, 63, 10, step_param_names[step_param_cursor]);
-            gfxPrint(13, y, s.triggers + 1);
-            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(13, 63, 6, step_param_names[step_param_cursor]);
+            gfxPrint(10, y, s.triggers + 1);
+            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(10, 63, 6, step_param_names[step_param_cursor]);
             break;
         case StepParamCursor::STEP_PARAM_CLOCKS:
             gfxIcon(0, y, CLOCK_ICON);
             if (cursor == EnvSeqCursor::STEP_PARAM) gfxSpicyCursor(0, 63, 10, step_param_names[step_param_cursor]);
-            gfxPrint(13, y, s.clocks + 1);
-            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(13, 63, 6, step_param_names[step_param_cursor]);
+            gfxPrint(10, y, s.clocks + 1);
+            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(10, 63, 6, step_param_names[step_param_cursor]);
             break;
         case StepParamCursor::STEP_PARAM_LENGTH:
             gfxIcon(0, y, LENGTH_ICON);
             if (cursor == EnvSeqCursor::STEP_PARAM) gfxSpicyCursor(0, 63, 10, step_param_names[step_param_cursor]);
-            gfxPos(13, y);
+            gfxPos(10, y);
             gfxPrint(s.length);
             gfxPrint("%");
-            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(13, 63, 24, step_param_names[step_param_cursor]);
+            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(10, 63, 24, step_param_names[step_param_cursor]);
             break;
         case StepParamCursor::STEP_PARAM_PROBABILITY:
             gfxIcon(0, y, TOSS_ICON);
             if (cursor == EnvSeqCursor::STEP_PARAM) gfxSpicyCursor(0, 63, 10, step_param_names[step_param_cursor]);
-            gfxPos(13, y);
+            gfxPos(10, y);
             gfxPrint(s.probability);
             gfxPrint("%");
-            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(13, 63, 24, step_param_names[step_param_cursor]);
+            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(10, 63, 24, step_param_names[step_param_cursor]);
             break;
         case StepParamCursor::STEP_PARAM_RETRIGGER_LEVEL:
             gfxIcon(0, y, GAUGE_ICON);
             if (cursor == EnvSeqCursor::STEP_PARAM) gfxSpicyCursor(0, 63, 10, step_param_names[step_param_cursor]);
-            gfxPos(13, y);
+            gfxPos(10, y);
             if (s.retrigger_level == 0) {
                 gfxPrint("no");
             } else {
@@ -1267,88 +1287,104 @@ private:
 
                 gfxPrint(abs(s.retrigger_level));
             }
-            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(13, 63, 50, step_param_names[step_param_cursor]);
+            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(10, 63, 53, step_param_names[step_param_cursor]);
             break;
         case StepParamCursor::STEP_PARAM_MOD_MARK:
             gfxIcon(0, y, CHECK_ICON);
             if (cursor == EnvSeqCursor::STEP_PARAM) gfxSpicyCursor(0, 63, 10, step_param_names[step_param_cursor]);
-            gfxIcon(13, y, s.mod_mark ? CHECK_ON_ICON : CHECK_OFF_ICON);
-            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(13, 63, 10, step_param_names[step_param_cursor]);
+            gfxIcon(10, y, s.mod_mark ? CHECK_ON_ICON : CHECK_OFF_ICON);
+            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(10, 63, 10, step_param_names[step_param_cursor]);
             break;
         case StepParamCursor::STEP_PARAM_GATE_LENGTH:
             gfxIcon(0, y, GATE_ICON);
             if (cursor == EnvSeqCursor::STEP_PARAM) gfxSpicyCursor(0, 63, 10, step_param_names[step_param_cursor]);
-            gfxPos(13, y);
+            gfxPos(10, y);
             if (s.gate_length < 156) {
                 graphics.printf("%1d.%02dms", SPLIT_INT_DEC(0.05f + 10.0f*s.gate_length*s.gate_length/241.0f, 100));
             } else {
                 gfxPrint(s.gate_length - 155);
                 gfxPrint("%");
             }
-            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(13, 63, 50, step_param_names[step_param_cursor]);
+            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(10, 63, 53, step_param_names[step_param_cursor]);
             break;
         case StepParamCursor::STEP_PARAM_COPY:
             gfxIcon(0, y, UP_ICON);
             if (cursor == EnvSeqCursor::STEP_PARAM) gfxSpicyCursor(0, 63, 10, step_param_names[step_param_cursor]);
-            gfxPrint(13, y, step_param_names[step_param_cursor]);
-            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(13, 63, 50, step_param_names[step_param_cursor]);
+            gfxPrint(10, y, step_param_names[step_param_cursor]);
+            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(10, 63, 53, step_param_names[step_param_cursor]);
             break;
         case StepParamCursor::STEP_PARAM_PASTE:
             gfxIcon(0, y, DOWN_ICON);
             if (cursor == EnvSeqCursor::STEP_PARAM) gfxSpicyCursor(0, 63, 10, step_param_names[step_param_cursor]);
-            gfxPrint(13, y, step_param_names[step_param_cursor]);
-            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(13, 63, 50, step_param_names[step_param_cursor]);
+            gfxPrint(10, y, step_param_names[step_param_cursor]);
+            if (cursor == EnvSeqCursor::STEP_PARAM_VALUE) gfxSpicyCursor(10, 63, 53, step_param_names[step_param_cursor]);
             break;
         }
     }
 
     void draw_random_view() {
-        uint8_t y = 5;
+        for (int line = 0; line < 5; ++line) {
+            const int item = random_menu_cursor.first_visible() + line;
+            if (item > random_menu_cursor.last_visible()) {
+                break;
+            }
 
-        y += 10;
-        gfxIcon(0, y, random_offsets ? CHECK_ON_ICON : CHECK_OFF_ICON);
-        gfxPrint(10, y, "Ofs");
-        if (random_cursor == RandomCursor::RANDOM_OFFSETS) gfxSpicyCursor(10, y + 8, 18);
+            const uint8_t y = 15 + (line * 10);
+            switch (item) {
+            case RandomCursor::RANDOM_OFFSETS:
+                gfxIcon(0, y, random_offsets ? CHECK_ON_ICON : CHECK_OFF_ICON);
+                gfxPrint(10, y, step_param_names[StepParamCursor::STEP_PARAM_OFFSET]);
+                break;
+            case RandomCursor::RANDOM_AMPS:
+                gfxIcon(0, y, random_amps ? CHECK_ON_ICON : CHECK_OFF_ICON);
+                gfxPrint(10, y, step_param_names[StepParamCursor::STEP_PARAM_AMP]);
+                break;
+            case RandomCursor::RANDOM_SHAPES:
+                gfxIcon(0, y, random_shapes ? CHECK_ON_ICON : CHECK_OFF_ICON);
+                gfxPrint(10, y, "Shape");
+                break;
+            case RandomCursor::RANDOM_VOSC:
+                gfxIcon(0, y, random_vosc ? CHECK_ON_ICON : CHECK_OFF_ICON);
+                gfxPrint(10, y, "VOSC");
+                break;
+            case RandomCursor::RANDOM_LENGTHS:
+                gfxIcon(0, y, random_lengths ? CHECK_ON_ICON : CHECK_OFF_ICON);
+                gfxPrint(10, y, step_param_names[StepParamCursor::STEP_PARAM_LENGTH]);
+                break;
+            case RandomCursor::RANDOM_TRIGGERS:
+                gfxIcon(0, y, random_triggers ? CHECK_ON_ICON : CHECK_OFF_ICON);
+                gfxPrint(10, y, step_param_names[StepParamCursor::STEP_PARAM_TRIGGERS]);
+                break;
+            case RandomCursor::RANDOM_CLOCKS:
+                gfxIcon(0, y, random_clocks ? CHECK_ON_ICON : CHECK_OFF_ICON);
+                gfxPrint(10, y, step_param_names[StepParamCursor::STEP_PARAM_CLOCKS]);
+                break;
+            case RandomCursor::RANDOM_MOD_MARKS:
+                gfxIcon(0, y, random_mod_marks ? CHECK_ON_ICON : CHECK_OFF_ICON);
+                gfxPrint(10, y, step_param_names[StepParamCursor::STEP_PARAM_MOD_MARK]);
+                break;
+            case RandomCursor::RANDOM_RETRIGGER_LEVELS:
+                gfxIcon(0, y, random_retrigger_levels ? CHECK_ON_ICON : CHECK_OFF_ICON);
+                gfxPrint(10, y, step_param_names[StepParamCursor::STEP_PARAM_RETRIGGER_LEVEL]);
+                break;
+            case RandomCursor::RANDOM_GATE_LENGTHS:
+                gfxIcon(0, y, random_gate_lengths ? CHECK_ON_ICON : CHECK_OFF_ICON);
+                gfxPrint(10, y, step_param_names[StepParamCursor::STEP_PARAM_GATE_LENGTH]);
+                break;
+            case RandomCursor::RANDOM_APPLY:
+                gfxIcon(0, y, CHECK_ICON);
+                gfxPrint(10, y, "Apply");
+                break;
+            case RandomCursor::RANDOM_CANCEL:
+                gfxIcon(0, y, LEFT_ICON);
+                gfxPrint(10, y, "Back");
+                break;
+            }
 
-        gfxIcon(31, y, random_amps ? CHECK_ON_ICON : CHECK_OFF_ICON);
-        gfxPrint(41, y, "Amp");
-        if (random_cursor == RandomCursor::RANDOM_AMPS) gfxSpicyCursor(41, y + 8, 18);
-
-        y += 10;
-        gfxIcon(0, y, random_shapes ? CHECK_ON_ICON : CHECK_OFF_ICON);
-        gfxPrint(10, y, "Shp");
-        if (random_cursor == RandomCursor::RANDOM_SHAPES) gfxSpicyCursor(10, y + 8, 18);
-
-        gfxIcon(31, y, random_vosc ? CHECK_ON_ICON : CHECK_OFF_ICON);
-        gfxPrint(41, y, "Osc");
-        if (random_cursor == RandomCursor::RANDOM_VOSC) gfxSpicyCursor(41, y + 8, 18);
-
-        y += 10;
-        gfxIcon(0, y, random_lengths ? CHECK_ON_ICON : CHECK_OFF_ICON);
-        gfxPrint(10, y, "Len");
-        if (random_cursor == RandomCursor::RANDOM_LENGTHS) gfxSpicyCursor(10, y + 8, 18);
-
-        gfxIcon(31, y, random_triggers ? CHECK_ON_ICON : CHECK_OFF_ICON);
-        gfxPrint(41, y, "Trg");
-        if (random_cursor == RandomCursor::RANDOM_TRIGGERS) gfxSpicyCursor(41, y + 8, 18);
-
-        y += 10;
-        gfxIcon(0, y, random_clocks ? CHECK_ON_ICON : CHECK_OFF_ICON);
-        gfxPrint(10, y, "Clk");
-        if (random_cursor == RandomCursor::RANDOM_CLOCKS) gfxSpicyCursor(10, y + 8, 18);
-
-        gfxIcon(31, y, random_mod_marks ? CHECK_ON_ICON : CHECK_OFF_ICON);
-        gfxPrint(41, y, "Mod");
-        if (random_cursor == RandomCursor::RANDOM_MOD_MARKS) gfxSpicyCursor(41, y + 8, 18);
-
-        y += 10;
-        gfxIcon(0, y, random_retrigger_levels ? CHECK_ON_ICON : CHECK_OFF_ICON);
-        gfxPrint(10, y, "RFd");
-        if (random_cursor == RandomCursor::RANDOM_RETRIGGER_LEVELS) gfxSpicyCursor(10, y + 8, 18);
-
-        gfxIcon(31, y, RANDOM_ICON);
-        gfxPrint(41, y, "RND");
-        if (random_cursor == RandomCursor::RANDOM_APPLY) gfxSpicyCursor(41, y + 8, 18);
+            if (item == random_menu_cursor.cursor_pos()) {
+                gfxSpicyCursor(10, y + 8, 53);
+            }
+        }
     }
 
     void init_steps() {
@@ -1410,6 +1446,9 @@ private:
             }
             if (random_retrigger_levels) {
                 steps[i].retrigger_level = random(-15, 16);
+            }
+            if (random_gate_lengths) {
+                steps[i].gate_length = random(156, 206);
             }
         }
     }
@@ -1507,17 +1546,17 @@ private:
     const char* mod2_mode_string(EnvSeqManager::ModulationMode mode) {
         switch (mode) {
         case EnvSeqManager::ModulationMode::LENGTH:
-            return "Length";
+            return step_param_names[StepParamCursor::STEP_PARAM_LENGTH];
         case EnvSeqManager::ModulationMode::STEP_SEL:
             return "StepSel";
         case EnvSeqManager::ModulationMode::RETRIGGER_LEVEL:
-            return "RetrgLv";
+            return step_param_names[StepParamCursor::STEP_PARAM_RETRIGGER_LEVEL];
         case EnvSeqManager::ModulationMode::MOD:
             return "Mod";
         case EnvSeqManager::ModulationMode::MOD_MARK:
-            return "ModMark";
+            return step_param_names[StepParamCursor::STEP_PARAM_MOD_MARK];
         case EnvSeqManager::ModulationMode::GATE_LENGTH:
-            return "GateLen";
+            return step_param_names[StepParamCursor::STEP_PARAM_GATE_LENGTH];
         default:
             return "";
         }

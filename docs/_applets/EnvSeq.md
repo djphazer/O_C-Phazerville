@@ -140,18 +140,20 @@ Sets the gate pulse length for gate-based outputs:
 Copy the current step’s settings and paste them onto another step, even across hemispheres. Paste is only shown when the clipboard has data.
 
 ## Random
-Selecting `Random` on the main page opens a checklist-style randomizer for step parameters:
+Selecting `Random` on the main page opens a scrollable, checklist-style randomizer for step parameters:
 
-- `Ofs`: randomize step Offsets
+- `Offset`: randomize step Offsets
 - `Amp`: randomize step Amplitudes
-- `Shp`: randomize step Shapes
-- `Osc`: allow randomizing VOSC waveform numbers when Shape is `VOSC`
-- `Len`: randomize step Lengths
-- `Trg`: randomize step Triggers (occasionally)
-- `Clk`: randomize step Clocks (occasionally)
-- `Mod`: randomize step Mod2 marks
+- `Shape`: randomize step Shapes
+- `VOSC`: allow randomizing VOSC waveform numbers when Shape is `VOSC`
+- `Length`: randomize step Lengths
+- `Triggers`: randomize step Triggers (occasionally)
+- `Clocks`: randomize step Clocks (occasionally)
+- `ModMark`: randomize step Mod2 marks
+- `RetrgLvl`: randomize step Retrigger Levels
+- `Gate`: randomize per-step Gate Lengths (1..50%)
 
-Select `RND` to apply randomization and return to the main view.
+Select `Apply` to apply randomization and return to the main view, or `Back` to exit without changes.
 
 ## TR2
 When enabled, TR2 (input 2) **replaces TR1** as the step-advance trigger. TR1 still provides the clock timebase for step length. When disabled, TR1 advances steps and TR2 acts as Reset.
