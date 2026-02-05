@@ -32,14 +32,14 @@ EnvSeq has two screens:
 
 ## Mod2 (CV2) modes
 
-| Mode    | Description                                                                                 |
-|---------|--------------------------------------------------------------------------------------------|
-| Length  | CV2 modulates the **Length** parameter (time-warp of the shape within the step, bipolar, 1-200%)           |
-| RetrgLv | CV2 modulates the **Retrigger Level** (-15..15). Negative values fade in (0%→100%), positive values fade out (100%→0%), 0 = no fade. |
-| Mod     | CV2 is added to the output CV for all steps.                                               |
-| ModMark | CV2 is added to the output CV only on steps marked with `Mod2` in the step editor.         |
-| StepSel | CV2 selects the **next played step** (unipolar **0–5V** mapped across the active `num_steps`). The selection is **sampled on the clock** when advancing steps. Step **Probability is ignored** in this mode, but multi-clock steps (`Clk`) are still honored (the current step holds until its clocks are done). |
-| GateLen | CV2 scales **Gate Length** (1–200% of the per-step gate length) for gate-based outputs. |
+| Mode     | Description                                                                                 |
+|----------|--------------------------------------------------------------------------------------------|
+| Length   | CV2 modulates the **Length** parameter (time-warp of the shape within the step, bipolar, 1-200%)           |
+| StepSel  | CV2 selects the **next played step** (unipolar **0–5V** mapped across the active `num_steps`). The selection is **sampled on the clock** when advancing steps. Step **Probability is ignored** in this mode, but multi-clock steps (`Clk`) are still honored (the current step holds until its clocks are done). |
+| RetrgLvl | CV2 modulates the **Retrigger Level** (-15..15). Negative values fade in (0%→100%), positive values fade out (100%→0%), 0 = no fade. |
+| Mod      | CV2 is added to the output CV for all steps.                                               |
+| ModMark  | CV2 is added to the output CV only on steps marked with `Mod2` in the step editor.         |
+| GateLen  | CV2 scales **Gate Length** (1–200% of the per-step gate length) for gate-based outputs. |
 
 ## Out2 modes
 Output 2 can mirror or complement the main envelope output:
@@ -82,7 +82,7 @@ Shape for the step:
 #### Offset
 DC offset added to the step output (and used as the center point for `InvO`).
 
-#### Amplitude
+#### Amplitude (amp)
 Bipolar amplitude of the step’s shape; negative values invert the shape.
 
 #### Waveform offset (WaveOff)
@@ -97,9 +97,6 @@ Flips the waveform vertically. Applies only when the Shape is set to `VOSC`.
 #### Option
 Post-process the waveform. Applies only when the Shape is set to `VOSC`.
 
-#### VOSC parameters
-These apply when the Shape is set to `VOSC`. The waveform number is selected as part of the Shape control.
-
 - `None`: no post-processing.
 - `FoldUp`: reflect upward the values below waveform offset.
 - `FoldDw`: reflect downward the values above waveform offset.
@@ -107,7 +104,7 @@ These apply when the Shape is set to `VOSC`. The waveform number is selected as 
 - `ZeroDw`: zero out values below waveform offset.
 
 #### Triggers
-Sets how many times (1-8) the shape restarts within the step.
+Sets how many times (1-8) the shape triggers within the step.
 
 #### Clocks
 How many incoming clocks (1-8) this step lasts.
@@ -121,11 +118,11 @@ Time-warp of the shape progression within the step (1–200%).
 #### Probability (Prob)
 Chance (0–100%) that this step will be played when the sequence reaches it.
 
-#### Retrigger Level (Fade Lvl)
+#### Retrigger Level (RetrgLvl)
 Sets the retrigger fade behavior in the range -15..15:
-- `-15`: fade in from 0% to 100% across retriggers
-- `0`: no fade (all retriggers at 100%)
-- `+15`: fade out from 100% to 0% across retriggers
+- `from 1` .. `from 15`: substract from first trigger and fade in from it to 100%
+- `no`: no fade (all retriggers at 100%)
+- `to 1` .. `to 15`: substract from last trigger and fade out from 100% to it
 
 #### Mod Mark
 Marks this step as eligible for Mod2 when `Mod2` mode is `ModMark`.
@@ -146,12 +143,13 @@ Selecting `Random` on the main page opens a scrollable, checklist-style randomiz
 - `Amp`: randomize step Amplitudes
 - `Shape`: randomize step Shapes
 - `VOSC`: allow randomizing VOSC waveform numbers when Shape is `VOSC`
-- `Length`: randomize step Lengths
 - `Triggers`: randomize step Triggers (occasionally)
 - `Clocks`: randomize step Clocks (occasionally)
-- `ModMark`: randomize step Mod2 marks
+- `Length`: randomize step Lengths
+- `Prob`: randomize step probabilities (50-100%)
 - `RetrgLvl`: randomize step Retrigger Levels
-- `Gate`: randomize per-step Gate Lengths (1..50%)
+- `ModMark`: randomize step Mod2 marks
+- `GateLen`: randomize step Gate Lengths (1..50%)
 
 Select `Apply` to apply randomization and return to the main view, or `Back` to exit without changes.
 

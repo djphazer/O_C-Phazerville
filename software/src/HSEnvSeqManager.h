@@ -120,7 +120,7 @@ public:
     void Unload(HEM_SIDE hemisphere) {
         registered[hemisphere] = false;
         SetLink(hemisphere, false);
-        if (hemisphere & 1 == 0) {
+        if ((hemisphere & 1) == 0) {
             // Unloaded left applet
             linked_states[hemisphere >> 1].linked = false;
         }

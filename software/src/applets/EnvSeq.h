@@ -85,11 +85,12 @@ public:
         RANDOM_AMPS,
         RANDOM_SHAPES,
         RANDOM_VOSC,
-        RANDOM_LENGTHS,
         RANDOM_TRIGGERS,
         RANDOM_CLOCKS,
-        RANDOM_MOD_MARKS,
+        RANDOM_LENGTHS,
+        RANDOM_PROBABILITIES,
         RANDOM_RETRIGGER_LEVELS,
+        RANDOM_MOD_MARKS,
         RANDOM_GATE_LENGTHS,
         RANDOM_APPLY,
         RANDOM_CANCEL,
@@ -464,6 +465,9 @@ public:
             case RandomCursor::RANDOM_GATE_LENGTHS:
                 random_gate_lengths = !random_gate_lengths;
                 return;
+            case RandomCursor::RANDOM_PROBABILITIES:
+                random_probabilities = !random_probabilities;
+                return;
             }
         }
 
@@ -695,6 +699,7 @@ public:
         Pack(data, PackLocation {40, 1}, random_mod_marks);
         Pack(data, PackLocation {41, 1}, random_retrigger_levels);
         Pack(data, PackLocation {42, 1}, random_gate_lengths);
+        Pack(data, PackLocation {43, 1}, random_probabilities);
 
         return data;
     }
@@ -725,6 +730,7 @@ public:
         random_mod_marks = Unpack(data, PackLocation {40, 1});
         random_retrigger_levels = Unpack(data, PackLocation {41, 1});
         random_gate_lengths = Unpack(data, PackLocation {42, 1});
+        random_probabilities = Unpack(data, PackLocation {43, 1});
 
         Reset();
     }
@@ -767,7 +773,8 @@ private:
     bool random_mod_marks = false; // Whether to randomize the mod_mark flag for each step
     bool random_retrigger_levels = false; // Whether to randomize the retrigger levels flag for each step
     bool random_gate_lengths = false; // Whether to randomize the gate lengths flag for each step
-    
+    bool random_probabilities = false; // Whether to randomize the probabilities flag for each step
+
     bool reset_flag = false; // Prevent stepping forward after a reset
     bool step_select = false; // Toggle for switching step_view while editing params
     bool follow = false; // update step view on clock advance
@@ -1351,6 +1358,10 @@ private:
                 gfxIcon(0, y, random_gate_lengths ? CHECK_ON_ICON : CHECK_OFF_ICON);
                 gfxPrint(10, y, step_param_names[StepParamCursor::STEP_PARAM_GATE_LENGTH]);
                 break;
+            case RandomCursor::RANDOM_PROBABILITIES:
+                gfxIcon(0, y, random_probabilities ? CHECK_ON_ICON : CHECK_OFF_ICON);
+                gfxPrint(10, y, step_param_names[StepParamCursor::STEP_PARAM_PROBABILITY]);
+                break;
             case RandomCursor::RANDOM_APPLY:
                 gfxIcon(0, y, CHECK_ICON);
                 gfxPrint(10, y, "Apply");
@@ -1429,6 +1440,9 @@ private:
             }
             if (random_gate_lengths) {
                 steps[i].gate_length = random(156, 206);
+            }
+            if (random_probabilities) {
+                steps[i].probability = random(50, 101);
             }
         }
     }
