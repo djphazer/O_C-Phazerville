@@ -512,7 +512,7 @@ struct IOFrame {
       MIDIState.Init();
     }
 
-    const int ViewOut(DAC_CHANNEL ch) const { return outputs[ch].get(); }
+    const int ViewOut(DAC_CHANNEL ch) const { return outputs[ch].get(output_atten[ch]); }
 
     // --- Soft IO ---
     void Out(DAC_CHANNEL channel, int value, bool override = false) {
@@ -549,7 +549,7 @@ struct IOFrame {
 
         for (int i = 0; i < DAC_CHANNEL_COUNT; ++i) {
           outputs[i].push(output_slew[i]);
-          OC::DAC::set_pitch_scaled(chan[i], constrain(Proportion(output_atten[i], 63, outputs[i].get()), HEMISPHERE_MIN_CV, HEMISPHERE_MAX_CV), 0);
+          OC::DAC::set_pitch_scaled(chan[i], outputs[i].get(output_atten[i]), 0);
         }
         // oh no, this is certainly broken now...
         if (autoMIDIOut) MIDIState.Send(outputs);

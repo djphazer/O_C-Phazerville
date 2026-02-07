@@ -9,13 +9,6 @@
 // misc. utility functions extracted from Hemisphere
 // -NJM
 
-// Simulated fixed floats by multiplying and dividing by powers of 2
-#ifndef int2simfloat
-#define int2simfloat(x) (x << 14)
-#define simfloat2int(x) (x >> 14)
-using simfloat = int32_t;
-#endif
-
 // Reference Constants
 #define ONE_OCTAVE (12 << 7)
 #define PULSE_VOLTAGE HS::octave_max
@@ -305,29 +298,6 @@ static constexpr uint8_t pad(int range, int number) {
     }
     if (number < 0 && padding > 0) padding -= 6; // Compensate for minus sign
     return padding;
-}
-
-
-//////////////// Calculation methods
-////////////////////////////////////////////////////////////////////////////////
-
-/* Proportion method using simfloat, useful for calculating scaled values given
- * a fractional value.
- *
- * Solves this:  numerator        ???
- *              ----------- = -----------
- *              denominator       max
- *
- * For example, to convert a parameter with a range of 1 to 100 into value scaled
- * to HEMISPHERE_MAX_CV, to be sent to the DAC:
- *
- * Out(ch, Proportion(value, 100, HEMISPHERE_MAX_CV));
- *
- */
-constexpr int Proportion(const int numerator, const int denominator, const int max_value) {
-    simfloat proportion = int2simfloat((int32_t)abs(numerator)) / (int32_t)denominator;
-    int scaled = simfloat2int(proportion * max_value);
-    return numerator >= 0 ? scaled : -scaled;
 }
 
 /* Proportion CV values into pixels for display purposes.
