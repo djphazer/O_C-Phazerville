@@ -28,7 +28,7 @@ typedef int(*CalcFunction)(int, int);
 
 class Calculate : public HemisphereApplet {
 public:
-    enum CalcFunctions {
+    enum CalcFunctions : uint8_t {
       MIN_FN,
       MAX_FN,
       SUM_FN,
@@ -57,10 +57,11 @@ public:
     void Controller() {
         ForEachChannel(ch)
         {
-            int idx = operation[ch];
+            const uint8_t &idx = operation[ch];
 
             if (idx == 5) { // S&H
-                if (Clock(ch)) Out(ch, In(ch));
+                if (Clock(ch)) StartADCLag(ch);
+                if (EndOfADCLag(ch)) Out(ch, In(ch));
             } else if (idx >= 6) { // Rand
                 // The first time a clock comes in, Rand becomes clocked.
                 // Otherwise, Rand is unclocked, and outputs a random value with each tick.
@@ -130,8 +131,7 @@ protected:
 private:
     const char* const op_name[CALC_FN_COUNT] = {"Min", "Max", "Sum", "Diff", "Mean", "S&H", "Rnd+", "-Rnd+"};
     const CalcFunction calc_fn[5] = {hem_MIN, hem_MAX, hem_SUM, hem_DIFF, hem_MEAN};
-    int hold[2];
-    int operation[2];
+    uint8_t operation[2];
     int selected;
     bool rand_clocked[2];
 
