@@ -24,99 +24,121 @@ using namespace HS;
 #define applet_icon applet_icon() override { return applet_icon_(); } \
   static constexpr const uint8_t* applet_icon_
 
-#include "applets/ADSREG.h"
-#include "applets/ADEG.h"
-#include "applets/ASR.h"
-#include "applets/AttenuateOffset.h"
-#include "applets/Binary.h"
-#include "applets/BootsNCat.h"
-#include "applets/Brancher.h"
-#include "applets/BugCrack.h"
-#include "applets/Burst.h"
-#include "applets/Button.h"
-#include "applets/BitBeat.h"
-#include "applets/Cumulus.h"
-#include "applets/CVRecV2.h"
-#include "applets/Calculate.h"
-#include "applets/Calibr8.h"
-#include "applets/Carpeggio.h"
-#include "applets/Chordinator.h"
-#include "applets/ClockDivider.h"
-#include "applets/ClkToGate.h"
+#include "ADSREG.h"
+#include "ADEG.h"
+#include "ASR.h"
+#include "AttenuateOffset.h"
+#ifdef PEWPEWPEW
+#include "Binary.h"
+#endif
+#include "BootsNCat.h"
+#include "Brancher.h"
+#include "BugCrack.h"
+#include "Burst.h"
+#include "Button.h"
+#include "BitBeat.h"
+#include "Cumulus.h"
+#include "CVRecV2.h"
+#include "Calculate.h"
+#include "Calibr8.h"
+#include "Carpeggio.h"
+#ifdef PEWPEWPEW
+#include "Chordinator.h"
+#endif
+#include "ClockDivider.h"
+#include "ClkToGate.h"
 #ifdef ARDUINO_TEENSY41
-#include "applets/ClockSetupT4.h"
+#include "ClockSetupT4.h"
 #else
-#include "applets/ClockSetup.h"
+#include "ClockSetup.h"
 #endif
-#include "applets/ClockSkip.h"
-#include "applets/Combin8.h"
-#include "applets/Compare.h"
-#include "applets/DivSeq.h"
-#include "applets/DivSeq10.h"
-#include "applets/DrumMap.h"
-#include "applets/DualQuant.h"
-#include "applets/OffsetQuant.h"
-#include "applets/TwoRings.h"
+#include "ClockSkip.h"
+#include "Combin8.h"
+#include "Compare.h"
+#include "DivSeq.h"
+#include "DivSeq10.h"
+#include "DrumMap.h"
+#include "DualQuant.h"
+#ifdef PEWPEWPEW
+#include "OffsetQuant.h"
+#endif
+#include "TwoRings.h"
 #if !defined(CUSTOM_BUILD) || defined(PEWPEWPEW)
-#include "applets/DuoTET.h"
+#include "DuoTET.h"
 #endif
-#include "applets/EbbAndLfo.h"
-#include "applets/EnigmaJr.h"
-#include "applets/EnsOscKey.h"
-#include "applets/EnvFollow.h"
-#include "applets/EnvSeq.h"
-#include "applets/EuclidX.h"
-#include "applets/GameOfLife.h"
-#include "applets/GateDelay.h"
-#include "applets/GatedVCA.h"
-#include "applets/DrLoFi.h"
-#include "applets/Logic.h"
-#include "applets/LowerRenz.h"
-#include "applets/Metronome.h"
+#include "EbbAndLfo.h"
+#ifdef ENABLE_APP_ENIGMA
+#include "EnigmaJr.h"
+#endif
+#ifdef PEWPEWPEW
+#include "EnsOscKey.h"
+#endif
+#include "EnvFollow.h"
+#include "EnvSeq.h"
+#include "EuclidX.h"
+#ifdef PEWPEWPEW
+#include "GameOfLife.h"
+#endif
+#include "GateDelay.h"
+#include "GatedVCA.h"
+#include "DrLoFi.h"
+#include "Logic.h"
+#include "LowerRenz.h"
+#include "Metronome.h"
 #ifdef __IMXRT1062__
-#include "applets/MidiLoop.h"
+#include "MidiLoop.h"
 #endif
-#include "applets/MultiScale.h"
-#include "applets/Palimpsest.h"
-#include "applets/Pigeons.h"
-#include "applets/PolyDiv.h"
-#include "applets/ProbabilityDivider.h"
-#include "applets/ProbabilityMelody.h"
-#include "applets/Relabi.h"
-#include "applets/ResetClock.h"
-#include "applets/RndWalk.h"
-#include "applets/RunglBook.h"
-#include "applets/ScaleDuet.h"
-#include "applets/Schmitt.h"
-#include "applets/Scope.h"
-#include "applets/SequenceX.h"
-#include "applets/Seq32.h"
-#include "applets/SeqPlay7.h"
-#include "applets/ShiftGate.h"
-#include "applets/ShiftReg.h"
-#include "applets/Shredder.h"
-#include "applets/Shuffle.h"
-#include "applets/Slew.h"
-#include "applets/Squanch.h"
-#include "applets/Stairs.h"
-#include "applets/Strum.h"
-#include "applets/Switch.h"
-#include "applets/SwitchSeq.h"
-#include "applets/TB3PO.h"
-#include "applets/TLNeuron.h"
-#include "applets/Trending.h"
-#include "applets/TrigSeq.h"
-#include "applets/TrigSeq16.h"
-#include "applets/Tuner.h"
-#include "applets/VectorEG.h"
-#include "applets/VectorLFO.h"
-#include "applets/VectorMod.h"
-#include "applets/VectorMorph.h"
-#include "applets/Voltage.h"
-#include "applets/WTVCO.h"
-#include "applets/Xfader.h"
-#include "applets/hMIDIIn.h"
-#include "applets/hMIDIOut.h"
+#ifdef PEWPEWPEW
+#include "MultiScale.h"
+#endif
+#include "Palimpsest.h"
+#include "Pigeons.h"
+#include "PolyDiv.h"
+#include "ProbabilityDivider.h"
+#include "ProbabilityMelody.h"
+#include "Relabi.h"
+#include "ResetClock.h"
+#include "RndWalk.h"
+#ifdef PEWPEWPEW
+#include "RunglBook.h"
+#endif
+#include "ScaleDuet.h"
+#include "Schmitt.h"
+#include "Scope.h"
+#include "SequenceX.h"
+#include "Seq32.h"
+#include "SeqPlay7.h"
+#include "ShiftGate.h"
+#ifdef PEWPEWPEW
+#include "ShiftReg.h"
+#endif
+#include "Shredder.h"
+#include "Shuffle.h"
+#include "Slew.h"
+#include "Squanch.h"
+#include "Stairs.h"
+#include "Strum.h"
+#include "Switch.h"
+#include "SwitchSeq.h"
+#include "TB3PO.h"
+#include "TLNeuron.h"
+#ifdef PEWPEWPEW
+#include "Trending.h"
+#endif
+#include "TrigSeq.h"
+#include "TrigSeq16.h"
+#include "Tuner.h"
+#include "VectorEG.h"
+#include "VectorLFO.h"
+#include "VectorMod.h"
+#include "VectorMorph.h"
+#include "Voltage.h"
+#ifdef PEWPEWPEW
+#include "WTVCO.h"
+#endif
+#include "Xfader.h"
+#include "hMIDIIn.h"
+#include "hMIDIOut.h"
 
 #undef applet_name
 #undef applet_icon
@@ -128,7 +150,9 @@ constexpr Registry reg = Registry<HemisphereApplet, 200 // max ID
     , DeclareApplet<ADEG, 34, 0x01>
     , DeclareApplet<MiniASR, 47, 0x09>
     , DeclareApplet<AttenuateOffset, 56, 0x10>
+#ifdef PEWPEWPEW
     , DeclareApplet<Binary, 41, 0x41>
+#endif
     , DeclareApplet<BitBeat, 79, 0x01>
     , DeclareApplet<BootsNCat, 55, 0x80>
     , DeclareApplet<Brancher, 4, 0x14>
@@ -138,7 +162,9 @@ constexpr Registry reg = Registry<HemisphereApplet, 200 // max ID
     , DeclareApplet<Calculate, 12, 0x10>
     , DeclareApplet<Calibr8, 88, 0x10>
     , DeclareApplet<Carpeggio, 32, 0x0a>
+#ifdef PEWPEWPEW
     , DeclareApplet<Chordinator, 64, 0x08>
+#endif
     , DeclareApplet<ClockDivider, 6, 0x04>
     , DeclareApplet<ClkToGate, 78, 0x04>
     , DeclareApplet<ClockSkip, 28, 0x04>
@@ -158,8 +184,12 @@ constexpr Registry reg = Registry<HemisphereApplet, 200 // max ID
     , DeclareApplet<DuoTET, 63, 0x08>
 #endif
     , DeclareApplet<EbbAndLfo, 7, 0x01>
+#ifdef ENABLE_APP_ENIGMA
     , DeclareApplet<EnigmaJr, 45, 0x02>
+#endif
+#ifdef PEWPEWPEW
     , DeclareApplet<EnsOscKey, 35, 0x08>
+#endif
     , DeclareApplet<EnvFollow, 42, 0x11>
     , DeclareApplet<EnvSeq, 91, 0x02>
     , DeclareApplet<EuclidX, 15, 0x02>
@@ -167,7 +197,9 @@ constexpr Registry reg = Registry<HemisphereApplet, 200 // max ID
     , DeclareApplet<GameOfLife, 22, 0x01>
 #endif
     , DeclareApplet<GateDelay, 29, 0x04>
+#ifdef PEWPEWPEW
     , DeclareApplet<GatedVCA, 17, 0x50>
+#endif
     , DeclareApplet<Logic, 10, 0x44>
     , DeclareApplet<LowerRenz, 21, 0x01>
     , DeclareApplet<Metronome, 50, 0x04>
@@ -176,7 +208,9 @@ constexpr Registry reg = Registry<HemisphereApplet, 200 // max ID
 #endif
     , DeclareApplet<hMIDIIn, 150, 0x20>
     , DeclareApplet<hMIDIOut, 27, 0x20>
+#ifdef PEWPEWPEW
     , DeclareApplet<MultiScale, 73, 0x08>
+#endif
     , DeclareApplet<Palimpsest, 20, 0x02>
     , DeclareApplet<Pigeons, 71, 0x02>
     , DeclareApplet<PolyDiv, 72, 0x06>
@@ -185,7 +219,9 @@ constexpr Registry reg = Registry<HemisphereApplet, 200 // max ID
     , DeclareApplet<Relabi, 89, 0x01>
     , DeclareApplet<ResetClock, 70, 0x14>
     , DeclareApplet<RndWalk, 69, 0x01>
+#ifdef PEWPEWPEW
     , DeclareApplet<RunglBook, 44, 0x01>
+#endif
     , DeclareApplet<ScaleDuet, 26, 0x08>
     , DeclareApplet<Schmitt, 40, 0x40>
     , DeclareApplet<Scope, 23, 0x80>
@@ -206,7 +242,9 @@ constexpr Registry reg = Registry<HemisphereApplet, 200 // max ID
     , DeclareApplet<SwitchSeq, 38, 0x10>
     , DeclareApplet<TB_3PO, 60, 0x02>
     , DeclareApplet<TLNeuron, 13, 0x40>
+#ifdef PEWPEWPEW
     , DeclareApplet<Trending, 37, 0x40>
+#endif
     , DeclareApplet<TrigSeq, 11, 0x06>
     , DeclareApplet<TrigSeq16, 25, 0x06>
     , DeclareApplet<Tuner, 39, 0x80>
@@ -216,7 +254,9 @@ constexpr Registry reg = Registry<HemisphereApplet, 200 // max ID
 //    , DeclareApplet<VectorMod, 53, 0x01> // awkward middle child
     , DeclareApplet<VectorMorph, 54, 0x01>
     , DeclareApplet<Voltage, 43, 0x10>
+#ifdef PEWPEWPEW
     , DeclareApplet<WTVCO, 67, 0x80>
+#endif
     , DeclareApplet<Xfader, 33, 0x10>
 >{};
 
