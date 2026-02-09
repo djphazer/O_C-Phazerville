@@ -201,8 +201,7 @@ struct DigitalInputMap {
   };
 
   static const int ppqn = 4;
-  static constexpr float GATE_PW_LOW = 0.49f;
-  static constexpr float GATE_PW_HIGH = 0.51f;
+  static constexpr float internal_clocked_gate_pw = 0.5f;
   static const int num_sources = 4 * IO_CHANNEL_COUNT;
 
   static constexpr size_t Size = 16; // Make this compatible with Packable
@@ -260,10 +259,7 @@ struct DigitalInputMap {
         //if (div_mult.steps > 0) tpb = tpb / (div_mult.steps+1);
 
         uint32_t tick_phase = (mult * ticks_since_beat) % tpb;
-        // hysteresis to guard against jitter from external clock sync
-        // TODO: this only helps with falling edge
-        uint32_t phase_edge = last_gate_state ? (GATE_PW_HIGH * tpb) : (GATE_PW_LOW * tpb);
-        bool gate = tick_phase < phase_edge;
+        bool gate = tick_phase < (internal_clocked_gate_pw * tpb);
         return gate;
       }
       case DIGITAL_INPUT:
