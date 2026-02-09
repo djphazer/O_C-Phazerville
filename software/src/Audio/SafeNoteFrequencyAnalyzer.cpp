@@ -20,6 +20,8 @@
  * THE SOFTWARE.
  */
 
+#ifdef ARDUINO_TEENSY41
+
 #include <Arduino.h>
 #include "SafeNoteFrequencyAnalyzer.h"
 #include "utility/dspinst.h"
@@ -400,3 +402,5 @@ void SafeNoteFrequencyAnalyzer::end() {
 } // flush and disable to save CPU usage
 void SafeNoteFrequencyAnalyzer::pause_switch(bool p) {} // quick on/off switch without teardown (like for audio being unplugged)
 bool SafeNoteFrequencyAnalyzer::isEnabled() { return enabled; } // get enabled state for TuneTracker functionality
+
+#endif
