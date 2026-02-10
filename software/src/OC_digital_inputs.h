@@ -126,10 +126,10 @@ public:
     auto activated = LOW;
 #endif
     switch (input) {
-      case DIGITAL_INPUT_1: return (digitalRead(TR1) == activated);
-      case DIGITAL_INPUT_2: return (digitalRead(TR2) == activated);
-      case DIGITAL_INPUT_3: return (digitalRead(TR3) == activated);
-      case DIGITAL_INPUT_4: return (digitalRead(TR4) == activated);
+      case DIGITAL_INPUT_1: return (digitalReadFast(TR1) == activated);
+      case DIGITAL_INPUT_2: return (digitalReadFast(TR2) == activated);
+      case DIGITAL_INPUT_3: return (digitalReadFast(TR3) == activated);
+      case DIGITAL_INPUT_4: return (digitalReadFast(TR4) == activated);
       case DIGITAL_INPUT_LAST: break;
     }
     return false;
