@@ -191,7 +191,9 @@ constexpr Registry reg = Registry<HemisphereApplet, 200 // max ID
     , DeclareApplet<EnsOscKey, 35, 0x08>
 #endif
     , DeclareApplet<EnvFollow, 42, 0x11>
+#ifdef __IMXRT1062__
     , DeclareApplet<EnvSeq, 91, 0x02>
+#endif
     , DeclareApplet<EuclidX, 15, 0x02>
 #ifdef PEWPEWPEW
     , DeclareApplet<GameOfLife, 22, 0x01>
