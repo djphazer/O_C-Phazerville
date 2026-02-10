@@ -237,16 +237,16 @@ void FASTRUN AppLorenzGenerator::Process(OC::IOFrame *ioframe) {
   lorenz_generator_.lorenz.set_rho2(USAT16(rho2));
 
   uint8_t out_a = lorenz_generator_.get_out_a() ;
-  lorenz_generator_.lorenz.set_out_a(out_a);
+  lorenz_generator_.lorenz.set_out(0, out_a);
 
   uint8_t out_b = lorenz_generator_.get_out_b() ;
-  lorenz_generator_.lorenz.set_out_b(out_b);
+  lorenz_generator_.lorenz.set_out(1, out_b);
 
   uint8_t out_c = lorenz_generator_.get_out_c() ;
-  lorenz_generator_.lorenz.set_out_c(out_c);
+  lorenz_generator_.lorenz.set_out(2, out_c);
 
   uint8_t out_d = lorenz_generator_.get_out_d() ;
-  lorenz_generator_.lorenz.set_out_d(out_d);
+  lorenz_generator_.lorenz.set_out(3, out_d);
 
   if (reset_both_phase) {
     reset1_phase = true ;

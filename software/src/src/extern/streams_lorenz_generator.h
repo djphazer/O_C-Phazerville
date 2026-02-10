@@ -38,12 +38,14 @@
 #include "../../util/util_macros.h"
 // #include "stmlib/stmlib.h"
 // #include "streams/meta_parameters.h"
+#include "OC_DAC.h"
+#include "OC_config.h"
 
 namespace streams {
 
-const size_t kNumChannels = 4;
+const size_t kNumChannels = DAC_CHANNEL_COUNT;
 
-enum ELorenzOutputMap {
+enum ELorenzOutputMap : uint8_t {
   LORENZ_OUTPUT_X1,
   LORENZ_OUTPUT_Y1,
   LORENZ_OUTPUT_Z1,
@@ -97,20 +99,9 @@ class LorenzGenerator {
     c2_ = (rho + (6 << 3)) * (1 << 13) ; // was 13
   }
 
-  inline void set_out_a(uint8_t out_a) {
-    out_a_ = out_a;
-  }
-
-  inline void set_out_b(uint8_t out_b) {
-    out_b_ = out_b;
-  }
-
-  inline void set_out_c(uint8_t out_c) {
-    out_c_ = out_c;
-  }
-
-  inline void set_out_d(uint8_t out_d) {
-    out_d_ = out_d;
+  inline void set_out(uint8_t idx, uint8_t outmode) {
+    out_[idx] = ELorenzOutputMap(outmode);
+    DetermineActiveGenerators();
   }
  
  inline const uint16_t dac_code(uint8_t index) const {
@@ -123,7 +114,8 @@ class LorenzGenerator {
   int32_t Lx2_, Ly2_, Lz2_;
   int32_t Rx2_, Ry2_, Rz2_;
 
-  uint8_t out_a_, out_b_, out_c_, out_d_ ;
+  bool lorenz1_active, rossler1_active, lorenz2_active, rossler2_active;
+  ELorenzOutputMap out_[kNumChannels]; // out_a_, out_b_, out_c_, out_d_ ;
 
   int64_t sigma_, rho1_, rho2_, beta_, c1_,  c2_ ;
   
@@ -136,7 +128,7 @@ class LorenzGenerator {
   static void Rossler(int32_t &x, int32_t &y, int32_t &z, int64_t c, int64_t a, int64_t b, int64_t dt);
   static void ScaleLorenz(int32_t x, int32_t y, int32_t z, int32_t &x_scaled, int32_t &y_scaled, int32_t &z_scaled);
   static void ScaleRossler(int32_t x, int32_t y, int32_t z, int32_t &x_scaled, int32_t &y_scaled, int32_t &z_scaled);
-  void DetermineActiveGenerators(bool &lorenz1, bool &rossler1, bool &lorenz2, bool &rossler2) const;
+  void DetermineActiveGenerators();
   
   DISALLOW_COPY_AND_ASSIGN(LorenzGenerator);
 };

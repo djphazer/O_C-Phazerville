@@ -38,10 +38,10 @@ class LorenzGeneratorManager {
     LorenzGeneratorManager() {
         lorenz.Init(0);
         lorenz.Init(1);
-        lorenz.set_out_a(streams::LORENZ_OUTPUT_X1);
-        lorenz.set_out_b(streams::LORENZ_OUTPUT_Y1);
-        lorenz.set_out_c(streams::LORENZ_OUTPUT_X2);
-        lorenz.set_out_d(streams::LORENZ_OUTPUT_Y2);
+        lorenz.set_out(0, streams::LORENZ_OUTPUT_X1);
+        lorenz.set_out(1, streams::LORENZ_OUTPUT_Y1);
+        lorenz.set_out(2, streams::LORENZ_OUTPUT_X2);
+        lorenz.set_out(3, streams::LORENZ_OUTPUT_Y2);
         last_process_tick = 0;
     }
 

@@ -35,6 +35,7 @@
 
 #include "streams_lorenz_generator.h"
 
+#include "OC_config.h"
 #include "streams_resources.h"
 
 namespace streams {
@@ -86,75 +87,54 @@ void LorenzGenerator::Process(
   if (reset2) Init(1) ; 
 
   // --- State updates ---
-  int64_t Ldt1 = static_cast<int64_t>(lut_lorenz_rate[rate1] >> (5 - freq_range1));
-  Lorenz(Lx1_, Ly1_, Lz1_, rho1_, sigma, beta, Ldt1);
-
-  int64_t Rdt1 = static_cast<int64_t>(lut_lorenz_rate[rate1] >> 0);
-  Rossler(Rx1_, Ry1_, Rz1_, c1_, a, b, Rdt1);
-
-  int64_t Ldt2 = static_cast<int64_t>(lut_lorenz_rate[rate2] >> (5 - freq_range2));
-  Lorenz(Lx2_, Ly2_, Lz2_, rho2_, sigma, beta, Ldt2);
-
-  int64_t Rdt2 = static_cast<int64_t>(lut_lorenz_rate[rate2] >> 0);
-  Rossler(Rx2_, Ry2_, Rz2_, c2_, a, b, Rdt2);
-
-  // --- Scaling ---
-  // For performance, we only calculate the scaled output values for a given
+  // For performance, we only calculate values for a given
   // generator if one of its outputs (X, Y, or Z) is currently assigned to one
   // of the four DAC channels. This avoids redundant calculations while ensuring
   // the underlying state of the generator is always continuous.
 
-  bool lorenz1_active, rossler1_active, lorenz2_active, rossler2_active;
-  DetermineActiveGenerators(lorenz1_active, rossler1_active, lorenz2_active, rossler2_active);
-
   int32_t Lz1_scaled = 0;
   int32_t Lx1_scaled = 0;
   int32_t Ly1_scaled = 0;
-  if (lorenz1_active)
-    ScaleLorenz(Lx1_, Ly1_, Lz1_, Lx1_scaled, Ly1_scaled, Lz1_scaled);
 
   int32_t Rz1_scaled = 0;
   int32_t Rx1_scaled = 0;
   int32_t Ry1_scaled = 0;
-  if (rossler1_active)
-    ScaleRossler(Rx1_, Ry1_, Rz1_, Rx1_scaled, Ry1_scaled, Rz1_scaled);
 
   int32_t Lz2_scaled = 0;
   int32_t Lx2_scaled = 0;
   int32_t Ly2_scaled = 0;
-  if (lorenz2_active)
-    ScaleLorenz(Lx2_, Ly2_, Lz2_, Lx2_scaled, Ly2_scaled, Lz2_scaled);
 
   int32_t Rz2_scaled = 0;
   int32_t Rx2_scaled = 0;
   int32_t Ry2_scaled = 0;
-  if (rossler2_active)
+
+  if (lorenz1_active) {
+    int64_t Ldt1 = static_cast<int64_t>(lut_lorenz_rate[rate1] >> (5 - freq_range1));
+    Lorenz(Lx1_, Ly1_, Lz1_, rho1_, sigma, beta, Ldt1);
+    ScaleLorenz(Lx1_, Ly1_, Lz1_, Lx1_scaled, Ly1_scaled, Lz1_scaled);
+  }
+
+  if (lorenz2_active) {
+    int64_t Ldt2 = static_cast<int64_t>(lut_lorenz_rate[rate2] >> (5 - freq_range2));
+    Lorenz(Lx2_, Ly2_, Lz2_, rho2_, sigma, beta, Ldt2);
+    ScaleLorenz(Lx2_, Ly2_, Lz2_, Lx2_scaled, Ly2_scaled, Lz2_scaled);
+  }
+
+  if (rossler1_active) {
+    int64_t Rdt1 = static_cast<int64_t>(lut_lorenz_rate[rate1] >> 0);
+    Rossler(Rx1_, Ry1_, Rz1_, c1_, a, b, Rdt1);
+    ScaleRossler(Rx1_, Ry1_, Rz1_, Rx1_scaled, Ry1_scaled, Rz1_scaled);
+  }
+
+  if (rossler2_active) {
+    int64_t Rdt2 = static_cast<int64_t>(lut_lorenz_rate[rate2] >> 0);
+    Rossler(Rx2_, Ry2_, Rz2_, c2_, a, b, Rdt2);
     ScaleRossler(Rx2_, Ry2_, Rz2_, Rx2_scaled, Ry2_scaled, Rz2_scaled);
+  }
 
   // --- Output mapping ---
-  uint8_t out_channel ;
-  
-  for (uint8_t i = 0; i < 4; ++i) {
-    switch(i) {
-      case 0:
-        out_channel = out_a_ ;
-        break ;
-      case 1:
-        out_channel = out_b_ ;
-        break ;
-      case 2:
-        out_channel = out_c_ ;
-        break ;
-      case 3:
-        out_channel = out_d_ ;
-        break ; 
-      default:
-        // shut up compiler warning: 'out_channel' may be used uninitialized
-        out_channel = LORENZ_OUTPUT_LAST; 
-        break ;       
-    }
- 
-    switch (out_channel) {
+  for (uint8_t i = 0; i < kNumChannels; ++i) {
+    switch (out_[i]) {
       case LORENZ_OUTPUT_X1:
         dac_code_[i] = Lx1_scaled;
         break;
@@ -258,59 +238,58 @@ void LorenzGenerator::ScaleRossler(int32_t x, int32_t y, int32_t z, int32_t &x_s
   z_scaled = (z >> 14);
 }
 
-void LorenzGenerator::DetermineActiveGenerators(bool &lorenz1, bool &rossler1, bool &lorenz2, bool &rossler2) const {
-  lorenz1 = false;
-  rossler1 = false;
-  lorenz2 = false;
-  rossler2 = false;
+void LorenzGenerator::DetermineActiveGenerators() {
+  lorenz1_active = false;
+  rossler1_active = false;
+  lorenz2_active = false;
+  rossler2_active = false;
 
-  uint8_t outputs[4] = {out_a_, out_b_, out_c_, out_d_};
-  for (int i = 0; i < 4; ++i) {
-    switch (outputs[i]) {
+  for (int i = 0; i < kNumChannels; ++i) {
+    switch (out_[i]) {
       case LORENZ_OUTPUT_X1:
       case LORENZ_OUTPUT_Y1:
       case LORENZ_OUTPUT_Z1:
       case LORENZ_OUTPUT_LX1_XOR_LY1:
-        lorenz1 = true;
+        lorenz1_active = true;
         break;
 
       case LORENZ_OUTPUT_X2:
       case LORENZ_OUTPUT_Y2:
       case LORENZ_OUTPUT_Z2:
-        lorenz2 = true;
+        lorenz2_active = true;
         break;
 
       case ROSSLER_OUTPUT_X1:
       case ROSSLER_OUTPUT_Y1:
       case ROSSLER_OUTPUT_Z1:
-        rossler1 = true;
+        rossler1_active = true;
         break;
 
       case ROSSLER_OUTPUT_X2:
       case ROSSLER_OUTPUT_Y2:
       case ROSSLER_OUTPUT_Z2:
-        rossler2 = true;
+        rossler2_active = true;
         break;
 
       case LORENZ_OUTPUT_LX1_PLUS_RX1:
       case LORENZ_OUTPUT_LX1_XOR_RX1:
       case LORENZ_OUTPUT_LX1_PLUS_RZ1:
-        lorenz1 = true;
-        rossler1 = true;
+        lorenz1_active = true;
+        rossler1_active = true;
         break;
 
       case LORENZ_OUTPUT_LX1_PLUS_LY2:
       case LORENZ_OUTPUT_LX1_PLUS_LZ2:
       case LORENZ_OUTPUT_LX1_XOR_LX2:
-        lorenz1 = true;
-        lorenz2 = true;
+        lorenz1_active = true;
+        lorenz2_active = true;
         break;
 
       case LORENZ_OUTPUT_LX1_PLUS_RX2:
       case LORENZ_OUTPUT_LX1_XOR_RX2:
       case LORENZ_OUTPUT_LX1_PLUS_RZ2:
-        lorenz1 = true;
-        rossler2 = true;
+        lorenz1_active = true;
+        rossler2_active = true;
         break;
 
       case LORENZ_OUTPUT_LAST:
