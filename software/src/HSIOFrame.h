@@ -31,7 +31,7 @@ static constexpr int MIDIMAP_MAX = 32;
 static constexpr int IO_CHANNEL_COUNT = 32; // virtual inputs and outputs
 #else
 static constexpr int MIDIMAP_MAX = 8;
-static constexpr int IO_CHANNEL_COUNT = 8;
+static constexpr int IO_CHANNEL_COUNT = 32;
 #endif
 static constexpr int TRIGMAP_MAX = DIGITAL_INPUT_COUNT + IO_CHANNEL_COUNT + IO_CHANNEL_COUNT + MIDIMAP_MAX;
 static constexpr int CVMAP_MAX = IO_CHANNEL_COUNT + IO_CHANNEL_COUNT + MIDIMAP_MAX;
