@@ -2167,7 +2167,7 @@ void AppDualSequencer::GetIOConfig(IOConfig &ioconfig) const
 {
   ioconfig.outputs[DAC_CHANNEL_A].set("CH1", OUTPUT_MODE_PITCH);
   switch(seq_channel_[0].get_aux_mode()) {
-  case GATE: ioconfig.outputs[DAC_CHANNEL_C].set("CH1 gate", OUTPUT_MODE_GATE); break;
+  case GATE_OUT: ioconfig.outputs[DAC_CHANNEL_C].set("CH1 gate", OUTPUT_MODE_GATE); break;
   case COPY: ioconfig.outputs[DAC_CHANNEL_C].set("CH1 copy", OUTPUT_MODE_PITCH); break;
   case ENV_AD: ioconfig.outputs[DAC_CHANNEL_C].set("CH1 AD", OUTPUT_MODE_UNI); break;
   case ENV_ADR: ioconfig.outputs[DAC_CHANNEL_C].set("CH1 ADR", OUTPUT_MODE_UNI); break;
@@ -2177,7 +2177,7 @@ void AppDualSequencer::GetIOConfig(IOConfig &ioconfig) const
 
   ioconfig.outputs[DAC_CHANNEL_B].set("CH2", OUTPUT_MODE_PITCH);
   switch(seq_channel_[1].get_aux_mode()) {
-  case GATE: ioconfig.outputs[DAC_CHANNEL_D].set("CH2 gate", OUTPUT_MODE_GATE); break;
+  case GATE_OUT: ioconfig.outputs[DAC_CHANNEL_D].set("CH2 gate", OUTPUT_MODE_GATE); break;
   case COPY: ioconfig.outputs[DAC_CHANNEL_D].set("CH2 copy", OUTPUT_MODE_PITCH); break;
   case ENV_AD: ioconfig.outputs[DAC_CHANNEL_D].set("CH2 AD", OUTPUT_MODE_UNI); break;
   case ENV_ADR: ioconfig.outputs[DAC_CHANNEL_D].set("CH2 ADR", OUTPUT_MODE_UNI); break;
