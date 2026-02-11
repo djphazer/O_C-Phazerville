@@ -553,19 +553,19 @@ public:
                 return;
             }
 
-            const EnvSeqManager::LinkedData* linked_data = manager.GetLinkedData(hemisphere);
+            EnvSeqManager::LinkedData* linked_data = manager.GetLinkedData(hemisphere);
             switch (linked_cursor) {
             case LinkedCursor::LINKED_MOD1_MODE:
-                manager.SetModulationMode(hemisphere, 0, (EnvSeqManager::ModulationMode)constrain(linked_data[0].modulation.mode + direction, 0, EnvSeqManager::ModulationMode::MAX_MODULATION_MODE - 1));
+                linked_data[0].SetModulationMode(linked_data[0].modulation.mode + direction);
                 break;
             case LinkedCursor::LINKED_MOD2_MODE:
-                manager.SetModulationMode(hemisphere, 1, (EnvSeqManager::ModulationMode)constrain(linked_data[1].modulation.mode + direction, 0, EnvSeqManager::ModulationMode::MAX_MODULATION_MODE - 1));
+                linked_data[1].SetModulationMode(linked_data[1].modulation.mode + direction);
                 break;
             case LinkedCursor::LINKED_OUTPUT1_MODE:
-                manager.SetModulationOutputMode(hemisphere, 0, (EnvSeqManager::OutputMode)constrain(linked_data[0].modulation.output_mode + direction, 0, EnvSeqManager::OutputMode::MAX_OUTPUT_MODE - 1));
+                linked_data[0].SetModulationOutputMode(linked_data[0].modulation.output_mode + direction);
                 break;
             case LinkedCursor::LINKED_OUTPUT2_MODE:
-                manager.SetModulationOutputMode(hemisphere, 1, (EnvSeqManager::OutputMode)constrain(linked_data[1].modulation.output_mode + direction, 0, EnvSeqManager::OutputMode::MAX_OUTPUT_MODE - 1));
+                linked_data[1].SetModulationOutputMode(linked_data[1].modulation.output_mode + direction);
                 break;
             }
 
@@ -715,10 +715,11 @@ public:
         if (manager.IsLinked(hemisphere)) {
             linked_cursor = LinkedCursor::UNLINK;
         }
-        manager.SetModulationMode(hemisphere, 0, (EnvSeqManager::ModulationMode)constrain(Unpack(data, PackLocation {17, 4}), 0, EnvSeqManager::ModulationMode::MAX_MODULATION_MODE - 1));
-        manager.SetModulationMode(hemisphere, 1, (EnvSeqManager::ModulationMode)constrain(Unpack(data, PackLocation {21, 4}), 0, EnvSeqManager::ModulationMode::MAX_MODULATION_MODE - 1));
-        manager.SetModulationOutputMode(hemisphere, 0, (EnvSeqManager::OutputMode)constrain(Unpack(data, PackLocation {25, 4}), 0, EnvSeqManager::OutputMode::MAX_OUTPUT_MODE - 1));
-        manager.SetModulationOutputMode(hemisphere, 1, (EnvSeqManager::OutputMode)constrain(Unpack(data, PackLocation {29, 4}), 0, EnvSeqManager::OutputMode::MAX_OUTPUT_MODE - 1));
+        EnvSeqManager::LinkedData* linked_data = manager.GetLinkedData(hemisphere);
+        linked_data[0].SetModulationMode(Unpack(data, PackLocation {17, 4}));
+        linked_data[1].SetModulationMode(Unpack(data, PackLocation {21, 4}));
+        linked_data[0].SetModulationOutputMode(Unpack(data, PackLocation {25, 4}));
+        linked_data[1].SetModulationOutputMode(Unpack(data, PackLocation {29, 4}));
 
         random_offsets = Unpack(data, PackLocation {33, 1});
         random_amps = Unpack(data, PackLocation {34, 1});
@@ -799,10 +800,11 @@ private:
 
     // Controller for linked applet
     void controller_linked() {
-        manager.SetModulationCV(hemisphere, 0, In(0));
-        manager.SetModulationCV(hemisphere, 1, In(1));
-
         EnvSeqManager::LinkedData *linked_data = manager.GetLinkedData(hemisphere);
+
+        linked_data[0].modulation.cv = In(0);
+        linked_data[1].modulation.cv = In(1);
+
         for (uint8_t i = 0; i < 2; i++) {
             if (linked_data[i].output.is_cv) {
                 Out(i, constrain(linked_data[i].output.cv, HEMISPHERE_MIN_CV, HEMISPHERE_MAX_CV));

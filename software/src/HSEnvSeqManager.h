@@ -57,6 +57,13 @@ public:
     struct LinkedData {
         Modulation modulation;
         Output output;
+
+        void SetModulationMode(const int mode) {
+          modulation.mode = (ModulationMode)constrain(mode, 0, ModulationMode::MAX_MODULATION_MODE - 1);
+        }
+        void SetModulationOutputMode(const int mode) {
+          modulation.output_mode = (OutputMode)constrain(mode, 0, OutputMode::MAX_OUTPUT_MODE - 1);
+        }
     };
 
     struct LinkedState {
@@ -157,27 +164,6 @@ public:
     }
     LinkedData* GetLinkedData(HEM_SIDE hemisphere) {
         return linked_states[hemisphere >> 1].data;
-    }
-
-    // Set the modulation mode for the applet (only the right applet can do it)
-    void SetModulationMode(HEM_SIDE hemisphere, uint8_t part, const ModulationMode& mode) {
-        if (hemisphere & 1) {
-            linked_states[hemisphere >> 1].data[part & 1].modulation.mode = mode;
-        }
-    }
-
-    // Set the modulation output mode for the applet (only the right applet can do it)
-    void SetModulationOutputMode(HEM_SIDE hemisphere, uint8_t part, const OutputMode& output_mode) {
-        if (hemisphere & 1) {
-            linked_states[hemisphere >> 1].data[part & 1].modulation.output_mode = output_mode;
-        }
-    }
-
-    // Set the modulation CV for the applet (only the right applet can do it)
-    void SetModulationCV(HEM_SIDE hemisphere, uint8_t part, const int16_t& cv) {
-        if (hemisphere & 1) {
-            linked_states[hemisphere >> 1].data[part & 1].modulation.cv = cv;
-        }
     }
 
     // Copy a step to the clipboard
