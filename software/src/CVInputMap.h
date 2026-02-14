@@ -16,11 +16,6 @@ struct CVInputMap {
 
   static constexpr size_t Size = 16; // Make this compatible with Packable
 
-  // increments of 0.1%
-  int Atten() {
-    // exponential curve; 60 becomes 100.0%
-    return 10 * attenuversion * abs(attenuversion) / 36;
-  }
   int RawIn() {
     return source <= ADC_CHANNEL_LAST
       ? frame.inputs[source - 1]
@@ -31,12 +26,12 @@ struct CVInputMap {
 
   int In(int default_value = 0) {
     if (!source) return default_value;
-    return RawIn() * Atten() / 1000;
+    return RawIn() * Atten(attenuversion) / 1000;
   }
 
   float InF(float default_value = 0.0f) {
     if (!source) return default_value;
-    return 0.001f * Atten() * static_cast<float>(RawIn())
+    return 0.001f * Atten(attenuversion) * static_cast<float>(RawIn())
       / static_cast<float>((source <= ADC_CHANNEL_LAST)?HEMISPHERE_MAX_INPUT_CV:HEMISPHERE_MAX_CV);
   }
 

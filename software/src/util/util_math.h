@@ -51,6 +51,12 @@ constexpr int Proportion(const int numerator, const int denominator, const int m
     return numerator >= 0 ? scaled : -scaled;
 }
 
+// Given a bipolar param value from -127 to +128, returns a scalar value in increments of 0.1%
+constexpr int Atten(int8_t att) {
+  // exponential curve; 60 becomes 100.0%
+  return 10 * att * abs(att) / 36;
+}
+
 // Woo. Funky macro magic to avoid dividing by non-power-of-two.
 // Essentially a quick fixed-point calculation, but only valid up to 2^exp
 
@@ -140,10 +146,12 @@ struct SlewedValue {
   }
 
   // attenuverted getter
-  // 63 == 100%
-  // 126 == 200%
   int get(int8_t atten) const {
-    return Proportion(atten, 63, get());
+    // exponential curve; 60 becomes 100.0%; 127 == 448%
+    return get() * Atten(atten) / 1000;
+
+    // linear curve; 63 == 100%; 126 == 200%
+    //return Proportion(atten, 63, get());
   }
   int get() const {
     return value_ >> EXTRA_PRECISION;

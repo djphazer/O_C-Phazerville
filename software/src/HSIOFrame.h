@@ -486,7 +486,7 @@ struct IOFrame {
     bool autoMIDIOut = false;
     uint8_t clockskip[DAC_CHANNEL_COUNT] = {0};
     int8_t output_slew[DAC_CHANNEL_COUNT] = {0};
-    int8_t output_atten[DAC_CHANNEL_COUNT] = {63}; // -126 (-200%) to 126 (+200%), 63 is 100%
+    int8_t output_atten[DAC_CHANNEL_COUNT]; // -126 (-200%) to 126 (+200%), 63 is 100%
 
     // pre-calculated clocks, subject to trigger mapping
     bool clocked[OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_COUNT];
@@ -510,6 +510,9 @@ struct IOFrame {
 
     void Init() {
       MIDIState.Init();
+      for (int i = 0; i < DAC_CHANNEL_COUNT; ++i) {
+        output_atten[i] = 60; // default to 100%
+      }
     }
 
     const int ViewOut(DAC_CHANNEL ch) const { return outputs[ch].get(output_atten[ch]); }
@@ -533,7 +536,7 @@ struct IOFrame {
         output_slew[ch] = constrain(output_slew[ch] + dir, 0, 100);
     }
     void NudgeAtten(int ch, int dir) {
-        output_atten[ch] = constrain(output_atten[ch] + dir, -126, 126);
+        output_atten[ch] = constrain(output_atten[ch] + dir, -127, 127);
     }
 
     // --- Hard IO ---

@@ -224,7 +224,7 @@ public:
         PhzConfig::setValue(preset_key | OUTSLEW_KEY, data);
         data = 0;
         for (size_t i = 0; i < 8; ++i) {
-          Pack(data, PackLocation{i*8, 8}, HS::frame.output_atten[i] + 126);
+          Pack(data, PackLocation{i*8, 8}, static_cast<uint8_t>(HS::frame.output_atten[i]));
         }
         PhzConfig::setValue(preset_key | OUTATTEN_KEY, data);
 
@@ -373,7 +373,7 @@ public:
         const bool has_output_atten = PhzConfig::getValue(preset_key | OUTATTEN_KEY, data);
         for (size_t i = 0; i < 8; ++i)
         {
-          HS::frame.output_atten[i] = has_output_atten ? Unpack(data, PackLocation{i*8, 8}) - 126 : 63;
+          HS::frame.output_atten[i] = has_output_atten ? Unpack(data, PackLocation{i*8, 8}) : 60;
         }
 
         //LoadGlobals();
@@ -563,9 +563,10 @@ public:
           gfxPrint(HS::frame.output_slew[zoom_slot*2 + zoom_cursor-5]);
           gfxPrint("%");
 
-          gfxPrint(x, y+20, "Atten=");
-          gfxPrint(Proportion(HS::frame.output_atten[zoom_slot*2 + zoom_cursor-5], 126, 200));
-          gfxPrint("%");
+          const int att = Atten(HS::frame.output_atten[zoom_slot*2 + zoom_cursor-5]);
+          gfxPrint(x, y+20, "Lvl=");
+          if (att < 0) gfxPrint("-");
+          graphics.printf("%d.%d%%", abs(att) / 10, abs(att) % 10);
         }
       } else {
         if (CursorBlink()) {

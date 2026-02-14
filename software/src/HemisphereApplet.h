@@ -597,7 +597,7 @@ public:
         gfxClear(0, 0, 63, 11);
         switch (selected_input_map.index()) {
           case CV_INPUT_MAP: {
-            int tenths = std::get<CVInputMap*>(selected_input_map)->Atten();
+            int tenths = Atten(std::get<CVInputMap*>(selected_input_map)->attenuversion);
             gfxPos(32 - 7 * 6 / 2 + pad(10000, tenths) - 6*(abs(tenths)<10), 2);
             if (tenths < 0) gfxPrint("-");
             graphics.printf("%d.%d%%", abs(tenths) / 10, abs(tenths) % 10);

@@ -394,8 +394,8 @@ public:
         }
         PhzConfig::setValue(preset_key | OUTSLEW_KEY, data);
         data = 0;
-        for (size_t i = 0; i < 8; ++i) {
-          Pack(data, PackLocation{i*8, 8}, HS::frame.output_atten[i] + 126);
+        for (size_t i = 0; i < DAC_CHANNEL_COUNT; ++i) {
+          Pack(data, PackLocation{i*8, 8}, static_cast<uint8_t>(HS::frame.output_atten[i]));
         }
         PhzConfig::setValue(preset_key | OUTATTEN_KEY, data);
 
@@ -527,9 +527,9 @@ public:
         }
 
         const bool has_output_atten = PhzConfig::getValue(preset_key | OUTATTEN_KEY, data);
-        for (size_t i = 0; i < 8; ++i)
+        for (size_t i = 0; i < DAC_CHANNEL_COUNT; ++i)
         {
-          HS::frame.output_atten[i] = has_output_atten ? Unpack(data, PackLocation{i*8, 8}) - 126 : 63;
+          HS::frame.output_atten[i] = has_output_atten ? Unpack(data, PackLocation{i*8, 8}) : 60;
         }
 
         // --- Global stuff ---
@@ -834,9 +834,10 @@ public:
                 gfxPrint(HS::frame.output_slew[zoom_slot*2 + zoom_cursor-5]);
                 gfxPrint("%");
 
-                gfxPrint(x, y+20, "Atten=");
-                gfxPrint(Proportion(HS::frame.output_atten[zoom_slot*2 + zoom_cursor-5], 126, 200));
-                gfxPrint("%");
+                const int att = Atten(HS::frame.output_atten[zoom_slot*2 + zoom_cursor-5]);
+                gfxPrint(x, y+20, "Lvl=");
+                if (att < 0) gfxPrint("-");
+                graphics.printf("%d.%d%%", abs(att) / 10, abs(att) % 10);
               }
             } else {
               if (CursorBlink()) {
@@ -1098,7 +1099,7 @@ public:
         // Fullscreen cursor stuff
         if (zoom_slot > -1) {
           if (select_mode == zoom_slot) ChangeApplet(HEM_SIDE(zoom_slot), event.value);
-          else if (LEFT_HEMISPHERE == h) // left enc jumps between applet or config
+          else if (!isEditing && LEFT_HEMISPHERE == h) // left enc jumps between applet or config
             zoom_cursor = (event.value > 0)? 0 : -1;
           else if (zoom_cursor < 0) { // right enc is normal applet behavior
             int index = my_applet[zoom_slot];
