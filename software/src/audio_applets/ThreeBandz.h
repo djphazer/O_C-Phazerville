@@ -242,11 +242,12 @@ private:
   int8_t limit_threshold[BANDZ] = {-3, -6, -6};
   int8_t makeupgain[BANDZ] = {-1, -1, -1}; // negative means auto
 
-  uint16_t splitfreq[2] = {500, 2500};
+  uint16_t splitfreq[2] = {250, 2500};
 
   AudioPassthrough<Channels> input;
   std::array<AudioFilterStateVariable2, Channels> filter[2];
   std::array<std::array<AudioEffectDynamics, BANDZ>, Channels> complimit;
   std::array<AudioMixer<BANDZ>, Channels> mixout;
+  // TODO: maybe a final limiter after the mix?
   AudioPassthrough<Channels> output;
 };
