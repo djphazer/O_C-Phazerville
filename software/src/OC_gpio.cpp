@@ -186,11 +186,7 @@ void OC::Pinout_Detect() {
   }
 
   // any HW_ID significantly higher than the reference design will use +/-10V at the outputs
-  DAC_20Vpp = (id_voltage >= 0.11 && id_voltage <= 0.35);
-  if (DAC_20Vpp) {
-    DAC::kOctaveZero = 5;
-    HS::octave_max = 10;
-  }
+  DAC_20Vpp = (id_voltage >= 0.11 && id_voltage <= 0.25);
 
   // 0.4v for Serge variant from NLM, or others that want -5v to +5v output range
   if (id_voltage >= 0.35 && id_voltage <= 0.45) {
@@ -205,33 +201,39 @@ void OC::Pinout_Detect() {
 
   CalSynthXL = (id_voltage >= 0.25 && id_voltage <= 0.35);
   if (CalSynthXL) {
-    // remap buttons and I/O here
+    //DAC_20Vpp = true;
+    // remapped buttons and I/O here
     but_top  = 29; // 'A'
-    but_top2 = 28; // 'X'
-    but_bot  = 14; // 'B'
-    but_bot2 = 15; // 'Y'
-    but_mid  = 20; // 'Z'
+    but_top2 = 20; // 'X'
+    but_bot  = 28; // 'B'
+    but_bot2 = 14; // 'Y'
+    but_mid  = 15; // 'Z'
     // TODO: flip_mode?
 
     // Input index
-    ADC_CHANNEL_1 = 0;
-    ADC_CHANNEL_2 = 1;
-    ADC_CHANNEL_3 = 2;
-    ADC_CHANNEL_4 = 3;
-    ADC_CHANNEL_5 = 4;
-    ADC_CHANNEL_6 = 5;
-    ADC_CHANNEL_7 = 6;
-    ADC_CHANNEL_8 = 7;
+    ADC_CHANNEL_1 = 4;
+    ADC_CHANNEL_2 = 5;
+    ADC_CHANNEL_3 = 6;
+    ADC_CHANNEL_4 = 7;
+    ADC_CHANNEL_5 = 0;
+    ADC_CHANNEL_6 = 1;
+    ADC_CHANNEL_7 = 2;
+    ADC_CHANNEL_8 = 3;
 
     // Output index
-    DAC_CHANNEL_A = 0;
-    DAC_CHANNEL_B = 1;
-    DAC_CHANNEL_C = 2;
-    DAC_CHANNEL_D = 3;
-    DAC_CHANNEL_E = 4;
-    DAC_CHANNEL_F = 5;
-    DAC_CHANNEL_G = 6;
-    DAC_CHANNEL_H = 7;
+    DAC_CHANNEL_A = 4;
+    DAC_CHANNEL_B = 5;
+    DAC_CHANNEL_C = 6;
+    DAC_CHANNEL_D = 7;
+    DAC_CHANNEL_E = 0;
+    DAC_CHANNEL_F = 1;
+    DAC_CHANNEL_G = 2;
+    DAC_CHANNEL_H = 3;
+  }
+
+  if (DAC_20Vpp) {
+    DAC::kOctaveZero = 5;
+    HS::octave_max = 10;
   }
 
   // 0.5v for Northern Light - unipolar Buchla format
