@@ -17,6 +17,19 @@ public:
 
     CURSOR_MAX = AMP_CV
   };
+  enum FiltMode : uint8_t {
+    FILT_BYPASS,
+    FILT_LPF,
+    FILT_BPF,
+    FILT_HPF,
+    FILT_TILT,
+    FILT_DJ,
+
+    FILT_MODE_COUNT
+  };
+  const char * const modename[FILT_MODE_COUNT] = {
+    "", "+LPF", "+BPF", "+HPF", "+Tilt", "+DJ"
+  };
 
   const char* applet_name() {
     return "Fold/MMF";
@@ -31,11 +44,18 @@ public:
   }
 
   void Controller() {
-    const bool tiltmode = filtfolder[0].modesel > 3;
-    const int bias = tiltmode ? tiltbias + res_cv.InRescaled(LVL_MAX_DB) : 0;
+    const int cv = pitch + pitch_cv.In();
+    const bool tiltmode = filtfolder[0].modesel == FILT_TILT;
+    const bool djmode = filtfolder[0].modesel == FILT_DJ;
+    const int bias = tiltmode ? tiltbias + res_cv.InRescaled(LVL_MAX_DB)
+                              : (djmode ? cv > 0 : 0);
 
     for (int i = 0; i < Channels; i++) {
-      filtfolder[i].filter.frequency(PitchToRatio(pitch + pitch_cv.In()) * C3);
+      if (filtfolder[i].modesel == FILT_DJ) {
+        filtfolder[i].filter.frequency(PitchToRatio((cv<0)*8*ONE_OCTAVE + cv) * C0);
+      } else
+        filtfolder[i].filter.frequency(PitchToRatio(cv) * C3);
+
       if (tiltmode) {
         filtfolder[i].filter.resonance(0.70);
       } else {
@@ -50,9 +70,6 @@ public:
   }
 
   void View() {
-    const char * const modename[] = {
-      "", "+LPF", "+BPF", "+HPF", "+Tilt"
-    };
     const int label_x = 1;
     int label_y = 15;
 
@@ -71,7 +88,8 @@ public:
     gfxPrint(modename[filtfolder[0].modesel]);
     gfxEndCursor(cursor == FILTMODE);
 
-    if (filtfolder[0].modesel) {
+    switch (filtfolder[0].modesel) {
+      default:
       label_y += 10;
       gfxStartCursor(label_x, label_y);
       gfxPrintPitchHz(pitch);
@@ -81,7 +99,8 @@ public:
       gfxEndCursor(cursor == FILTER_FREQ_CV, false, pitch_cv.InputName());
 
       label_y += 10;
-      if (filtfolder[0].modesel < 4) {
+      if (filtfolder[0].modesel < FILT_TILT
+          || filtfolder[0].modesel == FILT_DJ) {
         gfxPrint(label_x, label_y, "Res: ");
         gfxStartCursor();
         graphics.printf("%3d%%", res);
@@ -98,6 +117,9 @@ public:
         gfxPrint(res_cv);
         gfxEndCursor(cursor == FILTER_RES_CV, false, res_cv.InputName());
       }
+
+      case FILT_BYPASS:
+        break;
     }
 
     label_y += 10;
@@ -127,7 +149,7 @@ public:
     if (!EditMode()) {
       do {
         MoveCursor(cursor, direction, CURSOR_MAX);
-      } while (0 == filtfolder[0].modesel && cursor >= FILTER_FREQ && cursor <= FILTER_RES_CV);
+      } while (FILT_BYPASS == filtfolder[0].modesel && cursor >= FILTER_FREQ && cursor <= FILTER_RES_CV);
       return;
     }
     if (EditSelectedInputMap(direction)) return;
@@ -142,7 +164,7 @@ public:
         pitch_cv.ChangeSource(direction);
         break;
       case FILTER_RES:
-        if (filtfolder[0].modesel > 3)
+        if (filtfolder[0].modesel == FILT_TILT)
           tiltbias = constrain(tiltbias + direction, LVL_MIN_DB, LVL_MAX_DB);
         else
           res = constrain(res + direction, 70, 500);
@@ -205,12 +227,16 @@ private:
     AudioSynthWaveformDc drive;
     AudioMixer4 mixer;
 
-    uint8_t modesel = 0; // 0 = BYPASS, 1 = LPF, 2 = BPF, 3 = HPF, 4 = Tilt
+    FiltMode modesel = FILT_BYPASS;
 
     void AmpAndFold(float foldF, float level, int tilt = 0) {
       drive.amplitude(foldF);
-      for (int i = 0; i < 4; ++i) {
-        float chanlvl = (i == modesel || (modesel > 3 && (i==1 || i==3))) * level;
+      for (uint8_t i = 0; i < 4; ++i) {
+        bool chan_active = ( i == modesel
+            || (modesel == FILT_TILT && (i==1 || i==3))
+            || (modesel == FILT_DJ && (tilt>0 ? i==3 : i==1))
+        );
+        float chanlvl = chan_active * level;
         if (i==1) chanlvl *= dbToScalar(tilt);
         if (i==3) chanlvl *= -dbToScalar(-tilt);
         mixer.gain(i, chanlvl);
@@ -232,9 +258,9 @@ private:
   AudioPassthrough<Channels> output;
 
   void ChangeMode(int dir) {
-    uint8_t newmode = constrain(filtfolder[0].modesel + dir, 0, 4);
+    uint8_t newmode = constrain(filtfolder[0].modesel + dir, 0, FILT_MODE_COUNT);
     for (int i = 0; i < Channels; i++) {
-      filtfolder[i].modesel = newmode;
+      filtfolder[i].modesel = FiltMode(newmode);
     }
   }
 };
