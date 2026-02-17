@@ -45,6 +45,7 @@ public:
     void Controller() {
         ForEachChannel(ch)
         {
+            // TODO: modulate shape or frequency
             if (Gate(ch)) {
                 if (!gated[ch]) { // Gate wasn't on last time, so start the waveform
                     osc[ch].Start();

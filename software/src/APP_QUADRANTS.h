@@ -1217,19 +1217,63 @@ private:
     };
 
     void Randomizer(bool audio = false) {
+      static uint8_t cycle = 0;
+
       if (audio) audio_app.ReInit();
-      // randomize all applets
-      for (int ch = 0; ch < APPLET_SLOTS; ++ch) {
-        size_t index = random(HEMISPHERE_AVAILABLE_APPLETS);
-        SetApplet(HEM_SIDE(ch), index);
+
+      switch (cycle) {
+        case 0:
+          // randomize all applets
+          for (int ch = 0; ch < APPLET_SLOTS; ++ch) {
+            size_t index = random(HEMISPHERE_AVAILABLE_APPLETS);
+            SetApplet(HEM_SIDE(ch), index);
 #ifdef PEWPEWPEW
-        // load random data !!!
-        // this will expose critical bugs in data validation ;)
-        HS::available_applets[index].instance[ch]->OnDataReceive(
-          uint64_t(random()) << 32 | (uint64_t)random()
-        );
+            // load random data !!!
+            // this will expose critical bugs in data validation ;)
+            HS::available_applets[index].instance[ch]->OnDataReceive(
+              uint64_t(random()) << 32 | (uint64_t)random()
+            );
 #endif
+          }
+          break;
+        case 3:
+          // oops all LFOs
+          SetApplet(HEM_SIDE(0), HS::get_applet_index_by_id(7)); // Ebb&LFO
+          SetApplet(HEM_SIDE(1), HS::get_applet_index_by_id(7)); // Ebb&LFO
+          SetApplet(HEM_SIDE(2), HS::get_applet_index_by_id(49)); // VectorLFO
+          SetApplet(HEM_SIDE(3), HS::get_applet_index_by_id(49)); // VectorLFO
+          break;
+        case 2:
+          // oops all envelopes
+          SetApplet(HEM_SIDE(0), HS::get_applet_index_by_id(8)); // ADSR
+          SetApplet(HEM_SIDE(1), HS::get_applet_index_by_id(52)); // VectorEG
+          SetApplet(HEM_SIDE(2), HS::get_applet_index_by_id(8)); // ADSR
+          SetApplet(HEM_SIDE(3), HS::get_applet_index_by_id(52)); // VectorEG
+          break;
+        case 1:
+          // oops all quantizers
+          SetApplet(HEM_SIDE(0), HS::get_applet_index_by_id(9)); // DualQuant
+          SetApplet(HEM_SIDE(1), HS::get_applet_index_by_id(9)); // DualQuant
+          SetApplet(HEM_SIDE(2), HS::get_applet_index_by_id(46)); // Squanch
+          SetApplet(HEM_SIDE(3), HS::get_applet_index_by_id(46)); // Squanch
+          break;
+        case 4:
+          // oops all sequencers
+          SetApplet(HEM_SIDE(0), HS::get_applet_index_by_id(14)); // SeqX
+          SetApplet(HEM_SIDE(1), HS::get_applet_index_by_id(60)); // TB-3PO
+          SetApplet(HEM_SIDE(2), HS::get_applet_index_by_id(58)); // Shredder
+          SetApplet(HEM_SIDE(3), HS::get_applet_index_by_id(18)); // TwoRings
+          break;
+        case 5:
+          // oops all clocks
+          SetApplet(HEM_SIDE(0), HS::get_applet_index_by_id(6)); // ClockDiv
+          SetApplet(HEM_SIDE(1), HS::get_applet_index_by_id(50)); // Metronome
+          SetApplet(HEM_SIDE(2), HS::get_applet_index_by_id(72)); // PolyDiv
+          SetApplet(HEM_SIDE(3), HS::get_applet_index_by_id(15)); // EuclidX
+          break;
       }
+
+      ++cycle %= 6;
     }
 
     void ConfigEncoderAction(int h, int dir) {
