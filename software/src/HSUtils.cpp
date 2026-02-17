@@ -71,7 +71,12 @@ namespace HS {
   void ResetMappings() {
     for (int i = 0; i < APPLET_SLOTS * 2; ++i) {
       trigmap[i].source = (i%4) + 1;
+      trigmap[i].Reset(true);
       cvmap[i].source = i + 1;
+      cvmap[i].attenuversion = 60;
+      frame.output_slew[i] = 0;
+      frame.output_atten[i] = 60;
+      frame.clockskip[i] = 0;
       clock_m.SetMultiply(0, i);
     }
   }

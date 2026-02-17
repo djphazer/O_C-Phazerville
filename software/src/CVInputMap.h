@@ -112,7 +112,8 @@ struct DigitalInputMap {
     source = constrain(source + dir, -2, num_sources);
   }
 
-  void Reset() {
+  void Reset(bool hard = false) {
+    if (hard) div_mult.steps = 1;
     div_mult.Reset();
     last_gate_state = false;
     clkcount = 0;

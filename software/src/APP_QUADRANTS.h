@@ -1399,6 +1399,8 @@ private:
             // reset input mappings to defaults
             HS::Init();
             Randomizer(true);
+            jump_trig_.source = 0;
+            jump_trig_.Reset(true);
             break;
 
           case DELETE_PRESET:
