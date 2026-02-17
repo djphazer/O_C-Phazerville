@@ -78,10 +78,11 @@ public:
         mask = 0;
         last_mask = 0;
 
-        SetApplet(HEM_SIDE(0), HS::get_applet_index_by_id(18)); // DualTM
-        SetApplet(HEM_SIDE(1), HS::get_applet_index_by_id(15)); // EuclidX
-        SetApplet(HEM_SIDE(2), HS::get_applet_index_by_id(68)); // DivSeq
-        SetApplet(HEM_SIDE(3), HS::get_applet_index_by_id(71)); // Pigeons
+        Randomizer();
+        //SetApplet(HEM_SIDE(0), HS::get_applet_index_by_id(18)); // DualTM
+        //SetApplet(HEM_SIDE(1), HS::get_applet_index_by_id(15)); // EuclidX
+        //SetApplet(HEM_SIDE(2), HS::get_applet_index_by_id(68)); // DivSeq
+        //SetApplet(HEM_SIDE(3), HS::get_applet_index_by_id(71)); // Pigeons
     }
 
     void Resume() {
@@ -1215,6 +1216,22 @@ private:
         MAX_CURSOR = MIDIMAP32
     };
 
+    void Randomizer(bool audio = false) {
+      if (audio) audio_app.ReInit();
+      // randomize all applets
+      for (int ch = 0; ch < APPLET_SLOTS; ++ch) {
+        size_t index = random(HEMISPHERE_AVAILABLE_APPLETS);
+        SetApplet(HEM_SIDE(ch), index);
+#ifdef PEWPEWPEW
+        // load random data !!!
+        // this will expose critical bugs in data validation ;)
+        HS::available_applets[index].instance[ch]->OnDataReceive(
+          uint64_t(random()) << 32 | (uint64_t)random()
+        );
+#endif
+      }
+    }
+
     void ConfigEncoderAction(int h, int dir) {
         if (!isEditing && !preset_cursor) {
           if (h == 0) { // change pages
@@ -1337,18 +1354,7 @@ private:
           case CONFIG_DUMMY:
             // reset input mappings to defaults
             HS::Init();
-            // randomize all applets
-            for (int ch = 0; ch < APPLET_SLOTS; ++ch) {
-              size_t index = random(HEMISPHERE_AVAILABLE_APPLETS);
-              SetApplet(HEM_SIDE(ch), index);
-#ifdef PEWPEWPEW
-              // load random data !!!
-              // this will expose critical bugs in data validation ;)
-              HS::available_applets[index].instance[ch]->OnDataReceive(
-                uint64_t(random()) << 32 | (uint64_t)random()
-              );
-#endif
-            }
+            Randomizer(true);
             break;
 
           case DELETE_PRESET:

@@ -79,6 +79,21 @@ public:
     peak_conns[1][0].connect(OC::AudioIO::InputStream(), 1, peaks[1][0], 0);
   }
 
+  void ReInit() {
+    stereo = 0;
+    for (size_t slot = 0; slot < Slots; slot++) {
+      // todo: reset to defaults here
+      if (IsStereo(slot)) {
+        ChangeStereoApplet(LEFT_HEMISPHERE, slot, 0);
+        stereo ^= 1 << slot;
+        SwapMonoStereo(slot);
+      }
+      ForEachSide(side) {
+        ChangeMonoApplet(side, slot, 0);
+      }
+    }
+  }
+
   void Controller() {
     AudioNoInterrupts();
     for (size_t i = 0; i < Slots; i++) {
@@ -176,9 +191,9 @@ public:
     return false;
   }
 
-  void SetupMonoStereo(int c) {
+  void SwapMonoStereo(int c) {
     if (IsStereo(c)) {
-      get_selected_stereo_applet(c).BaseStart(LEFT_HEMISPHERE);
+      get_selected_stereo_applet(c).BaseStart(LEFT_HEMISPHERE + AUDIO_SLOT_L);
       ForEachSide(side) {
         get_selected_mono_applet(side, c).Disconnect();
         get_selected_mono_applet(side, c).Unload();
@@ -189,7 +204,7 @@ public:
       get_selected_stereo_applet(c).Disconnect();
       get_selected_stereo_applet(c).Unload();
       ForEachSide(side) {
-        get_selected_mono_applet(side, c).BaseStart(side);
+        get_selected_mono_applet(side, c).BaseStart(side + AUDIO_SLOT_L);
         ConnectMonoToNext(side, c);
         if (c > 0) ConnectSlotToNext(side, c - 1);
       }
@@ -203,7 +218,7 @@ public:
         int c = cursor[0];
         stereo ^= 1 << c;
 
-        SetupMonoStereo(c);
+        SwapMonoStereo(c);
       }
       // Prevent press detection when doing a button combo
       ready_for_press = false;
@@ -243,7 +258,7 @@ public:
     get_selected_stereo_applet(slot).Unload();
     sel = ix;
     auto& app = get_selected_stereo_applet(slot);
-    app.BaseStart(side);
+    app.BaseStart(side + AUDIO_SLOT_L);
     ForEachSide(side) ConnectStereoToNext(side, slot);
     if (slot > 0) {
       ForEachSide(side) ConnectSlotToNext(side, slot - 1);
@@ -257,7 +272,7 @@ public:
     get_selected_mono_applet(side, slot).Unload();
     sel = ix;
     auto& app = get_selected_mono_applet(side, slot);
-    app.BaseStart(side);
+    app.BaseStart(side + AUDIO_SLOT_L);
     ConnectMonoToNext(side, slot);
     if (slot > 0) ConnectSlotToNext(side, slot - 1);
   }
@@ -366,7 +381,7 @@ public:
 
       if (IsStereo(slot)) {
         if (0 == ((oldstereo >> slot) & 1)) {
-          SetupMonoStereo(slot);
+          SwapMonoStereo(slot);
         }
         data = 0; // Default to input/passthrough if nothing is found.
         // stereo applets
@@ -385,7 +400,7 @@ public:
         }
       } else {
         if ((oldstereo >> slot) & 1) {
-          SetupMonoStereo(slot);
+          SwapMonoStereo(slot);
         }
         // mono applets
         ForEachSide(ch) {
