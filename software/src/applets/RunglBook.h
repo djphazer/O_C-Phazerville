@@ -34,7 +34,7 @@ public:
     }
 
     void Controller() {
-	Modulate(threshold, 1, (12 << 7), (12 << 7) * 5);
+        threshold = constrain(In(1), (12 << 7), (12 << 7) * 5);
 
         if (Clock(0)) {
             if (Gate(1)) {
