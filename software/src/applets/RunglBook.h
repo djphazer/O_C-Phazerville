@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 // Modified by Samuel Burt 2023
+// Modified by Mace Ojala 2026
 
 class RunglBook : public HemisphereApplet {
 public:
@@ -33,6 +34,8 @@ public:
     }
 
     void Controller() {
+	Modulate(threshold, 1, (12 << 7), (12 << 7) * 5);
+
         if (Clock(0)) {
             if (Gate(1)) {
                 // Digital 2 freezes the buffer, so just rotate left
@@ -78,7 +81,7 @@ protected:
     help[HELP_DIGITAL1] = "Clock";
     help[HELP_DIGITAL2] = "Freeze";
     help[HELP_CV1]      = "Signal";
-    help[HELP_CV2]      = "";
+    help[HELP_CV2]      = "Thr";
     help[HELP_OUT1]     = "Rungle";
     help[HELP_OUT2]     = "Alt";
     help[HELP_EXTRA1] = "Set: Threshold";
