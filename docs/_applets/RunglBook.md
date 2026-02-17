@@ -11,9 +11,9 @@ layout: default
 
 |        | 1/3 | 2/4 |
 | ------ | :-: | :-: |
-| TRIG   |  Clock   |  Freeze   |
-| CV INs | Signal    |  N/A   |
-| OUTs   |  Rungle output (low three bits)   | Rungle output (high three bits)    |
+| TRIG   | Clock     |  Freeze   |
+| CV INs | Signal    |  Threshold   |
+| OUTs   | Rungle output (low three bits)   | Rungle output (high three bits)    |
 
 ## UI Parameters
  * Threshold (semitone increments)
