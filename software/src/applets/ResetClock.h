@@ -18,8 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#define RC_MIN_SPACING 6
-#define RC_TICKS_PER_MS 17
+#define RC_MIN_SPACING 1
+#define RC_TICKS_PER_MS HEMISPHERE_CLOCK_TICKS
 
 class ResetClock : public HemisphereApplet {
 public:
@@ -118,6 +118,7 @@ public:
         length = Unpack(data, PackLocation {0,5}) + 1;
         offset = Unpack(data, PackLocation {5,5});
         spacing = Unpack(data, PackLocation {10,7});
+        CONSTRAIN(spacing, RC_MIN_SPACING, 100);
     }
 
 protected:
