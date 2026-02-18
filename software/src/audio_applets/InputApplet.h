@@ -12,7 +12,7 @@ public:
   }
   void Start() override {
     if (MONO == Channels) {
-      modesel_ = hemisphere;
+      modesel_ = hemisphere & 1;
     }
 
     ForEachChannel(ch) {
