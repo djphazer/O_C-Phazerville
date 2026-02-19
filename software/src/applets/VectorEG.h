@@ -26,6 +26,8 @@
 
 class VectorEG : public HemisphereApplet {
 public:
+  static constexpr int MIN_FREQ = 1; // centihertz
+  static constexpr int MAX_FREQ = 2000;
 
     const char* applet_name() {
         return "VectorEG";
@@ -33,18 +35,32 @@ public:
     const uint8_t* applet_icon() { return PhzIcons::vectorEG; }
 
     void Start() {
-        ForEachChannel(ch)
-        {
+        ForEachChannel(ch) {
             freq[ch] = 50;
-            SwitchWaveform(ch, HS::EG1 + ch);
+            wave_mod[ch] = waveform_number[ch] = HS::EG1 + ch;
+            SwitchWaveform(ch, waveform_number[ch]);
             gated[ch] = 0;
             Out(ch, 0);
         }
     }
 
     void Controller() {
-        ForEachChannel(ch)
-        {
+        ForEachChannel(ch) {
+            // modulate shape or frequency
+            if (modshape) {
+              int wave = WaveformManager::GetNextWaveform(waveform_number[ch], SemitoneIn(ch));
+              if (wave_mod[ch] != wave) {
+                wave_mod[ch] = wave;
+                SwitchWaveform(ch, wave_mod[ch]);
+              }
+            } else {
+              // Input is frequency modulation for channel
+              //osc[ch].SetPhaseIncrement(ComputePhaseIncrement(pitch[ch] + In(ch)));
+              freq_mod[ch] = freq[ch];
+              Modulate(freq_mod[ch], ch, MIN_FREQ, MAX_FREQ);
+              osc[ch].SetFrequency(freq_mod[ch]);
+            }
+
             if (Gate(ch)) {
                 if (!gated[ch]) { // Gate wasn't on last time, so start the waveform
                     osc[ch].Start();
@@ -64,6 +80,16 @@ public:
         DrawInterface();
     }
 
+    void AuxButton() {
+      modshape = cursor & 1;
+      if (!modshape) {
+        ForEachChannel(ch) {
+          wave_mod[ch] = waveform_number[ch];
+          SwitchWaveform(ch, waveform_number[ch]);
+        }
+      }
+      CancelEdit();
+    }
     //void OnButtonPress() { }
 
     void OnEncoderMove(int direction) {
@@ -71,10 +97,9 @@ public:
             MoveCursor(cursor, direction, 3);
             return;
         }
-        
-        byte c = cursor;
-        byte ch = cursor < 2 ? 0 : 1;
-        if (ch) c -= 2;
+
+        const uint8_t c = cursor & 1;
+        const uint8_t ch = cursor >> 1;
 
         if (c == 1) { // Waveform
             waveform_number[ch] = WaveformManager::GetNextWaveform(waveform_number[ch], direction);
@@ -82,24 +107,28 @@ public:
         }
         if (c == 0) { // Frequency
             if (freq[ch] > 50) direction *= 10;
-            freq[ch] = constrain(freq[ch] + direction, 10, 500);
+            freq_mod[ch] = freq[ch] = constrain(freq[ch] + direction, MIN_FREQ, MAX_FREQ);
             osc[ch].SetFrequency(freq[ch]);
         }
     }
-        
+
     uint64_t OnDataRequest() {
         uint64_t data = 0;
         Pack(data, PackLocation {0,6}, waveform_number[0]);
         Pack(data, PackLocation {6,6}, waveform_number[1]);
         Pack(data, PackLocation {12,10}, freq[0] & 0x03ff);
         Pack(data, PackLocation {22,10}, freq[1] & 0x03ff);
+        Pack(data, PackLocation {32, 1}, modshape);
         return data;
     }
     void OnDataReceive(uint64_t data) {
         freq[0] = Unpack(data, PackLocation {12,10});
         freq[1] = Unpack(data, PackLocation {22,10});
-        SwitchWaveform(0, Unpack(data, PackLocation {0,6}));
-        SwitchWaveform(1, Unpack(data, PackLocation {6,6}));
+        waveform_number[0] = Unpack(data, PackLocation {0,6});
+        waveform_number[1] = Unpack(data, PackLocation {6,6});
+        SwitchWaveform(0, waveform_number[0]);
+        SwitchWaveform(1, waveform_number[1]);
+        modshape = Unpack(data, PackLocation {32, 1});
     }
 
 protected:
@@ -107,12 +136,12 @@ protected:
         //                    "-------" <-- Label size guide
         help[HELP_DIGITAL1] = "Gate 1";
         help[HELP_DIGITAL2] = "Gate 2";
-        help[HELP_CV1]      = "";
-        help[HELP_CV2]      = "";
+        help[HELP_CV1]      = modshape? "Shape" : "Freq";
+        help[HELP_CV2]      = modshape? "Shape" : "Freq";
         help[HELP_OUT1]     = "Ch1 Env";
         help[HELP_OUT2]     = "Ch2 Env";
-        help[HELP_EXTRA1] = "";
-        help[HELP_EXTRA2] = "Enc: Freq, Waveform";
+        help[HELP_EXTRA1] = "Enc: Freq, Shape";
+        help[HELP_EXTRA2] = "AuxBtn: CV mode";
        //                   "---------------------" <-- Extra text size guide
     }
 
@@ -122,42 +151,49 @@ private:
     bool gated[2];
 
     // Settings
-    int waveform_number[2];
-    int freq[2];
-    
+    bool modshape = false;
+    uint8_t waveform_number[2];
+    uint8_t wave_mod[2];
+    int16_t freq[2];
+    int16_t freq_mod[2];
+
     void DrawInterface() {
-        byte c = cursor;
-        byte ch = cursor < 2 ? 0 : 1;
-        if (ch) c -= 2;
+        uint8_t c = cursor & 1;
+        uint8_t ch = cursor >> 1;
 
         // Show channel output
         gfxPos(1, 15);
         gfxPrint(OutputLabel(ch));
         gfxInvert(1, 14, 7, 9);
 
-        gfxPrint(10, 15, ones(freq[ch]));
+        gfxPrint(10, 15, ones(freq_mod[ch]));
         gfxPrint(".");
-        int h = hundredths(freq[ch]);
+        int h = hundredths(freq_mod[ch]);
         if (h < 10) gfxPrint("0");
         gfxPrint(h);
         gfxPrint(" Hz");
+
+        if (freq[ch] != freq_mod[ch]) gfxIcon(56, 10, CV_ICON);
+
+        gfxIcon(56, 15, modshape? DOWN_ICON : LEFT_ICON);
+
         DrawWaveform(ch);
 
-        if (c == 0) gfxCursor(8, 23, 55);
-        if (c == 1 && (EditMode() || CursorBlink()) ) gfxFrame(0, 24, 63, 40);
+        if (c == 0) gfxSpicyCursor(9, 23, 27);
+        if (c == 1 && (EditMode() || CursorBlink()) ) gfxFrame(0, 24, 63, 40, true);
     }
 
-    void DrawWaveform(byte ch) {
+    void DrawWaveform(uint8_t ch) {
         uint16_t total_time = osc[ch].TotalTime();
         VOSegment seg = osc[ch].GetSegment(osc[ch].SegmentCount() - 1);
-        byte prev_x = 0; // Starting coordinates
-        byte prev_y = 63 - Proportion(seg.level, 255, 38);
-        for (byte i = 0; i < osc[ch].SegmentCount(); i++)
+        uint8_t prev_x = 0; // Starting coordinates
+        uint8_t prev_y = 63 - Proportion(seg.level, 255, 38);
+        for (uint8_t i = 0; i < osc[ch].SegmentCount(); i++)
         {
             seg = osc[ch].GetSegment(i);
-            byte y = 63 - Proportion(seg.level, 255, 38);
-            byte seg_x = Proportion(seg.time, total_time, 62);
-            byte x = prev_x + seg_x;
+            uint8_t y = 63 - Proportion(seg.level, 255, 38);
+            uint8_t seg_x = Proportion(seg.time, total_time, 62);
+            uint8_t x = prev_x + seg_x;
             x = constrain(x, 0, 62);
             y = constrain(y, 25, 62);
             gfxLine(prev_x, prev_y, x, y);
@@ -169,16 +205,21 @@ private:
         gfxDottedLine(0, 44, 63, 44, 8);
     }
 
-    void SwitchWaveform(byte ch, int waveform) {
+    void SwitchWaveform(uint8_t ch, uint8_t waveform) {
         osc[ch] = WaveformManager::VectorOscillatorFromWaveform(waveform);
-        waveform_number[ch] = waveform;
         osc[ch].SetFrequency(freq[ch]);
-#ifdef NORTHERNLIGHT
-        osc[ch].SetScale((12 << 7) * 8); // 8V
-#else
-        osc[ch].SetScale(3840); // 2.5V
-        osc[ch].Offset(3840); // For a total range of 0-5V
-#endif
+
+        // unipolar
+        osc[ch].SetScale(HEMISPHERE_MAX_CV/2);
+        osc[ch].Offset(HEMISPHERE_MAX_CV/2);
+
+        //if (OC::DAC::kOctaveZero == 0) {
+        //} else {
+        // TODO: bipolar
+        //osc[ch].Offset(0);
+        //osc[ch].SetScale(HEMISPHERE_MAX_CV);
+        //}
+
         osc[ch].Sustain(); // EG
         osc[ch].Cycle(0); // Non cycling
     }
