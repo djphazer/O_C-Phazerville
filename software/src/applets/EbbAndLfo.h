@@ -281,10 +281,15 @@ public:
         ratio = constrain(ratio + direction, -128, 127);
       } else {
         uint32_t old_pi = ComputePhaseIncrement(pitch);
-        pitch += (knob_accel >> 8) * direction;
-        while (ComputePhaseIncrement(pitch) == old_pi) {
-          pitch += direction;
+        int new_pitch = pitch + (knob_accel >> 8) * direction;
+        while (ComputePhaseIncrement(new_pitch) == old_pi) {
+          new_pitch += direction;
         }
+        pitch = constrain(
+          new_pitch,
+          -32767 - HEMISPHERE_MIN_CV,
+          ComputePitch(0x7fffffff) // nyquist
+        );
       }
       break;
     }
