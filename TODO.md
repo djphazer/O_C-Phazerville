@@ -7,7 +7,6 @@ TODO (Roadmap)
   - this is mostly done on the dev/2.0 branch
 * Auto-tuner with floor/ceiling detection (fail gracefully)
 * generalized AppletParams for flexible assignment, extra virtual I/O
-* Pop-up MIDI Map editor
 * Integrate Calibr8or with DAC for global tracking adjustments
 * USB Gamepad support
 * MTP_Teensy lib for file management over USB
@@ -17,7 +16,6 @@ TODO (Roadmap)
 * Re-implement Piqued envelopes in an applet
 * Audio Applets for T4.1
   - add VCF+VCA to Osc
-  - 3-band EQ / multi-band dynamics
   - WAVPlay: rework looping/caching; support more metadata tags (tempo, cue points)
 * Update Boilerplates - I just assume this needs attention
 * MORE MIDI STUFF:
@@ -37,6 +35,8 @@ TODO (Roadmap)
 * Tetris
 
 # [DONE]
+* Pop-up MIDI Map editor
+- 3-band EQ / multi-band dynamics
 * MIDI mapping for param modulation sources
 - multi-mode (HP, BP, LP) for Filt/Fold
 * Quadrants Preset Bank switching

@@ -27,7 +27,7 @@ There are two distinct _microcontrollers_ aka MCU's (and each has variants) and 
   - DAC and OLED share a SPI bus
   - 8HP uO_c by jakplugg - https://github.com/jakplugg/uO_c
   - original 14HP panels & gerbers are in the `hardware` directory
-* "O_C T4.1" aka **O.R.N.8** - https://github.com/PaulStoffregen/O_C_T41
+* **O.R.N.8** aka "O_C T4.1" - https://github.com/PaulStoffregen/O_C_T41
   - 8ch ADC / 8ch DAC / 2ch Audio In + 2ch Audio Out
   - SPI0 dedicated for DAC
   - SPI1 dedicated for OLED
