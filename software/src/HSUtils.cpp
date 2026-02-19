@@ -392,6 +392,11 @@ void gfxPrintFreqFromPitch(int16_t pitch) {
     denom = t;
   }
   int int_part = num / denom;
+  bool minutes = (swap && int_part > 600);
+  if (minutes) {
+    denom *= 60;
+    int_part = num / denom;
+  }
   int digits = 0;
   if (int_part < 10)
     digits = 1;
@@ -413,7 +418,7 @@ void gfxPrintFreqFromPitch(int16_t pitch) {
     digits++;
   }
   if (swap) {
-    gfxPrint("s");
+    gfxPrint(minutes ? "m" : "s");
   } else {
     gfxPrint("Hz");
   }
