@@ -63,7 +63,7 @@ public:
 
         MAX_STEP_PARAM_CURSOR,
     };
-    static constexpr const char* const step_param_names[MAX_STEP_PARAM_CURSOR] = {
+    const char* const step_param_names[MAX_STEP_PARAM_CURSOR] = {
         "Offset", "Amp", "WaveOff", "Revert",
         "Invert", "Option", "Triggers", "Clocks",
         "Length", "Prob", "RetrgLvl", "ModMark",
@@ -106,6 +106,7 @@ public:
 
         MAX_MODULATION_MODE,
     };
+    const char* const mod_mode_txt[MAX_MODULATION_MODE] = { "Mod", "H step", "H seq" };
 
     // Shape types for step transitions
     enum Shape : uint8_t {
@@ -119,7 +120,10 @@ public:
         LOG_DOWN = 7,
         LOG_UP = 8,
         VOSC = 9,
+
+        MAX_SHAPE
     };
+    const char* const shape_txt[MAX_SHAPE] = { "Hold", "Zero", "Flat", "ExpDw", "ExpUp", "RampDw", "RampUp", "LogDw", "LogUp", "VOSC" };
 
     const char* applet_name() {
         return "EnvSeq";
@@ -1526,16 +1530,7 @@ private:
     }
 
     const char* mod1_mode_string(ModulationMode mode) {
-        switch (mode) {
-        case ModulationMode::MOD:
-            return "Mod";
-        case ModulationMode::HOLD_STEP_START:
-            return "H step";
-        case ModulationMode::HOLD_SEQ_START:
-            return "H seq";
-        default:
-            return "";
-        }
+      return mod_mode_txt[mode];
     }
 
     const char* mod2_mode_string(EnvSeqManager::ModulationMode mode) {
@@ -1562,65 +1557,15 @@ private:
     }
 
     const char* output2_mode_string(EnvSeqManager::OutputMode mode) {
-        switch (mode) {
-        case EnvSeqManager::OutputMode::COPY:
-            return "Cpy";
-        case EnvSeqManager::OutputMode::INV:
-            return "Inv";
-        case EnvSeqManager::OutputMode::INVO:
-            return "InvO";
-        case EnvSeqManager::OutputMode::CV_STEP_START:
-            return "HStart";
-        case EnvSeqManager::OutputMode::GATE_STEP:
-            return "Step";
-        case EnvSeqManager::OutputMode::GATE_STEP_INCL_RETRIGGERS:
-            return "StepTrg";
-        case EnvSeqManager::OutputMode::GATE_SEQUENCE:
-            return "Seq";
-        default:
-            return "";
-        }
+      return EnvSeqManager::output_mode_txt[mode];
     }
 
-    const char* shape_string(uint16_t shape) {
-        switch (shape) {
-        case Shape::HOLD:
-            return "Hold";
-        case Shape::ZERO:
-            return "Zero";
-        case Shape::FLAT:
-            return "Flat";
-        case Shape::RAMP_UP:
-            return "RampUp";
-        case Shape::RAMP_DOWN:
-            return "RampDw";
-        case Shape::EXP_UP:
-            return "ExpUp";
-        case Shape::EXP_DOWN:
-            return "ExpDw";
-        case Shape::LOG_UP:
-            return "LogUp";
-        case Shape::LOG_DOWN:
-            return "LogDw";
-        default:
-            return "VOSC";
-        }
+    const char* shape_string(Shape shape) {
+      if (shape >= VOSC) return shape_txt[VOSC];
+      return shape_txt[shape];
     }
 
     const char* option_string(EnvSeqManager::Option option) {
-        switch (option) {
-        case EnvSeqManager::Option::NO_OPTION:
-            return "None";
-        case EnvSeqManager::Option::FOLD_UP:
-            return "FoldUp";
-        case EnvSeqManager::Option::FOLD_DOWN:
-            return "FoldDw";
-        case EnvSeqManager::Option::ZERO_UP:
-            return "ZeroUp";
-        case EnvSeqManager::Option::ZERO_DOWN:
-            return "ZeroDw";
-        default:
-            return "";
-        }
+      return EnvSeqManager::option_txt[option];
     }
 };

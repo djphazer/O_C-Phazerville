@@ -43,11 +43,12 @@ namespace EnvSeqManager {
 
         MAX_OUTPUT_MODE,
     };
+    const char* const output_mode_txt[MAX_OUTPUT_MODE] = {"Cpy", "Inv", "InvO", "HStart", "Step", "StepTrg", "Seq"};
 
     struct Modulation {
-        ModulationMode mode = ModulationMode::MOD;
-        OutputMode output_mode = OutputMode::COPY;
-        int cv = 0;
+      ModulationMode mode = ModulationMode::MOD;
+      OutputMode output_mode = OutputMode::COPY;
+      int cv = 0;
     };
 
     struct Output {
@@ -84,6 +85,7 @@ namespace EnvSeqManager {
 
         MAX_OPTIONS,
     };
+    const char* const option_txt[MAX_OPTIONS] = {"None", "FoldUp", "FoldDw", "ZeroUp", "ZeroDw"};
 
     struct Step {
         uint16_t shape; // Shape for the step. 0..VOSC-1 is the enum value, >=VOSC is the VOSC waveform number.
