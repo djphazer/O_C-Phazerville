@@ -138,9 +138,9 @@ public:
 
     void Controller()
     {
-        manager.Register(hemisphere);
-        bool linked = manager.IsLinked(hemisphere);
-        if (manager.CanLink(hemisphere)) {
+        EnvSeqManager::Register(hemisphere);
+        bool linked = EnvSeqManager::IsLinked(hemisphere);
+        if (EnvSeqManager::CanLink(hemisphere)) {
             if (linked) {
                 controller_linked();
                 return;
@@ -360,10 +360,10 @@ public:
             cv_step_start = output_cv;
         }
 
-        EnvSeqManager::LinkedData *linked_data = manager.GetLinkedData(hemisphere);
+        EnvSeqManager::LinkedData *linked_data = EnvSeqManager::GetLinkedData(hemisphere);
 
         // Output to CV2 and linked outputs
-        const uint8_t output_count = manager.IsLinked(hemisphere) ? 3 : 1;
+        const uint8_t output_count = EnvSeqManager::IsLinked(hemisphere) ? 3 : 1;
         for (uint8_t i = 0; i < output_count; i++) {
             EnvSeqManager::Output &output = (i == 0) ? output2 : linked_data[i - 1].output;
             bool do_gate = false;
@@ -417,7 +417,7 @@ public:
     }
 
     void Unload() {
-        manager.Unload(hemisphere);
+        EnvSeqManager::Unload(hemisphere);
     }
 
     void View() {
@@ -473,7 +473,7 @@ public:
 
         if (linked_cursor == LinkedCursor::UNLINK) {
             // Unlink and return to the main view
-            manager.SetLink(hemisphere, false);
+            EnvSeqManager::SetLink(hemisphere, false);
             linked_cursor = LinkedCursor::MAX_LINKED_CURSOR;
             return;
         }
@@ -487,7 +487,7 @@ public:
         switch (cursor) {
         case EnvSeqCursor::LINK:
             // Link and open linked view
-            manager.SetLink(hemisphere, true);
+            EnvSeqManager::SetLink(hemisphere, true);
             linked_cursor = LinkedCursor::UNLINK;
             return;
 
@@ -521,10 +521,10 @@ public:
                 steps[step_view].mod_mark = !steps[step_view].mod_mark;
                 return;
             case StepParamCursor::STEP_PARAM_COPY:
-                manager.CopyStep(steps[step_view]);
+                EnvSeqManager::CopyStep(steps[step_view]);
                 return;
             case StepParamCursor::STEP_PARAM_PASTE:
-                manager.PasteStep(steps[step_view]);
+                EnvSeqManager::PasteStep(steps[step_view]);
                 osc_draw_reinit = true;
                 if (step == step_view) {
                     osc_reinit = true;
@@ -553,7 +553,7 @@ public:
                 return;
             }
 
-            EnvSeqManager::LinkedData* linked_data = manager.GetLinkedData(hemisphere);
+            EnvSeqManager::LinkedData* linked_data = EnvSeqManager::GetLinkedData(hemisphere);
             switch (linked_cursor) {
             case LinkedCursor::LINKED_MOD1_MODE:
                 linked_data[0].SetModulationMode(linked_data[0].modulation.mode + direction);
@@ -579,7 +579,7 @@ public:
 
         if (!EditMode()) {
             MoveCursor(cursor, direction, EnvSeqCursor::MAX_CURSOR - 1);
-            if (cursor == EnvSeqCursor::LINK && !manager.CanLink(hemisphere)) {
+            if (cursor == EnvSeqCursor::LINK && !EnvSeqManager::CanLink(hemisphere)) {
                 // Cannot link, skip cursor 
                 cursor += direction > 0 ? 1 : -1;
             }
@@ -630,7 +630,7 @@ public:
         }
         case EnvSeqCursor::STEP_PARAM:
             MoveCursor(step_param_cursor, direction, StepParamCursor::MAX_STEP_PARAM_CURSOR - 1);
-            if (step_param_cursor == StepParamCursor::STEP_PARAM_PASTE && !manager.HasClipboard()) {
+            if (step_param_cursor == StepParamCursor::STEP_PARAM_PASTE && !EnvSeqManager::HasClipboard()) {
                 // No clipboard, set to copy cursor
                 step_param_cursor = StepParamCursor::STEP_PARAM_COPY;
             }
@@ -682,8 +682,8 @@ public:
         Pack(data, PackLocation {9, 4}, mod2_mode);
         Pack(data, PackLocation {13, 3}, output2_mode);
         
-        const EnvSeqManager::LinkedData* linked_data = manager.GetLinkedData(hemisphere);
-        Pack(data, PackLocation {16, 1}, manager.IsLinked(hemisphere));
+        const EnvSeqManager::LinkedData* linked_data = EnvSeqManager::GetLinkedData(hemisphere);
+        Pack(data, PackLocation {16, 1}, EnvSeqManager::IsLinked(hemisphere));
         Pack(data, PackLocation {17, 4}, linked_data[0].modulation.mode);
         Pack(data, PackLocation {21, 4}, linked_data[1].modulation.mode);
         Pack(data, PackLocation {25, 4}, linked_data[0].modulation.output_mode);
@@ -711,11 +711,11 @@ public:
         mod2_mode = (EnvSeqManager::ModulationMode)constrain(Unpack(data, PackLocation {9, 4}), 0, EnvSeqManager::ModulationMode::MAX_MODULATION_MODE - 1);
         output2_mode = (EnvSeqManager::OutputMode)constrain(Unpack(data, PackLocation {13, 3}), 0, EnvSeqManager::OutputMode::MAX_OUTPUT_MODE - 1);
 
-        manager.SetLink(hemisphere, Unpack(data, PackLocation {16, 1}));
-        if (manager.IsLinked(hemisphere)) {
+        EnvSeqManager::SetLink(hemisphere, Unpack(data, PackLocation {16, 1}));
+        if (EnvSeqManager::IsLinked(hemisphere)) {
             linked_cursor = LinkedCursor::UNLINK;
         }
-        EnvSeqManager::LinkedData* linked_data = manager.GetLinkedData(hemisphere);
+        EnvSeqManager::LinkedData* linked_data = EnvSeqManager::GetLinkedData(hemisphere);
         linked_data[0].SetModulationMode(Unpack(data, PackLocation {17, 4}));
         linked_data[1].SetModulationMode(Unpack(data, PackLocation {21, 4}));
         linked_data[0].SetModulationOutputMode(Unpack(data, PackLocation {25, 4}));
@@ -754,7 +754,6 @@ private:
     int8_t cursor = 0, step_param_cursor = 0, linked_cursor = MAX_LINKED_CURSOR;
     bool random_menu_active = false; // Whether the random menu is active
     OC::menu::ScreenCursor<5> random_menu_cursor;
-    EnvSeqManager& manager = EnvSeqManager::get();
 
     bool trigger2 = false; // Whether to trigger on TR2
     uint8_t num_steps = 8; // How many steps of the generated envelope to play before looping
@@ -800,7 +799,7 @@ private:
 
     // Controller for linked applet
     void controller_linked() {
-        EnvSeqManager::LinkedData *linked_data = manager.GetLinkedData(hemisphere);
+        EnvSeqManager::LinkedData *linked_data = EnvSeqManager::GetLinkedData(hemisphere);
 
         linked_data[0].modulation.cv = In(0);
         linked_data[1].modulation.cv = In(1);
@@ -893,8 +892,8 @@ private:
             output.cv = detented ? DetentedIn(1) : In(1);
         }
 
-        if (manager.IsLinked(hemisphere)) {
-            const EnvSeqManager::LinkedData *linked_data = manager.GetLinkedData(hemisphere);
+        if (EnvSeqManager::IsLinked(hemisphere)) {
+            const EnvSeqManager::LinkedData *linked_data = EnvSeqManager::GetLinkedData(hemisphere);
             for (int i = 0; i < 2; i++) {
                 if (linked_data[i].modulation.mode == mod_mode) {
                     output.is_cv = true;
@@ -994,7 +993,7 @@ private:
 
     void draw_interface_linked() {
         uint8_t y = 5;
-        const EnvSeqManager::LinkedData* linked_data = manager.GetLinkedData(hemisphere);
+        const EnvSeqManager::LinkedData* linked_data = EnvSeqManager::GetLinkedData(hemisphere);
 
         y += 10;
         if (DetentedIn(0)) {
@@ -1027,8 +1026,8 @@ private:
     }
 
     void draw_interface() {
-        bool can_link = manager.CanLink(hemisphere);
-        if (can_link && manager.IsLinked(hemisphere)) {
+        bool can_link = EnvSeqManager::CanLink(hemisphere);
+        if (can_link && EnvSeqManager::IsLinked(hemisphere)) {
             draw_interface_linked();
             return;
         }

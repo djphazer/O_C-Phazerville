@@ -18,8 +18,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-class EnvSeqManager {
-public:
+#pragma once
+
+namespace EnvSeqManager {
     enum ModulationMode : uint8_t {
         LENGTH = 0, // Modulate the step length
         STEP_SEL = 1, // Modulate the step selector
@@ -102,36 +103,9 @@ public:
         int8_t retrigger_level : 5; // Retrigger level (-15..15). -15: fade in 0->100, 0: no fade, 15: fade out 100->0
     };
 
-private:
-    EnvSeqManager() = default;
-    static EnvSeqManager* instance;
     bool registered[4] = {false, false, false, false};
     LinkedState linked_states[2] = {LinkedState{}, LinkedState{}};
     Step* clipboard = nullptr;
-
-public:
-    static EnvSeqManager& get() {
-        if (!instance) {
-            instance = new EnvSeqManager;
-        }
-
-        return *instance;
-    }
-
-    // Register the applet in the manager
-    void Register(HEM_SIDE hemisphere) {
-        registered[hemisphere] = true;
-    }
-
-    // Unregister the applet from the manager
-    void Unload(HEM_SIDE hemisphere) {
-        registered[hemisphere] = false;
-        SetLink(hemisphere, false);
-        if ((hemisphere & 1) == 0) {
-            // Unloaded left applet
-            linked_states[hemisphere >> 1].linked = false;
-        }
-    }
 
     // Check if the applet can be linked to the other applet
     // The applet can be linked if it's in the right hemisphere and both applets are registered
@@ -153,15 +127,27 @@ public:
         }
     }
 
+    // Register the applet in the manager
+    void Register(HEM_SIDE hemisphere) {
+        registered[hemisphere] = true;
+    }
+
+    // Unregister the applet from the manager
+    void Unload(HEM_SIDE hemisphere) {
+        registered[hemisphere] = false;
+        SetLink(hemisphere, false);
+        if ((hemisphere & 1) == 0) {
+            // Unloaded left applet
+            linked_states[hemisphere >> 1].linked = false;
+        }
+    }
+
     // Check if the applet is linked to the other applet
-    const bool IsLinked(HEM_SIDE hemisphere) const {
+    const bool IsLinked(HEM_SIDE hemisphere) {
         return linked_states[hemisphere >> 1].linked;
     }
 
     // Get the linked data for the applet
-    const LinkedData* GetLinkedData(HEM_SIDE hemisphere) const {
-        return linked_states[hemisphere >> 1].data;
-    }
     LinkedData* GetLinkedData(HEM_SIDE hemisphere) {
         return linked_states[hemisphere >> 1].data;
     }
@@ -183,9 +169,7 @@ public:
     }
 
     // Check if there is a step in the clipboard
-    bool HasClipboard() const {
+    bool HasClipboard() {
         return clipboard != nullptr;
     }
 };
-
-EnvSeqManager* EnvSeqManager::instance = 0;
