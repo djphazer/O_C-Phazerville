@@ -190,6 +190,7 @@ namespace HS {
       } else { // edit mask bits
         const int idx = q_edit - 4;
         q_engine[qview].EditMask(idx, dir>0);
+        q_engine[qview].Reconfig();
       }
     }
   }
