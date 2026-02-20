@@ -239,6 +239,7 @@ namespace HS {
   void DrawPopup(const int config_cursor = 0, const int preset_id = 0, const bool blink = 0);
   void ToggleClockRun();
   void PokePopup(PopupType pop, ErrMsgIndex err = NO_ERROR);
+  void PokePopup(PopupType pop, const char* msg);
 
 } // namespace HS
 

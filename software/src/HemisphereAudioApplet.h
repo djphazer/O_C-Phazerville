@@ -133,7 +133,7 @@ public:
 
     // TODO: we need a static_assert, if possible... or use a vector instead
     if (cable_count >= MAX_CABLES) {
-      HS::PokePopup(HS::MESSAGE_POPUP, HS::MYSTERIOUS_ERROR);
+      HS::PokePopup(HS::MESSAGE_POPUP, "AUDIO MAXED!!");
       return;
     }
 

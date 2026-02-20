@@ -1235,6 +1235,7 @@ private:
             );
 #endif
           }
+          PokePopup(HS::MESSAGE_POPUP, "Reset/Random");
           break;
         case 3:
           // oops all LFOs
@@ -1242,6 +1243,7 @@ private:
           SetApplet(HEM_SIDE(1), HS::get_applet_index_by_id(7)); // Ebb&LFO
           SetApplet(HEM_SIDE(2), HS::get_applet_index_by_id(49)); // VectorLFO
           SetApplet(HEM_SIDE(3), HS::get_applet_index_by_id(49)); // VectorLFO
+          PokePopup(HS::MESSAGE_POPUP, "LFOs!");
           break;
         case 2:
           // oops all envelopes
@@ -1249,6 +1251,7 @@ private:
           SetApplet(HEM_SIDE(1), HS::get_applet_index_by_id(52)); // VectorEG
           SetApplet(HEM_SIDE(2), HS::get_applet_index_by_id(8)); // ADSR
           SetApplet(HEM_SIDE(3), HS::get_applet_index_by_id(52)); // VectorEG
+          PokePopup(HS::MESSAGE_POPUP, "Envelopes!");
           break;
         case 1:
           // oops all quantizers
@@ -1256,6 +1259,7 @@ private:
           SetApplet(HEM_SIDE(1), HS::get_applet_index_by_id(9)); // DualQuant
           SetApplet(HEM_SIDE(2), HS::get_applet_index_by_id(46)); // Squanch
           SetApplet(HEM_SIDE(3), HS::get_applet_index_by_id(46)); // Squanch
+          PokePopup(HS::MESSAGE_POPUP, "Quantizers!");
           break;
         case 4:
           // oops all sequencers
@@ -1263,6 +1267,7 @@ private:
           SetApplet(HEM_SIDE(1), HS::get_applet_index_by_id(60)); // TB-3PO
           SetApplet(HEM_SIDE(2), HS::get_applet_index_by_id(58)); // Shredder
           SetApplet(HEM_SIDE(3), HS::get_applet_index_by_id(18)); // TwoRings
+          PokePopup(HS::MESSAGE_POPUP, "Sequencers!");
           break;
         case 5:
           // oops all clocks
@@ -1270,6 +1275,7 @@ private:
           SetApplet(HEM_SIDE(1), HS::get_applet_index_by_id(50)); // Metronome
           SetApplet(HEM_SIDE(2), HS::get_applet_index_by_id(72)); // PolyDiv
           SetApplet(HEM_SIDE(3), HS::get_applet_index_by_id(15)); // EuclidX
+          PokePopup(HS::MESSAGE_POPUP, "Clocks!");
           break;
       }
 
@@ -1401,6 +1407,7 @@ private:
             Randomizer(true);
             jump_trig_.source = 0;
             jump_trig_.Reset(true);
+            config_page = HIDE_CONFIG;
             break;
 
           case DELETE_PRESET:

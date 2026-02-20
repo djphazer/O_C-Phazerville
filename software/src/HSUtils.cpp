@@ -20,13 +20,14 @@ namespace HS {
 
   uint32_t popup_tick; // for button feedback
   PopupType popup_type = MENU_POPUP;
+  const char* popup_msg;
+  ErrMsgIndex msg_idx;
+
   int q_edit = 0; // edit cursor for quantizer popup, 0 = not editing
   uint8_t qview = 0; // which quantizer's setting is shown in popup
 
   int midi_edit = 0;
   uint8_t mview = 0;
-
-  ErrMsgIndex msg_idx;
 
   OC::SemitoneQuantizer input_quant[ADC_CHANNEL_LAST];
 
@@ -81,8 +82,13 @@ namespace HS {
     }
   }
 
+  void PokePopup(PopupType pop, const char* msg) {
+    popup_msg = msg;
+    popup_type = pop;
+    popup_tick = OC::CORE::ticks;
+  }
   void PokePopup(PopupType pop, ErrMsgIndex err) {
-    msg_idx = err;
+    popup_msg = OC::Strings::err_msg[err];
     popup_type = pop;
     popup_tick = OC::CORE::ticks;
   }
@@ -275,7 +281,7 @@ namespace HS {
     switch (popup_type) {
       default:
       case MESSAGE_POPUP:
-        gfxPrint(OC::Strings::err_msg[msg_idx]);
+        gfxPrint(popup_msg);
         break;
       case MENU_POPUP:
         gfxPrint(78, 30, "Load");
