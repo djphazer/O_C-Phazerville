@@ -231,7 +231,7 @@ UiMode Ui::Splashscreen(bool &reset_settings) {
     GRAPHICS_BEGIN_FRAME(true);
 
     menu::DefaultTitleBar::Draw();
-    graphics.print( NorthernLightModular? OC::Strings::NAME_NLM : OC::Strings::NAME);
+    graphics.print( DAC_is_inverted? OC::Strings::NAME_NLM : OC::Strings::NAME);
     weegfx::coord_t y = menu::CalcLineY(0);
 
     graphics.setPrintPos(menu::kIndentDx, y + menu::kTextDy);

@@ -18,7 +18,6 @@ bool ADC33131D_Uses_FlexIO=false;
 bool OLED_Uses_SPI1=false;
 bool Large_OLED=false;
 bool DAC8568_Uses_SPI=false;
-bool DAC_is_inverted = false;
 #if !defined(NORTHERNLIGHT) && defined(ARDUINO_TEENSY41)
 bool NorthernLightModular=false;
 #endif
@@ -32,6 +31,7 @@ bool SDcard_Ready = false;
 #ifdef ARDUINO_TEENSY41
 bool DAC_20Vpp = false;
 bool CalSynthXL = false;
+bool DAC_is_inverted = false;
 #endif
 
 float OC::GetIDVoltage() {

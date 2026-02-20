@@ -140,7 +140,7 @@ static void debug_menu_core() {
 static void debug_menu_version()
 {
   graphics.setPrintPos(2, 12);
-  graphics.print(NorthernLightModular ? Strings::NAME_NLM : Strings::NAME);
+  graphics.print(DAC_is_inverted ? Strings::NAME_NLM : Strings::NAME);
   graphics.setPrintPos(2, 22);
   graphics.print(Strings::VERSION);
   graphics.setPrintPos(2, 32);
