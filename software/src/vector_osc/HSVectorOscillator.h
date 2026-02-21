@@ -174,6 +174,9 @@ public:
         return rescale(InterpLinear16(start * 256, end * 256, segment_phase >> 16));
     }
 
+    const uint32_t GetPhase() const {
+      return phase;
+    }
 private:
     VOSegment segments[HS::VO_MAX_SEGMENTS]; // Array of segments in this Oscillator
     uint8_t segment_count = 0; // Number of segments
