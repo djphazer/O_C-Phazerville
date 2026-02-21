@@ -203,6 +203,10 @@ private:
 
         // Zero line
         gfxDottedLine(0, 44, 63, 44, 8);
+
+        // current position
+        const int pos = osc[ch].GetPhase() >> 26;
+        gfxLine(pos, 25, pos, 63);
     }
 
     void SwitchWaveform(uint8_t ch, uint8_t waveform) {

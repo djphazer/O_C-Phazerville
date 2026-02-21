@@ -54,7 +54,7 @@ public:
           }
         } else {
           // Input 1 is frequency modulation for channel 1
-          pitch_mod[0] = pitch[0] + In(0);
+          pitch_mod[0] = pitch[0] + DetentedIn(0);
           osc[0].SetPhaseIncrement(ComputePhaseIncrement(pitch_mod[0]));
 
           // Input 2 determines signal 1's level on the B/D output mix
@@ -69,7 +69,7 @@ public:
                 uint32_t ticks = ClockCycleTicks(ch);
                 uint32_t phase_inc = 0xffffffff / ticks;
                 osc[ch].SetPhaseIncrement(phase_inc);
-                pitch[ch] = ComputePitch(phase_inc);
+                pitch_mod[ch] = pitch[ch] = ComputePitch(phase_inc);
                 osc[ch].Reset();
             }
 
@@ -226,6 +226,10 @@ private:
 
         // Zero line
         gfxDottedLine(0, 44, 63, 44, 8);
+
+        // current position
+        const int pos = osc[ch].GetPhase() >> 26;
+        gfxLine(pos, 25, pos, 63);
     }
 
     void SwitchWaveform(uint8_t ch, uint8_t waveform) {
