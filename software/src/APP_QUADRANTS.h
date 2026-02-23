@@ -1189,6 +1189,7 @@ private:
         PRESET_BANK_NUM,
         PRESET_JUMP_TRIG,
         MIDI_PC_CHANNEL,
+        AUTO_MIDI,
 
         // Input Remapping
         TRIGMAP1, TRIGMAP2, TRIGMAP3, TRIGMAP4,
@@ -1493,6 +1494,10 @@ private:
             HS::cursor_wrap = !HS::cursor_wrap;
             break;
 
+          case AUTO_MIDI:
+            HS::frame.autoMIDIOut = !HS::frame.autoMIDIOut;
+            break;
+
           case SHOWHIDELIST:
             if (h == 0) // left encoder inverts selection
             {
@@ -1641,11 +1646,16 @@ private:
           gfxPrint(jump_trig_);
         }
 
-        const uint8_t pc_ch = HS::frame.MIDIState.pc_channel;
-        gfxPrint(1, 55, "MIDI-PC Ch:   ");
-        if (pc_ch == 0) gfxPrint("Omni");
-        else if (pc_ch <= 16) gfxPrint(pc_ch);
-        else gfxPrint("Off");
+        if (AUTO_MIDI == config_cursor) {
+          gfxPrint(1, 55, "Auto MIDI-Out:  ");
+          gfxPrint( OC::Strings::off_on[HS::frame.autoMIDIOut]);
+        } else {
+          const uint8_t pc_ch = HS::frame.MIDIState.pc_channel;
+          gfxPrint(1, 55, "MIDI-PC Ch:   ");
+          if (pc_ch == 0) gfxPrint("Omni");
+          else if (pc_ch <= 16) gfxPrint(pc_ch);
+          else gfxPrint("Off");
+        }
 
         switch (config_cursor) {
         case TRIG_LENGTH:
@@ -1662,6 +1672,9 @@ private:
         case PRESET_BANK_NUM:
             gfxIcon(73, 45, RIGHT_ICON);
             if (isEditing) gfxInvert(82, 44, 45, 10);
+            break;
+        case AUTO_MIDI:
+            gfxIcon(89, 55, RIGHT_ICON);
             break;
         case MIDI_PC_CHANNEL:
             gfxIcon(73, 55, RIGHT_ICON);
