@@ -179,17 +179,17 @@ private:
         switch (cursor) {
         case SHIFT1:
         case SHIFT2:
-            gfxCursor(10 + (cursor - SHIFT1)*32, 23, 19);
+            gfxCursor(10 + (cursor - SHIFT1)*32, 23, 19, "Shift");
             break;
         case NOTE_WRAP1:
         case NOTE_WRAP2:
-            gfxCursor(16 + (cursor - NOTE_WRAP1)*32, 33, 13);
+            gfxCursor(16 + (cursor - NOTE_WRAP1)*32, 33, 13, "Wrap");
             break;
         case SCALE:
-            gfxCursor(10, 43, 25);
+            gfxCursor(10, 43, 25, "Scale");
             break;
         case ROOT_NOTE:
-            gfxCursor(40, 43, 13);
+            gfxCursor(40, 43, 13, "Root");
             break;
         }
 
