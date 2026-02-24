@@ -12,7 +12,7 @@ VectorEG is a dual AR envelope generator based on Vector Oscillator waveforms. T
 |        | 1/3 | 2/4 |
 | ------ | :-: | :-: |
 | TRIG   | Gate Ch1    | Gate Ch2    |
-| CV INs |  N/A   | N/A    |
+| CV INs | Freq or Shape Ch1  | Freq or Shape Ch2   |
 | OUTs   | Ch1 EG    | Ch2 EG    |
 
 
@@ -21,7 +21,7 @@ Controls
 * Channel 1 waveform selection
 * Channel 2 EG Frequency
 * Channel 2 waveform selection
-
+* AuxButton to toggle CV modulation assignment
 
 The EG runs freely until it gets to the second-to-last segment, and sustains at that point. When released, it proceeds to the level of the final segment at the speed specified by the final segment.
 
