@@ -412,20 +412,20 @@ private:
             graphics.printf("%s", probmelod::cv_modes[cv_mode].cv1_label);
             gfxPos(32, 15);
             graphics.printf("%5s", probmelod::cv_modes[cv_mode].cv2_label);
-            gfxCursor(1, 23, 62);
+            gfxCursor(1, 23, 62, "CV Mode");
         } else {
             gfxIcon(0, 13, DOWN_BTN_ICON);
             gfxIcon(30, 16, UP_BTN_ICON);
 
             if (cursor == LOWER) {
                 gfxPrintOctDotSemi(8, 15, down);
-                gfxCursor(9, 23, 21);
+                gfxCursor(9, 23, 21, "Lower");
             } else {
                 gfxPrintOctDotSemi(8, 15, down_mod);
             }
             if (cursor == UPPER) {
                 gfxPrintOctDotSemi(38, 15, up);
-                gfxCursor(39, 23, 21);
+                gfxCursor(39, 23, 21, "Upper");
             } else {
                 gfxPrintOctDotSemi(38, 15, up_mod);
             }
