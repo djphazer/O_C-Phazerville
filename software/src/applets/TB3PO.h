@@ -761,7 +761,7 @@ private:
     // Draw edit cursor
     switch (cursor) {
     case LOCK_SEED:
-      gfxCursor(14, 23, lock_seed ? 11 : 36); // Seed = auto-randomize / locked-manual
+      gfxCursor(14, 23, lock_seed ? 11 : 36, "Seed"); // Seed = auto-randomize / locked-manual
       break;
     case DIGIT1:
     case DIGIT2:
@@ -770,11 +770,11 @@ private:
       gfxCursor(25 + 6 * (cursor - 1), 23, 7);
       break;
     case DENSITY:
-      gfxSpicyCursor(9, 45, 14);
+      gfxSpicyCursor(9, 45, 14, "Density");
       gfxIcon(26, 37, LEFT_ICON);
       break;
     case QSELECT:
-      gfxSpicyCursor(44, 34, 13);
+      gfxSpicyCursor(44, 34, 13, "Q-engine");
       gfxIcon(35, 26, RIGHT_ICON);
       if (EditMode()) {
         // overlay preview of scale + root
@@ -785,7 +785,7 @@ private:
       gfxIcon(31, 36, RIGHT_ICON);
       break;
     case LENGTH:
-      gfxSpicyCursor(20, 54, 12, 8);
+      gfxSpicyCursor(20, 54, 12, 8, "Length");
       gfxIcon(33, 47, LEFT_ICON, true);
       break;
     case HOLD_PITCH:
