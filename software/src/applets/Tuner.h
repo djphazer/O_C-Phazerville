@@ -29,7 +29,7 @@
 // Teensy 4.x can use any of the trigger inputs for FreqMeasure, but 4.0 on old
 // hardware only works with TR1 or TR2...
 
-#include "../src/drivers/FreqMeasure/OC_FreqMeasure.h"
+#include "../src/drivers/FreqMeasure/OC_FreqMeasureMulti.h"
 
 #if defined(ARDUINO_TEENSY41)
 
@@ -39,6 +39,7 @@
 
 #elif defined(ARDUINO_TEENSY40)
 #define TUNER_ENABLED (hemisphere == OC::calibration_data.flipcontrols())
+#define TUNER_PIN 0
 #else
 #define TUNER_ENABLED (hemisphere == 1 - OC::calibration_data.flipcontrols())
 #endif
@@ -59,7 +60,7 @@ public:
 #if defined(ARDUINO_TEENSY41)
             freq_measure.begin(TUNER_PIN);
 #else
-            freq_measure.begin();
+            freq_measure.begin(TUNER_PIN, FREQMEASUREMULTI_FALLING);
 #endif
         }
         AllowRestart();
@@ -149,7 +150,7 @@ private:
     float frequency_ ;
     elapsedMillis milliseconds_since_last_freq_;
     int A4_Hz; // Tuning reference
-    FreqMeasureClass freq_measure;
+    FreqMeasureMulti freq_measure;
 
     void DrawTuner() {
         float frequency_ = get_frequency() ;

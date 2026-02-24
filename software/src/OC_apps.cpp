@@ -30,7 +30,7 @@
 #include "OC_calibration.h"
 #include "OC_patterns.h"
 #include "enigma/TuringMachine.h"
-#include "src/drivers/FreqMeasure/OC_FreqMeasure.h"
+// #include "src/drivers/FreqMeasure/OC_FreqMeasureMulti.h"
 #include "util/util_pagestorage.h"
 #include "util/EEPROMStorage.h"
 #include "PhzConfig.h"
@@ -836,7 +836,7 @@ bool Ui::AppSettings(bool drawmenu) {
 
   if (change_app) {
     apps::set_current_app(cursor.cursor_pos());
-    FreqMeasure.end();
+    // FreqMeasure.end();
     OC::DigitalInputs::reInit();
     if (save) {
       save_app_data();
