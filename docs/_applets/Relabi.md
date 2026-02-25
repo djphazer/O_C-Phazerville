@@ -1,7 +1,7 @@
 ---
 layout: default
 ---
-# Ebb & LFO
+# Relabi
 
 <!--![Relabi screenshot](images/EbbAndLFO.png)
 -->
