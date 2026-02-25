@@ -23,6 +23,8 @@
 
 class RunglBook : public HemisphereApplet {
 public:
+  static constexpr int MIN_THRESH = ONE_OCTAVE;
+  static constexpr int MAX_THRESH = ONE_OCTAVE * 5;
 
     const char* applet_name() {
         return "RunglBook";
@@ -30,18 +32,19 @@ public:
     const uint8_t* applet_icon() { return PhzIcons::runglBook; }
 
     void Start() {
-        threshold = (12 << 7) * 2;
+        threshold = ONE_OCTAVE * 2;
     }
 
     void Controller() {
-        threshold = constrain(In(1), (12 << 7), (12 << 7) * 5);
+        threshold_mod = threshold;
+        Modulate(threshold_mod, 1, MIN_THRESH, MAX_THRESH);
 
         if (Clock(0)) {
             if (Gate(1)) {
                 // Digital 2 freezes the buffer, so just rotate left
                 reg = (reg << 1) | ((reg >> 7) & 0x01);
             } else {
-                byte b0 = In(0) > threshold ? 0x01 : 0x00;
+                uint8_t b0 = In(0) > threshold_mod ? 0x01 : 0x00;
                 reg = (reg << 1) | b0;
             }
 
@@ -55,17 +58,16 @@ public:
 
     void View() {
         gfxPrint(1, 15, "Thr:");
-        gfxPrintVoltage(threshold);
+        gfxPrintVoltage(threshold_mod);
         gfxSkyline();
     }
 
     void OnButtonPress() { }
 
     void OnEncoderMove(int direction) {
-        threshold += (direction * 128);
-        threshold = constrain(threshold, (12 << 7), (12 << 7) * 5); // 1V - 5V
+        threshold = constrain(threshold + (direction * 128), MIN_THRESH, MAX_THRESH); // 1V - 5V
     }
-        
+
     uint64_t OnDataRequest() {
         uint64_t data = 0;
         Pack(data, PackLocation {0,16}, threshold);
@@ -81,7 +83,7 @@ protected:
     help[HELP_DIGITAL1] = "Clock";
     help[HELP_DIGITAL2] = "Freeze";
     help[HELP_CV1]      = "Signal";
-    help[HELP_CV2]      = "Thr";
+    help[HELP_CV2]      = "Thresh";
     help[HELP_OUT1]     = "Rungle";
     help[HELP_OUT2]     = "Alt";
     help[HELP_EXTRA1] = "Set: Threshold";
@@ -90,6 +92,7 @@ protected:
   }
 
 private:
-    byte reg;
+    uint8_t reg;
     uint16_t threshold;
+    uint16_t threshold_mod;
 };
