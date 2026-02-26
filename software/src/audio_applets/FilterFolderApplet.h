@@ -258,7 +258,7 @@ private:
   AudioPassthrough<Channels> output;
 
   void ChangeMode(int dir) {
-    uint8_t newmode = constrain(filtfolder[0].modesel + dir, 0, FILT_MODE_COUNT);
+    uint8_t newmode = constrain(filtfolder[0].modesel + dir, 0, FILT_MODE_COUNT - 1);
     for (int i = 0; i < Channels; i++) {
       filtfolder[i].modesel = FiltMode(newmode);
     }
