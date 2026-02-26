@@ -3,7 +3,7 @@ layout: default
 ---
 # Fold/MMF (mono/stereo)
 
-(TODO: screenshot)
+![Fold/MMF screenshot](images/Fold_MMF.png)
 
 A simple wavefolder with an optional state-variable filter after folding.
 

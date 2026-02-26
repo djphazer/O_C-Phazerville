@@ -3,7 +3,7 @@ layout: default
 ---
 # Dynamics (mono/stereo)
 
-TODO: screenshot
+![Dynamics screenshot](images/Dynamics.png)
 
 A single chain of standard dynamics processors with minimal parameters and sensible defaults. The signal flow is:
 ```
