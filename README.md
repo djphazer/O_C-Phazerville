@@ -2,10 +2,11 @@
 
 Phazerville Suite - an active o_C firmware fork
 ===
-[![Firmware Update v1.10](http://img.youtube.com/vi/UvlA5_C1aig/0.jpg)](http://www.youtube.com/watch?v=UvlA5_C1aig "Phazerville Suite v1.10 - O_C Firmware Update")
+[![SynthDad is pretty cool ;P](http://img.youtube.com/vi/kT94mBjvVQI/0.jpg)](http://www.youtube.com/watch?v=kT94mBjvVQI "Ornament and Crime Teensy 4.1 with Phazerville. What's New and Improved?")
 
 <details><summary>More Videos...</summary>
 
+  [![Firmware Update v1.10](http://img.youtube.com/vi/UvlA5_C1aig/0.jpg)](http://www.youtube.com/watch?v=UvlA5_C1aig "Phazerville Suite v1.10 - O_C Firmware Update")
   [![SynthDad's v1.7 update](http://img.youtube.com/vi/bziSog_xscA/0.jpg)](http://www.youtube.com/watch?v=bziSog_xscA "Ornament and Crime Phazerville 1.7: What's new in this big release!")
   [![SynthDad's video overview](http://img.youtube.com/vi/XRGlAmz3AKM/0.jpg)](http://www.youtube.com/watch?v=XRGlAmz3AKM "Phazerville; newest firmware for Ornament and Crime. Tutorial and patch ideas")
   [![Pigeons, Polyrhythms, Music & Math](http://img.youtube.com/vi/J1OH-oomvMA/0.jpg)](http://www.youtube.com/watch?v=J1OH-oomvMA "Pigeons & Polyrhythms / Music & Math")
