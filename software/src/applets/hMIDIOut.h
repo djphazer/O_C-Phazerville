@@ -300,7 +300,7 @@ protected:
         help[HELP_DIGITAL1] = "Gate";
         help[HELP_DIGITAL2] = "";
         help[HELP_CV1]      = "Pitch";
-        help[HELP_CV2]      = fn_name[functionB];
+        help[HELP_CV2]      = fn_name[min(functionB, CC_CONTROL)];
         help[HELP_OUT1]     = "";
         help[HELP_OUT2]     = "";
         help[HELP_EXTRA1]   = "";
