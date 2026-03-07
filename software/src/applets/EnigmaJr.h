@@ -168,7 +168,7 @@ private:
         if (cursor == 2) gfxCursor(13, 33, 44);
         if (cursor == 3) gfxCursor(13, 43, 44);
 
-        tm_state.DrawAt(hemisphere * 64, 45);
+        tm_state.DrawAt((hemisphere & 1) * 64, 45);
     }
 
     // When a new TM is selected, load it here
