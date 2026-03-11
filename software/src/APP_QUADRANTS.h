@@ -1241,7 +1241,7 @@ private:
         case 3:
           // oops all LFOs
           SetApplet(HEM_SIDE(0), HS::get_applet_index_by_id(7)); // Ebb&LFO
-          SetApplet(HEM_SIDE(1), HS::get_applet_index_by_id(7)); // Ebb&LFO
+          SetApplet(HEM_SIDE(1), HS::get_applet_index_by_id(89)); // Relabi
           SetApplet(HEM_SIDE(2), HS::get_applet_index_by_id(49)); // VectorLFO
           SetApplet(HEM_SIDE(3), HS::get_applet_index_by_id(49)); // VectorLFO
           PokePopup(HS::MESSAGE_POPUP, "LFOs!");
