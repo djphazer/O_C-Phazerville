@@ -61,6 +61,11 @@ public:
     selected_mono_applets[0].fill(0);
     selected_mono_applets[1].fill(0);
     selected_stereo_applets.fill(0);
+
+    // Input applet for top slots
+    selected_mono_applets[0][0] = 1;
+    selected_mono_applets[1][0] = 1;
+    selected_stereo_applets[0] = 1;
   }
 
   void Init() {
@@ -80,16 +85,15 @@ public:
   }
 
   void ReInit() {
-    stereo = 0;
     for (size_t slot = 0; slot < Slots; slot++) {
-      // todo: reset to defaults here
+      // reset to defaults here
       if (IsStereo(slot)) {
-        ChangeStereoApplet(LEFT_HEMISPHERE, slot, 0);
-        stereo ^= 1 << slot;
+        ChangeStereoApplet(LEFT_HEMISPHERE, slot, slot ? 0 : 1);
+        stereo ^= 1 << slot; // change it back to dual mono
         SwapMonoStereo(slot);
       }
       ForEachSide(side) {
-        ChangeMonoApplet(side, slot, 0);
+        ChangeMonoApplet(side, slot, slot ? 0 : 1); // Input for top slots
       }
     }
   }
@@ -243,7 +247,10 @@ public:
       case SWITCH_APPLET:
         if (IsStereo(c)) ChangeStereoApplet(side, c, candidate[side]);
         else ChangeMonoApplet(side, c, candidate[side]);
-        state[side] = EDIT_APPLET;
+        if (candidate[side])
+          state[side] = EDIT_APPLET;
+        else // don't edit the PassthruApplet (index 0)
+          state[side] = MOVE_CURSOR;
         break;
       case EDIT_APPLET:
         get_selected_applet(side).OnButtonPress();

@@ -26,16 +26,16 @@ Factory<AudioEffectReverbSchroeder, 8> HemisphereAudioApplet::bung_factory;
 Factory<AudioEffectFreeverb, 8> HemisphereAudioApplet::verb_factory;
 
 DMAMEM std::tuple<
-  InputApplet<MONO>,
   PassthruApplet<MONO>,
+  InputApplet<MONO>,
   HandSawApplet,
   UpsampledApplet<MONO>,
   OscApplet,
   WavPlayerApplet<MONO>>
     mono_input_pool[2];
 DMAMEM std::tuple<
-  InputApplet<STEREO>,
   PassthruApplet<STEREO>,
+  InputApplet<STEREO>,
   WavPlayerApplet<STEREO>,
   UpsampledApplet<STEREO>>
     stereo_input_pool;
