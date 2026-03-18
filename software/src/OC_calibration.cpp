@@ -147,7 +147,8 @@ static constexpr uint16_t DAC_OFFSET = 4890; // DAC offset, initial approx., ish
 #endif
 
 FLASHMEM void calibration_reset() {
-  if (NorthernLightModular) {
+  if (DAC_is_inverted) {
+    // Serge and Buchla variants of NLM hardware use different defaults
     memcpy(&OC::calibration_data, &kNLMCalibrationDefaults, sizeof(OC::calibration_data));
   } else {
     memcpy(&OC::calibration_data, &kCalibrationDefaults, sizeof(OC::calibration_data));
