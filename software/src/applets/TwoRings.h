@@ -43,6 +43,8 @@ public:
         PROB,
         QUANT_A,
         QUANT_B,
+        HOLD_PITCH_A,
+        HOLD_PITCH_B,
         RANGE,
         SLEW,
         CVMODE1,
@@ -192,21 +194,29 @@ public:
         };
 
         ForEachChannel(ch) {
+            const bool hold_pitch = ch ? hold_pitch_b : hold_pitch_a;
             switch (outmode[ch]) {
             case PITCH_BLEND: {
               // this is the unique case where input CV crossfades between the two melodies
               int x = constrain(note_trans[2], -range_mod, range_mod);
               int y = range_mod;
               int n = (note[0] * (y + x) + note[1] * (y - x)) / (2*y);
-              slew(Output[ch], HS::QuantizerLookup(qselect_mod[ch], n));
+              if (!hold_pitch || (reg[0] & 0x01) || (reg[1] & 0x01))
+                slew(Output[ch], HS::QuantizerLookup(qselect_mod[ch], n));
               break;
             }
-            case PITCH1:
-              slew(Output[ch], HS::QuantizerLookup(qselect_mod[ch], note[0] + note_trans[0]));
+            case PITCH1: {
+              const bool hit = (reg[0] & 0x01);
+              if (!hold_pitch || hit)
+                slew(Output[ch], HS::QuantizerLookup(qselect_mod[ch], note[0] + note_trans[0]));
               break;
-            case PITCH2:
-              slew(Output[ch], HS::QuantizerLookup(qselect_mod[ch], note[1] + note_trans[1]));
+            }
+            case PITCH2: {
+              const bool hit = (reg[1] & 0x01);
+              if (!hold_pitch || hit)
+                slew(Output[ch], HS::QuantizerLookup(qselect_mod[ch], note[1] + note_trans[1]));
               break;
+            }
             case MOD1: // 8-bit bi-polar proportioned CV
             case MOD2: {
               const int rnum = outmode[ch] - MOD1;
@@ -219,16 +229,18 @@ public:
             case TRIGPITCH1:
             case TRIGPITCH2: {
               const int rnum = outmode[ch] - TRIGPITCH1;
-              if (clk && (reg[outmode[ch]-TRIGPITCH1] & 0x01) == 1) // trigger if 1st bit is high
+              const bool hit = (reg[rnum] & 0x01);
+              if (clk && hit) // trigger if 1st bit is high
               {
                 Output[ch] = HEMISPHERE_MAX_CV;
                 trigpulse[ch] = HEMISPHERE_CLOCK_TICKS * trig_length;
+                trigpitch_note[ch] = note[rnum];
               }
               else // decay to pitch
               {
                 // hold until it's time to pull it down
                 if (--trigpulse[ch] < 0)
-                  slew(Output[ch], HS::QuantizerLookup(qselect_mod[ch], note[rnum] + note_trans[rnum]));
+                  slew(Output[ch], HS::QuantizerLookup(qselect_mod[ch], (hold_pitch ? trigpitch_note[ch] : note[rnum]) + note_trans[rnum]));
               }
               break;
             }
@@ -270,7 +282,16 @@ public:
     void DrawFullScreen() {
         DrawSequence();
     }
-    // void OnButtonPress() { }
+
+    void OnButtonPress() {
+      if (cursor == HOLD_PITCH_A) {
+        hold_pitch_a ^= 1;
+      } else if (cursor == HOLD_PITCH_B) {
+        hold_pitch_b ^= 1;
+      } else {
+        CursorToggle();
+      }
+    }
 
     void AuxButton() {
       switch (cursor) {
@@ -353,6 +374,8 @@ public:
         Pack(data, PackLocation {52,4}, qselect[1]);
 
         Pack(data, PackLocation {56,1}, rotate_right);
+        Pack(data, PackLocation {57,1}, hold_pitch_a);
+        Pack(data, PackLocation {58,1}, hold_pitch_b);
 
         // TODO: utilize enigma's global turing machine storage for the registers
 
@@ -377,6 +400,8 @@ public:
         CONSTRAIN(qselect[1], 0, DAC_CHANNEL_LAST - 1);
 
         rotate_right = Unpack(data, PackLocation {56,1});
+        hold_pitch_a = Unpack(data, PackLocation {57,1});
+        hold_pitch_b = Unpack(data, PackLocation {58,1});
     }
 
 protected:
@@ -403,10 +428,13 @@ private:
     uint32_t reg_snap[2]; // for resetting
     bool reset_active = false;
     bool rotate_right = false;
+    bool hold_pitch_a = true;
+    bool hold_pitch_b = true;
 
     // most recent output values
     int Output[2] = {0, 0};
     int trigpulse[2] = {0, 0}; // tick timer for Trig output modes
+    int trigpitch_note[2] = {0, 0}; // note at last hit
 
     // Settings and modulated copies
     int qselect[2];
@@ -554,7 +582,9 @@ private:
         case SLEW:
             gfxBitmap(1, 25, 8, SCALE_ICON);
             gfxPrint(12, 25, "Q"); gfxPrint(qselect_mod[0] + 1);
+            if (hold_pitch_a) gfxPrint(26, 25, "H");
             gfxPrint(39, 25, "Q"); gfxPrint(qselect_mod[1] + 1);
+            if (hold_pitch_b) gfxPrint(53, 25, "H");
 
             gfxBitmap(1, 35, 8, UP_DOWN_ICON);
             gfxPrint(10, 35, range_mod);
@@ -587,6 +617,14 @@ private:
               if (EditMode()) {
                 gfxPrint(20, 35, HS::GetQuantEngine(qselect[ch]));
               }
+              break;
+            }
+
+            case HOLD_PITCH_A:
+            case HOLD_PITCH_B: {
+              const int ch = (cursor-HOLD_PITCH_A);
+              gfxFrame(25 + 27 * ch, 23, 9, 11, true);
+              gfxIcon(35 + 6 * ch, 25, ch ? RIGHT_ICON : LEFT_ICON, true);
               break;
             }
 
