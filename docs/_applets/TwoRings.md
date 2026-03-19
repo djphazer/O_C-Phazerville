@@ -18,12 +18,21 @@ Adapted from the original [**ShiftReg**](https://github.com/Chysn/O_C-Hemisphere
 
 The **Slew** parameter allows extreme smoothing on the output stage for portamento and gentle modulation. It acts as a Decay tail on the Trigger output modes. With modulation of Slew, you can have CV control over decay envelopes, or variable portamento.
 
+### Hold pitch (per output)
+
+Each physical output (**A** and **B**) has its own **Hold pitch** toggle (shown as **H** next to the quantizer slot). Toggle hold pitch mode by turning the encoder when the parameter is selected.
+
+Hold pitch only affects **pitch-related** output modes: **Blend**, **Pitch 1**, **Pitch 2**, **TrigPitch 1**, and **TrigPitch 2**.
+
+When enabled, the pitch stays put across rest steps instead of tracking the register. If turned off, pitch tracks the register every update, including on rest bits.
+
 ## Parameters:
 * Length - how many bits are looped in the registers
   - AuxButton toggles shift direction
 * p=Probability (%) - when unlocked with the cursor or a gate input on TR2, how likely the current bit will be flipped
   - AuxButton toggles Reset capture mode - TR2 Resets to captured register states
 * Quantizer select - for pitch quantization (AuxButton to edit)
+* Hold pitch A / Hold pitch B - per-output rest behavior for pitch modes
 * Range - how many discrete notes, in scale degrees (only applies to pitches)
 * Slew - smoothing parameter (hybrid linear/logarithmic function)
 * Input modes CV1 and CV2 - see below
