@@ -33,8 +33,8 @@
 // Teensyduino USB MIDI Library message numbers
 // See https://www.pjrc.com/teensy/td_midi.html
 
-#if defined(__IMXRT1062__)
 #include <MIDI.h>
+#if defined(__IMXRT1062__)
 #include <USBHost_t36.h>
 extern USBHost thisUSB;
 extern MIDIDevice_BigBuffer usbHostMIDI;
@@ -44,16 +44,16 @@ extern midi::MidiInterface<midi::SerialMIDI<HardwareSerial> > MIDI1;
 namespace HS {
 
 enum HemMidiType {
-  HEM_MIDI_NOTE_ON = usbMIDI.NoteOn,
-  HEM_MIDI_NOTE_OFF = usbMIDI.NoteOff,
-  HEM_MIDI_CC = usbMIDI.ControlChange,
-  HEM_MIDI_AFTERTOUCH_CHANNEL = usbMIDI.AfterTouchChannel,
-  HEM_MIDI_AFTERTOUCH_POLY = usbMIDI.AfterTouchPoly,
-  HEM_MIDI_PITCHBEND = usbMIDI.PitchBend,
-  HEM_MIDI_SYSEX = usbMIDI.SystemExclusive,
-  HEM_MIDI_CLOCK = usbMIDI.Clock,
-  HEM_MIDI_START = usbMIDI.Start,
-  HEM_MIDI_STOP = usbMIDI.Stop,
+  HEM_MIDI_NOTE_ON = midi::NoteOn,
+  HEM_MIDI_NOTE_OFF = midi::NoteOff,
+  HEM_MIDI_CC = midi::ControlChange,
+  HEM_MIDI_AFTERTOUCH_CHANNEL = midi::AfterTouchChannel,
+  HEM_MIDI_AFTERTOUCH_POLY = midi::AfterTouchPoly,
+  HEM_MIDI_PITCHBEND = midi::PitchBend,
+  HEM_MIDI_SYSEX = midi::SystemExclusive,
+  HEM_MIDI_CLOCK = midi::Clock,
+  HEM_MIDI_START = midi::Start,
+  HEM_MIDI_STOP = midi::Stop,
 };
 
 const char* const midi_note_numbers[128] = {
@@ -314,7 +314,7 @@ protected:
     bool ListenForSysEx() {
         bool heard_sysex = 0;
         if (usbMIDI.read()) {
-            if (usbMIDI.getType() == usbMIDI.SystemExclusive) {
+            if (usbMIDI.getType() == midi::SystemExclusive) {
                 OnReceiveSysEx();
                 heard_sysex = 1;
             }
