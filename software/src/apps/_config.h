@@ -140,12 +140,12 @@ static AppContainer<void // this space intentionally left blank
 #ifdef ENABLE_APP_REFERENCES
   , AppReferences
 #endif
+#ifdef ENABLE_APP_PONG
+  , AppPong
+#endif
   , AppScaleEditor
 #ifndef NO_HEMISPHERE
   , AppWaveformEditor
-#endif
-#ifdef ENABLE_APP_PONG
-  , AppPong
 #endif
   , AppBackup
 > app_container;

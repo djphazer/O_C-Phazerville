@@ -159,6 +159,7 @@ static void SaveGlobalSettings() {
     PhzConfig::setValue(TURING_MACHINES_KEY | i, data);
   }
 
+#ifndef NO_HEMISPHERE
   data = 0;
   // User Waveform (custom VectorOsc shapes)
   for (size_t i = 0; i < HS::VO_SEGMENT_COUNT; ++i) {
@@ -169,6 +170,7 @@ static void SaveGlobalSettings() {
       data = 0;
     }
   }
+#endif
 
   // Auto Calibration Data
   /*
@@ -472,6 +474,7 @@ void AppSwitcher::Init(bool reset_settings) {
         HS::user_turing_machines[i].favorite = Unpack(data, PackLocation{24, 1});
       }
 
+#ifndef NO_HEMISPHERE
       // -- User Waveform (custom VectorOsc shapes)
       for (size_t i = 0; i < HS::VO_SEGMENT_COUNT; ++i) {
         if ((i & 0x3) == 0x0) {
@@ -483,6 +486,7 @@ void AppSwitcher::Init(bool reset_settings) {
         HS::user_waveforms[i].level = (wavedata >> 8) & 0xff;
         HS::user_waveforms[i].time = wavedata & 0xff;
       }
+#endif
 
       // -- Auto Calibration Data
       /*
@@ -621,7 +625,7 @@ bool Ui::AppSettings(bool drawmenu) {
     item.y = (64 - (5 * menu::kMenuLineH)) / 2;
 
     for (int current = cursor.first_visible();
-         current <= cursor.last_visible();
+         current <= cursor.last_visible() && current < app_container.num_apps();
          ++current, item.y += menu::kMenuLineH) {
       item.selected = current == cursor.cursor_pos();
       item.SetPrintPos();
