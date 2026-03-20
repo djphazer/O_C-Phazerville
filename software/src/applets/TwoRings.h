@@ -206,13 +206,13 @@ public:
               break;
             }
             case PITCH1: {
-              const bool hit = (reg[0] & 0x01);
+              const bool hit = (reg[1] & 0x01);
               if (!hold_pitch || hit)
                 slew(Output[ch], HS::QuantizerLookup(qselect_mod[ch], note[0] + note_trans[0]));
               break;
             }
             case PITCH2: {
-              const bool hit = (reg[1] & 0x01);
+              const bool hit = (reg[0] & 0x01);
               if (!hold_pitch || hit)
                 slew(Output[ch], HS::QuantizerLookup(qselect_mod[ch], note[1] + note_trans[1]));
               break;
@@ -229,7 +229,7 @@ public:
             case TRIGPITCH1:
             case TRIGPITCH2: {
               const int rnum = outmode[ch] - TRIGPITCH1;
-              const bool hit = (reg[rnum] & 0x01);
+              const bool hit = (reg[1-rnum] & 0x01);
               if (clk && hit) // trigger if 1st bit is high
               {
                 Output[ch] = HEMISPHERE_MAX_CV;
