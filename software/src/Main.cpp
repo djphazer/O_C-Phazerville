@@ -58,6 +58,9 @@ MIDI_CREATE_INSTANCE(HardwareSerial, Serial8, MIDI1);
 #include "AudioIO.h"
 #include "usb_desc.h"
 #include "Wire.h"
+#ifdef MULTIBOOT
+#include "util/cachedisable.h"
+#endif
 
 void ScanI2C() {
   noInterrupts();
@@ -139,6 +142,81 @@ void FASTRUN CORE_timer_ISR() {
 }
 
 /*       ---------------------------------------------------------         */
+
+#ifdef MULTIBOOT
+extern "C" {
+  static void jump_to_alt(uint32_t choice) {
+    const uint32_t JUMP_ADDR = 0x60000000 + (choice * 0x80000);
+    uint32_t instptr = JUMP_ADDR + 0x1000 + sizeof(uint32_t);
+    uint32_t instaddr = *(uint32_t*)instptr;
+    ((void (*)(void))instaddr)();
+  }
+}
+
+void BootMenu() {
+  bool save = false;
+  int choice = -1;
+
+  while (true) {
+    const bool z_held = OC::ui.read_immediate(OC::CONTROL_BUTTON_Z);
+    const bool a_held = OC::ui.read_immediate(OC::CONTROL_BUTTON_A);
+    const bool b_held = OC::ui.read_immediate(OC::CONTROL_BUTTON_B);
+    const bool x_held = OC::ui.read_immediate(OC::CONTROL_BUTTON_X);
+    const bool y_held = OC::ui.read_immediate(OC::CONTROL_BUTTON_Y);
+    const bool any_held = (a_held || b_held || z_held || x_held || y_held);
+
+    if (a_held) choice = 0;
+    if (b_held) choice = 1;
+    if (x_held) choice = 2;
+    if (y_held) choice = 3;
+    if (choice > -1) {
+      if (OC::calibration_data.bootchoice() != choice) {
+        OC::calibration_data.set_bootchoice(choice);
+        if (z_held) {
+          save = true;
+        }
+      }
+      if (!any_held)
+        break;
+    }
+
+    GRAPHICS_BEGIN_FRAME(true);
+    graphics.setPrintPos(1, 5);
+    graphics.print("Boot Menu:");
+
+    graphics.setPrintPos(1, 15);
+    graphics.print("A: Phazerville");
+    if (any_held && 0 == OC::calibration_data.bootchoice()) {
+      graphics.invertRect(1, 15, 127, 9);
+    }
+    graphics.setPrintPos(1, 25);
+    graphics.print("B: Phz + USB Audio");
+    if (any_held && 1 == OC::calibration_data.bootchoice()) {
+      graphics.invertRect(1, 25, 127, 9);
+    }
+    graphics.setPrintPos(1, 35);
+    graphics.print("X: Stock + MTP");
+    if (any_held && 2 == OC::calibration_data.bootchoice()) {
+      graphics.invertRect(1, 35, 127, 9);
+    }
+    graphics.setPrintPos(1, 45);
+    graphics.print("Y: ????");
+    if (any_held && 3 == OC::calibration_data.bootchoice()) {
+      graphics.invertRect(1, 45, 127, 9);
+    }
+
+    graphics.setPrintPos(1, 55);
+    graphics.print("(hold Z to set)");
+    GRAPHICS_END_FRAME();
+
+    delay(10);
+  }
+
+  if (save) {
+    OC::calibration_save();
+  }
+}
+#endif
 
 void setup() {
   delay(50);
@@ -225,6 +303,23 @@ void setup() {
   graphics.setPrintPos(1, 28);
   graphics.print("*Main Screen Turn On*");
   GRAPHICS_END_FRAME();
+
+#ifdef MULTIBOOT
+  delay(100);
+  if (OC::ui.read_immediate(OC::CONTROL_BUTTON_Z)) {
+    BootMenu();
+  }
+
+  if (OC::calibration_data.bootchoice()) {
+    GRAPHICS_BEGIN_FRAME(true);
+    graphics.setPrintPos(1, 28);
+    graphics.print("Switching to alt mode!");
+    GRAPHICS_END_FRAME();
+    delay(200);
+    disableCache();
+    jump_to_alt(OC::calibration_data.bootchoice());
+  }
+#endif
 
   // --- more hardware init
 #ifdef __IMXRT1062__

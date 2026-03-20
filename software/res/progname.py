@@ -16,24 +16,14 @@ def get_version():
     return last_line 
 
 
-version = get_version()
-git_rev = get_git_rev()
-extras = ""
-env.Append(BUILD_FLAGS=[ f'-DOC_BUILD_TAG=\\"{git_rev}\\"' ])
+tag = get_git_rev()
 
 build_flags = env.ParseFlags(env['BUILD_FLAGS'])
 defines = build_flags.get("CPPDEFINES")
-for item in defines:
-    if item[0] == 'OC_VERSION_EXTRA':
-        extras += item[1].strip('"')
 
 if "USB_AUDIO" in defines:
-    extras += "+audio"
+    tag += "+audio"
 if "USB_MTPDISK" in defines:
-    extras += "+MTP"
-if "VOR" in defines:
-    extras += "+VOR"
-if "FLIP_180" in defines:
-    extras += "_flipped"
+    tag += "+MTP"
 
-env.Replace(PROGNAME=f"o_C-phazerville-{version}{extras}-{git_rev}")
+env.Append(BUILD_FLAGS=[ f'-DOC_BUILD_TAG=\\"{tag}\\"' ])

@@ -128,6 +128,7 @@ enum CalibrationFlags : uint32_t {
 
   CALIBRATION_FLAG_FLIPSCREEN   = 1u << 2,
   CALIBRATION_FLAG_FLIPCONTROLS = 1u << 3,
+  CALIBRATION_FLAG_BOOTCHOICE   = (0x3 << 4), // 2 bits, 4 choices
   // a signal for the wizard
   CALIBRATION_FLAG_START        = 1u << 31,
 };
@@ -164,6 +165,12 @@ struct CalibrationData {
   bool flipscreen() const {
     return (flags & CALIBRATION_FLAG_FLIPSCREEN);
   }
+  uint32_t bootchoice() const {
+    return (flags & CALIBRATION_FLAG_BOOTCHOICE) >> 4;
+  }
+  void set_bootchoice(uint32_t choice) {
+    flags = (flags & ~CALIBRATION_FLAG_BOOTCHOICE) | ((choice & 0x3) << 4);
+  }
   // default behavior - flip both screen and I/O
   void toggle_flipmode() {
     flags = (flags & ~CALIBRATION_FLAG_FLIP_MASK) |
@@ -172,11 +179,11 @@ struct CalibrationData {
   // flip both bits independently
   void cycle_flipmode() {
     flags = (flags & ~CALIBRATION_FLAG_FLIP_MASK) |
-      ( ((flags & CALIBRATION_FLAG_FLIP_MASK) + (1 << CALIBRATION_FLAG_FLIPSCREEN))
+      ( ((flags & CALIBRATION_FLAG_FLIP_MASK) + (CALIBRATION_FLAG_FLIPSCREEN))
        & CALIBRATION_FLAG_FLIP_MASK );
   }
   bool toggle_flipscreen() {
-    flags ^= (1 << CALIBRATION_FLAG_FLIPSCREEN);
+    flags ^= CALIBRATION_FLAG_FLIPSCREEN;
 
     return flipscreen();
   }
