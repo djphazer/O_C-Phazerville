@@ -7,7 +7,7 @@ layout: default
 
 [Video demo](https://youtu.be/cVnJ3RqdbJU)
 
-The **MIDI Out** applet is a monophonic CV-to-MIDI interface that uses the USB port on the back of the Ornament and Crime module. The MIDI interface should appear in your computer as "Teensy MIDI" or "PewPewMIDI" (as of v1.8).
+The **MIDI Out** applet is a monophonic CV-to-MIDI interface. It uses the Teensy's USB port on the back of the O_C module, as well as the USB Host port and serial MIDI output on ORN8 hardware. The USB MIDI interface should appear in your computer as "Teensy MIDI" or "PewPewMIDI" (as of v1.8).
 
 ## I/O
 
