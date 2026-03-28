@@ -49,6 +49,7 @@ namespace HS {
   int octave_max = 6;
 #endif
 
+  bool midi_thru_enabled = 1;
   bool cursor_wrap = 0;
   bool auto_save_enabled = false;
   DigitalInputMap trigmap[ADC_CHANNEL_LAST];

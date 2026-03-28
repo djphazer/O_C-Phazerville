@@ -214,6 +214,7 @@ namespace HS {
 #endif
 
   extern int select_mode;
+  extern bool midi_thru_enabled;
   extern bool cursor_wrap;
   extern bool auto_save_enabled;
   extern uint8_t trig_length;

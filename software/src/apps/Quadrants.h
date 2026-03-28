@@ -496,9 +496,15 @@ public:
                 //continue;
             }
 
+            // receive it
             f.MIDIState.ProcessMIDIMsg({device.getChannel(), message, data1, data2});
-            next_device.send(message, data1, data2, device.getChannel(), 0);
-            dev3.send((midi::MidiType)message, data1, data2, device.getChannel());
+
+            // TODO: even more options for forwarding only certain traffic to certain places, etc.
+            if (HS::midi_thru_enabled) {
+              // send it along
+              next_device.send(message, data1, data2, device.getChannel(), 0);
+              dev3.send((midi::MidiType)message, data1, data2, device.getChannel());
+            }
         }
         if (load_slot >= 0 && load_slot < QUAD_PRESET_COUNT) {
             QueuePresetLoad(load_slot);
@@ -1060,6 +1066,7 @@ private:
         PRESET_JUMP_TRIG,
         MIDI_PC_CHANNEL,
         AUTO_MIDI,
+        MIDI_THRU_TOGGLE,
 
         // Input Remapping
         TRIGMAP1, TRIGMAP2, TRIGMAP3, TRIGMAP4,
@@ -1366,6 +1373,10 @@ private:
             HS::frame.autoMIDIOut = !HS::frame.autoMIDIOut;
             break;
 
+          case MIDI_THRU_TOGGLE:
+            HS::midi_thru_enabled = !HS::midi_thru_enabled;
+            break;
+
           case SHOWHIDELIST:
             if (h == 0) // left encoder inverts selection
             {
@@ -1517,6 +1528,9 @@ private:
         if (AUTO_MIDI == config_cursor) {
           gfxPrint(1, 55, "Auto MIDI-Out:  ");
           gfxPrint( OC::Strings::off_on[HS::frame.autoMIDIOut]);
+        } else if (MIDI_THRU_TOGGLE == config_cursor) {
+          gfxPrint(1, 55, "MIDI Thru:  ");
+          gfxPrint( OC::Strings::off_on[HS::midi_thru_enabled]);
         } else {
           const uint8_t pc_ch = HS::frame.MIDIState.pc_channel;
           gfxPrint(1, 55, "MIDI-PC Ch:   ");
@@ -1542,6 +1556,7 @@ private:
             if (isEditing) gfxInvert(82, 44, 45, 10);
             break;
         case AUTO_MIDI:
+        case MIDI_THRU_TOGGLE:
             gfxIcon(89, 55, RIGHT_ICON);
             break;
         case MIDI_PC_CHANNEL:
