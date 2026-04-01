@@ -75,6 +75,7 @@ using namespace HS;
 #endif
 #include "EnvFollow.h"
 #include "EnvSeq.h"
+#include "EuclidO.h"
 #include "EuclidX.h"
 #ifdef PEWPEWPEW
 #include "GameOfLife.h"
@@ -196,6 +197,7 @@ constexpr Registry reg = Registry<HemisphereApplet, 200 // max ID
 #ifdef __IMXRT1062__
     , DeclareApplet<EnvSeq, 91, 0x02>
 #endif
+    , DeclareApplet<EuclidO, 83, 0x02>
     , DeclareApplet<EuclidX, 15, 0x02>
 #ifdef PEWPEWPEW
     , DeclareApplet<GameOfLife, 22, 0x01>
