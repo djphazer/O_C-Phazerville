@@ -211,6 +211,7 @@ public:
         scene_presets[id].index = id;
         scene_presets[id].valid = PhzConfig::getValue(id << 8, data);
       }
+      LoadPreset();
 #endif
       // reset input mappings
       for (int i = 0; i < APPLET_SLOTS * 2; ++i) {
@@ -648,8 +649,8 @@ static size_t ScenesApp_restore(const void *storage) {
     for (int i = 0; i < 4; ++i) {
         used += scene_presets[i].Restore(static_cast<const char*>(storage) + used);
     }
-#endif
     ScenesApp_instance.LoadPreset();
+#endif
     return used;
 }
 
