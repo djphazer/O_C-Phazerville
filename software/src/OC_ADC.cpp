@@ -375,6 +375,11 @@ static void Init_Teensy41_ADC33131D_chip() {
 
   // configure FlexIO timers
   IMXRT_FLEXIO_t *flexio = (IMXRT_FLEXIO_t *)IMXRT_FLEXIO2_ADDRESS;
+  // disable and reset, in case of re-init
+  flexio->CTRL &= ~FLEXIO_CTRL_FLEXEN;
+  flexio->CTRL |= FLEXIO_CTRL_SWRST;
+  flexio->CTRL &= ~FLEXIO_CTRL_SWRST;
+
   const int baud_timer = 0;
   const int cs_timer = 1;
   const int mux_timer = 2;
@@ -440,7 +445,7 @@ static void Init_Teensy41_ADC33131D_chip() {
 
   // use a DMA channel to capture FlexIO output
   dma0.begin();
-  dma0.TCD->SADDR = &(((IMXRT_FLEXIO_t *)IMXRT_FLEXIO2_ADDRESS)->SHIFTBUFBIS[data_shifter]);
+  dma0.TCD->SADDR = &(flexio->SHIFTBUFBIS[data_shifter]);
   dma0.TCD->SOFF = 0;
   dma0.TCD->ATTR = DMA_TCD_ATTR_SSIZE(1) | DMA_TCD_ATTR_DSIZE(1);
   dma0.TCD->NBYTES_MLNO = DMA_TCD_NBYTES_MLOFFYES_NBYTES(2);
