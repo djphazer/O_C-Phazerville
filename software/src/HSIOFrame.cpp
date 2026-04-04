@@ -164,6 +164,13 @@ bool HS::MIDIMapping::ProcessMsg(const MIDIMessage msg, HS::MIDIFrame &state) {
                 ClockOut();
                 break;
 
+            case HEM_MIDI_GATE_RT_OUT:
+                if (output > 0) {
+                    gate_retrig = true;
+                    trigout_countdown = HEMISPHERE_CLOCK_TICKS * HS::trig_length;
+                    output = 0;
+                    break;
+                }
             case HEM_MIDI_GATE_OUT:
                 output = PULSE_VOLTAGE * (12 << 7);
                 break;
@@ -228,7 +235,7 @@ bool HS::MIDIMapping::ProcessMsg(const MIDIMessage msg, HS::MIDIFrame &state) {
 
         if (!state.CheckSustainLatch(m_ch)) {
             if (buf.size() == 0) { // turn mono gate off, only when all notes are off
-                if (function == HEM_MIDI_GATE_OUT) output = 0;
+                if (function == HEM_MIDI_GATE_OUT || function == HEM_MIDI_GATE_RT_OUT) output = 0;
                 if (function == HEM_MIDI_GATE_INV_OUT) output = PULSE_VOLTAGE * (12 << 7);
             }
             if (function == HEM_MIDI_GATE_POLY_OUT) {
@@ -254,6 +261,7 @@ bool HS::MIDIMapping::ProcessMsg(const MIDIMessage msg, HS::MIDIFrame &state) {
                 if (!(buf.size() > 0)) {
                     switch (function) {
                         case HEM_MIDI_GATE_OUT:
+                        case HEM_MIDI_GATE_RT_OUT:
                         case HEM_MIDI_GATE_POLY_OUT:
                             output = 0;
                             break;
@@ -410,7 +418,14 @@ void HS::IOFrame::Load(OC::IOFrame *ioframe) {
     for (int i = 0; i < MIDIMAP_MAX; ++i) {
         MIDIMapping& m = MIDIState.mapping[i];
         if (m.trigout_countdown > 0) {
-            if (--m.trigout_countdown == 0) m.output = 0;
+            if (--m.trigout_countdown == 0) {
+                if (m.gate_retrig) {
+                    m.gate_retrig = false;
+                    m.output = PULSE_VOLTAGE * (12 << 7);
+                } else {
+                    m.output = 0;
+                }
+            }
         }
     }
 
