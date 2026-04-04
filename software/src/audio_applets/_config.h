@@ -28,6 +28,7 @@
 #include "audio_applets/AdvKrpsStrngApplet.h"
 #include "audio_applets/ModalResonatorApplet.h"
 #include "audio_applets/WAVRecorderApplet.h"
+#include "audio_applets/WTVCOApplet.h"
 
 const size_t NUM_SLOTS = 5;
 
@@ -43,7 +44,9 @@ DMAMEM std::tuple<
   FMDrumApplet,
   WavPlayerApplet<MONO>,
   OneShotPlayerApplet<MONO>,
-  AdvKrpsStrngApplet>
+  AdvKrpsStrngApplet,
+  WTVCOApplet
+  >
     mono_input_pool[2];
 DMAMEM std::tuple<
   PassthruApplet<STEREO>,
@@ -74,7 +77,8 @@ DMAMEM std::tuple<
   GritApplet<MONO>,
   MistierApplet<MONO>,
   AdvKrpsStrngApplet,
-  ModalResonatorApplet<MONO>
+  ModalResonatorApplet<MONO>,
+  WTVCOApplet
 #ifndef USB_AUDIO
   , WavRecorderApplet<MONO>
 #endif
