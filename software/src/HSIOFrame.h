@@ -775,7 +775,7 @@ struct alignas(32) MIDIFrame {
         usbMIDI.sendAfterTouch(val, midi_ch + 1);
 #endif
     }
-    void SendPitchBend(const uint8_t midi_ch, uint16_t bend) {
+    void SendPitchBend(const uint8_t midi_ch, int bend) {
 #ifdef ARDUINO_TEENSY41
       MidiLog::Push(true, 0xE0, midi_ch + 1, bend & 0x7F, (bend >> 7) & 0x7F);
       if (~midi_msgtx_disable & mMaskUSBDev)   usbMIDI.sendPitchBend(bend, midi_ch + 1);
