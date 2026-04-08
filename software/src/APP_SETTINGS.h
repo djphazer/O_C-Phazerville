@@ -313,9 +313,6 @@ public:
       gfxIcon(0, 45, PhzIcons::frontBack);
       gfxPrint(10, 45, "github.com/djphazer");
       gfxPrint(0, 55, reflash ? "[Reflash]" : "[CALIBRATE]   [RESET]");
-
-      // It's snowing!!
-      ZapScreensaver();
   }
 
   void DrawCalibration() {
@@ -650,6 +647,7 @@ void Settings_screensaver() {
       gfxBitmap((i & 0x1)*64, (i>>1)*8, 64, pewpew_bits + i*64);
     }
 #endif
+  ZapScreensaver();
 }
 
 void Settings_handleButtonEvent(const UI::Event &event) {
