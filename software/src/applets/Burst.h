@@ -230,10 +230,21 @@ private:
         }
 
         // Cursor
-        if (cursor < 2) gfxCursor(1, 23 + (cursor * 10), 13 + 12*cursor);
-        if (cursor == 2) gfxCursor(10, 43, 19);
-        if (cursor == 3) gfxCursor(40, 43, 13);
-        if (cursor == 4) gfxCursor(1, 53, 62);
+        switch (cursor) {
+          case 0:
+          case 1:
+            gfxCursor( 1, 23 + (cursor * 10), 13 + 12 * cursor, cursor ? "Spacing" : "Count");
+            break;
+          case 2:
+            gfxCursor(10, 43, 19, "Accel");
+            break;
+          case 3:
+            gfxCursor(40, 43, 13, "Jitter");
+            break;
+          case 4:
+            gfxCursor(1, 53, 62, "ClkDiv");
+            break;
+        }
     }
 
     void DrawIndicator() {
