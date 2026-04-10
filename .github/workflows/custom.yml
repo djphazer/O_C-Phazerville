@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         ref: T32
 
@@ -23,13 +23,13 @@ jobs:
         echo "CUSTOM_BUILD_FLAGS=$(python software/res/parse_build_request.py)" >> $GITHUB_ENV
 
     - name: Cache PlatformIO
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ~/.platformio
         key: ${{ runner.os }}-${{ hashFiles('**/lockfiles') }}
 
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.x'
         cache: 'pip'
@@ -45,14 +45,14 @@ jobs:
         pio run -e custom
 
     - name: Copy artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: o_C-${{env.OC_ARTIFACT_TAG}}
         path: software/.pio/build/*/*.hex
 
 # TODO: this will only work with Issues or Pull Requests...
 #    - name: Add follow-up comment to discussion
-#      uses: actions/github-script@v6
+#      uses: actions/github-script@v9
 #      if: always()
 #      with:
 #        script: |
