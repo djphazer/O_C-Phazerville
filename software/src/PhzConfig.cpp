@@ -19,7 +19,7 @@ namespace PhzConfig {
 LittleFS_Program myfs;
 File dataFile;
 ConfigMap cfg_store;
-size_t record_count = 0;
+ConfigMap data_store;
 
 // Specify size to use of onboard Teensy Program Flash chip.
 // the maximum flash available for LittleFS is 960 blocks of 1024 bytes
@@ -62,6 +62,7 @@ void Init()
 
 void clear_config() {
   cfg_store.clear();
+  data_store.clear();
 }
 
 void setValue(KEY key, VALUE value)
@@ -83,14 +84,69 @@ void deleteKey(KEY key) {
   cfg_store.erase(key);
 }
 
+void setData(KEY key, VALUE value) {
+  data_store[key] = value;
+}
+bool getData(KEY key, VALUE &value) {
+  auto thing = data_store.find(key);
+  if (thing != data_store.end()) {
+    value = thing->second;
+    return true;
+  }
+  return false;
+}
+void deleteData(KEY key) {
+  data_store.erase(key);
+}
+
+size_t save_chunk(const size_t offset, const char* sig, ConfigMap &store) {
+  size_t record_count = 0;
+  size_t bytes_written = 0;
+
+  // 12-byte header:
+  char header_buf[HEADER_SIZE] = {
+    sig[0], sig[1], // signature
+    0, 0, // record count
+    0, 0, 0, 0, 0, 0, 0, 0, // checksum
+  };
+
+  dataFile.seek(offset);
+  dataFile.write(header_buf, HEADER_SIZE);
+
+  uint64_t checksum = 0;
+  for (auto &i : store)
+  {
+    checksum ^= i.second;
+    int result = dataFile.write((const uint8_t*)&i.first, sizeof(i.first)) +
+                dataFile.write((const uint8_t*)&i.second, sizeof(i.second));
+    if (result != (sizeof(i.first) + sizeof(i.second))) {
+      // something went wrong
+      SERIAL_PRINTLN("!! ERROR while writing file !!\n   Result = %d\n", result);
+      return 0;
+    }
+    bytes_written += result;
+
+    record_count += 1;
+  }
+
+  if (dataFile.seek(offset + 2)) {
+    dataFile.write((const uint8_t*)&record_count, 2);
+    dataFile.write((const uint8_t*)&checksum, 8);
+  }
+
+  SERIAL_PRINTLN("Records written = %u\n", record_count);
+  SERIAL_PRINTLN("Bytes written = %u\n", bytes_written);
+  SERIAL_PRINTLN("Checksum: %lx%lx\n",
+      (uint32_t)checksum, (uint32_t)(checksum >> 32));
+
+  return offset + HEADER_SIZE + bytes_written;
+}
 bool save_config(const char* filename, FS &fs)
 {
     SERIAL_PRINTLN("\nSaving Config: %s\n", filename);
 
     const char* const TEMPFILE = "PEWPEW.TMP";
     bool success = true;
-    size_t bytes_written = 0;
-    record_count = 0;
 
     // opens a file or creates a file if not present,
     // FILE_WRITE will append data
@@ -99,87 +155,35 @@ bool save_config(const char* filename, FS &fs)
     fs.remove(TEMPFILE);
     dataFile = fs.open(TEMPFILE, FILE_WRITE_BEGIN);
     if (dataFile) {
-      // 12-byte header:
-      const char header_buf[HEADER_SIZE] = {
-        'P', 'Z', // signature
-        0, 0, // record count
-        0, 0, 0, 0, 0, 0, 0, 0, // checksum
-      };
-      dataFile.write(header_buf, HEADER_SIZE);
-
-      uint64_t checksum = 0;
-      for (auto &i : cfg_store)
-      {
-        checksum ^= i.second;
-        int result = dataFile.write((const uint8_t*)&i.first, sizeof(i.first)) +
-                    dataFile.write((const uint8_t*)&i.second, sizeof(i.second));
-        if (result != (sizeof(i.first) + sizeof(i.second))) {
-          // something went wrong
-          SERIAL_PRINTLN("!! ERROR while writing file !!\n   Result = %d\n", result);
-          HS::PokePopup(HS::MESSAGE_POPUP, HS::LFS_WRITE_ERROR);
-          success = false;
-          break;
-        }
-        bytes_written += result;
-
-        record_count += 1;
+      size_t sz  = save_chunk( 0, "PZ",  cfg_store);
+      if (sz) sz = save_chunk(sz, "PX", data_store);
+      if (sz) { // success!
+        dataFile.close();
+      } else {
+        HS::PokePopup(HS::MESSAGE_POPUP, "Write ERROR !!");
       }
-
-      if (success && dataFile.seek(2)) {
-        dataFile.write((const uint8_t*)&record_count, 2);
-        dataFile.write((const uint8_t*)&checksum, 8);
-      }
-
-      SERIAL_PRINTLN("Records written = %u\n", record_count);
-      SERIAL_PRINTLN("Bytes written = %u\n", bytes_written);
-      SERIAL_PRINTLN("Checksum: %lx%lx\n",
-          (uint32_t)checksum, (uint32_t)(checksum >> 32));
-
-      dataFile.close();
     } else {
-      SERIAL_PRINTLN("error opening %s\n", filename);
+      SERIAL_PRINTLN("PhzConfig: Error opening %s\n", filename);
+      HS::PokePopup(HS::MESSAGE_POPUP, "File ERROR !!");
       success = false;
     }
 
     if (success) {
       fs.remove(filename);
-      fs.rename(TEMPFILE, filename);
+      success = fs.rename(TEMPFILE, filename);
+      if (!success)
+        HS::PokePopup(HS::MESSAGE_POPUP, "TempFile ERR !!");
     }
 
     return success;
 }
 
-bool load_config(const char* filename, FS &fs)
-{
-  cfg_store.clear();
-  record_count = 0;
+bool load_chunk(uint8_t *buf, const char *sig, ConfigMap &store) {
+  // quick signature check
+  if (buf[0] != sig[0] || buf[1] != sig[1]) return false;
 
-  SERIAL_PRINTLN("\nLoading Config: %s\n", filename);
-  dataFile = fs.open(filename);
-  if (!dataFile) {
-    SERIAL_PRINTLN("ERROR opening %s\n", filename);
-    return false;
-  }
-
-  uint8_t buf[12];
-  size_t pos = 0;
-
-  while (dataFile.available() && pos < HEADER_SIZE) {
-    uint8_t n = dataFile.read();
-    buf[pos++] = n;
-  }
-
-  // header signature
-  if (buf[0] != 'P' || buf[1] != 'Z') {
-    SERIAL_PRINTLN("Bad PZ signature...");
-    dataFile.close();
-    return false;
-  }
-
-#ifdef PRINT_DEBUG
-  // XXX: for size verification
+  size_t record_count = 0;
   size_t expected_record_count = uint16_t(buf[2]) | uint16_t(buf[3]) << 8;
-#endif
   uint64_t expected_checksum =
           (uint64_t)buf[4] |
           (uint64_t)buf[5] << 8 |
@@ -191,14 +195,14 @@ bool load_config(const char* filename, FS &fs)
           (uint64_t)buf[11] << 56;
   uint64_t computed_checksum = 0;
 
-  pos = 0;
+  size_t pos = 0;
   while (dataFile.available()) {
     uint8_t n = dataFile.read();
     buf[pos++] = n;
 
     static_assert(sizeof(KEY) + sizeof(VALUE) == 10, "config data size mismatch");
     if (pos >= (sizeof(KEY) + sizeof(VALUE))) {
-      cfg_store.insert_or_assign(
+      store.insert_or_assign(
           (uint16_t)buf[0] |
           (uint16_t)buf[1] << 8,
 
@@ -228,7 +232,7 @@ bool load_config(const char* filename, FS &fs)
       // XXX: if we utilize the expected record count,
       // multiple chunks could be packed in series in one file... for whatever purpose.
       // For now, we'll just load everything regardless.
-      //if (record_count == expected_record_count) break;
+      if (record_count == expected_record_count) break;
     }
   }
   SERIAL_PRINTLN("Loaded %u Records. (expected %u)\n", record_count, expected_record_count);
@@ -238,8 +242,46 @@ bool load_config(const char* filename, FS &fs)
   SERIAL_PRINTLN("(File header checksum: %lx%lx)\n",
       (uint32_t)expected_checksum, (uint32_t)(expected_checksum >> 32));
 
+  return true;
+}
+
+bool load_config(const char* filename, FS &fs)
+{
+  cfg_store.clear();
+  data_store.clear();
+
+  SERIAL_PRINTLN("\nLoading Config: %s\n", filename);
+  dataFile = fs.open(filename);
+  if (!dataFile) {
+    SERIAL_PRINTLN("ERROR opening %s\n", filename);
+    return false;
+  }
+
+  uint8_t buf[12];
+  size_t pos = 0;
+
+  do {
+    // read in header
+    pos = 0;
+    while (dataFile.available() && pos < HEADER_SIZE) {
+      uint8_t n = dataFile.read();
+      buf[pos++] = n;
+    }
+
+    // check for every chunk signature
+    const bool has_config = load_chunk(buf, "PZ", cfg_store);
+    const bool has_data = load_chunk(buf, "PX", data_store);
+
+    if (!has_config && !has_data) {
+      SERIAL_PRINTLN("PhzConfig: Bad signature... %x %x", buf[0], buf[1]);
+      dataFile.close();
+      return false; // no bueno
+    }
+
+  } while (dataFile.available());
+
   dataFile.close();
-  return computed_checksum == expected_checksum;
+  return true; // everything was fine!
 }
 
 FLASHMEM

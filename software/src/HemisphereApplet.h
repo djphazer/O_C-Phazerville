@@ -44,6 +44,7 @@
 
 #include "HSUtils.h"
 #include "HSIOFrame.h"
+#include "PhzConfig.h"
 #include <variant>
 
 #define APPLET_INTERFACE(clazz, name, icon) \
@@ -113,6 +114,23 @@ public:
     virtual void Unload() { }
     virtual void DrawFullScreen() { View(); }
     virtual void AuxButton() { CancelEdit(); }
+
+    // Arbitrary applet data blobs, key format:
+    // 5-bit preset ID
+    // 3-bit HEM_SIDE slot ID - assumes no more than 8 applet slots
+    // 8-bit key
+    bool GetData(PhzConfig::KEY key, PhzConfig::VALUE &data) {
+      return PhzConfig::getData(
+        (key & 0xff) | (uint16_t(hemisphere & 0x7) << 8) | (uint16_t(preset_id) << 11),
+        data
+      );
+    }
+    void SetData(PhzConfig::KEY key, const PhzConfig::VALUE data) {
+      PhzConfig::setData(
+        (key & 0xff) | (uint16_t(hemisphere & 0x7) << 8) | (uint16_t(preset_id) << 11),
+        data
+      );
+    }
 
     // standard entry points
     void BaseView(bool full_screen = false, bool parked = true) const;

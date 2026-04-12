@@ -202,6 +202,7 @@ public:
 
     void StoreToPreset(int id);
     void store_to_preset(int id) {
+        preset_id = id;
         // preset id is upper 5 bits - 32 presets per bank
         uint16_t preset_key = id << 11;
 
@@ -308,8 +309,6 @@ public:
 
         if (success)
           PokePopup(HS::MESSAGE_POPUP, HS::PRESET_SAVED);
-
-        preset_id = id;
     }
 
     void LoadFromPreset(int id);
@@ -998,7 +997,6 @@ protected:
 private:
     char bank_filename[16] = "BANK_000.DAT";
     uint8_t bank_num = 0;
-    int preset_id = -1;
     int queued_preset = -1;
     int preset_cursor = 0;
     HemisphereApplet *active_applet[4]; // Pointers to actual applets

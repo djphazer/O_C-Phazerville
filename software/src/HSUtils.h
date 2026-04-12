@@ -213,7 +213,7 @@ namespace HS {
   static constexpr int octave_max = 6;
 #endif
 
-  extern int select_mode;
+  extern int preset_id;
   extern bool midi_thru_enabled;
   extern bool cursor_wrap;
   extern bool auto_save_enabled;

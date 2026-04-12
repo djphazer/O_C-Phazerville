@@ -25,6 +25,8 @@ namespace HS {
   const char* popup_msg;
   ErrMsgIndex msg_idx;
 
+  int preset_id = -1;
+
   int q_edit = 0; // edit cursor for quantizer popup, 0 = not editing
   uint8_t qview = 0; // which quantizer's setting is shown in popup
 
