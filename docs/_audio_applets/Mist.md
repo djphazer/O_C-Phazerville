@@ -1,4 +1,11 @@
+---
+layout: default
+---
 # Mist — Live Granular Audio Processor
+
+(TODO: screenshot)
+
+## License
 
 MIT License  
 (c) 2026 Andy Jenkinson (uglifruit) — with ClaudeCode.
