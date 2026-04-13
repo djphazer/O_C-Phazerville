@@ -138,6 +138,7 @@ public:
     static constexpr int CURSOR_LAST   = 3;
 
     const char* applet_name() { return "MarkoV"; }
+    const uint8_t* applet_icon() { return PhzIcons::palimpsest; }
 
     void Start() {
         cursor       = 0;
