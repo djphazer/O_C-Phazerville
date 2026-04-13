@@ -20,6 +20,7 @@
 #include "audio_applets/PhaserApplet.h"
 #include "audio_applets/ThreeBandz.h"
 #include "audio_applets/TuneTrackerApplet.h"
+#include "audio_applets/FMDrumApplet.h"
 #include "audio_applets/GlitchApplet.h"
 #include "audio_applets/MistApplet.h"
 #include "audio_applets/AdvKrpsStrngApplet.h"
@@ -35,6 +36,7 @@ DMAMEM std::tuple<
   HandSawApplet,
   UpsampledApplet<MONO>,
   OscApplet,
+  FMDrumApplet,
   WavPlayerApplet<MONO>,
   AdvKrpsStrngApplet>
     mono_input_pool[2];
@@ -49,6 +51,7 @@ DMAMEM std::tuple<
   InputApplet<MONO>,
   OscApplet,
   HandSawApplet,
+  FMDrumApplet,
   WavPlayerApplet<MONO>,
   VcaApplet<MONO>,
   LadderApplet<MONO>,
