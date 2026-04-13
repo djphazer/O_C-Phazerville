@@ -5,6 +5,8 @@
 // sections and the section attribute is silently ignored; out-of-line
 // definitions in a translation unit do not have this problem.
 
+#ifdef ARDUINO_TEENSY41
+
 #include "synth_advanced_karplus.h"
 
 // --- Lifecycle -----------------------------------------------------------
@@ -133,3 +135,5 @@ FLASHMEM __attribute__((noinline)) void AudioSynthAdvancedKarplus::updateCore() 
     transmit(out);
     release(out);
 }
+
+#endif // ARDUINO_TEENSY41
