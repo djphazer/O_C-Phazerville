@@ -133,6 +133,7 @@ using namespace HS;
 #include "VectorMod.h"
 #include "VectorMorph.h"
 #include "Voltage.h"
+#include "MarkoV.h"
 #ifdef PEWPEWPEW
 #include "WTVCO.h"
 #endif
@@ -208,6 +209,7 @@ constexpr Registry reg = Registry<HemisphereApplet, 200 // max ID
 #ifdef __IMXRT1062__
     , DeclareApplet<MidiLoop, 81, 0x20>
 #endif
+    , DeclareApplet<MarkoV, 93, 0x02>
     , DeclareApplet<hMIDIIn, 150, 0x20>
     , DeclareApplet<hMIDIOut, 27, 0x20>
 #ifdef PEWPEWPEW

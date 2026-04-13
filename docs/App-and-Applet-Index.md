@@ -88,6 +88,7 @@ If you're coming from any of the other Hemisphere forks, note that many of the a
 * [Metronome](Metronome) - internal clock tempo control + multiplier output
 * [MIDI In](MIDI-Input) - from USB to CV
 * [MIDI Out](MIDI-Out) - from CV to USB
+* [MarkoV](MarkoV) - first-order Markov chain melodic generator with Tendency Profiles and Chaos control
 * [MultiScale](MultiScale) - like ScaleDuet, but with 4 scale masks
 * [Palimpsest](Palimpsest) - accent sequencer
 * [Pigeons](Pigeons) - dual Fibonacci-style melody generator
