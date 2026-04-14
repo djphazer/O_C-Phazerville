@@ -141,9 +141,9 @@ public:
         if (trigger_flash > 0) --trigger_flash;
 
         // --- Oscillator frequencies ---
-        // Pitch sweep: adds (swp% * pitch) Hz at envelope peak, decays with amp_env
-        float sweep_hz   = (eff_swp * 0.01f) * eff_pitch * amp_env;
-        float carrier_hz = eff_pitch + sweep_hz;
+        // Pitch sweep: exponential ratio sweep — (1 + swp/100)^2 at peak, decays to pitch
+        float sweep_ratio = 1.f + eff_swp * 0.01f;
+        float carrier_hz  = eff_pitch * (1.f + (sweep_ratio * sweep_ratio - 1.f) * amp_env);
         carrier.frequency(constrain(carrier_hz, 1.f, 20000.f));
         modulator.frequency(constrain(carrier_hz * eff_rto * 0.1f, 1.f, 20000.f));
 
@@ -202,7 +202,8 @@ public:
                 trg.ChangeSource(direction);
                 break;
             case PRESET:
-                preset_idx = (preset_idx + (NUM_PRESETS + 1) + direction) % (NUM_PRESETS + 1);
+                if (preset_idx > NUM_PRESETS) preset_idx = (direction > 0) ? 0 : NUM_PRESETS;
+                else preset_idx = (preset_idx + (NUM_PRESETS + 1) + direction) % (NUM_PRESETS + 1);
                 LoadPreset(preset_idx);
                 break;
             case PIT:    pitch_hz = constrain(pitch_hz + direction * 5, 10, 2000); break;
@@ -244,7 +245,7 @@ public:
     }
 
     FLASHMEM void AuxButton() override {
-        preset_idx = (preset_idx + 1) % (NUM_PRESETS + 1);
+        preset_idx = (preset_idx >= NUM_PRESETS) ? 0 : preset_idx + 1;
         LoadPreset(preset_idx);
     }
 
@@ -260,6 +261,7 @@ public:
         UnpackPackables(data[1], noi, ndc, mix, trg, mix_cv);
         UnpackPackables(data[2], pitch_cv, dec_cv, swp_cv, rto_cv);
         UnpackPackables(data[3], fmi_cv, fmd_cv, noi_cv, ndc_cv);
+        preset_idx = 9;  // sentinel "---": params from savestate, not a named preset
     }
 
 protected:
@@ -320,7 +322,7 @@ private:
     int8_t  cursor      = TRG;
     int8_t  scroll_top  = 0;
     uint8_t trigger_flash = 0;
-    uint8_t preset_idx  = 0;
+    uint8_t preset_idx  = 9;  // 9 = sentinel "---": params from savestate, not a named preset (NUM_PRESETS=8, Rnd=8, None=9)
 
     // --- Audio objects ---
     AudioPassthrough<MONO>       input_stream;
@@ -399,7 +401,9 @@ private:
             case 1: // PRESET
                 gfxPrint(1, y, "Type:");
                 gfxStartCursor(31, y);
-                gfxPrint(preset_idx < NUM_PRESETS ? PRESETS[preset_idx].name : "Rnd");
+                if      (preset_idx < NUM_PRESETS)       gfxPrint(PRESETS[preset_idx].name);
+                else if (preset_idx == NUM_PRESETS)      gfxPrint("Rnd");
+                else                                     gfxPrint("---");
                 gfxEndCursor(cursor == PRESET);
                 break;
             case 2: // Pit + CV
