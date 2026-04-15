@@ -3,7 +3,7 @@
 #include "AudioBuffer.h"
 #include "../dsputils.h"
 #include "../dsputils_arm.h"
-#include "src/extern/stmlib_utils_random.h"
+#include "../src/extern/stmlib_utils_random.h"
 #include <Audio.h>
 
 // Thin subclass of ExtAudioBuffer exposing write position and raw buffer

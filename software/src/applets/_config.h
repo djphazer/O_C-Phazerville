@@ -134,6 +134,7 @@ using namespace HS;
 #include "VectorMorph.h"
 #include "Voltage.h"
 #include "MarkoV.h"
+#include "MarkovPerc.h"
 #ifdef PEWPEWPEW
 #include "WTVCO.h"
 #endif
@@ -210,6 +211,7 @@ constexpr Registry reg = Registry<HemisphereApplet, 200 // max ID
     , DeclareApplet<MidiLoop, 81, 0x20>
 #endif
     , DeclareApplet<MarkoV, 93, 0x02>
+    , DeclareApplet<MarkovPerc, 94, 0x80>
     , DeclareApplet<hMIDIIn, 150, 0x20>
     , DeclareApplet<hMIDIOut, 27, 0x20>
 #ifdef PEWPEWPEW

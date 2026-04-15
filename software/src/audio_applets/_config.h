@@ -24,6 +24,7 @@
 #include "audio_applets/GlitchApplet.h"
 #include "audio_applets/MistApplet.h"
 #include "audio_applets/AdvKrpsStrngApplet.h"
+#include "audio_applets/WAVRecorderApplet.h"
 
 const size_t NUM_SLOTS = 5;
 
@@ -65,7 +66,11 @@ DMAMEM std::tuple<
   UpsampledApplet<MONO>,
   GlitchApplet<MONO>,
   MistApplet<MONO>,
-  AdvKrpsStrngApplet>
+  AdvKrpsStrngApplet
+#ifndef USB_AUDIO
+  , WavRecorderApplet<MONO>
+#endif
+  >
     mono_processors_pool[2][NUM_SLOTS - 1];
 DMAMEM std::tuple<
   PassthruApplet<STEREO>,
@@ -79,7 +84,11 @@ DMAMEM std::tuple<
   VcaApplet<STEREO>,
   FilterFolderApplet<STEREO>,
   WavPlayerApplet<STEREO>,
-  UpsampledApplet<STEREO>>
+  UpsampledApplet<STEREO>
+#ifndef USB_AUDIO
+  , WavRecorderApplet<STEREO>
+#endif
+  >
     stereo_processors_pool[NUM_SLOTS - 1];
 
 // Helper to extract the tuple type from an array... thanks ChatGPT...
