@@ -1,15 +1,6 @@
 # FMDrum — FM Synthesis Drum Voice
 
-MIT License  
-(c) 2026 Andy Jenkinson (uglifruit) — with ClaudeCode.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
----
 
 ## Overview
 
@@ -66,7 +57,7 @@ All parameters except TRG and Type accept CV modulation via assignable CV inputs
 | Encoder (browse) | Navigate cursor through the parameter list; display scrolls to follow |
 | Encoder (edit) | Adjust parameter value |
 | Button | Enter/exit edit mode; assign CV input when cursor is on a CV slot |
-| **Aux button** | Cycle to the next preset (wraps through all 6 named presets then Rnd) |
+| **Aux button** | Cycle to the next preset (wraps through all named presets then Rnd) |
 
 ---
 
@@ -84,6 +75,7 @@ All parameters except TRG and Type accept CV modulation via assignable CV inputs
 | Cowbl | 562 Hz | 300 ms |  0% | 5.0×  | 80% |  100 ms |  5% |  100 ms |
 
 All presets default to Mix=100% (no audio passthrough).
+These are currently a bit rubbish.
 
 ---
 
@@ -103,3 +95,15 @@ All presets default to Mix=100% (no audio passthrough).
 | File | Purpose |
 |------|---------|
 | `audio_applets/FMDrumApplet.h` | Complete applet — DSP signal graph, envelopes, UI, and presets |
+
+
+MIT License  
+(c) 2026 Andy Jenkinson (uglifruit) — with ClaudeCode.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+---

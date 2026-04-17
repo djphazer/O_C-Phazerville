@@ -228,8 +228,6 @@ at 100%.
   shrinks to ~62 ms and the display shows `No PSRAM`. Operation is limited to very short slices.
 - A 64-sample (~1.3 ms) micro-fade is applied at slice loop boundaries to suppress clicks.
   For slices shorter than 128 samples the fade is skipped.
-- In stereo, left and right channels share the same hold/freeze state, mode, and parameters
-  but use independent buffers. Stereo image is preserved.
 - The buffer records continuously regardless of hold state (unless FRZ is high), so releasing
   ON always returns to current live audio with no stale gap.
 - Bit = 15 (1-bit comparator mode) produces a significant loudness increase — all samples

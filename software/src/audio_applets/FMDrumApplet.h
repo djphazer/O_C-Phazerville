@@ -105,7 +105,7 @@ public:
             (float)fmi + Proportion(fmi_cv.In(), HEMISPHERE_MAX_INPUT_CV, 100),
             0.f, 200.f);
         float eff_fmd = constrain(
-            (float)fmd_s * 10.f + Proportion(fmd_cv.In(), HEMISPHERE_MAX_INPUT_CV, 500),
+            (float)fmd + Proportion(fmd_cv.In(), HEMISPHERE_MAX_INPUT_CV, 500),
             1.f, 5000.f);
         float eff_noi = constrain(
             (float)noi + Proportion(noi_cv.In(), HEMISPHERE_MAX_INPUT_CV, 100),
@@ -210,9 +210,9 @@ public:
             case SWP:    swp      = constrain(swp + direction, 0, 100); break;
             case RTO:    rto      = constrain(rto + direction, 1, 100); break;
             case FMI:    fmi      = constrain(fmi + direction, 0, 100); break;
-            case FMD:    fmd_s    = constrain(fmd_s + direction, 1, 100); break;
+            case FMD:    fmd      = constrain(fmd + direction * 10, 10, 4000); break;
             case NOI:    noi      = constrain(noi + direction, 0, 100); break;
-            case NDC:    ndc      = constrain(ndc + direction * 5, 5, 2000); break;
+            case NDC:    ndc      = constrain(ndc + direction * 5, 5, 4000); break;
             case MIX:    mix      = constrain(mix + direction, 0, 100); break;
             case CV_PIT: pitch_cv.ChangeSource(direction); break;
             case CV_DCY: dec_cv.ChangeSource(direction);   break;
@@ -249,14 +249,14 @@ public:
     }
 
     FLASHMEM void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
-        data[0] = PackPackables(pitch_hz, dec, swp, rto, fmi, fmd_s);
+        data[0] = PackPackables(pitch_hz, pack<12>(dec), swp, rto, fmi, pack<12>(fmd));
         data[1] = PackPackables(noi, ndc, mix, trg, mix_cv);
         data[2] = PackPackables(pitch_cv, dec_cv, swp_cv, rto_cv);
         data[3] = PackPackables(fmi_cv, fmd_cv, noi_cv, ndc_cv);
     }
 
     FLASHMEM void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
-        UnpackPackables(data[0], pitch_hz, dec, swp, rto, fmi, fmd_s);
+        UnpackPackables(data[0], pitch_hz, pack<12>(dec), swp, rto, fmi, pack<12>(fmd));
         UnpackPackables(data[1], noi, ndc, mix, trg, mix_cv);
         UnpackPackables(data[2], pitch_cv, dec_cv, swp_cv, rto_cv);
         UnpackPackables(data[3], fmi_cv, fmd_cv, noi_cv, ndc_cv);
@@ -290,13 +290,13 @@ private:
 
     // --- Parameters ---
     int16_t pitch_hz = 100;  // 10..2000 Hz
-    int16_t dec      = 400;  // 10..2000 ms
+    int16_t dec      = 400;  // 10..4000 ms
     int8_t  swp      = 60;   // 0..100 %
     int8_t  rto      = 10;   // 1..100 (÷10 = 0.1..10.0×)
     int8_t  fmi      = 80;   // 0..100 %
-    int8_t  fmd_s    = 20;   // 1..100 (×10 = 10..1000 ms)
+    int16_t fmd      = 200;  // 10..4000 ms
     int8_t  noi      = 20;   // 0..100 %
-    int16_t ndc      = 80;   // 5..1000 ms
+    int16_t ndc      = 80;   // 5..4000 ms
     int8_t  mix      = 100;  // 0..100 % (100 = drum only, 0 = full passthrough)
 
     DigitalInputMap trg;
@@ -343,7 +343,7 @@ private:
         int8_t  swp;
         int8_t  rto;
         int8_t  fmi;
-        int8_t  fmd_s;
+        int16_t fmd;
         int8_t  noi;
         int16_t ndc;
         const char* name;
@@ -351,15 +351,15 @@ private:
 
     static const int NUM_PRESETS = 8;
     static constexpr FMDrumPreset PRESETS[NUM_PRESETS] = {
-        //        hz   dec  swp  rto  fmi  fmd noi  ndc  name
-        {  60,   500,  80,  10,  90,  20,   5,  30, "Kick"  },
-        { 160,    80,  15,  14,  70,   4,  90, 320, "Snare" },
-        {1000,    60,   0,  35,  25,   3, 100, 100, "HiHat" },
-        {1000,   350,   0,  35,  25,   8, 100, 750, "O.Hat" },
-        { 120,   350,  60,  12,  70,  15,  15,  60, "Tom"   },
-        { 300,    80,   5,   8,  40,   5,  90,  80, "Clap"  },
-        { 500,   100,   0,  37,  90,   8,  10,  80, "Metal" },
-        { 562,   300,   0,  50,  80,  10,   5, 100, "Cowbl" },
+        //        hz   dec  swp  rto  fmi   fmd noi  ndc  name
+        {  60,   500,  80,  10,  90,  200,   5,  30, "Kick"  },
+        { 160,    80,  15,  14,  70,   40,  90, 320, "Snare" },
+        {1000,    60,   0,  35,  25,   30, 100, 100, "HiHat" },
+        {1000,   350,   0,  35,  25,   80, 100, 750, "O.Hat" },
+        { 120,   350,  60,  12,  70,  150,  15,  60, "Tom"   },
+        { 300,    80,   5,   8,  40,   50,  90,  80, "Clap"  },
+        { 500,   100,   0,  37,  90,   80,  10,  80, "Metal" },
+        { 562,   300,   0,  50,  80,  100,   5, 100, "Cowbl" },
     };
 
     FLASHMEM void LoadPreset(int idx) {
@@ -370,7 +370,7 @@ private:
             swp      = p.swp;
             rto      = p.rto;
             fmi      = p.fmi;
-            fmd_s    = p.fmd_s;
+            fmd      = p.fmd;
             noi      = p.noi;
             ndc      = p.ndc;
         } else {
@@ -380,7 +380,7 @@ private:
             swp      = random(0, 100);
             rto      = random(1, 50);
             fmi      = random(20, 100);
-            fmd_s    = random(2, 50);
+            fmd      = random(20, 500);
             noi      = random(0, 80);
             ndc      = random(20, 300);
         }
@@ -450,7 +450,7 @@ private:
             case 7: // FMd + CV
                 gfxPrint(1, y, "FMd:");
                 gfxStartCursor(25, y);
-                graphics.printf("%4d", (int)fmd_s * 10);
+                graphics.printf("%4d", (int)fmd);
                 gfxEndCursor(cursor == FMD);
                 gfxStartCursor();
                 gfxPrint(fmd_cv);
