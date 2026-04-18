@@ -57,8 +57,12 @@ void Scales::LoadScala(Scale &scale, File &file) {
     buf = file.readStringUntil('\n');
   }
   // found the first non-comment - description. skip it.
-  if (!file.available()) return;
-  buf = file.readStringUntil('\n'); // next line - number of notes
+  do {
+    if (!file.available()) return;
+    buf = file.readStringUntil('\n');
+  } while (buf.charAt(0) == '!'); // skip other comments
+
+  // next line - number of notes
   scale.num_notes = buf.toInt();
   CONSTRAIN(scale.num_notes, 2, 16);
 
@@ -66,9 +70,13 @@ void Scales::LoadScala(Scale &scale, File &file) {
   scale.notes[0] = 0;
   // start at one because 0.0 is implicit
   for (size_t i = 1; i < scale.num_notes; ++i) {
-    if (!file.available()) return;
-    buf = file.readStringUntil('\n'); // a note, either a decimal or fraction
-                                      // so we look for either '.' or '/' inside
+    do {
+      if (!file.available()) return;
+      buf = file.readStringUntil('\n');
+    } while (buf.charAt(0) == '!'); // skip comments
+
+    // a note, either a decimal or fraction
+    // so we look for either '.' or '/' inside
     float notef = buf.toFloat();
     int dividx = buf.indexOf('/');
     if (dividx > 0) {
