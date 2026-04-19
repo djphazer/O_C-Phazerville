@@ -201,7 +201,7 @@ void OC::Pinout_Detect() {
 
   CalSynthXL = (id_voltage >= 0.25 && id_voltage <= 0.35);
   if (CalSynthXL) {
-    //DAC_20Vpp = true;
+    DAC_20Vpp = true;
     // remapped buttons and I/O here
     but_top  = 29; // 'A'
     but_top2 = 20; // 'X'
