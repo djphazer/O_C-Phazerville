@@ -124,7 +124,7 @@ public:
                 gfxStartCursor();
                 gfxPrint(clock_source);
                 gfxEndCursor(cursor == CLOCK_SRC, false, clock_source.InputName());
-                gfxStartCursor(37, y);
+                gfxStartCursor(30, y);
                 gfxPrint(DIV_NAMES[div]);
                 gfxEndCursor(cursor == DIV);
                 break;

@@ -134,7 +134,7 @@ public:
         if (is_recording)
             gfxInvert(1, 14, 18, 9);
 
-        gfxStartCursor(30, 15);
+        gfxStartCursor(38, 15);
         gfxPrint(rec_cv);
         gfxEndCursor(cursor == REC_CV, false, rec_cv.InputName(), "RecTrig");
 
