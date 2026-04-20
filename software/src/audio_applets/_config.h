@@ -24,6 +24,7 @@
 #include "audio_applets/GlitchApplet.h"
 #include "audio_applets/MistApplet.h"
 #include "audio_applets/AdvKrpsStrngApplet.h"
+#include "audio_applets/ModalResonatorApplet.h"
 #include "audio_applets/WAVRecorderApplet.h"
 
 const size_t NUM_SLOTS = 5;
@@ -66,7 +67,8 @@ DMAMEM std::tuple<
   UpsampledApplet<MONO>,
   GlitchApplet<MONO>,
   MistApplet<MONO>,
-  AdvKrpsStrngApplet
+  AdvKrpsStrngApplet,
+  ModalResonatorApplet<MONO>
 #ifndef USB_AUDIO
   , WavRecorderApplet<MONO>
 #endif
@@ -84,7 +86,8 @@ DMAMEM std::tuple<
   VcaApplet<STEREO>,
   FilterFolderApplet<STEREO>,
   WavPlayerApplet<STEREO>,
-  UpsampledApplet<STEREO>
+  UpsampledApplet<STEREO>,
+  ModalResonatorApplet<STEREO>
 #ifndef USB_AUDIO
   , WavRecorderApplet<STEREO>
 #endif
