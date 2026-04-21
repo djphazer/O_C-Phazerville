@@ -140,7 +140,9 @@ public:
         reset_flag = true;
     }
 
-    void Controller()
+    void Controller();
+
+    void core_process()
     {
         EnvSeqManager::Register(hemisphere);
         bool linked = EnvSeqManager::IsLinked(hemisphere);
@@ -424,9 +426,7 @@ public:
         EnvSeqManager::Unload(hemisphere);
     }
 
-    void View() {
-        draw_interface();
-    }
+    void View();
 
     void OnButtonPress() {
         if (random_menu_active) {
@@ -1569,3 +1569,10 @@ private:
       return EnvSeqManager::option_txt[option];
     }
 };
+
+void FLASHMEM EnvSeq::View() {
+  draw_interface();
+}
+void FLASHMEM EnvSeq::Controller() {
+  core_process();
+}

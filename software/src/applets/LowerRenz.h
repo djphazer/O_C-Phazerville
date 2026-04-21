@@ -37,7 +37,9 @@ public:
         rho = 64;
     }
 
-    void Controller() {
+    void Controller();
+
+    void core_process() {
         if (!Gate(1)) { // Freeze if gated
             int freq_cv = Proportion(In(0), HEMISPHERE_MAX_INPUT_CV, 63);
             int rho_cv = Proportion(In(1), HEMISPHERE_MAX_INPUT_CV, 31);
@@ -131,3 +133,7 @@ private:
     }
 
 };
+
+void FLASHMEM LowerRenz::Controller() {
+  core_process();
+}
