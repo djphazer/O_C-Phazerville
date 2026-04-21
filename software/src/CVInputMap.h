@@ -54,7 +54,7 @@ struct CVInputMap {
 
       case TYPE_INTERNAL:
         // noise source
-        if (source == 0xff) return random();
+        if (source == 0xff) return int(random(ONE_OCTAVE * HS::octave_max * 2)) - ONE_OCTAVE * HS::octave_max;
         // else, fall through to default
       default:
         return 0;

@@ -245,12 +245,7 @@ public:
       LoadPreset();
 #endif
       // reset input mappings
-      for (int i = 0; i < APPLET_SLOTS * 2; ++i) {
-        // TR1-TR4, then CV5-CV8
-        trigmap[i].source = i + 1 + (i>3)*4;
-        cvmap[i].source = i + 1;
-        clock_m.SetMultiply(0, i);
-      }
+      HS::ResetMappings();
     }
 
     void Controller() {

@@ -114,6 +114,7 @@ public:
 
     // returns true if changed
     bool StoreInputMap() {
+      // TODO: this is likely broken in v2.0
       uint16_t cvmap = 0;
       uint16_t trigmap = 0;
       for (size_t i = 0; i < 4; ++i) {
@@ -129,14 +130,15 @@ public:
       return changed;
     }
     void LoadInputMap() {
+      // TODO: this is likely broken in v2.0
       for (size_t i = 0; i < 4; ++i) {
         int val = (uint16_t(values_[HEMISPHERE_TRIGMAP]) >> (i*4)) & 0x0F;
         if (val != 0)
-          HS::trigmap[i].source = constrain(val - 1, 0, TRIGMAP_MAX);
+          HS::trigmap[i].source = val - 1;
 
         val = (uint16_t(values_[HEMISPHERE_CVMAP]) >> (i*4)) & 0x0F;
         if (val != 0)
-          HS::cvmap[i].source = constrain(val - 1, 0, CVMAP_MAX);
+          HS::cvmap[i].source = val - 1;
       }
     }
 

@@ -344,28 +344,14 @@ public:
         ClockSetup_instance.SetGlobals(global_data);
 
         // Input Mappings
-        if (!PhzConfig::getValue(preset_key | TRIGMAP_KEY, data)) {
-          PhzConfig::getValue(preset_key | OLD_TRIGMAP_KEY, data);
-          const size_t bitsize = 5;
-          for (size_t i = 0; i < 8; ++i) {
-            const int val = Unpack(data, PackLocation{i*bitsize, bitsize});
-            if (val != 0) HS::trigmap[i].source = constrain(val - 1, 0, TRIGMAP_MAX);
-          }
-        } else {
+        if (PhzConfig::getValue(preset_key | TRIGMAP_KEY, data)) {
           for (size_t i = 0; i < ADC_CHANNEL_LAST/4; ++i) {
             UnpackPackables(data, HS::trigmap[i*4], HS::trigmap[i*4+1], HS::trigmap[i*4+2], HS::trigmap[i*4+3]);
             if (!PhzConfig::getValue(preset_key | (TRIGMAP_KEY + i+1), data)) break;
           }
         }
 
-        if (!PhzConfig::getValue(preset_key | CVMAP_KEY, data)) {
-          PhzConfig::getValue(preset_key | OLD_CVMAP_KEY, data);
-          const size_t bitsize = 5;
-          for (size_t i = 0; i < 8; ++i) {
-            const int val = Unpack(data, PackLocation{i*bitsize, bitsize});
-            if (val != 0) HS::cvmap[i].source = constrain(val - 1, 0, CVMAP_MAX);
-          }
-        } else {
+        if (PhzConfig::getValue(preset_key | CVMAP_KEY, data)) {
           for (size_t i = 0; i < ADC_CHANNEL_LAST/4; ++i) {
             UnpackPackables(data, HS::cvmap[i*4], HS::cvmap[i*4+1], HS::cvmap[i*4+2], HS::cvmap[i*4+3]);
             if (!PhzConfig::getValue(preset_key | (CVMAP_KEY + i+1), data)) break;
