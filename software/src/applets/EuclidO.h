@@ -120,6 +120,7 @@ public:
     const char* applet_name() {
         return "EuclidO";
     }
+    const uint8_t* applet_icon() { return PhzIcons::euclidX; }
 
     void Start() {
         param_cursor_ = 0;
