@@ -201,7 +201,8 @@ public:
         //audio_app.deletePresetData(id);
     }
 
-    void StoreToPreset(int id) {
+    void StoreToPreset(int id);
+    void store_to_preset(int id) {
         // preset id is upper 5 bits - 32 presets per bank
         uint16_t preset_key = id << 11;
 
@@ -311,7 +312,9 @@ public:
 
         preset_id = id;
     }
-    void LoadFromPreset(int id) {
+
+    void LoadFromPreset(int id);
+    void load_from_preset(int id) {
         preset_id = id;
 
         uint16_t preset_key = id << 11;
@@ -1692,6 +1695,7 @@ void AppQuadrants::Loop() {
     audio_app.mainloop();
 }
 
+FLASHMEM
 void AppQuadrants::DrawMenu() const {
     View();
 }
@@ -1719,6 +1723,7 @@ void AppQuadrants::DrawDebugInfo() const {
   // TODO:
 }
 
+FLASHMEM
 void AppQuadrants::HandleButtonEvent(const UI::Event &event) {
     last_mask = mask;
     mask = event.mask;
@@ -1873,6 +1878,16 @@ void AppQuadrants::HandleButtonEvent(const UI::Event &event) {
     }
 }
 
+FLASHMEM
 void AppQuadrants::HandleEncoderEvent(const UI::Event &event) {
     DelegateEncoderMovement(event);
+}
+
+FLASHMEM
+void AppQuadrants::StoreToPreset(int id) {
+  store_to_preset(id);
+}
+FLASHMEM
+void AppQuadrants::LoadFromPreset(int id) {
+  load_from_preset(id);
 }
