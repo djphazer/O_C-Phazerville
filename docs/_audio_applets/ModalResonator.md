@@ -49,7 +49,7 @@ Instruments Rings) rather than a simple harmonic series.
 | 0 | Negative stiffness — partials compressed **below** the fundamental, descending cluster |
 | ~3 | Stiffness ≈ 0 — true harmonic series: f, 2f, 3f, 4f … → string, organ |
 | 25 | Slightly stretched overtones → acoustic piano character |
-| 50 | Moderately stretched → marimba, wooden bars |
+| **50 (default)** | Moderately stretched → marimba, wooden bars |
 | 75 | Strongly inharmonic → steel tongue drum, bell plates |
 | 100 | Maximally stretched → bell, bowl, gong |
 
@@ -159,6 +159,18 @@ exciter signal. This is useful for confirming that the resonator is being struck
 
 ---
 
+### Trg — Gate trigger input
+
+The **Trg** parameter (last row, visible when cursor scrolls past Mix) accepts an assignable
+gate input. A rising edge on the assigned jack fires a full-amplitude noise-burst strike —
+identical to pressing the Aux button. Use this to clock the resonator from a sequencer,
+envelope gate, clock divider, or any other trigger source in the patch.
+
+To assign: navigate to the **Trg** row, press the encoder button, then select the input jack
+from the map editor.
+
+---
+
 ### AuxButton — Manual strike
 
 Pressing the **Aux** button fires a white-noise burst directly into the resonator at full
@@ -167,6 +179,8 @@ the sound without a patched exciter, or for manually triggering a transient duri
 
 The noise burst is one audio block (~2.7 ms) long — short enough to be a clean impulse at
 most decay settings.
+
+Both Trg and AuxButton can be active simultaneously — either source triggers the strike.
 
 ---
 
@@ -207,13 +221,15 @@ most decay settings.
 
 ### Technical notes
 
-- The resonator bank consists of **12 parallel two-pole bandpass filters** (classic two-pole
-  resonator, Direct Form I). Each mode has its own frequency, pole radius, and gain weight.
+- The resonator bank consists of **12 parallel Chamberlin state-variable filters** (SVF bandpass).
+  Each mode has its own frequency coefficient, damping, and gain weight.
 - All trigonometric coefficient computation (`powf`, `cosf`, `sinf`) runs at control rate
   (~150 Hz) in `Controller()`. The audio interrupt loop (`update()`) contains only
   multiply-accumulate operations — no trig in the hot path.
 - A **single-pole DC blocker** (pole at z = 0.995) is applied to the summed output.
-- Mode frequencies are clamped below 20 kHz to prevent aliasing near Nyquist.
+- Mode frequencies are clamped below ~17.6 kHz (40% of Nyquist) to maintain SVF filter
+  stability margin. Clamping at exactly 20 kHz left only 0.7% headroom below the instability
+  boundary; the lower ceiling provides ~5% margin.
 - The applet is available in both **mono** (processor chain, left or right) and **stereo**
   (full-width stereo processor chain) configurations.
 - Memory footprint: approximately 400 bytes per active channel instance — no heap allocation.

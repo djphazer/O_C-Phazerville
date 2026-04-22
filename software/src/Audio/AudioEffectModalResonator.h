@@ -12,7 +12,8 @@
 //   lp   += f * bp
 //   bp   += f * (notch - lp)   → bp is the bandpass output
 // The SVF bandpass has no DC path by construction — no per-mode x_prev[]
-// differencing or output DC blocker required.
+// differencing required. A single-pole DC blocker (z=0.995) is applied to the
+// summed output to remove any residual DC from floating-point accumulation.
 //
 // Stiffness model (Rings-style additive stretch):
 //   stretch starts at 1.0, increments by stiffness each mode.
@@ -60,11 +61,13 @@ public:
         strike_vel_     = 0.0f;
         strike_remain_  = 0;
         noise_seed_     = 0xCAFEBABE;
+        dc_x1_ = dc_y1_ = 0.0f;
         updateCoeffs(261.63f, 0.5f, 0.7f, 0.5f, 0.25f);
     }
 
     void Release() {
         for (int k = 0; k < NUM_MODES; k++) lp_[k] = bp_[k] = 0.0f;
+        dc_x1_ = dc_y1_ = 0.0f;
     }
 
     // --- Parameter update (call from Controller, ~150 Hz) -------------------
@@ -98,10 +101,14 @@ public:
         float gain_sum = 0.0f;
 
         for (int k = 0; k < NUM_MODES; k++) {
-            // Modal frequency via additive stretch
+            // Modal frequency via additive stretch.
+            // Ceiling at 40% of Nyquist: fcoef = 2*sin(0.4*π) ≈ 1.90, giving a
+            // ~5% stability margin vs. the SVF limit of fcoef < 2.0.
+            // (20 kHz was only 0.7% margin — too close at extreme settings.)
+            const float FREQ_CEIL = AUDIO_SAMPLE_RATE_EXACT * 0.40f;
             float f_k = freq_hz * stretch;
-            if (f_k > 20000.0f) f_k = 20000.0f;
-            if (f_k <    20.0f) f_k =    20.0f;
+            if (f_k > FREQ_CEIL) f_k = FREQ_CEIL;
+            if (f_k <      20.0f) f_k =      20.0f;
 
             // Chamberlin SVF frequency coefficient: 2*sin(π*f/fs)
             f_[k] = 2.0f * sinf(3.14159265f * f_k / AUDIO_SAMPLE_RATE_EXACT);
@@ -237,10 +244,21 @@ public:
                 y           += mg[k] * bp[k];
             }
 
-            dst[i] = Clip16(y * 32767.0f);
+            // DC blocker: y_out = y - x[n-1] + 0.995*y[n-1]
+            float y_out = y - dc_x1_ + 0.995f * dc_y1_;
+            dc_x1_ = y;
+            dc_y1_ = y_out;
+            dst[i] = Clip16(y_out * 32767.0f);
         }
 
+        // Clamp before write-back: steady-state SVF amplitude is ≤1.0;
+        // values beyond ±2.0 indicate transient blow-up in progress.
+        // This catches slow drift that the load-time sanitiser misses.
         for (int k = 0; k < NUM_MODES; k++) {
+            if (lp[k] >  2.0f) lp[k] =  2.0f;
+            if (lp[k] < -2.0f) lp[k] = -2.0f;
+            if (bp[k] >  2.0f) bp[k] =  2.0f;
+            if (bp[k] < -2.0f) bp[k] = -2.0f;
             lp_[k] = lp[k];
             bp_[k] = bp[k];
         }
@@ -272,4 +290,8 @@ private:
 
     // VU
     volatile uint16_t excite_peak_ = 0;
+
+    // DC blocker state (single-pole, pole at 0.995)
+    float dc_x1_ = 0.0f;
+    float dc_y1_ = 0.0f;
 };

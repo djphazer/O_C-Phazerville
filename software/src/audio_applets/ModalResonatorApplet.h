@@ -56,13 +56,18 @@ public:
         float dry_gain, wet_gain;
         EqualPowerFade(dry_gain, wet_gain, eff_mix);
 
+        // Rising edge on strike_input gate
+        bool cur_strike_gate = strike_input.Gate();
+        bool gate_strike = cur_strike_gate && !prev_strike_gate_;
+        prev_strike_gate_ = cur_strike_gate;
+
         for (int ch = 0; ch < Channels; ch++) {
             channels[ch].resonator.updateCoeffs(
                 freq_hz, eff_structure, eff_bright, eff_damp, eff_pos);
             channels[ch].wet_dry_mixer.gain(ResonatorChannel::DRY_CH, dry_gain);
             channels[ch].wet_dry_mixer.gain(ResonatorChannel::WET_CH, wet_gain);
 
-            if (manual_strike_) {
+            if (manual_strike_ || gate_strike) {
                 channels[ch].resonator.strike(1.0f);
             }
         }
@@ -119,7 +124,7 @@ public:
         gfxPrint(damp_cv);
         gfxEndCursor(cursor == DAMP_CV, false, damp_cv.InputName());
 
-        // Row 5 (y=55): context-sensitive — Pos while cursor ≤ POS_CV, else Mix
+        // Row 5 (y=55): context-sensitive — Pos / Mix / Strike depending on cursor
         if (cursor <= POS_CV) {
             gfxPrint(1, 55, "Pos:");
             gfxStartCursor(25, 55);
@@ -128,7 +133,7 @@ public:
             gfxStartCursor();
             gfxPrint(pos_cv);
             gfxEndCursor(cursor == POS_CV, false, pos_cv.InputName());
-        } else {
+        } else if (cursor <= MIX_CV) {
             gfxPrint(1, 55, "Mix:");
             gfxStartCursor(25, 55);
             graphics.printf("%3d%%", mix);
@@ -136,6 +141,11 @@ public:
             gfxStartCursor();
             gfxPrint(mix_cv);
             gfxEndCursor(cursor == MIX_CV, false, mix_cv.InputName());
+        } else {
+            gfxPrint(1, 55, "Trg:");
+            gfxStartCursor(25, 55);
+            gfxPrint(strike_input);
+            gfxEndCursor(cursor == STRIKE, true, strike_input.InputName());
         }
 
         gfxDisplayInputMapEditor();
@@ -158,7 +168,8 @@ public:
                 IndexedInput(BRIGHT_CV, bright_cv),
                 IndexedInput(DAMP_CV,   damp_cv),
                 IndexedInput(POS_CV,    pos_cv),
-                IndexedInput(MIX_CV,    mix_cv)
+                IndexedInput(MIX_CV,    mix_cv),
+                IndexedInput(STRIKE,    strike_input)
             ))
             return;
         CursorToggle();
@@ -166,7 +177,7 @@ public:
 
     FLASHMEM void OnEncoderMove(int direction) override {
         if (!EditMode()) {
-            MoveCursor(cursor, direction, MIX_CV);
+            MoveCursor(cursor, direction, STRIKE);
             return;
         }
         if (EditSelectedInputMap(direction)) return;
@@ -192,6 +203,7 @@ public:
             case POS_CV:     pos_cv.ChangeSource(direction);     break;
             case MIX:        mix        = constrain(mix        + direction, 0, 100); break;
             case MIX_CV:     mix_cv.ChangeSource(direction);     break;
+            case STRIKE:     strike_input.ChangeSource(direction); break;
             default: break;
         }
     }
@@ -202,13 +214,13 @@ public:
     FLASHMEM void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
         data[0] = PackPackables(MODAL_PARAMS);
         data[1] = PackPackables(freq_cv, struct_cv, bright_cv, damp_cv);
-        data[2] = PackPackables(pos_cv, mix_cv);
+        data[2] = PackPackables(pos_cv, mix_cv, strike_input);
     }
 
     FLASHMEM void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
         UnpackPackables(data[0], MODAL_PARAMS);
         UnpackPackables(data[1], freq_cv, struct_cv, bright_cv, damp_cv);
-        UnpackPackables(data[2], pos_cv, mix_cv);
+        UnpackPackables(data[2], pos_cv, mix_cv, strike_input);
     }
 #undef MODAL_PARAMS
 
@@ -236,13 +248,14 @@ private:
         POS_CV,
         MIX,
         MIX_CV,
+        STRIKE,   // DigitalInputMap — assignable gate trigger; AuxButton is manual fallback
     };
 
     int8_t cursor = FREQ;
 
     // Parameters
     int16_t pitch      = 1 * 12 * 128;  // C4 default
-    int8_t  structure  = 0;             // 0=harmonic, 100=inharmonic
+    int8_t  structure  = 50;            // 0=harmonic, 100=inharmonic
     int8_t  brightness = 70;            // mode amplitude taper
     int8_t  damping    = 50;            // decay time
     int8_t  position   = 25;            // excitation point
@@ -256,6 +269,9 @@ private:
     CVInputMap mix_cv;
 
     bool manual_strike_ = false;
+
+    DigitalInputMap strike_input;
+    bool prev_strike_gate_ = false;
 
     // Per-channel DSP struct
     struct ResonatorChannel {
