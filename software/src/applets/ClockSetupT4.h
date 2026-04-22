@@ -46,6 +46,14 @@ public:
         TRIG6,
         TRIG7,
         TRIG8,
+        BOOP1,
+        BOOP2,
+        BOOP3,
+        BOOP4,
+        BOOP5,
+        BOOP6,
+        BOOP7,
+        BOOP8,
         OUTSKIP1,
         OUTSKIP2,
         OUTSKIP3,
@@ -158,6 +166,10 @@ public:
     void OnButtonPress() {
         if (!EditMode()) { // special cases for toggle buttons
             if (cursor == PLAY_STOP) PlayStop();
+            else if (cursor >= BOOP1 && cursor <= BOOP8) {
+                clock_m.Boop(cursor-BOOP1);
+                button_ticker = HEMISPHERE_PULSE_ANIMATION_TIME_LONG;
+            }
             else CursorToggle();
         }
         else CursorToggle();
@@ -204,15 +216,17 @@ public:
             HS::trigmap[cursor-TRIG1].ChangeSource(direction);
             break;
 
-        /* the boops shall return in a hidden form
         case BOOP1:
         case BOOP2:
         case BOOP3:
         case BOOP4:
+        case BOOP5:
+        case BOOP6:
+        case BOOP7:
+        case BOOP8:
             HS::clock_m.Boop(cursor-BOOP1);
             button_ticker = HEMISPHERE_PULSE_ANIMATION_TIME_LONG;
             break;
-        */
 
         case OUTSKIP1:
         case OUTSKIP2:
@@ -372,9 +386,10 @@ private:
         graphics.clearRect(0, 0, 128, 24);
         graphics.clearRect(0, 24, 52, 12); // label box
 
+        const char* const lbl[] = { "Tempo", "Clk Mult", "Trig Ins", "Boop!" };
         gfxLine(0, 35, 50, 35);
         gfxLine(50, 23, 50, 35);
-        gfxPrint(0, 25, (cursor<MULT1)? "Tempo" : ((cursor<TRIG1)? "Clk Mult":"Trig Ins"));
+        gfxPrint(0, 25, lbl[(cursor >= MULT1) * (1 + (cursor-MULT1) / 8)]);
 
         gfxDottedLine(0, 21, 127, 21);
         gfxLine(0, 22, 127, 22);
@@ -440,6 +455,15 @@ private:
             // Trigger indicators
             gfxIcon(23 + x, y, DOWN_BTN_ICON);
             if (flash_ticker[ch]) gfxInvert(22 + x, y, 9, 8);
+        }
+      } else if (cursor <= BOOP8) {
+        int y = 1;
+        for (int ch=0; ch<8; ++ch) {
+            const int x = (ch % 4) * 32;
+            if (ch == 4) y += 10;
+
+            // Manual trigger buttons
+            gfxIcon(4 + x, y, (button_ticker && ch == cursor-BOOP1)?BTN_ON_ICON:BTN_OFF_ICON);
         }
       } else if (cursor <= OUTSKIP8) {
         int y = 45;
@@ -540,15 +564,20 @@ private:
           break;
         }
 
-        /* the boops shall return in a hidden form
         case BOOP1:
         case BOOP2:
         case BOOP3:
         case BOOP4:
-            if (0 == button_ticker)
-                gfxIcon(12 + 32*(cursor-BOOP1), 49, LEFT_ICON);
-            break;
-        */
+        case BOOP5:
+        case BOOP6:
+        case BOOP7:
+        case BOOP8:
+          if (0 == button_ticker) {
+            const int x_ = 12 + 32 * ((cursor-BOOP1) % 4);
+            const int y_ = 1 + ((cursor-BOOP1) / 4 * 10);
+            gfxIcon(x_, y_, LEFT_ICON);
+          }
+          break;
 
         default: break;
         }
