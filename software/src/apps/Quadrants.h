@@ -666,7 +666,6 @@ public:
         if (draw_applets) {
           if (view_state == AUDIO_SETUP) {
             audio_app.View();
-            ClockSetup_instance.DrawIndicator();
 
             draw_applets = false;
           }
@@ -691,13 +690,13 @@ public:
             // vertical separator
             graphics.drawLine(63, 0, 63, 63, 2);
           }
+        }
 
-          // Clock setup is an overlay
-          if (view_state == CLOCK_SETUP) {
-            ClockSetup_instance.View();
-          } else {
-            ClockSetup_instance.DrawIndicator(view_state == OVERVIEW);
-          }
+        // Clock setup is an overlay
+        if (clock_overlay) {
+          ClockSetup_instance.View();
+        } else {
+          ClockSetup_instance.DrawIndicator(view_state == OVERVIEW);
         }
 
         // Overlay popup window last
@@ -758,8 +757,8 @@ public:
           return;
         }
 
-        if (view_state == CLOCK_SETUP) {
-          ClockSetup_instance.OnButtonPress();
+        if (view_state == OVERVIEW) {
+          // TODO:
           return;
         }
 
@@ -791,7 +790,7 @@ public:
 
         // dual press A+B for Clock Setup
         if (CheckButtonCombo(OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_B)) {
-            view_state = CLOCK_SETUP;
+            clock_overlay = true;
             return true;
         }
         // dual press X+Y for Audio Setup
@@ -812,6 +811,12 @@ public:
             return true;
         }
 
+        // cancel clock view
+        if (clock_overlay) {
+          clock_overlay = false;
+          return true;
+        }
+
         // cancel preset select or config screens
         if (config_page || preset_cursor) {
           if (isEditing && config_cursor == PRESET_BANK_NUM) SetBank(bank_num);
@@ -822,7 +827,7 @@ public:
         }
 
         // cancel other view layers
-        if (view_state != APPLETS && view_state != APPLET_FULLSCREEN) {
+        if (view_state != APPLETS && view_state != APPLET_FULLSCREEN && view_state != OVERVIEW) {
           view_state = APPLETS;
           return true;
         }
@@ -855,6 +860,14 @@ public:
           return;
         }
 
+        if (clock_overlay) {
+          if (h == LEFT_HEMISPHERE)
+            ClockSetup_instance.OnLeftEncoderMove(increment);
+          else
+            ClockSetup_instance.OnEncoderMove(increment);
+          return;
+        }
+
         if (config_page > HIDE_CONFIG || preset_cursor) {
             ConfigEncoderAction(h, increment);
             return;
@@ -864,11 +877,8 @@ public:
           return;
         }
 
-        if (view_state == CLOCK_SETUP) {
-          if (h == LEFT_HEMISPHERE)
-            ClockSetup_instance.OnLeftEncoderMove(increment);
-          else
-            ClockSetup_instance.OnEncoderMove(increment);
+        if (view_state == OVERVIEW) {
+          // TODO:
           return;
         }
 
@@ -1025,10 +1035,11 @@ private:
       OVERVIEW,
       //CONFIG_MENU,
       //PRESET_PICKER,
-      CLOCK_SETUP,
+      //CLOCK_SETUP,
       AUDIO_SETUP,
     };
     QuadrantsView view_state = APPLETS;
+    bool clock_overlay = false;
 
     enum QuadrantsConfigPage {
       HIDE_CONFIG,
@@ -1722,9 +1733,10 @@ void AppQuadrants::HandleButtonEvent(const UI::Event &event) {
       last_mask
     );
 
-    if (AUDIO_SETUP == view_state) {
+    if (AUDIO_SETUP == view_state && !clock_overlay) {
       if (CheckButtonCombo(OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_B)) {
-        view_state = APPLETS;
+        clock_overlay = true;
+        //view_state = APPLETS;
         return;
       }
       // dual press A+X for Load Preset
@@ -1750,6 +1762,7 @@ void AppQuadrants::HandleButtonEvent(const UI::Event &event) {
     if (CheckButtonCombo(OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_Y) ||
         CheckButtonCombo(OC::CONTROL_BUTTON_X | OC::CONTROL_BUTTON_B)) {
       view_state = OVERVIEW;
+      OC::ui.SetButtonIgnoreMask();
       return;
     }
 
@@ -1797,7 +1810,10 @@ void AppQuadrants::HandleButtonEvent(const UI::Event &event) {
         event.control == OC::CONTROL_BUTTON_L ||
         event.control == OC::CONTROL_BUTTON_R)
       {
-          DelegateEncoderPush(event);
+          if (clock_overlay) {
+            ClockSetup_instance.OnButtonPress();
+          } else
+            DelegateEncoderPush(event);
           // ignore long-press to prevent Main Menu >:)
           //OC::ui.SetButtonIgnoreMask();
       } else if (
@@ -1831,6 +1847,9 @@ void AppQuadrants::HandleButtonEvent(const UI::Event &event) {
                 else ExitFullScreen(); // Exit help screen if same button is clicked
                 OC::ui.SetButtonIgnoreMask(); // ignore release
             }
+            if (view_state == OVERVIEW) {
+              // TODO: what do A/B/X/Y do in the Overview? modifiers?
+            }
 
             // mark this single click
             click_tick = OC::CORE::ticks;
@@ -1851,7 +1870,12 @@ void AppQuadrants::HandleButtonEvent(const UI::Event &event) {
         if (view_state == APPLET_FULLSCREEN && slot == zoom_slot)
           view_state = APPLETS;
 
-        SwitchToSlot(slot);
+        if (view_state == OVERVIEW) {
+          // jump to applet view on release
+          SetFullScreen(slot);
+          zoom_cursor = -1; // applet UI, not config
+        } else
+          SwitchToSlot(slot);
       }
       // ignore all other button release events
       break;
