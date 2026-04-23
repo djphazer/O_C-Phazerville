@@ -189,6 +189,8 @@ public:
       print_applet_line(i);
     }
 
+    gfxDottedLine(0, 0, 127, 0);
+
     ForEachSide(side) {
       if (state[side] == EDIT_APPLET) {
         HemisphereApplet& applet = get_selected_applet(side);
