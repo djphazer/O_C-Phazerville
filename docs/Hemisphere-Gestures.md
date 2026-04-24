@@ -47,11 +47,12 @@ Only 2 applets are visible at a given time (although all are active). To swap vi
 
 | Action    | Gesture    |   Notes   |
 | --------- |:----------:|:---------:|
-| **Open Overview** | Press A + Y or B + X together (diagonal button combos) | Monitor input and output voltages of all 4 quadrants at once |
+| **Quick-change applets** | Hold X or Y and rotate either encoder | Switches the visible applet on each side without menus, like Hemispheres select mode |
 | **Change NW applet**  | Double press A button to enter help/config screen. Select applet name with RIGHT Encoder cursor and press to enter applet selection menu. Scroll with RIGHT encoder and press to select. | Press A/B/X/Y to escape without changing applet.   |
 | **Change NE applet**  | Double press B button to enter help/config screen. Select applet name with RIGHT Encoder cursor and press to enter applet selection menu. Scroll with RIGHT encoder and press to select. | Press A/B/X/Y to escape without changing applet.   |
 | **Change SW applet**  | Double press X button to enter help/config screen. Select applet name with RIGHT Encoder cursor and press to enter applet selection menu. Scroll with RIGHT encoder and press to select. | Press A/B/X/Y to escape without changing applet.    |
 | **Change SE applet**  | Double press Y button to enter help/config screen. Select applet name with RIGHT Encoder cursor and press to enter applet selection menu. Scroll with RIGHT encoder and press to select. | Press A/B/X/Y to escape without changing applet.    |
+| **Open Overview** | Press A + Y or B + X together (diagonal button combos) | Monitor input and output voltages of all 4 quadrants at once |
 | **Open full-screen applet help/config** | With applet visible, double-press the corresponding A/B/X/Y button. Press the same button again to exit. Press a different Select button to switch to that applet slot. | RIGHT encoder is always used to move cursor and edit params; LEFT encoder swaps between applet config and full-screen view. |
 | **View applet UI in full-screen**   | Open help/config screen (see above), and rotate LEFT encoder. Then, use RIGHT encoder to interact with the Applet. | Applets that make use of full-screen view currently include Scope, EuclidX, and Ebb&LFO. More to come.    |
 | **Open [Clock / Trigger Setup](Clock-Setup)**  |  Press both A + B buttons together  |  Adjust internal BPM, swing, external sync, and per-trigger clock mult/div; remap trigger inputs (also available within the [Config menus](Hemisphere-Config) or in applet help/config view).  |
