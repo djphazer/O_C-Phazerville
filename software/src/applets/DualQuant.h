@@ -58,6 +58,12 @@ public:
         DrawSelector();
     }
 
+    void AuxButton() {
+        uint8_t ch = cursor / 2;
+        HS::QuantizerEdit(io_offset + ch);
+        CancelEdit();
+    }
+
     // void OnButtonPress() { }
 
     void OnEncoderMove(int direction) {
@@ -126,7 +132,7 @@ private:
             // Draw cursor
             int y = cursor % 2; // 0=top line, 1=bottom
             if (ch == (cursor / 2)) {
-                gfxCursor(y*10 + ch*31, 23 + y*10, 12+(1-y)*18, ch?"Root":"Scale");
+                gfxSpicyCursor(y*10 + ch*31, 23 + y*10, 12+(1-y)*18, y?"Root":"Scale");
             }
 
             // Little note display
