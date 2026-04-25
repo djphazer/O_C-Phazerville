@@ -379,7 +379,7 @@ namespace HS {
           // context clues at top/bottom of screen
           gfxFooter("L:cursor     R:adjust");
           graphics.clearRect(0, 0, 128, 10);
-          gfxHeader("A:Oct+         B:Oct-");
+          gfxHeader("A:Oct-         B:Oct+");
         }
 
         break;

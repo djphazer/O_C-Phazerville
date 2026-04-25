@@ -1786,9 +1786,9 @@ void AppHemisphere::HandleButtonEvent(const UI::Event &event) {
             break;
         }
         if (HS::q_edit) {
-          if (event.control == OC::CONTROL_BUTTON_A)
+          if (event.control == OC::CONTROL_BUTTON_B)
             HS::NudgeOctave(HS::qview, 1);
-          else if (event.control == OC::CONTROL_BUTTON_B)
+          else if (event.control == OC::CONTROL_BUTTON_A)
             HS::NudgeOctave(HS::qview, -1);
           else {
             HS::q_edit = 0;
