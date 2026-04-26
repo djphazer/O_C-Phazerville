@@ -361,7 +361,7 @@ public:
 protected:
   void SetHelp() {}
 
-  void set_taps(size_t t) {
+  void set_taps(int t) {
     CONSTRAIN(t, 1, 8);
     taps = t;
     float tap_gain = EQUAL_POWER_EQUAL_MIX[taps];
