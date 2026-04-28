@@ -82,16 +82,8 @@ public:
         }
     }
 
-    void Controller() {
-        ForEachChannel(ch) {
-            // Process Algorithm (outputs to corresponding channel)
-            ProcessAlgorithm(ch, Clock(ch)? peaks::CONTROL_GATE_RISING : 0);
-        }
-    }
-
-    void View() {
-        DrawInterface();
-    }
+    void Controller();
+    void View();
 
     void AuxButton() {
         if (cursor > CURSOR_LAST) return;
@@ -620,3 +612,13 @@ private:
     }
     */
 };
+
+FLASHMEM void BitBeat::Controller() {
+  ForEachChannel(ch) {
+    // Process Algorithm (outputs to corresponding channel)
+    ProcessAlgorithm(ch, Clock(ch)? peaks::CONTROL_GATE_RISING : 0);
+  }
+}
+FLASHMEM void BitBeat::View() {
+  DrawInterface();
+}
