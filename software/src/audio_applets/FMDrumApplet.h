@@ -49,10 +49,10 @@ public:
         noise_vca.level(1.0f);
         noise_vca.rectify(true);
 
-        // Output mixer: gain[0] fixed, gains[1..2] updated in Controller
+        // Output mixer: gain[0] and gain[2] fixed, gain[1] updated in Controller
         output_mixer.gain(0, 1.0f);
         output_mixer.gain(1, 0.0f);
-        output_mixer.gain(2, 0.0f);
+        output_mixer.gain(2, 1.0f);
 
         // --- Cable routing ---
         // FM chain
@@ -159,7 +159,6 @@ public:
         float mix_gain = eff_mix * 0.01f;
         output_mixer.gain(0, mix_gain);
         output_mixer.gain(1, constrain(eff_noi * mix_gain * 0.01f, 0.f, 2.f));
-        output_mixer.gain(2, constrain((100.f - eff_mix) * 0.01f, 0.f, 1.f));
     }
 
     FLASHMEM void View() override {
@@ -207,7 +206,7 @@ public:
                 LoadPreset(preset_idx);
                 break;
             case PIT:    pitch_hz = constrain(pitch_hz + direction * 5, 10, 2000); break;
-            case DCY:    dec      = constrain(dec + direction * 5, 10, 4000); break;
+            case DCY:    dec      = constrain(dec + direction * (dec>>1), 10, 4000); break;
             case SWP:    swp      = constrain(swp + direction, 0, 100); break;
             case RTO:    rto      = constrain(rto + direction, 1, 100); break;
             case FMI:    fmi      = constrain(fmi + direction, 0, 100); break;
@@ -292,14 +291,14 @@ private:
 
     // --- Parameters ---
     int16_t pitch_hz = 100;  // 10..2000 Hz
-    int16_t dec      = 400;  // 10..4000 ms
+    uint16_t dec      = 400;  // 10..4000 ms
     int8_t  swp      = 60;   // 0..100 %
     int8_t  rto      = 10;   // 1..100 (÷10 = 0.1..10.0×)
     int8_t  fmi      = 80;   // 0..100 %
-    int16_t fmd      = 200;  // 10..4000 ms
+    uint16_t fmd      = 200;  // 10..4000 ms
     int8_t  noi      = 20;   // 0..100 %
     int16_t ndc      = 80;   // 5..4000 ms
-    int8_t  mix      = 100;  // 0..100 % (100 = drum only, 0 = full passthrough)
+    int8_t  mix      = 25;  // 0..100 % (100 = drum only, 0 = full passthrough)
 
     DigitalInputMap trg;
     CVInputMap pitch_cv, dec_cv, swp_cv, rto_cv;
@@ -341,11 +340,11 @@ private:
     // --- Preset system ---
     struct FMDrumPreset {
         int16_t pitch_hz;
-        int16_t dec;
+        uint16_t dec;
         int8_t  swp;
         int8_t  rto;
         int8_t  fmi;
-        int16_t fmd;
+        uint16_t fmd;
         int8_t  noi;
         int16_t ndc;
         const char* name;
@@ -479,7 +478,7 @@ private:
                 gfxEndCursor(cursor == CV_NDC, false, ndc_cv.InputName());
                 break;
             case 10: // Mix + CV
-                gfxPrint(1, y, "Mix:");
+                gfxPrint(1, y, "Lvl:");
                 gfxStartCursor(25, y);
                 graphics.printf("%3d%%", (int)mix);
                 gfxEndCursor(cursor == MIX);
