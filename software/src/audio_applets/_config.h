@@ -23,6 +23,7 @@
 #include "audio_applets/TuneTrackerApplet.h"
 #include "audio_applets/FMDrumApplet.h"
 #include "audio_applets/GlitchApplet.h"
+#include "audio_applets/GritApplet.h"
 #include "audio_applets/MistierApplet.h"
 #include "audio_applets/AdvKrpsStrngApplet.h"
 #include "audio_applets/ModalResonatorApplet.h"
@@ -70,6 +71,7 @@ DMAMEM std::tuple<
   TuneTrackerApplet<MONO>,
   UpsampledApplet<MONO>,
   GlitchApplet<MONO>,
+  GritApplet<MONO>,
   MistierApplet<MONO>,
   AdvKrpsStrngApplet,
   ModalResonatorApplet<MONO>
