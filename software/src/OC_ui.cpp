@@ -143,64 +143,12 @@ UiMode Ui::DispatchEvents(AppBase *app) {
     if (IgnoreEvent(event))
       continue;
 
-    /*
-    switch (event.type) {
-      case UI::EVENT_BUTTON_PRESS:
-#ifdef VOR
-        if (OC::CONTROL_BUTTON_M == event.control) {
-            VBiasManager *vbias_m = vbias_m->get();
-            vbias_m->AdvanceBias();
-        } else
-#endif
-        app->HandleButtonEvent(event);
-        break;
-      case UI::EVENT_BUTTON_DOWN:
-#ifdef VOR
-        // dual encoder press
-        if ( ((OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_R) == event.mask) )
-        {
-            VBiasManager *vbias_m = vbias_m->get();
-            vbias_m->AdvanceBias();
-            SetButtonIgnoreMask(); // ignore release and long-press
-        }
-        else
-#endif
-            app->HandleButtonEvent(event);
-        break;
-      case UI::EVENT_BUTTON_LONG_PRESS:
-        if (OC::CONTROL_BUTTON_UP == event.control && !preempt_screensaver_) {
-          SetButtonIgnoreMask(); // ignore release
-          screensaver_ = true;
-        }
-        //else if (event.control == OC::CONTROL_BUTTON_R) {
-          // only if holding both encoders...
-          //if (event.mask == (OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_R))
-          //jump_to_menu_ = true;
-        //}
-        else
-          app->HandleButtonEvent(event);
-        break;
-      case UI::EVENT_BUTTON_LONG_RELEASE:
-        if (event.control == OC::CONTROL_BUTTON_R)
-          jump_to_menu_ = true;
-        else
-          app->HandleButtonEvent(event);
-        break;
-      case UI::EVENT_ENCODER:
-        // if either encoder is turned while held down, ignore release/long-press
-        if (event.mask & (OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_R))
-          SetButtonIgnoreMask();
-        app->HandleEncoderEvent(event);
-        break;
-      default:
-        break;
-    }
-    */
     MENU_REDRAW = 1;
 
     // Handle global hotkeys
-    if (UI::EVENT_BUTTON_LONG_RELEASE == event.type) {
-      if (CONTROL_BUTTON_R == event.control) {
+    if (UI::EVENT_BUTTON_DOWN == event.type) {
+      // hold Z and push right encoder for main menu
+      if (CONTROL_BUTTON_R == event.control && (event.mask & OC::CONTROL_BUTTON_Z)) {
         jump_to_menu_ = true;
         break;
       }
