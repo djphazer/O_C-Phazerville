@@ -40,6 +40,8 @@ using namespace HS;
 #include "Cumulus.h"
 #include "CVRecV2.h"
 #include "Calculate.h"
+#include "TruthCat3.h"
+#include "TruthCat4.h"
 #include "Calibr8.h"
 #include "Carpeggio.h"
 #ifdef PEWPEWPEW
@@ -255,6 +257,8 @@ constexpr Registry reg = Registry<HemisphereApplet, 200 // max ID
 #endif
     , DeclareApplet<TrigSeq, 11, 0x06>
     , DeclareApplet<TrigSeq16, 25, 0x06>
+    , DeclareApplet<TruthCat3, 85, 0x46>
+    , DeclareApplet<TruthCat4, 84, 0x46>
     , DeclareApplet<Tuner, 39, 0x80>
     , DeclareApplet<TwoRings, 18, 0x02>
     , DeclareApplet<VectorEG, 52, 0x01>
