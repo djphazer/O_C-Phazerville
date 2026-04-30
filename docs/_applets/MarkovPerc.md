@@ -27,7 +27,7 @@ Turn the encoder to move between parameters. Click to enter edit mode, click aga
 
 | Display | Parameter | Range | Notes |
 |---------|-----------|-------|-------|
-| **S / T / J** | Style (Tendency Profile) | S, T, J | See profiles below |
+| **S / T / J / P** | Style (Tendency Profile) | S, T, J, P | See profiles below |
 | **0–100%** | Chaos | 0–100% | Baseline chaos; CV In 1 adds on top |
 
 The top line of the display shows the name of the currently-selected parameter.
@@ -36,16 +36,67 @@ The top line of the display shows the name of the currently-selected parameter.
 
 ### Tendency Profiles
 
-Each profile is an 8×8 transition matrix defining how likely each hit type is to follow any other. Weights range from 1 to 18, giving clear stylistic character at 0% chaos.
+Each profile is an **8×8 transition matrix** defining how likely each hit type is to follow any other. The row is the current state; the column is the next state. Higher numbers mean more likely. Weights range from 1 to 20; at 0% Chaos these weights dominate strongly.
 
 **S — Steady (Rock/Pop)**
 Gravitates strongly toward plain hits and accented hits. Rests are brief — the machine quickly rebounds to playing. Flams appear as occasional ornaments. Ratchets are rare fills after dense passages. Produces a reliable, driving groove.
 
+```
+From       Rst  Hit  AcH  Flm  AcF  Rc2  Rc3  Rc4
+  REST:      2,  18,  12,   4,   2,   3,   1,   1
+  HIT:       4,  16,  10,   6,   2,   4,   1,   1
+  ACC_HIT:   4,  14,  10,   4,   4,   4,   2,   1
+  FLAM:      4,  16,  10,   4,   2,   5,   1,   1
+  ACC_FLAM:  6,  14,  10,   4,   2,   4,   2,   1
+  RATCHET_2: 8,  14,   8,   4,   2,   4,   1,   1
+  RATCHET_3:12,  12,   6,   2,   2,   4,   2,   2
+  RATCHET_4:14,  12,   6,   2,   2,   2,   2,   2
+```
+
 **T — Syncopated (Funk/Latin)**
 Rests are structurally meaningful pauses, not gaps to escape from. Flams are very common — from almost any state, a flam is a likely next event. Ratchet-2 serves as a common syncopation device. Higher overall energy than Steady, but with deliberate space built in.
 
+```
+From       Rst  Hit  AcH  Flm  AcF  Rc2  Rc3  Rc4
+  REST:      4,  10,   6,  12,   8,  10,   2,   1
+  HIT:      10,   6,   4,  14,   8,  10,   4,   2
+  ACC_HIT:   8,   8,   4,  12,  10,   8,   4,   2
+  FLAM:      8,  10,   4,   8,   8,  12,   4,   2
+  ACC_FLAM:  8,   8,   6,  10,   8,  10,   4,   2
+  RATCHET_2:12,   8,   4,   8,   6,   8,   4,   2
+  RATCHET_3:14,   8,   4,   6,   4,   6,   4,   2
+  RATCHET_4:16,   6,   4,   4,   4,   6,   4,   2
+```
+
 **J — Jazz/Free**
-Favours complexity: accented flams are the signature gesture, ratchets are common fills, and extended rests are followed by dense bursts of activity. The chain can self-reinforce into cascading ratchets (Ratchet-3 → Ratchet-4 → Ratchet-4…) before collapsing to a rest. Most unpredictable of the three profiles.
+Favours complexity: accented flams are the signature gesture, ratchets are common fills, and extended rests are followed by dense bursts of activity. The chain can self-reinforce into cascading ratchets (Ratchet-3 → Ratchet-4 → Ratchet-4…) before collapsing to a rest. Most unpredictable of the four profiles.
+
+```
+From       Rst  Hit  AcH  Flm  AcF  Rc2  Rc3  Rc4
+  REST:      4,   6,   4,   8,  14,  12,   8,   6
+  HIT:       6,   4,   4,   8,  12,  14,  10,   6
+  ACC_HIT:   4,   4,   4,   8,  14,  12,  10,   6
+  FLAM:      6,   6,   4,   6,  14,  12,  10,   6
+  ACC_FLAM:  4,   4,   4,   6,  12,  14,  12,   8
+  RATCHET_2: 8,   6,   4,   8,  10,  10,  12,   8
+  RATCHET_3:10,   4,   4,   6,   8,   8,  14,  10
+  RATCHET_4:12,   4,   4,   4,   6,   6,  12,  14
+```
+
+**P — Sparse**
+Strong pull back to rest from every state. Plain hits are the only reliable non-rest event; accented and ornamental hit types are rare and become increasingly unlikely the more active the current state. Produces very open, spacious patterns — long silences broken by single clean hits. Most useful as a sparse kick or occasional accent layer, or with Density CV to dynamically control busyness.
+
+```
+From       Rst  Hit  AcH  Flm  AcF  Rc2  Rc3  Rc4
+  REST:     12,  10,   2,   1,   1,   1,   1,   1
+  HIT:      18,   6,   2,   1,   1,   1,   1,   1
+  ACC_HIT:  16,   6,   4,   1,   1,   1,   1,   1
+  FLAM:     18,   4,   2,   2,   1,   1,   1,   1
+  ACC_FLAM: 18,   4,   2,   1,   2,   1,   1,   1
+  RATCHET_2:20,   4,   2,   1,   1,   2,   1,   1
+  RATCHET_3:20,   4,   2,   1,   1,   1,   1,   1
+  RATCHET_4:20,   4,   2,   1,   1,   1,   1,   1
+```
 
 ---
 
@@ -121,6 +172,7 @@ The musical insight is that drumming styles have characteristic patterns of what
 - Steady rock patterns tend to stay in motion with occasional ornaments
 - Funk patterns use space deliberately and reach for flams
 - Jazz patterns build tension through complexity and release through rest
+- Sparse patterns return to silence as their default behaviour
 
 By encoding these tendencies as probability weights, MarkovPerc generates rhythms that feel stylistically consistent without being deterministic or repetitive.
 
@@ -132,5 +184,12 @@ By encoding these tendencies as probability weights, MarkovPerc generates rhythm
 - **Use with a kick drum module**: The structured rest/hit balance of the S profile produces reliable kick patterns that groove without becoming mechanical. Patch a second trigger-to-audio module into a different hemisphere channel for snare.
 - **Density sweep for builds**: Patch a slow rising CV into CV In 2 to gradually push from sparse (rests) to dense (continuous hits) over a phrase or section.
 - **J profile for live improvisation**: The Jazz profile's tendency toward self-reinforcing ratchets creates natural peak moments. Use the Aux button to reset back to a simpler seed when the complexity gets too high.
+- **P profile + Density CV**: At 0V Density the P profile is almost silent. Use Density to gradually introduce hits — the chain's pull back to rest creates natural silences even at high Density values, giving you controllable sparseness rather than a fixed pattern.
 - **Pair MarkovPerc with MarkoV**: Clock both from the same source. MarkovPerc drives a percussion voice while MarkoV generates a melody. The S/T/J profile names are intentionally parallel — matching the "mood" of both creates coherent ensemble textures.
 - **Long-press seed to change groove**: Mid-performance, hold Digital In 2 to pick a new random seed and pivot to a different rhythmic starting point.
+
+---
+
+## Credits
+
+MarkovPerc by uglifruit.

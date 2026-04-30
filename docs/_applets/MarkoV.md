@@ -73,15 +73,29 @@ CV 1 adds to the encoder-set baseline, so you can set a floor with the encoder a
 
 ## The Five Profiles (Transition Matrices)
 
-Each profile is an 8×8 weight table. The **row** is the current state (where you are now); the **column** is a possible next state (where you might go). Higher numbers mean more likely. At Chaos=0 these weights are followed closely; at Chaos=100 they are ignored entirely.
+Each profile is a **10×10 weight table**. The **row** is the current state (where you are now); the **column** is a possible next state (where you might go). Higher numbers mean more likely. At Chaos=0 these weights are followed closely; at Chaos=100 they are ignored entirely.
 
-The eight states are scale degrees: **0** = root, **1** = 2nd, **2** = 3rd, **3** = 4th, **4** = 5th, **5** = 6th, **6** = 7th, **7** = octave. The actual pitches depend on your chosen quantizer and scale.
+The ten states are scale degrees: **0** = root, **1** = 2nd, **2** = 3rd, **3** = 4th, **4** = 5th, **5** = 6th, **6** = 7th, **7** = 8th, **8** = 9th, **9** = octave. The actual pitches depend on your chosen quantizer and scale.
 
 ### S — Stability (Pentatonic)
 
-Root (0) and fifth (4) are overwhelmingly preferred destinations from any position. The chain continuously gravitates back to these two anchors. The octave (7) is a common secondary arrival. All other steps are rare.
+Root (0) and fifth (4) are overwhelmingly preferred destinations from any position. The chain continuously gravitates back to these two anchors. The octave (9) is a common secondary arrival. All other steps are rare.
 
 Produces melodies that orbit the root and fifth — characteristic of folk, modal, and drone-adjacent music. Even with moderate Chaos, the tonal centre stays very clear. Best with a pentatonic or similarly open scale.
+
+```
+From  →  0    1    2    3    4    5    6    7    8    9
+  0:    20,   2,   3,   1,  18,   1,   1,   1,   1,   8
+  1:    18,   2,  14,   1,  16,   1,   1,   1,   1,   2
+  2:    14,   1,   5,   1,  18,   1,   1,   1,   1,   4
+  3:     8,   1,   4,   2,  20,   3,   1,   1,   1,   2
+  4:    20,   1,   3,   1,  18,   1,   1,   4,   2,   8
+  5:    16,   1,   4,   1,  14,   2,   1,   2,   1,   5
+  6:    20,   1,   2,   1,  12,   1,   1,   2,   1,   1
+  7:    18,   2,   3,   1,  14,   1,   1,   4,   2,   2
+  8:    16,   2,   3,   1,  12,   1,   1,   3,   2,   2
+  9:    18,   3,   4,   1,  14,   1,   1,   4,   3,   5
+```
 
 ### T — Tension (Chromatic)
 
@@ -89,25 +103,81 @@ Stepwise motion dominates: from any position the most likely moves are ±1 state
 
 Works well when the quantizer includes close intervals (chromatic, whole-tone). With a sparse scale the steps become larger intervals. Add Chaos to occasionally break out of the current direction of travel.
 
+```
+From  →  0    1    2    3    4    5    6    7    8    9
+  0:     8,  20,   1,   1,   1,   1,   1,   1,   1,   4
+  1:    20,   8,  20,   1,   1,   1,   1,   1,   1,   1
+  2:     1,  20,   8,  20,   1,   1,   1,   1,   1,   1
+  3:     1,   1,  20,   8,  20,   1,   1,   1,   1,   1
+  4:     1,   1,   1,  20,   8,  20,   1,   1,   1,   1
+  5:     1,   1,   1,   1,  20,   8,  20,   1,   1,   1
+  6:     1,   1,   1,   1,   1,  20,   8,  20,   1,   1
+  7:     1,   1,   1,   1,   1,   1,  20,   8,  20,   1
+  8:     1,   1,   1,   1,   1,   1,   1,  20,   8,  20
+  9:     4,   1,   1,   1,   1,   1,   1,   1,  20,   8
+```
+
 ### J — Jazz Tendencies
 
 The seventh (state 6) exerts a strong gravitational pull from almost every position — many rows weight it very highly. From the seventh, the root is the overwhelmingly likely resolution. This creates the core jazz gesture: tension toward the 7th, release to root, repeat with variation.
 
-Secondary tendencies include the 3rd (state 2) as a common secondary arrival and an implied tritone pull from the 4th toward the 7th. Use a Dorian, Mixolydian, or Lydian dominant scale to put the 7th in the right harmonic position.
+Secondary tendencies include the 3rd (state 2) as a common secondary arrival. Use a Dorian, Mixolydian, or Lydian dominant scale to put the 7th in the right harmonic position.
+
+```
+From  →  0    1    2    3    4    5    6    7    8    9
+  0:     4,   1,   6,   1,   5,   1,  20,   3,   2,   3
+  1:     4,   1,  12,   1,   4,   1,  18,   2,   2,   2
+  2:     4,   1,   4,   1,   6,   1,  20,   3,   2,   2
+  3:     2,   1,   4,   1,   3,   1,  22,   3,   2,   2
+  4:    10,   1,   4,   1,   4,   1,  14,  10,   4,   4
+  5:     4,   1,   8,   1,   4,   1,  18,   4,   3,   3
+  6:    22,   1,   4,   3,   5,   1,   4,   3,   2,   2
+  7:    14,   1,   4,   1,   8,   1,  10,   4,   4,   4
+  8:    10,   1,   4,   1,   6,   1,  14,   5,   3,   4
+  9:    12,   1,   4,   1,   8,   1,  12,   4,   4,   4
+```
 
 ### G — Glacial
 
-Very heavy self-loops: staying on the current note is the most probable move (~40–50%). When the chain does move, only adjacent steps (±1) are possible — leaps are essentially eliminated. Root and fifth remain as attractors when movement finally occurs.
+Very heavy self-loops: staying on the current note is highly probable. When the chain does move, only adjacent steps (±1) are realistic. Root and fifth remain as attractors when movement finally occurs.
 
 Suited to very slow clocks and long sustained notes. The chain drifts minimally through a scale, changing direction only rarely. Adding Chaos is particularly effective here — it breaks the self-loops and introduces movement while still preventing leaps.
 
+```
+From  →  0    1    2    3    4    5    6    7    8    9
+  0:    20,  10,   1,   1,  10,   1,   1,   2,   1,   1
+  1:    14,  18,  10,   1,   4,   1,   1,   1,   1,   1
+  2:     8,  10,  18,  10,   4,   1,   1,   1,   1,   1
+  3:     6,   1,  10,  18,  10,   1,   1,   1,   1,   1
+  4:    12,   1,   1,  10,  20,   8,   1,   1,   1,   1
+  5:     6,   1,   1,   1,   8,  18,  10,   1,   1,   1
+  6:    14,   1,   1,   1,   4,   8,  16,   5,   1,   1
+  7:    10,   1,   1,   1,   6,   1,   6,  18,  10,   1
+  8:     8,   1,   1,   1,   4,   1,   1,   8,  18,  10
+  9:    10,   1,   1,   1,   4,   1,   1,   4,   8,  18
+```
+
 ### D — Drone
 
-The strongest self-loops of any profile: ~83% probability of staying on the current note. No attractors — the chain has no pull toward root, fifth, or any other degree. The only meaningful escapes are ±1 steps, and even these are rare.
+The strongest self-loops of any profile: staying on the current note is overwhelmingly likely. No attractors — the chain has no pull toward root, fifth, or any other degree. The only meaningful escapes are ±1 steps, and even these are rare.
 
-**Out B will stay silent for long stretches at Chaos=0.** The note is locked in place. This profile is intended for use with CV 1 Chaos as the primary performance control: at low Chaos you get a sustained drone; sweeping Chaos upward gradually introduces movement and triggers. The transition from silence to occasional movement to active melody all happens within the Chaos range.
+**Out B will stay silent for long stretches at Chaos=0.** The note is locked in place. This profile is intended for use with CV 1 Chaos as the primary performance control: at low Chaos you get a sustained drone; sweeping Chaos upward gradually introduces movement and triggers.
 
 Patch an envelope or LFO into CV 1 to animate the drone into life at musical moments, then let it settle back to stillness.
+
+```
+From  →  0    1    2    3    4    5    6    7    8    9
+  0:    40,   2,   1,   1,   1,   1,   1,   1,   1,   1
+  1:     2,  40,   2,   1,   1,   1,   1,   1,   1,   1
+  2:     1,   2,  40,   2,   1,   1,   1,   1,   1,   1
+  3:     1,   1,   2,  40,   2,   1,   1,   1,   1,   1
+  4:     1,   1,   1,   2,  40,   2,   1,   1,   1,   1
+  5:     1,   1,   1,   1,   2,  40,   2,   1,   1,   1
+  6:     1,   1,   1,   1,   1,   2,  40,   2,   1,   1
+  7:     1,   1,   1,   1,   1,   1,   2,  40,   2,   1
+  8:     1,   1,   1,   1,   1,   1,   1,   2,  40,   2
+  9:     1,   1,   1,   1,   1,   1,   1,   1,   2,  40
+```
 
 ---
 
@@ -141,7 +211,7 @@ Same as rotating the encoder on Seed: generates a new seed and jumps to it.
 ──────────────────────       ← baseline
 ```
 
-The bar graph shows the last 8 states. Bar height represents scale degree — state 0 = minimum height, state 7 = full height. This is a history readout only; it does not predict future steps.
+The bar graph shows the last 8 states. Bar height represents scale degree — state 0 = minimum height, state 9 = full height. This is a history readout only; it does not predict future steps.
 
 ---
 
