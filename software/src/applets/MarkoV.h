@@ -187,38 +187,45 @@ public:
         if (seed_flash  > 0) --seed_flash;
         if (reset_flash > 0) --reset_flash;
 
+        // CV 2: Transpose — applied before quantizer so it shifts by scale degrees
+        int transpose = In(1);
+
         // --- Digital In 1: Clock ---
-        if (Clock(0)) StartADCLag(0);
+        if (Clock(0)) {
+          StartADCLag(0); // for transpose
 
+          // CV 1: Chaos — adds to chaos_base, clamped to 0-100
+          int cv1      = constrain(In(0), 0, HEMISPHERE_MAX_INPUT_CV);
+          int cv_chaos = Proportion(cv1, HEMISPHERE_MAX_INPUT_CV, 100);
+          chaos_pct    = constrain(chaos_base + cv_chaos, 0, 100);
+          // Map chaos_pct (0-100) to fixed-point 0-256 for NextState
+          int chaos    = (chaos_pct * 256) / 100;
+
+          // Advance the Markov chain
+          state = NextState(state, chaos);
+
+          int pitch_cv = HS::Quantize(qselect, state * STATE_CV_STEP + transpose);
+          Out(0, pitch_cv);
+
+          // Output B: trigger when quantized pitch changes
+          if (pitch_cv != prev_cv) ClockOut(1);
+          prev_cv = pitch_cv;
+
+          // Update scrolling note history
+          history[history_head] = state;
+          history_head = (history_head + 1) % HISTORY_SIZE;
+        }
+
+        // update transpose after the lag
+        // XXX: this is a tricky compromise - the trigger will still fire before
+        // the lag, so transpose could still sound slippy.
+        // I think we need a global option to enable/disable ADC lag.
         if (EndOfADCLag(0)) {
-            // CV 1: Chaos — adds to chaos_base, clamped to 0-100
-            int cv1      = constrain(In(0), 0, HEMISPHERE_MAX_INPUT_CV);
-            int cv_chaos = Proportion(cv1, HEMISPHERE_MAX_INPUT_CV, 100);
-            chaos_pct    = constrain(chaos_base + cv_chaos, 0, 100);
+          int pitch_cv = HS::Quantize(qselect, state * STATE_CV_STEP + transpose);
+          Out(0, pitch_cv);
 
-            // Map chaos_pct (0-100) to fixed-point 0-256 for NextState
-            int chaos    = (chaos_pct * 256) / 100;
-
-            // CV 2: Transpose — applied before quantizer so it shifts which
-            // scale notes are accessed rather than transposing post-quantization.
-            // Small CV jitter on In(1) is absorbed by the quantizer's note-snapping.
-            int transpose = In(1);
-
-            // Advance the Markov chain
-            state = NextState(state, chaos);
-
-            // Output A: transpose added before quantization; the quantizer maps
-            // the transposed position to the nearest scale note.
-            int pitch_cv = HS::Quantize(qselect, state * STATE_CV_STEP + transpose);
-            Out(0, pitch_cv);
-
-            // Output B: trigger when quantized pitch (including transpose) changes
-            if (pitch_cv != prev_cv) ClockOut(1);
-            prev_cv = pitch_cv;
-
-            // Update scrolling note history
-            history[history_head] = state;
-            history_head = (history_head + 1) % HISTORY_SIZE;
+          if (pitch_cv != prev_cv) ClockOut(1);
+          prev_cv = pitch_cv;
         }
     }
 
