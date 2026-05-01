@@ -271,7 +271,7 @@ class HandSawApplet : public HemisphereAudioApplet {
             WAVEFORM_SINE,
             WAVEFORM_TRIANGLE_VARIABLE, // actual triangle
             WAVEFORM_TRIANGLE_VARIABLE, // saw
-            WAVEFORM_BANDLIMIT_PULSE,
+            WAVEFORM_PULSE,
             WAVEFORM_TRIANGLE_VARIABLE, // reverse saw
         };
         static constexpr char const* WAVEFORM_NAMES[5] = {"SIN", "TRI", "SAW", "PLS", "SAWR"};
