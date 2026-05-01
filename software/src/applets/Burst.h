@@ -176,7 +176,7 @@ public:
         Pack(data, PackLocation {8,8}, spacing);
         Pack(data, PackLocation {16,8}, div + 8);
         Pack(data, PackLocation {24,8}, jitter);
-        Pack(data, PackLocation {32,8}, accel);
+        Pack(data, PackLocation {32,8}, (uint8_t)accel);
 
         Pack(data, PackLocation {40,1}, passthru);
         Pack(data, PackLocation {41,7}, prob);
@@ -188,7 +188,8 @@ public:
         spacing = constrain(Unpack(data, PackLocation {8,8}), HEM_BURST_SPACING_MIN, HEM_BURST_SPACING_MAX);
         div = Unpack(data, PackLocation {16,8}) - 8; div_constrain(); // special constrain for div
         jitter = constrain(Unpack(data, PackLocation {24,8}), 0, HEM_BURST_JITTER_MAX);
-        accel = constrain(Unpack(data, PackLocation {32,8}), -HEM_BURST_ACCEL_MAX, HEM_BURST_ACCEL_MAX);
+        accel = Unpack(data, PackLocation {32,8});
+        CONSTRAIN(accel, -HEM_BURST_ACCEL_MAX, HEM_BURST_ACCEL_MAX);
 
         passthru = Unpack(data, PackLocation {40,1});
         prob = Unpack(data, PackLocation {41,7});
@@ -222,11 +223,11 @@ private:
                              // decide whether the ADC delay should be used when clocks come in.
 
     // Settings
-    int number; // How many bursts fire at each trigger
-    int spacing; // How many ms pass between each burst
     int div; // Divide or multiply the clock tempo
+    uint8_t number; // How many bursts fire at each trigger
+    uint8_t spacing; // How many ms pass between each burst
     int8_t accel; // Accelleration or deceleration
-    int8_t jitter; // Randomness
+    uint8_t jitter; // Randomness
     bool passthru; // regular clock pulses come out, too
     uint8_t prob; // randomly ignore burst triggers
 
