@@ -28,7 +28,10 @@
 class Burst : public HemisphereApplet {
 public:
     enum BurstCursor {
+      CLKPASSTHRU, PROB,
+      NUMBER, SPACING, ACCEL, JITTER, DIVISION,
 
+      MAX_CURSOR = JITTER
     };
 
     const char* applet_name() {
@@ -63,6 +66,9 @@ public:
                 spacing = (ticks_since_clock / number) / 17;
                 ticks_since_clock = 0;
             } else clocked = 1;
+
+            if (passthru)
+              ClockOut(0);
         }
         ticks_since_clock++;
 
@@ -107,7 +113,7 @@ public:
         // the applet can adapt to contexts that involve (1) the need to accurately interpret rapidly-
         // changing CV values or (2) the need for tight timing when Number is static-ish.
         bool number_is_changing = (OC::CORE::ticks - last_number_cv_tick < 80000);
-        bool btrig = Clock(1);
+        bool btrig = Clock(1) && (random(100) >= prob);
         if (btrig && number_is_changing) StartADCLag();
 
         if (EndOfADCLag() || (btrig && !number_is_changing)) {
@@ -124,30 +130,40 @@ public:
         DrawIndicator();
     }
 
-    //void OnButtonPress() { CursorToggle(); }
+    void OnButtonPress() {
+      if (CLKPASSTHRU == cursor)
+        passthru = !passthru;
+      else
+        CursorToggle();
+    }
 
     void OnEncoderMove(int direction) {
         if (!EditMode()) {
-            MoveCursor(cursor, direction, clocked ? 4 : 3);
+            MoveCursor(cursor, direction, MAX_CURSOR + clocked);
             return;
         }
 
         switch (cursor) {
-        case 0:
+          case CLKPASSTHRU:
+            break;
+          case PROB:
+            prob = constrain(prob + direction, 0, 100);
+            break;
+          case NUMBER:
             number = constrain(number + direction, 1, HEM_BURST_NUMBER_MAX);
             break;
-        case 1:
+          case SPACING:
             spacing = constrain(spacing + direction, HEM_BURST_SPACING_MIN, HEM_BURST_SPACING_MAX);
             clocked = 0;
             break;
-        case 2:
+          case ACCEL:
             accel = constrain(accel + direction, -HEM_BURST_ACCEL_MAX, HEM_BURST_ACCEL_MAX);
             break;
-        case 3:
+          case JITTER:
             jitter = constrain(jitter + direction, 0, HEM_BURST_JITTER_MAX);
             break;
 
-        case 4:
+          case DIVISION:
             div += direction;
             div_constrain(direction);
             break;
@@ -161,6 +177,9 @@ public:
         Pack(data, PackLocation {16,8}, div + 8);
         Pack(data, PackLocation {24,8}, jitter);
         Pack(data, PackLocation {32,8}, accel);
+
+        Pack(data, PackLocation {40,1}, passthru);
+        Pack(data, PackLocation {41,7}, prob);
         return data;
     }
 
@@ -170,6 +189,9 @@ public:
         div = Unpack(data, PackLocation {16,8}) - 8; div_constrain(); // special constrain for div
         jitter = constrain(Unpack(data, PackLocation {24,8}), 0, HEM_BURST_JITTER_MAX);
         accel = constrain(Unpack(data, PackLocation {32,8}), -HEM_BURST_ACCEL_MAX, HEM_BURST_ACCEL_MAX);
+
+        passthru = Unpack(data, PackLocation {40,1});
+        prob = Unpack(data, PackLocation {41,7});
     }
 
 protected:
@@ -193,6 +215,8 @@ private:
     int burst_count; // How many bursts have passed
     bool clocked; // When a clock signal is received at Digital 1, clocked is activated, and the
                   // spacing of a new burst is number/clock length.
+
+    // state
     int ticks_since_clock; // When clocked, this is the time since the last clock.
     int last_number_cv_tick; // The last time the number was changed via CV. This is used to
                              // decide whether the ADC delay should be used when clocks come in.
@@ -203,46 +227,73 @@ private:
     int div; // Divide or multiply the clock tempo
     int8_t accel; // Accelleration or deceleration
     int8_t jitter; // Randomness
+    bool passthru; // regular clock pulses come out, too
+    uint8_t prob; // randomly ignore burst triggers
 
     void DrawSelector() {
+        int y = 13;
+
+        // clock passthru
+        gfxIcon(1, y, CLOCK_ICON);
+        gfxIcon(10, y, passthru ? CHECK_ON_ICON : CHECK_OFF_ICON);
+
+        gfxPrint(32, y, prob);
+        gfxPrint("%");
+
+        y += 9;
+
         // Number
-        gfxPrint(1, 15, number);
-        gfxPrint(27, 15, "bursts");
+        gfxPrint(1, y, number);
+        gfxPrint(27, y, "bursts");
+
+        y += 9;
 
         // Spacing
-        gfxPrint(1, 25, clocked ? get_effective_spacing() : spacing);
-        gfxPrint(28, 25, "ms");
+        gfxPrint(1, y, clocked ? get_effective_spacing() : spacing);
+        gfxPrint(28, y, "ms");
+
+        y += 9;
 
         // Acceleration
-        gfxIcon(1, 34, GAUGE_ICON);
-        gfxPrint(10, 35, accel);
+        gfxIcon(1, y-1, GAUGE_ICON);
+        gfxPrint(10, y, accel);
 
         // Jitter
-        gfxIcon(32, 34, RANDOM_ICON);
-        gfxPrint(40, 35, jitter);
+        gfxIcon(32, y - 1, RANDOM_ICON);
+        gfxPrint(40, y, jitter);
+
+        y += 9;
 
         // Div
         if (clocked) {
-            gfxBitmap(1, 45, 8, CLOCK_ICON);
-            gfxPrint(11, 45, div < 0 ? "x" : "/");
+            gfxBitmap(1, y, 8, CLOCK_ICON);
+            gfxPrint(11, y, div < 0 ? "x" : "/");
             gfxPrint(div < 0 ? -div : div);
             gfxPrint(div < 0 ? " Mult" : " Div");
         }
 
         // Cursor
         switch (cursor) {
-          case 0:
-          case 1:
-            gfxCursor( 1, 23 + (cursor * 10), 13 + 12 * cursor, cursor ? "Spacing" : "Count");
+          case CLKPASSTHRU:
+            gfxIcon(19, 13, LEFT_ICON);
             break;
-          case 2:
-            gfxCursor(10, 43, 19, "Accel");
+          case PROB:
+            gfxCursor(32, 21, 19, 9, "Skip %");
             break;
-          case 3:
-            gfxCursor(40, 43, 13, "Jitter");
+          case NUMBER:
+            gfxCursor( 1, 30, 13, 9, "Count");
             break;
-          case 4:
-            gfxCursor(1, 53, 62, "ClkDiv");
+          case SPACING:
+            gfxCursor( 1, 39, 25, 9, "Spacing");
+            break;
+          case ACCEL:
+            gfxCursor(10, 48, 19, 9, "Accel");
+            break;
+          case JITTER:
+            gfxCursor(40, 48, 13, 9, "Jitter");
+            break;
+          case DIVISION:
+            gfxCursor(1, 57, 62, 9, "ClkDiv");
             break;
         }
     }
@@ -252,7 +303,7 @@ private:
         {
 //            gfxLine(0 + (i * 5), 11, 4 + (i * 5), 11);
 //            gfxInvert(3 + (i * 5), 10, 2, 3);
-            gfxFrame(1 + (i * 5), 55, 4, 4);
+            gfxFrame(1 + (i * 5), 59, 4, 4);
         }
     }
 
