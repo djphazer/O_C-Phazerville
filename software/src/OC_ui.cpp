@@ -140,23 +140,32 @@ UiMode Ui::DispatchEvents(AppBase *app) {
 
   while (event_queue_.available()) {
     const UI::Event event = event_queue_.PullEvent();
+    if (screensaver_ && UI::EVENT_BUTTON_LONG_RELEASE == event.type)
+      continue; // saves some headaches
     if (IgnoreEvent(event))
       continue;
 
     MENU_REDRAW = 1;
 
-    // Handle global hotkeys
-    if (UI::EVENT_BUTTON_DOWN == event.type) {
-      // hold Z and push right encoder for main menu
-      if (CONTROL_BUTTON_R == event.control && (event.mask & OC::CONTROL_BUTTON_Z)) {
+    // --- Handle global hotkeys
+    // Hold Z and push...
+    if (UI::EVENT_BUTTON_DOWN == event.type && (event.mask & CONTROL_BUTTON_Z)) {
+      // ...right encoder for main menu
+      if (CONTROL_BUTTON_R == event.control) {
         jump_to_menu_ = true;
         break;
       }
-    }
-    if (UI::EVENT_BUTTON_LONG_PRESS == event.type) {
-      if (CONTROL_BUTTON_UP == event.control) {
+      // ...left encoder for IO settings menu
+      if (CONTROL_BUTTON_L == event.control) {
         app->EditIOSettings();
+        SetButtonIgnoreMask();
         continue;
+      }
+      // ...A for screensaver
+      if (CONTROL_BUTTON_A == event.control) {
+        screensaver_ = true;
+        SetButtonIgnoreMask();
+        break;
       }
     }
 
