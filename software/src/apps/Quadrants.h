@@ -1801,14 +1801,8 @@ void AppQuadrants::HandleButtonEvent(const UI::Event &event) {
         break;
       }
 
-      if (event.control == OC::CONTROL_BUTTON_Z)
-      {
-          // Z-button - Zap the CLOCK!!
-          ToggleClockRun();
-          OC::ui.SetButtonIgnoreMask();
-      } else if (
-        event.control == OC::CONTROL_BUTTON_L ||
-        event.control == OC::CONTROL_BUTTON_R)
+      if (event.control == OC::CONTROL_BUTTON_L ||
+          event.control == OC::CONTROL_BUTTON_R)
       {
           if (clock_overlay) {
             ClockSetup_instance.OnButtonPress();
@@ -1877,11 +1871,22 @@ void AppQuadrants::HandleButtonEvent(const UI::Event &event) {
         } else
           SwitchToSlot(slot);
       }
+      // fall thru here
+    case UI::EVENT_BUTTON_LONG_RELEASE:
+      // Z-button acts on release, either short or long
+      if (event.control == OC::CONTROL_BUTTON_Z) {
+        ToggleClockRun();
+      }
+
       // ignore all other button release events
       break;
 
     case UI::EVENT_BUTTON_LONG_PRESS:
       if (event.control == OC::CONTROL_BUTTON_B) ToggleConfigMenu();
+      if (event.control == OC::CONTROL_BUTTON_Z) {
+        // TODO: show a menu when Z is held long enough
+        // - encoder can change selected Z action
+      }
       break;
 
     default: break;
