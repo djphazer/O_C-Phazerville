@@ -18,41 +18,27 @@ class HandSawApplet : public HemisphereAudioApplet {
             vca_level.Acquire();
             vca_level.Method(INTERPOLATION_LINEAR);
 
-            // Wire each oscillator into its sub-mixer (3 per mixer).
+            // Making audio connections...
             // Call order follows signal flow: sources before sinks,
             // so the audio scheduler can process them in one pass.
             for (int i = 0; i < 12; i++) {
-                PatchCable(synths[i], 0, mixers[i / 3], i % 3);
+              PatchCable(synths[i], 0, outputMixer, i);
             }
 
-            // Sub-mixers into stack mixer
-            for (int i = 0; i < 4; i++) {
-                PatchCable(mixers[i], 0, stackMixer, i);
-            }
-
-            // Stack + passthru → output → VCA
-            PatchCable(input_stream,  0, outputMixer, 0);
-            PatchCable(stackMixer,    0, outputMixer, 1);
+            PatchCable(input_stream,  0, outputMixer, 12);
             PatchCable(outputMixer,   0, vca,         0);
             PatchCable(vca_level,     0, vca,         1);
 
-            outputMixer.gain(0, 1.0f); // passthru
-            outputMixer.gain(1, 1.0f);
+            outputMixer.gain(12, 1.0f); // passthru
 
             for (int i = 0; i < 12; i++) {
                 synths[i].amplitude(1.0f);
             }
 
-            // Each sub-mixer sums 3 oscillators; normalise to 1/3
-            for (int m = 0; m < 4; m++) {
-                for (int ch = 0; ch < 3; ch++) {
-                    mixers[m].gain(ch, 0.33f);
-                }
-            }
-
-            // Stack mixer sums 4 sub-mixers; normalise to 1/4
-            for (int i = 0; i < 4; i++) {
-                stackMixer.gain(i, 0.25f);
+            // 3 oscillators per voice; normalise to 1/3
+            // 4 voices; normalise to 1/4
+            for (int ch = 0; ch < 12; ch++) {
+                outputMixer.gain(ch, 0.25f / 3);
             }
         }
 
@@ -187,6 +173,12 @@ class HandSawApplet : public HemisphereAudioApplet {
             waveform = constrain(wf, 0, 4);
             for (int i = 0; i < 12; i++) {
                 synths[i].begin(WAVEFORMS[waveform]);
+                if (2 == waveform) // saw
+                  synths[i].pulseWidth(0.0f);
+                else if (4 == waveform) // rev saw
+                  synths[i].pulseWidth(1.0f);
+                else // triangle or pulse
+                  synths[i].pulseWidth(0.5f);
             }
         }
 
@@ -277,10 +269,10 @@ class HandSawApplet : public HemisphereAudioApplet {
 
         static constexpr int8_t WAVEFORMS[5] = {
             WAVEFORM_SINE,
-            WAVEFORM_TRIANGLE_VARIABLE,
-            WAVEFORM_BANDLIMIT_SAWTOOTH,
+            WAVEFORM_TRIANGLE_VARIABLE, // actual triangle
+            WAVEFORM_TRIANGLE_VARIABLE, // saw
             WAVEFORM_BANDLIMIT_PULSE,
-            WAVEFORM_BANDLIMIT_SAWTOOTH_REVERSE
+            WAVEFORM_TRIANGLE_VARIABLE, // reverse saw
         };
         static constexpr char const* WAVEFORM_NAMES[5] = {"SIN", "TRI", "SAW", "PLS", "SAWR"};
 
@@ -299,6 +291,8 @@ class HandSawApplet : public HemisphereAudioApplet {
 
         int8_t detuneFactor = 50;
         int8_t phaseFactor  = 1;
+        // TODO:
+        // uint8_t pw = 50;
 
         CVInputMap pitch_cv[4];
         CVInputMap detune_cv;
@@ -307,9 +301,7 @@ class HandSawApplet : public HemisphereAudioApplet {
 
         AudioPassthrough<MONO>  input_stream;
         AudioSynthWaveform      synths[12];
-        AudioMixer<3>           mixers[4];
-        AudioMixer<4>           stackMixer;
-        AudioMixer<2>           outputMixer;
+        AudioMixer<13>          outputMixer;
         AudioVCA                vca;
         InterpolatingStream<>   vca_level;
 };
