@@ -59,7 +59,7 @@ namespace HS {
   const char * const ssmodes[SCREENSAVER_MODE_COUNT] = {
     "[blank]",
     "Meters", "Scope",
-    "Snow!", "Stars", "Zips",
+    "Zaps", "Stars", "Zips",
     "Beats",
   };
 
@@ -728,7 +728,7 @@ void ZapScreensaver(const uint8_t stars) {
     if (stars)
       gfxPixel(zaps[i].x/100, zaps[i].y/100);
     else {
-      const uint8_t idx = (zaps[i].flip > OC::CORE::FreeRam()) ? 3 : (zaps[i].flip % 3);
+      const uint8_t idx = (zaps[i].flip < OC::CORE::FreeRam()) ? 3 : (zaps[i].flip % 3);
       gfxIcon(zaps[i].x/100, zaps[i].y/100, flake_icon[idx]);
     }
   }
