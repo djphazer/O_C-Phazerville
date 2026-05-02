@@ -18,7 +18,7 @@ public:
         vca.rectify(true);
         PatchCable(input_stream, 0, mixer, 0);
         for (int i = 0; i < max_partials; ++i) {
-            PatchCable(*partial[i], 0, harmosc, i);
+            PatchCable(partial[i], 0, harmosc, i);
         }
         PatchCable(vca_cv, 0, vca, 1);
         PatchCable(harmosc, 0, vca, 0);
@@ -35,9 +35,9 @@ public:
         float freq = PitchToRatio(pitch + pitch_cv.In()) * C3;
         float total_amp = 0.0f;
         for (int i = 0; i < max_partials; ++i) {
-            partial[i]->frequency(freq * ((float)partial_ratios[i] / detune_resolution));
+            partial[i].frequency(freq * ((float)partial_ratios[i] / detune_resolution));
             float amp = ((float)amplitudes[i]) / amplitude_resolution;
-            partial[i]->amplitude(amp);
+            partial[i].amplitude(amp);
             total_amp += amp;
         }
         for (int i = 0; i < max_partials; ++i) {
@@ -268,40 +268,7 @@ private:
     CVInputMap mix_cv;
 
     AudioPassthrough<MONO> input_stream;
-    AudioSynthWaveform partial1;
-    AudioSynthWaveform partial2;
-    AudioSynthWaveform partial3;
-    AudioSynthWaveform partial4;
-    AudioSynthWaveform partial5;
-    AudioSynthWaveform partial6;
-    AudioSynthWaveform partial7;
-    AudioSynthWaveform partial8;
-    AudioSynthWaveform partial9;
-    AudioSynthWaveform partial10;
-    AudioSynthWaveform partial11;
-    AudioSynthWaveform partial12;
-    AudioSynthWaveform partial13;
-    AudioSynthWaveform partial14;
-    AudioSynthWaveform partial15;
-    AudioSynthWaveform partial16;
-    AudioSynthWaveform* partial[max_partials] = {
-        &partial1,
-        &partial2,
-        &partial3,
-        &partial4,
-        &partial5,
-        &partial6,
-        &partial7,
-        &partial8,
-        &partial9,
-        &partial10,
-        &partial11,
-        &partial12,
-        &partial13,
-        &partial14,
-        &partial15,
-        &partial16
-    };
+    AudioSynthWaveform partial[max_partials];
     InterpolatingStream<> vca_cv;
     AudioVCA vca;
     AudioMixer<max_partials> harmosc;
