@@ -38,7 +38,7 @@ frequency according to the **Structure** parameter.
 
 ---
 
-#### Str — Structure (0–100)
+#### Inh — Inharmonicity (0–100)
 
 Controls the **spectral stiffness** of the modal bank — how partials are spaced relative
 to the fundamental. The model uses an additive stretch algorithm (inspired by Mutable
@@ -53,16 +53,16 @@ Instruments Rings) rather than a simple harmonic series.
 | 75 | Strongly inharmonic → steel tongue drum, bell plates |
 | 100 | Maximally stretched → bell, bowl, gong |
 
-**Low Structure (0–10):** At STR=0 the stiffness is slightly negative, meaning upper
+**Low Inharmonicity (0–10):** At Inh=0 the stiffness is slightly negative, meaning upper
 partials are tuned *below* the fundamental frequency in a compressed descending cluster.
 This produces dense, dark, gamelan-like tones rather than a bright harmonic series.
-Because the partials shift from below the fundamental to above it as Structure increases,
+Because the partials shift from below the fundamental to above it as Inharmonicity increases,
 sweeping from 0 upward creates a noticeable **perceived pitch shift** — this is expected
-behaviour, not a tuning error. For a conventional harmonic series, use STR≈3.
+behaviour, not a tuning error. For a conventional harmonic series, use Inh≈3.
 
-**Str CV** offsets the value; full positive swing pushes toward maximally stretched.
+**Inh CV** offsets the value; full positive swing pushes toward maximally stretched.
 
-> Sweeping Structure with a slow CV while the resonator is ringing produces a continuous
+> Sweeping Inharmonicity with a slow CV while the resonator is ringing produces a continuous
 > timbral morph — the spectrum reorganises around each new set of partials.
 
 ---
@@ -147,35 +147,52 @@ tremolo effect between the raw exciter and the resonant tail.
 
 ---
 
-### VU meter
+### VU meters
 
-A small bar across the top of the display (y = 7) shows the peak level of the incoming
-exciter signal. This is useful for confirming that the resonator is being struck:
+Two small bars sit at the top of the display:
 
-- No bar → no excitation signal; the resonator may ring briefly from a previous hit but
-  will not be continuously driven.
-- Full bar → strong excitation; the resonator is being driven hard and may not fully decay
-  between strikes.
+- **Top bar (filled)** — peak level of the incoming exciter signal. Confirms that the
+  resonator is being driven: no bar = no excitation; full bar = heavy continuous driving.
+- **Bottom bar (outline)** — peak level of the resonator's wet output, post-filtering.
+  Use this to gauge how much the resonator is ringing relative to the excitation.
+
+The two bars together show whether the resonator is building up energy (output bar growing)
+or decaying (output bar shrinking while excitation bar is low).
 
 ---
 
 ### Trg — Gate trigger input
 
-The **Trg** parameter (last row, visible when cursor scrolls past Mix) accepts an assignable
-gate input. A rising edge on the assigned jack fires a full-amplitude noise-burst strike —
-identical to pressing the Aux button. Use this to clock the resonator from a sequencer,
-envelope gate, clock divider, or any other trigger source in the patch.
+The **Trg** parameter (visible when cursor scrolls past Mix) accepts an assignable gate input.
+A **rising edge** on the assigned jack fires a noise-burst strike at the current **Vel** setting.
+Use this to clock the resonator from a sequencer, envelope gate, clock divider, or any other
+trigger source in the patch.
+
+The **Trg** label inverts (white-on-black) while the gate is held high, giving a clear visual
+indication of the gate state.
 
 To assign: navigate to the **Trg** row, press the encoder button, then select the input jack
 from the map editor.
 
 ---
 
+#### Vel — Strike velocity (0–100%)
+
+Sets the base amplitude of noise-burst strikes fired by the **Trg** gate input. 100% = full
+amplitude; lower values produce softer, quieter strikes.
+
+**Vel CV** adds a CV offset on top of the base value, clamped to 0–100%. This allows
+per-note velocity from a MIDI controller or a sequencer's accent CV output.
+
+> AuxButton strikes always fire at 100% velocity regardless of the Vel setting.
+
+---
+
 ### AuxButton — Manual strike
 
 Pressing the **Aux** button fires a white-noise burst directly into the resonator at full
-amplitude. This is equivalent to a full-velocity percussive strike and is useful for auditioning
-the sound without a patched exciter, or for manually triggering a transient during performance.
+amplitude (100% velocity). This is useful for auditioning the sound without a patched exciter,
+or for manually triggering a transient during performance.
 
 The noise burst is one audio block (~2.7 ms) long — short enough to be a clean impulse at
 most decay settings.
@@ -187,17 +204,17 @@ Both Trg and AuxButton can be active simultaneously — either source triggers t
 ### Suggested patches
 
 **Tuned metallic percussion**
-- Set Structure = 70–80 (bell/bar), Damping = 40–60, Brightness = 80.
+- Set Inh = 70–80 (bell/bar), Damping = 40–60, Brightness = 80.
 - Drive with a short trigger from a clock divider or a drum sequencer gate.
 - V/Oct from a sequencer tracks melodic lines across the bar spectrum.
 
 **Glass harmonica / singing bowl**
-- Set Structure = 0 (harmonic), Damping = 90, Brightness = 50, Position = 50.
+- Set Inh = 0 (harmonic), Damping = 90, Brightness = 50, Position = 50.
 - Drive with a slow, low-amplitude sine or triangle LFO (continuous light excitation).
 - The resonator sustains indefinitely and the position comb creates an airy, filtered tone.
 
 **Plucked body tone (Rings-style)**
-- Set Structure = 10–20 (near-harmonic), Damping = 55, Brightness = 65, Position = 25.
+- Set Inh = 10–20 (near-harmonic), Damping = 55, Brightness = 65, Position = 25.
 - Trigger with a V/Oct sequencer gate. Mix = 100%.
 - Varies the pitch quickly for chord arpeggios.
 
@@ -209,7 +226,7 @@ Both Trg and AuxButton can be active simultaneously — either source triggers t
 
 **Timbral sweep**
 - Lock a note with AuxButton or a held gate.
-- Slowly sweep Structure from 0 to 100 with a slow envelope or LFO on Str CV.
+- Slowly sweep Inharmonicity from 0 to 100 with a slow envelope or LFO on Inh CV.
 - The spectrum morphs continuously from a pure string tone to a metallic bell.
 
 **Percussive body resonance insert**
@@ -230,8 +247,8 @@ Both Trg and AuxButton can be active simultaneously — either source triggers t
 - Mode frequencies are clamped below ~17.6 kHz (40% of Nyquist) to maintain SVF filter
   stability margin. Clamping at exactly 20 kHz left only 0.7% headroom below the instability
   boundary; the lower ceiling provides ~5% margin.
-- The applet is available in both **mono** (processor chain, left or right) and **stereo**
-  (full-width stereo processor chain) configurations.
+- The applet is available in **slot 0** (input slot) and all processor slots, in both
+  **mono** and **stereo** configurations.
 - Memory footprint: approximately 400 bytes per active channel instance — no heap allocation.
 - **Extreme parameter combinations:** High Str (80–100) combined with high Dmp (80–100)
   and very low Brt (0–15) pushes upper filter modes near the Nyquist frequency with minimal

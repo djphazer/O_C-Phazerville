@@ -21,6 +21,7 @@
 //   input ──────────────────────► wet_dry_mixer ─┘
 //
 // AuxButton: fires a manual noise-burst strike (test without a patched exciter).
+// Trg input: assignable gate trigger (rising edge). Vel CV: scales strike velocity.
 
 template <AudioChannels Channels>
 class ModalResonatorApplet : public HemisphereAudioApplet {
@@ -68,7 +69,9 @@ public:
             channels[ch].wet_dry_mixer.gain(ResonatorChannel::WET_CH, wet_gain);
 
             if (manual_strike_ || gate_strike) {
-                channels[ch].resonator.strike(1.0f);
+                float vel = manual_strike_ ? 1.0f
+                          : constrain(0.01f * velocity + vel_cv.InF(), 0.0f, 1.0f);
+                channels[ch].resonator.strike(vel);
             }
         }
         manual_strike_ = false;
@@ -77,11 +80,18 @@ public:
     // --- View (64×64 px) -----------------------------------------------------
 
     FLASHMEM void View() override {
-        // VU bar: excitation level at y=7, always visible
+        // VU bars: excitation input (y=7), output wet mix (y=12)
         uint16_t peak = channels[0].resonator.readPeak();
         if (peak > 0) {
             int bar_w = (int)((uint32_t)peak * 56 / 32767) + 1;
-            gfxRect(1, 7, bar_w, 4);
+            gfxRect(1, 7, bar_w, 3);
+        }
+        {
+            uint16_t out_peak = channels[0].resonator.readOutputPeak();
+            if (out_peak > 0) {
+                int bar_w = (int)((uint32_t)out_peak * 56 / 32767) + 1;
+                gfxFrame(1, 11, bar_w, 3);
+            }
         }
 
         // Row 1 (y=15): pitch note + Hz + freq CV
@@ -97,8 +107,8 @@ public:
         gfxPrint(freq_cv);
         gfxEndCursor(cursor == FREQ_CV, false, freq_cv.InputName());
 
-        // Row 2 (y=25): Structure
-        gfxPrint(1, 25, "Str:");
+        // Row 2 (y=25): Inharmonicity
+        gfxPrint(1, 25, "Inh:");
         gfxStartCursor(25, 25);
         graphics.printf("%3d", structure);
         gfxEndCursor(cursor == STRUCT);
@@ -141,11 +151,20 @@ public:
             gfxStartCursor();
             gfxPrint(mix_cv);
             gfxEndCursor(cursor == MIX_CV, false, mix_cv.InputName());
-        } else {
+        } else if (cursor <= STRIKE) {
             gfxPrint(1, 55, "Trg:");
+            if (prev_strike_gate_) gfxInvert(1, 55, 20, 8);
             gfxStartCursor(25, 55);
             gfxPrint(strike_input);
             gfxEndCursor(cursor == STRIKE, true, strike_input.InputName());
+        } else {
+            gfxPrint(1, 55, "Vel:");
+            gfxStartCursor(25, 55);
+            graphics.printf("%3d%%", velocity);
+            gfxEndCursor(cursor == VEL);
+            gfxStartCursor();
+            gfxPrint(vel_cv);
+            gfxEndCursor(cursor == VEL_CV, false, vel_cv.InputName());
         }
 
         gfxDisplayInputMapEditor();
@@ -169,7 +188,8 @@ public:
                 IndexedInput(DAMP_CV,   damp_cv),
                 IndexedInput(POS_CV,    pos_cv),
                 IndexedInput(MIX_CV,    mix_cv),
-                IndexedInput(STRIKE,    strike_input)
+                IndexedInput(STRIKE,    strike_input),
+                IndexedInput(VEL_CV,    vel_cv)
             ))
             return;
         CursorToggle();
@@ -177,7 +197,7 @@ public:
 
     FLASHMEM void OnEncoderMove(int direction) override {
         if (!EditMode()) {
-            MoveCursor(cursor, direction, STRIKE);
+            MoveCursor(cursor, direction, VEL_CV);
             return;
         }
         if (EditSelectedInputMap(direction)) return;
@@ -204,23 +224,25 @@ public:
             case MIX:        mix        = constrain(mix        + direction, 0, 100); break;
             case MIX_CV:     mix_cv.ChangeSource(direction);     break;
             case STRIKE:     strike_input.ChangeSource(direction); break;
+            case VEL:        velocity = constrain(velocity + direction, 0, 100); break;
+            case VEL_CV:     vel_cv.ChangeSource(direction);       break;
             default: break;
         }
     }
 
     // --- Persistence ---------------------------------------------------------
 
-#define MODAL_PARAMS pitch, structure, brightness, damping, position, mix
+#define MODAL_PARAMS pitch, structure, brightness, damping, position, mix, velocity
     FLASHMEM void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
         data[0] = PackPackables(MODAL_PARAMS);
         data[1] = PackPackables(freq_cv, struct_cv, bright_cv, damp_cv);
-        data[2] = PackPackables(pos_cv, mix_cv, strike_input);
+        data[2] = PackPackables(pos_cv, mix_cv, strike_input, vel_cv);
     }
 
     FLASHMEM void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
         UnpackPackables(data[0], MODAL_PARAMS);
         UnpackPackables(data[1], freq_cv, struct_cv, bright_cv, damp_cv);
-        UnpackPackables(data[2], pos_cv, mix_cv, strike_input);
+        UnpackPackables(data[2], pos_cv, mix_cv, strike_input, vel_cv);
     }
 #undef MODAL_PARAMS
 
@@ -249,6 +271,8 @@ private:
         MIX,
         MIX_CV,
         STRIKE,   // DigitalInputMap — assignable gate trigger; AuxButton is manual fallback
+        VEL,      // base strike velocity 0–100%
+        VEL_CV,   // CVInputMap — adds to base velocity
     };
 
     int8_t cursor = FREQ;
@@ -260,6 +284,7 @@ private:
     int8_t  damping    = 50;            // decay time
     int8_t  position   = 25;            // excitation point
     int8_t  mix        = 100;           // wet/dry %
+    int8_t  velocity   = 100;           // strike velocity 0–100%
 
     CVInputMap freq_cv;
     CVInputMap struct_cv;
@@ -267,6 +292,7 @@ private:
     CVInputMap damp_cv;
     CVInputMap pos_cv;
     CVInputMap mix_cv;
+    CVInputMap vel_cv;
 
     bool manual_strike_ = false;
 

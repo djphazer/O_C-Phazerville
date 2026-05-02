@@ -47,8 +47,8 @@ DMAMEM std::tuple<
   WavPlayerApplet<MONO>,
   OneShotPlayerApplet<MONO>,
   AdvKrpsStrngApplet,
-  WTVCOApplet
-  >
+  WTVCOApplet,
+  ModalResonatorApplet<MONO>>
     mono_input_pool[2];
 DMAMEM std::tuple<
   PassthruApplet<STEREO>,

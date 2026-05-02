@@ -57,6 +57,7 @@ public:
             mode_gain_[k] = 0.0f;
         }
         excite_peak_    = 0;
+        output_peak_    = 0;
         strike_pending_ = false;
         strike_vel_     = 0.0f;
         strike_remain_  = 0;
@@ -165,6 +166,12 @@ public:
         return p;
     }
 
+    uint16_t readOutputPeak() {
+        uint16_t p = output_peak_;
+        output_peak_ = (uint16_t)(p * 220 / 256);
+        return p;
+    }
+
     // --- AudioStream update --------------------------------------------------
 
     void update() override {
@@ -248,7 +255,13 @@ public:
             float y_out = y - dc_x1_ + 0.995f * dc_y1_;
             dc_x1_ = y;
             dc_y1_ = y_out;
-            dst[i] = Clip16(y_out * 32767.0f);
+            int16_t s = Clip16(y_out * 32767.0f);
+            dst[i] = s;
+            // Track output peak
+            {
+                uint16_t av = s < 0 ? (uint16_t)(-s) : (uint16_t)s;
+                if (av > output_peak_) output_peak_ = av;
+            }
         }
 
         // Clamp before write-back: steady-state SVF amplitude is ≤1.0;
@@ -289,7 +302,8 @@ private:
     uint32_t       noise_seed_     = 0xCAFEBABE;
 
     // VU
-    volatile uint16_t excite_peak_ = 0;
+    volatile uint16_t excite_peak_  = 0;
+    volatile uint16_t output_peak_  = 0;
 
     // DC blocker state (single-pole, pole at 0.995)
     float dc_x1_ = 0.0f;
