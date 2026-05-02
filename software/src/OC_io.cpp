@@ -60,7 +60,7 @@ void InputDesc::set_printf(const char *fmt, ...)
   }
   {
     DEBUG_PIN_SCOPE(OC_GPIO_DEBUG_PIN1);
-    for (int channel = 0; channel < ADC_CHANNEL_LAST; ++channel) {
+    for (int channel = 0; channel < ADC_CHANNEL_COUNT; ++channel) {
       int32_t value = io_settings->adc_filter_enabled(channel)
         ? ADC::value(static_cast<ADC_CHANNEL>(channel))
         : ADC::unsmoothed_value(static_cast<ADC_CHANNEL>(channel));

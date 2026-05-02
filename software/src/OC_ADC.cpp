@@ -640,7 +640,7 @@ void ADC::Read(IOFrame *ioframe)
 /*static*/
 void ADC::Read(IOFrame *ioframe)
 {
-  for (int channel = ADC_CHANNEL_1; channel < ADC_CHANNEL_LAST; ++channel) {
+  for (int channel = 0; channel < ADC_CHANNEL_COUNT; ++channel) {
     ioframe->cv.values[channel] = value(static_cast<ADC_CHANNEL>(channel));
     ioframe->cv.pitch_values[channel] = value_to_pitch( ioframe->cv.values[channel] );
   }

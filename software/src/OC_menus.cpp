@@ -58,9 +58,9 @@ void DrawEditIcon(weegfx::coord_t x, weegfx::coord_t y, int value, const setting
   graphics.drawBitmap8(x - 5, y + 1, OC::kBitmapEditIndicatorW, src);
 }
 
-void DrawIOStatusBar(uint32_t status_mask) {
-  weegfx::coord_t x = 32 - 14;
-  for (int i = 0; i < 4; ++i, x += 32, status_mask >>= 8) {
+void DrawIOStatusBar(uint32_t status_mask, int col_w = 32) {
+  weegfx::coord_t x = col_w - 14;
+  for (int i = 0; i < 4; ++i, x += col_w, status_mask >>= 4) {
     if (status_mask & 0x1) graphics.drawBitmap8(x, 9, 2, bitmap_io_settings_8);
     if (status_mask & 0x2) graphics.drawBitmap8(x + 4, 9, 2, bitmap_io_settings_8);
     if (status_mask & 0x4) graphics.drawBitmap8(x + 8, 9, 2, bitmap_io_settings_8);

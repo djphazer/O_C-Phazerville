@@ -97,11 +97,11 @@ public:
   }
 
   uint32_t status_mask() const {
-    return
-      status_mask(0) |
-      status_mask(1) << 8 |
-      status_mask(2) << 16 |
-      status_mask(3) << 24;
+    uint32_t mask = 0;
+    for (int i = 0; i < DAC_CHANNEL_COUNT; ++i) {
+      mask |= status_mask(i) << (4 * i);
+    }
+    return mask;
   }
 
   SETTINGS_ARRAY_DECLARE() {{
