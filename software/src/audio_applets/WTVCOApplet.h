@@ -7,7 +7,7 @@ public:
     }
 
     void Start() override {
-        bool sd_ready = CheckSD();
+        sd_ready = CheckSD();
 
         waveform[A] = WAVE_SINE;
         waveform[B] = WAVE_TRIANGLE;
@@ -50,8 +50,7 @@ public:
         if (level_cv.source) {
             vca.bias(0.0f);
             vca.level(gain);
-            vca_cv.Push(float_to_q15(dbToScalar(-48 * (1.0f - level_cv.InF())))
-            );
+            vca_cv.Push(float_to_q15(dbToScalar(-48 * (1.0f - level_cv.InF()))));
         } else {
             vca.bias(gain);
             vca.level(0.0f);
@@ -153,12 +152,9 @@ public:
                 case WAVEFORM_B:
                 case WAVEFORM_C: {
                     const int idx = cursor - WAVEFORM_A;
-                    if (userwave_select) {
-                        userwave[idx] = constrain(userwave[idx] + direction, 0, 255);
-                    } else {
-                        waveform[idx] = (WaveForms)constrain(((int)waveform[idx]) + direction, 0, WAVEFORM_COUNT - 1);
-                    }
-                        GenerateWaveTable(idx);
+                    if (userwave_select) userwave[idx] = constrain(userwave[idx] + direction, 0, raw_wave_count);
+                    else waveform[idx] = (WaveForms)constrain(((int)waveform[idx]) + direction, 0, WAVEFORM_COUNT - 1);
+                    GenerateWaveTable(idx);
                     break;
                 }
                 default: break;
@@ -167,25 +163,24 @@ public:
     }
 
     void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
-        data[0] = PackPackables(pitch, wt_blend, pulse_duty);
-        data[1] = PackPackables(level, mix);
-        data[2] = PackPackables(pitch_cv, wt_blend_cv, pulse_duty_cv);
-        data[3] = PackPackables(level_cv, mix_cv);
-        data[4] = PackPackables(waveform[A], waveform[B], waveform[C]);
+        // data[0] = PackPackables(pitch, wt_blend, pulse_duty);
+        // data[1] = PackPackables(level, mix);
+        // data[2] = PackPackables(pitch_cv, wt_blend_cv, pulse_duty_cv);
+        // data[3] = PackPackables(level_cv, mix_cv);
+        // data[4] = PackPackables(waveform[A], waveform[B], waveform[C]);
+        // // userwave[idx]
     }
 
     void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
-        UnpackPackables(data[0], pitch, wt_blend, pulse_duty);
-        UnpackPackables(data[1], level, mix);
-        UnpackPackables(data[2], pitch_cv, wt_blend_cv, pulse_duty_cv);
-        UnpackPackables(data[3], level_cv, mix_cv);
-        UnpackPackables(data[4], waveform[A], waveform[B], waveform[C]);
+        // UnpackPackables(data[0], pitch, wt_blend, pulse_duty);
+        // UnpackPackables(data[1], level, mix);
+        // UnpackPackables(data[2], pitch_cv, wt_blend_cv, pulse_duty_cv);
+        // UnpackPackables(data[3], level_cv, mix_cv);
+        // UnpackPackables(data[4], waveform[A], waveform[B], waveform[C]);
+        // // userwave[idx]
 
-        CONSTRAIN(level, LVL_MIN_DB, LVL_MAX_DB);
+        // CONSTRAIN(level, LVL_MIN_DB, LVL_MAX_DB);
 
-        waveform[A] = WAVE_SINE;
-        waveform[B] = WAVE_TRIANGLE;
-        waveform[C] = WAVE_PULSE;
         for (int w = A; w <= C; ++w) GenerateWaveTable(w);
     }
 
@@ -261,6 +256,7 @@ private:
     static constexpr int16_t WT_SIZE = 256;
     static constexpr int16_t MAX_PITCH = 7 * 12 * 128;
     static constexpr int16_t MIN_PITCH = -3 * 12 * 128;
+    static constexpr uint8_t MAX_RAW_WAVES = 255;
 
     int16_t pitch = 1 * 12 * 128;  // C4
     int wt_blend = 0;
@@ -272,6 +268,7 @@ private:
     bool noise_freeze = false;  // push aux button while Noise wave is selected to freeze the buffer
 
     bool userwave_select = false;  // push aux button while User wave is selected to choose from SD card.
+    bool sd_ready = false;
     int raw_wave_count = 0;
 
     WaveForms waveform[3];  // selected waveform name
@@ -361,7 +358,6 @@ private:
             case PARAM_OCTAVE:
             case PARAM_PITCH:
             case PARAM_PITCH_CV:
-                // pitch
                 gfxStartCursor(1, 14);
                 gfxPrintTuningIndicator(pitch);
                 gfxEndCursor(cursor == PARAM_OCTAVE);
@@ -378,16 +374,12 @@ private:
             case PARAM_OSC_DIRECTION:
             case PARAM_BLEND:
             case PARAM_BLEND_CV:
-                // blend
-                // gfxStartCursor(1,14);
-                // gfxIcon(1, 14, WAVEFORM_ICON);
-                // if (osc_rev) gfxIcon(9, 14, LEFT_ICON);
+                gfxStartCursor(1, 14);
                 gfxPrint(1, 14, "Blnd:");
-                if (osc_rev) gfxInvert(1, 14, 7*4, 8);
-                gfxStartCursor();
                 gfxEndCursor(cursor == PARAM_OSC_DIRECTION);
+                if (osc_rev) gfxInvert(1, 14, 7 * 4, 8);
 
-                gfxStartCursor(11, 14);
+                gfxStartCursor();
                 graphics.printf("%4d", wt_blend);
                 gfxEndCursor(cursor == PARAM_BLEND);
 
@@ -434,52 +426,13 @@ private:
 
             default: break;
         }
-
-        // gfxPrint(1, 35, "Lvl:");
-        // gfxStartCursor();
-        // graphics.printf("%3ddB", level);
-        // gfxEndCursor(cursor == LEVEL);
-
-        // gfxStartCursor();
-        // gfxPrint(level_cv);
-        // gfxEndCursor(cursor == LEVEL_CV, false, level_cv.InputName());
-
-        // gfxPrint(1, 45, "Mix: ");
-        // gfxStartCursor();
-        // graphics.printf("%3d%%", mix);
-        // gfxEndCursor(cursor == MIX);
-
-        // gfxStartCursor();
-        // gfxPrint(mix_cv);
-        // gfxEndCursor(cursor == MIX_CV, false, mix_cv.InputName());
-
-    //     uint8_t y = MENU_ROW + Y_DIV;
-
-    //     gfxIcon(0, y, NOTE_ICON); gfxBitmap(6, y + 6, 3, SUP_ONE); // Pitch 1
-    //     gfxPos(6, y); graphics.printf("%4d", pitch / 128);
-    //     y += Y_DIV;
-
-    //     gfxIcon(1, y, WAVEFORM_ICON); gfxBitmap(8, y - 1, 3, SUP_ONE); gfxBitmap(8, y + 2, 3, SUB_TWO); // Blend
-    //     gfxPos(6, y); graphics.printf("%4d", wt_blend);
-    //     y += Y_DIV;
-
-    //     if (page_cursor < PARAM_LAST) {
-    //         gfxIcon(33, y, GATE_ICON); // SqDuty
-    //         gfxPos(44, y); graphics.printf("%3d", pulse_duty);
-    //     } else {
-    //         gfxIcon(1, y, GATE_ICON); // SqDuty
-    //         gfxPos(12, y); graphics.printf("%3d", pulse_duty);
-
-    //         gfxIcon(33, y, STAIRS_ICON); // SR.Div
-    //         gfxPos(44, y); graphics.printf("%3d", sample_rate_div);
-    //     }
     }
 
 // WAVETABLE STUFF:
     void InterpolateSample(int16_t* wt, const int blend, uint8_t sample) {
         uint8_t s = sample * (1 - 2 * osc_rev) + (255 * osc_rev);
         wt[s] = (((blend <= 127) * ((127 - blend) * (int)wavetable[A][sample] + blend * (int)wavetable[B][sample]))
-                      + ((blend > 127) * ((255 - blend) * (int)wavetable[B][sample] + (blend - 128) * (int)wavetable[C][sample]))) / 127;
+                + ((blend > 127) * ((255 - blend) * (int)wavetable[B][sample] + (blend - 128) * (int)wavetable[C][sample]))) / 127;
     }
 
     void UpdatePulseDuty(int16_t* wt, const uint8_t sample, const uint8_t duty) {
@@ -504,6 +457,7 @@ private:
             case WAVE_SAW:
                 GenerateWaveForm_Sawtooth(wavetable[w]);
                 break;
+        // probably going to get rid of these:
             case WAVE_RAMP:
                 GenerateWaveForm_Ramp(wavetable[w]);
                 break;
@@ -513,13 +467,13 @@ private:
             case WAVE_RAND_STEPPED:
                 GenerateWaveForm_RandStepped(wavetable[w]);
                 break;
+        //
             case WAVE_NOISE:
                 GenerateWaveForm_Noise(wavetable[w]);
                 break;
             case WAVE_USER:
                 GenerateWaveForm_User(wavetable[w]);
                 break;
-            // add waves here
             default: break;
         }
     }
@@ -597,91 +551,68 @@ private:
         }
     }
 
-    void GenerateWaveForm_User(int16_t* waveform) {
-        GenerateWaveForm_Sine(waveform);
-        // if(!SD.begin(BUILTIN_SDCARD)) GenerateWaveForm_Sine(waveform);
-        // else GenerateWaveForm_Sawtooth(waveform);  // SelectUserWaveform()
+    void GenerateWaveForm_Silence(int16_t* waveform) {
+        for (int i = 0; i < WT_SIZE; ++i) {
+            waveform[i] = 0;
+        }
     }
 
-    void SelectUserWaveForm(int* waveform, int dir) {
+    void GenerateWaveForm_User(int16_t* waveform) {
+        if (!ReadWaveFromSD(waveform)) GenerateWaveForm_Silence(waveform);
+    }
 
+    bool ReadWaveFromSD(int16_t* waveform) {
+        if(!sd_ready) return false;
+        const int idx = cursor - WAVEFORM_A;
+        File dir = SD.open("/WTVCO");
+        File file;
+        for (int i = 0; i < userwave[idx]; ++i) {
+            file = dir.openNextFile();
+        }
+        // if (file.size() < WT_SIZE) {
+        //     file.close();
+        //     return false;
+        // }
+        bool read = false;
+        if (!file.isDirectory() && isRawFile(file.name())) {
+            size_t readBytes = file.read(waveform, 2 * WT_SIZE);
+            // if (readBytes != 2 * WT_SIZE) read = false;
+            read = true;
+        }
+        file.close();
+        dir.close();
+        return read;
     }
 
     bool CheckSD() {
-        int fileCount = 0;
-        bool wtvcoReady = false;
-
         File dir = SD.open("/WTVCO");
 
         if (!dir || !dir.isDirectory()) {
-            // Directory does not exist
-            return wtvcoReady;
+            sd_ready = false;
+            return sd_ready;
         }
 
         while (true) {
-            File entry = dir.openNextFile();
-            if (!entry) break;
+            File file = dir.openNextFile();
+            if (!file) break;
 
-            if (!entry.isDirectory() && isRawFile(entry.name())) {
-                // if (fileCount < 256) {
-                //     strncpy(filenames[fileCount], entry.name(), 7);
-                //     filenames[fileCount][7 - 1] = '\0';
-                //     fileCount++;
-                // }
+            if (!file.isDirectory() && isRawFile(file.name())) {
+                if (raw_wave_count < MAX_RAW_WAVES) {
+                    raw_wave_count++;
+                }
             }
-
-            entry.close();
+            file.close();
         }
-
         dir.close();
 
-        if (fileCount > 0) {
-            wtvcoReady = true;
+        if (raw_wave_count > 0) {
+            sd_ready = true;
         }
-        return wtvcoReady;
+        return sd_ready;
     }
 
     bool isRawFile(const char* name) {
         const char* ext = strrchr(name, '.');
         return ext && strcasecmp(ext, ".raw") == 0;
     }
-
-    // bool loadWavetableByIndex(int index) {
-    //     if (!wtvcoReady || index < 0 || index >= fileCount) return false;
-
-    //     char path[64];
-    //     snprintf(path, sizeof(path), "/WTVCO/%s", filenames[index]);
-
-    //     File file = SD.open(path);
-    //     if (!file) return false;
-
-    //     if (file.size() < WT_SIZE) {
-    //         file.close();
-    //         return false;
-    //     }
-
-    //     size_t readBytes = file.read((uint8_t*)wavetable, WT_SIZE);
-    //     file.close();
-
-    //     if (readBytes != TABLE_SIZE) return false;
-
-    //     // updateShortName(filenames[index]);
-
-    //     return true;
-    // }
-
-    // void changeWavetable(int delta) {
-    //     if (!wtvcoReady) return;
-
-    //     int newIndex = currentIndex + delta;
-
-    //     // wrap
-    //     if (newIndex < 0) newIndex = fileCount - 1;
-    //     if (newIndex >= fileCount) newIndex = 0;
-
-    //     if (newIndex != currentIndex) {
-    //         currentIndex = newIndex;
-    //         loadWavetableByIndex(currentIndex);
-    //     }
-    // }
 };
