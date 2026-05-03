@@ -160,7 +160,7 @@ Five parameters, navigated by the encoder (rotate to move cursor, press to enter
 | Cursor | Parameter | Range | Notes |
 |--------|-----------|-------|-------|
 | **Ops** | Operator pattern | 0–7, or CV | NOR/NAND mix across the three slots |
-| **Steps** | Sequence length | 3, 4, 5, 6, 7, 8, 10, 12, 15, 16, 20, 24, 32 | Default 16 |
+| **Steps** | Sequence length | 3, 4, 5, 6, 7, 8, 10, 12, 15, 16 | Default 16 |
 | **Tree** | Parse tree | 1–5 (internal 0–4), or CV | Bracketing of the expression |
 | **TR2 Mode** | TR2 jack function | RST / HLD / TrAdv / OpAdv | See TR2 Modes below |
 | **OUT2** | OUT2 relation | NXT / NOT / AND / OR / XOR / FLP | See OUT2 Relation below |
@@ -212,9 +212,9 @@ Because there are only 5 trees, the differences between adjacent trees are prono
 ## Display
 
 ```
-↑NOR       ↓NAND          ← context help (when Ops cursor active)
+↓NOR       ↑NAND          ← context help (when Ops cursor active)
 ───────────────
-Op: ↑ ↑ ↓               ← 3 arrow icons: ↑=NOR, ↓=NAND
+Op: ↓ ↓ ↑               ← 3 arrow icons: ↓=NOR, ↑=NAND
 07/16    T:03             ← current step / length | tree (1-indexed)
 RST      B:XOR            ← TR2 mode | Output2-label:OUT2-mode
 A ▌  ▌▌   ▌  ▌▌          ← OUT1 history (16 steps)
@@ -223,8 +223,8 @@ B ▌▌ ▌  ▌▌  ▌ ▌           ← OUT2 history (16 steps)
 
 Output letters adapt to hemisphere position: top-left A/B, top-right C/D, bottom-left E/F, bottom-right G/H.
 
-- **Op** — 3 arrow icons (↑ = NOR, ↓ = NAND); shows "CV" when under CV control
-- **T** — current parse tree (1-indexed)
+- **Op** — 3 arrow icons (↓ = NOR, ↑ = NAND); shows "CV N" (CV + live pattern number 1–8) when under CV control
+- **T** — current parse tree (1-indexed); when under CV control, the live tree number replaces the "T:" label entirely
 - **Step/length** — current step (1-indexed) / total steps; length underlined when selected
 - **TR2 mode** — active mode abbreviation
 - **OUT2** — output letter + colon + mode abbreviation

@@ -71,6 +71,8 @@ public:
         out2_state = false;
         hist1      = 0;
         hist2      = 0;
+        ops_live   = 0;
+        tree_live  = 0;
     }
 
     void Controller() {
@@ -104,6 +106,8 @@ public:
             int tree_mod = (tree_base == TREE_CV_CTRL)
                 ? constrain(Proportion(In(1), HEMISPHERE_MAX_INPUT_CV, NUM_TREES - 1), 0, NUM_TREES - 1)
                 : tree_base;
+            ops_live  = ops_mod;
+            tree_live = tree_mod;
 
             // Decode 4 bits from counter
             bool A = (counter >> 3) & 1;
@@ -191,8 +195,9 @@ protected:
 
 private:
     // ---- Constants ----
-    static constexpr int STEP_LENGTHS[]   = {3,4,5,6,7,8,10,12,15,16,20,24,32};
-    static constexpr int NUM_STEP_LENGTHS = 13;
+    // TruthCat3 uses a 4-bit counter (max 16 unique states), so lengths above 16 are excluded.
+    static constexpr int STEP_LENGTHS[]   = {3,4,5,6,7,8,10,12,15,16};
+    static constexpr int NUM_STEP_LENGTHS = 10;
 
     // 8 operator patterns ordered by NAND density (0 NANDs → 3 NANDs)
     static constexpr GateOp opPatterns[NUM_OPS_PATTERNS][3] = {
@@ -223,6 +228,8 @@ private:
     bool     out2_state;
     uint32_t hist1;
     uint32_t hist2;
+    int      ops_live;   // last resolved ops index (for CV display)
+    int      tree_live;  // last resolved tree index (for CV display)
 
     // ---- Helpers ----
 
@@ -296,9 +303,9 @@ private:
             graphics.clearRect(gfx_offset, 0, 64, 10);
         }
         if (cursor == OPS) {
-            gfxIcon(0, 1, UP_ICON);
+            gfxIcon(0, 1, DOWN_ICON);
             gfxPrint(9, 2, "NOR");
-            gfxIcon(31, 1, DOWN_ICON);
+            gfxIcon(31, 1, UP_ICON);
             gfxPrint(39, 2, "NAND");
         } else if (cursor == TR2_MODE) {
             gfxPrint(0, 2, "Trg input");
@@ -306,18 +313,20 @@ private:
             gfxPrint(0, 2, "Output 2");
         }
 
-        // Row 1: Ops — 3 arrow icons
+        // Row 1: Ops — 3 arrow icons; in CV mode show "CV" + live pattern number
         gfxPrint(0, 15, "Op:");
         if (ops_base == OPS_CV_CTRL) {
             gfxPrint("CV");
+            gfxPrint(pad(10, ops_live + 1), ops_live + 1);
         } else {
             for (int i = 0; i < 3; i++) {
                 gfxIcon(19 + i * 9, 15,
-                    opPatterns[ops_base][i] == NOR_OP ? UP_ICON : DOWN_ICON);
+                    opPatterns[ops_base][i] == NOR_OP ? DOWN_ICON : UP_ICON);
             }
         }
 
         // Row 2: step counter / length (left) + tree index (right)
+        // In CV mode, show live tree number in place of "T:"
         const int slen   = stepLength();
         const int slash_x = 12;
         const int len_x   = 19;
@@ -325,10 +334,11 @@ private:
         gfxPrint(pad(10, counter + 1), 25, counter + 1);
         gfxPrint(slash_x, 25, "/");
         gfxPrint(len_x, 25, slen);
-        gfxPrint(tree_x, 25, "T:");
         if (tree_base == TREE_CV_CTRL) {
-            gfxPrint("CV");
+            gfxPrint(tree_x, 25, pad(10, tree_live + 1));
+            gfxPrint(tree_live + 1);
         } else {
+            gfxPrint(tree_x, 25, "T:");
             gfxPrint(pad(10, tree_base + 1), tree_base + 1);
         }
 

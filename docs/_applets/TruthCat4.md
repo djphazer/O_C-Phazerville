@@ -249,9 +249,9 @@ The relationship between parse trees and rhythm density is non-obvious but music
 The display in context (top-right quadrant example):
 
 ```
-↑NOR       ↓NAND          ← context help (when Ops cursor active)
+↓NOR       ↑NAND          ← context help (when Ops cursor active)
 ───────────────
-Op: ↑ ↑ ↓ ↑               ← 4 arrow icons: ↑=NOR, ↓=NAND
+Op: ↓ ↓ ↑ ↓               ← 4 arrow icons: ↓=NOR, ↑=NAND
 07/32    T:09              ← current step / length | tree (1-indexed)
 RST      D:XOR             ← TR2 mode | Output2-label:OUT2-mode
 C ▌  ▌▌   ▌  ▌▌           ← OUT1 history (16 steps, output letter = C/E/G)
@@ -260,8 +260,8 @@ D ▌▌ ▌  ▌▌  ▌ ▌            ← OUT2 history (16 steps, output lett
 
 The output letters on the history rows adapt to hemisphere position: top-left uses A/B, top-right uses C/D, bottom-left uses E/F, bottom-right uses G/H.
 
-- **Op** — 4 arrow icons (↑ = NOR, ↓ = NAND); shows "CV" when under CV control
-- **T** — current parse tree number (1-indexed display)
+- **Op** — 4 arrow icons (↓ = NOR, ↑ = NAND); shows "CV N" (CV + live pattern number 1–16) when under CV control
+- **T** — current parse tree number (1-indexed display); when under CV control, the live tree number replaces the "T:" label entirely
 - **St** — current step (1-indexed) / total steps
 - **RST / HLD / TrAdv / OpAdv** — active TR2 mode
 - **O2** — active OUT2 relation
