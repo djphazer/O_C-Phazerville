@@ -38,7 +38,7 @@ public:
     void Controller() override {
         float freq = PitchToRatio(pitch + pitch_cv.In()) * C3;
         synth.frequency(freq);
-        int _wt_blend = wt_blend + Proportion(wt_blend_cv.In(), HEMISPHERE_MAX_INPUT_CV, WT_SIZE - 1);
+        int _wt_blend = wt_blend + wt_blend_cv.InRescaled(WT_SIZE - 1);
 
         InterpolateSample(wavetable[OUT], _wt_blend, wt_sample++);
         for (int w = A; w <= C; ++w) {
@@ -163,23 +163,17 @@ public:
     }
 
     void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
-        // data[0] = PackPackables(pitch, wt_blend, pulse_duty);
-        // data[1] = PackPackables(level, mix);
-        // data[2] = PackPackables(pitch_cv, wt_blend_cv, pulse_duty_cv);
-        // data[3] = PackPackables(level_cv, mix_cv);
-        // data[4] = PackPackables(waveform[A], waveform[B], waveform[C]);
-        // // userwave[idx]
+        data[0] = PackPackables(pitch, wt_blend, pulse_duty, level, mix);
+        data[1] = PackPackables(pitch_cv, wt_blend_cv, pulse_duty_cv, level_cv);
+        data[2] = PackPackables(mix_cv, waveform[A], waveform[B], waveform[C], userwave[0], userwave[1], userwave[2]);
     }
 
     void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
-        // UnpackPackables(data[0], pitch, wt_blend, pulse_duty);
-        // UnpackPackables(data[1], level, mix);
-        // UnpackPackables(data[2], pitch_cv, wt_blend_cv, pulse_duty_cv);
-        // UnpackPackables(data[3], level_cv, mix_cv);
-        // UnpackPackables(data[4], waveform[A], waveform[B], waveform[C]);
-        // // userwave[idx]
+        UnpackPackables(data[0], pitch, wt_blend, pulse_duty, level, mix);
+        UnpackPackables(data[1], pitch_cv, wt_blend_cv, pulse_duty_cv, level_cv);
+        UnpackPackables(data[2], mix_cv, waveform[A], waveform[B], waveform[C], userwave[0], userwave[1], userwave[2]);
 
-        // CONSTRAIN(level, LVL_MIN_DB, LVL_MAX_DB);
+        CONSTRAIN(level, LVL_MIN_DB, LVL_MAX_DB);
 
         for (int w = A; w <= C; ++w) GenerateWaveTable(w);
     }
@@ -220,7 +214,7 @@ private:
 
     enum WaveTables { A, B, C, OUT };
 
-    enum WaveForms {
+    enum WaveForms : uint8_t {
         WAVE_SINE,
         WAVE_TRIANGLE,
         WAVE_PULSE,
@@ -259,7 +253,7 @@ private:
     static constexpr uint8_t MAX_RAW_WAVES = 255;
 
     int16_t pitch = 1 * 12 * 128;  // C4
-    int wt_blend = 0;
+    uint8_t wt_blend = 0;
     uint8_t pulse_duty = 127;
     int8_t level = 0;  // dB
     int8_t mix = 100;
