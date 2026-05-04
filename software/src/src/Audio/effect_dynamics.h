@@ -185,7 +185,7 @@ private:
 	float aLimitAttack;
 	float aOneMinusLimitAttack;
 	float aLimitRelease;
-	const static unsigned int sampleBufferSize = AUDIO_SAMPLE_RATE / 10; // number of samples to use for running RMS calulation = 1/10th of a second
+	const static unsigned int sampleBufferSize = AUDIO_SAMPLE_RATE / 20; // number of samples to use for running RMS calulation = 1/20th of a second = 50ms
 	static constexpr float invSampleBufferSize = 1.0f / (float)sampleBufferSize;
 	uint64_t sumOfSamplesSquared = 0;
 	uint32_t* samplesSquared;
