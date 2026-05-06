@@ -49,9 +49,6 @@
 #define PADDLE_DELAY 200
 #define PADDLE_WIDTH 3
 
-/* TRIGGER_CYCLE_LENGTH specifies how many loop cycles a triggered event (like a hit) lasts. */
-#define TRIGGER_CYCLE_LENGTH 400
-
 /* This value is used for converting a ball's or paddle's Y position into a pitch value. This number was determined
  * experimentally, since I wasn't sure what the total range for pitch values is.
  */
@@ -65,6 +62,11 @@
  */
 #define CENTER_DETENT 640
 
+// Length of audio bloops upon bounce
+#define BLOOP_LENGTH 1000 // 17 * 100ms
+#define BLOOP_LOW 0x8
+#define BLOOP_HIGH 0x4
+
 class Pong : public HSApplication {
 private:
     int ball_delay; // The ball's delay at the next movement
@@ -72,6 +74,7 @@ private:
     int paddle_countdown; // Time until the paddle may move
     int return_countdown; // Time until the return trigger (at Output A) ends
     int bounce_countdown; // Time until the bounce trigger (at Output B) ends
+    int bloop_pitch;
     int score; // The number of hits in this game
     int hi_score; // The highest number of hits in a game since initialization
     int level_up_x_advance;
@@ -163,7 +166,12 @@ public:
         uint32_t out_D = ((paddle_y + (paddle_h / 2)) - BOUNDARY_TOP) * Y_POSITION_COEFF;
 
         Out(2, out_C);
-        Out(3, out_D);
+        // Out(3, out_D);
+
+        // make bloop noises
+        if(bounce_countdown > 0){
+            GateOut(3, OC::CORE::ticks & bloop_pitch);
+        }
     }
 
     int get_score() {return score;}
@@ -185,12 +193,14 @@ public:
             // Check the playfield boundaries. Oh, yes, O_C will crash if you go too far out of bounds.
             if ((ball_x >> 1) > BOUNDARY_RIGHT || (ball_x>>1) < BOUNDARY_LEFT) {
                 dir_x = -dir_x;
-                //bounce_countdown = TRIGGER_CYCLE_LENGTH;
+                bounce_countdown = BLOOP_LENGTH;
+                bloop_pitch = BLOOP_HIGH;
                 ClockOut(1);
             }
             if ((ball_y>>1) > BOUNDARY_BOTTOM || (ball_y>>1) < BOUNDARY_TOP) {
                 dir_y = -dir_y;
-                //bounce_countdown = TRIGGER_CYCLE_LENGTH;
+                bounce_countdown = BLOOP_LENGTH;
+                bloop_pitch = BLOOP_HIGH;
                 ClockOut(1);
             }
 
@@ -201,7 +211,8 @@ public:
                 // CV trigger at the next loop() call.
                 dir_x = -dir_x;
                 score++;
-                //return_countdown = TRIGGER_CYCLE_LENGTH;
+                bounce_countdown = BLOOP_LENGTH;
+                bloop_pitch = BLOOP_LOW;
                 ClockOut(0);
 
                 // Level up!!
