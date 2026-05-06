@@ -35,6 +35,7 @@ namespace OC {
 // global (there can be only one) and app-specific. Really we kind of want some
 // kind of popup/overlay/menu stack.
 static IOSettingsMenu io_settings_menu;
+static bool z_button_hold = false;
 
 void AppBase::InitDefaults()
 {
@@ -66,13 +67,24 @@ void AppBase::Draw(UiMode ui_mode) const
   } else {
     DrawScreensaver();
   }
+
+  if (z_button_hold) {
+    graphics.clearRect(0, 0, 128, 10);
+    graphics.clearRect(0, 10, 10, 44);
+    graphics.clearRect(118, 10, 10, 44);
+    graphics.clearRect(0, 54, 128, 10);
+
+    graphics.drawFrame(10, 10, 108, 44);
+
+    gfxPrint(12, 1, "Z=Clock");
+    gfxPrint(1, 56, "L:I/O Cfg  R:App Menu");
+  }
 }
 
 UiMode AppBase::DispatchEvent(const UI::Event &event)
 {
   UiMode mode = UI_MODE_MENU;
   if (!io_settings_menu.active()) {
-
     switch (event.type) {
       case UI::EVENT_ENCODER:
         HandleEncoderEvent(event);
@@ -86,6 +98,7 @@ UiMode AppBase::DispatchEvent(const UI::Event &event)
         } else
 #endif
         HandleButtonEvent(event);
+        z_button_hold = event.mask & CONTROL_BUTTON_Z;
         break;
 
       case UI::EVENT_BUTTON_DOWN:
@@ -99,12 +112,15 @@ UiMode AppBase::DispatchEvent(const UI::Event &event)
             break;
         }
 #endif
+        HandleButtonEvent(event);
+        break;
+
       case UI::EVENT_BUTTON_LONG_PRESS:
       default:
         HandleButtonEvent(event);
+        z_button_hold = event.mask & CONTROL_BUTTON_Z;
         break;
     }
-
   } else {
     mode = io_settings_menu.DispatchEvent(event);
   }
@@ -124,6 +140,7 @@ void AppBase::DispatchAppEvent(AppEvent app_event)
   // dedicated functions for the derived classes (OnSuspend/OnResume etc) since
   // a lot of the apps have very similar, mostly empty implementations.
   HandleAppEvent(app_event);
+  z_button_hold = false;
 }
 
 void AppBase::EditIOSettings()
@@ -132,6 +149,7 @@ void AppBase::EditIOSettings()
     APPS_SERIAL_PRINTLN("EditIOSettings(%s)", name());
     io_settings_menu.Edit(this);
   }
+  z_button_hold = false;
 }
 
 void AppBase::DispatchLoop()

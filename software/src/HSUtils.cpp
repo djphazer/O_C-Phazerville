@@ -642,7 +642,7 @@ void gfxFooter(const char *str, const uint8_t *icon) {
   gfxLine(0, 54, 127, 54);
   int x = 1;
   if (icon) {
-    gfxIcon(x, 1, icon);
+    gfxIcon(x, 56, icon);
     x += 8;
   }
   gfxPrint(x, 56, str);
