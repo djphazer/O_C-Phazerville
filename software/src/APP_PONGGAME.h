@@ -297,6 +297,9 @@ public:
         // Frame
         gfxFrame(0, 9, 128, 55);
 
+        // Net
+        gfxDottedLine( 64, 10, 64, 63);
+
         // Header
         gfxPos(1,1);
         int score = get_score();

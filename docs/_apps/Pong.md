@@ -8,16 +8,17 @@ The goal of Pong 2.0 app is going to be to make it have more features and more c
 
 ## Features We Want To Add
 
-- a dotted line "net" for the tennis court
-- bloop sound effect on one of the outputs
-- 2 player option
-- ??? menu for selecting input mode (cv or encoder) or find a way to handle both elegantly
-- self-patching Y position of the ball into the righthand paddle should recreate the original version of the game
-- random starting position of the ball
-- ?? start the paddle for both players in the center
-- ball should change angle/direction based on where it touches the paddle - like real Pong
-- ball should also account for paddle velocity to affect angle
-- ball should slow down if its going too fast???
+- [ ] a dotted line "net" for the tennis court
+- [ ] bloop sound effect on one of the outputs
+- [ ] 2 player option
+- [ ] ??? menu for selecting input mode (cv or encoder) or find a way to handle both elegantly
+- [ ] self-patching Y position of the ball into the righthand paddle should recreate the original version of the game
+- [ ] random starting position of the ball
+- [ ] ?? start the paddle for both players
+- [ ] ball should change angle/direction based on where it touches the paddle - like real Pong
+- [ ] ball should also account for paddle velocity to affect angle
+- [ ] ball should slow down if its going too fast???
+- [ ] encoder rotation acceleration
 
 # Pong (original documentation)
 
@@ -25,10 +26,18 @@ Like twenty years ago, I owned a Kurzweil K2000. It had what we call today--but 
 
 This is the Pong we all know and love, with a few twists. As a ball bounces its way across the screen, the player defends the left side of the screen with a "paddle," and the module defends the right side. It's an unfair game, though, because the module can't lose. As you return the ball and level up, the ball gets faster, and your paddle gets smaller and closer to your opponent. The odds are not in your favor!
 
+
+
+
+
 ## Controls
 
 - Up/Down Buttons: Move the paddle up and down. This is really to illustrate the use of the buttons' event handler, and you really don't want to play the game with these things.
 - Encoders: Both encoders move the paddle up and down.
+- Trig 1: P1 up
+- Trig 2: P1 down
+
+
 - CV Input 1: Negative values move the paddle up, and positive values move the paddle down. There's a "center detent," a small range that doesn't move the paddle at all. This is to compensate for noise that gets into the ADC.
 - Output A: When the ball bounces off your paddle, a short 5V trigger is sent to Output A.
 - Output B: When the ball bounces off anything else, a short 5V trigger is sent to Output B.
