@@ -470,7 +470,9 @@ public:
         }
     }
 
-    void View() const {
+    void View() const;
+
+    void MainView() const {
         /*
         if (autotuner.active()) {
             autotuner.Draw();
@@ -842,6 +844,7 @@ void AppCalibr8or::GetIOConfig(OC::IOConfig &ioconfig) const
   ioconfig.outputs[DAC_CHANNEL_D].set("Ch4", OUTPUT_MODE_PITCH);
 }
 
+FLASHMEM
 void AppCalibr8or::HandleAppEvent(OC::AppEvent event) {
     switch (event) {
     case OC::APP_EVENT_RESUME:
@@ -859,7 +862,11 @@ void AppCalibr8or::HandleAppEvent(OC::AppEvent event) {
 
 void AppCalibr8or::Loop() {} // Deprecated
 
+FLASHMEM
 void AppCalibr8or::DrawMenu() const { BaseView(); }
+
+FLASHMEM
+void AppCalibr8or::View() const { MainView(); }
 
 void AppCalibr8or::DrawScreensaver() const {
     BaseScreensaver(true);

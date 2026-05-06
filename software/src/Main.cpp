@@ -62,6 +62,7 @@ MIDI_CREATE_INSTANCE(HardwareSerial, Serial8, MIDI1);
 #include "util/cachedisable.h"
 #endif
 
+FLASHMEM
 void ScanI2C() {
   noInterrupts();
 

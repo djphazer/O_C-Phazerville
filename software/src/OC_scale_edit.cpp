@@ -44,7 +44,7 @@ namespace OC {
 /*virtual*/ void ScaleEditorEventHandler::set_scale_at_slot(int /*scale*/, uint16_t /*mask*/, int /*root*/, int /*transpose*/, int /*scale_slot*/) {
 }
 
-
+FLASHMEM
 void ScaleEditor::Init(bool extended_mode/* = false*/) {
   owner_ = nullptr;
   scale_name_ = "?!";
@@ -65,6 +65,7 @@ void ScaleEditor::Edit(ScaleEditorEventHandler *owner, int scale) {
   }
 }
 
+FLASHMEM
 void ScaleEditor::Draw() const {
 
   size_t num_notes = num_notes_;
@@ -177,6 +178,7 @@ void ScaleEditor::Draw() const {
   }
 }
 
+FLASHMEM
 void ScaleEditor::HandleButtonEvent(const UI::Event &event) {
   if (UI::EVENT_BUTTON_PRESS == event.type) {
     switch (event.control) {
@@ -201,6 +203,7 @@ void ScaleEditor::HandleButtonEvent(const UI::Event &event) {
   }
 }
 
+FLASHMEM
 void ScaleEditor::HandleEncoderEvent(const UI::Event &event) {
   bool scale_changed = false;
   uint16_t mask = mask_;

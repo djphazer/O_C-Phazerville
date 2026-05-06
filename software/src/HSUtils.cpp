@@ -88,6 +88,7 @@ namespace HS {
 
     ResetMappings();
   }
+  FLASHMEM
   void ResetMappings() {
     for (int i = 0; i < APPLET_SLOTS * 2; ++i) {
       trigmap[i].SetGateInput(i % 4);
@@ -433,6 +434,7 @@ namespace HS {
   const char * get_applet_name(const int index);
   const uint8_t * get_applet_icon(const int index);
 
+  FLASHMEM
   void DrawAppletList(bool blink) {
     const size_t LineH = 12;
 

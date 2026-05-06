@@ -33,6 +33,7 @@ const Scale &Scales::GetScale(int index) {
     return braids::scales[index - SCALE_USER_COUNT];
 }
 
+FLASHMEM
 void Scales::SaveToScala(Scale &scale, File &file) {
   file.print("O_C User Scale\n");
 
@@ -47,6 +48,8 @@ void Scales::SaveToScala(Scale &scale, File &file) {
 
   // TA-DA!! it's that easy.
 }
+
+FLASHMEM
 void Scales::LoadScala(Scale &scale, File &file) {
   if (!file.available()) return;
   String buf = file.readStringUntil('\n'); // grab the first line

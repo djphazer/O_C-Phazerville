@@ -358,7 +358,9 @@ public:
         if (edit_timer) --edit_timer;
     }
 
-    void View() const {
+    void View() const;
+
+    void MainView() const {
         gfxHeader("Scenery", PhzIcons::mixerBal);
 
         if (preset_select) {
@@ -664,6 +666,8 @@ void AppScenery::GetIOConfig(OC::IOConfig &ioconfig) const
   ioconfig.outputs[DAC_CHANNEL_C].set("Out C", OUTPUT_MODE_PITCH);
   ioconfig.outputs[DAC_CHANNEL_D].set("Out D", OUTPUT_MODE_PITCH);
 }
+
+FLASHMEM
 void AppScenery::HandleAppEvent(OC::AppEvent event) {
     switch (event) {
     case OC::APP_EVENT_RESUME:
@@ -681,7 +685,11 @@ void AppScenery::HandleAppEvent(OC::AppEvent event) {
 
 void AppScenery::Loop() {} // Deprecated
 
+FLASHMEM
 void AppScenery::DrawMenu() const { BaseView(); }
+
+FLASHMEM
+void AppScenery::View() const { MainView(); }
 
 void AppScenery::DrawScreensaver() const {
     BaseScreensaver();
@@ -690,6 +698,7 @@ void AppScenery::DrawDebugInfo() const {
   // TODO:
 }
 
+FLASHMEM
 void AppScenery::HandleButtonEvent(const UI::Event &event) {
     // For left encoder, handle press and long press
     // For right encoder, only handle press (long press is reserved)
@@ -732,6 +741,7 @@ void AppScenery::HandleButtonEvent(const UI::Event &event) {
     }
 }
 
+FLASHMEM
 void AppScenery::HandleEncoderEvent(const UI::Event &event) {
     // Left encoder turned
     if (event.control == OC::CONTROL_ENCODER_L) OnLeftEncoderMove(event.value);

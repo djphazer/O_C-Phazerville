@@ -96,6 +96,7 @@ static PROGMEM const uint8_t adc2_pin_to_channel[] = {
 #endif // __IMXRT1062__
 
 
+FLASHMEM
 /*static*/ void ADC::Init(CalibrationData *calibration_data, bool flip180)
 {
   if (flip180) {
@@ -209,6 +210,7 @@ static void Init_Teensy4_builtin_ADC();
 static void Init_Teensy41_ADC33131D_chip();
 #endif
 
+FLASHMEM
 void ADC::Init_DMA() {
   #if defined(ARDUINO_TEENSY41)
   if (ADC33131D_Uses_FlexIO) {
@@ -221,6 +223,7 @@ void ADC::Init_DMA() {
   #endif
 }
 
+FLASHMEM
 static void Init_Teensy4_builtin_ADC() {
   // Ornament & Crime CV inputs are 19/A5 18/A4 20/A6 17/A3
 #ifdef FLIP_180

@@ -2075,6 +2075,7 @@ private:
   void HandleRightButton();
 };
 
+FLASHMEM
 void AppDualSequencer::Init() {
 
   selected_channel_ = 0;
@@ -2091,6 +2092,7 @@ void AppDualSequencer::Init() {
   cursor_.AdjustEnd(seq_channel_[0].num_enabled_settings() - 1);
 }
 
+FLASHMEM
 size_t AppDualSequencer::SaveAppData(util::StreamBufferWriter &stream_buffer) const {
 
   for (auto &channel : seq_channel_)
@@ -2098,6 +2100,7 @@ size_t AppDualSequencer::SaveAppData(util::StreamBufferWriter &stream_buffer) co
   return stream_buffer.written();
 }
 
+FLASHMEM
 size_t AppDualSequencer::RestoreAppData(util::StreamBufferReader &stream_buffer) {
 
   for (auto &channel : seq_channel_) {
@@ -2113,6 +2116,7 @@ size_t AppDualSequencer::RestoreAppData(util::StreamBufferReader &stream_buffer)
   return stream_buffer.read();
 }
 
+FLASHMEM
 void AppDualSequencer::HandleAppEvent(AppEvent event) {
   switch (event) {
     case APP_EVENT_RESUME:
@@ -2186,6 +2190,7 @@ void AppDualSequencer::GetIOConfig(IOConfig &ioconfig) const
   }
 }
 
+FLASHMEM
 void AppDualSequencer::HandleButtonEvent(const UI::Event &event) {
 
   if (UI::EVENT_BUTTON_LONG_PRESS == event.type) {
@@ -2232,6 +2237,7 @@ void AppDualSequencer::HandleButtonEvent(const UI::Event &event) {
   }
 }
 
+FLASHMEM
 void AppDualSequencer::HandleEncoderEvent(const UI::Event &event) {
 
   if (pattern_editor_.active()) {
@@ -2297,6 +2303,7 @@ void AppDualSequencer::HandleEncoderEvent(const UI::Event &event) {
   }
 }
 
+FLASHMEM
 void AppDualSequencer::HandleUpButton() {
 
   SEQ_Channel &selected = seq_channel_[selected_channel_];
@@ -2315,6 +2322,7 @@ void AppDualSequencer::HandleUpButton() {
   }
 }
 
+FLASHMEM
 void AppDualSequencer::HandleDownButton() {
 
   SEQ_Channel &selected = seq_channel_[selected_channel_];
@@ -2431,6 +2439,7 @@ void AppDualSequencer::HandleDownButtonLong() {
   }
 }
 
+FLASHMEM
 void AppDualSequencer::DrawMenu() const {
 
   menu::DualTitleBar::Draw();
@@ -2534,6 +2543,7 @@ void AppDualSequencer::DrawDebugInfo() const {
 
 } // namespace OC
 
+FLASHMEM
 void SEQ_Channel::RenderScreensaver() const {
 
       uint8_t seq_id = channel_id_;

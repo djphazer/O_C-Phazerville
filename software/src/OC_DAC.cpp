@@ -55,6 +55,7 @@ int DAC::kOctaveZero = 3;
 #endif
 
 /*static*/
+FLASHMEM
 void DAC::Init(const CalibrationData *calibration_data, const AutotuneCalibrationData *autotune_calibration_data, bool flip180) {
 
   calibration_data_ = calibration_data;
