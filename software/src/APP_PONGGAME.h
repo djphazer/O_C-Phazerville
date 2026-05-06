@@ -1,24 +1,26 @@
-// (c) 2018, Jason Justian (chysn), Beize Maze
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
-//
-// CV-controllable Pong game
+/** 
+* APP_PONGGAME.h - CV Controllable Pong game for Ornament and Crime
+*
+* (c) 2018, Jason Justian (chysn), Beize Maze, Swamp Flux
+*
+* Permission is hereby granted, free of charge, to any person obtaining a copy
+* of this software and associated documentation files (the "Software"), to deal
+* in the Software without restriction, including without limitation the rights
+* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+* copies of the Software, and to permit persons to whom the Software is
+* furnished to do so, subject to the following conditions:
+*
+* The above copyright notice and this permission notice shall be included in all
+* copies or substantial portions of the Software.
+*
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+* SOFTWARE.
+*/
 
 #ifdef ENABLE_APP_PONG
 
@@ -28,8 +30,8 @@
 #include "OC_ui.h"
 #include "HSApplication.h"
 
-/* Define the screen boundaries. There's a frame around the screen, so these numbers need to
- * take that into account.
+/* Define the screen boundaries. There's a frame around the screen,
+*  so these numbers need to take that into account.
  */
 #define BOUNDARY_TOP 11
 #define BOUNDARY_BOTTOM 61
@@ -64,6 +66,28 @@
 #define CENTER_DETENT 640
 
 class Pong : public HSApplication {
+private:
+    int ball_delay; // The ball's delay at the next movement
+    int ball_countdown; // Time (in increments of 60 microseconds) until the ball moves
+    int paddle_countdown; // Time until the paddle may move
+    int return_countdown; // Time until the return trigger (at Output A) ends
+    int bounce_countdown; // Time until the bounce trigger (at Output B) ends
+    int score; // The number of hits in this game
+    int hi_score; // The highest number of hits in a game since initialization
+    int level_up_x_advance;
+
+    // the ball's coordinates have greater precision, half-pixels
+    // bitshift right by 1 for actual pixel position
+    int ball_x;
+    int ball_y;
+    int dir_x;
+    int dir_y;
+
+    int paddle_x;
+    int paddle_y;
+    int paddle_h;
+
+    bool twoplayermode = false;
 public:
     /* There are two types of game state properties: Those that should be initialized only once (like high score), and
      * those that need to be initialized after each game. Init() sets the first kind, and then calls StartNewGame()
@@ -294,28 +318,6 @@ public:
         DrawPlayerPaddle();
         DrawOCPaddle();
     }
-private:
-    int ball_delay; // The ball's delay at the next movement
-    int ball_countdown; // Time (in increments of 60 microseconds) until the ball moves
-    int paddle_countdown; // Time until the paddle may move
-    int return_countdown; // Time until the return trigger (at Output A) ends
-    int bounce_countdown; // Time until the bounce trigger (at Output B) ends
-    int score; // The number of hits in this game
-    int hi_score; // The highest number of hits in a game since initialization
-    int level_up_x_advance;
-
-    // the ball's coordinates have greater precision, half-pixels
-    // bitshift right by 1 for actual pixel position
-    int ball_x;
-    int ball_y;
-    int dir_x;
-    int dir_y;
-
-    int paddle_x;
-    int paddle_y;
-    int paddle_h;
-
-    bool twoplayermode = false;
 };
 
 Pong pong_instance;
