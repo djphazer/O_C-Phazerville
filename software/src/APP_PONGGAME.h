@@ -67,17 +67,58 @@
 #define BLOOP_LOW 0x8
 #define BLOOP_HIGH 0x4
 
+enum playerModeOption {
+    NONE,
+    HUMAN,
+    CPU
+};
+
+struct Player {
+    int score; // The number of hits in this game
+    int y_position;
+    playerModeOption player_mode = HUMAN;
+    int paddle_x = 8;
+    int paddle_y = 1 + BOUNDARY_TOP;
+    int paddle_h = 16;
+    int movement_countdown = 0; // Used to limit the speed
+
+    void MovePaddleUp() {
+        if (movement_countdown <= 0) {
+            --paddle_y;
+            if (paddle_y < BOUNDARY_TOP) paddle_y = BOUNDARY_TOP;
+            movement_countdown = PADDLE_DELAY;
+        }
+    }
+
+    /* Like MovePaddleUp(), only more down */
+    void MovePaddleDown() {
+        if (movement_countdown <= 0) {
+            ++paddle_y;
+            if (paddle_y > (BOUNDARY_BOTTOM - paddle_h)) paddle_y = BOUNDARY_BOTTOM - paddle_h;
+            movement_countdown = PADDLE_DELAY;
+        }
+    }
+
+    /* Allows the paddle to be moved without an enforced delay, for use with encoder play */
+    void ResetPaddle() {
+        movement_countdown = 0;
+    }
+
+        /* The player paddle is a filled rectangle of fixed width and adjustable height. */
+    void DrawPaddle() {
+        graphics.drawRect(paddle_x, paddle_y, PADDLE_WIDTH, paddle_h);
+    }
+
+    int getScore() {return score;}
+};
+
 class Pong : public HSApplication {
 private:
     int ball_delay; // The ball's delay at the next movement
     int ball_countdown; // Time (in increments of 60 microseconds) until the ball moves
-    int paddle_countdown; // Time until the paddle may move
-    int return_countdown; // Time until the return trigger (at Output A) ends
-    int bounce_countdown; // Time until the bounce trigger (at Output B) ends
+    int bloop_countdown;
     int bloop_pitch;
-    int score; // The number of hits in this game
     int hi_score; // The highest number of hits in a game since initialization
-    int level_up_x_advance;
 
     // the ball's coordinates have greater precision, half-pixels
     // bitshift right by 1 for actual pixel position
@@ -90,16 +131,19 @@ private:
     int paddle_y;
     int paddle_h;
 
-    bool twoplayermode = false;
 public:
+    Player player1;
+    Player player2;
     /* There are two types of game state properties: Those that should be initialized only once (like high score), and
      * those that need to be initialized after each game. Init() sets the first kind, and then calls StartNewGame()
      * to start a new game.
      */
     void Start() {
-        return_countdown = 0;
-        bounce_countdown = 0;
+        bloop_countdown = 0;
         hi_score = 0;
+        player1.player_mode = HUMAN;
+        player2.player_mode = CPU;
+        player2.paddle_x = 116;
 
         StartNewGame();
     }
@@ -109,20 +153,16 @@ public:
         // Game state
         ball_delay = INITIAL_BALL_DELAY;
         ball_countdown = ball_delay;
-        paddle_countdown = 0;
-        score = 0;
-        level_up_x_advance = 0; // Used to smoothly move the paddle forward after level-up
+        player1.score = 0;
+        player2.score = 0;
+        player1.movement_countdown = 0;
+        player2.movement_countdown = 0;
 
         // Ball properties
         ball_x = 64;
         ball_y = random((BOUNDARY_TOP + 2)*2, (BOUNDARY_BOTTOM - 2)*2); // Start off in a random spot
         dir_x = 1;
         dir_y = random(0, 100) > 50 ? 1 : -1; // Start off in a random direction
-
-        // Player properties
-        paddle_x = 8;
-        paddle_y = 1 + BOUNDARY_TOP;
-        paddle_h = 16;
     }
 
     /* I'm using the ISR for keeping track of object timing. The interrupt is timer-based, so each
@@ -130,9 +170,9 @@ public:
      */
     void Controller() {
         ball_countdown--;
-        paddle_countdown--;
-        return_countdown--;
-        bounce_countdown--;
+        bloop_countdown--;
+        if(player1.movement_countdown) --player1.movement_countdown;
+        if(player2.movement_countdown) --player2.movement_countdown;
 
         MoveBall();
 
@@ -169,7 +209,7 @@ public:
         // Out(3, out_D);
 
         // make bloop noises
-        if(bounce_countdown > 0){
+        if(bloop_countdown > 0){
             GateOut(3, OC::CORE::ticks & bloop_pitch);
         }
     }
@@ -193,13 +233,13 @@ public:
             // Check the playfield boundaries. Oh, yes, O_C will crash if you go too far out of bounds.
             if ((ball_x >> 1) > BOUNDARY_RIGHT || (ball_x>>1) < BOUNDARY_LEFT) {
                 dir_x = -dir_x;
-                bounce_countdown = BLOOP_LENGTH;
+                bloop_countdown = BLOOP_LENGTH;
                 bloop_pitch = BLOOP_HIGH;
                 ClockOut(1);
             }
             if ((ball_y>>1) > BOUNDARY_BOTTOM || (ball_y>>1) < BOUNDARY_TOP) {
                 dir_y = -dir_y;
-                bounce_countdown = BLOOP_LENGTH;
+                bloop_countdown = BLOOP_LENGTH;
                 bloop_pitch = BLOOP_HIGH;
                 ClockOut(1);
             }
@@ -227,12 +267,6 @@ public:
 
             ball_countdown = ball_delay; // Reset delay to start a new movement cycle
         }
-
-        /* This is like the above, but for the paddle, and much simpler. The idea of the countdown is to constrain
-         * the paddle from moving too fast, which is more of an issue when the paddle is under CV control. Surely
-         * we don't want to make things too easy on your clever AI patches!
-         */
-        if (paddle_countdown <= 0) {paddle_countdown = 0;}
     }
 
     /* Performs the LevelUp. The game is designed to get brutal over time. The paddle gets smaller, the
@@ -255,54 +289,9 @@ public:
       graphics.drawFrame(ball_x >> 1, ball_y >> 1, 2, 2);
     }
 
-    /* The player paddle is a filled rectangle of fixed width and adjustable height. */
-    void DrawPlayerPaddle() {
-        graphics.drawRect(paddle_x, paddle_y, PADDLE_WIDTH, paddle_h);
-    }
-
-    /* I'm also drawing a paddle for Ornament and Crime, just as visual effect. It's really quite
-     * an unfair farce, as it's totally unbeatable.
-     */
-    void DrawOCPaddle() {
-        int oc_x = BOUNDARY_RIGHT + 2;
-        int oc_y = (ball_y>>1) - 8;
-        if (oc_y < BOUNDARY_TOP) oc_y = BOUNDARY_TOP;
-        if (oc_y + 16 > BOUNDARY_BOTTOM) oc_y = BOUNDARY_BOTTOM - 16;
-        graphics.drawRect(oc_x, oc_y, PADDLE_WIDTH, 16);
-    }
-
     /* If the paddle countdown has elapsed, the paddle may move. Whenever the paddle is moved, the downdown begins again
      * to constrain the speed of the paddle. See the bottom of MoveBall() for more deets.
      */
-    void MovePaddleUp() {
-        if (paddle_countdown <= 0) {
-            --paddle_y;
-            if (paddle_y < BOUNDARY_TOP) paddle_y = BOUNDARY_TOP;
-            paddle_countdown = PADDLE_DELAY;
-        }
-    }
-
-    /* Like MovePaddleUp(), only more down */
-    void MovePaddleDown() {
-        if (paddle_countdown <= 0) {
-            ++paddle_y;
-            if (paddle_y > (BOUNDARY_BOTTOM - paddle_h)) paddle_y = BOUNDARY_BOTTOM - paddle_h;
-            paddle_countdown = PADDLE_DELAY;
-        }
-    }
-
-    /* Allows the paddle to be moved without an enforced delay, for use with encoder play */
-    void ResetPaddle() {
-        paddle_countdown = 0;
-    }
-
-    void SnapToBall() {
-        paddle_y = (ball_y>>1) - (paddle_h/2);
-    }
-
-    void ToggleTwoPlayer() {
-        twoplayermode ^= 1;
-    }
 
     void View() {
         // Frame
@@ -313,15 +302,15 @@ public:
 
         // Header
         gfxPos(1,1);
-        int score = get_score();
+        int p1_score = player1.getScore();
+        int p2_score = player2.getScore();
         int hi_score = get_hi_score();
-        if (score == 0 && hi_score > 0) {
-            gfxPrint("Pong High : ");
-            gfxPrint(hi_score);
-        } else {
-            gfxPrint("Pong Score: ");
-            gfxPrint(score);
-        }
+        
+        gfxPrint(0,0,p1_score); // left
+        gfxPrint(46,0,"HI:"); // center
+        gfxPrint(hi_score); // center
+        gfxPrint(110,0,p2_score); // right
+        
 
         DrawGame();
     }
@@ -329,8 +318,8 @@ public:
     void DrawGame() {
         // Game pieces
         DrawBall();
-        DrawPlayerPaddle();
-        DrawOCPaddle();
+        player1.DrawPaddle();
+        player2.DrawPaddle();
     }
 };
 
@@ -370,8 +359,8 @@ void PONGGAME_menu() {
 void PONGGAME_screensaver() {
     // Game pieces only
     pong_instance.DrawBall();
-    pong_instance.DrawPlayerPaddle();
-    pong_instance.DrawOCPaddle();
+    pong_instance.player1.DrawPaddle();
+    pong_instance.player2.DrawPaddle();
 }
 
 /* Controlling the game with the buttons is the worst experience ever, so this is really just here
@@ -407,9 +396,14 @@ void PONGGAME_handleButtonEvent(const UI::Event &event) {
  * negative when it's turned widdershins. I just wanted to say "widdershins."
  */
 void PONGGAME_handleEncoderEvent(const UI::Event &event) {
-    if (event.value < 0) pong_instance.MovePaddleUp();
-    if (event.value > 0) pong_instance.MovePaddleDown();
-    pong_instance.ResetPaddle();
+    if (OC::CONTROL_ENCODER_L == event.control) {
+        if (event.value < 0) pong_instance.player1.MovePaddleUp();
+        if (event.value > 0) pong_instance.player1.MovePaddleDown();
+    }
+    if (OC::CONTROL_ENCODER_R == event.control) {
+        if (event.value < 0) pong_instance.player2.MovePaddleUp();
+        if (event.value > 0) pong_instance.player2.MovePaddleDown();
+    }
 }
 
 #endif

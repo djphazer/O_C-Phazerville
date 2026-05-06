@@ -10,8 +10,11 @@ The goal of Pong 2.0 app is going to be to make it have more features and more c
 
 - [x] a dotted line "net" for the tennis court
 - [x] bloop sound effect on one of the outputs
-- [ ] make bloop sounds through-zero Out() instead of GateOut()
 - [ ] 2 player option
+  - [x] scores for both players
+  - [ ] input for right side
+  - [ ] new cpu algorithm instead of just a wall
+  - [ ] a way to toggle a player between CPU and manual control
 - [ ] ??? menu for selecting input mode (cv or encoder) or find a way to handle both elegantly
 - [ ] self-patching Y position of the ball into the righthand paddle should recreate the original version of the game
 - [ ] random starting position of the ball
@@ -20,6 +23,13 @@ The goal of Pong 2.0 app is going to be to make it have more features and more c
 - [ ] ball should also account for paddle velocity to affect angle
 - [ ] ball should slow down if its going too fast???
 - [ ] encoder rotation acceleration
+- [ ] make bloop sounds through-zero Out() instead of GateOut()
+- [ ] improve precision of calculations (see bitshift for ball x/y)
+
+## Stretch Goals
+
+- [ ] Make Pong into a Hemispheres app?????
+  - Left side the applet starts with a left side paddle, right side with a right side paddle, and if you load it on both sides the ball teleports to the other applet
 
 # Pong (original documentation)
 
