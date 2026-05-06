@@ -97,6 +97,7 @@ using namespace HS;
 #include "Palimpsest.h"
 #include "Pigeons.h"
 #include "PolyDiv.h"
+#include "Pong.h"
 #include "ProbabilityDivider.h"
 #include "ProbabilityMelody.h"
 #include "Relabi.h"
@@ -224,6 +225,7 @@ constexpr Registry reg = Registry<HemisphereApplet, 200 // max ID
     , DeclareApplet<Palimpsest, 20, 0x02>
     , DeclareApplet<Pigeons, 71, 0x02>
     , DeclareApplet<PolyDiv, 72, 0x06>
+    , DeclareApplet<Ponglet, 99, 0x00>
     , DeclareApplet<ProbabilityDivider, 59, 0x04>
     , DeclareApplet<ProbabilityMelody, 62, 0x04>
     , DeclareApplet<Relabi, 89, 0x01>
