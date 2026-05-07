@@ -10,17 +10,20 @@ The goal of Pong 2.0 app is going to be to make it have more features and more c
 
 - [x] a dotted line "net" for the tennis court
 - [x] bloop sound effect on one of the outputs
-- [ ] 2 player option
+- [-] 2 player option
   - [x] scores for both players
-  - [ ] input for right side
-  - [ ] new cpu algorithm instead of just a wall
-  - [ ] a way to toggle a player between CPU and manual control
+  - [x] digital input for right side
+  - [-] new cpu algorithm instead of just a wall
+  - [-] a way to toggle a player between CPU and manual control
+- [x] high score should update in real time as score increases
+- [ ] direct CV control over the paddle instead of just digital inputs
 - [ ] ??? menu for selecting input mode (cv or encoder) or find a way to handle both elegantly
 - [ ] self-patching Y position of the ball into the righthand paddle should recreate the original version of the game
 - [ ] random starting position of the ball
 - [ ] ?? start the paddle for both players
 - [ ] ball should change angle/direction based on where it touches the paddle - like real Pong
 - [ ] ball should also account for paddle velocity to affect angle
+- [ ] highlight the high score player with gfxInvert() after rendering txt
 - [ ] ball should slow down if its going too fast???
 - [ ] encoder rotation acceleration
 - [ ] make bloop sounds through-zero Out() instead of GateOut()

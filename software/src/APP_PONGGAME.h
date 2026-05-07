@@ -140,7 +140,7 @@ public:
      */
     void Start() {
         bloop_countdown = 0;
-        hi_score = 0;
+        hi_score = 27;
         player1.player_mode = HUMAN;
         player2.player_mode = CPU;
         player2.paddle_x = 116;
@@ -149,20 +149,25 @@ public:
     }
     void Resume() { }
 
-    void StartNewGame() {
+    void ServeBall() {
         // Game state
         ball_delay = INITIAL_BALL_DELAY;
         ball_countdown = ball_delay;
-        player1.score = 0;
-        player2.score = 0;
-        player1.movement_countdown = 0;
-        player2.movement_countdown = 0;
 
         // Ball properties
         ball_x = 64;
         ball_y = random((BOUNDARY_TOP + 2)*2, (BOUNDARY_BOTTOM - 2)*2); // Start off in a random spot
         dir_x = 1;
         dir_y = random(0, 100) > 50 ? 1 : -1; // Start off in a random direction
+    }
+
+    void StartNewGame() {
+        player1.score = 0;
+        player2.score = 0;
+        player1.movement_countdown = 0;
+        player2.movement_countdown = 0;
+
+        ServeBall();
     }
 
     /* I'm using the ISR for keeping track of object timing. The interrupt is timer-based, so each
@@ -180,19 +185,24 @@ public:
          *
          * CV 1 is a paddle control. Negative values go up, positive values go down.
          */
-        int move_cv = DetentedIn(0);
+        // int move_cv = DetentedIn(0);
 
         // tweak for NLM to center the inputs around 5 octaves (6V on 1.2V/oct)
-        if (NorthernLightModular && move_cv) move_cv -= HSAPPLICATION_5V;
+        // if (NorthernLightModular && move_cv) move_cv -= HSAPPLICATION_5V;
 
         // check the detent again, just for NLM
-        if (move_cv < -HEMISPHERE_CENTER_DETENT) MovePaddleUp();
-        if (move_cv > HEMISPHERE_CENTER_DETENT) MovePaddleDown();
+        // if (move_cv < -HEMISPHERE_CENTER_DETENT) MovePaddleUp();
+        // if (move_cv > HEMISPHERE_CENTER_DETENT) MovePaddleDown();
+
+        if(Gate(0) && !Gate(1)) player1.MovePaddleUp();
+        if(Gate(1) && !Gate(0)) player1.MovePaddleDown();
+        if(Gate(2) && !Gate(3)) player2.MovePaddleUp();
+        if(Gate(3) && !Gate(2)) player2.MovePaddleDown();
 
         /* Handle output states:
          *
          * Outputs are set as follows. Note that outs A and B are triggers, so it's just a small value transposed
-         * five octaves up. The trigger time is handled by counting down from TRIGGER_CYCLE_LENGTH. There might be
+         * five octaves up. The trigger time is handled by counting down from BLOOP_LENGTH. There might be
          * a better way to do triggers, and I'll revisit this later.
          *
          * C and D outs are just scaled values. We have about a 60-step Y value, and I multiply that by Y_POSITION_COEFF
@@ -203,7 +213,7 @@ public:
         uint32_t out_C = ((ball_y - BOUNDARY_TOP) * Y_POSITION_COEFF)/2;
 
         // Player paddle position CV (0 to 4-ish volts), based on the center of the paddle
-        uint32_t out_D = ((paddle_y + (paddle_h / 2)) - BOUNDARY_TOP) * Y_POSITION_COEFF;
+        // uint32_t out_D = ((paddle_y + (paddle_h / 2)) - BOUNDARY_TOP) * Y_POSITION_COEFF;
 
         Out(2, out_C);
         // Out(3, out_D);
@@ -214,7 +224,6 @@ public:
         }
     }
 
-    int get_score() {return score;}
     int get_hi_score() {return hi_score;}
 
     void MoveBall() {
@@ -227,16 +236,7 @@ public:
             ball_x += dir_x;
             ball_y += dir_y;
 
-            // After a level-up, the paddle's x location is moved forward, one step at a time
-            if (level_up_x_advance-- > 0) paddle_x++;
-
             // Check the playfield boundaries. Oh, yes, O_C will crash if you go too far out of bounds.
-            if ((ball_x >> 1) > BOUNDARY_RIGHT || (ball_x>>1) < BOUNDARY_LEFT) {
-                dir_x = -dir_x;
-                bloop_countdown = BLOOP_LENGTH;
-                bloop_pitch = BLOOP_HIGH;
-                ClockOut(1);
-            }
             if ((ball_y>>1) > BOUNDARY_BOTTOM || (ball_y>>1) < BOUNDARY_TOP) {
                 dir_y = -dir_y;
                 bloop_countdown = BLOOP_LENGTH;
@@ -244,24 +244,53 @@ public:
                 ClockOut(1);
             }
 
-            // All these conditions are just asking "Did the ball hit the paddle while traveling left?"
-            if (((ball_x>>1) <= paddle_x + PADDLE_WIDTH) && ((ball_x>>1) >= paddle_x)
-              && ((ball_y>>1) <= paddle_y + paddle_h) && ((ball_y>>1) >= paddle_y) && dir_x < 0) {
+            // Check collision with Player 1
+            if (dir_x < 0 &&
+                ((ball_x>>1) <= player1.paddle_x + PADDLE_WIDTH) && ((ball_x>>1) >= player1.paddle_x) &&
+                ((ball_y>>1) <= player1.paddle_y + player1.paddle_h) && ((ball_y>>1) >= player1.paddle_y)) {
+                
                 // If so, bounce the ball, increase the score, and set the hit trigger to fire the reward
                 // CV trigger at the next loop() call.
                 dir_x = -dir_x;
-                score++;
-                bounce_countdown = BLOOP_LENGTH;
+                bloop_countdown = BLOOP_LENGTH;
                 bloop_pitch = BLOOP_LOW;
                 ClockOut(0);
 
                 // Level up!!
-                if (!(score % 5)) LevelUp();
+                if (!(player1.score % 5)) LevelUp();
             }
 
-            // Since the point of the game is to defend your left wall, this is when you lose :,(
-            if (ball_x < 4) {
-                if (score > hi_score) hi_score = score;
+            // Check collision with Player 2
+            if (dir_x > 0 &&
+                ((ball_x>>1) <= player2.paddle_x + PADDLE_WIDTH) && ((ball_x>>1) >= player2.paddle_x) &&
+                ((ball_y>>1) <= player2.paddle_y + player2.paddle_h) && ((ball_y>>1) >= player2.paddle_y)) {
+
+                // If so, bounce the ball, increase the score, and set the hit trigger to fire the reward
+                // CV trigger at the next loop() call.
+                dir_x = -dir_x;
+                bloop_countdown = BLOOP_LENGTH;
+                bloop_pitch = BLOOP_LOW;
+                ClockOut(0);
+
+                // Level up!!
+                if (!(player2.score % 5)) LevelUp();
+            }
+
+            if (ball_x < (BOUNDARY_LEFT)<<1) {
+                player2.score++;
+                ServeBall();
+            }
+            if( ball_x > (BOUNDARY_RIGHT)<<1) {
+                player1.score++;
+                ServeBall();
+            }
+
+            if (player1.score > hi_score) {
+                hi_score = player1.score;
+                StartNewGame();
+            }
+            if (player2.score > hi_score) {
+                hi_score = player2.score;
                 StartNewGame();
             }
 
@@ -273,12 +302,12 @@ public:
      * ball gets faster, and the paddle gets closer to the wall. Fun times!
      */
     void LevelUp() {
-        paddle_h--;
+        // paddle_h--;
         ball_delay -= 25;
-        if (paddle_x < 64) level_up_x_advance = 4;
+        // if (paddle_x < 64) level_up_x_advance = 4;
 
         // Here are some points after which it doesn't get any harder
-        if (paddle_h < 4) paddle_h = 4;
+        // if (paddle_h < 4) paddle_h = 4;
         if (ball_delay < 50) ball_delay = 50;
     }
 
@@ -368,22 +397,22 @@ void PONGGAME_screensaver() {
  */
 void PONGGAME_handleButtonEvent(const UI::Event &event) {
     if (UI::EVENT_BUTTON_DOWN == event.type && OC::CONTROL_BUTTON_L == event.control) {
-        pong_instance.SnapToBall();
+        // pong_instance.SnapToBall();
     }
     if (UI::EVENT_BUTTON_PRESS == event.type) {
         switch (event.control) {
           case OC::CONTROL_BUTTON_UP:
-                pong_instance.MovePaddleUp();
-                pong_instance.ResetPaddle();
+                // pong_instance.MovePaddleUp();
+                // pong_instance.ResetPaddle();
             break;
 
           case OC::CONTROL_BUTTON_DOWN:
-                pong_instance.MovePaddleDown();
-                pong_instance.ResetPaddle();
+                // pong_instance.MovePaddleDown();
+                // pong_instance.ResetPaddle();
             break;
 
           case OC::CONTROL_BUTTON_R:
-                pong_instance.ToggleTwoPlayer();
+                // pong_instance.ToggleTwoPlayer();
             break;
         }
     }
@@ -401,8 +430,8 @@ void PONGGAME_handleEncoderEvent(const UI::Event &event) {
         if (event.value > 0) pong_instance.player1.MovePaddleDown();
     }
     if (OC::CONTROL_ENCODER_R == event.control) {
-        if (event.value < 0) pong_instance.player2.MovePaddleUp();
-        if (event.value > 0) pong_instance.player2.MovePaddleDown();
+        if (event.value < 0) pong_instance.player2.MovePaddleDown();
+        if (event.value > 0) pong_instance.player2.MovePaddleUp();
     }
 }
 
