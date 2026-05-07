@@ -37,6 +37,7 @@
 #define BOUNDARY_BOTTOM 61
 #define BOUNDARY_RIGHT 116
 #define BOUNDARY_LEFT 2
+#define Y_CENTER 38
 
 /* Define player properties. INITIAL_BALL_DELAY is how many ISR cycles the ball takes to move. It
  * gets faster as the game goes on. PADDLE_DELAY is how many ISR cycles the player must wait before moving
@@ -52,6 +53,7 @@
 /* This value is used for converting a ball's or paddle's Y position into a pitch value. This number was determined
  * experimentally, since I wasn't sure what the total range for pitch values is.
  */
+#define PRECISION 1
 #define Y_POSITION_COEFF 128
 
 /*
@@ -127,10 +129,6 @@ private:
     int dir_x;
     int dir_y;
 
-    int paddle_x;
-    int paddle_y;
-    int paddle_h;
-
 public:
     Player player1;
     Player player2;
@@ -181,15 +179,24 @@ public:
 
         MoveBall();
 
-        /* Handle input states:
-         *
-         * CV 1 is a paddle control. Negative values go up, positive values go down.
-         */
-        // int move_cv = DetentedIn(0);
+        // handle direct CV inputs
+        // TODO: eliminate paddle_h
+        int paddle_range = BOUNDARY_BOTTOM - BOUNDARY_TOP - player1.paddle_h;
 
+        player1.paddle_y = constrain(
+            Y_CENTER - (In(0) >> 7) * paddle_range / 64,
+            BOUNDARY_TOP,
+            BOUNDARY_BOTTOM - player1.paddle_h
+        );
+        player2.paddle_y = constrain(
+            Y_CENTER - (In(3) >> 7) * paddle_range / 64,
+            BOUNDARY_TOP,
+            BOUNDARY_BOTTOM - player2.paddle_h
+        );
+
+        // TODO:find out if i still need NLM / Buchla tweaks????
         // tweak for NLM to center the inputs around 5 octaves (6V on 1.2V/oct)
-        // if (NorthernLightModular && move_cv) move_cv -= HSAPPLICATION_5V;
-
+        //if (NorthernLightModular && p1_cv) p1_cv -= HSAPPLICATION_5V;
         // check the detent again, just for NLM
         // if (move_cv < -HEMISPHERE_CENTER_DETENT) MovePaddleUp();
         // if (move_cv > HEMISPHERE_CENTER_DETENT) MovePaddleDown();
@@ -210,7 +217,7 @@ public:
          */
 
         // Ball position CV (0 to 4-ish volts), based on the top of the ball
-        uint32_t out_C = ((ball_y - BOUNDARY_TOP) * Y_POSITION_COEFF)/2;
+        uint32_t out_C = (((BOUNDARY_BOTTOM << PRECISION) - ball_y) * Y_POSITION_COEFF)/2;
 
         // Player paddle position CV (0 to 4-ish volts), based on the center of the paddle
         // uint32_t out_D = ((paddle_y + (paddle_h / 2)) - BOUNDARY_TOP) * Y_POSITION_COEFF;
