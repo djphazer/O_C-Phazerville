@@ -301,7 +301,7 @@ void gfxIcon(int x, int y, const uint8_t *data, bool clearfirst = false);
 void gfxHeader(const char *str, const uint8_t *icon = nullptr);
 void gfxFooter(const char *str, const uint8_t *icon = nullptr);
 
-static constexpr uint8_t pad(int range, int number) {
+constexpr uint8_t pad(int range, int number) {
     uint8_t padding = 0;
     while (range > 1)
     {
@@ -310,6 +310,18 @@ static constexpr uint8_t pad(int range, int number) {
     }
     if (number < 0 && padding > 0) padding -= 6; // Compensate for minus sign
     return padding;
+}
+
+// For ascii strings of 9 characters or less, will just be the ascii bits
+// concatenated together. More characters than that and the xor plus misaligned
+// shifting should avoid collisions.
+constexpr uint64_t strhash(const char* str) {
+  uint64_t id = 0;
+  for (const char* c = str; *c != '\0'; c++) {
+    id = (id << 7) | (id >> (64 - 7));
+    id ^= (*c);
+  }
+  return id;
 }
 
 /* Proportion CV values into pixels for display purposes.

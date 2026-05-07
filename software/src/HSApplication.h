@@ -134,12 +134,12 @@ public:
         frame.Out( (DAC_CHANNEL)(ch), value + (octave * (12 << 7)));
     }
 
-    int In(int ch) const {
+    const int In(int ch) const {
       return cvmap[ch].In();
     }
 
     // Apply small center detent to input, so it reads zero before a threshold
-    int DetentedIn(int ch) {
+    const int DetentedIn(int ch) const {
         if (NorthernLightModular && In(ch) < HEMISPHERE_CENTER_DETENT)
           return 0;
 
@@ -155,7 +155,7 @@ public:
 
     // Standard bi-polar CV modulation scenario
     template <typename T>
-    void Modulate(T &param, const int ch, const int min = 0, const int max = 255) {
+    void Modulate(T &param, const int ch, const int min = 0, const int max = 255) const {
         int cv = DetentedIn(ch);
         param = constrain(param + Proportion(cv, HEMISPHERE_MAX_INPUT_CV, max), min, max);
     }

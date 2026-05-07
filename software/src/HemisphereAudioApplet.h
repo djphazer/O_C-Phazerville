@@ -5,18 +5,6 @@
 #include "Audio/effect_reverb_schroeder.h"
 #include <AudioStream.h>
 
-// For ascii strings of 9 characters or less, will just be the ascii bits
-// concatenated together. More characters than that and the xor plus misaligned
-// shifting should avoid collisions.
-constexpr uint64_t strhash(const char* str) {
-  uint64_t id = 0;
-  for (const char* c = str; *c != '\0'; c++) {
-    id = (id << 7) | (id >> (64 - 7));
-    id ^= (*c);
-  }
-  return id;
-}
-
 enum AudioChannels : uint8_t {
   NONE,
   MONO,

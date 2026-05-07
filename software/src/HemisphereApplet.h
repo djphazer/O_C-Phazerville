@@ -191,7 +191,7 @@ public:
 
     // Override HSUtils function to only return positive values
     // Not ideal, but too many applets rely on this.
-    const int ProportionCV(const int cv_value, const int max_pixels, const int max_cv = HEMISPHERE_MAX_CV) {
+    const int ProportionCV(const int cv_value, const int max_pixels, const int max_cv = HEMISPHERE_MAX_CV) const {
         int prop = constrain(Proportion(cv_value, max_cv, max_pixels), 0, max_pixels);
         return prop;
     }

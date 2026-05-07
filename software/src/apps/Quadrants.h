@@ -1571,11 +1571,11 @@ private:
         gfxDisplayInputMapEditor();
     }
 
-    bool isValidPreset(int id) {
+    bool isValidPreset(int id) const {
       uint64_t data;
       return PhzConfig::getValue(id << 11 | APPLET_METADATA_KEY, data);
     }
-    HemisphereApplet* GetApplet(int id, size_t h) {
+    HemisphereApplet* GetApplet(int id, size_t h) const {
         uint64_t data = 0;
         PhzConfig::getValue(id << 11 | APPLET_METADATA_KEY, data);
         int idx = HS::get_applet_index_by_id( Unpack(data, PackLocation{h*8, 8}) );
