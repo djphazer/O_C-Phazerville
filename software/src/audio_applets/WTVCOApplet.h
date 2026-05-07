@@ -40,11 +40,11 @@ public:
         synth.frequency(freq);
         int _wt_blend = wt_blend + wt_blend_cv.InRescaled(WT_SIZE - 1);
 
-        InterpolateSample(wavetable[OUT], _wt_blend, wt_sample++);
         for (int w = A; w <= C; ++w) {
             if (waveform[w] == WAVE_PULSE) UpdatePulseDuty(wavetable[w], wt_sample, pulse_duty + pulse_duty_cv.In());
             if (waveform[w] == WAVE_NOISE && !noise_freeze) UpdateNoiseSample(wavetable[w], wt_sample);
         }
+        InterpolateSample(wavetable[OUT], _wt_blend, wt_sample++);  // this does not necessarilly interpolate the same sample of the waveform that is played from the output during the same program cycle
 
         float gain = dbToScalar(level);
         if (level_cv.source) {
@@ -152,7 +152,7 @@ public:
                 case WAVEFORM_B:
                 case WAVEFORM_C: {
                     const int idx = cursor - WAVEFORM_A;
-                    if (userwave_select) userwave[idx] = constrain(userwave[idx] + direction, 0, raw_wave_count);
+                    if (userwave_select) userwave[idx] = raw_wave_count > 0 ? constrain(userwave[idx] + direction, 0, raw_wave_count - 1) : 0;
                     else waveform[idx] = (WaveForms)constrain(((int)waveform[idx]) + direction, 0, WAVEFORM_COUNT - 1);
                     GenerateWaveTable(idx);
                     break;
@@ -165,13 +165,13 @@ public:
     void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
         data[0] = PackPackables(pitch, wt_blend, pulse_duty, level, mix);
         data[1] = PackPackables(pitch_cv, wt_blend_cv, pulse_duty_cv, level_cv);
-        data[2] = PackPackables(mix_cv, waveform[A], waveform[B], waveform[C], userwave[0], userwave[1], userwave[2]);
+        data[2] = PackPackables(mix_cv, waveform[A], waveform[B], waveform[C], userwave[A], userwave[B], userwave[C]);
     }
 
     void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
         UnpackPackables(data[0], pitch, wt_blend, pulse_duty, level, mix);
         UnpackPackables(data[1], pitch_cv, wt_blend_cv, pulse_duty_cv, level_cv);
-        UnpackPackables(data[2], mix_cv, waveform[A], waveform[B], waveform[C], userwave[0], userwave[1], userwave[2]);
+        UnpackPackables(data[2], mix_cv, waveform[A], waveform[B], waveform[C], userwave[A], userwave[B], userwave[C]);
 
         CONSTRAIN(level, LVL_MIN_DB, LVL_MAX_DB);
 
@@ -223,13 +223,14 @@ private:
         WAVE_STEPPED,
         WAVE_RAND_STEPPED,
         WAVE_NOISE,
+        WAVE_SILENCE,
         WAVE_USER,
         // add more waves here and generator functions at the bottom
 
         WAVEFORM_COUNT
     };
     static constexpr const char* const waveform_names[WAVEFORM_COUNT] = {
-        "Sine", "Triangl", "Pulse", "Saw", "Ramp", "Stepped", "RandStp", "Noise", "User"
+        "Sine", "Triangl", "Pulse", "Saw", "Ramp", "Stepped", "RandStp", "Noise", "Silence", "User"
     };
 
     CVInputMap pitch_cv;
@@ -433,7 +434,7 @@ private:
         wt[sample] = (sample < duty) ? 32767 : -32768;
     }
 
-    void UpdateNoiseSample(int16_t* wt, const uint8_t sample) {
+    void UpdateNoiseSample(int16_t* wt, const uint8_t sample) {  // noise sounds funny, i think this is getting called less frequently than the audio output
         wt[sample] = static_cast<int16_t>(random(-32768, 32768));
     }
 
@@ -465,8 +466,11 @@ private:
             case WAVE_NOISE:
                 GenerateWaveForm_Noise(wavetable[w]);
                 break;
+            case WAVE_SILENCE:
+                GenerateWaveForm_Silence(wavetable[w]);
+                break;
             case WAVE_USER:
-                GenerateWaveForm_User(wavetable[w]);
+                GenerateWaveForm_User(wavetable[w], w);
                 break;
             default: break;
         }
@@ -551,26 +555,22 @@ private:
         }
     }
 
-    void GenerateWaveForm_User(int16_t* waveform) {
-        if (!ReadWaveFromSD(waveform)) GenerateWaveForm_Silence(waveform);
+    void GenerateWaveForm_User(int16_t* waveform, const int idx) {
+        if (!ReadWaveFromSD(waveform, idx)) GenerateWaveForm_Silence(waveform);
     }
 
-    bool ReadWaveFromSD(int16_t* waveform) {
+    bool ReadWaveFromSD(int16_t* waveform, const int idx = 0) {
         if(!sd_ready) return false;
-        const int idx = cursor - WAVEFORM_A;
+        // const int idx = cursor - WAVEFORM_A;  // BUG: this causes problems when loading preset
         File dir = SD.open("/WTVCO");
         File file;
-        for (int i = 0; i < userwave[idx]; ++i) {
+        for (int i = 0; i <= userwave[idx]; ++i) {
             file = dir.openNextFile();
         }
-        // if (file.size() < WT_SIZE) {
-        //     file.close();
-        //     return false;
-        // }
+
         bool read = false;
         if (!file.isDirectory() && isRawFile(file.name())) {
-            size_t readBytes = file.read(waveform, 2 * WT_SIZE);
-            // if (readBytes != 2 * WT_SIZE) read = false;
+            file.read(waveform, 2 * WT_SIZE);
             read = true;
         }
         file.close();
