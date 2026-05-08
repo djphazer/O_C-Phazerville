@@ -53,7 +53,7 @@ struct Factory {
   uint16_t mask = 0;
 
   T* get() {
-    for (int i = 0; i < max_instances; ++i) {
+    for (size_t i = 0; i < max_instances; ++i) {
       if (mask & (1 << i)) continue;
 
       if (!pool[i] && OC::CORE::FreeRam() > (int)sizeof(T) + 1000) { // 1KB of padding to be safe
@@ -67,7 +67,7 @@ struct Factory {
     return nullptr;
   }
   void release(T* instance) {
-    for (int i = 0; i < max_instances; ++i) {
+    for (size_t i = 0; i < max_instances; ++i) {
       if (pool[i] == instance) {
         mask &= ~(1 << i);
       }

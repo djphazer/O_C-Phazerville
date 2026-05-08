@@ -253,7 +253,7 @@ public:
 
   void SwapMonoStereo(int c) {
     if (IsStereo(c)) {
-      get_selected_stereo_applet(c).BaseStart(LEFT_HEMISPHERE + AUDIO_SLOT_L);
+      get_selected_stereo_applet(c).BaseStart(HEM_SIDE(LEFT_HEMISPHERE + AUDIO_SLOT_L));
       ForEachSide(side) {
         get_selected_mono_applet(side, c).Disconnect();
         get_selected_mono_applet(side, c).Unload();
@@ -264,7 +264,7 @@ public:
       get_selected_stereo_applet(c).Disconnect();
       get_selected_stereo_applet(c).Unload();
       ForEachSide(side) {
-        get_selected_mono_applet(side, c).BaseStart(side + AUDIO_SLOT_L);
+        get_selected_mono_applet(side, c).BaseStart(HEM_SIDE(side + AUDIO_SLOT_L));
         ConnectMonoToNext(side, c);
         if (c > 0) ConnectSlotToNext(side, c - 1);
       }
@@ -329,7 +329,7 @@ public:
     get_selected_stereo_applet(slot).Unload();
     sel = ix;
     auto& app = get_selected_stereo_applet(slot);
-    app.BaseStart(side + AUDIO_SLOT_L);
+    app.BaseStart(HEM_SIDE(side + AUDIO_SLOT_L));
     ForEachSide(side) ConnectStereoToNext(side, slot);
     if (slot > 0) {
       ForEachSide(side) ConnectSlotToNext(side, slot - 1);
@@ -343,7 +343,7 @@ public:
     get_selected_mono_applet(side, slot).Unload();
     sel = ix;
     auto& app = get_selected_mono_applet(side, slot);
-    app.BaseStart(side + AUDIO_SLOT_L);
+    app.BaseStart(HEM_SIDE(side + AUDIO_SLOT_L));
     ConnectMonoToNext(side, slot);
     if (slot > 0) ConnectSlotToNext(side, slot - 1);
   }
