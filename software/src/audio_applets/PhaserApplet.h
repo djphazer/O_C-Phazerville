@@ -7,7 +7,7 @@
 // MONO only... for now
 class PhazerApplet : public HemisphereAudioApplet {
 public:
-  const char* applet_name() override {
+  const char* applet_name() {
     return "Phazer";
   }
   void Start() override {

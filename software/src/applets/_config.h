@@ -151,7 +151,7 @@ using namespace HS;
 
 #include "AppletRegistry.h"
 
-constexpr Registry reg = Registry<HemisphereApplet, 200 // max ID
+constexpr Registry reg = Registry<HemisphereApplet, HS::APPLET_SLOTS // max ID
     , DeclareApplet<ADSREG, 8, 0x01>
     , DeclareApplet<ADEG, 34, 0x01>
     , DeclareApplet<MiniASR, 47, 0x09>

@@ -76,7 +76,7 @@ public:
 
   void Init();
 
-  UiMode Splashscreen(bool &reset_settings);
+  UiMode Splashscreen(bool &reset_settings, uint8_t phase = 0);
   bool ConfirmReset();
   void DebugStats();
   bool AppSettings(bool drawmenu);

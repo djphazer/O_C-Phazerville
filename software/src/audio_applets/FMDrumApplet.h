@@ -6,7 +6,7 @@
 
 class FMDrumApplet : public HemisphereAudioApplet {
 public:
-    const char* applet_name() override { return "FMDrum"; }
+    const char* applet_name() { return "FMDrum"; }
 
     AudioStream* InputStream()  override { return &input_stream; }
     AudioStream* OutputStream() override { return &output_mixer; }

@@ -26,7 +26,7 @@
 template <AudioChannels Channels>
 class ModalResonatorApplet : public HemisphereAudioApplet {
 public:
-    const char* applet_name() override { return "ModalRes"; }
+    const char* applet_name() { return "ModalRes"; }
 
     // --- Lifecycle -----------------------------------------------------------
 

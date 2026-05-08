@@ -108,7 +108,7 @@ static constexpr unsigned long SETTINGS_SAVE_TIMEOUT_MS = 1000;
 /* ------------ Extra ADC debug stats ---------------------------------------------------------------  */
 //#define OC_DEBUG_ADC_STATS
 /* ------------ Debug for app load/save -------------------------------------------------------------  */
-//#define OC_DEBUG_APPS
+#define OC_DEBUG_APPS
 /* ------------ Debug for UI events/stats -----------------------------------------------------------  */
 //#define OC_DEBUG_UI
 /* ------------ Enable debug trace pins -------------------------------------------------------------  */

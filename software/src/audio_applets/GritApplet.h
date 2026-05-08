@@ -25,7 +25,7 @@
 template <AudioChannels Channels>
 class GritApplet : public HemisphereAudioApplet {
 public:
-    const char* applet_name() override { return "Grit"; }
+    const char* applet_name() { return "Grit"; }
 
     void Start() override {
         for (int ch = 0; ch < Channels; ch++) {

@@ -1,19 +1,12 @@
 #pragma once
 
 #include "AudioIO.h"
-#include "FS.h"
-#include "HSUtils.h"
 #include "HemisphereAudioApplet.h"
 #include "OC_ui.h"
 #include "PhzConfig.h"
 #include "waveheaderparser.h"
 #include "src/UI/ui_events.h"
 #include "util/util_tuples.h"
-#include "dsputils_arm.h"
-#include "Audio/AudioMixer.h"
-#include "Audio/AudioPassthrough.h"
-#include "Audio/AudioVCA.h"
-#include "Audio/InterpolatingStream.h"
 
 #define ForEachSide(ch) for (HEM_SIDE ch : {LEFT_HEMISPHERE, RIGHT_HEMISPHERE})
 
@@ -24,41 +17,27 @@ class Slot {};
 
 template <
   uint_fast8_t Slots,
-  size_t NumMonoSources,
-  size_t NumStereoSources,
   size_t NumMonoProcessors,
-  size_t NumStereoProcessors>
+  size_t NumStereoProcessors,
+  typename MonoReg,
+  typename StereoReg>
 class AudioAppletSubapp {
 public:
-  template <class... MIs, class... SIs, class... MPs, class... SPs>
-  AudioAppletSubapp(
-    tuple<MIs...> (&mono_source_pool)[2],
-    tuple<SIs...>& stereo_source_pool,
-    tuple<MPs...> (&mono_processor_pool)[2][Slots - 1],
-    tuple<SPs...> (&stereo_processor_pool)[Slots - 1]
-  )
-    : mono_input_applets{
-        util::tuple_to_ptr_arr<HemisphereAudioApplet>(mono_source_pool[0]),
-        util::tuple_to_ptr_arr<HemisphereAudioApplet>(mono_source_pool[1]),
-      }
-    , stereo_input_applets(
-        util::tuple_to_ptr_arr<HemisphereAudioApplet>(stereo_source_pool)
-      ) {
-    for (size_t slot = 0; slot < Slots - 1; slot++) {
-      mono_processor_applets[0][slot]
-        = util::tuple_to_ptr_arr<HemisphereAudioApplet>(
-          mono_processor_pool[0][slot]
-        );
-      mono_processor_applets[1][slot]
-        = util::tuple_to_ptr_arr<HemisphereAudioApplet>(
-          mono_processor_pool[1][slot]
-        );
+  MonoReg &mono_applets;
+  StereoReg &stereo_applets;
 
-      stereo_processor_applets[slot]
-        = util::tuple_to_ptr_arr<HemisphereAudioApplet>(
-          stereo_processor_pool[slot]
-        );
-    }
+  const array<RegID, NumMonoProcessors> mono_appletIds;
+  const array<RegID, NumStereoProcessors> stereo_appletIds;
+
+  static constexpr size_t NumStereoSources = NumStereoProcessors;
+  static constexpr size_t NumMonoSources = NumMonoProcessors;
+
+  AudioAppletSubapp(MonoReg &mono_applets_, StereoReg &stereo_applets_)
+    : mono_applets(mono_applets_)
+    , stereo_applets(stereo_applets_)
+    , mono_appletIds(mono_applets.getIds())
+    , stereo_appletIds(stereo_applets.getIds())
+  {
     selected_mono_applets[0].fill(0);
     selected_mono_applets[1].fill(0);
     selected_stereo_applets.fill(0);
@@ -193,7 +172,7 @@ public:
 
     ForEachSide(side) {
       if (state[side] == EDIT_APPLET) {
-        HemisphereApplet& applet = get_selected_applet(side);
+        HemisphereAudioApplet& applet = get_selected_applet(side);
         applet.SetDisplaySide(static_cast<HEM_SIDE>(side + AUDIO_SLOT_L));
         applet.BaseView();
       } else {
@@ -596,14 +575,10 @@ protected:
 
 private:
   static const size_t APPLET_CONFIG_SIZE = HemisphereAudioApplet::CONFIG_SIZE;
-  array<array<HemisphereAudioApplet*, NumMonoSources>, 2> mono_input_applets;
-  array<HemisphereAudioApplet*, NumStereoSources> stereo_input_applets;
-  array<array<array<HemisphereAudioApplet*, NumMonoProcessors>, Slots - 1>, 2>
-    mono_processor_applets;
-  array<array<HemisphereAudioApplet*, NumStereoProcessors>, Slots - 1>
-    stereo_processor_applets;
+
   uint32_t stereo = 0; // bitset
 
+  // indexes
   array<array<int, Slots>, 2> selected_mono_applets;
   array<int, Slots> selected_stereo_applets;
 
@@ -640,16 +615,33 @@ private:
   // candidate applet for each side, referenced by index into applets arrays
   int candidate[2];
 
+  PassthruApplet<MONO> dummy_mono;
+  PassthruApplet<STEREO> dummy_stereo;
+
   HemisphereAudioApplet& get_mono_applet(
     HEM_SIDE side, size_t slot, size_t ix
   ) {
-    return slot == 0 ? *mono_input_applets[side][ix]
-                     : *mono_processor_applets[side][slot - 1][ix];
+    HemisphereAudioApplet* target = mono_applets.get(mono_appletIds[ix], side * Slots + slot);
+    if (target) return *target;
+
+    static uint8_t counter = 0;
+    if (counter < 10) {
+      ++counter;
+      SERIAL_PRINTLN("nullptr from mono_applets - side: %u slot: %u ix: %u", side, slot, ix);
+    }
+    return dummy_mono;
   }
 
   HemisphereAudioApplet& get_stereo_applet(size_t slot, size_t ix) {
-    return slot == 0 ? *stereo_input_applets[ix]
-                     : *stereo_processor_applets[slot - 1][ix];
+    HemisphereAudioApplet* target = stereo_applets.get(stereo_appletIds[ix], slot);
+    if (target) return *target;
+
+    static uint8_t counter = 0;
+    if (counter < 10) {
+      ++counter;
+      SERIAL_PRINTLN("nullptr from stereo_applets - slot: %u ix: %u", slot, ix);
+    }
+    return dummy_stereo;
   }
 
   HemisphereAudioApplet& get_selected_mono_applet(HEM_SIDE side, size_t slot) {
@@ -668,35 +660,23 @@ private:
   }
 
   template <size_t N>
-  int get_applet_ix_by_id(
-    array<HemisphereAudioApplet*, N> applets,
-    uint64_t id,
-    int default_value = -1
-  ) {
-    for (size_t i = 0; i < applets.size(); i++) {
-      if (applets[i]->applet_id() == id) return static_cast<int>(i);
+  int get_applet_ix_by_id(array<RegID, N> appletIds, RegID id, int default_value = 0) {
+    for (size_t i = 0; i < appletIds.size(); i++) {
+      if (appletIds[i] == id) return static_cast<int>(i);
     }
     return default_value;
   }
 
   int get_mono_applet_ix_by_id(
-    HEM_SIDE side, int slot, uint64_t id, int default_value = -1
+    HEM_SIDE side, int slot, RegID id, int default_value = 0
   ) {
-    if (slot == 0)
-      return get_applet_ix_by_id(mono_input_applets[side], id, default_value);
-    return get_applet_ix_by_id(
-      mono_processor_applets[side][slot - 1], id, default_value
-    );
+    return get_applet_ix_by_id(mono_appletIds, id, default_value);
   }
 
   int get_stereo_applet_ix_by_id(
-    int slot, uint64_t id, int default_value = -1
+    int slot, RegID id, int default_value = 0
   ) {
-    if (slot == 0)
-      return get_applet_ix_by_id(stereo_input_applets, id, default_value);
-    return get_applet_ix_by_id(
-      stereo_processor_applets[slot - 1], id, default_value
-    );
+      return get_applet_ix_by_id(stereo_appletIds, id, default_value);
   }
 
   HemisphereAudioApplet& get_listed_stereo_applet(int slot) {

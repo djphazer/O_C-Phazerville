@@ -1724,14 +1724,11 @@ FLASHMEM
 void AppQuadrants::HandleButtonEvent(const UI::Event &event) {
     last_mask = mask;
     mask = event.mask;
-    SERIAL_PRINTLN(
-      "mask=%d type=%d value=%d control=%d last_mask=%d",
-      event.mask,
-      event.type,
-      event.value,
-      event.control,
-      last_mask
-    );
+    /*SERIAL_PRINTLN(*/
+    /*  "mask=%d type=%d value=%d control=%d last_mask=%d",*/
+    /*  event.mask, event.type, event.value, event.control,*/
+    /*  last_mask*/
+    /*);*/
 
     if (AUDIO_SETUP == view_state && !clock_overlay) {
       if (CheckButtonCombo(OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_B)) {

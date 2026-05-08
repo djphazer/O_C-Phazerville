@@ -28,7 +28,7 @@
 
 class AdvKrpsStrngApplet : public HemisphereAudioApplet {
 public:
-  const char* applet_name() override { return "KrpsStrng"; }
+  const char* applet_name() { return "KrpsStrng"; }
 
   // --- Lifecycle ----------------------------------------------------------
 

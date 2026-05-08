@@ -346,9 +346,9 @@ void setup() {
   usbHostMIDI.begin();
 #endif
 
-  // Display splash screen and optional calibration
+  // Display loading splash screen and optional calibration
   bool reset_settings = false;
-  ui_mode = OC::ui.Splashscreen(reset_settings);
+  ui_mode = OC::ui.Splashscreen(reset_settings, 0);
 
   bool start_cal = false;
   if (ui_mode == OC::UI_MODE_CALIBRATE) {
@@ -364,6 +364,9 @@ void setup() {
 
   // initialize apps
   OC::app_switcher.Init(reset_settings);
+
+  // Welcome splash
+  OC::ui.Splashscreen(reset_settings, 1);
 
   if (start_cal)
     OC::start_calibration();

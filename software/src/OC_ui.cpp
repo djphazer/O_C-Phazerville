@@ -192,105 +192,113 @@ UiMode Ui::DispatchEvents(AppBase *app) {
 }
 
 FLASHMEM
-UiMode Ui::Splashscreen(bool &reset_settings) {
+UiMode Ui::Splashscreen(bool &reset_settings, uint8_t phase) {
 
   UiMode mode = UI_MODE_MENU;
 
   elapsedMillis timeout = 0;
-  do {
 
-    mode = UI_MODE_MENU;
-    if (read_immediate(CONTROL_BUTTON_L))
-      mode = UI_MODE_CALIBRATE;
-    if (read_immediate(CONTROL_BUTTON_R))
-      mode = UI_MODE_APP_SETTINGS;
+  switch (phase) {
+  case 0:
+    do {
 
-    reset_settings =
-    #if defined(NORTHERNLIGHT) && !defined(IO_10V)
-       read_immediate(CONTROL_BUTTON_UP) && read_immediate(CONTROL_BUTTON_R);
-    #else
-       read_immediate(CONTROL_BUTTON_UP) && read_immediate(CONTROL_BUTTON_DOWN);
-    #endif
+      mode = UI_MODE_MENU;
+      if (read_immediate(CONTROL_BUTTON_L))
+        mode = UI_MODE_CALIBRATE;
+      if (read_immediate(CONTROL_BUTTON_R))
+        mode = UI_MODE_APP_SETTINGS;
 
-    GRAPHICS_BEGIN_FRAME(true);
+      reset_settings =
+      #if defined(NORTHERNLIGHT) && !defined(IO_10V)
+         read_immediate(CONTROL_BUTTON_UP) && read_immediate(CONTROL_BUTTON_R);
+      #else
+         read_immediate(CONTROL_BUTTON_UP) && read_immediate(CONTROL_BUTTON_DOWN);
+      #endif
 
-    menu::DefaultTitleBar::Draw();
-    graphics.print( DAC_is_inverted? OC::Strings::NAME_NLM : OC::Strings::NAME);
-    weegfx::coord_t y = menu::CalcLineY(0);
+      GRAPHICS_BEGIN_FRAME(true);
 
-    graphics.setPrintPos(menu::kIndentDx, y + menu::kTextDy);
-    graphics.print("[L] => Calibrate");
-    if (UI_MODE_CALIBRATE == mode)
-      graphics.invertRect(menu::kIndentDx, y, 128, menu::kMenuLineH);
+      menu::DefaultTitleBar::Draw();
+      graphics.print( DAC_is_inverted? OC::Strings::NAME_NLM : OC::Strings::NAME);
+      weegfx::coord_t y = menu::CalcLineY(0);
 
-    y += menu::kMenuLineH;
-    graphics.setPrintPos(menu::kIndentDx, y + menu::kTextDy);
-    graphics.print("[R] => Main Menu");
-    if (UI_MODE_APP_SETTINGS == mode)
-      graphics.invertRect(menu::kIndentDx, y, 128, menu::kMenuLineH);
+      graphics.setPrintPos(menu::kIndentDx, y + menu::kTextDy);
+      graphics.print("[L] => Calibrate");
+      if (UI_MODE_CALIBRATE == mode)
+        graphics.invertRect(menu::kIndentDx, y, 128, menu::kMenuLineH);
 
-    y += menu::kMenuLineH;
-    graphics.setPrintPos(menu::kIndentDx, y + menu::kTextDy);
-    if (reset_settings) {
-      graphics.print("!! RESET EEPROM !!");
       y += menu::kMenuLineH;
       graphics.setPrintPos(menu::kIndentDx, y + menu::kTextDy);
-    }
-    graphics.print(OC::Strings::VERSION);
-    graphics.print(" ");
-    graphics.print(OC::Strings::BUILD_TAG);
+      graphics.print("[R] => Main Menu");
+      if (UI_MODE_APP_SETTINGS == mode)
+        graphics.invertRect(menu::kIndentDx, y, 128, menu::kMenuLineH);
 
-    const uint8_t *iconroulette[] = {
-      PhzIcons::clockDivider, PhzIcons::clockSkip,
-      PhzIcons::clock_warp_A, PhzIcons::clock_warp_B,
-      PhzIcons::snowflakeB,
-      PhzIcons::snowflakeA
-    };
+      y += menu::kMenuLineH;
+      graphics.setPrintPos(menu::kIndentDx, y + menu::kTextDy);
+      if (reset_settings) {
+        graphics.print("!! RESET EEPROM !!");
+        y += menu::kMenuLineH;
+        graphics.setPrintPos(menu::kIndentDx, y + menu::kTextDy);
+      }
+      graphics.print(OC::Strings::VERSION);
+      graphics.print(" ");
+      graphics.print(OC::Strings::BUILD_TAG);
 
-    static int pick = 0;
-    if (timeout % 50 == 0) pick = random(6);
-    // pew pew?
-    for (int i = 0; i < 124; i+=8)
-      graphics.drawBitmap8(i, 56, 8, iconroulette[pick]);
+      const uint8_t *iconroulette[] = {
+        PhzIcons::clockDivider, PhzIcons::clockSkip,
+        PhzIcons::clock_warp_A, PhzIcons::clock_warp_B,
+        PhzIcons::snowflakeB,
+        PhzIcons::snowflakeA
+      };
 
-    // chargin mah lazerrrr
-    weegfx::coord_t w = timeout * 128 / SPLASHSCREEN_DELAY_MS;
-    w %= 256;
-    if (w > 128) w = 256 - w;
-    graphics.invertRect(0, 56, w, 8);
+      static int pick = 0;
+      if (timeout % 50 == 0) pick = random(6);
+      // pew pew?
+      for (int i = 0; i < 124; i+=8)
+        graphics.drawBitmap8(i, 56, 8, iconroulette[pick]);
 
-    ZapScreensaver();
+      // chargin mah lazerrrr
+      weegfx::coord_t w = timeout * 128 / SPLASHSCREEN_DELAY_MS;
+      w %= 256;
+      if (w > 128) w = 256 - w;
+      graphics.invertRect(0, 56, w, 8);
 
-    /* fixes spurious button presses when booting ? */
-    while (event_queue_.available())
-      (void)event_queue_.PullEvent();
+      ZapScreensaver();
 
-    GRAPHICS_END_FRAME();
+      /* fixes spurious button presses when booting ? */
+      while (event_queue_.available())
+        (void)event_queue_.PullEvent();
 
-  } while (timeout < SPLASHSCREEN_DELAY_MS);
+      GRAPHICS_END_FRAME();
 
-  do {
-    GRAPHICS_BEGIN_FRAME(true);
-    /*
-    const uint8_t *flake_icon[] = { PhzIcons::snowflakeA, PhzIcons::snowflakeB, ZAP_ICON };
-    for (int i=0; i<128; ++i) {
-      graphics.drawBitmap8(i*8%128 + random(2), i/16*8 + random(2), 8, flake_icon[random(3)]);
-    }
-    */
-    ZapScreensaver();
+    } while (timeout < SPLASHSCREEN_DELAY_MS);
+      break;
 
-    graphics.clearRect(27, 22, 74, 22);
-    graphics.setPrintPos(28, 23);
-    graphics.print(" Welcome to");
-    graphics.setPrintPos(28, 33);
-    graphics.print("Phazerville!");
-    //graphics.print(OC::Strings::RELEASE_NAME);
+  case 1:
+  default:
+    do {
+      GRAPHICS_BEGIN_FRAME(true);
+      /*
+      const uint8_t *flake_icon[] = { PhzIcons::snowflakeA, PhzIcons::snowflakeB, ZAP_ICON };
+      for (int i=0; i<128; ++i) {
+        graphics.drawBitmap8(i*8%128 + random(2), i/16*8 + random(2), 8, flake_icon[random(3)]);
+      }
+      */
+      ZapScreensaver();
 
-    while (event_queue_.available())
-      (void)event_queue_.PullEvent();
-    GRAPHICS_END_FRAME();
-    delay(5);
-  } while (timeout < SPLASHSCREEN_DELAY_MS*3/2);
+      graphics.clearRect(27, 22, 74, 22);
+      graphics.setPrintPos(28, 23);
+      graphics.print(" Welcome to");
+      graphics.setPrintPos(28, 33);
+      graphics.print("Phazerville!");
+      //graphics.print(OC::Strings::RELEASE_NAME);
+
+      while (event_queue_.available())
+        (void)event_queue_.PullEvent();
+      GRAPHICS_END_FRAME();
+      delay(5);
+    } while (timeout < SPLASHSCREEN_DELAY_MS*3/2);
+    break;
+  }
 
   SetButtonIgnoreMask();
   return mode;

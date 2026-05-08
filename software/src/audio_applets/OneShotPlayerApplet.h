@@ -25,11 +25,8 @@
 template <AudioChannels Channels>
 class OneShotPlayerApplet : public HemisphereAudioApplet {
 public:
-  const uint64_t applet_id() override {
-    return strhash("OneShot");
-  }
-  const char* applet_name() override {
-    return titlestat;
+  const char* applet_name() {
+    return "OneShot";
   }
 
   void Start() {
@@ -177,10 +174,6 @@ public:
     if (gain < 0.0f) gain = 0.0f;
     gain *= env_level; // Apply envelope
     SetLevel(gain);
-
-    // Update title status
-    titlestat[7] = wavplayer.isPlaying() ? '*' : ' ';
-    titlestat[8] = current_gate ? '|' : ' ';
   }
 
   void mainloop() {
@@ -432,8 +425,6 @@ private:
     TRIG_MODE_TRIGGER = 0,
     TRIG_MODE_GATE = 1
   };
-
-  char titlestat[10] = "OneShot  ";
 
   int cursor = 0;
 

@@ -30,7 +30,7 @@ template <AudioChannels Channels>
 class WavRecorderApplet : public HemisphereAudioApplet {
 public:
 
-    const char* applet_name() override { return title; }
+    const char* applet_name() { return "WavRec"; }
 
     // -----------------------------------------------------------------------
     // Audio framework interface

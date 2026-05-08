@@ -32,7 +32,7 @@ extern "C" uint8_t external_psram_size;
 template <AudioChannels Channels>
 class GlitchApplet : public HemisphereAudioApplet {
 public:
-    const char* applet_name() override { return "Glitch"; }
+    const char* applet_name() { return "Glitch"; }
 
     void Start() override {
         for (int ch = 0; ch < Channels; ch++) {
