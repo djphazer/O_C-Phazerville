@@ -88,7 +88,7 @@ static constexpr unsigned long SETTINGS_SAVE_TIMEOUT_MS = 1000;
 #define OC_CALIBRATION_DEFAULT_FLAGS (0)
 
 /* ------------ uncomment line below to print boot-up and settings saving/restore info to serial ----- */
-#define PRINT_DEBUG
+//#define PRINT_DEBUG
 /* ------------ uncomment line below to enable ASR debug page ---------------------------------------- */
 //#define ASR_DEBUG
 /* ------------ uncomment line below to enable POLYLFO debug page ------------------------------------ */
@@ -108,10 +108,10 @@ static constexpr unsigned long SETTINGS_SAVE_TIMEOUT_MS = 1000;
 /* ------------ Extra ADC debug stats ---------------------------------------------------------------  */
 //#define OC_DEBUG_ADC_STATS
 /* ------------ Debug for app load/save -------------------------------------------------------------  */
-#define OC_DEBUG_APPS
+//#define OC_DEBUG_APPS
 /* ------------ Debug for UI events/stats -----------------------------------------------------------  */
 //#define OC_DEBUG_UI
 /* ------------ Enable debug trace pins -------------------------------------------------------------  */
-#define OC_DEBUG_ENABLE_PINS
+//#define OC_DEBUG_ENABLE_PINS
 
 #endif // OC_CONFIG_H_
