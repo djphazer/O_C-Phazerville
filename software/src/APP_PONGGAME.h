@@ -24,95 +24,7 @@
 
 #ifdef ENABLE_APP_PONG
 
-#include <Arduino.h>
-#include "OC_config.h"
-#include "OC_apps.h"
-#include "OC_ui.h"
 #include "HSApplication.h"
-
-/* Define the screen boundaries. There's a frame around the screen,
-*  so these numbers need to take that into account.
- */
-#define BOUNDARY_TOP 11
-#define BOUNDARY_BOTTOM 61
-#define BOUNDARY_RIGHT 116
-#define BOUNDARY_LEFT 2
-#define Y_CENTER 38
-
-/* Define player properties. INITIAL_BALL_DELAY is how many ISR cycles the ball takes to move. It
- * gets faster as the game goes on. PADDLE_DELAY is how many ISR cycles the player must wait before moving
- * again. This is to keep the game interesting at higher levels. PADDLE_WIDTH is the chunkiness of the paddle,
- * in pixels.
- *
- * Note: Each ISR cycle is about 60 microseconds.
- */
-#define INITIAL_BALL_DELAY 200
-#define PADDLE_DELAY 200
-#define PADDLE_WIDTH 3
-
-/* This value is used for converting a ball's or paddle's Y position into a pitch value. This number was determined
- * experimentally, since I wasn't sure what the total range for pitch values is.
- */
-#define PRECISION 1
-#define Y_POSITION_COEFF 128
-
-/*
- * When checking the ADC, if I just look for whether the value is positive or negative, then the value can't be
- * zeroed, and the player can't move the paddle with the onboard controls. This is probably because there's a little
- * noise that randomly swirls around 0. So this value simulates a center detent. This is another experimentally-
- * determined value.
- */
-#define CENTER_DETENT 640
-
-// Length of audio bloops upon bounce
-#define BLOOP_LENGTH 1000 // 17 * 100ms
-#define BLOOP_LOW 0x8
-#define BLOOP_HIGH 0x4
-
-enum playerModeOption {
-    NONE,
-    HUMAN,
-    CPU
-};
-
-struct Player {
-    int score; // The number of hits in this game
-    int y_position;
-    playerModeOption player_mode = HUMAN;
-    int paddle_x = 8;
-    int paddle_y = 1 + BOUNDARY_TOP;
-    int paddle_h = 16;
-    int movement_countdown = 0; // Used to limit the speed
-
-    void MovePaddleUp() {
-        if (movement_countdown <= 0) {
-            --paddle_y;
-            if (paddle_y < BOUNDARY_TOP) paddle_y = BOUNDARY_TOP;
-            movement_countdown = PADDLE_DELAY;
-        }
-    }
-
-    /* Like MovePaddleUp(), only more down */
-    void MovePaddleDown() {
-        if (movement_countdown <= 0) {
-            ++paddle_y;
-            if (paddle_y > (BOUNDARY_BOTTOM - paddle_h)) paddle_y = BOUNDARY_BOTTOM - paddle_h;
-            movement_countdown = PADDLE_DELAY;
-        }
-    }
-
-    /* Allows the paddle to be moved without an enforced delay, for use with encoder play */
-    void ResetPaddle() {
-        movement_countdown = 0;
-    }
-
-        /* The player paddle is a filled rectangle of fixed width and adjustable height. */
-    void DrawPaddle() {
-        graphics.drawRect(paddle_x, paddle_y, PADDLE_WIDTH, paddle_h);
-    }
-
-    int getScore() {return score;}
-};
 
 class Pong : public HSApplication {
 private:
@@ -130,6 +42,82 @@ private:
     int dir_y;
 
 public:
+
+  // Length of audio bloops upon bounce
+  static constexpr int BLOOP_LENGTH = 1000; // 17 * 100ms
+  static constexpr int BLOOP_LOW = 0x8;
+  static constexpr int BLOOP_HIGH = 0x4;
+
+  enum playerModeOption { MODE_NONE, MODE_HUMAN, MODE_CPU };
+
+  struct Player {
+      int score; // The number of hits in this game
+      int y_position;
+      playerModeOption player_mode = MODE_HUMAN;
+      int paddle_x = 8;
+      int paddle_y = 1 + BOUNDARY_TOP;
+      int paddle_h = 16;
+      int movement_countdown = 0; // Used to limit the speed
+
+      void MovePaddleUp() {
+          if (movement_countdown <= 0) {
+              --paddle_y;
+              if (paddle_y < BOUNDARY_TOP) paddle_y = BOUNDARY_TOP;
+              movement_countdown = PADDLE_DELAY;
+          }
+      }
+
+      /* Like MovePaddleUp(), only more down */
+      void MovePaddleDown() {
+          if (movement_countdown <= 0) {
+              ++paddle_y;
+              if (paddle_y > (BOUNDARY_BOTTOM - paddle_h)) paddle_y = BOUNDARY_BOTTOM - paddle_h;
+              movement_countdown = PADDLE_DELAY;
+          }
+      }
+
+      /* Allows the paddle to be moved without an enforced delay, for use with encoder play */
+      void ResetPaddle() {
+          movement_countdown = 0;
+      }
+
+          /* The player paddle is a filled rectangle of fixed width and adjustable height. */
+      void DrawPaddle() {
+          graphics.drawRect(paddle_x, paddle_y, PADDLE_WIDTH, paddle_h);
+      }
+
+      int getScore() {return score;}
+  };
+
+  /* Define the screen boundaries. There's a frame around the screen, so these numbers need to
+   * take that into account.
+   */
+  static constexpr int BOUNDARY_TOP = 11;
+  static constexpr int BOUNDARY_BOTTOM = 61;
+  static constexpr int BOUNDARY_RIGHT = 116;
+  static constexpr int BOUNDARY_LEFT = 2;
+  static constexpr int Y_CENTER = 38;
+
+  /* Define player properties. INITIAL_BALL_DELAY is how many ISR cycles the ball takes to move. It
+   * gets faster as the game goes on. PADDLE_DELAY is how many ISR cycles the player must wait before moving
+   * again. This is to keep the game interesting at higher levels. PADDLE_WIDTH is the chunkiness of the paddle,
+   * in pixels.
+   *
+   * Note: Each ISR cycle is about 60 microseconds.
+   */
+  static constexpr int INITIAL_BALL_DELAY = 200;
+  static constexpr int PADDLE_DELAY = 200;
+  static constexpr int PADDLE_WIDTH = 3;
+
+  /* TRIGGER_CYCLE_LENGTH specifies how many loop cycles a triggered event (like a hit) lasts. */
+  static constexpr int TRIGGER_CYCLE_LENGTH = 400;
+
+  /* This value is used for converting a ball's or paddle's Y position into a pitch value. This number was determined
+   * experimentally, since I wasn't sure what the total range for pitch values is.
+   */
+  static constexpr int Y_POSITION_COEFF = 128;
+  static constexpr int PRECISION = 1;
+
     Player player1;
     Player player2;
     /* There are two types of game state properties: Those that should be initialized only once (like high score), and
@@ -139,8 +127,8 @@ public:
     void Start() {
         bloop_countdown = 0;
         hi_score = 27;
-        player1.player_mode = HUMAN;
-        player2.player_mode = CPU;
+        player1.player_mode = MODE_HUMAN;
+        player2.player_mode = MODE_CPU;
         player2.paddle_x = 116;
 
         StartNewGame();
@@ -173,7 +161,6 @@ public:
      */
     void Controller() {
         ball_countdown--;
-        bloop_countdown--;
         if(player1.movement_countdown) --player1.movement_countdown;
         if(player2.movement_countdown) --player2.movement_countdown;
 
@@ -201,10 +188,10 @@ public:
         // if (move_cv < -HEMISPHERE_CENTER_DETENT) MovePaddleUp();
         // if (move_cv > HEMISPHERE_CENTER_DETENT) MovePaddleDown();
 
-        if(Gate(0) && !Gate(1)) player1.MovePaddleUp();
-        if(Gate(1) && !Gate(0)) player1.MovePaddleDown();
-        if(Gate(2) && !Gate(3)) player2.MovePaddleUp();
-        if(Gate(3) && !Gate(2)) player2.MovePaddleDown();
+        /*if(Gate(0) && !Gate(1)) player1.MovePaddleUp();*/
+        /*if(Gate(1) && !Gate(0)) player1.MovePaddleDown();*/
+        /*if(Gate(2) && !Gate(3)) player2.MovePaddleUp();*/
+        /*if(Gate(3) && !Gate(2)) player2.MovePaddleDown();*/
 
         /* Handle output states:
          *
@@ -226,8 +213,9 @@ public:
         // Out(3, out_D);
 
         // make bloop noises
-        if(bloop_countdown > 0){
-            GateOut(3, OC::CORE::ticks & bloop_pitch);
+        if (bloop_countdown) {
+          bloop_countdown--;
+          GateOut(3, OC::CORE::ticks & bloop_pitch);
         }
     }
 
