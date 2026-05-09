@@ -201,7 +201,6 @@ UiMode Ui::Splashscreen(bool &reset_settings, uint8_t phase) {
   switch (phase) {
   case 0:
     do {
-
       mode = UI_MODE_MENU;
       if (read_immediate(CONTROL_BUTTON_L))
         mode = UI_MODE_CALIBRATE;
@@ -296,7 +295,7 @@ UiMode Ui::Splashscreen(bool &reset_settings, uint8_t phase) {
         (void)event_queue_.PullEvent();
       GRAPHICS_END_FRAME();
       delay(5);
-    } while (timeout < SPLASHSCREEN_DELAY_MS*3/2);
+    } while (timeout < SPLASHSCREEN_DELAY_MS/2);
     break;
   }
 
