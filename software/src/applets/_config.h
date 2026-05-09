@@ -97,7 +97,7 @@ using namespace HS;
 #include "Palimpsest.h"
 #include "Pigeons.h"
 #include "PolyDiv.h"
-#include "Pong.h"
+#include "Ponglet.h"
 #include "ProbabilityDivider.h"
 #include "ProbabilityMelody.h"
 #include "Relabi.h"
