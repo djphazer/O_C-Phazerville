@@ -261,10 +261,13 @@ public:
         } else if (cursor == CVSeqCursor::CHANNEL_LOOP) {
             // Replace whichever point is closer to step_index. Naturally
             // extends when outside, contracts the nearer side when inside,
-            // and collapses to a single step when step_index sits on a point.
+            // and collapses to a single step when step_index sits on a point
+            // (in which case we move the *other* marker, since snapping the
+            // one already on this step would be a no-op).
             const int d0 = abs((int)step_index - (int)loops[channel_index].points[0]);
             const int d1 = abs((int)step_index - (int)loops[channel_index].points[1]);
-            loops[channel_index].points[d1 < d0 ? 1 : 0] = step_index;
+            const uint8_t which = (d0 == 0) ? 1 : (d1 == 0 ? 0 : (d1 < d0 ? 1 : 0));
+            loops[channel_index].points[which] = step_index;
             on_loop_points_changed(channel_index);
         } else if (cursor == CVSeqCursor::GENERAL_COPY_0_TO_1) {
             copy_channel(0, 1);
@@ -300,9 +303,7 @@ public:
         } else if (cursor > CVSeqCursor::CHANNEL_INDEX && cursor <= CVSeqCursor::CHANNEL_CLOCKS) {
             // Toggle between selecting step or selecting which step to edit.
             step_select ^= true;
-        }
-
-        CancelEdit();
+        } else CancelEdit();
     }
 
     void OnEncoderMove(int direction) override {
