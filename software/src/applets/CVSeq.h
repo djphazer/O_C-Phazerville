@@ -33,7 +33,7 @@ public:
         RANDOM,
         LOOP1,
         LOOP2,
-        LOOP_SWAP,
+        LOOP_FLIP,
 
         VALUE_INDEX,
         VALUE_CV,
@@ -46,8 +46,7 @@ public:
         CHANNEL_STEPS,
         CHANNEL_STEP,
         CHANNEL_VALUE,
-        CHANNEL_LOOP_START,
-        CHANNEL_LOOP_END,
+        CHANNEL_LOOP,
         CHANNEL_CLOCKS,
 
         GENERAL_COPY_0_TO_1,
@@ -109,7 +108,6 @@ public:
     }
 
     void Reset() override {
-        // Only set flag, keep step playing until next clock.
         reset_flag = true;
     }
 
@@ -132,68 +130,62 @@ public:
             half_fired = true;
         }
 
-        bool new_step = false;
-        if (clocked && reset_flag) {
-            // Latched reset takes effect on the first clock.
-            do_reset();
-            new_step = true;
+        bool new_ch0_step = false;
+        if (reset_flag) {
+            // Latched reset: freeze playback until the next whole clock, then snap to start.
+            if (clocked) {
+                do_reset();
+                new_ch0_step = true;
+            }
         } else if (clocked || half_boundary) {
             // Both whole- and half-clock events advance the half-clock counter by 1.
             bar_half_clocks++;
             for (uint8_t ch = 0; ch < 2; ch++) {
+                // Capture the pre-tick step so we can decide new_step after any
+                // engage/disengage retargeting has settled.
+                const uint8_t prev_step = live(ch).step;
+
                 // Always advance the live sequencer first; this also drives the
                 // pre-engage no-loop tick at an engage clock (loop_active is
                 // still false at that point, so the advance is no-loop).
-                current_half_clocks[ch]++;
-                if (current_half_clocks[ch] >= target_half_clocks[ch]) {
-                    current_step[ch] = next_step_index(ch);
-                    current_half_clocks[ch] = 0;
-                    enter_current_step(ch);
-                    if (ch == 0) new_step = true;
-                }
+                advance_seq(ch, live(ch), loop_active[ch]);
+
                 // Advance the shadow whenever a loop is driving playback.
-                if (loop_active[ch]) advance_shadow(ch);
+                if (loop_active[ch]) advance_seq(ch, shadow(ch), false);
                 // Phantom always advances — it's the phase-locked reference for
                 // outside-engages, anchored at sequence reset.
-                advance_phantom(ch);
+                advance_seq(ch, phantom(ch), true);
 
                 // Handle pending jumps on whole-clock events. By this point all
                 // three sequencers have already taken their tick, so we're
                 // working with post-tick positions.
-                if (clocked && pending_loop[ch] == LP_ENTER) {
-                    shadow_step[ch] = current_step[ch];
-                    shadow_half_clocks[ch] = current_half_clocks[ch];
-                    shadow_target_half_clocks[ch] = target_half_clocks[ch];
-                    shadow_run_count[ch] = run_count[ch];
+                if (clocked) {
+                    if (pending_loop[ch] == LP_ENTER) {
+                        shadow(ch) = live(ch);
 
-                    if (is_inside_loop(ch, current_step[ch])) {
-                        // Stay where we are; just retarget under loop semantics.
-                        retarget_step(ch, current_step[ch], target_half_clocks[ch], run_count[ch], true);
-                    } else {
-                        // Snap to phantom's current phase-locked position.
-                        current_step[ch] = phantom_step[ch];
-                        current_half_clocks[ch] = phantom_half_clocks[ch];
-                        target_half_clocks[ch] = phantom_target_half_clocks[ch];
-                        run_count[ch] = phantom_run_count[ch];
+                        if (loops[ch].contains(live(ch).step)) {
+                            // Stay where we are; just retarget under loop semantics.
+                            retarget_step(ch, live(ch), true);
+                        } else {
+                            // Snap to phantom's current phase-locked position.
+                            live(ch) = phantom(ch);
+                        }
+                        loop_active[ch] = true;
+                        pending_loop[ch] = LP_NONE;
+                    } else if (pending_loop[ch] == LP_EXIT) {
+                        live(ch) = shadow(ch);
+                        loop_active[ch] = false;
+                        pending_loop[ch] = LP_NONE;
                     }
-                    loop_active[ch] = true;
-                    pending_loop[ch] = LP_NONE;
-                    if (ch == 0) new_step = true;
-                } else if (clocked && pending_loop[ch] == LP_EXIT) {
-                    current_step[ch] = shadow_step[ch];
-                    current_half_clocks[ch] = shadow_half_clocks[ch];
-                    target_half_clocks[ch] = shadow_target_half_clocks[ch];
-                    run_count[ch] = shadow_run_count[ch];
-                    loop_active[ch] = false;
-                    pending_loop[ch] = LP_NONE;
-                    if (ch == 0) new_step = true;
                 }
+
+                if (ch == 0 && live(ch).step != prev_step) new_ch0_step = true;
             }
         }
 
-        if (channel_follow) step_index = current_step[channel_index];
+        if (channel_follow) step_index = live(channel_index).step;
 
-        write_outputs(new_step);
+        write_outputs(new_ch0_step);
     }
 
     void View() override {
@@ -255,7 +247,7 @@ public:
         } else if (cursor == CVSeqCursor::LOOP2) {
             loops[1].enabled ^= true;
             on_loop_toggle(1);
-        } else if (cursor == CVSeqCursor::LOOP_SWAP) {
+        } else if (cursor == CVSeqCursor::LOOP_FLIP) {
             loops[0].enabled ^= true;
             loops[1].enabled ^= true;
             on_loop_toggle(0);
@@ -266,10 +258,17 @@ public:
             cv_value_clipboard = cv_values[cv_value_index];
         } else if (cursor == CVSeqCursor::VALUE_PASTE) {
             cv_values[cv_value_index] = cv_value_clipboard;
-        } else if (cursor == CVSeqCursor::CHANNEL_LOOP_START) {
-            loops[channel_index].start = step_index;
-        } else if (cursor == CVSeqCursor::CHANNEL_LOOP_END) {
-            loops[channel_index].end = step_index;
+        } else if (cursor == CVSeqCursor::CHANNEL_LOOP) {
+            // Replace whichever point is closer to step_index. Naturally
+            // extends when outside, contracts the nearer side when inside,
+            // and collapses to a single step when step_index sits on a point
+            // (in which case we move the *other* marker, since snapping the
+            // one already on this step would be a no-op).
+            const int d0 = abs((int)step_index - (int)loops[channel_index].points[0]);
+            const int d1 = abs((int)step_index - (int)loops[channel_index].points[1]);
+            const uint8_t which = (d0 == 0) ? 1 : (d1 == 0 ? 0 : (d1 < d0 ? 1 : 0));
+            loops[channel_index].points[which] = step_index;
+            on_loop_points_changed(channel_index);
         } else if (cursor == CVSeqCursor::GENERAL_COPY_0_TO_1) {
             copy_channel(0, 1);
         } else if (cursor == CVSeqCursor::GENERAL_COPY_1_TO_0) {
@@ -292,31 +291,19 @@ public:
         if (random_menu_active) {
             // Just exit random menu on aux button.
             random_menu_active = false;
-            CancelEdit();
-            return;
-        }
-
-        if (cursor == CVSeqCursor::QSELECT) {
+        } else if (cursor == CVSeqCursor::QSELECT) {
+            // Open quantizer selection.
             HS::QuantizerEdit(qselect);
-            return;
-        }
-
-        if (cursor == CVSeqCursor::VALUE_CV || cursor == CVSeqCursor::VALUE_NOTE) {
+        } else if (cursor == CVSeqCursor::VALUE_CV || cursor == CVSeqCursor::VALUE_NOTE) {
             // Toggle between selecting CV value or selecting which CV value to edit.
             cv_value_select ^= true;
-            return;
-        }
-
-        if (cursor == CVSeqCursor::CHANNEL_INDEX) {
+        } else if (cursor == CVSeqCursor::CHANNEL_INDEX) {
+            // Toggle following the channel's current step in the live sequencer.
             channel_follow ^= true;
-            return;
-        }
-
-        if (cursor > CVSeqCursor::CHANNEL_INDEX && cursor <= CVSeqCursor::CHANNEL_CLOCKS) {
+        } else if (cursor > CVSeqCursor::CHANNEL_INDEX && cursor <= CVSeqCursor::CHANNEL_CLOCKS) {
             // Toggle between selecting step or selecting which step to edit.
             step_select ^= true;
-            return;
-        }
+        } else CancelEdit();
     }
 
     void OnEncoderMove(int direction) override {
@@ -326,7 +313,6 @@ public:
         }
 
         if (!EditMode()) {
-            // Move cursor.
             MoveCursor(cursor, direction, CVSeqCursor::MAX_CURSOR - 1);
             return;
         }
@@ -352,7 +338,14 @@ public:
             output2_mode = (Output2Mode)constrain(output2_mode + direction, 0, Output2Mode::MAX_OUTPUT2_MODE - 1);
             break;
         case CVSeqCursor::QSELECT:
-            qselect = constrain(qselect + direction, 0, QUANT_CHANNEL_COUNT - 1);
+            // Encoder ramp is OFF, Q1, Q2, … — OFF sits one click below Q1.
+            if (quantize_off) {
+                if (direction > 0) quantize_off = false;
+            } else if (qselect == 0 && direction < 0) {
+                quantize_off = true;
+            } else {
+                qselect = constrain(qselect + direction, 0, QUANT_CHANNEL_COUNT - 1);
+            }
             break;
         case CVSeqCursor::VALUE_INDEX:
             cv_value_index = constrain(cv_value_index + direction, 0, MAX_CV_VALUES - 1);
@@ -387,9 +380,10 @@ public:
         Pack(data, PackLocation {0, 2}, input2_mode);
         Pack(data, PackLocation {2, 3}, output2_mode);
         Pack(data, PackLocation {5, 3}, qselect);
-        Pack(data, PackLocation {8, 1}, transpose_in_semitones);
-        Pack(data, PackLocation {9, 1}, random_channels[0]);
-        Pack(data, PackLocation {10, 1}, random_channels[1]);
+        Pack(data, PackLocation {8, 1}, quantize_off);
+        Pack(data, PackLocation {9, 1}, transpose_in_semitones);
+        Pack(data, PackLocation {10, 1}, random_channels[0]);
+        Pack(data, PackLocation {11, 1}, random_channels[1]);
 
         return data;
     }
@@ -398,13 +392,15 @@ public:
         input2_mode = (Input2Mode)constrain(Unpack(data, PackLocation {0, 2}), 0, Input2Mode::MAX_INPUT2_MODE - 1);
         output2_mode = (Output2Mode)constrain(Unpack(data, PackLocation {2, 3}), 0, Output2Mode::MAX_OUTPUT2_MODE - 1);
         qselect = constrain(Unpack(data, PackLocation {5, 3}), 0, QUANT_CHANNEL_COUNT - 1);
-        transpose_in_semitones = Unpack(data, PackLocation {8, 1});
-        random_channels[0] = Unpack(data, PackLocation {9, 1});
-        random_channels[1] = Unpack(data, PackLocation {10, 1});
+        quantize_off = Unpack(data, PackLocation {8, 1});
+        transpose_in_semitones = Unpack(data, PackLocation {9, 1});
+        random_channels[0] = Unpack(data, PackLocation {10, 1});
+        random_channels[1] = Unpack(data, PackLocation {11, 1});
 
-        // Suppress half-boundary events on stale state, then reset everything
-        // immediately so playback starts cleanly from the new preset.
+        // Suppress any half-boundary event from stale clock state, then reset
+        // everything immediately so playback starts cleanly from the new preset.
         clock_ticks = 0;
+        half_fired = true;
         do_reset();
     }
 
@@ -424,30 +420,24 @@ protected:
 
 private:
     int cursor = 0;
-    
+
     uint32_t clock_ticks = 0; // Ticks between the last two clock inputs.
     uint32_t last_clock_tick = 0; // Tick of last Clock(0) rising edge.
     bool half_fired = true; // Mid-clock half-boundary already emitted this cycle.
-    uint8_t bar_half_clocks = 0; // Independent bar position counter, advances every half-clock.
+    uint8_t bar_half_clocks = 0; // Independent bar position counter, advances on every whole- and half-clock event (8 ticks = one 4-clock bar).
     uint8_t num_steps[2] = {1, 1}; // Number of steps in the sequence for each channel.
-    uint8_t current_step[2] = {0, 0}; // Current sequencer step for each channel.
-    uint8_t current_half_clocks[2] = {0, 0}; // Half-clock events elapsed since the current step started, for each channel.
-    uint8_t target_half_clocks[2] = {2, 2}; // Half-clock duration of the current step, for each channel.
-    uint8_t run_count[2] = {0, 0}; // Length of the current consecutive half-clock run, for each channel.
 
-    // Shadow sequencer: while a loop is engaged, this advances as if the loop
-    // were off, so we can resume there when the user releases the loop.
-    uint8_t shadow_step[2] = {0, 0};
-    uint8_t shadow_half_clocks[2] = {0, 0};
-    uint8_t shadow_target_half_clocks[2] = {2, 2};
-    uint8_t shadow_run_count[2] = {0, 0};
-    // Phantom sequencer: always plays the loop region (regardless of loop_active),
-    // anchored at eff_start at sequence reset. Used to phase-lock the entry
-    // position when the loop is engaged from outside the loop region.
-    uint8_t phantom_step[2] = {0, 0};
-    uint8_t phantom_half_clocks[2] = {0, 0};
-    uint8_t phantom_target_half_clocks[2] = {2, 2};
-    uint8_t phantom_run_count[2] = {0, 0};
+    enum SeqRole : uint8_t { SEQ_LIVE, SEQ_SHADOW, SEQ_PHANTOM, SEQ_COUNT };
+    struct SeqState {
+        uint8_t step = 0;
+        uint8_t half_clocks = 0;
+        uint8_t target_half_clocks = 2;
+        uint8_t run_count = 0;
+    };
+    // live: what you hear; shadow: where we'd be without the loop (resume point on exit);
+    // phantom: always plays the loop region, phase-locked from reset (engage reference).
+    SeqState seq[2][SEQ_COUNT];
+
     bool loop_active[2] = {false, false}; // Whether the loop is currently driving playback (lags loops[].enabled by one clock).
     enum LoopPending : uint8_t { LP_NONE, LP_ENTER, LP_EXIT }; // Latched action for the next Clock(0): enter the loop, exit to shadow, or do nothing.
     LoopPending pending_loop[2] = {LP_NONE, LP_NONE};
@@ -458,21 +448,24 @@ private:
     };
 
     struct Loop {
-        uint8_t start = 0; // Index of loop start step.
-        uint8_t end = 0; // Index of loop end step.
+        uint8_t points[2] = {0, 0}; // Two unordered markers; the loop region is [lo(), hi()].
         bool enabled = false; // Whether the loop is enabled.
+        uint8_t lo() const { return points[0] < points[1] ? points[0] : points[1]; }
+        uint8_t hi() const { return points[0] < points[1] ? points[1] : points[0]; }
+        bool contains(uint8_t step) const { return step >= lo() && step <= hi(); }
     };
 
     Input2Mode input2_mode = Input2Mode::CV2_IN; // What CV2 input is used for.
     Output2Mode output2_mode = Output2Mode::CV2; // What CV2 outputs.
     int qselect = io_offset; // Quantizer channel selection for both channels, since they share the quantizer.
+    bool quantize_off = false; // When true, skip quantization entirely (sits one click below Q1 in the encoder ramp).
     bool transpose_in_semitones = false; // Whether CV1 transpose (or root note if scale is off) is in semitones or scale degrees.
     int32_t transpose_amt = 0; // Always in semitones; quantized into a scale degree when transpose_in_semitones is false.
     bool reset_flag = false; // Latched: do_reset() runs on the next Clock(0).
     bool random_menu_active = false; // Whether the random menu is active.
     OC::menu::ScreenCursor<5> random_menu_cursor; // Cursor for the random menu.
     bool random_channels[2] = {true, true}; // Randomization settings for each channel.
-    int8_t cv_values[MAX_CV_VALUES] = {}; // CV values available for the sequence, stored as -127 to 127 for easier editing and display as voltage. The actual CV output will be this value multiplied by CV_INCREMENT.
+    int8_t cv_values[MAX_CV_VALUES] = {}; // CV values available for the sequence, in half-semitone units (-127..127). At output, (v >> 1) whole semitones go through the quantizer and (v & 1) adds a chromatic 50¢ residue (CV_INCREMENT DAC units).
     uint8_t cv_value_index = 0; // The index of CV value currently being edited, from the cv_values array.
     bool cv_value_select = false; // Whether the CV value is being selected with the AUX button.
     int8_t cv_value_clipboard = 0; // A clipboard for copying and pasting CV values.
@@ -483,6 +476,13 @@ private:
     Loop loops[2] = {}; // Loop points for each channel.
     Step steps[2][MAX_STEPS]; // The sequence itself for each channel.
 
+    SeqState&       live(uint8_t ch)          { return seq[ch][SEQ_LIVE]; }
+    const SeqState& live(uint8_t ch)    const { return seq[ch][SEQ_LIVE]; }
+    SeqState&       shadow(uint8_t ch)        { return seq[ch][SEQ_SHADOW]; }
+    const SeqState& shadow(uint8_t ch)  const { return seq[ch][SEQ_SHADOW]; }
+    SeqState&       phantom(uint8_t ch)       { return seq[ch][SEQ_PHANTOM]; }
+    const SeqState& phantom(uint8_t ch) const { return seq[ch][SEQ_PHANTOM]; }
+
     void draw_interface() {
         if (random_menu_active) {
             draw_random_menu();
@@ -491,8 +491,13 @@ private:
 
         uint8_t y = 11;
 
-        const uint8_t ph1 = Proportion(total_half_clocks(0, current_step[0]) + current_half_clocks[0], total_half_clocks(0), 64);
-        const uint8_t ph2 = Proportion(total_half_clocks(1, current_step[1]) + current_half_clocks[1], total_half_clocks(1), 64);
+        // Clamp to 64: when a loop pulls in steps past num_steps the live
+        // position can exceed total_half_clocks(ch), which would overflow the
+        // uint8_t and draw a wrong-width bar.
+        const uint16_t total0 = total_half_clocks(0);
+        const uint16_t total1 = total_half_clocks(1);
+        const uint8_t ph1 = constrain(Proportion(total_half_clocks(0, live(0).step) + live(0).half_clocks, total0, 64), 0, 64);
+        const uint8_t ph2 = constrain(Proportion(total_half_clocks(1, live(1).step) + live(1).half_clocks, total1, 64), 0, 64);
         const uint8_t phbar = Proportion(bar_half_clocks % 8, 8, 64);
 
         y += 4;
@@ -582,12 +587,18 @@ private:
         y += 10;
         const uint8_t y_qselect = y; // saved for the overlay drawn after all other rows
         if (cursor == CVSeqCursor::QSELECT || cursor == CVSeqCursor::TRANS_MODE) {
-            const char txt[] = { 'Q', char('1' + qselect), '\0' };
-            gfxPrint(6, y, txt);
-            gfxPrint(0, y + 10, transpose_in_semitones ? "Semi" : "Deg");
+            if (quantize_off) {
+                gfxPrint(0, y, "OFF");
+            } else {
+                const char txt[] = { 'Q', char('1' + qselect), '\0' };
+                gfxPrint(6, y, txt);
+            }
+            gfxPrint(0, y + 10, transpose_in_semitones ? "Root" : "Deg");
             if (cursor == CVSeqCursor::TRANS_MODE) {
                 gfxSpicyCursor(0, y + 18, 24);
             }
+        } else if (quantize_off) {
+            gfxPrint(0, y, "OFF");
         } else {
             // Show scale and root note like old times.
             gfxPrint(0, y, HS::GetQuantEngine(qselect), false);
@@ -608,14 +619,18 @@ private:
         gfxIcon(18, y, RANDOM_ICON);
         if (cursor == CVSeqCursor::RANDOM) gfxSpicyCursor(18, y + 8, 8);
         gfxIcon(32, y, LOOP_ICON);
-        gfxPrint(40, y, "Swp");
-        if (cursor == CVSeqCursor::LOOP_SWAP) gfxSpicyCursor(40, y + 8, 18);
+        gfxPrint(40, y, "Flp");
+        if (cursor == CVSeqCursor::LOOP_FLIP) gfxSpicyCursor(40, y + 8, 18);
 
         if (cursor == CVSeqCursor::QSELECT) {
-            gfxSpicyCursor(6, y_qselect + 8, 12, "Q-engine");
-            if (EditMode()) {
-                // Overlay preview of scale + root.
-                gfxPrint(1, y_qselect + 9, HS::GetQuantEngine(qselect));
+            if (quantize_off) {
+                gfxSpicyCursor(0, y_qselect + 8, 18, "Q-engine");
+            } else {
+                gfxSpicyCursor(6, y_qselect + 8, 12, "Q-engine");
+                if (EditMode()) {
+                    // Overlay preview of scale + root.
+                    gfxPrint(1, y_qselect + 9, HS::GetQuantEngine(qselect));
+                }
             }
         }
     }
@@ -688,27 +703,27 @@ private:
         if (cursor == CVSeqCursor::CHANNEL_STEPS) gfxSpicyCursor(32, y + 8, 12, "Num steps");
         if (cursor == CVSeqCursor::CHANNEL_STEP) gfxSpicyCursor(50, y + 8, 12, "Step");
 
+        const Step& step = steps[channel_index][step_index];
         y += 10;
         gfxPos(0, y);
         gfxPrint("val #");
-        gfxPrint(steps[channel_index][step_index].value + 1);
+        gfxPrint(step.value + 1);
         if (cursor == CVSeqCursor::CHANNEL_VALUE) gfxSpicyCursor(30, y + 8, 12, "Step val.");
-        if (loops[channel_index].start == step_index) gfxPrint(48, y, ">");
-        if (cursor == CVSeqCursor::CHANNEL_LOOP_START) gfxSpicyCursor(48, y + 8, 6);
-        if (loops[channel_index].end == step_index) gfxPrint(54, y, "<");
-        if (cursor == CVSeqCursor::CHANNEL_LOOP_END) gfxSpicyCursor(54, y + 8, 6);
+        if (loops[channel_index].lo() == step_index) gfxPrint(48, y, ">");
+        if (loops[channel_index].hi() == step_index) gfxPrint(54, y, "<");
+        if (cursor == CVSeqCursor::CHANNEL_LOOP) gfxSpicyCursor(48, y + 8, 12);
 
         y += 10;
-        if (steps[channel_index][step_index].clocks == 0) {
+        if (step.clocks == 0) {
             gfxPrint(0, y, "1/2");
         } else {
-            gfxPrint(0, y, steps[channel_index][step_index].clocks);
+            gfxPrint(0, y, step.clocks);
         }
         gfxPrint(24, y, "clocks");
         if (cursor == CVSeqCursor::CHANNEL_CLOCKS) gfxSpicyCursor(0, y + 8, 18, "Clocks");
 
         y += 10;
-        gfxPrint(0, y, total_clocks(channel_index));
+        gfxPrint(0, y, total_half_clocks(channel_index) / 2);
         gfxPos(30, y);
         if (step_index < num_steps[channel_index]) {
             // Show when the current step starts in clocks, relative to the start of the sequence.
@@ -733,25 +748,13 @@ private:
     void draw_general_screen(uint8_t y) {
         gfxPrint(0, y, "CH1 > CH2");
         if (cursor == CVSeqCursor::GENERAL_COPY_0_TO_1) gfxSpicyCursor(0, y + 8, 60);
-        
+
         y += 10;
         gfxPrint(0, y, "CH2 > CH1");
         if (cursor == CVSeqCursor::GENERAL_COPY_1_TO_0) gfxSpicyCursor(0, y + 8, 60);
     }
 
-    // Total length of the sequence in whole clocks.
-    // Always a whole number because trailing half-clock runs are auto-extended.
-    uint16_t total_clocks(uint8_t ch) {
-        return total_half_clocks(ch) / 2;
-    }
-
-    // Returns the total length of the sequence in half clocks
-    // by summing the lengths of all steps.
-    // Successive half-clock steps come in pairs (each contributing 1 half-clock).
-    // If a run of consecutive half-clock steps has an odd count,
-    // the last one is automatically extended to a full clock
-    // so that the next step always starts at the beginning of a clock.
-    uint16_t total_half_clocks(uint8_t ch, uint8_t up_to_step = MAX_STEPS) {
+    uint16_t total_half_clocks(uint8_t ch, uint8_t up_to_step = MAX_STEPS) const {
         uint16_t half_clocks = 0;
         uint8_t run = 0; // length of the current consecutive half-clock run
         const uint8_t limit = num_steps[ch] < up_to_step ? num_steps[ch] : up_to_step;
@@ -773,16 +776,19 @@ private:
         return half_clocks;
     }
 
-    // Copy all step data from one channel to another.
     void copy_channel(uint8_t from, uint8_t to) {
         num_steps[to] = num_steps[from];
-        memcpy(steps[to], steps[from], sizeof(steps[0]));
+        memcpy(steps[to], steps[from], sizeof(Step) * MAX_STEPS);
         loops[to] = loops[from];
     }
 
-    // Reset all sequencer state to a clean starting position. Called by the
-    // latched reset on the first clock after Reset() / Clock(1), and directly
-    // by OnDataReceive when a preset is loaded.
+    void reset_phantom(uint8_t ch) {
+        phantom(ch) = SeqState{};
+        phantom(ch).step = loops[ch].lo();
+        enter_step(ch, phantom(ch), true);
+    }
+
+    // Latched reset: called on the first clock after Reset()/Clock(1) or when a preset is loaded.
     void do_reset() {
         reset_flag = false;
         bar_half_clocks = 0;
@@ -790,36 +796,23 @@ private:
             loop_active[ch] = loops[ch].enabled;
             pending_loop[ch] = LP_NONE;
 
-            current_step[ch] = 0;
-            current_half_clocks[ch] = 0;
-            run_count[ch] = 0;
-            enter_current_step(ch);
+            live(ch) = SeqState{};
+            enter_step(ch, live(ch), loop_active[ch]);
 
-            shadow_step[ch] = 0;
-            shadow_half_clocks[ch] = 0;
-            shadow_run_count[ch] = 0;
-            enter_shadow_step(ch);
+            shadow(ch) = SeqState{};
+            enter_step(ch, shadow(ch), false);
 
-            phantom_step[ch] = eff_start(ch);
-            phantom_half_clocks[ch] = 0;
-            phantom_run_count[ch] = 0;
-            enter_phantom_step(ch);
+            reset_phantom(ch);
         }
     }
 
-    // Loop start/end clamped to the active step range.
-    uint8_t eff_start(uint8_t ch) const {
-        return loops[ch].start < num_steps[ch] ? loops[ch].start : (uint8_t)(num_steps[ch] - 1);
-    }
-    uint8_t eff_end(uint8_t ch) const {
-        return loops[ch].end < num_steps[ch] ? loops[ch].end : (uint8_t)(num_steps[ch] - 1);
-    }
-
-    // Compute the next step index from a given step, optionally honoring loops.
-    // Pure (does not mutate state). Loop points beyond num_steps are clamped to
-    // the last enabled step.
+    // Forward-only: loop_on causes hi→lo wrap; otherwise wraps at num_steps.
     uint8_t step_after(uint8_t ch, uint8_t step, bool loop_on) const {
-        if (loop_on && step == eff_end(ch)) return eff_start(ch);
+        if (loop_on) {
+            if (step == loops[ch].hi()) return loops[ch].lo();
+            // step < hi() <= MAX_STEPS - 1, so step + 1 is always in range.
+            return step + 1;
+        }
 
         const uint8_t next = step + 1;
         if (next >= num_steps[ch]) return 0;
@@ -827,26 +820,17 @@ private:
         return next;
     }
 
-    // Next step for the live sequencer, honoring the actual playback loop state.
-    uint8_t next_step_index(uint8_t ch) const {
-        return step_after(ch, current_step[ch], loop_active[ch]);
-    }
-
-    // Compute target_half_clocks for a step that's already pointed at by the
-    // run counter (i.e., do NOT increment run). Used both during a fresh entry
-    // (after enter_step bumps the run) and to retarget a step in place when
-    // the loop state flips mid-step.
-    void retarget_step(uint8_t ch, uint8_t step, uint8_t& target_hc, uint8_t& run, bool loop_on) const {
-        const Step& s = steps[ch][step];
+    void retarget_step(uint8_t ch, SeqState& ss, bool loop_on) const {
+        const Step& s = steps[ch][ss.step];
         if (s.clocks > 0) {
-            run = 0;
-            target_hc = s.clocks * 2;
+            ss.run_count = 0;
+            ss.target_half_clocks = s.clocks * 2;
             return;
         }
 
-        if ((run & 1) == 0) {
+        if ((ss.run_count & 1) == 0) {
             // Even position in the run: paired with previous half-clock step.
-            target_hc = 1;
+            ss.target_half_clocks = 1;
             return;
         }
 
@@ -854,63 +838,47 @@ private:
         // this step ends the playback cycle — in which case extend to a whole
         // clock so each cycle starts on a clock boundary (matches
         // total_half_clocks() display logic).
-        const uint8_t cycle_end = loop_on ? eff_end(ch) : (uint8_t)(num_steps[ch] - 1);
-        if (step == cycle_end) {
-            run = 0;
-            target_hc = 2;
+        const uint8_t cycle_end = loop_on ? loops[ch].hi() : (uint8_t)(num_steps[ch] - 1);
+        if (ss.step == cycle_end) {
+            ss.run_count = 0;
+            ss.target_half_clocks = 2;
             return;
         }
 
-        const uint8_t next = step_after(ch, step, loop_on);
-        target_hc = (steps[ch][next].clocks == 0) ? 1 : 2;
+        const uint8_t next = step_after(ch, ss.step, loop_on);
+        ss.target_half_clocks = (steps[ch][next].clocks == 0) ? 1 : 2;
     }
 
-    // Enter a step: bump the run counter for half-clock steps, then compute
-    // the target. Drives the live, shadow, and phantom sequencers.
-    void enter_step(uint8_t ch, uint8_t step, uint8_t& target_hc, uint8_t& run, bool loop_on) {
-        if (steps[ch][step].clocks == 0) run++;
-        retarget_step(ch, step, target_hc, run, loop_on);
+    void enter_step(uint8_t ch, SeqState& ss, bool loop_on) {
+        if (steps[ch][ss.step].clocks == 0) ss.run_count++;
+        retarget_step(ch, ss, loop_on);
     }
 
-    void enter_current_step(uint8_t ch) {
-        enter_step(ch, current_step[ch], target_half_clocks[ch], run_count[ch], loop_active[ch]);
-    }
-
-    void enter_shadow_step(uint8_t ch) {
-        enter_step(ch, shadow_step[ch], shadow_target_half_clocks[ch], shadow_run_count[ch], false);
-    }
-
-    void enter_phantom_step(uint8_t ch) {
-        enter_step(ch, phantom_step[ch], phantom_target_half_clocks[ch], phantom_run_count[ch], true);
-    }
-
-    // Advance the shadow sequencer one half-clock event, ignoring loops.
-    void advance_shadow(uint8_t ch) {
-        shadow_half_clocks[ch]++;
-        if (shadow_half_clocks[ch] >= shadow_target_half_clocks[ch]) {
-            shadow_step[ch] = step_after(ch, shadow_step[ch], false);
-            shadow_half_clocks[ch] = 0;
-            enter_shadow_step(ch);
+    void advance_seq(uint8_t ch, SeqState& s, bool loop_on) {
+        if (++s.half_clocks >= s.target_half_clocks) {
+            s.step = step_after(ch, s.step, loop_on);
+            s.half_clocks = 0;
+            enter_step(ch, s, loop_on);
         }
     }
 
-    // Advance the phantom sequencer one half-clock event, always honoring loops.
-    void advance_phantom(uint8_t ch) {
-        phantom_half_clocks[ch]++;
-        if (phantom_half_clocks[ch] >= phantom_target_half_clocks[ch]) {
-            phantom_step[ch] = step_after(ch, phantom_step[ch], true);
-            phantom_half_clocks[ch] = 0;
-            enter_phantom_step(ch);
-        }
-    }
+    // Called after a loop start/end point changes. Always re-anchors the
+    // phantom at the new region's start so the next engage stays in phase
+    // (otherwise phantom may sit outside the new bounds and take a full lap
+    // to wrap back in). When the loop is active, also corrects the live
+    // sequencer: retargets in place if still inside the new region, or snaps
+    // to the phantom if it has wandered outside. Shadow is left alone — it
+    // remains the valid no-loop resume point for when the loop is released.
+    void on_loop_points_changed(uint8_t ch) {
+        reset_phantom(ch);
 
-    // True if `step` falls within the loop region, regardless of loop direction.
-    bool is_inside_loop(uint8_t ch, uint8_t step) const {
-        const uint8_t a = eff_start(ch);
-        const uint8_t b = eff_end(ch);
-        const uint8_t lo = a < b ? a : b;
-        const uint8_t hi = a < b ? b : a;
-        return step >= lo && step <= hi;
+        if (!loop_active[ch]) return;
+
+        if (loops[ch].contains(live(ch).step)) {
+            retarget_step(ch, live(ch), true);
+        } else {
+            live(ch) = phantom(ch);
+        }
     }
 
     // Handle a press on a LOOP toggle button. The Loop's enabled flag has
@@ -935,21 +903,20 @@ private:
 
     // Compute the CV output for a channel: sequence value offsets the input CV
     // in semitone units, the result is quantized, then sub-semitone residue and
-    // the global CV2 transpose are optionally applied.
-    int pitch_for_step(uint8_t ch, uint8_t step, int input_cv, bool apply_global_transpose) {
+    // the global CV2 transpose are applied (ch1 only).
+    int pitch_for_step(uint8_t ch, uint8_t step, int input_cv) const {
         const int8_t v = cv_values[steps[ch][step].value];
         // v is in half-semitones; whole semitones go through the quantizer,
         // the +50¢ residue stays chromatic and is applied after.
         const int seq_semitones = (v >> 1) * 128;
         const int seq_residue   = (v & 1) * CV_INCREMENT;
-        const int transpose_offset = apply_global_transpose ? (transpose_amt << 7) : 0;
-        const bool scale_off = OC::Scales::GetScale(HS::GetScale(qselect)).num_notes == 0;
+        const int transpose_offset = (ch == 0) ? (transpose_amt << 7) : 0;
 
         int cv;
-        if (scale_off) {
+        if (quantize_off) {
             cv = input_cv + seq_semitones + seq_residue + transpose_offset;
         } else if (transpose_in_semitones) {
-            // Semitone mode: chromatic transpose + residue applied after quantization.
+            // Root mode: chromatic transpose + residue applied after quantization.
             cv = HS::q_engine[qselect].Process(input_cv + seq_semitones, 0, 0)
                + transpose_offset + seq_residue;
         } else {
@@ -961,14 +928,13 @@ private:
         return constrain(cv, HEMISPHERE_MIN_CV, HEMISPHERE_MAX_CV);
     }
 
-    // Write CV outputs for both channels based on the current step and input CV, according to the current mode settings.
-    void write_outputs(bool new_step) {
+    void write_outputs(bool new_ch0_step) {
         const int ch1_input_cv = In(0);
-        const int play_cv = pitch_for_step(0, current_step[0], ch1_input_cv, true);
+        const int play_cv = pitch_for_step(0, live(0).step, ch1_input_cv);
         Out(0, play_cv);
 
         const int ch2_input_cv = (input2_mode == Input2Mode::CV2_IN) ? In(1) : 0;
-        const int ch2_seq_cv = pitch_for_step(1, current_step[1], ch2_input_cv, false);
+        const int ch2_seq_cv = pitch_for_step(1, live(1).step, ch2_input_cv);
 
         switch (output2_mode) {
             case Output2Mode::CV2:
@@ -990,12 +956,11 @@ private:
                 Out(1, play_cv + 2 * ONE_OCTAVE);
                 break;
             case Output2Mode::CV1_GATE:
-                if (new_step) ClockOut(1);
+                if (new_ch0_step) ClockOut(1);
                 break;
             case Output2Mode::CV1_IN:
                 Out(1, ch1_input_cv);
                 break;
-            default: break;
         }
     }
 
@@ -1044,17 +1009,12 @@ private:
         }
     }
 
-    // Initialize all steps to 0.
     void zero_steps() {
-        num_steps[0] = 1;
-        num_steps[1] = 1;
-        loops[0] = Loop{};
-        loops[1] = Loop{};
-
-        for (uint8_t i = 0; i < MAX_CV_VALUES; i++) cv_values[i] = 0;
-        for (uint8_t i = 0; i < MAX_STEPS; i++) {
-            steps[0][i] = Step();
-            steps[1][i] = Step();
+        memset(cv_values, 0, sizeof(cv_values));
+        for (uint8_t ch = 0; ch < 2; ch++) {
+            num_steps[ch] = 1;
+            loops[ch] = Loop{};
+            for (uint8_t i = 0; i < MAX_STEPS; i++) steps[ch][i] = Step();
         }
     }
 

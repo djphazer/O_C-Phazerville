@@ -5,7 +5,7 @@ layout: default
 
 ![CVSeq screenshot](images/CVSeq.png)
 
-**CVSeq** is a clocked dual-channel CV/note sequencer with a shared pool of CV values. Each channel has its own list of steps; each step picks a value from the pool and lasts a configurable number of clocks (including a half-clock option for ratchets/swing). Output 1 plays channel 1 (quantized, with optional CV1/CV2 transpose); Output 2 can play channel 2 or mirror channel 1 at various octave offsets. Both channels can have independent loop regions, toggleable on the fly.
+**CVSeq** is a clocked dual-channel CV/note sequencer with a shared pool of 32 CV values. Each channel has its own step list; each step picks a value from the pool and lasts a configurable number of clocks (with a half-clock option for ratchets/swing). Output 1 plays channel 1 (quantized, with optional CV1/CV2 transpose); Output 2 can play channel 2 or mirror channel 1 at various octave offsets. Both channels have independent loop regions, toggleable on the fly.
 
 ### I/O
 
@@ -15,127 +15,83 @@ layout: default
 | CV INs | CV1 (transpose / pitch base for channel 1) | Per `In2` mode (CV2 input or CV1 transpose) |
 | OUTs   | Channel 1 CV (quantized) | Per `Out2` mode |
 
-### UI Controls
-CVSeq has four screens that the cursor traverses in order:
+### Screens
+The cursor traverses four screens in order: **Main** (modes, quantizer, transpose, reset/random, loop toggles), **Values** (edit the shared CV pool), **Channel** (per-channel step editor), **General** (CH1↔CH2 copy). A header on every screen shows both channel playhead positions and a 4-clock bar counter (one tick per half-clock, dotted at each whole clock); channel bars scale to `Num steps` and pin to full when a loop pulls playback past that length.
 
-- **Main screen**: In2 mode, Out2 mode, Quantizer select, Transpose mode, Reset, Random, Loop1, Loop2, Loop swap.
-- **Values screen**: select a CV value index from the shared pool, edit it as voltage or as note, plus Zero/Copy/Paste shortcuts.
-- **Channel screen**: pick the channel, set the number of steps, pick a step, edit its value index, mark loop start/end, set clocks-per-step.
-- **General screen**: copy CH1→CH2 and CH2→CH1.
-
-A progress bar at the top of every screen shows channel 1 and channel 2 playback position, plus an independent bar-position counter (advances every half-clock, with tick marks at quarters of the bar).
+Pressing **AUX** while on most editable fields (CV/Note on Values; Num steps/Step/Value/Loop/Clocks on Channel) toggles a quick mode that scrubs the index without leaving the field.
 
 ## In2 (CV2 input) modes
-`In2` defines what CV2 is used for:
 
-| Mode  | Description                                                                          |
-|-------|-------------------------------------------------------------------------------------|
+| Mode  | Description |
+|-------|-------------|
 | CV2   | CV2 is the pitch base for **channel 2** (added before the channel 2 sequence value, then quantized). |
-| Trnsp | CV2 transposes **channel 1** (read in semitones, applied before quantization). In `Deg` mode the transposed value is snapped to a scale note; in `Semi` mode the transpose stays chromatic. |
+| Trnsp | CV2 transposes **channel 1** in semitones. See *Quantizer & transpose* for `Deg`/`Root` behaviour. |
 
 ## Out2 modes
-Output 2 can play channel 2 or mirror channel 1:
 
 | Out2 Mode | Description |
 |-----------|-------------|
 | CV2       | Channel 2 sequencer output (quantized, using CV2 as pitch base when `In2` = `CV2`) |
-| CV1-2     | Channel 1 output, two octaves down |
-| CV1-1     | Channel 1 output, one octave down |
-| CV1       | Channel 1 output (same as Out1) |
-| CV1+1     | Channel 1 output, one octave up |
-| CV1+2     | Channel 1 output, two octaves up |
+| CV1±2 / CV1±1 / CV1 | Channel 1 output, transposed by ±2 / ±1 / 0 octaves |
 | Gate      | Short gate at each new channel 1 step |
 | CV1in     | CV1 input passed through (unquantized, not transposed) |
 
 ## Quantizer & transpose
-Both channels share one quantizer (`Q1`–`Q8`). On the main screen:
+Both channels share one quantizer (`Q1`–`Q8`), with an `OFF` setting one click below `Q1` that bypasses quantization (CV1/CV2, sequence values, and transpose are summed and output chromatically). The quantizer field shows the current scale and root; pressing **AUX** on it opens the global quantizer editor for that channel (works in `OFF` mode too, so you can prep before switching back).
 
-- The quantizer field shows the current scale and root note. Pressing **AUX** while the cursor is on `Q-engine` opens the global quantizer editor for the selected channel.
-- The transpose-mode toggle (`Deg` / `Semi`) controls how the CV1-transpose (and the manual root note when no scale is selected) is interpreted:
-  - `Deg`: transpose is added **before** quantization, snapping to a scale degree.
-  - `Semi`: transpose is added **after** quantization, staying chromatic.
-- Sub-semitone `+50¢` residue from a CV value (odd values) is always applied chromatically, after quantization.
+The transpose-mode toggle controls how CV1-transpose (and the manual root note when no scale is selected) is applied:
+- `Deg`: added **before** quantization, snapping to a scale degree.
+- `Root`: added **after** quantization, staying chromatic (manual root-note offset, matching TB3PO).
 
 ## Values screen
-The shared pool holds **32 CV values**, indexed 1–32. Each step on either channel points at one of these values. Editing a value changes every step that references it.
+The shared pool holds **32 CV values**, indexed 1–32. Each step on either channel points at one of these; editing a value changes every step that references it.
 
-### Value index
-Selects which CV value (1–32) to edit. Pressing **AUX** while on the CV or Note row toggles a quick mode that lets the encoder scrub the index without leaving the value/note field.
-
-### CV
-The value as voltage. Resolution is ~0.08 V (±10 V range), shown with two decimals.
-
-### Note
-The same value as a chromatic note name + octave. Octave is signed (e.g. `B-1`). Odd values append `+50c` to indicate a quarter-tone between two semitones — useful as a chromatic detune that survives quantization.
-
-### Zero / Cpy / Past
-- `0`: reset the current value to 0 V.
-- `Cpy`: copy the current value to the clipboard.
-- `Past`: paste the clipboard onto the current value.
+- **Value index** — selects which value (1–32) to edit.
+- **CV** — value as voltage. Each increment is half a semitone (50¢, ~0.042 V), giving a ±63.5-semitone range.
+- **Note** — same value as a chromatic note name + octave (signed, e.g. `B-1`). Odd values append `+50c` to indicate a quarter-tone — useful as a chromatic detune that survives quantization.
+- **0 / Cpy / Past** — reset the current value to 0 V, copy to clipboard, paste from clipboard.
 
 ## Channel screen
 Per-channel step editor.
 
-### Channel (CH)
-Selects the channel (1 or 2) being edited. Pressing **AUX** here toggles **channel-follow**: when on, the step cursor automatically tracks the live playback position of the selected channel (the channel label is highlighted to show follow is active).
-
-### Num steps (length icon)
-Number of active steps in the channel sequence (1–64). Steps beyond this count are kept in memory but ignored during playback.
-
-### Step (#)
-Selects which step you’re editing. Pressing **AUX** on any step-related field toggles a quick mode that lets the encoder scrub the step index without leaving the field.
-
-### Value (val #)
-Index into the shared CV-values pool (1–32) that this step plays.
-
-### Loop start / Loop end
-- `>` next to the step number marks it as the channel’s **loop start**.
-- `<` next to the step number marks it as the channel’s **loop end**.
-- Press the encoder while the cursor is on either field to set the loop start/end to the currently viewed step.
-
-### Clocks
-How many clocks this step lasts (1–31), with a special `1/2` value for half-clock ratchets/swing:
-
-- A `1/2` step contributes one half-clock event (advances on either the next whole clock or the next half-clock boundary, whichever comes first).
-- Pairs of consecutive `1/2` steps fit cleanly inside a single clock.
-- A trailing odd half-clock run (e.g. a single `1/2` step followed by a whole-clock step) is automatically extended to a full clock so the next step always starts on a clock boundary. The bottom row shows `/` after the start time when a step actually starts on a half-clock boundary.
-
-### Total length / step start
-The bottom row shows the total length of the active sequence in whole clocks, followed by when the current step starts (in clocks, relative to the start of the sequence). A trailing `/` means the step starts on a half-clock boundary. If the viewed step is past `num_steps`, the start position shows `-` (the step won’t play).
+- **CH** — selects channel 1 or 2. Pressing **AUX** here toggles **channel-follow**: the step cursor tracks live playback (channel label highlights when active).
+- **Num steps** — active sequence length (1–64). Steps beyond this are kept in memory but ignored unless a loop pulls them in.
+- **Step (#)** — which step you're editing.
+- **Value (val #)** — index into the shared CV pool (1–32).
+- **Loop** — region bounded by `>` (lower) and `<` (higher) markers. Pressing the encoder snaps the *closer* marker onto the current step: extends the region from outside, contracts the nearer side from inside, collapses to a single step when on a marker. Markers can land anywhere from 1 to 64.
+- **Clocks** — step length. 32 values: a half-clock `1/2` for ratchets/swing, then 1–31 whole clocks. Pairs of consecutive `1/2` steps fit inside a single clock; a trailing odd `1/2` run is auto-extended so the next step starts on a clock boundary.
+- **Bottom row** — total length of the active sequence (whole clocks), then when the current step starts. A trailing `/` means a half-clock boundary (e.g. `5/` is five-and-a-half clocks in); `-` means the step is past `num_steps`.
 
 ## General screen
-Sequence-level utilities:
-
 - `CH1 > CH2`: copy channel 1 (steps, length, loop) onto channel 2.
 - `CH2 > CH1`: copy channel 2 onto channel 1.
 
 ## Loops
-Each channel has an independent loop region defined by **Loop start** and **Loop end** (set on the channel screen). On the main screen, three controls toggle loops live:
+Each channel has an independent loop region. On the main screen, `ch1` / `ch2` toggle the loop for that channel; `Flp` toggles both at once (useful for swapping which channel is looping).
 
-- `ch1` / `ch2`: toggle loop for that channel.
-- `Swp`: toggle both loops at once (useful for swapping which channel is looping).
+Loop changes are **clock-locked** — they take effect on the next whole clock so swaps stay musical. Toggling again before the next clock cancels the pending change; editing the endpoints re-anchors the phase reference; a reset applies the current state immediately and clears any pending toggle.
 
-Loop engagement is **clock-locked** and uses three internal sequencers per channel to make engage/disengage musical:
-
-- **Live**: what you actually hear.
-- **Shadow**: keeps running as if the loop were off, so disengaging the loop resumes where the sequence “would have been”.
-- **Phantom**: always plays the loop region (anchored at the loop start at sequence reset). When you engage the loop from outside the loop region, playback snaps to the phantom’s phase-locked position so the loop enters in time. If you engage while already inside the loop region, the live sequencer stays put and just retargets under loop semantics.
-
-Toggling a loop while a jump is already pending (before the next clock) cancels the pending jump.
+- Engaging from outside the region: snaps to the position the loop *would* be playing if it had been running since reset (phase-locked re-entry).
+- Engaging from inside: leaves the playhead where it is.
+- Disengaging: continues from where the un-looped sequence would have been (the loop is treated as a detour, not a reset).
 
 ## Random
-Selecting `Random` on the main page opens a scrollable, checklist-style randomizer:
+Selecting `Random` on the main page opens a checklist-style randomizer:
 
-- `CH1` / `CH2`: per-channel checkboxes — only the checked channels are affected by `Steps` (and `Init` / `Zero` always reset both).
-- `Values`: randomize the entire CV-values pool within ±18 semitones (whole-semitone increments, 32 values).
+- `CH1` / `CH2`: per-channel checkboxes — only checked channels are affected by `Steps` (`Init` / `Zero` always reset both).
+- `Values`: randomize the entire CV pool within ±18 semitones (whole semitones).
 - `Transpose`: randomly transpose ~half of the CV values up or down by up to 6 semitones.
-- `Steps`: regenerate the step list for each enabled channel. Picks a musically reasonable target length (8/16/32 clocks for CH1; CH2 gets the same, half, or a quarter), then fills with random clock counts (mostly 4-clock, some 2-clock) and random value indices. Loops are cleared.
+- `Steps`: regenerate the step list for each enabled channel with random clocks-per-step (mostly 4, some 2) and random value indices. CH1 targets 16 clocks (occasionally 8 or 32); CH2 is the same, half, or a quarter. Loops are cleared.
 - `Zero`: clear all CV values to 0, reset both channels to a single empty step, clear loops.
-- `Init`: load the default init sequence (root / 4th / 5th–driving techno pattern, CH1 = 3 steps, CH2 = 2 steps).
-- `Back`: exit the menu without changes.
+- `Init`: load the default init sequence (root / 4th / 5th–driving techno pattern, CH1 = 3 steps, CH2 = 2 steps), and refill the CV pool with that interval set.
+- `Back`: exit without changes.
 
 ## Reset
-Resetting (digital 2 trigger or pressing **Reset** on the main page) is **latched**: the current step keeps playing until the next clock, then both channels jump back to step 0. This keeps Reset musical when fired off-grid.
+Resetting (digital 2 trigger or pressing **Reset** on the main page) is **latched**: the current step keeps playing until the next whole clock, then both channels jump back to step 0. This keeps Reset musical when fired off-grid.
+
+## Persistence
+
+> ⚠️ **Step data is not saved across power cycles.** Saved presets store only configuration (In2/Out2 modes, quantizer selection including `OFF`, transpose mode, random checkbox state). The CV pool, step list, sequence lengths, and loop points all reset to the default Init pattern on power-up or preset reload.
 
 ## Credits
 Authored by Daniel Gorgan
