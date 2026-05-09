@@ -14,15 +14,12 @@ namespace OC {
 
     AudioOutputI2S2* output_stream = nullptr;
     AudioPassthrough<2> output_route;
-    AudioRecordQueue record_queue[2];
 #ifdef AUDIO_INTERFACE
     AudioInputUSB input_usb;
     AudioOutputUSB output_usb;
     AudioConnection out_conn_usbL{output_route, 0, output_usb, 0};
     AudioConnection out_conn_usbR{output_route, 1, output_usb, 1};
 #endif
-    AudioConnection rec_conn_L{output_route, 0, record_queue[0], 0};
-    AudioConnection rec_conn_R{output_route, 1, record_queue[1], 0};
 
     AudioConnection out_conn[2];
 
@@ -55,44 +52,6 @@ namespace OC {
     void Init() {
       AudioMemory(AUDIO_MEMORY);
     }
-
-    int GetRecordQueueSize() {
-      return min(record_queue[0].available(), record_queue[1].available());
-    }
-    void RecordStart() {
-      record_queue[0].begin();
-      record_queue[1].begin();
-    }
-    void RecordStop() {
-      record_queue[0].end();
-      record_queue[0].clear();
-      record_queue[1].end();
-      record_queue[1].clear();
-    }
-
-    size_t RecordFlush(File &file) {
-      size_t written = 0;
-
-      noInterrupts();
-      // check number of packets; each packet is 128 x 16-bit samples
-      if (record_queue[0].available() && record_queue[1].available()) {
-        int16_t *packet_left = record_queue[0].readBuffer();
-        int16_t *packet_right = record_queue[1].readBuffer();
-        //if (!packet_left || !packet_right) break;
-        for (int i = 0; i < 128; ++i) {
-          written += file.write((uint8_t*)packet_left, 2);
-          written += file.write((uint8_t*)packet_right, 2);
-          ++packet_left;
-          ++packet_right;
-        }
-        record_queue[0].freeBuffer();
-        record_queue[1].freeBuffer();
-      }
-      interrupts();
-
-      return written;
-    }
-
   }
 }
 #endif
