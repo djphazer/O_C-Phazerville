@@ -57,6 +57,7 @@ using namespace HS;
 #include "ClockSkip.h"
 #include "Combin8.h"
 #include "Compare.h"
+#include "CVSeq.h"
 #include "DivSeq.h"
 #include "DivSeq10.h"
 #include "DrumMap.h"
@@ -178,6 +179,7 @@ constexpr Registry reg = Registry<HemisphereApplet, HS::APPLET_SLOTS // max ID
     , DeclareApplet<Compare, 30, 0x10>
     , DeclareApplet<Cumulus, 5, 0x40>
     , DeclareApplet<CVRecV2, 24, 0x02>
+    , DeclareApplet<CVSeq, 92, 0x02>
     , DeclareApplet<DivSeq, 68, 0x06>
     , DeclareApplet<DivSeq10, 80, 0x06>
     , DeclareApplet<DrLoFi, 16, 0x80>
