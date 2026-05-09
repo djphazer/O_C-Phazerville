@@ -82,7 +82,7 @@ constexpr Registry mono_applets = Registry<HemisphereAudioApplet, NUM_SLOTS * 2
     , DeclareFancyApplet<MistierApplet<MONO>>
     , DeclareFancyApplet<AdvKrpsStrngApplet>
     , DeclareFancyApplet<ModalResonatorApplet<MONO>>
-    /*, DeclareFancyApplet<WTVCOApplet>*/
+    , DeclareFancyApplet<WTVCOApplet>
     /*, DeclareFancyApplet<WavRecorderApplet<MONO>>*/
 >{};
 
