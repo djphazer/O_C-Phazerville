@@ -34,6 +34,7 @@ private:
 
   uint32_t bleep_ticker = 0;
   uint32_t bloop_ticker = 0;
+  uint32_t crash_ticker = 0;
 
   // the ball's coordinates have greater precision, half-pixels
   // bitshift right by PRECISION for actual pixel position
@@ -51,20 +52,24 @@ public:
   static constexpr int BOOP_PITCH = 400;
   static constexpr int BEEP_LEN = 17 * 110; // 17 ticks == 1ms
   static constexpr int BOOP_LEN = 17 * 90;
+  static constexpr int CRASH_LEN = 17 * 200;
   static constexpr int BEEP_TICKS = OC_CORE_ISR_FREQ / BEEP_PITCH;
   static constexpr int BOOP_TICKS = OC_CORE_ISR_FREQ / BOOP_PITCH;
 
-  void Bleep() {
-    const bool high = (OC::CORE::ticks % BEEP_TICKS) < (BEEP_TICKS / 2);
-    const int amp = bleep_ticker * ONE_OCTAVE * 3 / BEEP_LEN * (high ? 1 : -1)
-      + (OC::DAC::kOctaveZero == 0) * HSAPPLICATION_5V;
-    Out(3, amp);
+  int Bleep() {
+    const bool high = (bleep_ticker % BEEP_TICKS) < (BEEP_TICKS / 2);
+    const int amp = bleep_ticker * ONE_OCTAVE * 3 / BEEP_LEN * (high ? 1 : -1);
+    return amp;
+    // Out(3, amp);
   }
-  void Bloop() {
-    const bool high = (OC::CORE::ticks % BOOP_TICKS) < (BOOP_TICKS / 2);
-    const int amp = bloop_ticker * ONE_OCTAVE * 3 / BOOP_LEN * (high ? 1 : -1)
-      + (OC::DAC::kOctaveZero == 0) * HSAPPLICATION_5V;
-    Out(3, amp);
+  int Bloop() {
+    const bool high = (bloop_ticker % BOOP_TICKS) < (BOOP_TICKS / 2);
+    const int amp = bloop_ticker * ONE_OCTAVE * 3 / BOOP_LEN * (high ? 1 : -1);
+    return amp;
+  }
+  int Crash() {
+    const int amp = crash_ticker * random(HSAPPLICATION_5V) / CRASH_LEN - (HSAPPLICATION_5V / 2);
+    return amp;
   }
 
   enum playerModeOption { MODE_NONE, MODE_HUMAN, MODE_CPU };
@@ -105,7 +110,7 @@ public:
       int movement_countdown = 0; // Used to limit the speed
 
       void SetPosition(int ypos) {
-        paddle_y = constrain(ypos, BOUNDARY_TOP - (paddle_h/2), BOUNDARY_BOTTOM - (paddle_h/2));
+        paddle_y = constrain(ypos, BOUNDARY_TOP - (2 << PRECISION), BOUNDARY_BOTTOM - paddle_h + (2 << PRECISION));
       }
       void MovePaddleUp() {
           if (movement_countdown <= 0) {
@@ -233,12 +238,11 @@ public:
         // Out(3, out_D);
 
         // make bloop noises
-        if (bleep_ticker) {
-          Bleep(); --bleep_ticker;
-        }
-        if (bloop_ticker) {
-          Bloop(); --bloop_ticker;
-        }
+        Out(3, Bleep() + Bloop() + Crash() + (OC::DAC::kOctaveZero == 0) * HSAPPLICATION_5V);
+
+        if (bleep_ticker) { --bleep_ticker; }
+        if (bloop_ticker) { --bloop_ticker; }
+        if (crash_ticker) { --crash_ticker; }
     }
 
     void MoveBall() {
@@ -304,12 +308,18 @@ public:
               // Level up!!
               if (!(player2.score % 5)) LevelUp();
               ServeBall();
+              bleep_ticker = CRASH_LEN/4;
+              bloop_ticker = CRASH_LEN/4;
+              crash_ticker = CRASH_LEN;
             }
             if (ball_x > BOUNDARY_RIGHT) {
               player1.score++;
               // Level up!!
               if (!(player1.score % 5)) LevelUp();
               ServeBall();
+              bleep_ticker = CRASH_LEN/4;
+              bloop_ticker = CRASH_LEN/4;
+              crash_ticker = CRASH_LEN;
             }
 
             if (player1.score > hi_score) {
