@@ -83,7 +83,9 @@ constexpr Registry mono_applets = Registry<HemisphereAudioApplet, NUM_SLOTS * 2
     , DeclareFancyApplet<AdvKrpsStrngApplet>
     , DeclareFancyApplet<ModalResonatorApplet<MONO>>
     , DeclareFancyApplet<WTVCOApplet>
+#ifndef USB_AUDIO
     , DeclareFancyApplet<WavRecorderApplet<MONO>>
+#endif
 >{};
 
 constexpr Registry stereo_applets = Registry<HemisphereAudioApplet, NUM_SLOTS
@@ -101,7 +103,9 @@ constexpr Registry stereo_applets = Registry<HemisphereAudioApplet, NUM_SLOTS
   , DeclareFancyApplet<OneShotPlayerApplet<STEREO>>
   , DeclareFancyApplet<UpsampledApplet<STEREO>>
   , DeclareFancyApplet<ModalResonatorApplet<STEREO>>
+#ifndef USB_AUDIO
   , DeclareFancyApplet<WavRecorderApplet<STEREO>>
+#endif
 >{};
 
 static constexpr auto mono_appletIds = mono_applets.getIds();
