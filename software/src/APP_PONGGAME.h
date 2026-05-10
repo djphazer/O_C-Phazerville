@@ -157,7 +157,9 @@ public:
 
         StartNewGame();
     }
-    void Resume() { }
+    void Resume() {
+      ResetMappings();
+    }
 
     void ServeBall() {
         // Game state
@@ -399,6 +401,7 @@ void PONGGAME_isr() {
 }
 
 void PONGGAME_handleAppEvent(OC::AppEvent event) {
+  if (event == OC::APP_EVENT_RESUME) pong_instance.Resume();
 }
 
 void PONGGAME_loop() {
