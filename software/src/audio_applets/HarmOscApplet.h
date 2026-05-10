@@ -227,19 +227,18 @@ public:
     void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
         data[0] = PackPackables(pitch, level, mix);
         data[1] = PackPackables(pitch_cv, level_cv, mix_cv);
-        // data[2] = PackPackables();
-        // for (int i = 3; i < 3 + max_partials; ++i) {
-        //     data[i] = PackPackables(amplitudes[i-3]);
-        // }
+        for (int i = 0; i < max_partials; ++i) {
+          Pack(data[2 + i / 8], PackLocation{(i % 8) * 8, 8}, amplitudes[i]);
+        }
+        // no room for amp CV
     }
 
     void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
         UnpackPackables(data[0], pitch, level, mix);
         UnpackPackables(data[1], pitch_cv, level_cv, mix_cv);
-        // UnpackPackables(data[2], );
-        // for (int i = 3; i < 3 + max_partials; ++i) {
-        //     UnpackPackables(data[i], amplitudes[i-3]);
-        // }
+        for (int i = 0; i < max_partials; ++i) {
+          amplitudes[i] = Unpack(data[2 + i / 8], PackLocation{(i % 8) * 8, 8});
+        }
     }
 
     AudioStream* InputStream() override {
@@ -272,8 +271,8 @@ private:
     uint8_t partial_param = 0;  // 0 = amplitude, 1 = detune, 3 = cvmap
     bool partial_map = false;
 
-    int amplitudes[max_partials];
-    int partial_ratios[max_partials];
+    uint8_t amplitudes[max_partials];
+    uint16_t partial_ratios[max_partials];
 
     CVInputMap pitch_cv;
     CVInputMap level_cv;
@@ -287,7 +286,7 @@ private:
     AudioMixer<max_partials> harmosc;
     AudioMixer<2> mixer;
 
-    void InitWaveform(int* amp, int* rat, int n_partials) {
+    void InitWaveform(uint8_t* amp, uint16_t* rat, int n_partials) {
         for (int i = 0; i < n_partials; ++i) {  // approximate saw wave
             amp[i] = 255 / (i + 1);
             rat[i] = 256 * (i + 1);
