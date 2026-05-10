@@ -39,13 +39,13 @@ public:
         float freq = PitchToRatio(pitch + pitch_cv.In()) * C3;
         synth.frequency(freq);
         int _wt_blend = wt_blend + wt_blend_cv.InRescaled(WT_SIZE - 1);
-
         for (int w = A; w <= C; ++w) {
             if (waveform[w] == WAVE_PULSE) UpdatePulseDuty(wavetable[w], wt_sample, pulse_duty + pulse_duty_cv.In());
             if (waveform[w] == WAVE_NOISE && !noise_freeze) UpdateNoiseSample(wavetable[w], wt_sample);
         }
         InterpolateSample(wavetable[OUT], _wt_blend, wt_sample++);  // this does not necessarilly interpolate the same sample of the waveform that is played from the output during the same program cycle
 
+        // stolen from OscApplet
         float gain = dbToScalar(level);
         if (level_cv.source) {
             vca.bias(0.0f);
@@ -55,9 +55,7 @@ public:
             vca.bias(gain);
             vca.level(0.0f);
         }
-
-        // There's a good chance of phase correlation if the incoming signal is
-        // internal, so use equal amplitude
+        // There's a good chance of phase correlation if the incoming signal is internal, so use equal amplitude
         float m = constrain(static_cast<float>(mix) * 0.01f + mix_cv.InF(), 0.0f, 1.0f);
         mixer.gain(1, m);
         mixer.gain(0, 1.0f - m);
@@ -104,7 +102,7 @@ public:
             MoveCursor(cursor, direction, CURSOR_LAST);
             return;
         }
-        if(EditSelectedInputMap(direction)) return;
+        if (EditSelectedInputMap(direction)) return;
 
         if (cursor > WAVEFORM_LAST) {
             switch(cursor) {
@@ -189,12 +187,11 @@ protected:
     void SetHelp() override {}
 
 private:
-    enum WTVCO_Cursor {
+    enum Cursor {
         WAVEFORM_OUT = 0,
         WAVEFORM_A,
         WAVEFORM_B,
-        WAVEFORM_C,
-        WAVEFORM_LAST = WAVEFORM_C,
+        WAVEFORM_C, WAVEFORM_LAST = WAVEFORM_C,
 
         PARAM_OCTAVE,
         PARAM_PITCH,
@@ -207,8 +204,7 @@ private:
         PARAM_LEVEL,
         PARAM_LEVEL_CV,
         PARAM_MIX,
-        PARAM_MIX_CV,
-        PARAM_LAST = PARAM_MIX_CV
+        PARAM_MIX_CV, PARAM_LAST = PARAM_MIX_CV
     };
     const int CURSOR_LAST = PARAM_LAST;
 
@@ -224,13 +220,13 @@ private:
         WAVE_RAND_STEPPED,
         WAVE_NOISE,
         WAVE_SILENCE,
-        WAVE_USER,
         // add more waves here and generator functions at the bottom
+        WAVE_USER,
 
         WAVEFORM_COUNT
     };
     static constexpr const char* const waveform_names[WAVEFORM_COUNT] = {
-        "Sine", "Triangl", "Pulse", "Saw", "Ramp", "Stepped", "RandStp", "Noise", "Silence", "User"
+        "Sine", "Triangl", "Pulse", "Saw", "Ramp", "Stepped", "RandStp", "Noise", "Silence", "User "
     };
 
     CVInputMap pitch_cv;
@@ -352,7 +348,7 @@ private:
         switch(cursor) {
             case PARAM_OCTAVE:
             case PARAM_PITCH:
-            case PARAM_PITCH_CV:
+            case PARAM_PITCH_CV: {
                 gfxStartCursor(1, 14);
                 gfxPrintTuningIndicator(pitch);
                 gfxEndCursor(cursor == PARAM_OCTAVE);
@@ -365,10 +361,10 @@ private:
                 gfxPrint(pitch_cv);
                 gfxEndCursor(cursor == PARAM_PITCH_CV, false, pitch_cv.InputName());
                 break;
-
+            }
             case PARAM_OSC_DIRECTION:
             case PARAM_BLEND:
-            case PARAM_BLEND_CV:
+            case PARAM_BLEND_CV: {
                 gfxStartCursor(1, 14);
                 gfxPrint(1, 14, "Blnd:");
                 gfxEndCursor(cursor == PARAM_OSC_DIRECTION);
@@ -382,9 +378,9 @@ private:
                 gfxPrint(wt_blend_cv);
                 gfxEndCursor(cursor == PARAM_BLEND_CV, false, wt_blend_cv.InputName());
                 break;
-
+            }
             case PARAM_PULSE_DUTY:
-            case PARAM_PULSE_DUTY_CV:
+            case PARAM_PULSE_DUTY_CV: {
                 gfxPrint(1, 14, "Duty:");
                 gfxStartCursor();
                 graphics.printf("%4d", pulse_duty);
@@ -394,9 +390,9 @@ private:
                 gfxPrint(pulse_duty_cv);
                 gfxEndCursor(cursor == PARAM_PULSE_DUTY_CV, false, pulse_duty_cv.InputName());
                 break;
-
+            }
             case PARAM_LEVEL:
-            case PARAM_LEVEL_CV:
+            case PARAM_LEVEL_CV: {
                 gfxPrint(1, 14, "Lvl:");
                 gfxStartCursor();
                 graphics.printf("%3ddB", level);
@@ -406,9 +402,9 @@ private:
                 gfxPrint(level_cv);
                 gfxEndCursor(cursor == PARAM_LEVEL_CV, false, level_cv.InputName());
                 break;
-
+            }
             case PARAM_MIX:
-            case PARAM_MIX_CV:
+            case PARAM_MIX_CV: {
                 gfxPrint(1, 14, "Mix: ");
                 gfxStartCursor();
                 graphics.printf("%3d%%", mix);
@@ -418,7 +414,7 @@ private:
                 gfxPrint(mix_cv);
                 gfxEndCursor(cursor == PARAM_MIX_CV, false, mix_cv.InputName());
                 break;
-
+            }
             default: break;
         }
     }
@@ -561,7 +557,7 @@ private:
 
     bool ReadWaveFromSD(int16_t* waveform, const int idx = 0) {
         if(!sd_ready) return false;
-        // const int idx = cursor - WAVEFORM_A;  // BUG: this causes problems when loading preset
+
         File dir = SD.open("/WTVCO");
         File file;
         for (int i = 0; i <= userwave[idx]; ++i) {
@@ -580,7 +576,6 @@ private:
 
     bool CheckSD() {
         File dir = SD.open("/WTVCO");
-
         if (!dir || !dir.isDirectory()) {
             sd_ready = false;
             return sd_ready;
