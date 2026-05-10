@@ -529,7 +529,7 @@ struct IOFrame {
 
     void Init() {
       MIDIState.Init();
-      for (int i = 0; i < DAC_CHANNEL_COUNT; ++i) {
+      for (int i = 0; i < IO_CHANNEL_COUNT; ++i) {
         output_atten[i] = 60; // default to 100%
       }
     }
