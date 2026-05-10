@@ -163,8 +163,9 @@ public:
 
         StartNewGame();
     }
-
-    void Resume() { }
+    void Resume() {
+      ResetMappings();
+    }
 
     void ServeBall() {
         // Game state
@@ -399,6 +400,7 @@ void AppPong::Process(OC::IOFrame *ioframe) {
 }
 
 void AppPong::HandleAppEvent(OC::AppEvent event) {
+  if (event == OC::APP_EVENT_RESUME) Resume();
 }
 
 void AppPong::Loop() {
