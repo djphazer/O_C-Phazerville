@@ -7,7 +7,7 @@ template <AudioChannels Channels>
 class TuneTrackerApplet : public HemisphereAudioApplet {
 public:
   const char* applet_name() {
-    return "TuneTrackr";
+    return "TuneTrk";
   }
 
   void Start() override {
