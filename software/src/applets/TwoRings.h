@@ -396,8 +396,8 @@ public:
 
         qselect[0] = Unpack(data, PackLocation {48,4});
         qselect[1] = Unpack(data, PackLocation {52,4});
-        CONSTRAIN(qselect[0], 0, DAC_CHANNEL_LAST - 1);
-        CONSTRAIN(qselect[1], 0, DAC_CHANNEL_LAST - 1);
+        CONSTRAIN(qselect[0], 0, DAC_CHANNEL_COUNT - 1);
+        CONSTRAIN(qselect[1], 0, DAC_CHANNEL_COUNT - 1);
 
         rotate_right = Unpack(data, PackLocation {56,1});
         hold_pitch_a = Unpack(data, PackLocation {57,1});

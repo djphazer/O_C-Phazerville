@@ -76,7 +76,7 @@ const char* const ppqn_labels[10] = {
 class ReferenceChannel : public settings::SettingsBase<ReferenceChannel, REF_SETTING_LAST> {
 public:
 
-  void Init(DAC_CHANNEL dac_channel) {
+  void Init(size_t dac_channel) {
     InitDefaults();
 
     dac_channel_ = dac_channel;
@@ -96,7 +96,7 @@ public:
     return values_[REF_SETTING_OCTAVE];
   }
 
-  DAC_CHANNEL get_channel() const {
+  size_t get_channel() const {
     return dac_channel_;
   }
 
@@ -525,7 +525,7 @@ public:
 private:
   static constexpr size_t kHistoryDepth = 10;
 
-  DAC_CHANNEL dac_channel_;
+  size_t dac_channel_;
   const uint16_t *calibration_data_;
   OC::DAC::AutotuneChannelCalibrationData *autotune_calibration_data_;
 
@@ -590,7 +590,7 @@ OC_APP_TRAITS(AppReferences, TWOCCS("RF"), "References", "Voltages");
 class OC_APP_CLASS(AppReferences) {
 public:
   OC_APP_INTERFACE_DECLARE(AppReferences);
-  OC_APP_STORAGE_SIZE(DAC_CHANNEL_LAST * ReferenceChannel::storageSize());
+  OC_APP_STORAGE_SIZE(DAC_CHANNEL_COUNT * ReferenceChannel::storageSize());
 
 private:
   OC::Autotuner<ReferenceChannel> autotuner;
@@ -600,7 +600,7 @@ private:
     menu::ScreenCursor<menu::kScreenLines> cursor;
   } ui;
 
-  ReferenceChannel channels_[DAC_CHANNEL_LAST];
+  ReferenceChannel channels_[DAC_CHANNEL_COUNT];
 
   ReferenceChannel &selected_channel() { return channels_[ui.selected_channel]; }
   const ReferenceChannel &selected_channel() const { return channels_[ui.selected_channel]; }
@@ -673,7 +673,7 @@ private:
 void AppReferences::Init() {
   int dac_channel = 0;
   for (auto &channel : channels_)
-    channel.Init(static_cast<DAC_CHANNEL>(dac_channel++));
+    channel.Init(dac_channel++);
 
   ui.selected_channel = DAC_CHANNEL_FTM;
   ui.cursor.Init(0, channels_[DAC_CHANNEL_FTM].num_enabled_settings() - 1);
@@ -731,10 +731,10 @@ void AppReferences::GetIOConfig(OC::IOConfig &ioconfig) const
 {
   ioconfig.digital_inputs[DAC_CHANNEL_FTM].set("Frequency counter");
 
-  ioconfig.outputs[DAC_CHANNEL_A].set("CH1", OC::OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_B].set("CH2", OC::OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_C].set("CH3", OC::OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_D].set("CH4", OC::OUTPUT_MODE_PITCH);
+  ioconfig.outputs[0].set("CH1", OC::OUTPUT_MODE_PITCH);
+  ioconfig.outputs[1].set("CH2", OC::OUTPUT_MODE_PITCH);
+  ioconfig.outputs[2].set("CH3", OC::OUTPUT_MODE_PITCH);
+  ioconfig.outputs[3].set("CH4", OC::OUTPUT_MODE_PITCH);
 }
 
 void AppReferences::HandleAppEvent(OC::AppEvent event) {
@@ -748,7 +748,7 @@ void AppReferences::HandleAppEvent(OC::AppEvent event) {
     case OC::APP_EVENT_SCREENSAVER_ON:
     case OC::APP_EVENT_SCREENSAVER_OFF:
       //references_app.autotuner.Reset();
-      for (size_t i = 0; i < DAC_CHANNEL_LAST; ++i)
+      for (size_t i = 0; i < DAC_CHANNEL_COUNT; ++i)
         channels_[i].autotuner_reset();
       break;
   }
@@ -759,18 +759,19 @@ void AppReferences::Loop() {
 }
 
 void AppReferences::DrawMenu() const {
+  using OctaTitleBar = menu::TitleBar<menu::kDefaultMenuStartX, DAC_CHANNEL_COUNT, 6>;
   // autotuner ...
   if (autotuner.active()) {
     autotuner.Draw();
     return;
   }
 
-  menu::QuadTitleBar::Draw();
-  for (uint_fast8_t i = 0; i < DAC_CHANNEL_LAST; ++i) {
-    menu::QuadTitleBar::SetColumn(i);
+  OctaTitleBar::Draw();
+  for (uint_fast8_t i = 0; i < DAC_CHANNEL_COUNT; ++i) {
+    OctaTitleBar::SetColumn(i);
     graphics.print((char)('A' + i));
   }
-  menu::QuadTitleBar::Selected(ui.selected_channel);
+  OctaTitleBar::Selected(ui.selected_channel);
 
   const auto &channel = selected_channel();
   menu::SettingsList<menu::kScreenLines, 0, menu::kDefaultValueX> settings_list(ui.cursor);
@@ -864,7 +865,7 @@ void AppReferences::HandleEncoderEvent(const UI::Event &event) {
     
     int previous = selected_channel().num_enabled_settings();
     int selected = ui.selected_channel + event.value;
-    CONSTRAIN(selected, 0, DAC_CHANNEL_LAST - 0x1);
+    CONSTRAIN(selected, 0, DAC_CHANNEL_COUNT - 0x1);
     ui.selected_channel = selected;
 
     // hack -- deal w/ menu items / channels

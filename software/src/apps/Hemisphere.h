@@ -1720,15 +1720,15 @@ void AppHemisphere::GetIOConfig(OC::IOConfig &ioconfig) const
   ioconfig.digital_inputs[DIGITAL_INPUT_3].set("TR3");
   ioconfig.digital_inputs[DIGITAL_INPUT_4].set("TR4");
 
-  ioconfig.cv[ADC_CHANNEL_1].set("CV1");
-  ioconfig.cv[ADC_CHANNEL_2].set("CV2");
-  ioconfig.cv[ADC_CHANNEL_3].set("CV3");
-  ioconfig.cv[ADC_CHANNEL_4].set("CV4");
+  ioconfig.cv[0].set("C 1");
+  ioconfig.cv[1].set("C 2");
+  ioconfig.cv[2].set("C 3");
+  ioconfig.cv[3].set("C 4");
 
-  ioconfig.outputs[DAC_CHANNEL_A].set("Left A", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_B].set("Left B", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_C].set("Right C", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_D].set("Right D", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[0].set("Left A", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[1].set("Left B", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[2].set("Right C", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[3].set("Right D", OUTPUT_MODE_PITCH);
 }
 
 void AppHemisphere::HandleAppEvent(OC::AppEvent event) {

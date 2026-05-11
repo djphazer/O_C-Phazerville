@@ -52,8 +52,8 @@ namespace HS {
   bool midi_thru_enabled = 1;
   bool cursor_wrap = 0;
   bool auto_save_enabled = false;
-  DigitalInputMap trigmap[ADC_CHANNEL_LAST];
-  CVInputMap cvmap[ADC_CHANNEL_LAST];
+  DigitalInputMap trigmap[ADC_CHANNEL_COUNT];
+  CVInputMap cvmap[ADC_CHANNEL_COUNT];
   uint8_t trig_length = 10; // in ms, multiplier for HEMISPHERE_CLOCK_TICKS
   uint8_t screensaver_mode = SCREEN_BEATS; // ScreensaverMode
   const char * const ssmodes[SCREENSAVER_MODE_COUNT] = {

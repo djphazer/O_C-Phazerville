@@ -436,7 +436,7 @@ public:
     schedule_scale_update_ = true;
   }
 
-  inline void Update(OC::IOFrame *ioframe, DAC_CHANNEL dac_channel, DAC_CHANNEL aux_channel)
+  inline void Update(OC::IOFrame *ioframe, size_t dac_channel, size_t aux_channel)
   {
     uint32_t triggers = ioframe->digital_inputs.triggered();
     ticks_++;
@@ -460,7 +460,7 @@ public:
 
     if (get_scale_seq_mode()) {
         // to do, don't hardcode ..
-      uint8_t _advance_trig = (dac_channel == DAC_CHANNEL_A) ? digitalReadFast(TR2) : digitalReadFast(TR4);
+      uint8_t _advance_trig = (dac_channel == 0) ? digitalReadFast(TR2) : digitalReadFast(TR4);
       if (_advance_trig < scale_advance_state_)
         scale_advance_ = true;
       scale_advance_state_ = _advance_trig;
@@ -500,7 +500,7 @@ public:
 
       source = cv_source = get_source();
       _aux_cv_destination = get_aux_cv_dest();
-      channel_id = (dac_channel == DAC_CHANNEL_A) ? 1 : 3; // hardcoded to use CV2, CV4, for now
+      channel_id = (dac_channel == 0) ? 1 : 3; // hardcoded to use CV2, CV4, for now
 
       if (_aux_cv_destination != prev_destination_)
         clear_dest();
@@ -1134,25 +1134,25 @@ void AppDualQuantizer::HandleAppEvent(AppEvent event) {
 }
 
 void AppDualQuantizer::Process(IOFrame *ioframe) {
-  quantizer_channels_[0].Update(ioframe, DAC_CHANNEL_A, DAC_CHANNEL_C);
-  quantizer_channels_[1].Update(ioframe, DAC_CHANNEL_B, DAC_CHANNEL_D);
+  quantizer_channels_[0].Update(ioframe, 0, 2);
+  quantizer_channels_[1].Update(ioframe, 1, 3);
 }
 
 void AppDualQuantizer::GetIOConfig(IOConfig &ioconfig) const
 {
-  ioconfig.outputs[DAC_CHANNEL_A].set("CH1", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[0].set("CH1", OUTPUT_MODE_PITCH);
   switch (quantizer_channels_[0].get_aux_mode()) {
-  case DQ_GATE: ioconfig.outputs[DAC_CHANNEL_C].set("CH1 Gate", OUTPUT_MODE_GATE); break;
-  case DQ_COPY: ioconfig.outputs[DAC_CHANNEL_C].set("CH1 Copy", OUTPUT_MODE_PITCH); break;
-  case DQ_ASR:  ioconfig.outputs[DAC_CHANNEL_C].set("CH1 ASR", OUTPUT_MODE_PITCH); break;
+  case DQ_GATE: ioconfig.outputs[2].set("CH1 Gate", OUTPUT_MODE_GATE); break;
+  case DQ_COPY: ioconfig.outputs[2].set("CH1 Copy", OUTPUT_MODE_PITCH); break;
+  case DQ_ASR:  ioconfig.outputs[2].set("CH1 ASR", OUTPUT_MODE_PITCH); break;
   default: break;
   }
   
-  ioconfig.outputs[DAC_CHANNEL_B].set("CH2", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[1].set("CH2", OUTPUT_MODE_PITCH);
   switch (quantizer_channels_[1].get_aux_mode()) {
-  case DQ_GATE: ioconfig.outputs[DAC_CHANNEL_D].set("CH2 Gate", OUTPUT_MODE_GATE); break;
-  case DQ_COPY: ioconfig.outputs[DAC_CHANNEL_D].set("CH2 Copy", OUTPUT_MODE_PITCH); break;
-  case DQ_ASR:  ioconfig.outputs[DAC_CHANNEL_D].set("CH2 ASR", OUTPUT_MODE_PITCH); break;
+  case DQ_GATE: ioconfig.outputs[3].set("CH2 Gate", OUTPUT_MODE_GATE); break;
+  case DQ_COPY: ioconfig.outputs[3].set("CH2 Copy", OUTPUT_MODE_PITCH); break;
+  case DQ_ASR:  ioconfig.outputs[3].set("CH2 ASR", OUTPUT_MODE_PITCH); break;
   default: break;
   }
 }
@@ -1473,6 +1473,7 @@ void DQ_QuantizerChannel::RenderScreensaver(weegfx::coord_t start_x) const {
       break;
     default: {
       graphics.setPixel(start_x + DQ_OFFSET_X - 16, 4);
+      // TODO: the graphics thread shouldn't be reading directly from the drivers!
       int32_t cv = OC::ADC::value(static_cast<ADC_CHANNEL>(source));
       cv = (cv * 20 + 2047) >> 11;
       if (cv < 0)

@@ -216,7 +216,7 @@ public:
 
         uint64_t data = 0;
         // Input Mappings
-        for (size_t i = 0; i < ADC_CHANNEL_LAST/4; ++i) {
+        for (size_t i = 0; i < ADC_CHANNEL_COUNT/4; ++i) {
           data = PackPackables(HS::trigmap[i*4], HS::trigmap[i*4+1], HS::trigmap[i*4+2], HS::trigmap[i*4+3]);
           PhzConfig::setValue(preset_key | (TRIGMAP_KEY + i), data);
 
@@ -345,14 +345,14 @@ public:
 
         // Input Mappings
         if (PhzConfig::getValue(preset_key | TRIGMAP_KEY, data)) {
-          for (size_t i = 0; i < ADC_CHANNEL_LAST/4; ++i) {
+          for (size_t i = 0; i < ADC_CHANNEL_COUNT/4; ++i) {
             UnpackPackables(data, HS::trigmap[i*4], HS::trigmap[i*4+1], HS::trigmap[i*4+2], HS::trigmap[i*4+3]);
             if (!PhzConfig::getValue(preset_key | (TRIGMAP_KEY + i+1), data)) break;
           }
         }
 
         if (PhzConfig::getValue(preset_key | CVMAP_KEY, data)) {
-          for (size_t i = 0; i < ADC_CHANNEL_LAST/4; ++i) {
+          for (size_t i = 0; i < ADC_CHANNEL_COUNT/4; ++i) {
             UnpackPackables(data, HS::cvmap[i*4], HS::cvmap[i*4+1], HS::cvmap[i*4+2], HS::cvmap[i*4+3]);
             if (!PhzConfig::getValue(preset_key | (CVMAP_KEY + i+1), data)) break;
           }
@@ -1653,23 +1653,23 @@ void AppQuadrants::GetIOConfig(OC::IOConfig &ioconfig) const
   ioconfig.digital_inputs[DIGITAL_INPUT_3].set("TR3");
   ioconfig.digital_inputs[DIGITAL_INPUT_4].set("TR4");
 
-  ioconfig.cv[ADC_CHANNEL_1].set("CV1");
-  ioconfig.cv[ADC_CHANNEL_2].set("CV2");
-  ioconfig.cv[ADC_CHANNEL_3].set("CV3");
-  ioconfig.cv[ADC_CHANNEL_4].set("CV4");
-  ioconfig.cv[ADC_CHANNEL_5].set("CV5");
-  ioconfig.cv[ADC_CHANNEL_6].set("CV6");
-  ioconfig.cv[ADC_CHANNEL_7].set("CV7");
-  ioconfig.cv[ADC_CHANNEL_8].set("CV8");
+  ioconfig.cv[0].set("CV1");
+  ioconfig.cv[1].set("CV2");
+  ioconfig.cv[2].set("CV3");
+  ioconfig.cv[3].set("CV4");
+  ioconfig.cv[4].set("CV5");
+  ioconfig.cv[5].set("CV6");
+  ioconfig.cv[6].set("CV7");
+  ioconfig.cv[7].set("CV8");
 
-  ioconfig.outputs[DAC_CHANNEL_A].set("Out A", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_B].set("Out B", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_C].set("Out C", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_D].set("Out D", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_E].set("Out E", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_F].set("Out F", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_G].set("Out G", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_H].set("Out H", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[0].set("Out A", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[1].set("Out B", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[2].set("Out C", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[3].set("Out D", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[4].set("Out E", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[5].set("Out F", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[6].set("Out G", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[7].set("Out H", OUTPUT_MODE_PITCH);
 }
 
 void AppQuadrants::HandleAppEvent(OC::AppEvent event) {

@@ -466,7 +466,7 @@ public:
     return false;
   }
 
-  void Update(OC::IOFrame *ioframe, uint32_t triggers, uint64_t internal_trigger_mask, const int32_t cvs[ENVGEN_CHANNEL_COUNT], DAC_CHANNEL dac_channel) {
+  void Update(OC::IOFrame *ioframe, uint32_t triggers, uint64_t internal_trigger_mask, const int32_t cvs[ENVGEN_CHANNEL_COUNT], size_t dac_channel) {
     int32_t s[CV_MAPPING_COUNT];
     s[CV_MAPPING_NONE] = 0; // unused, but needs a placeholder to align with enum CVMapping
     s[CV_MAPPING_SEG1] = SCALE8_16(static_cast<int32_t>(get_segment_value(0)));
@@ -866,36 +866,11 @@ void AppQuadEnvelopeGenerator::Init() {
 }
 
 void AppQuadEnvelopeGenerator::Process(OC::IOFrame *ioframe) {
-  const ADC_CHANNEL adc_chan[] = {
-    ADC_CHANNEL_1,
-    ADC_CHANNEL_2,
-    ADC_CHANNEL_3,
-    ADC_CHANNEL_4,
-#ifdef ARDUINO_TEENSY41
-    ADC_CHANNEL_5,
-    ADC_CHANNEL_6,
-    ADC_CHANNEL_7,
-    ADC_CHANNEL_8,
-#endif
-  };
-  const DAC_CHANNEL dac_chan[] = {
-    DAC_CHANNEL_A,
-    DAC_CHANNEL_B,
-    DAC_CHANNEL_C,
-    DAC_CHANNEL_D,
-#ifdef ARDUINO_TEENSY41
-    DAC_CHANNEL_E,
-    DAC_CHANNEL_F,
-    DAC_CHANNEL_G,
-    DAC_CHANNEL_H,
-#endif
-  };
-
   // TODO[PLD] Do we need the excessive smoothing?
   //     [NJM] probably not... but T4.x can handle it.
   int i = 0;
   for (auto& cv : cv_smooth) {
-    cv.push(ioframe->cv.values[adc_chan[i++]]);
+    cv.push(ioframe->cv.values[i++]);
   }
 
   const int32_t cvs[ENVGEN_CHANNEL_COUNT] = {
@@ -927,7 +902,7 @@ void AppQuadEnvelopeGenerator::Process(OC::IOFrame *ioframe) {
 
   i = 0;
   for (auto& env : envelopes_) {
-    env->Update(ioframe, triggers, internal_trigger_mask, cvs, dac_chan[i++]);
+    env->Update(ioframe, triggers, internal_trigger_mask, cvs, i++);
   }
 }
 
@@ -1337,10 +1312,14 @@ void AppQuadEnvelopeGenerator::DrawDebugInfo() const {
 
 void AppQuadEnvelopeGenerator::GetIOConfig(OC::IOConfig &ioconfig) const
 {
-  ioconfig.outputs[DAC_CHANNEL_A].set("CH1", OC::OUTPUT_MODE_UNI);
-  ioconfig.outputs[DAC_CHANNEL_B].set("CH2", OC::OUTPUT_MODE_UNI);
-  ioconfig.outputs[DAC_CHANNEL_C].set("CH3", OC::OUTPUT_MODE_UNI);
-  ioconfig.outputs[DAC_CHANNEL_D].set("CH4", OC::OUTPUT_MODE_UNI);
+  ioconfig.outputs[0].set("CH1", OC::OUTPUT_MODE_UNI);
+  ioconfig.outputs[1].set("CH2", OC::OUTPUT_MODE_UNI);
+  ioconfig.outputs[2].set("CH3", OC::OUTPUT_MODE_UNI);
+  ioconfig.outputs[3].set("CH4", OC::OUTPUT_MODE_UNI);
+  ioconfig.outputs[4].set("CH5", OC::OUTPUT_MODE_UNI);
+  ioconfig.outputs[5].set("CH6", OC::OUTPUT_MODE_UNI);
+  ioconfig.outputs[6].set("CH7", OC::OUTPUT_MODE_UNI);
+  ioconfig.outputs[7].set("CH8", OC::OUTPUT_MODE_UNI);
 }
 
 } // namespace OC

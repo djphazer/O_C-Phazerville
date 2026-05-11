@@ -69,7 +69,7 @@ extern DAC_CHANNEL DAC_CHANNEL_E, DAC_CHANNEL_F, DAC_CHANNEL_G, DAC_CHANNEL_H;
 #endif
 
 // backward compat [deprecated]
-static constexpr int DAC_CHANNEL_LAST = DAC_CHANNEL_COUNT;
+//static constexpr int DAC_CHANNEL_LAST = DAC_CHANNEL_COUNT;
 
 namespace OC {
 

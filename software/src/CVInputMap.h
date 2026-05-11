@@ -28,7 +28,7 @@ struct CVInputMap {
   }
   void AutoLearn() {
     if (IsMidi()) {
-      frame.MIDIState.mapping[source - ADC_CHANNEL_LAST - DAC_CHANNEL_LAST - 1].AutoLearn();
+      frame.MIDIState.mapping[source - ADC_CHANNEL_COUNT - DAC_CHANNEL_COUNT - 1].AutoLearn();
     }
   }
 
@@ -152,7 +152,7 @@ struct CVInputMap {
           return PARAM_MAP_ICONS + (1 + index()) * 8;
       case TYPE_DAC:
         if (index() < 8)
-          return PARAM_MAP_ICONS + (1 + ADC_CHANNEL_LAST + index()) * 8;
+          return PARAM_MAP_ICONS + (1 + ADC_CHANNEL_COUNT + index()) * 8;
 
       default:
         return ZAP_ICON;
@@ -315,7 +315,7 @@ struct DigitalInputMap {
           return PARAM_MAP_ICONS + (1 + index()) * 8;
       case CV_OUTPUT:
         if (index() < 8)
-          return PARAM_MAP_ICONS + (1 + ADC_CHANNEL_LAST + index()) * 8;
+          return PARAM_MAP_ICONS + (1 + ADC_CHANNEL_COUNT + index()) * 8;
 
         return ZAP_ICON;
 
@@ -371,9 +371,9 @@ struct DigitalInputMap {
     if (source && (source >> 5) < 2) {
       if (source < 1 + DIGITAL_INPUT_COUNT)
         SetGateInput(source - 1);
-      else if (source < 1 + DIGITAL_INPUT_COUNT + ADC_CHANNEL_LAST)
+      else if (source < 1 + DIGITAL_INPUT_COUNT + ADC_CHANNEL_COUNT)
         SetInput(source - DIGITAL_INPUT_COUNT - 1);
-      else if (source < 1 + DIGITAL_INPUT_COUNT + ADC_CHANNEL_LAST + DAC_CHANNEL_LAST)
+      else if (source < 1 + DIGITAL_INPUT_COUNT + ADC_CHANNEL_COUNT + DAC_CHANNEL_COUNT)
         SetOutput(source - DIGITAL_INPUT_COUNT - ADC_CHANNEL_COUNT - 1);
       else
         SetMidiMap(source - DIGITAL_INPUT_COUNT - ADC_CHANNEL_COUNT - DAC_CHANNEL_COUNT - 1);
@@ -397,5 +397,5 @@ constexpr DigitalInputMap& pack(DigitalInputMap& input) {
   return input;
 }
 
-extern DigitalInputMap trigmap[ADC_CHANNEL_LAST];
-extern CVInputMap cvmap[ADC_CHANNEL_LAST];
+extern DigitalInputMap trigmap[ADC_CHANNEL_COUNT];
+extern CVInputMap cvmap[ADC_CHANNEL_COUNT];

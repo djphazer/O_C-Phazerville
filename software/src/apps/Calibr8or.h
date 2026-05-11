@@ -157,7 +157,7 @@ public:
 
         int ix = 1; // skip validity flag
 
-        for (int ch = 0; ch < DAC_CHANNEL_LAST; ++ch) {
+        for (int ch = 0; ch < DAC_CHANNEL_COUNT; ++ch) {
             HS::QuantizerConfigure(ch, values_[ix++]);
             const int ssize_ = SCALE_SIZE(HS::GetScale(ch));
 
@@ -185,7 +185,7 @@ public:
 
         values_[ix++] = 1; // validity flag
 
-        for (int ch = 0; ch < DAC_CHANNEL_LAST; ++ch) {
+        for (int ch = 0; ch < DAC_CHANNEL_COUNT; ++ch) {
           const int scale = HS::GetScale(ch);
             values_[ix++] = scale;
             values_[ix++] = channel[ch].scale_factor + 500;
@@ -277,7 +277,7 @@ public:
   //OC::Autotuner<Cal8ChannelConfig> autotuner;
 
   void Start() {
-    for (int i = 0; i < DAC_CHANNEL_LAST; ++i) {
+    for (int i = 0; i < DAC_CHANNEL_COUNT; ++i) {
       channel[i].chan_ = DAC_CHANNEL(i);
     }
 
@@ -303,7 +303,7 @@ public:
 #endif
         }
 
-        for (int ch = 0; ch < DAC_CHANNEL_LAST; ++ch) {
+        for (int ch = 0; ch < DAC_CHANNEL_COUNT; ++ch) {
             channel[ch].scale_factor = 0;
             channel[ch].offset = 0;
             channel[ch].transpose = 0;
@@ -346,7 +346,7 @@ public:
 
     void Resume() {
         // restore quantizer settings
-        for (int ch = 0; ch < DAC_CHANNEL_LAST; ++ch) {
+        for (int ch = 0; ch < DAC_CHANNEL_COUNT; ++ch) {
             q_engine[ch].quantizer.Requantize();
         }
     }
@@ -410,7 +410,7 @@ public:
         if (dothething) {
           // reconfigure with MIDI-derived masks
           // TODO: probably needs attention with new MIDI maps...
-          for (int ch = 0; ch < DAC_CHANNEL_LAST; ++ch) {
+          for (int ch = 0; ch < DAC_CHANNEL_COUNT; ++ch) {
             uint16_t mask_ = HS::frame.MIDIState.mapping[ch].semitone_mask;
 
             if (mask_) // manually override global config
@@ -430,7 +430,7 @@ public:
         ClockSetup_instance.Controller();
 
         // -- core processing --
-        for (int ch = 0; ch < DAC_CHANNEL_LAST; ++ch) {
+        for (int ch = 0; ch < DAC_CHANNEL_COUNT; ++ch) {
             bool clocked = Clock(ch);
             Cal8ChannelConfig &cfg = channel[ch];
 
@@ -595,8 +595,8 @@ public:
     // fires on button release
     void SwitchChannel(bool up) {
         if (!clock_setup && !preset_select) {
-            sel_chan += (up? -1 : 1) + DAC_CHANNEL_LAST;
-            sel_chan %= DAC_CHANNEL_LAST;
+            sel_chan += (up? -1 : 1) + DAC_CHANNEL_COUNT;
+            sel_chan %= DAC_CHANNEL_COUNT;
         }
 
         if (click_tick) {
@@ -683,10 +683,10 @@ public:
     bool first_click = 0;
     bool clock_setup = 0;
 
-    int trigger_flash[DAC_CHANNEL_LAST];
+    int trigger_flash[DAC_CHANNEL_COUNT];
 
     SegmentDisplay segment{SegmentSize::BIG_SEGMENTS};
-    Cal8ChannelConfig channel[DAC_CHANNEL_LAST];
+    Cal8ChannelConfig channel[DAC_CHANNEL_COUNT];
 
     void DrawPresetSelector() {
         // index is the currently loaded preset (0-3)
@@ -708,9 +708,9 @@ public:
 
     void DrawTabs() {
         // Draw channel tabs
-        const size_t w = 128 / DAC_CHANNEL_LAST;
+        const size_t w = 128 / DAC_CHANNEL_COUNT;
         const size_t y = 11;
-        for (int ch = 0; ch < DAC_CHANNEL_LAST; ++ch) {
+        for (int ch = 0; ch < DAC_CHANNEL_COUNT; ++ch) {
           const size_t x = ch * w;
             gfxLine(x, y, x, y+10); // vertical line on left
             if (channel[ch].chained)
@@ -833,15 +833,23 @@ void AppCalibr8or::GetIOConfig(OC::IOConfig &ioconfig) const
   ioconfig.digital_inputs[DIGITAL_INPUT_3].set("Ch3 Clk");
   ioconfig.digital_inputs[DIGITAL_INPUT_4].set("Ch4 Clk");
 
-  ioconfig.cv[ADC_CHANNEL_1].set("Ch1 CV");
-  ioconfig.cv[ADC_CHANNEL_2].set("Ch2 CV");
-  ioconfig.cv[ADC_CHANNEL_3].set("Ch3 CV");
-  ioconfig.cv[ADC_CHANNEL_4].set("Ch4 CV");
+  ioconfig.cv[0].set("Ch1 CV");
+  ioconfig.cv[1].set("Ch2 CV");
+  ioconfig.cv[2].set("Ch3 CV");
+  ioconfig.cv[3].set("Ch4 CV");
+  ioconfig.cv[4].set("Ch5 CV");
+  ioconfig.cv[5].set("Ch6 CV");
+  ioconfig.cv[6].set("Ch7 CV");
+  ioconfig.cv[7].set("Ch8 CV");
 
-  ioconfig.outputs[DAC_CHANNEL_A].set("Ch1", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_B].set("Ch2", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_C].set("Ch3", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_D].set("Ch4", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[0].set("Ch1", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[1].set("Ch2", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[2].set("Ch3", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[3].set("Ch4", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[4].set("Ch5", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[5].set("Ch6", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[6].set("Ch7", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[7].set("Ch8", OUTPUT_MODE_PITCH);
 }
 
 FLASHMEM

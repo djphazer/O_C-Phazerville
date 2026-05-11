@@ -43,23 +43,6 @@ public:
   OC_APP_INTERFACE_DECLARE(AppSettings);
   OC_APP_STORAGE_SIZE(0);
 
-  /*
-  clazz() : OC::AppBaseImpl<clazz, MACRO_CONCAT(clazz, Traits)>() { } \
-  virtual void Init() final; \
-  virtual size_t appdata_storage_size() const final { return kAppDataStorageSize; } \
-  virtual size_t SaveAppData(util::StreamBufferWriter &) const final; \
-  virtual size_t RestoreAppData(util::StreamBufferReader &) final; \
-  virtual void HandleAppEvent(OC::AppEvent) final; \
-  virtual void Loop() final; \
-  virtual void DrawMenu() const final; \
-  virtual void DrawScreensaver() const final; \
-  virtual void HandleButtonEvent(const UI::Event &) final; \
-  virtual void HandleEncoderEvent(const UI::Event &) final; \
-  virtual void Process(OC::IOFrame *ioframe) final; \
-  virtual void GetIOConfig(OC::IOConfig &) const final; \
-  virtual void DrawDebugInfo() const final
-  */
-
   bool reflash = false;
   bool calibration_mode = false;
   bool calibration_complete = true;
@@ -136,7 +119,7 @@ public:
             if (calstate.used_defaults) {
               // copy DAC A to the rest of them, to make life easier
               // WARNING: this doesn't work in flipped mode!
-              for (int ch = 1; ch < DAC_CHANNEL_LAST; ++ch) {
+              for (int ch = 1; ch < DAC_CHANNEL_COUNT; ++ch) {
                 for (int i = 0; i < OCTAVES; ++i) {
                   OC::calibration_data.dac.calibrated_octaves[ch][i] = OC::calibration_data.dac.calibrated_octaves[0][i];
                 }
@@ -659,10 +642,10 @@ void AppSettings::Loop() {} // Deprecated
 
 void AppSettings::GetIOConfig(OC::IOConfig &ioconfig) const
 {
-  ioconfig.outputs[DAC_CHANNEL_A].set("CH1", OC::OUTPUT_MODE_UNI);
-  ioconfig.outputs[DAC_CHANNEL_B].set("CH2", OC::OUTPUT_MODE_UNI);
-  ioconfig.outputs[DAC_CHANNEL_C].set("CH3", OC::OUTPUT_MODE_UNI);
-  ioconfig.outputs[DAC_CHANNEL_D].set("CH4", OC::OUTPUT_MODE_UNI);
+  ioconfig.outputs[0].set("CH1", OC::OUTPUT_MODE_UNI);
+  ioconfig.outputs[1].set("CH2", OC::OUTPUT_MODE_UNI);
+  ioconfig.outputs[2].set("CH3", OC::OUTPUT_MODE_UNI);
+  ioconfig.outputs[3].set("CH4", OC::OUTPUT_MODE_UNI);
 }
 void AppSettings::DrawDebugInfo() const { }
 

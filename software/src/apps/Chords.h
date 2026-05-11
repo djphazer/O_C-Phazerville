@@ -841,10 +841,10 @@ public:
       sample_c = OC::PitchUtils::PitchAddOctaves(sample_c, octave + OC::voicing[_voicing][2] + OC::inversion[_inversion][2]);
       sample_d = OC::PitchUtils::PitchAddOctaves(sample_d, octave + OC::voicing[_voicing][3] + OC::inversion[_inversion][3]);
 
-      ioframe->outputs.set_pitch_value(DAC_CHANNEL_A, sample_a);
-      ioframe->outputs.set_pitch_value(DAC_CHANNEL_B, sample_b);
-      ioframe->outputs.set_pitch_value(DAC_CHANNEL_C, sample_c);
-      ioframe->outputs.set_pitch_value(DAC_CHANNEL_D, sample_d);
+      ioframe->outputs.set_pitch_value(0, sample_a);
+      ioframe->outputs.set_pitch_value(1, sample_b);
+      ioframe->outputs.set_pitch_value(2, sample_c);
+      ioframe->outputs.set_pitch_value(3, sample_d);
     }
 
     bool changed = (last_sample_ != sample_a);
@@ -1004,17 +1004,17 @@ private:
     { 0, 0, OC::Chords::CHORDS_USER_COUNT - 1, "num.chords", NULL, settings::STORAGE_TYPE_U8 }, // progression 4
     { 0, 0, 0, "chords -->", NULL, settings::STORAGE_TYPE_U4 }, // = chord editor
     // CV
-    { 0, 0, ADC_CHANNEL_LAST, "root CV      >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-    { 0, 0, ADC_CHANNEL_LAST, "mask CV      >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-    { 0, 0, ADC_CHANNEL_LAST, "transpose CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-    { 0, 0, ADC_CHANNEL_LAST, "octave CV    >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-    { 0, 0, ADC_CHANNEL_LAST, "quality CV   >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-    { 0, 0, ADC_CHANNEL_LAST, "voicing CV   >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-    { 0, 0, ADC_CHANNEL_LAST, "inversion CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-    { 0, 0, ADC_CHANNEL_LAST, "prg.slot# CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-    { 0, 0, ADC_CHANNEL_LAST, "direction CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-    { 0, 0, ADC_CHANNEL_LAST, "-->br.prb CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
-    { 0, 0, ADC_CHANNEL_LAST, "num.chrds CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+    { 0, 0, ADC_CHANNEL_COUNT, "root CV      >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+    { 0, 0, ADC_CHANNEL_COUNT, "mask CV      >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+    { 0, 0, ADC_CHANNEL_COUNT, "transpose CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+    { 0, 0, ADC_CHANNEL_COUNT, "octave CV    >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+    { 0, 0, ADC_CHANNEL_COUNT, "quality CV   >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+    { 0, 0, ADC_CHANNEL_COUNT, "voicing CV   >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+    { 0, 0, ADC_CHANNEL_COUNT, "inversion CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+    { 0, 0, ADC_CHANNEL_COUNT, "prg.slot# CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+    { 0, 0, ADC_CHANNEL_COUNT, "direction CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+    { 0, 0, ADC_CHANNEL_COUNT, "-->br.prb CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
+    { 0, 0, ADC_CHANNEL_COUNT, "num.chrds CV >", OC::Strings::cv_input_names_none, settings::STORAGE_TYPE_U4 },
     { 0, 0, 0, "-", NULL, settings::STORAGE_TYPE_U4 }, // DUMMY
     { 0, 0, 0, " ", NULL, settings::STORAGE_TYPE_U4 }  // MORE DUMMY
   }};
@@ -1099,10 +1099,10 @@ void AppChordQuantizer::Process(IOFrame *ioframe) {
 
 void AppChordQuantizer::GetIOConfig(IOConfig &ioconfig) const
 {
-  ioconfig.outputs[DAC_CHANNEL_A].set("Root", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_B].set("3", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_C].set("5", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_D].set("12", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[0].set("Root", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[1].set("3", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[2].set("5", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[3].set("12", OUTPUT_MODE_PITCH);
 }
 
 void AppChordQuantizer::Loop() {

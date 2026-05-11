@@ -1151,23 +1151,23 @@ void AppCaptainMIDI::GetIOConfig(OC::IOConfig &ioconfig) const
   ioconfig.digital_inputs[DIGITAL_INPUT_3].set("Gate3");
   ioconfig.digital_inputs[DIGITAL_INPUT_4].set("Gate4");
 
-  ioconfig.cv[ADC_CHANNEL_1].set("Ch1 CV");
-  ioconfig.cv[ADC_CHANNEL_2].set("Ch2 CV");
-  ioconfig.cv[ADC_CHANNEL_3].set("Ch3 CV");
-  ioconfig.cv[ADC_CHANNEL_4].set("Ch4 CV");
-  ioconfig.cv[ADC_CHANNEL_5].set("Ch5 CV");
-  ioconfig.cv[ADC_CHANNEL_6].set("Ch6 CV");
-  ioconfig.cv[ADC_CHANNEL_7].set("Ch7 CV");
-  ioconfig.cv[ADC_CHANNEL_8].set("Ch8 CV");
+  ioconfig.cv[0].set("Ch1 CV");
+  ioconfig.cv[1].set("Ch2 CV");
+  ioconfig.cv[2].set("Ch3 CV");
+  ioconfig.cv[3].set("Ch4 CV");
+  ioconfig.cv[4].set("Ch5 CV");
+  ioconfig.cv[5].set("Ch6 CV");
+  ioconfig.cv[6].set("Ch7 CV");
+  ioconfig.cv[7].set("Ch8 CV");
 
-  ioconfig.outputs[DAC_CHANNEL_A].set("Ch1", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_B].set("Ch2", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_C].set("Ch3", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_D].set("Ch4", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_E].set("Ch5", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_F].set("Ch6", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_G].set("Ch7", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_H].set("Ch8", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[0].set("Ch1", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[1].set("Ch2", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[2].set("Ch3", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[3].set("Ch4", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[4].set("Ch5", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[5].set("Ch6", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[6].set("Ch7", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[7].set("Ch8", OUTPUT_MODE_PITCH);
 }
 
 FLASHMEM

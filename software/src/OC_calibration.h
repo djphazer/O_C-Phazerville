@@ -106,7 +106,7 @@ struct CalibrationState {
   uint16_t adc_3v;
 
   bool used_defaults;
-  bool auto_scale_set[DAC_CHANNEL_LAST];
+  bool auto_scale_set[DAC_CHANNEL_COUNT];
 };
 
 // Originally, this was a single bit that would reverse both encoders.

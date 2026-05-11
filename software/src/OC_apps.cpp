@@ -174,7 +174,7 @@ static void SaveGlobalSettings() {
 
   // Auto Calibration Data
   /*
-  for (size_t i = 0; i < DAC_CHANNEL_LAST; ++i) {
+  for (size_t i = 0; i < DAC_CHANNEL_COUNT; ++i) {
     data = 0;
     PhzConfig::setValue(AUTOCAL_KEY | (0xff - i), auto_calibration_data[i].use_auto_calibration_);
 
@@ -490,7 +490,7 @@ void AppSwitcher::Init(bool reset_settings) {
 
       // -- Auto Calibration Data
       /*
-      for (size_t i = 0; i < DAC_CHANNEL_LAST; ++i) {
+      for (size_t i = 0; i < DAC_CHANNEL_COUNT; ++i) {
         data = 0;
         if (!PhzConfig::getValue(AUTOCAL_KEY | (0xff - i), data))
           break;

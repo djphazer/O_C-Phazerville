@@ -1410,7 +1410,7 @@ public:
           sequence_max = _playmode - PM_SEQ3;
           prev_playmode_ = _playmode;
           // trigger?
-          uint8_t _advance_trig = (channel_id_ == DAC_CHANNEL_A) ? digitalReadFast(TR2) : digitalReadFast(TR4);
+          uint8_t _advance_trig = (channel_id_ == 0) ? digitalReadFast(TR2) : digitalReadFast(TR4);
 
           if (_advance_trig < sequence_advance_state_) {
 
@@ -1879,20 +1879,20 @@ public:
    num_enabled_settings_ = settings - enabled_settings_;
   }
 
-  void update_main_channel(DAC_CHANNEL &dac_channel, OC::IOFrame *ioframe) {
+  void update_main_channel(size_t channel, OC::IOFrame *ioframe) {
     output_.set(get_step_pitch());
     output_.push(get_slew(ioframe));
-    ioframe->outputs.set_pitch_value(dac_channel, output_.get());
+    ioframe->outputs.set_pitch_value(channel, output_.get());
   }
 
-  void update_aux_channel(DAC_CHANNEL &dac_channel, OC::IOFrame *ioframe)
+  void update_aux_channel(size_t channel, OC::IOFrame *ioframe)
   {
       switch (get_aux_mode()) {
       case GATE_OUT: // gate
-        ioframe->outputs.set_gate_value(dac_channel, get_step_gate() == ON);
+        ioframe->outputs.set_gate_value(channel, get_step_gate() == ON);
         break;
       case COPY: // copy
-        ioframe->outputs.set_pitch_value(dac_channel, get_step_pitch_aux());
+        ioframe->outputs.set_pitch_value(channel, get_step_pitch_aux());
         break;
       // code to process envelopes here
       case ENV_AD:
@@ -1907,7 +1907,7 @@ public:
         else if (prev_gate_raised_)
           env_gate_state_ |= peaks::CONTROL_GATE_FALLING;
         prev_gate_raised_ = env_gate_raised_;
-        ioframe->outputs.set_unipolar_value(dac_channel, HS::GetEnvelope(channel_id_).ProcessSingleSample(env_gate_state_));
+        ioframe->outputs.set_unipolar_value(channel, HS::GetEnvelope(channel_id_).ProcessSingleSample(env_gate_state_));
         break;
       default:
         break;
@@ -2160,32 +2160,32 @@ void AppDualSequencer::Process(IOFrame *ioframe) {
   seq_channel_[0].Update(ioframe);
   seq_channel_[1].Update(ioframe);
   // update DAC channels A, B:
-  seq_channel_[0].update_main_channel(DAC_CHANNEL_A, ioframe);
-  seq_channel_[1].update_main_channel(DAC_CHANNEL_B, ioframe);
+  seq_channel_[0].update_main_channel(0, ioframe);
+  seq_channel_[1].update_main_channel(1, ioframe);
   // update DAC channels C, D:
-  seq_channel_[0].update_aux_channel(DAC_CHANNEL_C, ioframe);
-  seq_channel_[1].update_aux_channel(DAC_CHANNEL_D, ioframe);
+  seq_channel_[0].update_aux_channel(2, ioframe);
+  seq_channel_[1].update_aux_channel(3, ioframe);
 }
 
 void AppDualSequencer::GetIOConfig(IOConfig &ioconfig) const
 {
-  ioconfig.outputs[DAC_CHANNEL_A].set("CH1", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[0].set("CH1", OUTPUT_MODE_PITCH);
   switch(seq_channel_[0].get_aux_mode()) {
-  case GATE_OUT: ioconfig.outputs[DAC_CHANNEL_C].set("CH1 gate", OUTPUT_MODE_GATE); break;
-  case COPY: ioconfig.outputs[DAC_CHANNEL_C].set("CH1 copy", OUTPUT_MODE_PITCH); break;
-  case ENV_AD: ioconfig.outputs[DAC_CHANNEL_C].set("CH1 AD", OUTPUT_MODE_UNI); break;
-  case ENV_ADR: ioconfig.outputs[DAC_CHANNEL_C].set("CH1 ADR", OUTPUT_MODE_UNI); break;
-  case ENV_ADSR: ioconfig.outputs[DAC_CHANNEL_C].set("CH1 ADSR", OUTPUT_MODE_UNI); break;
+  case GATE_OUT: ioconfig.outputs[2].set("CH1 gate", OUTPUT_MODE_GATE); break;
+  case COPY: ioconfig.outputs[2].set("CH1 copy", OUTPUT_MODE_PITCH); break;
+  case ENV_AD: ioconfig.outputs[2].set("CH1 AD", OUTPUT_MODE_UNI); break;
+  case ENV_ADR: ioconfig.outputs[2].set("CH1 ADR", OUTPUT_MODE_UNI); break;
+  case ENV_ADSR: ioconfig.outputs[2].set("CH1 ADSR", OUTPUT_MODE_UNI); break;
   default: break;
   }
 
-  ioconfig.outputs[DAC_CHANNEL_B].set("CH2", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[1].set("CH2", OUTPUT_MODE_PITCH);
   switch(seq_channel_[1].get_aux_mode()) {
-  case GATE_OUT: ioconfig.outputs[DAC_CHANNEL_D].set("CH2 gate", OUTPUT_MODE_GATE); break;
-  case COPY: ioconfig.outputs[DAC_CHANNEL_D].set("CH2 copy", OUTPUT_MODE_PITCH); break;
-  case ENV_AD: ioconfig.outputs[DAC_CHANNEL_D].set("CH2 AD", OUTPUT_MODE_UNI); break;
-  case ENV_ADR: ioconfig.outputs[DAC_CHANNEL_D].set("CH2 ADR", OUTPUT_MODE_UNI); break;
-  case ENV_ADSR: ioconfig.outputs[DAC_CHANNEL_D].set("CH2 ADSR", OUTPUT_MODE_UNI); break;
+  case GATE_OUT: ioconfig.outputs[3].set("CH2 gate", OUTPUT_MODE_GATE); break;
+  case COPY: ioconfig.outputs[3].set("CH2 copy", OUTPUT_MODE_PITCH); break;
+  case ENV_AD: ioconfig.outputs[3].set("CH2 AD", OUTPUT_MODE_UNI); break;
+  case ENV_ADR: ioconfig.outputs[3].set("CH2 ADR", OUTPUT_MODE_UNI); break;
+  case ENV_ADSR: ioconfig.outputs[3].set("CH2 ADSR", OUTPUT_MODE_UNI); break;
   default: break;
   }
 }

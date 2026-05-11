@@ -430,18 +430,18 @@ void FASTRUN AutomatonnetzState::Process(OC::IOFrame *ioframe) {
   if ((triggers & TRIGGER_MASK_GRID) || (triggers & TRIGGER_MASK_ARP)) {
     update_outputs(
         chord_changed,
-        ioframe->cv.pitch_values[ADC_CHANNEL_1],
+        ioframe->cv.pitch_values[0],
         cell_transpose_,
-        cell_inversion_ + ioframe->cv.ScaledValue<8>(ADC_CHANNEL_4));
+        cell_inversion_ + ioframe->cv.ScaledValue<8>(3));
   }
 
   if (OUTPUTA_MODE_TRIG == output_mode())
-    ioframe->outputs.set_gate_value(DAC_CHANNEL_A, output_values_[DAC_CHANNEL_A]);
+    ioframe->outputs.set_gate_value(0, output_values_[0]);
   else
-    ioframe->outputs.set_pitch_value(DAC_CHANNEL_A, output_values_[DAC_CHANNEL_A]);
-  ioframe->outputs.set_pitch_value(DAC_CHANNEL_B, output_values_[DAC_CHANNEL_B]);
-  ioframe->outputs.set_pitch_value(DAC_CHANNEL_C, output_values_[DAC_CHANNEL_C]);
-  ioframe->outputs.set_pitch_value(DAC_CHANNEL_D, output_values_[DAC_CHANNEL_D]);
+    ioframe->outputs.set_pitch_value(0, output_values_[0]);
+  ioframe->outputs.set_pitch_value(1, output_values_[1]);
+  ioframe->outputs.set_pitch_value(2, output_values_[2]);
+  ioframe->outputs.set_pitch_value(3, output_values_[3]);
 }
 
 void AutomatonnetzState::Reset() {
@@ -458,10 +458,10 @@ void AutomatonnetzState::Reset() {
 
 void AutomatonnetzState::update_outputs(bool chord_changed, int32_t pitch, int transpose, int inversion) {
   if (output_mode() == OUTPUTA_TUNE_ALL) {
-    output_values_[DAC_CHANNEL_A] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(0), 0);
-    output_values_[DAC_CHANNEL_B] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(0), 0);
-    output_values_[DAC_CHANNEL_C] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(0), 0);
-    output_values_[DAC_CHANNEL_D] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(0), 0);
+    output_values_[0] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(0), 0);
+    output_values_[1] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(0), 0);
+    output_values_[2] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(0), 0);
+    output_values_[3] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(0), 0);
     return;
   }
 
@@ -472,28 +472,28 @@ void AutomatonnetzState::update_outputs(bool chord_changed, int32_t pitch, int t
 
   switch (output_mode()) {
     case OUTPUTA_MODE_ROOT:
-      output_values_[DAC_CHANNEL_A] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(0), octave());
+      output_values_[0] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(0), octave());
       break;
     case OUTPUTA_MODE_TRIG:
       if (chord_changed) {
         trigger_out_ticks_ = kTriggerOutTicks;
-        output_values_[DAC_CHANNEL_A] = OC::PitchUtils::PitchFromOctave(5);
+        output_values_[0] = OC::PitchUtils::PitchFromOctave(5);
       }
       break;
     case OUTPUTA_MODE_ARP:
-      output_values_[DAC_CHANNEL_A] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(arp_index_ + 1), octave());
+      output_values_[0] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(arp_index_ + 1), octave());
     case OUTPUTA_MODE_STRUM:
       if (!strum_inhibit_)
-        output_values_[DAC_CHANNEL_A] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(arp_index_ + 1), octave());
+        output_values_[0] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(arp_index_ + 1), octave());
       break;
     case OUTPUTA_MODE_LAST:
     default:
       break;
   }
 
-  output_values_[DAC_CHANNEL_B] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(1), octave());
-  output_values_[DAC_CHANNEL_C] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(2), octave());
-  output_values_[DAC_CHANNEL_D] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(3), octave());
+  output_values_[1] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(1), octave());
+  output_values_[2] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(2), octave());
+  output_values_[3] = OC::PitchUtils::PitchFromSemitone(tonnetz_state.outputs(3), octave());
 }
 
 void AutomatonnetzState::update_trigger_out() {
@@ -501,7 +501,7 @@ void AutomatonnetzState::update_trigger_out() {
     uint32_t ticks = trigger_out_ticks_;
     --ticks;
     if (!ticks)
-      output_values_[DAC_CHANNEL_A] = 0;
+      output_values_[0] = 0;
     trigger_out_ticks_ = ticks;
   }
 }
@@ -554,20 +554,20 @@ void AppAutomatonnetz::GetIOConfig(IOConfig &ioconfig) const
   ioconfig.digital_inputs[DIGITAL_INPUT_3].set("Reset");
   ioconfig.digital_inputs[DIGITAL_INPUT_4].set("!Strum");
 
-  ioconfig.cv[ADC_CHANNEL_1].set("Root pitch");
-  ioconfig.cv[ADC_CHANNEL_4].set("Inversion");
+  ioconfig.cv[0].set("Root pitch");
+  ioconfig.cv[3].set("Inversion");
 
   switch (automatonnetz_state.output_mode()) {
-  case OUTPUTA_MODE_ROOT:  ioconfig.outputs[DAC_CHANNEL_A].set("Root", OUTPUT_MODE_PITCH); break;
-  case OUTPUTA_MODE_TRIG:  ioconfig.outputs[DAC_CHANNEL_A].set("Trig", OUTPUT_MODE_GATE); break;
-  case OUTPUTA_MODE_ARP:   ioconfig.outputs[DAC_CHANNEL_A].set("Arp", OUTPUT_MODE_PITCH); break;
-  case OUTPUTA_MODE_STRUM: ioconfig.outputs[DAC_CHANNEL_A].set("Strum", OUTPUT_MODE_PITCH); break;
+  case OUTPUTA_MODE_ROOT:  ioconfig.outputs[0].set("Root", OUTPUT_MODE_PITCH); break;
+  case OUTPUTA_MODE_TRIG:  ioconfig.outputs[0].set("Trig", OUTPUT_MODE_GATE); break;
+  case OUTPUTA_MODE_ARP:   ioconfig.outputs[0].set("Arp", OUTPUT_MODE_PITCH); break;
+  case OUTPUTA_MODE_STRUM: ioconfig.outputs[0].set("Strum", OUTPUT_MODE_PITCH); break;
   default: break;
   }
 
-  ioconfig.outputs[DAC_CHANNEL_B].set("1", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_C].set("2", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_D].set("3", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[1].set("1", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[2].set("2", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[3].set("3", OUTPUT_MODE_PITCH);
 }
 
 static const weegfx::coord_t kGridXStart = 0;

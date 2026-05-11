@@ -62,6 +62,8 @@ const char* const bb_cv_mapping_names[BB_CV_MAPPING_LAST] = {
   "off", "grav", "bnce", "ampl", "vel", "retr"
 };
 
+static constexpr int BBGEN_CHANNEL_COUNT = 4;
+
 class BouncingBall : public settings::SettingsBase<BouncingBall, BB_SETTING_LAST> {
 public:
 
@@ -123,7 +125,7 @@ public:
   }
 #endif // BBGEN_DEBUG
 
-  inline void apply_cv_mapping(BouncingBallSettings cv_setting, const int32_t cvs[ADC_CHANNEL_LAST], int32_t segments[kMaxBouncingBallParameters]) {
+  inline void apply_cv_mapping(BouncingBallSettings cv_setting, const int32_t cvs[BBGEN_CHANNEL_COUNT], int32_t segments[kMaxBouncingBallParameters]) {
     int mapping = values_[cv_setting];
     uint8_t bb_cv_rshift = 13 ;
     switch (mapping) {
@@ -146,7 +148,7 @@ public:
       segments[mapping - BB_CV_MAPPING_GRAVITY] += (cvs[cv_setting - BB_SETTING_CV1]) << (16 - bb_cv_rshift) ;
   }
 
-  void Update(OC::IOFrame *ioframe, uint32_t triggers, const int32_t cvs[ADC_CHANNEL_LAST], DAC_CHANNEL dac_channel) {
+  void Update(OC::IOFrame *ioframe, uint32_t triggers, const int32_t cvs[BBGEN_CHANNEL_COUNT], size_t dac_channel) {
 
     s[0] = SCALE8_16(static_cast<int32_t>(get_gravity()));
     s[1] = SCALE8_16(static_cast<int32_t>(get_bounce_loss()));
@@ -226,7 +228,7 @@ OC_APP_TRAITS(AppQuadBouncingBalls, TWOCCS("BB"), "Dialectic Ping Pong", "Balls"
 class OC_APP_CLASS(AppQuadBouncingBalls) {
 public:
   OC_APP_INTERFACE_DECLARE(AppQuadBouncingBalls);
-  OC_APP_STORAGE_SIZE(4 * BouncingBall::storageSize());
+  OC_APP_STORAGE_SIZE(BBGEN_CHANNEL_COUNT * BouncingBall::storageSize());
 
 private:
   static constexpr int32_t kCvSmoothing = 16;
@@ -251,7 +253,7 @@ private:
   void HandleTopButton();
   void HandleTowerButton();
 
-  BouncingBall balls_[4];
+  BouncingBall balls_[BBGEN_CHANNEL_COUNT];
 
   SmoothedValue<int32_t, kCvSmoothing> cv1;
   SmoothedValue<int32_t, kCvSmoothing> cv2;
@@ -276,24 +278,24 @@ void AppQuadBouncingBalls::Init() {
 void FASTRUN AppQuadBouncingBalls::Process(OC::IOFrame *ioframe) {
 // TODO[PLD] Do we need this excessive smoothing?
 #ifdef ARDUINO_TEENSY41
-  cv1.push(ioframe->cv.values[ADC_CHANNEL_5]);
-  cv2.push(ioframe->cv.values[ADC_CHANNEL_6]);
-  cv3.push(ioframe->cv.values[ADC_CHANNEL_7]);
-  cv4.push(ioframe->cv.values[ADC_CHANNEL_8]);
+  cv1.push(ioframe->cv.values[4]);
+  cv2.push(ioframe->cv.values[5]);
+  cv3.push(ioframe->cv.values[6]);
+  cv4.push(ioframe->cv.values[7]);
 #else
-  cv1.push(ioframe->cv.values[ADC_CHANNEL_1]);
-  cv2.push(ioframe->cv.values[ADC_CHANNEL_2]);
-  cv3.push(ioframe->cv.values[ADC_CHANNEL_3]);
-  cv4.push(ioframe->cv.values[ADC_CHANNEL_4]);
+  cv1.push(ioframe->cv.values[0]);
+  cv2.push(ioframe->cv.values[1]);
+  cv3.push(ioframe->cv.values[2]);
+  cv4.push(ioframe->cv.values[3]);
 #endif
 
-  const int32_t cvs[ADC_CHANNEL_LAST] = { cv1.value(), cv2.value(), cv3.value(), cv4.value() };
+  const int32_t cvs[BBGEN_CHANNEL_COUNT] = { cv1.value(), cv2.value(), cv3.value(), cv4.value() };
   uint32_t triggers = ioframe->digital_inputs.triggered();
 
-  balls_[0].Update(ioframe, triggers, cvs, DAC_CHANNEL_A);
-  balls_[1].Update(ioframe, triggers, cvs, DAC_CHANNEL_B);
-  balls_[2].Update(ioframe, triggers, cvs, DAC_CHANNEL_C);
-  balls_[3].Update(ioframe, triggers, cvs, DAC_CHANNEL_D);
+  balls_[0].Update(ioframe, triggers, cvs, 0);
+  balls_[1].Update(ioframe, triggers, cvs, 1);
+  balls_[2].Update(ioframe, triggers, cvs, 2);
+  balls_[3].Update(ioframe, triggers, cvs, 3);
 }
 
 size_t AppQuadBouncingBalls::SaveAppData(util::StreamBufferWriter &stream_buffer) const {
@@ -410,7 +412,7 @@ void AppQuadBouncingBalls::GetIOConfig(OC::IOConfig &ioconfig) const
     ioconfig.digital_inputs[di].set(label);
   }
 
-  for (int cv = ADC_CHANNEL_1; cv <= ADC_CHANNEL_4; ++cv) {
+  for (int cv = 0; cv < BBGEN_CHANNEL_COUNT; ++cv) {
     char *l = label;
     int channel = 0;
     for (const auto &ball : balls_) {
@@ -428,10 +430,10 @@ void AppQuadBouncingBalls::GetIOConfig(OC::IOConfig &ioconfig) const
     ioconfig.cv[cv].set(label);
   }
 
-  ioconfig.outputs[DAC_CHANNEL_A].set("Ball1", OC::OUTPUT_MODE_UNI);
-  ioconfig.outputs[DAC_CHANNEL_B].set("Ball2", OC::OUTPUT_MODE_UNI);
-  ioconfig.outputs[DAC_CHANNEL_C].set("Ball3", OC::OUTPUT_MODE_UNI);
-  ioconfig.outputs[DAC_CHANNEL_D].set("Ball4", OC::OUTPUT_MODE_UNI);
+  ioconfig.outputs[0].set("Ball1", OC::OUTPUT_MODE_UNI);
+  ioconfig.outputs[1].set("Ball2", OC::OUTPUT_MODE_UNI);
+  ioconfig.outputs[2].set("Ball3", OC::OUTPUT_MODE_UNI);
+  ioconfig.outputs[3].set("Ball4", OC::OUTPUT_MODE_UNI);
 }
 
 void AppQuadBouncingBalls::DrawDebugInfo() const {

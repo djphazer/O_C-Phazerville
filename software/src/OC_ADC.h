@@ -24,7 +24,7 @@ extern ADC_CHANNEL ADC_CHANNEL_1, ADC_CHANNEL_2, ADC_CHANNEL_3, ADC_CHANNEL_4;
 extern ADC_CHANNEL ADC_CHANNEL_5, ADC_CHANNEL_6, ADC_CHANNEL_7, ADC_CHANNEL_8;
 #endif
 
-static constexpr int ADC_CHANNEL_LAST = ADC_CHANNEL_COUNT;
+//static constexpr int ADC_CHANNEL_LAST = ADC_CHANNEL_COUNT;
 
 #define DMA_BUF_SIZE 16
 #define DMA_NUM_CH 4
@@ -141,7 +141,7 @@ private:
 #endif
 
 #ifdef OC_DEBUG_ADC_STATS
-  static ChannelStats channel_stats_[ADC_CHANNEL_LAST];
+  static ChannelStats channel_stats_[ADC_CHANNEL_COUNT];
   static uint32_t stats_ticks_;
 #endif
 

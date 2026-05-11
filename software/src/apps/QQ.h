@@ -478,7 +478,7 @@ public:
     return trigger_delay_.triggered();   
   }
 
-  inline void Update(OC::IOFrame *ioframe, DAC_CHANNEL dac_channel)
+  inline void Update(OC::IOFrame *ioframe, size_t dac_channel)
   {
     auto triggers = ioframe->digital_inputs.triggered();
     auto index = channel_index_;
@@ -1274,10 +1274,10 @@ void AppQuadQuantizer::HandleAppEvent(AppEvent event) {
 }
 
 void AppQuadQuantizer::Process(IOFrame *ioframe) {
-  quantizer_channels_[0].Update(ioframe, DAC_CHANNEL_A);
-  quantizer_channels_[1].Update(ioframe, DAC_CHANNEL_B);
-  quantizer_channels_[2].Update(ioframe, DAC_CHANNEL_C);
-  quantizer_channels_[3].Update(ioframe, DAC_CHANNEL_D);
+  quantizer_channels_[0].Update(ioframe, 0);
+  quantizer_channels_[1].Update(ioframe, 1);
+  quantizer_channels_[2].Update(ioframe, 2);
+  quantizer_channels_[3].Update(ioframe, 3);
 }
 
 void AppQuadQuantizer::GetIOConfig(IOConfig &ioconfig) const

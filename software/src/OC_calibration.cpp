@@ -156,7 +156,7 @@ FLASHMEM void calibration_reset() {
       return;
     }
 
-    for (int ch = 0; ch < DAC_CHANNEL_LAST; ++ch) {
+    for (int ch = 0; ch < DAC_CHANNEL_COUNT; ++ch) {
       for (int i = 0; i < OCTAVES; ++i) {
         OC::calibration_data.dac.calibrated_octaves[ch][i] += DAC_OFFSET;
       }

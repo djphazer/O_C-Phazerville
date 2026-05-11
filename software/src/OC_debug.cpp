@@ -305,7 +305,7 @@ static void debug_menu_pewpewpew() {
 #ifdef OC_DEBUG_ADC_STATS
 static void debug_menu_adc2() {
   weegfx::coord_t y = 12;
-  for (int channel = ADC_CHANNEL_1; channel < ADC_CHANNEL_LAST; ++channel) {
+  for (int channel = 0; channel < ADC_CHANNEL_COUNT; ++channel) {
     auto &stats = ADC::get_channel_stats(static_cast<ADC_CHANNEL>(channel));
     graphics.setPrintPos(2, y);
     graphics.printf("CV%d %5d %5d", channel + 1, stats.min, stats.max);

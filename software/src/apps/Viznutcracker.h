@@ -80,6 +80,8 @@ const char* const bytebeat_cv_mapping_names[BYTEBEAT_CV_MAPPING_LAST] = {
   "off", "equ", "spd", "p0", "p1", "p2", "beg++", "beg+", "beg", "end++", "end+", "end","pitch"
 };
 
+static constexpr int BYTEBEAT_CHANNEL_COUNT = 4; // DAC_CHANNEL_COUNT;
+
 class ByteBeat : public settings::SettingsBase<ByteBeat, BYTEBEAT_SETTING_LAST> {
 public:
 
@@ -247,7 +249,7 @@ public:
   }
   // end conditional menu items infrastructure
 
-  inline void apply_cv_mapping(ByteBeatSettings cv_setting, const int32_t cvs[4], int32_t segments[kMaxByteBeatParameters]) {
+  inline void apply_cv_mapping(ByteBeatSettings cv_setting, const int32_t cvs[BYTEBEAT_CHANNEL_COUNT], int32_t segments[kMaxByteBeatParameters]) {
     int mapping = values_[cv_setting];
     uint8_t bytebeat_cv_rshift = 12;
     switch (mapping) {
@@ -273,7 +275,7 @@ public:
      segments[mapping - BYTEBEAT_CV_MAPPING_FIRST] += (cvs[cv_setting - BYTEBEAT_SETTING_CV1] * 65536) >> bytebeat_cv_rshift;
   }
 
-  void Update(OC::IOFrame *ioframe, uint32_t triggers, const int32_t cvs[ADC_CHANNEL_COUNT], DAC_CHANNEL dac_channel) {
+  void Update(OC::IOFrame *ioframe, uint32_t triggers, const int32_t cvs[BYTEBEAT_CHANNEL_COUNT], size_t channel) {
 
     int32_t s[kMaxByteBeatParameters];
     s[0] = SCALE8_16(static_cast<int32_t>(get_equation() << 4));
@@ -317,12 +319,12 @@ public:
     uint16_t b = bytebeat_.ProcessSingleSample(gate_state);
 /*
     #ifdef NORTHERNLIGHT
-      uint32_t value = OC::DAC::get_zero_offset(dac_channel) + b;
+      uint32_t value = OC::DAC::get_zero_offset(channel) + b;
     #else
-      uint32_t value = OC::DAC::get_zero_offset(dac_channel) + (int16_t)b;
+      uint32_t value = OC::DAC::get_zero_offset(channel) + (int16_t)b;
     #endif
 */
-    ioframe->outputs.set_raw_value(dac_channel, b);
+    ioframe->outputs.set_raw_value(channel, b);
 
     b >>= 8;
     if (b != history_.last()) // This make the effect a bit different
@@ -390,7 +392,7 @@ OC_APP_TRAITS(AppQuadByteBeats, TWOCCS("BY"), "Viznutcracker sweet", "Bytebeats"
 class OC_APP_CLASS(AppQuadByteBeats) {
 public:
   OC_APP_INTERFACE_DECLARE(AppQuadByteBeats);
-  OC_APP_STORAGE_SIZE(4 * ByteBeat::storageSize());
+  OC_APP_STORAGE_SIZE(BYTEBEAT_CHANNEL_COUNT * ByteBeat::storageSize());
 
 private:
   static constexpr int32_t kCvSmoothing = 16;
@@ -418,7 +420,7 @@ private:
     return bytebeats_[ui.selected_channel];
   }
 
-  ByteBeat bytebeats_[4];
+  ByteBeat bytebeats_[BYTEBEAT_CHANNEL_COUNT];
 
   SmoothedValue<int32_t, kCvSmoothing> cv1;
   SmoothedValue<int32_t, kCvSmoothing> cv2;
@@ -459,13 +461,13 @@ void FASTRUN AppQuadByteBeats::Process(OC::IOFrame *ioframe) {
   cv4.push(ioframe->cv.values[ADC_CHANNEL_4]);
 #endif
 
-  const int32_t cvs[4] = { cv1.value(), cv2.value(), cv3.value(), cv4.value() };
+  const int32_t cvs[BYTEBEAT_CHANNEL_COUNT] = { cv1.value(), cv2.value(), cv3.value(), cv4.value() };
   uint32_t triggers = ioframe->digital_inputs.triggered();
 
-  bytebeats_[0].Update(ioframe, triggers, cvs, DAC_CHANNEL_A);
-  bytebeats_[1].Update(ioframe, triggers, cvs, DAC_CHANNEL_B);
-  bytebeats_[2].Update(ioframe, triggers, cvs, DAC_CHANNEL_C);
-  bytebeats_[3].Update(ioframe, triggers, cvs, DAC_CHANNEL_D);
+  bytebeats_[0].Update(ioframe, triggers, cvs, 0);
+  bytebeats_[1].Update(ioframe, triggers, cvs, 1);
+  bytebeats_[2].Update(ioframe, triggers, cvs, 2);
+  bytebeats_[3].Update(ioframe, triggers, cvs, 3);
 }
 
 size_t AppQuadByteBeats::SaveAppData(util::StreamBufferWriter &stream_buffer) const {
@@ -503,7 +505,7 @@ void AppQuadByteBeats::Loop() {
 void AppQuadByteBeats::DrawMenu() const {
 
   menu::QuadTitleBar::Draw();
-  for (uint_fast8_t i = 0; i < 4; ++i) {
+  for (uint_fast8_t i = 0; i < BYTEBEAT_CHANNEL_COUNT; ++i) {
     menu::QuadTitleBar::SetColumn(i);
     graphics.print((char)('A' + i));
   }
@@ -578,7 +580,7 @@ void AppQuadByteBeats::HandleEncoderEvent(const UI::Event &event) {
 
 void AppQuadByteBeats::DrawDebugInfo() const {
 #ifdef BYTEBEAT_DEBUG
-  for (int i = 0; i < 4; ++i) {
+  for (int i = 0; i < BYTEBEAT_CHANNEL_COUNT; ++i) {
     uint8_t ypos = 10*(i + 1) + 2 ;
     graphics.setPrintPos(2, ypos);
     graphics.print(i) ;
@@ -631,7 +633,7 @@ void AppQuadByteBeats::GetIOConfig(IOConfig &ioconfig) const
     ioconfig.digital_inputs[di].set(label);
   }
 
-  for (int cv = ADC_CHANNEL_1; cv <= ADC_CHANNEL_4; ++cv) {
+  for (int cv = 0; cv < BYTEBEAT_CHANNEL_COUNT; ++cv) {
     char *l = label;
     int channel = 0;
     for (const auto &bb : bytebeats_) {
@@ -648,7 +650,7 @@ void AppQuadByteBeats::GetIOConfig(IOConfig &ioconfig) const
     ioconfig.cv[cv].set(label);
   }
 
-  for (int i = DAC_CHANNEL_A; i <= DAC_CHANNEL_D; ++i)
+  for (int i = 0; i < BYTEBEAT_CHANNEL_COUNT; ++i)
     ioconfig.outputs[i].set_printf(OUTPUT_MODE_RAW, "CH%d %s", i + 1,
                                    Strings::bytebeat_equation_names[bytebeats_[i].get_equation()]);
 }

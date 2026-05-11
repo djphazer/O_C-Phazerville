@@ -981,10 +981,10 @@ void /*FASTRUN*/ AppH1200::Process(OC::IOFrame *ioframe) {
 
 void AppH1200::GetIOConfig(OC::IOConfig &ioconfig) const
 {
-  ioconfig.outputs[DAC_CHANNEL_A].set("ROOT", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_B].set("+1", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_C].set("+2", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_D].set("+3", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[0].set("ROOT", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[1].set("+1", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[2].set("+2", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[3].set("+3", OUTPUT_MODE_PITCH);
 }
 
 void AppH1200::Init() {

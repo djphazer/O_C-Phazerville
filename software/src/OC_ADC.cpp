@@ -22,7 +22,7 @@ namespace OC {
 #endif
 
 #ifdef OC_ADC_DEBUG_STATS
-/*static*/ ADC::ChannelStats ADC::channel_stats_[ADC_CHANNEL_LAST];
+/*static*/ ADC::ChannelStats ADC::channel_stats_[ADC_CHANNEL_COUNT];
 /*static*/ uint32_t ADC::stats_ticks_ = 0;
 #endif
 
@@ -496,7 +496,7 @@ void ADC::Read(IOFrame *ioframe)
     dma0->TCD->DADDR = &adcbuffer_0[0];
   }
 
-  for (int channel = ADC_CHANNEL_1; channel < ADC_CHANNEL_LAST; ++channel) {
+  for (int channel = 0; channel < ADC_CHANNEL_COUNT; ++channel) {
     ioframe->cv.values[channel] = value(static_cast<ADC_CHANNEL>(channel));
     ioframe->cv.pitch_values[channel] = value_to_pitch( ioframe->cv.values[channel] );
   }

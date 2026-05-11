@@ -388,10 +388,10 @@ void FASTRUN AppPolyLfo::Process(OC::IOFrame *ioframe) {
     poly_lfo_.lfo.Render(freq, reset_phase, tempo_sync, freq_mult);
 
   // TODO[PLD] Ranges & offsets
-  ioframe->outputs.set_raw_value(DAC_CHANNEL_A, poly_lfo_.lfo.dac_code(0));
-  ioframe->outputs.set_raw_value(DAC_CHANNEL_B, poly_lfo_.lfo.dac_code(1));
-  ioframe->outputs.set_raw_value(DAC_CHANNEL_C, poly_lfo_.lfo.dac_code(2));
-  ioframe->outputs.set_raw_value(DAC_CHANNEL_D, poly_lfo_.lfo.dac_code(3));
+  ioframe->outputs.set_raw_value(0, poly_lfo_.lfo.dac_code(0));
+  ioframe->outputs.set_raw_value(1, poly_lfo_.lfo.dac_code(1));
+  ioframe->outputs.set_raw_value(2, poly_lfo_.lfo.dac_code(2));
+  ioframe->outputs.set_raw_value(3, poly_lfo_.lfo.dac_code(3));
 }
 
 void AppPolyLfo::GetIOConfig(OC::IOConfig &ioconfig) const
@@ -400,15 +400,15 @@ void AppPolyLfo::GetIOConfig(OC::IOConfig &ioconfig) const
   ioconfig.digital_inputs[DIGITAL_INPUT_2].set("Freeze");
   ioconfig.digital_inputs[DIGITAL_INPUT_3].set("Tempo sync");
 
-  ioconfig.cv[ADC_CHANNEL_1].set("Freq");
-  ioconfig.cv[ADC_CHANNEL_2].set("Shape");
-  ioconfig.cv[ADC_CHANNEL_3].set("Spread");
-  ioconfig.cv[ADC_CHANNEL_4].set_printf("*%s", cv4_destinations[poly_lfo_.cv4_destination()]);
+  ioconfig.cv[0].set("Freq");
+  ioconfig.cv[1].set("Shape");
+  ioconfig.cv[2].set("Spread");
+  ioconfig.cv[3].set_printf("*%s", cv4_destinations[poly_lfo_.cv4_destination()]);
 
-  ioconfig.outputs[DAC_CHANNEL_A].set("CH1", OC::OUTPUT_MODE_RAW);
-  ioconfig.outputs[DAC_CHANNEL_B].set("CH2", OC::OUTPUT_MODE_RAW);
-  ioconfig.outputs[DAC_CHANNEL_C].set("CH3", OC::OUTPUT_MODE_RAW);
-  ioconfig.outputs[DAC_CHANNEL_D].set("CH4", OC::OUTPUT_MODE_RAW);
+  ioconfig.outputs[0].set("CH1", OC::OUTPUT_MODE_RAW);
+  ioconfig.outputs[1].set("CH2", OC::OUTPUT_MODE_RAW);
+  ioconfig.outputs[2].set("CH3", OC::OUTPUT_MODE_RAW);
+  ioconfig.outputs[3].set("CH4", OC::OUTPUT_MODE_RAW);
 }
 
 void AppPolyLfo::Init() {

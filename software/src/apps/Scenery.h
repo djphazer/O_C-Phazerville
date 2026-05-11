@@ -37,7 +37,7 @@ static const int NR_OF_SCENES = 8;
 #else
 static const int NR_OF_SCENES = 4;
 #endif
-static const int NR_OF_OUTPUTS = DAC_CHANNEL_LAST;
+static const int NR_OF_OUTPUTS = DAC_CHANNEL_COUNT;
 
 #define SCENE_MAX_VAL HEMISPHERE_MAX_CV
 #define SCENE_MIN_VAL HEMISPHERE_MIN_CV
@@ -656,15 +656,19 @@ void AppScenery::GetIOConfig(OC::IOConfig &ioconfig) const
   ioconfig.digital_inputs[DIGITAL_INPUT_3].set("Scene 3");
   ioconfig.digital_inputs[DIGITAL_INPUT_4].set("Scene 4");
 
-  ioconfig.cv[ADC_CHANNEL_1].set("Smooth Select");
-  ioconfig.cv[ADC_CHANNEL_2].set("Bias");
-  ioconfig.cv[ADC_CHANNEL_3].set("Slew");
-  ioconfig.cv[ADC_CHANNEL_4].set("RndScn4");
+  ioconfig.cv[0].set("Smooth Select");
+  ioconfig.cv[1].set("Bias");
+  ioconfig.cv[2].set("Slew");
+  ioconfig.cv[3].set("RndScn4");
 
-  ioconfig.outputs[DAC_CHANNEL_A].set("Out A", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_B].set("Out B", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_C].set("Out C", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_D].set("Out D", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[0].set("Out A", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[1].set("Out B", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[2].set("Out C", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[3].set("Out D", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[4].set("Out E", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[5].set("Out F", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[6].set("Out G", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[7].set("Out H", OUTPUT_MODE_PITCH);
 }
 
 FLASHMEM

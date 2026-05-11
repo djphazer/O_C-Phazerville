@@ -106,7 +106,7 @@ static const size_t kScopeDepth = 64;
 #endif
 
 uint16_t scope_history[DAC::kHistoryDepth];
-uint16_t averaged_scope_history[DAC_CHANNEL_LAST][kScopeDepth];
+uint16_t averaged_scope_history[DAC_CHANNEL_COUNT][kScopeDepth];
 size_t averaged_scope_tail = 0;
 int scope_update_channel = 0;
 
@@ -124,7 +124,7 @@ void scope_averaging() {
   DAC::getHistory(scope_update_channel, scope_history);
   averaged_scope_history[scope_update_channel][averaged_scope_tail] = ((65535U - calc_average<DAC::kHistoryDepth>(scope_history)) >> rshift) & bitmask;
 
-  ++scope_update_channel %= DAC_CHANNEL_LAST;
+  ++scope_update_channel %= DAC_CHANNEL_COUNT;
 
   if (0 == scope_update_channel) {
     averaged_scope_tail = (averaged_scope_tail + 1) % kScopeDepth;

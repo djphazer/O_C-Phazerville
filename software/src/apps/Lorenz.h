@@ -255,10 +255,10 @@ void FASTRUN AppLorenzGenerator::Process(OC::IOFrame *ioframe) {
   if (!freeze && !lorenz_generator_.frozen())
     lorenz_generator_.lorenz.Process(freq1, freq2, reset1_phase, reset2_phase, lorenz_generator_.get_freq_range1(), lorenz_generator_.get_freq_range2());
 
-  ioframe->outputs.set_raw_value(DAC_CHANNEL_A, lorenz_generator_.lorenz.dac_code(0));
-  ioframe->outputs.set_raw_value(DAC_CHANNEL_B, lorenz_generator_.lorenz.dac_code(1));
-  ioframe->outputs.set_raw_value(DAC_CHANNEL_C, lorenz_generator_.lorenz.dac_code(2));
-  ioframe->outputs.set_raw_value(DAC_CHANNEL_D, lorenz_generator_.lorenz.dac_code(3));
+  ioframe->outputs.set_raw_value(0, lorenz_generator_.lorenz.dac_code(0));
+  ioframe->outputs.set_raw_value(1, lorenz_generator_.lorenz.dac_code(1));
+  ioframe->outputs.set_raw_value(2, lorenz_generator_.lorenz.dac_code(2));
+  ioframe->outputs.set_raw_value(3, lorenz_generator_.lorenz.dac_code(3));
 }
 
 size_t AppLorenzGenerator::SaveAppData(util::StreamBufferWriter &stream_buffer) const {
@@ -380,15 +380,15 @@ void AppLorenzGenerator::GetIOConfig(IOConfig &ioconfig) const
   ioconfig.digital_inputs[DIGITAL_INPUT_3].set("Reset 1&2");
   ioconfig.digital_inputs[DIGITAL_INPUT_4].set("Freeze");
 
-  ioconfig.cv[ADC_CHANNEL_1].set("Freq1");
-  ioconfig.cv[ADC_CHANNEL_2].set("Rho1");
-  ioconfig.cv[ADC_CHANNEL_3].set("Freq2");
-  ioconfig.cv[ADC_CHANNEL_4].set("Rho2");
+  ioconfig.cv[0].set("Freq1");
+  ioconfig.cv[1].set("Rho1");
+  ioconfig.cv[2].set("Freq2");
+  ioconfig.cv[3].set("Rho2");
 
-  ioconfig.outputs[DAC_CHANNEL_A].set(lorenz_output_names[lorenz_generator_.get_out_a()], OUTPUT_MODE_RAW);
-  ioconfig.outputs[DAC_CHANNEL_B].set(lorenz_output_names[lorenz_generator_.get_out_b()], OUTPUT_MODE_RAW);
-  ioconfig.outputs[DAC_CHANNEL_C].set(lorenz_output_names[lorenz_generator_.get_out_c()], OUTPUT_MODE_RAW);
-  ioconfig.outputs[DAC_CHANNEL_D].set(lorenz_output_names[lorenz_generator_.get_out_d()], OUTPUT_MODE_RAW);
+  ioconfig.outputs[0].set(lorenz_output_names[lorenz_generator_.get_out_a()], OUTPUT_MODE_RAW);
+  ioconfig.outputs[1].set(lorenz_output_names[lorenz_generator_.get_out_b()], OUTPUT_MODE_RAW);
+  ioconfig.outputs[2].set(lorenz_output_names[lorenz_generator_.get_out_c()], OUTPUT_MODE_RAW);
+  ioconfig.outputs[3].set(lorenz_output_names[lorenz_generator_.get_out_d()], OUTPUT_MODE_RAW);
 }
 
 void AppLorenzGenerator::DrawDebugInfo() const {

@@ -36,11 +36,9 @@
 
 extern uint_fast8_t MENU_REDRAW;
 
-#define NUM_ASR_CHANNELS 0x4
-// TODO:
-// #define NUM_ASR_CHANNELS DAC_CHANNEL_LAST
-#define ASR_MAX_ITEMS 256 // = ASR ring buffer size.
-#define ASR_HOLD_BUF_SIZE ASR_MAX_ITEMS / NUM_ASR_CHANNELS // max. delay size
+static constexpr int NUM_ASR_CHANNELS = DAC_CHANNEL_COUNT;
+static constexpr int ASR_MAX_ITEMS = 256; // = ASR ring buffer size.
+static constexpr int ASR_HOLD_BUF_SIZE = ASR_MAX_ITEMS / NUM_ASR_CHANNELS; // max. delay size
 
 enum ASRSettings {
   ASR_SETTING_SCALE,
@@ -109,15 +107,15 @@ const char* const int_seq_CV_destinations[] = {
 using ASR_pitch = int16_t;
 
 #ifdef ARDUINO_TEENSY41
-  static constexpr ADC_CHANNEL &CVInput1 = ADC_CHANNEL_5;
-  static constexpr ADC_CHANNEL &CVInput2 = ADC_CHANNEL_6;
-  static constexpr ADC_CHANNEL &CVInput3 = ADC_CHANNEL_7;
-  static constexpr ADC_CHANNEL &CVInput4 = ADC_CHANNEL_8;
+  static constexpr size_t CVInput1 = 4;
+  static constexpr size_t CVInput2 = 5;
+  static constexpr size_t CVInput3 = 6;
+  static constexpr size_t CVInput4 = 7;
 #else
-  static constexpr ADC_CHANNEL &CVInput1 = ADC_CHANNEL_1;
-  static constexpr ADC_CHANNEL &CVInput2 = ADC_CHANNEL_2;
-  static constexpr ADC_CHANNEL &CVInput3 = ADC_CHANNEL_3;
-  static constexpr ADC_CHANNEL &CVInput4 = ADC_CHANNEL_4;
+  static constexpr size_t CVInput1 = 0;
+  static constexpr size_t CVInput2 = 1;
+  static constexpr size_t CVInput3 = 2;
+  static constexpr size_t CVInput4 = 3;
 #endif
 
 class ASR
@@ -447,16 +445,16 @@ public:
 
       // update outputs:
       _offset = _delay;
-      *(_asr_buf + DAC_CHANNEL_A) = _ASR.Poke(_offset++);
+      *(_asr_buf + 0) = _ASR.Poke(_offset++);
       // delay mechanics ...
       _delay = delay_type_ ? 0x0 : _delay;
       // continue updating
       _offset +=_delay;
-      *(_asr_buf + DAC_CHANNEL_B) = _ASR.Poke(_offset++);
+      *(_asr_buf + 1) = _ASR.Poke(_offset++);
       _offset +=_delay;
-      *(_asr_buf + DAC_CHANNEL_C) = _ASR.Poke(_offset++);
+      *(_asr_buf + 2) = _ASR.Poke(_offset++);
       _offset +=_delay;
-      *(_asr_buf + DAC_CHANNEL_D) = _ASR.Poke(_offset++);
+      *(_asr_buf + 3) = _ASR.Poke(_offset++);
   }
 
   inline void update(OC::IOFrame *ioframe) {
@@ -477,7 +475,7 @@ public:
          int8_t _transpose = 0;
          int8_t _mult = get_mult();
          int32_t _pitch = ioframe->cv.pitch_values[CVInput1];
-         int32_t _asr_buffer[DAC_CHANNEL_LAST];
+         int32_t _asr_buffer[NUM_ASR_CHANNELS];
 
          bool forced_update = force_update_;
          force_update_ = false;
@@ -879,10 +877,10 @@ void AppASR::GetIOConfig(IOConfig &ioconfig) const
   ioconfig.cv[CVInput3].set("*scale");
   ioconfig.cv[CVInput4].set_printf("*%s", asr_cv4_destinations[asr_.get_cv4_destination()]);
 
-  ioconfig.outputs[DAC_CHANNEL_A].set("ASR Tap1", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_B].set("ASR Tap2", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_C].set("ASR Tap3", OUTPUT_MODE_PITCH);
-  ioconfig.outputs[DAC_CHANNEL_D].set("ASR Tap4", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[0].set("ASR Tap1", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[1].set("ASR Tap2", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[2].set("ASR Tap3", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[3].set("ASR Tap4", OUTPUT_MODE_PITCH);
 }
 
 void AppASR::HandleButtonEvent(const UI::Event &event) {

@@ -161,7 +161,7 @@ public:
                 break;
             case hMIDIIn_A_POLY_VOICE:
             case hMIDIIn_B_POLY_VOICE:
-                map.dac_polyvoice = constrain(map.dac_polyvoice + direction, 0, DAC_CHANNEL_LAST - 1);
+                map.dac_polyvoice = constrain(map.dac_polyvoice + direction, 0, DAC_CHANNEL_COUNT - 1);
                 frame.MIDIState.UpdateMaxPolyphony();
                 break;
             case MAP_A_RANGELOW:
