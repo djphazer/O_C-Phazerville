@@ -54,29 +54,52 @@ enum {
     DT_MIDI_CHANNEL_ALT,
     DT_MIDI_CHANNEL_IN,
     DT_GATE_TIME,
-    DT_SETTING_LAST
+    DT_SETTING_COUNT
 };
 
-class TheDarkestTimeline : public HSApplication, public SystemExclusiveHandler,
-    public settings::SettingsBase<TheDarkestTimeline, DT_SETTING_LAST> {
-public:
-	void Start() {
-        Resume();
-	}
+class DarkestSettings : public settings::SettingsBase<DarkestSettings, DT_SETTING_COUNT> {
+  // MIDI channels are U8 instead of U4 because the channel number
+  // is not zero-indexed; 0 means "off"
+  // TOTAL EEPROM SIZE: 8 bytes
+  SETTINGS_ARRAY_DECLARE() {{
+    {16, 1, 32, "Length", NULL, settings::STORAGE_TYPE_U8},
+    {0, 0, 31, "Index", NULL, settings::STORAGE_TYPE_U8},
+    {5, 0, OC::Scales::NUM_SCALES - 1, "Scale", NULL, settings::STORAGE_TYPE_U8},
+    {0, 0, 11, "Root", NULL, settings::STORAGE_TYPE_U8},
+    {0, 0, 16, "MIDI Channel", NULL, settings::STORAGE_TYPE_U8},
+    {0, 0, 16, "MIDI Channel Alt", NULL, settings::STORAGE_TYPE_U8},
+    {0, 0, 16, "MIDI Channel In", NULL, settings::STORAGE_TYPE_U8},
+    {0, 0, 100, "Trigger Pct", NULL, settings::STORAGE_TYPE_U8},
+  }};
+};
+SETTINGS_ARRAY_DEFINE(DarkestSettings);
 
-	void Resume() {
+OC_APP_TRAITS(TheDarkestTimeline, TWOCCS("D2"), "Darkest Timeline", "Darkness");
+class OC_APP_CLASS(TheDarkestTimeline) , public HSApplication, public SystemExclusiveHandler
+{
+public:
+  OC_APP_INTERFACE_DECLARE(TheDarkestTimeline);
+  OC_APP_STORAGE_SIZE(DarkestSettings::storageSize());
+
+  DarkestSettings dt_settings;
+
+    void Start() {
+        Resume();
+    }
+
+    void Resume() {
         setup_screen = 0;
         last_midi_note[0] = -1;
         last_midi_note[1] = -1;
         if (!length()) {
-            values_[DT_LENGTH] = 16;
-            values_[DT_SCALE] = 5;
-            values_[DT_MIDI_CHANNEL] = 11;
-            values_[DT_MIDI_CHANNEL_ALT] = 12;
+            dt_settings.apply_value(DT_LENGTH, 16);
+            dt_settings.apply_value(DT_SCALE, 5);
+            dt_settings.apply_value(DT_MIDI_CHANNEL, 11);
+            dt_settings.apply_value(DT_MIDI_CHANNEL_ALT, 12);
         }
         HS::q_engine[0].quantizer.Init();
         HS::q_engine[0].quantizer.Configure(OC::Scales::GetScale(scale()), 0xffff);
-	}
+    }
 
     void Controller() {
         // Listen for MIDI In
@@ -126,7 +149,7 @@ public:
             int cv = DetentedIn(2);
             if (cv > 0) {
                 int cv_index = cv / (HSAPPLICATION_5V / 32);
-                apply_value(DT_INDEX, cv_index);
+                dt_settings.apply_value(DT_INDEX, cv_index);
             }
         }
 
@@ -236,7 +259,8 @@ public:
         if (!Clock(0) && note_on && (record[0] || record[1])) move_cursor(1);
     }
 
-    void View() {
+    void View() const;
+    void MainView() const {
         gfxHeader("Darkest Timeline");
         DrawInterface();
     }
@@ -250,8 +274,8 @@ public:
         {
             int ix = 0;
             V[ix++] = (char)page;
-            V[ix++] = (uint8_t)values_[DT_LENGTH]; // Store length and index with each page (legacy 1.3 support)
-            V[ix++] = (uint8_t)values_[DT_INDEX];
+            V[ix++] = (uint8_t)dt_settings.get_value(DT_LENGTH); // Store length and index with each page (legacy 1.3 support)
+            V[ix++] = (uint8_t)dt_settings.get_value(DT_INDEX);
             for (int b = 0; b < 16; b++)
             {
                 uint16_t cv = OC::user_patterns[page].notes[b];
@@ -284,8 +308,8 @@ public:
             int page = V[ix++];
             if (page < 4) {
                 // CV data pages 0-3
-                values_[DT_LENGTH] = V[ix++]; // V1.3 legacy support
-                values_[DT_INDEX] = V[ix++];
+                dt_settings.apply_value(DT_LENGTH, V[ix++]); // V1.3 legacy support
+                dt_settings.apply_value(DT_INDEX, V[ix++]);
                 for (int b = 0; b < 16; b++)
                 {
                     uint8_t low = V[ix++];
@@ -295,29 +319,29 @@ public:
                 }
             } else if (page == 4) {
                 // Metadata page 4
-                values_[DT_LENGTH] = V[ix++];
-                values_[DT_INDEX] = V[ix++];
-                values_[DT_SCALE] = V[ix++];
-                values_[DT_ROOT] = V[ix++];
+                dt_settings.apply_value(DT_LENGTH, V[ix++]);
+                dt_settings.apply_value(DT_INDEX, V[ix++]);
+                dt_settings.apply_value(DT_SCALE, V[ix++]);
+                dt_settings.apply_value(DT_ROOT, V[ix++]);
             }
         }
     }
 
-    uint8_t length() {return values_[DT_LENGTH];}
-    int8_t index() {return values_[DT_INDEX];}
-    uint8_t scale() {return values_[DT_SCALE];}
-    uint8_t root() {return values_[DT_ROOT];}
-    uint8_t midi_channel() {return values_[DT_MIDI_CHANNEL];}
-    uint8_t midi_channel_alt() {return values_[DT_MIDI_CHANNEL_ALT];}
-    uint8_t midi_channel_in() {return values_[DT_MIDI_CHANNEL_IN];}
-    uint8_t gate_time() {return values_[DT_GATE_TIME];}
+    uint8_t length() {return dt_settings.get_value(DT_LENGTH);}
+    int8_t index() {return dt_settings.get_value(DT_INDEX);}
+    uint8_t scale() {return dt_settings.get_value(DT_SCALE);}
+    uint8_t root() {return dt_settings.get_value(DT_ROOT);}
+    uint8_t midi_channel() {return dt_settings.get_value(DT_MIDI_CHANNEL);}
+    uint8_t midi_channel_alt() {return dt_settings.get_value(DT_MIDI_CHANNEL_ALT);}
+    uint8_t midi_channel_in() {return dt_settings.get_value(DT_MIDI_CHANNEL_IN);}
+    uint8_t gate_time() {return dt_settings.get_value(DT_GATE_TIME);}
 
     /////////////////////////////////////////////////////////////////
     // Control handlers
     /////////////////////////////////////////////////////////////////
     void OnLeftButtonPress() {
         // Advance through the setup screen
-        if (++setup_screen > (DT_SETTING_LAST - 2)) setup_screen = 0;
+        if (++setup_screen > (DT_SETTING_COUNT - 2)) setup_screen = 0;
         if (setup_screen > 0) setup_screen_timeout_countdown = DT_SETUP_SCREEN_TIMEOUT;
         ResetCursor();
     }
@@ -358,8 +382,8 @@ public:
     }
 
     void OnLeftEncoderMove(int direction) {
-        if (setup_screen == 0) change_value(DT_LENGTH, -direction);
-        else change_value(setup_screen + 1, direction);
+        if (setup_screen == 0) dt_settings.change_value(DT_LENGTH, -direction);
+        else dt_settings.change_value(setup_screen + 1, direction);
 
         HS::q_engine[0].quantizer.Configure(OC::Scales::GetScale(scale()), 0xffff);
         if (setup_screen > 0) setup_screen_timeout_countdown = DT_SETUP_SCREEN_TIMEOUT;
@@ -493,10 +517,11 @@ private:
     }
 
     int move_index(int direction) {
-        values_[DT_INDEX] += direction;
-        if (index() < 0) values_[DT_INDEX] = 31;
-        if (index() >= 32) values_[DT_INDEX] = 0;
-        return values_[DT_INDEX];
+        int val = index() + direction;
+        if (val < 0) val = 31;
+        if (val >= 32) val = 0;
+        dt_settings.apply_value(DT_INDEX, val);
+        return index();
     }
 
     uint16_t get_data_at(int step, bool timeline) {
@@ -520,83 +545,86 @@ private:
     }
 };
 
-// MIDI channels are U8 instead of U4 because the channel number is not zero-indexed; 0 means "off"
-// TOTAL EEPROM SIZE: 8 bytes
-SETTINGS_DECLARE(TheDarkestTimeline, DT_SETTING_LAST) {
-    {16, 1, 32, "Length", NULL, settings::STORAGE_TYPE_U8},
-    {0, 0, 31, "Index", NULL, settings::STORAGE_TYPE_U8},
-    {5, 0, OC::Scales::NUM_SCALES - 1, "Scale", NULL, settings::STORAGE_TYPE_U8},
-    {0, 0, 11, "Root", NULL, settings::STORAGE_TYPE_U8},
-    {0, 0, 16, "MIDI Channel", NULL, settings::STORAGE_TYPE_U8},
-    {0, 0, 16, "MIDI Channel Alt", NULL, settings::STORAGE_TYPE_U8},
-    {0, 0, 16, "MIDI Channel In", NULL, settings::STORAGE_TYPE_U8},
-    {0, 0, 100, "Trigger Pct", NULL, settings::STORAGE_TYPE_U8},
-};
-
-TheDarkestTimeline TheDarkestTimeline_instance;
-
 // App stubs
-void TheDarkestTimeline_init() {
-    TheDarkestTimeline_instance.BaseStart();
+void TheDarkestTimeline::Init() { BaseStart(); }
+
+void TheDarkestTimeline::Process(OC::IOFrame *ioframe) {
+  return BaseController(ioframe);
 }
 
-static constexpr size_t TheDarkestTimeline_storageSize() {
-    return TheDarkestTimeline::storageSize();
+void TheDarkestTimeline::GetIOConfig(OC::IOConfig &ioconfig) const {
+  using namespace OC;
+  // TODO:
+  ioconfig.digital_inputs[DIGITAL_INPUT_1].set("");
+  ioconfig.digital_inputs[DIGITAL_INPUT_2].set("");
+  ioconfig.digital_inputs[DIGITAL_INPUT_3].set("");
+  ioconfig.digital_inputs[DIGITAL_INPUT_4].set("");
+
+  ioconfig.outputs[0].set("Ch1", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[1].set("Ch2", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[2].set("Ch3", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[3].set("Ch4", OUTPUT_MODE_PITCH);
 }
 
-static size_t TheDarkestTimeline_save(void *storage) {
-    return TheDarkestTimeline_instance.Save(storage);
+size_t TheDarkestTimeline::SaveAppData(util::StreamBufferWriter &stream_buffer) const {
+  dt_settings.Save(stream_buffer);
+  return stream_buffer.written();
 }
 
-static size_t TheDarkestTimeline_restore(const void *storage) {
-    return TheDarkestTimeline_instance.Restore(storage);
+size_t TheDarkestTimeline::RestoreAppData(util::StreamBufferReader &stream_buffer) {
+  dt_settings.Restore(stream_buffer);
+  return stream_buffer.read();
 }
 
-void TheDarkestTimeline_process(OC::IOFrame *) {
-	return TheDarkestTimeline_instance.BaseController();
-}
-
-void TheDarkestTimeline_handleAppEvent(OC::AppEvent event) {
-    if (event ==  OC::APP_EVENT_RESUME) {
-        TheDarkestTimeline_instance.Resume();
+void TheDarkestTimeline::HandleAppEvent(OC::AppEvent event) {
+    if (event == OC::APP_EVENT_RESUME) {
+        Resume();
     }
     if (event == OC::APP_EVENT_SUSPEND) {
-        TheDarkestTimeline_instance.OnSendSysEx();
+        OnSendSysEx();
     }
 }
 
-void TheDarkestTimeline_loop() {} // Deprecated
+void TheDarkestTimeline::Loop() { }
 
-void TheDarkestTimeline_menu() {
-    TheDarkestTimeline_instance.BaseView();
+FLASHMEM
+void TheDarkestTimeline::DrawMenu() const { BaseView(); }
+
+FLASHMEM
+void TheDarkestTimeline::View() const { MainView(); }
+
+void TheDarkestTimeline::DrawScreensaver() const {
+  //BaseScreensaver(true);
+}
+void TheDarkestTimeline::DrawDebugInfo() const {
+  // TODO:
 }
 
-void TheDarkestTimeline_screensaver() {}
-
-void TheDarkestTimeline_handleButtonEvent(const UI::Event &event) {
+FLASHMEM
+void TheDarkestTimeline::HandleButtonEvent(const UI::Event &event) {
     // For left encoder, handle press and long press
     if (event.control == OC::CONTROL_BUTTON_L) {
-        if (event.type == UI::EVENT_BUTTON_LONG_PRESS) TheDarkestTimeline_instance.OnLeftButtonLongPress();
-        if (event.type == UI::EVENT_BUTTON_PRESS) TheDarkestTimeline_instance.OnLeftButtonPress();
+        if (event.type == UI::EVENT_BUTTON_LONG_PRESS) OnLeftButtonLongPress();
+        if (event.type == UI::EVENT_BUTTON_PRESS) OnLeftButtonPress();
     }
 
     // For right encoder, only handle press (long press is reserved)
-    if (event.control == OC::CONTROL_BUTTON_R && event.type == UI::EVENT_BUTTON_PRESS) TheDarkestTimeline_instance.OnRightButtonPress();
+    if (event.control == OC::CONTROL_BUTTON_R && event.type == UI::EVENT_BUTTON_PRESS) OnRightButtonPress();
 
     // For up button, handle only press (long press is reserved)
-    if (event.control == OC::CONTROL_BUTTON_UP && event.type == UI::EVENT_BUTTON_PRESS) TheDarkestTimeline_instance.OnUpButtonPress();
+    if (event.control == OC::CONTROL_BUTTON_UP && event.type == UI::EVENT_BUTTON_PRESS) OnUpButtonPress();
 
     // For down button, handle press and long press
     if (event.control == OC::CONTROL_BUTTON_DOWN) {
-        if (event.type == UI::EVENT_BUTTON_PRESS) TheDarkestTimeline_instance.OnDownButtonPress();
-        if (event.type == UI::EVENT_BUTTON_LONG_PRESS) TheDarkestTimeline_instance.OnDownButtonLongPress();
+        if (event.type == UI::EVENT_BUTTON_PRESS) OnDownButtonPress();
+        if (event.type == UI::EVENT_BUTTON_LONG_PRESS) OnDownButtonLongPress();
     }
 }
 
-void TheDarkestTimeline_handleEncoderEvent(const UI::Event &event) {
+void TheDarkestTimeline::HandleEncoderEvent(const UI::Event &event) {
     // Left encoder turned
-    if (event.control == OC::CONTROL_ENCODER_L) TheDarkestTimeline_instance.OnLeftEncoderMove(event.value);
+    if (event.control == OC::CONTROL_ENCODER_L) OnLeftEncoderMove(event.value);
 
     // Right encoder turned
-    if (event.control == OC::CONTROL_ENCODER_R) TheDarkestTimeline_instance.OnRightEncoderMove(event.value);
+    if (event.control == OC::CONTROL_ENCODER_R) OnRightEncoderMove(event.value);
 }
