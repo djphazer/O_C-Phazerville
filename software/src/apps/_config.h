@@ -31,7 +31,7 @@ namespace menu = OC::menu;
 #include "apps/Chords.h"
 #include "apps/References.h"
 // #include "apps/Passencore.h"
-// #include "apps/CaptainMIDI.h"
+#include "apps/CaptainMIDI.h"
 // #include "apps/TheDarkestTimeline.h"
 // #include "apps/Enigma.h"
 // #include "apps/NeuralNetwork.h"
@@ -56,9 +56,6 @@ static constexpr OC::App app_container[] = {
   // DECLARE_APP("PQ", "Tension", PASSENCORE),
   DECLARE_APP("PQ", "Passencore", PASSENCORE),
   #endif
-  #ifdef ENABLE_APP_MIDI
-  DECLARE_APP("MI", "Captain MIDI", MIDI),
-  #endif
   #ifdef ENABLE_APP_DARKEST_TIMELINE
   DECLARE_APP("D2", "Darkest Timeline", TheDarkestTimeline),
   #endif
@@ -68,10 +65,6 @@ static constexpr OC::App app_container[] = {
   #ifdef ENABLE_APP_NEURAL_NETWORK
   DECLARE_APP("NN", "Neural Net", NeuralNetwork),
   #endif
-  #ifdef ENABLE_APP_REFERENCES
-  DECLARE_APP("RF", "References", REFS),
-  #endif
-  DECLARE_APP("BR", "Backup / Restore", Backup),
 };
 */
 
@@ -100,6 +93,9 @@ static AppContainer<void // this space intentionally left blank
 #endif
 #ifdef ENABLE_APP_SCENES
   , AppScenery
+#endif
+#ifdef ENABLE_APP_MIDI
+  , AppCaptainMIDI
 #endif
 #ifdef ENABLE_APP_ASR
   , AppASR

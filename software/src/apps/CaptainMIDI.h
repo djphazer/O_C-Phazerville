@@ -149,7 +149,7 @@ const char* const cv2midi_label[] = {
 
 #ifdef __IMXRT1062__
 // per channel
-const settings::value_attr CaptainSettings[] = {
+const settings::ValueAttributes CaptainSettings[] = {
   // Assigned function
   // MIDI-to-CV
   { 0, 0, HEM_MIDI_MAX_FUNCTION, "", midi_fn_name, settings::STORAGE_TYPE_U8 },
@@ -245,12 +245,16 @@ struct CaptainMIDILog {
     }
 };
 
-class CaptainMIDI : public HSApplication, public SystemExclusiveHandler
+OC_APP_TRAITS(AppCaptainMIDI, TWOCCS("MI"), "Captain MIDI", "MIDI I/O");
+class OC_APP_CLASS(AppCaptainMIDI), public HSApplication, public SystemExclusiveHandler
 #ifndef __IMXRT1062__
-  , public settings::SettingsBase<CaptainMIDI, MIDI_SETTING_COUNT>
+  , public settings::SettingsBase<AppCaptainMIDI, MIDI_SETTING_COUNT>
 #endif
 {
 public:
+  OC_APP_INTERFACE_DECLARE(AppCaptainMIDI);
+  OC_APP_STORAGE_SIZE(0); // TODO
+
     static constexpr int MIDI_INDICATOR_COUNTDOWN = 2000;
 
     OC::menu::ScreenCursor<OC::menu::kScreenLines> cursor;
@@ -323,7 +327,8 @@ public:
         }
     }
 
-    void View() {
+    void View() const;
+    void MainView() const {
         if (copy_mode) DrawCopyScreen();
         else if (display == 0) DrawSetupScreens();
         else DrawLogScreen();
@@ -1094,95 +1099,125 @@ private:
         log_view = log_index - 6;
         if (log_view < 0) log_view = 0;
     }
-};
 
-#ifdef __IMXRT1062__
-#else
+#ifndef __IMXRT1062__
 // TOTAL EEPROM SIZE: 40*4 + 1 == 161 bytes
-SETTINGS_DECLARE(CaptainMIDI, MIDI_SETTING_COUNT) {
+SETTINGS_ARRAY_DECLARE() {{
     MIDI_SETUP_PARAMETER_LIST
     MIDI_SETUP_PARAMETER_LIST
     MIDI_SETUP_PARAMETER_LIST
     MIDI_SETUP_PARAMETER_LIST
     { 0, 0, 1, "Setup", NULL, settings::STORAGE_TYPE_U8 }
-};
+}};
 #endif
-
-CaptainMIDI captain_midi_instance;
+};
+#ifndef __IMXRT1062__
+SETTINGS_ARRAY_DEFINE(AppCaptainMIDI);
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 //// App Functions
 ////////////////////////////////////////////////////////////////////////////////
-void MIDI_init() {
-    captain_midi_instance.Start();
-}
+void AppCaptainMIDI::Init() { BaseStart(); }
 
 #ifdef __IMXRT1062__
-static constexpr size_t MIDI_storageSize() { return 0; }
-static size_t MIDI_save(void *storage) { return 0; }
-static size_t MIDI_restore(const void *storage) { return 0; }
+size_t AppCaptainMIDI::SaveAppData(util::StreamBufferWriter &stream_buffer) const {
+  return 0;
+}
+size_t AppCaptainMIDI::RestoreAppData(util::StreamBufferReader &stream_buffer) {
+  return 0;
+}
 #else
-static constexpr size_t MIDI_storageSize() {
-    return CaptainMIDI::storageSize();
+size_t AppCaptainMIDI::SaveAppData(util::StreamBufferWriter &stream_buffer) const {
+  Save(stream_buffer);
+  return stream_buffer.written();
 }
-static size_t MIDI_save(void *storage) {
-    return captain_midi_instance.Save(storage);
-}
-static size_t MIDI_restore(const void *storage) {
-    size_t s = captain_midi_instance.Restore(storage);
-    captain_midi_instance.Resume();
-    return s;
+size_t AppCaptainMIDI::RestoreAppData(util::StreamBufferReader &stream_buffer) {
+  Restore(stream_buffer);
+  Resume();
+  return stream_buffer.read();
 }
 #endif
 
-void MIDI_process(OC::IOFrame *) {
-	return captain_midi_instance.BaseController();
+void AppCaptainMIDI::Process(OC::IOFrame *ioframe) {
+  BaseController(ioframe);
 }
 
-void MIDI_handleAppEvent(OC::AppEvent event) {
-    if (event == OC::APP_EVENT_SUSPEND) {
-      captain_midi_instance.Suspend();
-    }
-    if (event == OC::APP_EVENT_RESUME) {
-      captain_midi_instance.Resume();
-    }
+void AppCaptainMIDI::GetIOConfig(OC::IOConfig &ioconfig) const
+{
+  using namespace OC;
+  ioconfig.digital_inputs[DIGITAL_INPUT_1].set("Gate1");
+  ioconfig.digital_inputs[DIGITAL_INPUT_2].set("Gate2");
+  ioconfig.digital_inputs[DIGITAL_INPUT_3].set("Gate3");
+  ioconfig.digital_inputs[DIGITAL_INPUT_4].set("Gate4");
+
+  ioconfig.cv[ADC_CHANNEL_1].set("Ch1 CV");
+  ioconfig.cv[ADC_CHANNEL_2].set("Ch2 CV");
+  ioconfig.cv[ADC_CHANNEL_3].set("Ch3 CV");
+  ioconfig.cv[ADC_CHANNEL_4].set("Ch4 CV");
+  ioconfig.cv[ADC_CHANNEL_5].set("Ch5 CV");
+  ioconfig.cv[ADC_CHANNEL_6].set("Ch6 CV");
+  ioconfig.cv[ADC_CHANNEL_7].set("Ch7 CV");
+  ioconfig.cv[ADC_CHANNEL_8].set("Ch8 CV");
+
+  ioconfig.outputs[DAC_CHANNEL_A].set("Ch1", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[DAC_CHANNEL_B].set("Ch2", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[DAC_CHANNEL_C].set("Ch3", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[DAC_CHANNEL_D].set("Ch4", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[DAC_CHANNEL_E].set("Ch5", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[DAC_CHANNEL_F].set("Ch6", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[DAC_CHANNEL_G].set("Ch7", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[DAC_CHANNEL_H].set("Ch8", OUTPUT_MODE_PITCH);
 }
 
-void MIDI_loop() {}
-
-void MIDI_menu() {
-    captain_midi_instance.BaseView();
+FLASHMEM
+void AppCaptainMIDI::HandleAppEvent(OC::AppEvent event) {
+  if (event == OC::APP_EVENT_SUSPEND) {
+    Suspend();
+  }
+  if (event == OC::APP_EVENT_RESUME) {
+    Resume();
+  }
 }
 
-void MIDI_screensaver() {
-    captain_midi_instance.BaseScreensaver();
-}
+void AppCaptainMIDI::Loop() {} // Deprecated
 
-void MIDI_handleButtonEvent(const UI::Event &event) {
+FLASHMEM
+void AppCaptainMIDI::DrawMenu() const { BaseView(); }
+
+FLASHMEM
+void AppCaptainMIDI::View() const { MainView(); }
+
+void AppCaptainMIDI::DrawScreensaver() const {
+    BaseScreensaver(true);
+}
+void AppCaptainMIDI::DrawDebugInfo() const { }
+
+void AppCaptainMIDI::HandleButtonEvent(const UI::Event &event) {
     if (event.control == OC::CONTROL_BUTTON_R && event.type == UI::EVENT_BUTTON_PRESS)
-        captain_midi_instance.ToggleCursor();
+        ToggleCursor();
     if (event.control == OC::CONTROL_BUTTON_L) {
-        if (event.type == UI::EVENT_BUTTON_LONG_PRESS) captain_midi_instance.Panic();
-        if (event.type == UI::EVENT_BUTTON_PRESS) captain_midi_instance.ToggleDisplay();
+        if (event.type == UI::EVENT_BUTTON_LONG_PRESS) Panic();
+        if (event.type == UI::EVENT_BUTTON_PRESS) ToggleDisplay();
     }
 
-    if (event.control == OC::CONTROL_BUTTON_UP && event.type == UI::EVENT_BUTTON_PRESS)
-        captain_midi_instance.SwitchSetup(1);
-    if (event.control == OC::CONTROL_BUTTON_DOWN) {
-        if (event.type == UI::EVENT_BUTTON_PRESS) captain_midi_instance.SwitchSetup(-1);
-        if (event.type == UI::EVENT_BUTTON_LONG_PRESS) captain_midi_instance.ToggleCopyMode();
+    if (event.control == OC::CONTROL_BUTTON_A && event.type == UI::EVENT_BUTTON_PRESS)
+        SwitchSetup(-1);
+    if (event.control == OC::CONTROL_BUTTON_B) {
+        if (event.type == UI::EVENT_BUTTON_PRESS) SwitchSetup(1);
+        if (event.type == UI::EVENT_BUTTON_LONG_PRESS) ToggleCopyMode();
     }
 }
 
-void MIDI_handleEncoderEvent(const UI::Event &event) {
+void AppCaptainMIDI::HandleEncoderEvent(const UI::Event &event) {
     if (event.control == OC::CONTROL_ENCODER_R) {
-        if (captain_midi_instance.cursor.editing()) {
-            captain_midi_instance.EncoderEdit(event.value);
+        if (cursor.editing()) {
+            EncoderEdit(event.value);
         } else {
-            captain_midi_instance.MoveCursor(event.value);
+            MoveCursor(event.value);
         }
     }
     if (event.control == OC::CONTROL_ENCODER_L) {
-        captain_midi_instance.SwitchScreenOrLogView(event.value);
+        SwitchScreenOrLogView(event.value);
     }
 }
