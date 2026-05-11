@@ -535,10 +535,10 @@ void AppQuadByteBeats::HandleLowerButton() {
 void AppQuadByteBeats::HandleButtonEvent(const UI::Event &event) {
   if (UI::EVENT_BUTTON_PRESS == event.type) {
     switch (event.control) {
-      case CONTROL_BUTTON_UP:
+      case CONTROL_BUTTON_B:
         HandleTopButton();
         break;
-      case CONTROL_BUTTON_DOWN:
+      case CONTROL_BUTTON_A:
         HandleLowerButton();
         break;
       case CONTROL_BUTTON_L:

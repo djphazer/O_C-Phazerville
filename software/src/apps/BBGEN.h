@@ -355,10 +355,10 @@ void AppQuadBouncingBalls::HandleTowerButton() {
 void AppQuadBouncingBalls::HandleButtonEvent(const UI::Event &event) {
   if (UI::EVENT_BUTTON_PRESS == event.type) {
     switch (event.control) {
-      case OC::CONTROL_BUTTON_UP:
+      case OC::CONTROL_BUTTON_B:
         HandleTopButton();
         break;
-      case OC::CONTROL_BUTTON_DOWN:
+      case OC::CONTROL_BUTTON_A:
         HandleTowerButton();
         break;
       case OC::CONTROL_BUTTON_L:

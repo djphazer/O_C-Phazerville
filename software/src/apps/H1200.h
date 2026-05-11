@@ -1028,11 +1028,11 @@ void AppH1200::Loop() {
 void AppH1200::HandleButtonEvent(const UI::Event &event) {
   if (UI::EVENT_BUTTON_PRESS == event.type) {
     switch (event.control) {
-      case OC::CONTROL_BUTTON_UP:
+      case OC::CONTROL_BUTTON_B:
         if (h1200_settings.change_value(H1200_SETTING_OCTAVE, 1))
           h1200_state.force_update();
         break;
-      case OC::CONTROL_BUTTON_DOWN:
+      case OC::CONTROL_BUTTON_A:
         if (h1200_settings.change_value(H1200_SETTING_OCTAVE, -1))
           h1200_state.force_update();
         break;
