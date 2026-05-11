@@ -875,6 +875,7 @@ void AppCalibr8or::DrawDebugInfo() const {
   // TODO:
 }
 
+FLASHMEM
 void AppCalibr8or::HandleButtonEvent(const UI::Event &event) {
   /*
   if (autotuner.active()) {
@@ -904,17 +905,14 @@ void AppCalibr8or::HandleButtonEvent(const UI::Event &event) {
           break;
         }
 
-        if (event.control == OC::CONTROL_BUTTON_M) {
-            HS::ToggleClockRun();
-            OC::ui.SetButtonIgnoreMask(); // ignore release and long-press
-            break;
-        }
-        else
-            OnButtonDown(event);
+        OnButtonDown(event);
         break;
 
     case UI::EVENT_BUTTON_PRESS: {
         switch (event.control) {
+        case OC::CONTROL_BUTTON_Z:
+            HS::ToggleClockRun();
+            break;
         case OC::CONTROL_BUTTON_L:
             OnLeftButtonPress();
             break;
