@@ -1730,7 +1730,7 @@ void AppQuadrants::HandleButtonEvent(const UI::Event &event) {
     /*  last_mask*/
     /*);*/
 
-    if (AUDIO_SETUP == view_state && !clock_overlay) {
+    if (AUDIO_SETUP == view_state && !clock_overlay && !preset_cursor) {
       if (CheckButtonCombo(OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_B)) {
         clock_overlay = true;
         //view_state = APPLETS;
