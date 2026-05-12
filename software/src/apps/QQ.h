@@ -897,7 +897,7 @@ public:
   }
 
   uint32_t get_shift_register() const {
-    const auto &turing_machine_ = HS::GetTM(index);
+    const auto &turing_machine_ = HS::GetTM(channel_index_);
     return turing_machine_.get_shift_register();
   }
 
