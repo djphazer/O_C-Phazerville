@@ -42,6 +42,7 @@ jobs:
       uses: actions/upload-artifact@v7
       with:
         name: o_C-${{env.OC_ARTIFACT_TAG}}
+        include-hidden-files: true
         path: |
           software/*.hex
           software/.pio/build/*/*.hex
