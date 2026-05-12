@@ -519,19 +519,7 @@ public:
         ClockSetup_instance.SetGlobals(global_data);
 
         // Input Mappings
-        if (!PhzConfig::getValue(preset_key | CVMAP_KEY, data)) {
-          PhzConfig::getValue(preset_key | OLD_INPUT_MAP_KEY, data);
-          for (size_t i = 0; i < 4; ++i)
-          {
-            int val = Unpack(data, PackLocation{i*16, 4});
-            if (val != 0) HS::trigmap[i].source = constrain(val - 1, -1, TRIGMAP_MAX);
-
-            val = Unpack(data, PackLocation{4 + i*16, 4});
-            if (val != 0) HS::cvmap[i].source = constrain(val - 1, 0, CVMAP_MAX);
-
-            HS::frame.clockskip[i] = Unpack(data, PackLocation{8 + i*16, 8});
-          }
-        } else {
+        if (PhzConfig::getValue(preset_key | CVMAP_KEY, data)) {
           UnpackPackables(data, HS::cvmap[0], HS::cvmap[1], HS::cvmap[2], HS::cvmap[3]);
 
           PhzConfig::getValue(preset_key | TRIGMAP_KEY, data);
