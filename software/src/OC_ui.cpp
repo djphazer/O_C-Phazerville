@@ -147,22 +147,24 @@ UiMode Ui::DispatchEvents(AppBase *app) {
 
     MENU_REDRAW = 1;
 
+    const bool z_hold = (event.mask & CONTROL_BUTTON_Z);
+    const bool a_hold = (event.mask & CONTROL_BUTTON_A);
+
     // --- Handle global hotkeys
-    // Hold Z and push...
-    if (UI::EVENT_BUTTON_DOWN == event.type && (event.mask & CONTROL_BUTTON_Z)) {
-      // ...right encoder for main menu
-      if (CONTROL_BUTTON_R == event.control) {
+    if (UI::EVENT_BUTTON_DOWN == event.type) {
+      // Hold Z or A and push right encoder for main menu
+      if (CONTROL_BUTTON_R == event.control && (z_hold || a_hold)) {
         jump_to_menu_ = true;
         break;
       }
-      // ...left encoder for IO settings menu
-      if (CONTROL_BUTTON_L == event.control) {
+      // Hold Z or A and push left encoder for IO settings menu
+      if (CONTROL_BUTTON_L == event.control && (z_hold || a_hold)) {
         app->EditIOSettings();
         SetButtonIgnoreMask();
         continue;
       }
-      // ...A for screensaver
-      if (CONTROL_BUTTON_A == event.control) {
+      // Hold Z and push A for screensaver (not available on O_C without VOR button)
+      if (CONTROL_BUTTON_A == event.control && z_hold) {
         screensaver_ = true;
         SetButtonIgnoreMask();
         break;
