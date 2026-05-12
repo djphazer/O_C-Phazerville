@@ -34,7 +34,9 @@ namespace menu = OC::menu;
 #include "apps/CaptainMIDI.h"
 #include "apps/TheDarkestTimeline.h"
 #include "apps/Enigma.h"
-// #include "apps/NeuralNetwork.h"
+#ifdef ENABLE_APP_NEURAL_NETWORK
+#include "apps/NeuralNetwork.h"
+#endif
 #include "apps/ScaleEditor.h"
 #include "apps/WaveformEditor.h"
 #include "apps/PongGame.h"
@@ -50,9 +52,6 @@ namespace OC {
 static constexpr OC::App app_container[] = {
   #ifdef ENABLE_APP_FPART
   DECLARE_APP("FP", "4 Parts", FPART),
-  #endif
-  #ifdef ENABLE_APP_NEURAL_NETWORK
-  DECLARE_APP("NN", "Neural Net", NeuralNetwork),
   #endif
 };
 */
@@ -91,6 +90,9 @@ static AppContainer<void // this space intentionally left blank
 #endif
 #ifdef ENABLE_APP_ENIGMA
   , AppEnigma
+#endif
+#ifdef ENABLE_APP_NEURAL_NETWORK
+  , AppNeuralNetwork
 #endif
 #ifdef ENABLE_APP_PASSENCORE
   // , AppPassencore

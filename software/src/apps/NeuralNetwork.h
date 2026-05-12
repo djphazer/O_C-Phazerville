@@ -33,10 +33,35 @@
 
 // 9 sets of 24 bytes allocated for storage
 #define NN_SETTING_LAST 216
+#define NN_EEPROM_DATA {0,0,255,"St",NULL,settings::STORAGE_TYPE_U8},
+#define NN_DO_TWENTYFOUR_TIMES(A) A A A A A A A A A A A A A A A A A A A A A A A A
 
-class NeuralNetwork : public HSApplication, public SystemExclusiveHandler,
-    public settings::SettingsBase<NeuralNetwork, NN_SETTING_LAST> {
+class NNSettings : public settings::SettingsBase<NNSettings, NN_SETTING_LAST> 
+{
+  // TOTAL EEPROM SIZE: 216 bytes
+  SETTINGS_ARRAY_DECLARE() {{
+    NN_DO_TWENTYFOUR_TIMES(NN_EEPROM_DATA)
+    NN_DO_TWENTYFOUR_TIMES(NN_EEPROM_DATA)
+    NN_DO_TWENTYFOUR_TIMES(NN_EEPROM_DATA)
+    NN_DO_TWENTYFOUR_TIMES(NN_EEPROM_DATA)
+    NN_DO_TWENTYFOUR_TIMES(NN_EEPROM_DATA)
+    NN_DO_TWENTYFOUR_TIMES(NN_EEPROM_DATA)
+    NN_DO_TWENTYFOUR_TIMES(NN_EEPROM_DATA)
+    NN_DO_TWENTYFOUR_TIMES(NN_EEPROM_DATA)
+    NN_DO_TWENTYFOUR_TIMES(NN_EEPROM_DATA)
+  }};
+};
+SETTINGS_ARRAY_DEFINE(NNSettings);
+
+OC_APP_TRAITS(AppNeuralNetwork, TWOCCS("NN"), "Neural Network", "Neural Net");
+class OC_APP_CLASS(AppNeuralNetwork), public HSApplication, public SystemExclusiveHandler
+{
 public:
+  OC_APP_INTERFACE_DECLARE(AppNeuralNetwork);
+  OC_APP_STORAGE_SIZE(NNSettings::storageSize());
+
+  NNSettings settings_;
+
     void Start() {
         for (int ch = 0; ch < 16; ch++) output_neuron[ch] = ch % 4;
     }
@@ -77,7 +102,8 @@ public:
         source_state = tmp_source_state;
     }
 
-    void View() {
+    void View() const;
+    void MainView() const {
         if (copy_mode) DrawCopyScreen();
         else DrawInterface();
     }
@@ -317,7 +343,7 @@ private:
             // Draw line to the output if selected
             uint8_t ix = (setup * 4) + o;
             if (output_neuron[ix] == selected || all_connections) {
-                if (neuron[(setup * 6) + output_neuron[ix]].type > LogicGateType::NONE) {
+                if (neuron[(setup * 6) + output_neuron[ix]].type > LogicGate::NONE) {
                     uint8_t fx = ((output_neuron[ix] / 2) * 32) + 45;
                     uint8_t fy = ((output_neuron[ix] % 2) * 24) + 29;
                     uint8_t ty = (o * 12) + 20;
@@ -408,14 +434,14 @@ private:
         uint8_t ix = 0;
         for (uint8_t n = 0; n < 24; n++)
         {
-            neuron[n].type = values_[ix++];
-            neuron[n].source1 = values_[ix++];
-            neuron[n].source2 = values_[ix++];
-            neuron[n].source3 = values_[ix++];
-            neuron[n].weight1 = values_[ix++] - 128;
-            neuron[n].weight2 = values_[ix++] - 128;
-            neuron[n].weight3 = values_[ix++] - 128;
-            neuron[n].threshold = values_[ix++] - 128;
+            neuron[n].type = settings_.get_value(ix++);
+            neuron[n].source1 = settings_.get_value(ix++);
+            neuron[n].source2 = settings_.get_value(ix++);
+            neuron[n].source3 = settings_.get_value(ix++);
+            neuron[n].weight1 = settings_.get_value(ix++) - 128;
+            neuron[n].weight2 = settings_.get_value(ix++) - 128;
+            neuron[n].weight3 = settings_.get_value(ix++) - 128;
+            neuron[n].threshold = settings_.get_value(ix++) - 128;
 
             // Adjust to 0 when no data is saved yet
             if (neuron[n].weight1 == -128) neuron[n].weight1 = 0;
@@ -423,7 +449,7 @@ private:
             if (neuron[n].weight3 == -128) neuron[n].weight3 = 0;
             if (neuron[n].threshold == -128) neuron[n].threshold = 0;
         }
-        for (uint8_t o = 0; o < 16; o++) output_neuron[o] = values_[ix++];
+        for (uint8_t o = 0; o < 16; o++) output_neuron[o] = settings_.get_value(ix++);
 
     }
 
@@ -431,20 +457,20 @@ private:
         uint8_t ix = 0;
         for (uint8_t n = 0; n < 24; n++)
         {
-            values_[ix++] = neuron[n].type;
-            values_[ix++] = neuron[n].source1;
-            values_[ix++] = neuron[n].source2;
-            values_[ix++] = neuron[n].source3;
-            values_[ix++] = neuron[n].weight1 + 128;
-            values_[ix++] = neuron[n].weight2 + 128;
-            values_[ix++] = neuron[n].weight3 + 128;
-            values_[ix++] = neuron[n].threshold + 128;
+            settings_.apply_value(ix++, neuron[n].type);
+            settings_.apply_value(ix++, neuron[n].source1);
+            settings_.apply_value(ix++, neuron[n].source2);
+            settings_.apply_value(ix++, neuron[n].source3);
+            settings_.apply_value(ix++, neuron[n].weight1 + 128);
+            settings_.apply_value(ix++, neuron[n].weight2 + 128);
+            settings_.apply_value(ix++, neuron[n].weight3 + 128);
+            settings_.apply_value(ix++, neuron[n].threshold + 128);
         }
-        for (uint8_t o = 0; o < 16; o++) values_[ix++] = output_neuron[o];
+        for (uint8_t o = 0; o < 16; o++) settings_.apply_value(ix++, output_neuron[o]);
     }
 
     void DrawLarge(uint8_t ix) {
-        if (neuron[ix].type == LogicGateType::TL_NEURON) DrawTLNeuron(ix);
+        if (neuron[ix].type == LogicGate::TL_NEURON) DrawTLNeuron(ix);
         else DrawLogicGate(ix);
     }
 
@@ -478,7 +504,7 @@ private:
     }
 
     void DrawLogicGate(uint8_t ix) {
-        if (neuron[ix].type != LogicGateType::NONE) {
+        if (neuron[ix].type != LogicGate::NONE) {
             DrawInputs(ix);
             DrawBody(ix);
             DrawNegation(ix);
@@ -487,7 +513,7 @@ private:
     }
 
     void DrawInputs(uint8_t ix) {
-        if (neuron[ix].type == LogicGateType::NOT) {
+        if (neuron[ix].type == LogicGate::NOT) {
             gfxDottedLine(64, 36, 76, 36, neuron[ix].SourceValue(0) ? 1 : 3);
         } else {
             gfxDottedLine(64, 28, 76, 28, neuron[ix].SourceValue(0) ? 1 : 3);
@@ -497,14 +523,14 @@ private:
 
     void DrawBody(uint8_t ix) {
       switch(neuron[ix].type) {
-        case LogicGateType::NOT:
+        case LogicGate::NOT:
             gfxLine(76, 20, 76, 52);
             gfxLine(76, 20, 108, 36);
             gfxLine(76, 52, 108, 36);
             break;
 
-        case LogicGateType::AND:
-        case LogicGateType::NAND:
+        case LogicGate::AND:
+        case LogicGate::NAND:
             gfxLine(76, 20, 76, 52);
             gfxLine(76, 20, 96, 20);
             gfxLine(96, 20, 103, 26);
@@ -515,12 +541,12 @@ private:
             gfxLine(103, 46, 108, 40);
             break;
 
-        case LogicGateType::XOR:
-        case LogicGateType::XNOR:
+        case LogicGate::XOR:
+        case LogicGate::XNOR:
             gfxLine(70, 20, 74, 36);
             gfxLine(70, 52, 74, 36);
-        case LogicGateType::OR:
-        case LogicGateType::NOR:
+        case LogicGate::OR:
+        case LogicGate::NOR:
             gfxLine(76, 20, 96, 20);
             gfxLine(96, 20, 108, 36);
             gfxLine(76, 52, 96, 52);
@@ -529,18 +555,18 @@ private:
             gfxLine(76, 52, 80, 36);
             break;
 
-        case LogicGateType::D_FLIPFLOP:
-        case LogicGateType::T_FLIPFLOP:
+        case LogicGate::D_FLIPFLOP:
+        case LogicGate::T_FLIPFLOP:
             gfxLine(76, 20, 76, 52);
             gfxLine(76, 20, 108, 20);
             gfxLine(76, 52, 108, 52);
             gfxLine(108, 20, 108, 52);
             gfxLine(76, 40, 84, 44);
             gfxLine(76, 48, 84, 44);
-            gfxPrint(78, 25, neuron[ix].type == LogicGateType::D_FLIPFLOP ? "D" : "T");
+            gfxPrint(78, 25, neuron[ix].type == LogicGate::D_FLIPFLOP ? "D" : "T");
             break;
 
-        case LogicGateType::LATCH:
+        case LogicGate::LATCH:
             gfxLine(76, 28, 84, 28); // Lines to NOR gates
             gfxLine(76, 44, 84, 44);
             gfxBitmap(84, 27, 16, NN_LOGIC_ICON[6]);
@@ -554,10 +580,10 @@ private:
     }
 
     void DrawNegation(uint8_t ix) {
-        if (neuron[ix].type == LogicGateType::NOT
-         || neuron[ix].type == LogicGateType::NAND
-         || neuron[ix].type == LogicGateType::NOR
-         || neuron[ix].type == LogicGateType::XNOR
+        if (neuron[ix].type == LogicGate::NOT
+         || neuron[ix].type == LogicGate::NAND
+         || neuron[ix].type == LogicGate::NOR
+         || neuron[ix].type == LogicGate::XNOR
         ) {
             gfxCircle(112, 36, 4);
         } else {
@@ -575,78 +601,93 @@ private:
     }
 };
 
-// TOTAL EEPROM SIZE: 216 bytes
-#define NN_EEPROM_DATA {0,0,255,"St",NULL,settings::STORAGE_TYPE_U8},
-#define NN_DO_TWENTYFOUR_TIMES(A) A A A A A A A A A A A A A A A A A A A A A A A A
-SETTINGS_DECLARE(NeuralNetwork, NN_SETTING_LAST) {
-    NN_DO_TWENTYFOUR_TIMES(NN_EEPROM_DATA)
-    NN_DO_TWENTYFOUR_TIMES(NN_EEPROM_DATA)
-    NN_DO_TWENTYFOUR_TIMES(NN_EEPROM_DATA)
-    NN_DO_TWENTYFOUR_TIMES(NN_EEPROM_DATA)
-    NN_DO_TWENTYFOUR_TIMES(NN_EEPROM_DATA)
-    NN_DO_TWENTYFOUR_TIMES(NN_EEPROM_DATA)
-    NN_DO_TWENTYFOUR_TIMES(NN_EEPROM_DATA)
-    NN_DO_TWENTYFOUR_TIMES(NN_EEPROM_DATA)
-    NN_DO_TWENTYFOUR_TIMES(NN_EEPROM_DATA)
-};
-
-NeuralNetwork NeuralNetwork_instance;
-
 // App stubs
-void NeuralNetwork_init() {
-    NeuralNetwork_instance.BaseStart();
+void AppNeuralNetwork::Init() { BaseStart(); }
+
+size_t AppNeuralNetwork::SaveAppData(util::StreamBufferWriter &stream_buffer) const {
+  settings_.Save(stream_buffer);
+  return stream_buffer.written();
+}
+size_t AppNeuralNetwork::RestoreAppData(util::StreamBufferReader &stream_buffer) {
+  settings_.Restore(stream_buffer);
+  return stream_buffer.read();
 }
 
-static constexpr size_t NeuralNetwork_storageSize() {return NeuralNetwork::storageSize();}
-static size_t NeuralNetwork_save(void *storage) {return NeuralNetwork_instance.Save(storage);}
-static size_t NeuralNetwork_restore(const void *storage) {return NeuralNetwork_instance.Restore(storage);}
-
-void NeuralNetwork_process(OC::IOFrame *) {
-    return NeuralNetwork_instance.BaseController();
+void AppNeuralNetwork::Process(OC::IOFrame *ioframe) {
+  BaseController(ioframe);
 }
 
-void NeuralNetwork_handleAppEvent(OC::AppEvent event) {
+void AppNeuralNetwork::GetIOConfig(OC::IOConfig &ioconfig) const
+{
+  using namespace OC;
+  // TODO:
+  ioconfig.digital_inputs[DIGITAL_INPUT_1].set("");
+  ioconfig.digital_inputs[DIGITAL_INPUT_2].set("");
+  ioconfig.digital_inputs[DIGITAL_INPUT_3].set("");
+  ioconfig.digital_inputs[DIGITAL_INPUT_4].set("");
+
+  ioconfig.cv[0].set("");
+  ioconfig.cv[1].set("");
+  ioconfig.cv[2].set("");
+  ioconfig.cv[3].set("");
+
+  ioconfig.outputs[0].set("Ch1", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[1].set("Ch2", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[2].set("Ch3", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[3].set("Ch4", OUTPUT_MODE_PITCH);
+}
+
+FLASHMEM
+void AppNeuralNetwork::HandleAppEvent(OC::AppEvent event) {
     if (event ==  OC::APP_EVENT_RESUME) {
-        NeuralNetwork_instance.Resume();
+        Resume();
     }
     if (event == OC::APP_EVENT_SUSPEND) {
-        NeuralNetwork_instance.OnSaveSettings();
-        NeuralNetwork_instance.OnSendSysEx();
+        OnSaveSettings();
+        OnSendSysEx();
     }
 }
 
-void NeuralNetwork_loop() {} // Deprecated
+void AppNeuralNetwork::Loop() {} // Deprecated
 
-void NeuralNetwork_menu() {
-    NeuralNetwork_instance.BaseView();
+FLASHMEM
+void AppNeuralNetwork::DrawMenu() const { BaseView(); }
+
+FLASHMEM
+void AppNeuralNetwork::View() const { MainView(); }
+
+void AppNeuralNetwork::DrawScreensaver() const {
+  //BaseScreensaver();
+}
+void AppNeuralNetwork::DrawDebugInfo() const {
+  // TODO:
 }
 
-void NeuralNetwork_screensaver() {} // Deprecated
-
-void NeuralNetwork_handleButtonEvent(const UI::Event &event) {
+FLASHMEM
+void AppNeuralNetwork::HandleButtonEvent(const UI::Event &event) {
     // For left encoder, handle press and long press
     if (event.control == OC::CONTROL_BUTTON_L) {
-        if (event.type == UI::EVENT_BUTTON_LONG_PRESS) NeuralNetwork_instance.OnLeftButtonLongPress();
-        if (event.type == UI::EVENT_BUTTON_PRESS) NeuralNetwork_instance.OnLeftButtonPress();
+        if (event.type == UI::EVENT_BUTTON_LONG_PRESS) OnLeftButtonLongPress();
+        if (event.type == UI::EVENT_BUTTON_PRESS) OnLeftButtonPress();
     }
 
     // For right encoder, only handle press (long press is reserved)
-    if (event.control == OC::CONTROL_BUTTON_R && event.type == UI::EVENT_BUTTON_PRESS) NeuralNetwork_instance.OnRightButtonPress();
+    if (event.control == OC::CONTROL_BUTTON_R && event.type == UI::EVENT_BUTTON_PRESS) OnRightButtonPress();
 
     // For up button, handle only press (long press is reserved)
-    if (event.control == OC::CONTROL_BUTTON_UP && event.type == UI::EVENT_BUTTON_PRESS) NeuralNetwork_instance.OnUpButtonPress();
+    if (event.control == OC::CONTROL_BUTTON_A && event.type == UI::EVENT_BUTTON_PRESS) OnDownButtonPress();
 
     // For down button, handle press and long press
-    if (event.control == OC::CONTROL_BUTTON_DOWN) {
-        if (event.type == UI::EVENT_BUTTON_PRESS) NeuralNetwork_instance.OnDownButtonPress();
-        if (event.type == UI::EVENT_BUTTON_LONG_PRESS) NeuralNetwork_instance.OnDownButtonLongPress();
+    if (event.control == OC::CONTROL_BUTTON_B) {
+        if (event.type == UI::EVENT_BUTTON_PRESS) OnUpButtonPress();
+        if (event.type == UI::EVENT_BUTTON_LONG_PRESS) OnDownButtonLongPress();
     }
 }
 
-void NeuralNetwork_handleEncoderEvent(const UI::Event &event) {
+void AppNeuralNetwork::HandleEncoderEvent(const UI::Event &event) {
     // Left encoder turned
-    if (event.control == OC::CONTROL_ENCODER_L) NeuralNetwork_instance.OnLeftEncoderMove(event.value);
+    if (event.control == OC::CONTROL_ENCODER_L) OnLeftEncoderMove(event.value);
 
     // Right encoder turned
-    if (event.control == OC::CONTROL_ENCODER_R) NeuralNetwork_instance.OnRightEncoderMove(event.value);
+    if (event.control == OC::CONTROL_ENCODER_R) OnRightEncoderMove(event.value);
 }

@@ -24,27 +24,6 @@
 // 0-7 are inputs, 8-13 are neuron outputs, 14 is ON and 15 is OFF
 #define LG_MAX_SOURCE 15
 
-enum LogicGateType : uint8_t {
-    NONE,
-
-    // Unary
-    NOT,
-
-    // Binary
-    AND,
-    OR,
-    XOR,
-    NAND,
-    NOR,
-    XNOR,
-    D_FLIPFLOP,
-    T_FLIPFLOP,
-    LATCH,
-
-    // Ternary
-    TL_NEURON
-};
-
 const char* const gate_name[12] = {
     "None", "NOT", "AND", "OR", "XOR", "NAND", "NOR", "XNOR", "D-FF", "T-FF", "Ltch", "TLNe"
 };
@@ -75,6 +54,27 @@ const uint8_t NN_LOGIC_ICON[12][16] = {
 
 class LogicGate {
 public:
+    enum LogicGateType : uint8_t {
+      NONE,
+
+      // Unary
+      NOT,
+
+      // Binary
+      AND,
+      OR,
+      XOR,
+      NAND,
+      NOR,
+      XNOR,
+      D_FLIPFLOP,
+      T_FLIPFLOP,
+      LATCH,
+
+      // Ternary
+      TL_NEURON
+    };
+
     // State attribute
     bool state; // Current state of the gate
     bool clocked = 0; // State of clock for flipflops
