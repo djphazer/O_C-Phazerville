@@ -74,12 +74,10 @@ class DarkestSettings : public settings::SettingsBase<DarkestSettings, DT_SETTIN
 };
 SETTINGS_ARRAY_DEFINE(DarkestSettings);
 
-OC_APP_TRAITS(TheDarkestTimeline, TWOCCS("D2"), "Darkest Timeline", "Darkness");
-class OC_APP_CLASS(TheDarkestTimeline) , public HSApplication, public SystemExclusiveHandler
-{
+OC_APP_CLASS(TheDarkestTimeline, TWOCCS("D2"), "Darkest Timeline", "Darkness"),
+  public HSApplication, public SystemExclusiveHandler {
 public:
-  OC_APP_INTERFACE_DECLARE(TheDarkestTimeline);
-  OC_APP_STORAGE_SIZE(DarkestSettings::storageSize());
+  OC_APP_INTERFACE_DECLARE(TheDarkestTimeline, DarkestSettings::storageSize());
 
   DarkestSettings dt_settings;
 

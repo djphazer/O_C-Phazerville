@@ -28,11 +28,10 @@
 #include "vector_osc/HSVectorOscillator.h"
 #include "vector_osc/WaveformManager.h"
 
-OC_APP_TRAITS(AppWaveformEditor, TWOCCS("WA"), "Wave-Edit", "Waveform Editor");
-class OC_APP_CLASS(AppWaveformEditor), public HSApplication, public SystemExclusiveHandler {
+OC_APP_CLASS(AppWaveformEditor, TWOCCS("WA"), "Wave-Edit", "Waveform Editor"),
+  public HSApplication, public SystemExclusiveHandler {
 public:
-  OC_APP_INTERFACE_DECLARE(AppWaveformEditor);
-  OC_APP_STORAGE_SIZE(0);
+  OC_APP_INTERFACE_DECLARE(AppWaveformEditor, 0);
 
     void Start() {
         WaveformManager::Validate();

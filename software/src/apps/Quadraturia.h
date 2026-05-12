@@ -265,11 +265,9 @@ void PolyLfo::Init() {
 
 namespace OC {
 
-OC_APP_TRAITS(AppPolyLfo, TWOCCS("PL"), "Quadraturia", "Quadrature LFO");
-class OC_APP_CLASS(AppPolyLfo) {
+OC_APP_CLASS(AppPolyLfo, TWOCCS("PL"), "Quadraturia", "Quadrature LFO") {
 public:
-  OC_APP_INTERFACE_DECLARE(AppPolyLfo);
-  OC_APP_STORAGE_SIZE(PolyLfo::storageSize());
+  OC_APP_INTERFACE_DECLARE(AppPolyLfo, PolyLfo::storageSize());
 
 private:
 

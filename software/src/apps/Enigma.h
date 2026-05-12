@@ -83,12 +83,10 @@ class EnigmaSettings : public settings::SettingsBase<EnigmaSettings, ENIGMA_SETT
 };
 SETTINGS_ARRAY_DEFINE(EnigmaSettings);
 
-OC_APP_TRAITS(AppEnigma, TWOCCS("EN"), "Enigma", "Enigma");
-class OC_APP_CLASS(AppEnigma), public HSApplication, public SystemExclusiveHandler
-{
+OC_APP_CLASS(AppEnigma, TWOCCS("EN"), "Enigma", "Enigma"),
+  public HSApplication, public SystemExclusiveHandler {
 public:
-  OC_APP_INTERFACE_DECLARE(AppEnigma);
-  OC_APP_STORAGE_SIZE( EnigmaSettings::storageSize() );
+  OC_APP_INTERFACE_DECLARE(AppEnigma, EnigmaSettings::storageSize() );
 
   EnigmaSettings settings_;
 

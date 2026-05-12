@@ -1023,11 +1023,9 @@ SETTINGS_ARRAY_DEFINE(ChordQuantizer);
 
 namespace OC {
 
-OC_APP_TRAITS(AppChordQuantizer, TWOCCS("CQ"), "Acid Curds", "Chords");
-class OC_APP_CLASS(AppChordQuantizer) {
+OC_APP_CLASS(AppChordQuantizer, TWOCCS("CQ"), "Acid Curds", "Chords") {
 public:
-  OC_APP_INTERFACE_DECLARE(AppChordQuantizer);
-  OC_APP_STORAGE_SIZE(ChordQuantizer::storageSize());
+  OC_APP_INTERFACE_DECLARE(AppChordQuantizer, ChordQuantizer::storageSize());
 
 private:
   ChordQuantizer chord_quantizer_;

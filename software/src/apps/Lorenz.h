@@ -161,11 +161,9 @@ void LorenzGenerator::Init() {
 
 namespace OC {
 
-OC_APP_TRAITS(AppLorenzGenerator, TWOCCS("LR"), "Low-rents", "Lorenz");
-class OC_APP_CLASS(AppLorenzGenerator) {
+OC_APP_CLASS(AppLorenzGenerator, TWOCCS("LR"), "Low-rents", "Lorenz") {
 public:
-  OC_APP_INTERFACE_DECLARE(AppLorenzGenerator);
-  OC_APP_STORAGE_SIZE(LorenzGenerator::storageSize());
+  OC_APP_INTERFACE_DECLARE(AppLorenzGenerator, LorenzGenerator::storageSize());
 
 private:
   LorenzGenerator lorenz_generator_;

@@ -388,11 +388,8 @@ void ByteBeat::Init(OC::DigitalInput default_trigger) {
 
 namespace OC {
 
-OC_APP_TRAITS(AppQuadByteBeats, TWOCCS("BY"), "Viznutcracker sweet", "Bytebeats");
-class OC_APP_CLASS(AppQuadByteBeats) {
-public:
-  OC_APP_INTERFACE_DECLARE(AppQuadByteBeats);
-  OC_APP_STORAGE_SIZE(BYTEBEAT_CHANNEL_COUNT * ByteBeat::storageSize());
+OC_APP_CLASS(AppQuadByteBeats, TWOCCS("BY"), "Viznutcracker sweet", "Bytebeats") {
+  OC_APP_INTERFACE_DECLARE(AppQuadByteBeats, BYTEBEAT_CHANNEL_COUNT * ByteBeat::storageSize());
 
 private:
   static constexpr int32_t kCvSmoothing = 16;

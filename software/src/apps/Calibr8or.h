@@ -267,11 +267,10 @@ SETTINGS_ARRAY_DEFINE(Calibr8orPreset);
 
 Calibr8orPreset cal8_presets[NR_OF_PRESETS];
 
-OC_APP_TRAITS(AppCalibr8or, TWOCCS("C8"), "Calibr8or", "Calibrator");
-class OC_APP_CLASS(AppCalibr8or), public HSApplication {
+OC_APP_CLASS(AppCalibr8or, TWOCCS("C8"), "Calibr8or", "Calibrator"),
+  public HSApplication {
 public:
-  OC_APP_INTERFACE_DECLARE(AppCalibr8or);
-  OC_APP_STORAGE_SIZE( Calibr8orPreset::storageSize() * NR_OF_PRESETS );
+  OC_APP_INTERFACE_DECLARE(AppCalibr8or, Calibr8orPreset::storageSize() * NR_OF_PRESETS);
 
   // TODO: refactor Autotuner, again...
   //OC::Autotuner<Cal8ChannelConfig> autotuner;
@@ -794,7 +793,6 @@ public:
             gfxIcon(0, 32 + edit_mode*22, RIGHT_ICON);
     }
 };
-
 
 // App stubs
 void AppCalibr8or::Init() { BaseStart(); }

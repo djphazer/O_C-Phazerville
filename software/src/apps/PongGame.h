@@ -24,8 +24,8 @@
 
 #include "HSApplication.h"
 
-OC_APP_TRAITS(AppPong, TWOCCS("PO"), "Pong 2.0", "Pong");
-class OC_APP_CLASS(AppPong), public HSApplication {
+OC_APP_CLASS(AppPong, TWOCCS("PO"), "Pong 2.0", "Pong"),
+  public HSApplication {
 private:
   int ball_delay; // The ball's delay at the next movement
   int ball_countdown; // Time (in increments of 60 microseconds) until the ball moves
@@ -43,8 +43,7 @@ private:
   int vel_y;
 
 public:
-  OC_APP_INTERFACE_DECLARE(AppPong);
-  OC_APP_STORAGE_SIZE(0);
+  OC_APP_INTERFACE_DECLARE(AppPong, 0);
 
   static constexpr int PRECISION = 7;
 

@@ -2044,11 +2044,9 @@ SETTINGS_ARRAY_DEFINE(SEQ_Channel);
 
 namespace OC {
 
-OC_APP_TRAITS(AppDualSequencer, TWOCCS("SQ"), "Sequins", "2x Sequencer");
-class OC_APP_CLASS(AppDualSequencer) {
+OC_APP_CLASS(AppDualSequencer, TWOCCS("SQ"), "Sequins", "2x Sequencer") {
 public:
-  OC_APP_INTERFACE_DECLARE(AppDualSequencer);
-  OC_APP_STORAGE_SIZE(NUM_CHANNELS * SEQ_Channel::storageSize());
+  OC_APP_INTERFACE_DECLARE(AppDualSequencer, NUM_CHANNELS * SEQ_Channel::storageSize());
 
 private:
   int selected_channel_;

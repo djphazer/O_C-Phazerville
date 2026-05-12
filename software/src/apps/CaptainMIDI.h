@@ -245,15 +245,14 @@ struct CaptainMIDILog {
     }
 };
 
-OC_APP_TRAITS(AppCaptainMIDI, TWOCCS("MI"), "Captain MIDI", "MIDI I/O");
-class OC_APP_CLASS(AppCaptainMIDI), public HSApplication, public SystemExclusiveHandler
+OC_APP_CLASS(AppCaptainMIDI, TWOCCS("MI"), "Captain MIDI", "MIDI I/O"),
+  public HSApplication, public SystemExclusiveHandler
 #ifndef __IMXRT1062__
   , public settings::SettingsBase<AppCaptainMIDI, MIDI_SETTING_COUNT>
 #endif
 {
 public:
-  OC_APP_INTERFACE_DECLARE(AppCaptainMIDI);
-  OC_APP_STORAGE_SIZE(0); // TODO
+  OC_APP_INTERFACE_DECLARE(AppCaptainMIDI, 0); // TODO
 
     static constexpr int MIDI_INDICATOR_COUNTDOWN = 2000;
 

@@ -586,11 +586,9 @@ SETTINGS_ARRAY_DEFINE(ReferenceChannel);
 
 namespace OC {
 
-OC_APP_TRAITS(AppReferences, TWOCCS("RF"), "References", "Voltages");
-class OC_APP_CLASS(AppReferences) {
+OC_APP_CLASS(AppReferences, TWOCCS("RF"), "References", "Voltages") {
 public:
-  OC_APP_INTERFACE_DECLARE(AppReferences);
-  OC_APP_STORAGE_SIZE(DAC_CHANNEL_COUNT * ReferenceChannel::storageSize());
+  OC_APP_INTERFACE_DECLARE(AppReferences, DAC_CHANNEL_COUNT * ReferenceChannel::storageSize());
 
 private:
   OC::Autotuner<ReferenceChannel> autotuner;

@@ -53,12 +53,11 @@ class NNSettings : public settings::SettingsBase<NNSettings, NN_SETTING_LAST>
 };
 SETTINGS_ARRAY_DEFINE(NNSettings);
 
-OC_APP_TRAITS(AppNeuralNetwork, TWOCCS("NN"), "Neural Network", "Neural Net");
-class OC_APP_CLASS(AppNeuralNetwork), public HSApplication, public SystemExclusiveHandler
+OC_APP_CLASS(AppNeuralNetwork, TWOCCS("NN"), "Neural Network", "Neural Net"),
+  public HSApplication, public SystemExclusiveHandler
 {
 public:
-  OC_APP_INTERFACE_DECLARE(AppNeuralNetwork);
-  OC_APP_STORAGE_SIZE(NNSettings::storageSize());
+  OC_APP_INTERFACE_DECLARE(AppNeuralNetwork, NNSettings::storageSize());
 
   NNSettings settings_;
 

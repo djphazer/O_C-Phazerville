@@ -136,17 +136,15 @@ protected:
   AppBaseImpl() : AppBase(kAppId, kAppName, kBoringAppName) { }
 };
 
-#define OC_APP_TRAITS(clazz, app_id, name, boring_name) \
+#define OC_APP_CLASS(clazz, app_id, name, boring_name) \
 struct MACRO_CONCAT(clazz, Traits) { \
   static constexpr uint16_t id = app_id; \
   static constexpr const char *const app_name = name; \
   static constexpr const char *const boring_app_name = boring_name; \
-}
+}; \
+class clazz : public OC::AppBaseImpl<clazz, MACRO_CONCAT(clazz, Traits)>
 
-#define OC_APP_CLASS(clazz) \
-clazz : public OC::AppBaseImpl<clazz, MACRO_CONCAT(clazz, Traits)>
-
-#define OC_APP_INTERFACE_DECLARE(clazz) \
+#define OC_APP_INTERFACE_DECLARE(clazz, s) \
 public: \
   clazz() : OC::AppBaseImpl<clazz, MACRO_CONCAT(clazz, Traits)>() { } \
   virtual void Init() final; \
@@ -161,10 +159,8 @@ public: \
   virtual void HandleEncoderEvent(const UI::Event &) final; \
   virtual void Process(OC::IOFrame *ioframe) final; \
   virtual void GetIOConfig(OC::IOConfig &) const final; \
-  virtual void DrawDebugInfo() const final
-
-#define OC_APP_STORAGE_SIZE(s) \
-  static constexpr size_t kAppDataStorageSize = s;
+  virtual void DrawDebugInfo() const final; \
+  static constexpr size_t kAppDataStorageSize = s
 
 }; // namespace OC
 

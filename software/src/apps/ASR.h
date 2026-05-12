@@ -763,11 +763,9 @@ SETTINGS_ARRAY_DEFINE(ASR);
 
 namespace OC {
 
-OC_APP_TRAITS(AppASR, TWOCCS("AS"), "CopierMaschine", "ASR");
-class OC_APP_CLASS(AppASR) {
+OC_APP_CLASS(AppASR, TWOCCS("AS"), "CopierMaschine", "ASR") {
 public:
-  OC_APP_INTERFACE_DECLARE(AppASR);
-  OC_APP_STORAGE_SIZE(ASR::storageSize());
+  OC_APP_INTERFACE_DECLARE(AppASR, ASR::storageSize());
 
 private:
 

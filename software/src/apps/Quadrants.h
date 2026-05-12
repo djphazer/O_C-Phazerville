@@ -53,11 +53,10 @@ using namespace HS;
 
 void QuadrantSysExHandler();
 
-OC_APP_TRAITS(AppQuadrants, TWOCCS("QS"), "Quadrants", "4x Applets");
-class OC_APP_CLASS(AppQuadrants), public HSApplication {
+OC_APP_CLASS(AppQuadrants, TWOCCS("QS"), "Quadrants", "4x Applets"),
+  public HSApplication {
 public:
-  OC_APP_INTERFACE_DECLARE(AppQuadrants);
-  OC_APP_STORAGE_SIZE(0);
+  OC_APP_INTERFACE_DECLARE(AppQuadrants, 0);
 
     void Start() {
         audio_app.Init();

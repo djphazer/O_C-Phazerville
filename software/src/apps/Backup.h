@@ -22,11 +22,10 @@
 #include "../extern/avr/eeprom.h"
 #include "../src/drivers/EEPROMStorage.h"
 
-OC_APP_TRAITS(AppBackup, TWOCCS("BU"), "Back It Up!", "Backup / Restore");
-class OC_APP_CLASS(AppBackup), public SystemExclusiveHandler {
+OC_APP_CLASS(AppBackup, TWOCCS("BU"), "Back It Up!", "Backup / Restore"),
+  public SystemExclusiveHandler {
 public:
-  OC_APP_INTERFACE_DECLARE(AppBackup);
-  OC_APP_STORAGE_SIZE(0);
+  OC_APP_INTERFACE_DECLARE(AppBackup, 0);
 
   void Resume() {
     receiving = 0;

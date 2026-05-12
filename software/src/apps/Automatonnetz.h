@@ -508,11 +508,9 @@ void AutomatonnetzState::update_trigger_out() {
 
 namespace OC {
 
-OC_APP_TRAITS(AppAutomatonnetz, TWOCCS("AT"), "Automatonnetz", "Vectors");
-class OC_APP_CLASS(AppAutomatonnetz) {
+OC_APP_CLASS(AppAutomatonnetz, TWOCCS("AT"), "Automatonnetz", "Vectors") {
 public:
-  OC_APP_INTERFACE_DECLARE(AppAutomatonnetz);
-  OC_APP_STORAGE_SIZE(AutomatonnetzState::storageSize() + GRID_CELLS * TransformCell::storageSize());
+  OC_APP_INTERFACE_DECLARE(AppAutomatonnetz, AutomatonnetzState::storageSize() + GRID_CELLS * TransformCell::storageSize());
 
 private:
   AutomatonnetzState automatonnetz_state;

@@ -224,11 +224,9 @@ void BouncingBall::Init(OC::DigitalInput default_trigger) {
 
 namespace OC {
 
-OC_APP_TRAITS(AppQuadBouncingBalls, TWOCCS("BB"), "Dialectic Ping Pong", "Balls");
-class OC_APP_CLASS(AppQuadBouncingBalls) {
+OC_APP_CLASS(AppQuadBouncingBalls, TWOCCS("BB"), "Dialectic Ping Pong", "Balls") {
 public:
-  OC_APP_INTERFACE_DECLARE(AppQuadBouncingBalls);
-  OC_APP_STORAGE_SIZE(BBGEN_CHANNEL_COUNT * BouncingBall::storageSize());
+  OC_APP_INTERFACE_DECLARE(AppQuadBouncingBalls, BBGEN_CHANNEL_COUNT * BouncingBall::storageSize());
 
 private:
   static constexpr int32_t kCvSmoothing = 16;

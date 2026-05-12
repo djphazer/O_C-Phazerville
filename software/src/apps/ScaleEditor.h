@@ -27,12 +27,10 @@
 #include "HSMIDI.h"
 #include "SegmentDisplay.h"
 
-OC_APP_TRAITS(AppScaleEditor, TWOCCS("SC"), "ScaleEdit", "Scale Editor");
-
-class OC_APP_CLASS(AppScaleEditor), public HSApplication, public SystemExclusiveHandler {
+OC_APP_CLASS(AppScaleEditor, TWOCCS("SC"), "ScaleEdit", "Scale Editor"),
+  public HSApplication, public SystemExclusiveHandler {
 public:
-  OC_APP_INTERFACE_DECLARE(AppScaleEditor);
-  OC_APP_STORAGE_SIZE(0);
+  OC_APP_INTERFACE_DECLARE(AppScaleEditor, 0);
 
     void Start() {
         current_scale = 0;

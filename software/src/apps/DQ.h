@@ -1059,11 +1059,9 @@ SETTINGS_ARRAY_DEFINE(DQ_QuantizerChannel);
 
 namespace OC {
 
-OC_APP_TRAITS(AppDualQuantizer, TWOCCS("DQ"), "Meta-Q", "2x Quantizer");
-class OC_APP_CLASS(AppDualQuantizer) {
+OC_APP_CLASS(AppDualQuantizer, TWOCCS("DQ"), "Meta-Q", "2x Quantizer") {
 public:
-  OC_APP_INTERFACE_DECLARE(AppDualQuantizer);
-  OC_APP_STORAGE_SIZE(NUMCHANNELS * DQ_QuantizerChannel::storageSize());
+  OC_APP_INTERFACE_DECLARE(AppDualQuantizer, NUMCHANNELS * DQ_QuantizerChannel::storageSize());
 
 private:
   int selected_channel_;

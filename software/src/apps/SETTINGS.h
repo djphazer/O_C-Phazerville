@@ -36,12 +36,10 @@
 extern "C" void _reboot_Teensyduino_();
 using namespace OC;
 
-OC_APP_TRAITS(AppSettings, TWOCCS("SE"), "Setup/About", "Settings");
-
-class OC_APP_CLASS(AppSettings), public HSApplication {
+OC_APP_CLASS(AppSettings, TWOCCS("SE"), "Setup/About", "Settings"),
+  public HSApplication {
 public:
-  OC_APP_INTERFACE_DECLARE(AppSettings);
-  OC_APP_STORAGE_SIZE(0);
+  OC_APP_INTERFACE_DECLARE(AppSettings, 0);
 
   bool reflash = false;
   bool calibration_mode = false;
@@ -614,7 +612,6 @@ public:
       // TODO:
         //OC::apps::Init(1);
     }
-
 };
 
 void AppSettings::Init() {

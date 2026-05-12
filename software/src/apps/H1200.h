@@ -689,11 +689,9 @@ H1200State h1200_state;
 namespace OC {
 
 // Instantiate an app for the OC::Framework
-OC_APP_TRAITS(AppH1200, TWOCCS("HA"), "Harrington 1200", "Triads");
-class OC_APP_CLASS(AppH1200) {
+OC_APP_CLASS(AppH1200, TWOCCS("HA"), "Harrington 1200", "Triads") {
 public:
-  OC_APP_INTERFACE_DECLARE(AppH1200);
-  OC_APP_STORAGE_SIZE(H1200Settings::storageSize());
+  OC_APP_INTERFACE_DECLARE(AppH1200, H1200Settings::storageSize());
 
 private:
   void HandleTopButton();

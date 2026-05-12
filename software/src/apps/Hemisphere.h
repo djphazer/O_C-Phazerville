@@ -248,15 +248,16 @@ using namespace HS;
 
 void ReceiveManagerSysEx();
 
-OC_APP_TRAITS(AppHemisphere, TWOCCS("HS"), "Hemisphere", "Applets");
-class OC_APP_CLASS(AppHemisphere), public HSApplication {
+OC_APP_CLASS(AppHemisphere, TWOCCS("HS"), "Hemisphere", "Applets"),
+  public HSApplication {
 public:
-  OC_APP_INTERFACE_DECLARE(AppHemisphere);
+  OC_APP_INTERFACE_DECLARE(AppHemisphere,
 #ifdef __IMXRT1062__
-  OC_APP_STORAGE_SIZE(0);
+  0 // no EEPROM needed on T4
 #else
-  OC_APP_STORAGE_SIZE( HemispherePreset::storageSize() * HEM_NR_OF_PRESETS + 1 );
+  HemispherePreset::storageSize() * HEM_NR_OF_PRESETS + 1
 #endif
+  );
 
     void Start() {
         select_mode = -1; // Not selecting

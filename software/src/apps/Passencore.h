@@ -273,11 +273,9 @@ class PassencoreSettings : public settings::SettingsBase<PassencoreSettings, PAS
 };
 
 
-OC_APP_TRAITS(AppPassencore, TWOCCS("PQ"), "Passencore", "Tension");
-class OC_APP_CLASS(AppPassencore) {
+OC_APP_CLASS(AppPassencore, TWOCCS("PQ"), "Passencore", "Tension") {
 public:
-  OC_APP_INTERFACE_DECLARE(AppPassencore);
-  OC_APP_STORAGE_SIZE(0); // todo
+  OC_APP_INTERFACE_DECLARE(AppPassencore, 0); // todo
 
   PassencoreSettings passencore_state;
 

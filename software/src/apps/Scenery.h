@@ -182,15 +182,16 @@ SETTINGS_ARRAY_DEFINE(ScenePreset);
 
 ScenePreset scene_presets[NR_OF_SCENE_PRESETS];
 
-OC_APP_TRAITS(AppScenery, TWOCCS("SX"), "Scenery", "Scenes");
-class OC_APP_CLASS(AppScenery), public HSApplication {
+OC_APP_CLASS(AppScenery, TWOCCS("SX"), "Scenery", "Scenes"),
+  public HSApplication {
 public:
-  OC_APP_INTERFACE_DECLARE(AppScenery);
+  OC_APP_INTERFACE_DECLARE(AppScenery,
 #ifdef __IMXRT1062__
-  OC_APP_STORAGE_SIZE(0);
+  0
 #else
-  OC_APP_STORAGE_SIZE( ScenePreset::storageSize() * NR_OF_SCENE_PRESETS );
+  ScenePreset::storageSize() * NR_OF_SCENE_PRESETS
 #endif
+  );
 
 
 	void Start() {
