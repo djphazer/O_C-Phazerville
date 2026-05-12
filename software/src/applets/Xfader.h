@@ -22,107 +22,10 @@
 #define MIXER_MAX_VALUE 255
 
 class Xfader : public HemisphereApplet {
-public:
+  APPLET_INTERFACE(Xfader, "Xfader", PhzIcons::mixerBal);
 
-    const char* applet_name() {
-        return "Xfader";  // formerly Mixer:Bal
-    }
-    const uint8_t* applet_icon() { return PhzIcons::mixerBal; }
-
-    void Start() {
-        balance = (128 << 8);  // midpoint
-        rate = 128;  // 50 % per second
-        center = 128;
-        center_reset_enable = false;
-        center_reset = false;
-    }
-
-    void Controller() {
-        int signal1 = In(0);
-        int signal2 = In(1);
-
-        uint32_t t = millis();
-        if (t - last_balance_update > 0) {
-            last_balance_update = t;
-            if (Gate(0) && !Gate(1)) {
-                balance = constrain(balance - (rate / 4), 0, 65535);  // (65536 / 16384) = 4 counts per ms
-                if (center_reset_enable) center_reset = true;
-            }
-            if (Gate(1) && !Gate(0)) {
-                balance = constrain(balance + (rate / 4), 0, 65535);
-                if (center_reset_enable) center_reset = true;
-            }
-            if (center_reset && !(Gate(0) || Gate(1))) {
-                center_reset = false;
-                balance = center << 8;
-            }
-        }
-
-        uint8_t _balance = balance >> 8;
-
-        int mix1 = Proportion(_balance, MIXER_MAX_VALUE, signal2)
-                 + Proportion(MIXER_MAX_VALUE - _balance, MIXER_MAX_VALUE, signal1);
-
-        int mix2 = Proportion(_balance, MIXER_MAX_VALUE, signal1)
-                 + Proportion(MIXER_MAX_VALUE - _balance, MIXER_MAX_VALUE, signal2);
-
-        Out(0, mix1);
-        Out(1, mix2);
-    }
-
-    void View() {
-        DrawBalanceIndicator();
-        gfxSkyline();
-    }
-
-    void OnEncoderMove(int direction) {
-        if (!EditMode()) {
-            balance = constrain(balance + direction * (1 << 8), 0, 65535);
-            center = balance >> 8;
-            return;
-        }
-        int rate_inc =  !(rate >> 15) ?
-                            !(rate >> 11) ?
-                                !(rate >> 7) ?
-                                    1 :
-                                16 :
-                            512 :
-                        2048;
-        rate = constrain(rate + direction * rate_inc, 0, 65535);
-    }
-
-    uint64_t OnDataRequest() {
-        uint64_t data = 0;
-        Pack(data, PackLocation {0,8}, balance >> 8);
-        Pack(data, PackLocation {8,16}, rate);
-        Pack(data, PackLocation {24,8}, center);
-        Pack(data, PackLocation {32,1}, center_reset_enable);
-        return data;
-    }
-
-    void OnDataReceive(uint64_t data) {
-        balance = Unpack(data, PackLocation {0,8}) << 8;
-        rate = Unpack(data, PackLocation {8,16});
-        center = Unpack(data, PackLocation {24,8});
-        center_reset_enable = Unpack(data, PackLocation {32,1});
-    }
-
-    void AuxButton() {
-        center_reset_enable = !center_reset_enable;
-    }
-
-protected:
-  void SetHelp() {
-    //                    "-------" <-- Label size guide
-    help[HELP_DIGITAL1] = "Fade L";
-    help[HELP_DIGITAL2] = "Fade R";
-    help[HELP_CV1]      = "Sig 1";
-    help[HELP_CV2]      = "Sig 2";
-    help[HELP_OUT1]     = "Mix 1+2";
-    help[HELP_OUT2]     = "Mix 2+1";
-    help[HELP_EXTRA1]   = "Set: Balance";
-    help[HELP_EXTRA2]   = "Press: Fade Rate";
-    //                    "---------------------" <-- Extra text size guide
+  void AuxButton() final {
+      center_reset_enable = !center_reset_enable;
   }
 
 private:
@@ -135,24 +38,117 @@ private:
     bool center_reset;
 
     void DrawBalanceIndicator() {
-        if (!EditMode()) {
-            gfxFrame(1, 15, 62, 6);
-            if (center_reset_enable) gfxInvert(Proportion(center, MIXER_MAX_VALUE, 62)+1, 13, 1, 10);
-            int x = Proportion(balance >> 8, MIXER_MAX_VALUE, 62);
-            gfxRect((x<32)?x+1:32, 16, (x<32)?32-x:x-31, 4);
+      if (!EditMode()) {
+        gfxFrame(1, 15, 62, 6);
+        if (center_reset_enable)
+          gfxInvert(Proportion(center, MIXER_MAX_VALUE, 62) + 1, 13, 1, 10);
+        int x = Proportion(balance >> 8, MIXER_MAX_VALUE, 62);
+        gfxRect((x < 32) ? x + 1 : 32, 16, (x < 32) ? 32 - x : x - 31, 4);
+      } else {
+        gfxPos(1, 15);
+        if (rate < 4) {
+          gfxPrint(0);
         } else {
-            gfxPos(1, 15);
-            if (rate < 4) {
-                gfxPrint(0);
-            } else {
-                uint percent_int = (rate * 100) / 256;
-                gfxPrint(percent_int);
-                if (rate < 256) {
-                    uint percent_frac = ((rate * 10000) / 256) % 100;
-                    gfxPrint("."); gfxPrint(percent_frac);
-                }
-            }
-            gfxPrint("%/sec");
+          uint percent_int = (rate * 100) / 256;
+          gfxPrint(percent_int);
+          if (rate < 256) {
+            uint percent_frac = ((rate * 10000) / 256) % 100;
+            gfxPrint(".");
+            gfxPrint(percent_frac);
+          }
         }
+        gfxPrint("%/sec");
+      }
     }
 };
+
+FLASHMEM void Xfader::Start() {
+    balance = (128 << 8);  // midpoint
+    rate = 128;  // 50 % per second
+    center = 128;
+    center_reset_enable = false;
+    center_reset = false;
+}
+
+void Xfader::Controller() {
+    int signal1 = In(0);
+    int signal2 = In(1);
+
+    uint32_t t = millis();
+    if (t - last_balance_update > 0) {
+        last_balance_update = t;
+        if (Gate(0) && !Gate(1)) {
+            balance = constrain(balance - (rate / 4), 0, 65535);  // (65536 / 16384) = 4 counts per ms
+            if (center_reset_enable) center_reset = true;
+        }
+        if (Gate(1) && !Gate(0)) {
+            balance = constrain(balance + (rate / 4), 0, 65535);
+            if (center_reset_enable) center_reset = true;
+        }
+        if (center_reset && !(Gate(0) || Gate(1))) {
+            center_reset = false;
+            balance = center << 8;
+        }
+    }
+
+    uint8_t _balance = balance >> 8;
+
+    int mix1 = Proportion(_balance, MIXER_MAX_VALUE, signal2)
+             + Proportion(MIXER_MAX_VALUE - _balance, MIXER_MAX_VALUE, signal1);
+
+    int mix2 = Proportion(_balance, MIXER_MAX_VALUE, signal1)
+             + Proportion(MIXER_MAX_VALUE - _balance, MIXER_MAX_VALUE, signal2);
+
+    Out(0, mix1);
+    Out(1, mix2);
+}
+
+FLASHMEM void Xfader::View() {
+    DrawBalanceIndicator();
+    gfxSkyline();
+}
+
+FLASHMEM void Xfader::OnEncoderMove(int direction) {
+    if (!EditMode()) {
+        balance = constrain(balance + direction * (1 << 8), 0, 65535);
+        center = balance >> 8;
+        return;
+    }
+    int rate_inc =  !(rate >> 15) ?
+                        !(rate >> 11) ?
+                            !(rate >> 7) ?
+                                1 :
+                            16 :
+                        512 :
+                    2048;
+    rate = constrain(rate + direction * rate_inc, 0, 65535);
+}
+
+uint64_t Xfader::OnDataRequest() {
+    uint64_t data = 0;
+    Pack(data, PackLocation {0,8}, balance >> 8);
+    Pack(data, PackLocation {8,16}, rate);
+    Pack(data, PackLocation {24,8}, center);
+    Pack(data, PackLocation {32,1}, center_reset_enable);
+    return data;
+}
+
+void Xfader::OnDataReceive(uint64_t data) {
+    balance = Unpack(data, PackLocation {0,8}) << 8;
+    rate = Unpack(data, PackLocation {8,16});
+    center = Unpack(data, PackLocation {24,8});
+    center_reset_enable = Unpack(data, PackLocation {32,1});
+}
+
+void Xfader::SetHelp() {
+  //                    "-------" <-- Label size guide
+  help[HELP_DIGITAL1] = "Fade L";
+  help[HELP_DIGITAL2] = "Fade R";
+  help[HELP_CV1]      = "Sig 1";
+  help[HELP_CV2]      = "Sig 2";
+  help[HELP_OUT1]     = "Mix 1+2";
+  help[HELP_OUT2]     = "Mix 2+1";
+  help[HELP_EXTRA1]   = "Set: Balance";
+  help[HELP_EXTRA2]   = "Press: Fade Rate";
+  //                    "---------------------" <-- Extra text size guide
+}

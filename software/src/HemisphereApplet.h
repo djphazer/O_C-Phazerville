@@ -46,6 +46,18 @@
 #include "HSIOFrame.h"
 #include <variant>
 
+#define APPLET_INTERFACE(clazz, name, icon) \
+protected: \
+  virtual void SetHelp() final; \
+public: \
+  virtual const char* applet_name() { return name; } \
+  virtual const uint8_t* applet_icon() { return icon; } \
+  virtual void Start() final; \
+  virtual void Controller() final; \
+  virtual void View() final; \
+  virtual uint64_t OnDataRequest() final; \
+  virtual void OnDataReceive(uint64_t data) final; \
+  virtual void OnEncoderMove(int direction) final
 
 namespace HS {
 
