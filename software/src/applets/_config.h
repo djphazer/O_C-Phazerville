@@ -152,7 +152,7 @@ using namespace HS;
 
 #include "AppletRegistry.h"
 
-constexpr Registry reg = Registry<HemisphereApplet, HS::APPLET_SLOTS // max ID
+constexpr Registry reg = Registry<HemisphereApplet, HS::APPLET_SLOTS
     , DeclareApplet<ADSREG, 8, 0x01>
     , DeclareApplet<ADEG, 34, 0x01>
     , DeclareApplet<MiniASR, 47, 0x09>
@@ -290,7 +290,7 @@ namespace HS {
     hidden_applets[seg] = hidden_applets[seg] ^ (uint64_t(1) << (index%64));
   }
 
-  HemisphereApplet * get_applet(const int index, HEM_SIDE slot = 0) {
+  HemisphereApplet * get_applet(const int index, HEM_SIDE slot = LEFT_HEMISPHERE) {
     return reg.get(appletIds[index], slot);
   }
 

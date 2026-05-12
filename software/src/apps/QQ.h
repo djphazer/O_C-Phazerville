@@ -50,14 +50,7 @@
  #define QQ_OFFSET_X 31
 #endif
 
-void QQ_downButtonLong();
-void QQ_topButton();
-void QQ_lowerButton();
-void QQ_leftButton();
-void QQ_rightButton();
-void QQ_leftButtonLong();
-
-enum ChannelSetting {
+enum ChannelSetting : uint8_t {
   CHANNEL_SETTING_SCALE,
   CHANNEL_SETTING_ROOT,
   CHANNEL_SETTING_MASK,
@@ -112,7 +105,7 @@ enum ChannelSetting {
   CHANNEL_SETTING_LAST
 };
 
-enum ChannelTriggerSource {
+enum ChannelTriggerSource : uint8_t {
   CHANNEL_TRIGGER_TR1,
   CHANNEL_TRIGGER_TR2,
   CHANNEL_TRIGGER_TR3,
@@ -122,7 +115,7 @@ enum ChannelTriggerSource {
   CHANNEL_TRIGGER_LAST
 };
 
-enum ChannelSource {
+enum ChannelSource : uint8_t {
   CHANNEL_SOURCE_CV1,
   CHANNEL_SOURCE_CV2,
   CHANNEL_SOURCE_CV3,
@@ -137,7 +130,7 @@ enum ChannelSource {
   CHANNEL_SOURCE_LAST
 };
 
-enum QQ_CV_DEST {
+enum QQ_CV_DEST : uint8_t {
   QQ_DEST_NONE,
   QQ_DEST_ROOT,
   QQ_DEST_OCTAVE,
@@ -481,7 +474,7 @@ public:
   inline void Update(OC::IOFrame *ioframe, size_t dac_channel)
   {
     auto triggers = ioframe->digital_inputs.triggered();
-    auto index = channel_index_;
+    const size_t index = channel_index_;
 
     ChannelSource source = get_source();
     ChannelTriggerSource trigger_source = get_trigger_source();
@@ -516,7 +509,7 @@ public:
 
     switch (source) {
       case CHANNEL_SOURCE_TURING: {
-          auto &turing_machine_ = HS::GetTM(index);
+          util::TuringShiftRegister &turing_machine_ = HS::GetTM(index);
           // this doesn't make sense when continuously quantizing; should be hidden via the menu ...
           if (continuous) // TODO[PLD] Fix this mess
             break;
@@ -1103,7 +1096,7 @@ private:
   uint8_t clock_;
   bool int_seq_reset_;
   int8_t continuous_offset_;
-  int8_t channel_index_;
+  uint8_t channel_index_;
   int32_t schedule_mask_rotate_;
   int8_t prev_destination_;
   int8_t prev_octave_cv_;

@@ -150,11 +150,6 @@ public:
 
   // returns true to exit
   bool HandleButtonEvent(const UI::Event& event) {
-    static size_t mask = 0;
-    static size_t last_mask = 0;
-    last_mask = mask;
-    mask = event.mask;
-
     if (event.type == UI::EVENT_BUTTON_PRESS) {
       switch (event.control) {
         case OC::CONTROL_BUTTON_A:

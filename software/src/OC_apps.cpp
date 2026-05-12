@@ -625,7 +625,7 @@ bool Ui::AppSettings(bool drawmenu) {
     item.y = (64 - (5 * menu::kMenuLineH)) / 2;
 
     for (int current = cursor.first_visible();
-         current <= cursor.last_visible() && current < app_container.num_apps();
+         current <= cursor.last_visible() && current < (int)app_container.num_apps();
          ++current, item.y += menu::kMenuLineH) {
       item.selected = current == cursor.cursor_pos();
       item.SetPrintPos();

@@ -227,7 +227,7 @@ public:
     void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
         data[0] = PackPackables(pitch, level, mix);
         data[1] = PackPackables(pitch_cv, level_cv, mix_cv);
-        for (int i = 0; i < max_partials; ++i) {
+        for (size_t i = 0; i < max_partials; ++i) {
           Pack(data[2 + i / 8], PackLocation{(i % 8) * 8, 8}, amplitudes[i]);
         }
         // no room for amp CV
@@ -236,7 +236,7 @@ public:
     void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
         UnpackPackables(data[0], pitch, level, mix);
         UnpackPackables(data[1], pitch_cv, level_cv, mix_cv);
-        for (int i = 0; i < max_partials; ++i) {
+        for (size_t i = 0; i < max_partials; ++i) {
           amplitudes[i] = Unpack(data[2 + i / 8], PackLocation{(i % 8) * 8, 8});
         }
     }

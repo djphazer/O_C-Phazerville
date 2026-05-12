@@ -244,7 +244,7 @@ void LorenzGenerator::DetermineActiveGenerators() {
   lorenz2_active = false;
   rossler2_active = false;
 
-  for (int i = 0; i < kNumChannels; ++i) {
+  for (size_t i = 0; i < kNumChannels; ++i) {
     switch (out_[i]) {
       case LORENZ_OUTPUT_X1:
       case LORENZ_OUTPUT_Y1:
