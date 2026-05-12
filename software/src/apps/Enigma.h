@@ -59,13 +59,39 @@ enum EnigmaMode {
 #define ENIGMA_TRACK_LOOP 1
 
 // Settings for various things
-#define ENIGMA_SETTING_LAST 150
+#define ENIGMA_SETTING_COUNT 150
 #define ENIGMA_NO_STEP_AVAILABLE 0xffff
 #define ENIGMA_INITIAL_HELP_TIME 65535
 
-class EnigmaTMWS : public HSApplication, public SystemExclusiveHandler,
-    public settings::SettingsBase<EnigmaTMWS, ENIGMA_SETTING_LAST> {
+#define ENIGMA_EEPROM_DATA {0,0,255,"St",NULL,settings::STORAGE_TYPE_U8},
+#define DO_THIRTY_TIMES(A) A A A A A A A A A A A A A A A A A A A A A A A A A A A A A A
+
+class EnigmaSettings : public settings::SettingsBase<EnigmaSettings, ENIGMA_SETTING_COUNT> {
+  // Setting declarations for EEPROM storage, which consists of the following:
+  //     Four output assignments @ 4 bytes each =  16 bytes
+  //     The first 32 song steps @ 4 bytes each = 128 bytes
+  //     Four track settings @ 1 uint8_t each      =   4 bytes
+  //     Song length                            =   1 uint8_t
+  // TOTAL EEPROM SIZE: 150 bytes
+  SETTINGS_ARRAY_DECLARE() {{
+    DO_THIRTY_TIMES(ENIGMA_EEPROM_DATA)
+    DO_THIRTY_TIMES(ENIGMA_EEPROM_DATA)
+    DO_THIRTY_TIMES(ENIGMA_EEPROM_DATA)
+    DO_THIRTY_TIMES(ENIGMA_EEPROM_DATA)
+    DO_THIRTY_TIMES(ENIGMA_EEPROM_DATA)
+  }};
+};
+SETTINGS_ARRAY_DEFINE(EnigmaSettings);
+
+OC_APP_TRAITS(AppEnigma, TWOCCS("EN"), "Enigma", "Enigma");
+class OC_APP_CLASS(AppEnigma), public HSApplication, public SystemExclusiveHandler
+{
 public:
+  OC_APP_INTERFACE_DECLARE(AppEnigma);
+  OC_APP_STORAGE_SIZE( EnigmaSettings::storageSize() );
+
+  EnigmaSettings settings_;
+
 	void Start() {
 	    for (int ix = 0; ix < HS::TURING_MACHINE_COUNT; ix++) state_prob[ix] = 0;
 	    tm_cursor = 0;
@@ -107,7 +133,8 @@ public:
         }
     }
 
-    void View() {
+    void View() const;
+    void MainView() const {
         DrawHeader();
         DrawInterface();
     }
@@ -724,7 +751,7 @@ private:
             int deferred_note = -1;
             for (int o = 0; o < 4; o++)
             {
-                output[o].SendToDAC<EnigmaTMWS>(this, reg);
+                output[o].SendToDAC<AppEnigma>(this, reg);
 
                 if (deferred_note > -1) output[o].SetDeferredNote(deferred_note);
                 output[o].SendToMIDI(reg);
@@ -807,7 +834,7 @@ private:
                         {
                             if (output[o].track() == t) {
                                 uint16_t reg = track_tm[t].GetRegister();
-                                output[o].SendToDAC<EnigmaTMWS>(this, reg, song_step[ssi].transpose() * 128);
+                                output[o].SendToDAC<AppEnigma>(this, reg, song_step[ssi].transpose() * 128);
 
                                 if (deferred_note > -1) output[o].SetDeferredNote(deferred_note);
                                 output[o].SendToMIDI(reg, song_step[ssi].transpose() * 128);
@@ -1093,26 +1120,27 @@ private:
         // Outputs
         for (int o = 0; o < 4; o++)
         {
-            values_[ix++] = output[o].tk;
-            values_[ix++] = output[o].ty;
-            values_[ix++] = output[o].sc;
-            values_[ix++] = output[o].mc;
+            settings_.apply_value(ix++, output[o].tk);
+            settings_.apply_value(ix++, output[o].ty);
+            settings_.apply_value(ix++, output[o].sc);
+            settings_.apply_value(ix++, output[o].mc);
         }
 
         int song_steps = constrain(total_steps, 0, 32);
-        values_[ix++] = static_cast<uint8_t>(song_steps);
+        settings_.apply_value(ix++, static_cast<uint8_t>(song_steps));
 
         // First 32 song steps
         for (int s = 0; s < 32; s++)
         {
-            values_[ix++] = song_step[s].tk;
-            values_[ix++] = song_step[s].pr;
-            values_[ix++] = song_step[s].re;
-            values_[ix++] = song_step[s].tr;
+            settings_.apply_value(ix++, song_step[s].tk);
+            settings_.apply_value(ix++, song_step[s].pr);
+            settings_.apply_value(ix++, song_step[s].re);
+            settings_.apply_value(ix++, song_step[s].tr);
         }
 
         // Track settings
-        for (int t = 0; t < 4; t++) values_[ix++] = track[t].data;
+        for (int t = 0; t < 4; t++)
+          settings_.apply_value(ix++, track[t].data);
     }
 
     void LoadFromEEPROMStage() {
@@ -1121,27 +1149,27 @@ private:
         // Outputs
         for (int o = 0; o < 4; o++)
         {
-            output[o].tk = values_[ix++];
-            output[o].ty = values_[ix++];
-            output[o].sc = values_[ix++];
-            output[o].mc = values_[ix++];
+            output[o].tk = settings_.get_value(ix++);
+            output[o].ty = settings_.get_value(ix++);
+            output[o].sc = settings_.get_value(ix++);
+            output[o].mc = settings_.get_value(ix++);
         }
 
         // Song length
-        uint8_t song_steps = values_[ix++];
+        uint8_t song_steps = settings_.get_value(ix++);
         if (song_steps > total_steps) total_steps = song_steps;
 
         // Song Steps
         for (int s = 0; s < 32; s++)
         {
-            song_step[s].tk = values_[ix++];
-            song_step[s].pr = values_[ix++];
-            song_step[s].re = values_[ix++];
-            song_step[s].tr = values_[ix++];
+            song_step[s].tk = settings_.get_value(ix++);
+            song_step[s].pr = settings_.get_value(ix++);
+            song_step[s].re = settings_.get_value(ix++);
+            song_step[s].tr = settings_.get_value(ix++);
         }
 
         // Track settings
-        for (int t = 0; t < 4; t++) track[t].data = values_[ix++];
+        for (int t = 0; t < 4; t++) track[t].data = settings_.get_value(ix++);
 
         // Reset everything if there's no data (meaning, song steps is 0)
         if (song_steps == 0) Start();
@@ -1153,85 +1181,93 @@ private:
     }
 };
 
-// Setting declarations for EEPROM storage, which consists of the following:
-//     Four output assignments @ 4 bytes each =  16 bytes
-//     The first 32 song steps @ 4 bytes each = 128 bytes
-//     Four track settings @ 1 uint8_t each      =   4 bytes
-//     Song length                            =   1 uint8_t
-// TOTAL EEPROM SIZE: 150 bytes
-#define ENIGMA_EEPROM_DATA {0,0,255,"St",NULL,settings::STORAGE_TYPE_U8},
-#define ENIGMA_DO_THIRTY_TIMES(A) A A A A A A A A A A A A A A A A A A A A A A A A A A A A A A
-SETTINGS_DECLARE(EnigmaTMWS, ENIGMA_SETTING_LAST) {
-    ENIGMA_DO_THIRTY_TIMES(ENIGMA_EEPROM_DATA)
-    ENIGMA_DO_THIRTY_TIMES(ENIGMA_EEPROM_DATA)
-    ENIGMA_DO_THIRTY_TIMES(ENIGMA_EEPROM_DATA)
-    ENIGMA_DO_THIRTY_TIMES(ENIGMA_EEPROM_DATA)
-    ENIGMA_DO_THIRTY_TIMES(ENIGMA_EEPROM_DATA)
-};
-
-EnigmaTMWS EnigmaTMWS_instance;
-
 // App stubs
-void EnigmaTMWS_init() {
-    EnigmaTMWS_instance.BaseStart();
+void AppEnigma::Init() { BaseStart(); }
+
+size_t AppEnigma::SaveAppData(util::StreamBufferWriter &stream_buffer) const {
+  settings_.Save(stream_buffer);
+  return stream_buffer.written();
+}
+size_t AppEnigma::RestoreAppData(util::StreamBufferReader &stream_buffer) {
+  settings_.Restore(stream_buffer);
+  return stream_buffer.read();
 }
 
-static constexpr size_t EnigmaTMWS_storageSize() {
-    return EnigmaTMWS::storageSize();
-}
-static size_t EnigmaTMWS_save(void *storage) {
-    return EnigmaTMWS_instance.Save(storage);
-}
-static size_t EnigmaTMWS_restore(const void *storage) {
-    return EnigmaTMWS_instance.Restore(storage);
+void AppEnigma::Process(OC::IOFrame *ioframe) {
+  return BaseController(ioframe);
 }
 
-void EnigmaTMWS_process(OC::IOFrame *) {
-	return EnigmaTMWS_instance.BaseController();
-}
+void AppEnigma::GetIOConfig(OC::IOConfig &ioconfig) const
+{
+  using namespace OC;
 
-void EnigmaTMWS_handleAppEvent(OC::AppEvent event) {
+  // TODO: what do these actually do? lol
+  ioconfig.digital_inputs[DIGITAL_INPUT_1].set("Ch1 Clk");
+  ioconfig.digital_inputs[DIGITAL_INPUT_2].set("Ch2 Clk");
+  ioconfig.digital_inputs[DIGITAL_INPUT_3].set("Ch3 Clk");
+  ioconfig.digital_inputs[DIGITAL_INPUT_4].set("Ch4 Clk");
+
+  ioconfig.cv[0].set("Ch1 CV");
+  ioconfig.cv[1].set("Ch2 CV");
+  ioconfig.cv[2].set("Ch3 CV");
+  ioconfig.cv[3].set("Ch4 CV");
+
+  ioconfig.outputs[0].set("Ch1", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[1].set("Ch2", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[2].set("Ch3", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[3].set("Ch4", OUTPUT_MODE_PITCH);
+}
+FLASHMEM
+void AppEnigma::HandleAppEvent(OC::AppEvent event) {
     if (event ==  OC::APP_EVENT_RESUME) {
-        EnigmaTMWS_instance.Resume();
+        Resume();
     }
     if (event == OC::APP_EVENT_SUSPEND) {
-        EnigmaTMWS_instance.OnSaveSettings();
-        EnigmaTMWS_instance.OnSendSysEx();
+        OnSaveSettings();
+        OnSendSysEx();
     }
 }
 
-void EnigmaTMWS_loop() {} // Deprecated
+void AppEnigma::Loop() {} // Deprecated
 
-void EnigmaTMWS_menu() {
-    EnigmaTMWS_instance.BaseView();
+FLASHMEM
+void AppEnigma::DrawMenu() const { BaseView(); }
+
+FLASHMEM
+void AppEnigma::View() const { MainView(); }
+
+void AppEnigma::DrawScreensaver() const {
+  //BaseScreensaver();
+}
+void AppEnigma::DrawDebugInfo() const {
+  // TODO:
 }
 
-void EnigmaTMWS_screensaver() {} // Deprecated
-
-void EnigmaTMWS_handleButtonEvent(const UI::Event &event) {
+FLASHMEM
+void AppEnigma::HandleButtonEvent(const UI::Event &event) {
     // For left encoder, handle press and long press
     if (event.control == OC::CONTROL_BUTTON_L) {
-        if (event.type == UI::EVENT_BUTTON_LONG_PRESS) EnigmaTMWS_instance.OnLeftButtonLongPress();
-        if (event.type == UI::EVENT_BUTTON_PRESS) EnigmaTMWS_instance.OnLeftButtonPress();
+        if (event.type == UI::EVENT_BUTTON_LONG_PRESS) OnLeftButtonLongPress();
+        if (event.type == UI::EVENT_BUTTON_PRESS) OnLeftButtonPress();
     }
 
     // For right encoder, only handle press (long press is reserved)
-    if (event.control == OC::CONTROL_BUTTON_R && event.type == UI::EVENT_BUTTON_PRESS) EnigmaTMWS_instance.OnRightButtonPress();
+    if (event.control == OC::CONTROL_BUTTON_R && event.type == UI::EVENT_BUTTON_PRESS) OnRightButtonPress();
 
     // For up button, handle only press (long press is reserved)
-    if (event.control == OC::CONTROL_BUTTON_UP && event.type == UI::EVENT_BUTTON_PRESS) EnigmaTMWS_instance.OnUpButtonPress();
+    if (event.control == OC::CONTROL_BUTTON_UP && event.type == UI::EVENT_BUTTON_PRESS) OnUpButtonPress();
 
     // For down button, handle press and long press
     if (event.control == OC::CONTROL_BUTTON_DOWN) {
-        if (event.type == UI::EVENT_BUTTON_PRESS) EnigmaTMWS_instance.OnDownButtonPress();
-        if (event.type == UI::EVENT_BUTTON_LONG_PRESS) EnigmaTMWS_instance.OnDownButtonLongPress();
+        if (event.type == UI::EVENT_BUTTON_PRESS) OnDownButtonPress();
+        if (event.type == UI::EVENT_BUTTON_LONG_PRESS) OnDownButtonLongPress();
     }
 }
 
-void EnigmaTMWS_handleEncoderEvent(const UI::Event &event) {
+void AppEnigma::HandleEncoderEvent(const UI::Event &event) {
     // Left encoder turned
-    if (event.control == OC::CONTROL_ENCODER_L) EnigmaTMWS_instance.OnLeftEncoderMove(event.value);
+    if (event.control == OC::CONTROL_ENCODER_L) OnLeftEncoderMove(event.value);
 
     // Right encoder turned
-    if (event.control == OC::CONTROL_ENCODER_R) EnigmaTMWS_instance.OnRightEncoderMove(event.value);
+    if (event.control == OC::CONTROL_ENCODER_R) OnRightEncoderMove(event.value);
 }

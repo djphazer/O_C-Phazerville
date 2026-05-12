@@ -33,7 +33,7 @@ namespace menu = OC::menu;
 // #include "apps/Passencore.h"
 #include "apps/CaptainMIDI.h"
 #include "apps/TheDarkestTimeline.h"
-// #include "apps/Enigma.h"
+#include "apps/Enigma.h"
 // #include "apps/NeuralNetwork.h"
 #include "apps/ScaleEditor.h"
 #include "apps/WaveformEditor.h"
@@ -55,9 +55,6 @@ static constexpr OC::App app_container[] = {
   // boring name version
   // DECLARE_APP("PQ", "Tension", PASSENCORE),
   DECLARE_APP("PQ", "Passencore", PASSENCORE),
-  #endif
-  #ifdef ENABLE_APP_ENIGMA
-  DECLARE_APP("EN", "Enigma", EnigmaTMWS),
   #endif
   #ifdef ENABLE_APP_NEURAL_NETWORK
   DECLARE_APP("NN", "Neural Net", NeuralNetwork),
@@ -96,6 +93,9 @@ static AppContainer<void // this space intentionally left blank
 #endif
 #ifdef ENABLE_APP_DARKEST_TIMELINE
   , TheDarkestTimeline
+#endif
+#ifdef ENABLE_APP_ENIGMA
+  , AppEnigma
 #endif
 #ifdef ENABLE_APP_ASR
   , AppASR
