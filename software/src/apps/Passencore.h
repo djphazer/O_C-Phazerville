@@ -209,8 +209,78 @@ struct PassenChord {
   }
 };
 
-class PASSENCORE : public settings::SettingsBase<PASSENCORE, PASSENCORE_SETTING_LAST> {
+class PassencoreSettings : public settings::SettingsBase<PassencoreSettings, PASSENCORE_SETTING_LAST> {
   public:
+    void Init() {
+      cursor.Init(PASSENCORE_SETTING_SCALE, PASSENCORE_SETTING_LAST - 1);
+      scale_editor.Init(false);
+      //chord_editor.Init();
+      left_encoder_value = OC::Scales::SCALE_SEMI + 1;
+    }
+
+    inline bool editing() const {
+      return cursor.editing();
+    }
+
+    inline int cursor_pos() const {
+      return cursor.cursor_pos();
+    }
+
+    menu::ScreenCursor<menu::kScreenLines> cursor;
+    OC::ScaleEditor<AppPassencore> scale_editor;
+    //OC::ChordEditor<AppPassencore> chord_editor;
+    int left_encoder_value;
+
+  // TOTAL EEPROM SIZE: 17 bytes
+  SETTINGS_ARRAY_DECLARE() {{
+    //PASSENCORE_SETTING_SCALE,
+    { OC::Scales::SCALE_SEMI + 1, OC::Scales::SCALE_SEMI, OC::Scales::NUM_SCALES - 1, "scale", OC::scale_names, settings::STORAGE_TYPE_U8 },
+    //PASSENCORE_SETTING_MASK,
+    { 65535, 1, 65535, "mask  -->", NULL, settings::STORAGE_TYPE_U16 }, // mask
+    //PASSENCORE_SETTING_SAMPLE_TRIGGER,
+    { 0, 0, 3, "sample trigger", OC::Strings::trigger_input_names_none + 1, settings::STORAGE_TYPE_U4},
+    //PASSENCORE_SETTING_TARGET_TRIGGER,
+    { 0, 0, 3, "target trigger", OC::Strings::trigger_input_names_none + 1, settings::STORAGE_TYPE_U4},
+    //PASSENCORE_SETTING_PASSING_TRIGGER,
+    { 2, 0, 3, "passing trigger", OC::Strings::trigger_input_names_none + 1, settings::STORAGE_TYPE_U4},
+    //PASSENCORE_SETTING_RESET_TRIGGER,
+    { 3, 0, 3, "reset trigger", OC::Strings::trigger_input_names_none + 1, settings::STORAGE_TYPE_U4},
+    //PASSENCORE_SETTING_A_OCTAVE,
+    { -1, -2, 3, "A octave", NULL, settings::STORAGE_TYPE_I8 },
+    //PASSENCORE_SETTING_A_MIDRANGE,
+    { 0, -6, 6,  "A mid range", NULL, settings::STORAGE_TYPE_I8},
+    //PASSENCORE_SETTING_B_OCTAVE,
+    { -1, -2, 3, "B octave", NULL, settings::STORAGE_TYPE_I8 },
+    //PASSENCORE_SETTING_B_MIDRANGE,
+    { 0, -6, 6,  "B mid range", NULL, settings::STORAGE_TYPE_I8},
+    //PASSENCORE_SETTING_C_OCTAVE,
+    { -1, -2, 3, "C octave", NULL, settings::STORAGE_TYPE_I8 },
+    //PASSENCORE_SETTING_C_MIDRANGE,
+    { 0, -6, 6,  "C mid range", NULL, settings::STORAGE_TYPE_I8},
+    //PASSENCORE_SETTING_D_OCTAVE,
+    { -1, -2, 3, "D octave", NULL, settings::STORAGE_TYPE_I8 },
+    //PASSENCORE_SETTING_D_MIDRANGE,
+    { 0, -6, 6,  "D mid range", NULL, settings::STORAGE_TYPE_I8},
+    //PASSENCORE_SETTING_BORROW_CHORDS,
+    { 1, 0, 1,  "Borrow chords?", OC::Strings::no_yes, settings::STORAGE_TYPE_I8},
+    // PASSENCORE_SETTING_BASE_COLOR,
+    { PASSENCORE_COLORS_CLASSIC, PASSENCORE_COLORS_POWER, PASSENCORE_COLORS_JAZZ, "color", passencore_color_names, settings::STORAGE_TYPE_I8},
+    // PASSENCORE_SETTING_CV3_ROLE
+    { PASSENCORE_CV_ROLE_NONE, PASSENCORE_CV_ROLE_NONE, PASSENCORE_CV_ROLE_LAST - 1, "CV3", passencore_cv_role_names, settings::STORAGE_TYPE_I8},
+    // PASSENCORE_SETTING_CV4_ROLE
+    { PASSENCORE_CV_ROLE_NONE, PASSENCORE_CV_ROLE_NONE, PASSENCORE_CV_ROLE_LAST - 1, "CV4", passencore_cv_role_names, settings::STORAGE_TYPE_I8},
+  }};
+};
+
+
+OC_APP_TRAITS(AppPassencore, TWOCCS("PQ"), "Passencore", "Tension");
+class OC_APP_CLASS(AppPassencore) {
+public:
+  OC_APP_INTERFACE_DECLARE(AppPassencore);
+  OC_APP_STORAGE_SIZE(0); // todo
+
+  PassencoreSettings passencore_state;
+
     int get_scale(uint8_t selected_scale_slot_) const {
       return values_[PASSENCORE_SETTING_SCALE];
     }
@@ -260,18 +330,6 @@ class PASSENCORE : public settings::SettingsBase<PASSENCORE, PASSENCORE_SETTING_
         apply_value(PASSENCORE_SETTING_MASK, mask);
         apply_value(PASSENCORE_SETTING_SCALE, scale);
       }
-    }
-
-    void Init() {
-      last_mask_ = 0;
-      last_scale_ = -1;
-      set_scale((int)OC::Scales::SCALE_SEMI + 1);
-      quantizer_.Init();
-      update_scale(true, false);
-      // start the playing chord on somethig we can start leading pleasantly from
-      add_chord(5, 1, 3, 5, 8, PASSENCORE_FUNCTIONS_DOMINANT, PASSENCORE_COLORS_CLASSIC);
-      voice_basic(possibilities[0]);
-      soundingChord = targetChord = possibilities[0];
     }
 
     void ISR();
@@ -336,7 +394,7 @@ class PASSENCORE : public settings::SettingsBase<PASSENCORE, PASSENCORE_SETTING_
       uint16_t mask = get_mask();
 
       if (mask_rotate)
-        mask = OC::ScaleEditor<PASSENCORE>::RotateMask(mask, OC::Scales::GetScale(scale).num_notes, mask_rotate);
+        mask = OC::ScaleEditor<AppPassencore>::RotateMask(mask, OC::Scales::GetScale(scale).num_notes, mask_rotate);
 
       if (force || (last_scale_ != scale || last_mask_ != mask)) {
         last_scale_ = scale;
@@ -367,7 +425,7 @@ int32_t nearest_note(int32_t sample, int32_t comparison) {
   return (abs(comparison - above) < abs(comparison - below)) ? above : below;
 }
 
-void PASSENCORE::voice_basic(PassenChord& target) {
+void AppPassencore::voice_basic(PassenChord& target) {
   for (int i = 0; i < 4; i++) {
     target.samples[i] = nearest_note(
                           target.samples[i],
@@ -378,7 +436,7 @@ void PASSENCORE::voice_basic(PassenChord& target) {
 
 // Voice the target with reference to previous, using the leading mask to determine whether
 // the voices should go up or down from previous - 0 is down, 1 is up, lsb is bass.
-void PASSENCORE::voice(PassenChord& target, const PassenChord& previous, uint8_t leading_mask, bool force_bass_movement, bool constant) {
+void AppPassencore::voice(PassenChord& target, const PassenChord& previous, uint8_t leading_mask, bool force_bass_movement, bool constant) {
   for (int v = 0; v < 4; v++) {
     bool up = (leading_mask >> v) & 0x1;
     // Look at voices we have not assigned yet, find the one that's nearest in the given direction to the same voice in the prev. chord.
@@ -410,7 +468,7 @@ void PASSENCORE::voice(PassenChord& target, const PassenChord& previous, uint8_t
 
 uint8_t PASSENCORE_VOICINGS[] = {0b0011, 0b1100, 0b0101, 0b1010, 0b1001, 0b0110};
 
-void PASSENCORE::add_voicings() {
+void AppPassencore::add_voicings() {
   int len = p_len;
   for (int i = 0; i < len; i++) {
     for (int j = 0; j < 5; j++) {
@@ -424,7 +482,7 @@ void PASSENCORE::add_voicings() {
   }
 }
 
-int PASSENCORE::score_voicing(const PassenChord& from, const PassenChord& to) {
+int AppPassencore::score_voicing(const PassenChord& from, const PassenChord& to) {
   int score = 8;
   int held = 0;
   bool prefer_root = false;
@@ -485,14 +543,14 @@ int PASSENCORE::score_voicing(const PassenChord& from, const PassenChord& to) {
   return score;
 }
 
-void PASSENCORE::score_voicings() {
+void AppPassencore::score_voicings() {
   for (int c = 0; c < p_len; c++) {
     int score = score_voicing(soundingChord, possibilities[c]);
     possibilities[c].score *= score;
   }
 }
 
-void PASSENCORE::Draw() {
+void AppPassencore::Draw() {
   graphics.setPrintPos(0, 0);
   for (int i = 0; i <= function; i++) {
     graphics.print("**");
@@ -548,10 +606,9 @@ void PASSENCORE::Draw() {
   */
 }
 
-void PASSENCORE::Loop() {
-}
+void AppPassencore::Loop() { }
 
-void PASSENCORE::find_passing_chord() {
+void AppPassencore::find_passing_chord() {
   add_passing_chords();
   for (int i = 0; i < p_len; i++) {
     possibilities[i].score = 1;
@@ -571,7 +628,7 @@ int chromatic_tone(int32_t sample) {
   return ret;
 }
 
-void PASSENCORE::score_by_root() {
+void AppPassencore::score_by_root() {
   bool root = false;
   int root_sample = 0;
 
@@ -594,7 +651,7 @@ void PASSENCORE::score_by_root() {
   }
 }
 
-void PASSENCORE::score_by_bass() {
+void AppPassencore::score_by_bass() {
   bool bass = false;
   int bass_sample = 0;
 
@@ -617,7 +674,7 @@ void PASSENCORE::score_by_bass() {
   }
 }
 
-void PASSENCORE::score_by_include() {
+void AppPassencore::score_by_include() {
   bool include = false;
   int include_sample = 0;
   if (values_[PASSENCORE_SETTING_CV3_ROLE] == PASSENCORE_CV_ROLE_INCLUDE) {
@@ -651,7 +708,7 @@ void PASSENCORE::score_by_include() {
 }
 
 
-void PASSENCORE::find_new_chord() {
+void AppPassencore::find_new_chord() {
   function = (int)((OC::ADC::value((ADC_CHANNEL)0) + 128) >> 9);
   CONSTRAIN(function, 0, PASSENCORE_FUNCTIONS_MEDIANT - 1);
   color = values_[PASSENCORE_SETTING_BASE_COLOR] + (int)((OC::ADC::value((ADC_CHANNEL)1) + 255) >> 9);
@@ -682,13 +739,13 @@ void PASSENCORE::find_new_chord() {
   targetChord = possibilities[0];
 }
 
-void PASSENCORE::add_basic_triads() {
+void AppPassencore::add_basic_triads() {
   for (int degree = 1; degree < 8; degree++) {
     add_chord(degree, 1, 3, 5, 8, PASSENCORE_FUNCTION_TABLE[degree - 1], PASSENCORE_COLORS_CLASSIC);
   }
 }
 
-void PASSENCORE::score_passing_voicing() {
+void AppPassencore::score_passing_voicing() {
 
   for (int i = 0; i < p_len; i++) {
     int to_passing = score_voicing(soundingChord, possibilities[i]);
@@ -707,7 +764,7 @@ void PASSENCORE::score_passing_voicing() {
   }
 }
 
-void PASSENCORE::add_passing_chords() {
+void AppPassencore::add_passing_chords() {
   p_len = 1;
   // sus variants of target, but at lower color
   add_chord(targetChord.root, 1, 2, 5, 8, targetChord.function, PASSENCORE_COLORS_CLASSIC);
@@ -739,7 +796,7 @@ void PASSENCORE::add_passing_chords() {
   add_chord(neighbor_dominant, 1, 3, 7, 5, PASSENCORE_FUNCTIONS_PREDOMINANT_DOMINANT, PASSENCORE_COLORS_SUBSTITUTED);
 }
 
-void PASSENCORE::add_variants() {
+void AppPassencore::add_variants() {
   int len = p_len;
   for (int i = 0; i < len; i++) {
     // Power chord
@@ -766,14 +823,14 @@ void PASSENCORE::add_variants() {
 }
 
 
-void PASSENCORE::take_top_four() {
+void AppPassencore::take_top_four() {
   std::sort(possibilities, possibilities + p_len, [](PassenChord lhs, PassenChord rhs) {
     return lhs.score > rhs.score;
   });
   p_len = 4;
 }
 
-void PASSENCORE::score_by_function() {
+void AppPassencore::score_by_function() {
   for (int c = 0; c < p_len; c++) {
     int function_score = 2 - abs(function - possibilities[c].function);
     // Major chords lead to the tonic better in both major (V) and minor (VII).
@@ -794,7 +851,7 @@ void PASSENCORE::score_by_function() {
   }
 }
 
-void PASSENCORE::score_by_color() {
+void AppPassencore::score_by_color() {
   for (int c = 0; c < p_len; c++) {
     int function_score = possibilities[c].score;
     // Chords with some resemblance to the right function gain a color bonus as valid substitutions.
@@ -815,30 +872,7 @@ void PASSENCORE::score_by_color() {
 }
 
 
-void PASSENCORE::ISR() {
-  // value()
-  uint32_t triggers = OC::DigitalInputs::clocked();
-  calc_new_chord_ = triggers & DIGITAL_INPUT_MASK(values_[PASSENCORE_SETTING_SAMPLE_TRIGGER]);
-  play_target_ = triggers & DIGITAL_INPUT_MASK(values_[PASSENCORE_SETTING_TARGET_TRIGGER]);
-  play_passing_chord_ = triggers & DIGITAL_INPUT_MASK(values_[PASSENCORE_SETTING_PASSING_TRIGGER]);
-  reset_ = triggers & DIGITAL_INPUT_MASK(values_[PASSENCORE_SETTING_RESET_TRIGGER]);
-  update_scale(force_update_, false);
-  if (calc_new_chord_) {
-    find_new_chord();
-    calc_new_chord_ = false;
-  }
-  if (play_passing_chord_) {
-    find_passing_chord();
-    play_chord(possibilities[0]);
-    play_passing_chord_ = false;
-  }
-  if (play_target_) {
-    play_chord(targetChord);
-    play_target_ = false;
-  }
-}
-
-void PASSENCORE::add_chord(int8_t root, int8_t i1, int8_t i2, int8_t i3, int8_t i4, PASSENCORE_FUNCTIONS f, PASSENCORE_COLORS c) {
+void AppPassencore::add_chord(int8_t root, int8_t i1, int8_t i2, int8_t i3, int8_t i4, PASSENCORE_FUNCTIONS f, PASSENCORE_COLORS c) {
   if (p_len >= POSSIBLE_LEN) return;
   possibilities[p_len].root = root;
   possibilities[p_len].intervals[0] = i1;
@@ -916,101 +950,78 @@ void PASSENCORE::add_chord(int8_t root, int8_t i1, int8_t i2, int8_t i3, int8_t 
   p_len++;
 }
 
-class PassencoreState {
-  public:
-    void Init() {
-      cursor.Init(PASSENCORE_SETTING_SCALE, PASSENCORE_SETTING_LAST - 1);
-      scale_editor.Init(false);
-      //chord_editor.Init();
-      left_encoder_value = OC::Scales::SCALE_SEMI + 1;
-    }
+FLASHMEM
+void AppPassencore::Init() {
+  last_mask_ = 0;
+  last_scale_ = -1;
+  set_scale((int)OC::Scales::SCALE_SEMI + 1);
+  quantizer_.Init();
+  update_scale(true, false);
+  // start the playing chord on somethig we can start leading pleasantly from
+  add_chord(5, 1, 3, 5, 8, PASSENCORE_FUNCTIONS_DOMINANT, PASSENCORE_COLORS_CLASSIC);
+  voice_basic(possibilities[0]);
+  soundingChord = targetChord = possibilities[0];
 
-    inline bool editing() const {
-      return cursor.editing();
-    }
-
-    inline int cursor_pos() const {
-      return cursor.cursor_pos();
-    }
-
-    menu::ScreenCursor<menu::kScreenLines> cursor;
-    OC::ScaleEditor<PASSENCORE> scale_editor;
-    //OC::ChordEditor<PASSENCORE> chord_editor;
-    int left_encoder_value;
-};
-
-
-// TOTAL EEPROM SIZE: 17 bytes
-SETTINGS_DECLARE(PASSENCORE, PASSENCORE_SETTING_LAST) {
-  //PASSENCORE_SETTING_SCALE,
-  { OC::Scales::SCALE_SEMI + 1, OC::Scales::SCALE_SEMI, OC::Scales::NUM_SCALES - 1, "scale", OC::scale_names, settings::STORAGE_TYPE_U8 },
-  //PASSENCORE_SETTING_MASK,
-  { 65535, 1, 65535, "mask  -->", NULL, settings::STORAGE_TYPE_U16 }, // mask
-  //PASSENCORE_SETTING_SAMPLE_TRIGGER,
-  { 0, 0, 3, "sample trigger", OC::Strings::trigger_input_names_none + 1, settings::STORAGE_TYPE_U4},
-  //PASSENCORE_SETTING_TARGET_TRIGGER,
-  { 0, 0, 3, "target trigger", OC::Strings::trigger_input_names_none + 1, settings::STORAGE_TYPE_U4},
-  //PASSENCORE_SETTING_PASSING_TRIGGER,
-  { 2, 0, 3, "passing trigger", OC::Strings::trigger_input_names_none + 1, settings::STORAGE_TYPE_U4},
-  //PASSENCORE_SETTING_RESET_TRIGGER,
-  { 3, 0, 3, "reset trigger", OC::Strings::trigger_input_names_none + 1, settings::STORAGE_TYPE_U4},
-  //PASSENCORE_SETTING_A_OCTAVE,
-  { -1, -2, 3, "A octave", NULL, settings::STORAGE_TYPE_I8 },
-  //PASSENCORE_SETTING_A_MIDRANGE,
-  { 0, -6, 6,  "A mid range", NULL, settings::STORAGE_TYPE_I8},
-  //PASSENCORE_SETTING_B_OCTAVE,
-  { -1, -2, 3, "B octave", NULL, settings::STORAGE_TYPE_I8 },
-  //PASSENCORE_SETTING_B_MIDRANGE,
-  { 0, -6, 6,  "B mid range", NULL, settings::STORAGE_TYPE_I8},
-  //PASSENCORE_SETTING_C_OCTAVE,
-  { -1, -2, 3, "C octave", NULL, settings::STORAGE_TYPE_I8 },
-  //PASSENCORE_SETTING_C_MIDRANGE,
-  { 0, -6, 6,  "C mid range", NULL, settings::STORAGE_TYPE_I8},
-  //PASSENCORE_SETTING_D_OCTAVE,
-  { -1, -2, 3, "D octave", NULL, settings::STORAGE_TYPE_I8 },
-  //PASSENCORE_SETTING_D_MIDRANGE,
-  { 0, -6, 6,  "D mid range", NULL, settings::STORAGE_TYPE_I8},
-  //PASSENCORE_SETTING_BORROW_CHORDS,
-  { 1, 0, 1,  "Borrow chords?", OC::Strings::no_yes, settings::STORAGE_TYPE_I8},
-  // PASSENCORE_SETTING_BASE_COLOR,
-  { PASSENCORE_COLORS_CLASSIC, PASSENCORE_COLORS_POWER, PASSENCORE_COLORS_JAZZ, "color", passencore_color_names, settings::STORAGE_TYPE_I8},
-  // PASSENCORE_SETTING_CV3_ROLE
-  { PASSENCORE_CV_ROLE_NONE, PASSENCORE_CV_ROLE_NONE, PASSENCORE_CV_ROLE_LAST - 1, "CV3", passencore_cv_role_names, settings::STORAGE_TYPE_I8},
-  // PASSENCORE_SETTING_CV4_ROLE
-
-  { PASSENCORE_CV_ROLE_NONE, PASSENCORE_CV_ROLE_NONE, PASSENCORE_CV_ROLE_LAST - 1, "CV4", passencore_cv_role_names, settings::STORAGE_TYPE_I8},
-
-};
-
-PassencoreState passencore_state;
-PASSENCORE passencore_instance;
-
-void PASSENCORE_init() {
-  passencore_instance.Init();
   passencore_state.Init();
 }
 
-static constexpr size_t PASSENCORE_storageSize() {
-  return PASSENCORE::storageSize();
+size_t AppPassencore::SaveAppData(util::StreamBufferWriter &stream_buffer) const {
+  passencore_state.Save(stream_buffer);
+  return stream_buffer.written();
 }
 
-static size_t PASSENCORE_save(void *storage) {
-  return passencore_instance.Save(storage);
+size_t AppPassencore::RestoreAppData(util::StreamBufferReader &stream_buffer) {
+  passencore_state.Restore(stream_buffer);
+  passencore_state.left_encoder_value = get_scale(DUMMY);
+  set_scale(passencore_state.left_encoder_value);
+  return stream_buffer.read();
 }
 
-void PASSENCORE_process(OC::IOFrame *) {
-  return passencore_instance.ISR();
-}
-
-void PASSENCORE_leftButton() {
-
-  if (passencore_state.left_encoder_value != passencore_instance.get_scale(DUMMY)) {
-    passencore_instance.set_scale(passencore_state.left_encoder_value);
+void AppPassencore::Process(OC::IOFrame *ioframe) {
+  // TODO: yikes, lol
+  // value()
+  uint32_t triggers = OC::DigitalInputs::clocked();
+  calc_new_chord_ = triggers & DIGITAL_INPUT_MASK(values_[PASSENCORE_SETTING_SAMPLE_TRIGGER]);
+  play_target_ = triggers & DIGITAL_INPUT_MASK(values_[PASSENCORE_SETTING_TARGET_TRIGGER]);
+  play_passing_chord_ = triggers & DIGITAL_INPUT_MASK(values_[PASSENCORE_SETTING_PASSING_TRIGGER]);
+  reset_ = triggers & DIGITAL_INPUT_MASK(values_[PASSENCORE_SETTING_RESET_TRIGGER]);
+  update_scale(force_update_, false);
+  if (calc_new_chord_) {
+    find_new_chord();
+    calc_new_chord_ = false;
+  }
+  if (play_passing_chord_) {
+    find_passing_chord();
+    play_chord(possibilities[0]);
+    play_passing_chord_ = false;
+  }
+  if (play_target_) {
+    play_chord(targetChord);
+    play_target_ = false;
   }
 }
 
+void AppPassencore::GetIOConfig(OC::IOConfig &ioconfig) const {
+  using namespace OC;
+  // TODO: actual Passencore I/O labels
+  ioconfig.digital_inputs[DIGITAL_INPUT_1].set("");
+  ioconfig.digital_inputs[DIGITAL_INPUT_2].set("");
+  ioconfig.digital_inputs[DIGITAL_INPUT_3].set("");
+  ioconfig.digital_inputs[DIGITAL_INPUT_4].set("");
 
-void PASSENCORE_handleAppEvent(OC::AppEvent event) {
+  ioconfig.cv[0].set("");
+  ioconfig.cv[1].set("");
+  ioconfig.cv[2].set("");
+  ioconfig.cv[3].set("");
+
+  ioconfig.outputs[0].set("Ch1", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[1].set("Ch2", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[2].set("Ch3", OUTPUT_MODE_PITCH);
+  ioconfig.outputs[3].set("Ch4", OUTPUT_MODE_PITCH);
+}
+
+FLASHMEM
+void AppPassencore::HandleAppEvent(OC::AppEvent event) {
   switch (event) {
     case OC::APP_EVENT_RESUME:
       passencore_state.cursor.set_editing(false);
@@ -1024,30 +1035,27 @@ void PASSENCORE_handleAppEvent(OC::AppEvent event) {
   }
 }
 
-void PASSENCORE_loop() {
-  passencore_instance.Loop();
-}
-
-void PASSENCORE_menu() {
+FLASHMEM
+void AppPassencore::DrawMenu() const {
   menu::TitleBar<0, 4, 0>::Draw();
 
   // print scale
   int scale = passencore_state.left_encoder_value;
   graphics.movePrintPos(5, 0);
   graphics.print(OC::scale_names[scale]);
-  if (passencore_instance.get_scale(DUMMY) == scale)
+  if (get_scale(DUMMY) == scale)
     graphics.drawBitmap8(1, menu::QuadTitleBar::kTextY, 4, OC::bitmap_indicator_4x8);
   menu::SettingsList < menu::kScreenLines, 0, menu::kDefaultValueX - 1 > settings_list(passencore_state.cursor);
   menu::SettingsListItem list_item;
   while (settings_list.available())
   {
     const int current = settings_list.Next(list_item);
-    const int value = passencore_instance.get_value(current);
+    const int value = passencore_state.get_value(current);
     if (current == PASSENCORE_SETTING_MASK) {
-        menu::DrawMask<false, 16, 8, 1>(menu::kDisplayWidth, list_item.y, passencore_instance.get_mask(), OC::Scales::GetScale(passencore_instance.get_scale(DUMMY)).num_notes);
-        list_item.DrawNoValue<false>(value, PASSENCORE::value_attr(current));
+        menu::DrawMask<false, 16, 8, 1>(menu::kDisplayWidth, list_item.y, get_mask(), OC::Scales::GetScale(get_scale(DUMMY)).num_notes);
+        list_item.DrawNoValue<false>(value, AppPassencore::value_attr(current));
     } else {
-        list_item.DrawDefault(value, PASSENCORE::value_attr(current));
+        list_item.DrawDefault(value, AppPassencore::value_attr(current));
     }
 
    if (passencore_state.scale_editor.active())
@@ -1055,11 +1063,15 @@ void PASSENCORE_menu() {
   }
 }
 
-void PASSENCORE_screensaver() {
-  passencore_instance.Draw();
+void AppPassencore::DrawScreensaver() const {
+  Draw();
+}
+void AppPassencore::DrawDebugInfo() const {
+  // TODO:
 }
 
-void PASSENCORE_handleButtonEvent(const UI::Event & event) {
+FLASHMEM
+void AppPassencore::HandleButtonEvent(const UI::Event &event) {
   if (passencore_state.scale_editor.active()) {
     passencore_state.scale_editor.HandleButtonEvent(event);
     return;
@@ -1077,13 +1089,15 @@ void PASSENCORE_handleButtonEvent(const UI::Event & event) {
         //PASSENCORE_lowerButton();
         break;
       case OC::CONTROL_BUTTON_L:
-        PASSENCORE_leftButton();
+        if (passencore_state.left_encoder_value != get_scale(DUMMY)) {
+          set_scale(passencore_state.left_encoder_value);
+        }
         break;
       case OC::CONTROL_BUTTON_R:
         if (passencore_state.cursor_pos() == PASSENCORE_SETTING_MASK) {
-          int scale = passencore_instance.get_scale(DUMMY);
+          int scale = get_scale(DUMMY);
           if (OC::Scales::SCALE_NONE != scale)
-            passencore_state.scale_editor.Edit(&passencore_instance, scale);
+            passencore_state.scale_editor.Edit(this, scale);
         } else {
           passencore_state.cursor.toggle_editing();
         }
@@ -1092,7 +1106,7 @@ void PASSENCORE_handleButtonEvent(const UI::Event & event) {
   }
 }
 
-void PASSENCORE_handleEncoderEvent(const UI::Event & event) {
+void AppPassencore::HandleEncoderEvent(const UI::Event &event) {
   if (passencore_state.scale_editor.active()) {
     passencore_state.scale_editor.HandleEncoderEvent(event);
     return;
@@ -1107,16 +1121,9 @@ void PASSENCORE_handleEncoderEvent(const UI::Event & event) {
     passencore_state.left_encoder_value = value;
   } else if (OC::CONTROL_ENCODER_R == event.control) {
     if (passencore_state.cursor.editing()) {
-      passencore_instance.change_value(passencore_state.cursor.cursor_pos(), event.value);
+      passencore_state.change_value(passencore_state.cursor.cursor_pos(), event.value);
     } else {
       passencore_state.cursor.Scroll(event.value);
     }
   }
-}
-
-static size_t PASSENCORE_restore(const void *storage) {
-  size_t storage_size = passencore_instance.Restore(storage);
-  passencore_state.left_encoder_value = passencore_instance.get_scale(DUMMY);
-  passencore_instance.set_scale(passencore_state.left_encoder_value);
-  return storage_size;
 }

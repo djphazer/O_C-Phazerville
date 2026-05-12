@@ -51,11 +51,6 @@ static constexpr OC::App app_container[] = {
   #ifdef ENABLE_APP_FPART
   DECLARE_APP("FP", "4 Parts", FPART),
   #endif
-  #ifdef ENABLE_APP_PASSENCORE
-  // boring name version
-  // DECLARE_APP("PQ", "Tension", PASSENCORE),
-  DECLARE_APP("PQ", "Passencore", PASSENCORE),
-  #endif
   #ifdef ENABLE_APP_NEURAL_NETWORK
   DECLARE_APP("NN", "Neural Net", NeuralNetwork),
   #endif
@@ -96,6 +91,9 @@ static AppContainer<void // this space intentionally left blank
 #endif
 #ifdef ENABLE_APP_ENIGMA
   , AppEnigma
+#endif
+#ifdef ENABLE_APP_PASSENCORE
+  // , AppPassencore
 #endif
 #ifdef ENABLE_APP_ASR
   , AppASR
