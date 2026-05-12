@@ -46,16 +46,6 @@ namespace menu = OC::menu;
 
 namespace OC {
 
-/* 
- * TODO
- * These are the apps that HAVE NOT been adapted yet...
-static constexpr OC::App app_container[] = {
-  #ifdef ENABLE_APP_FPART
-  DECLARE_APP("FP", "4 Parts", FPART),
-  #endif
-};
-*/
-
 /*
 // The order in the AppContainer is not inconsequential.
 // Each app's Start() method is called in sequence.
