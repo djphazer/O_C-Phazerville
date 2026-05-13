@@ -272,6 +272,11 @@ public:
 
   void HandleEncoderEvent(const UI::Event& event) {
     int dir = event.value;
+    if (event.mask & (OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_R)) {
+      // push-and-turn for coarse adjustments
+      dir *= 10;
+      OC::ui.SetButtonIgnoreMask();
+    }
     if (event.control == OC::CONTROL_ENCODER_L)
       HandleEncoderEvent(LEFT_HEMISPHERE, dir);
     if (event.control == OC::CONTROL_ENCODER_R)
