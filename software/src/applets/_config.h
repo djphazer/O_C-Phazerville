@@ -2,18 +2,6 @@
 
 #include "HemisphereApplet.h"
 
-// Categories*:
-// 0x01 = Modulator
-// 0x02 = Sequencer
-// 0x04 = Clocking
-// 0x08 = Quantizer
-// 0x10 = Utility
-// 0x20 = MIDI
-// 0x40 = Logic
-// 0x80 = Other
-//
-// *currently unused, but may be useful again someday
-
 using namespace HS;
 
 // hacks to effectively rewrite part of the applet boilerplate,
@@ -153,127 +141,127 @@ using namespace HS;
 #include "AppletRegistry.h"
 
 constexpr Registry reg = Registry<HemisphereApplet, HS::APPLET_SLOTS
-    , DeclareApplet<ADSREG, 8, 0x01>
-    , DeclareApplet<ADEG, 34, 0x01>
-    , DeclareApplet<MiniASR, 47, 0x09>
-    , DeclareApplet<AttenuateOffset, 56, 0x10>
+    , DeclareApplet<ADSREG, 8, CAT_MODULATOR>
+    , DeclareApplet<ADEG, 34, CAT_MODULATOR>
+    , DeclareApplet<MiniASR, 47, CAT_MODULATOR | CAT_QUANTIZER>
+    , DeclareApplet<AttenuateOffset, 56, CAT_UTILITY>
 #ifdef PEWPEWPEW
-    , DeclareApplet<Binary, 41, 0x41>
+    , DeclareApplet<Binary, 41, CAT_LOGIC | CAT_MODULATOR>
 #endif
-    , DeclareApplet<BitBeat, 79, 0x01>
-    , DeclareApplet<BootsNCat, 55, 0x80>
-    , DeclareApplet<Brancher, 4, 0x14>
-    , DeclareApplet<BugCrack, 51, 0x80>
-    , DeclareApplet<Burst, 31, 0x04>
-    , DeclareApplet<Button, 65, 0x10>
-    , DeclareApplet<Calculate, 12, 0x10>
-    , DeclareApplet<Calibr8, 88, 0x10>
-    , DeclareApplet<Carpeggio, 32, 0x0a>
+    , DeclareApplet<BitBeat, 79, CAT_MODULATOR>
+    , DeclareApplet<BootsNCat, 55, CAT_OTHER>
+    , DeclareApplet<Brancher, 4, CAT_UTILITY | CAT_CLOCKING>
+    , DeclareApplet<BugCrack, 51, CAT_OTHER>
+    , DeclareApplet<Burst, 31, CAT_CLOCKING>
+    , DeclareApplet<Button, 65, CAT_UTILITY>
+    , DeclareApplet<Calculate, 12, CAT_UTILITY>
+    , DeclareApplet<Calibr8, 88, CAT_UTILITY>
+    , DeclareApplet<Carpeggio, 32, CAT_SEQUENCER | CAT_QUANTIZER>
 #ifdef PEWPEWPEW
-    , DeclareApplet<Chordinator, 64, 0x08>
+    , DeclareApplet<Chordinator, 64, CAT_QUANTIZER>
 #endif
-    , DeclareApplet<ClockDivider, 6, 0x04>
-    , DeclareApplet<ClkToGate, 78, 0x04>
-    , DeclareApplet<ClockSkip, 28, 0x04>
-    , DeclareApplet<Combin8, 82, 0x10>
-    , DeclareApplet<Compare, 30, 0x10>
-    , DeclareApplet<Cumulus, 5, 0x40>
-    , DeclareApplet<CVRecV2, 24, 0x02>
-    , DeclareApplet<CVSeq, 92, 0x02>
-    , DeclareApplet<DivSeq, 68, 0x06>
-    , DeclareApplet<DivSeq10, 80, 0x06>
-    , DeclareApplet<DrLoFi, 16, 0x80>
-    , DeclareApplet<DrumMap, 57, 0x02>
-    , DeclareApplet<DualQuant, 9, 0x08>
+    , DeclareApplet<ClockDivider, 6, CAT_CLOCKING>
+    , DeclareApplet<ClkToGate, 78, CAT_CLOCKING>
+    , DeclareApplet<ClockSkip, 28, CAT_CLOCKING>
+    , DeclareApplet<Combin8, 82, CAT_UTILITY>
+    , DeclareApplet<Compare, 30, CAT_UTILITY>
+    , DeclareApplet<Cumulus, 5, CAT_LOGIC>
+    , DeclareApplet<CVRecV2, 24, CAT_SEQUENCER>
+    , DeclareApplet<CVSeq, 92, CAT_SEQUENCER>
+    , DeclareApplet<DivSeq, 68, CAT_SEQUENCER | CAT_CLOCKING>
+    , DeclareApplet<DivSeq10, 80, CAT_SEQUENCER | CAT_CLOCKING>
+    , DeclareApplet<DrLoFi, 16, CAT_OTHER>
+    , DeclareApplet<DrumMap, 57, CAT_SEQUENCER>
+    , DeclareApplet<DualQuant, 9, CAT_QUANTIZER>
 #ifdef PEWPEWPEW
-    , DeclareApplet<OffsetQuant, 90, 0x08>
+    , DeclareApplet<OffsetQuant, 90, CAT_QUANTIZER>
 #endif
 #if !defined(CUSTOM_BUILD) || defined(PEWPEWPEW)
-    , DeclareApplet<DuoTET, 63, 0x08>
+    , DeclareApplet<DuoTET, 63, CAT_QUANTIZER>
 #endif
-    , DeclareApplet<EbbAndLfo, 7, 0x01>
+    , DeclareApplet<EbbAndLfo, 7, CAT_MODULATOR>
 #ifdef ENABLE_APP_ENIGMA
-    , DeclareApplet<EnigmaJr, 45, 0x02>
+    , DeclareApplet<EnigmaJr, 45, CAT_SEQUENCER>
 #endif
 #ifdef PEWPEWPEW
-    , DeclareApplet<EnsOscKey, 35, 0x08>
+    , DeclareApplet<EnsOscKey, 35, CAT_QUANTIZER>
 #endif
-    , DeclareApplet<EnvFollow, 42, 0x11>
+    , DeclareApplet<EnvFollow, 42, CAT_UTILITY | CAT_MODULATOR>
 #ifdef __IMXRT1062__
-    , DeclareApplet<EnvSeq, 91, 0x02>
+    , DeclareApplet<EnvSeq, 91, CAT_SEQUENCER>
 #endif
-    , DeclareApplet<EuclidO, 83, 0x02>
-    , DeclareApplet<EuclidX, 15, 0x02>
+    , DeclareApplet<EuclidO, 83, CAT_SEQUENCER>
+    , DeclareApplet<EuclidX, 15, CAT_SEQUENCER>
 #ifdef PEWPEWPEW
-    , DeclareApplet<GameOfLife, 22, 0x01>
+    , DeclareApplet<GameOfLife, 22, CAT_MODULATOR>
 #endif
-    , DeclareApplet<GateDelay, 29, 0x04>
+    , DeclareApplet<GateDelay, 29, CAT_CLOCKING>
 #ifdef PEWPEWPEW
-    , DeclareApplet<GatedVCA, 17, 0x50>
+    , DeclareApplet<GatedVCA, 17, CAT_UTILITY | CAT_LOGIC>
 #endif
-    , DeclareApplet<Logic, 10, 0x44>
-    , DeclareApplet<LowerRenz, 21, 0x01>
-    , DeclareApplet<Metronome, 50, 0x04>
+    , DeclareApplet<Logic, 10, CAT_LOGIC | CAT_CLOCKING>
+    , DeclareApplet<LowerRenz, 21, CAT_MODULATOR>
+    , DeclareApplet<Metronome, 50, CAT_CLOCKING>
 #ifdef __IMXRT1062__
-    , DeclareApplet<MidiLoop, 81, 0x20>
+    , DeclareApplet<MidiLoop, 81, CAT_MIDI>
 #endif
-    , DeclareApplet<MarkoV, 93, 0x02>
-    , DeclareApplet<MarkovPerc, 94, 0x80>
-    , DeclareApplet<hMIDIIn, 150, 0x20>
-    , DeclareApplet<hMIDIOut, 27, 0x20>
+    , DeclareApplet<MarkoV, 93, CAT_SEQUENCER>
+    , DeclareApplet<MarkovPerc, 94, CAT_OTHER>
+    , DeclareApplet<hMIDIIn, 150, CAT_MIDI>
+    , DeclareApplet<hMIDIOut, 27, CAT_MIDI>
 #ifdef PEWPEWPEW
-    , DeclareApplet<MultiScale, 73, 0x08>
+    , DeclareApplet<MultiScale, 73, CAT_QUANTIZER>
 #endif
-    , DeclareApplet<Palimpsest, 20, 0x02>
-    , DeclareApplet<Pigeons, 71, 0x02>
-    , DeclareApplet<PolyDiv, 72, 0x06>
-    , DeclareApplet<Ponglet, 99, 0x00>
-    , DeclareApplet<ProbabilityDivider, 59, 0x04>
-    , DeclareApplet<ProbabilityMelody, 62, 0x04>
-    , DeclareApplet<Relabi, 89, 0x01>
-    , DeclareApplet<ResetClock, 70, 0x14>
-    , DeclareApplet<RndWalk, 69, 0x01>
+    , DeclareApplet<Palimpsest, 20, CAT_SEQUENCER>
+    , DeclareApplet<Pigeons, 71, CAT_SEQUENCER>
+    , DeclareApplet<PolyDiv, 72, CAT_SEQUENCER | CAT_CLOCKING>
+    , DeclareApplet<Ponglet, 99, CAT_OTHER>
+    , DeclareApplet<ProbabilityDivider, 59, CAT_CLOCKING>
+    , DeclareApplet<ProbabilityMelody, 62, CAT_CLOCKING>
+    , DeclareApplet<Relabi, 89, CAT_MODULATOR>
+    , DeclareApplet<ResetClock, 70, CAT_UTILITY | CAT_CLOCKING>
+    , DeclareApplet<RndWalk, 69, CAT_MODULATOR>
 #ifdef PEWPEWPEW
-    , DeclareApplet<RunglBook, 44, 0x01>
+    , DeclareApplet<RunglBook, 44, CAT_MODULATOR>
 #endif
-    , DeclareApplet<ScaleDuet, 26, 0x08>
-    , DeclareApplet<Schmitt, 40, 0x40>
-    , DeclareApplet<Scope, 23, 0x80>
-    , DeclareApplet<Seq32, 75, 0x02>
-    , DeclareApplet<SeqPlay7, 76, 0x02>
-    , DeclareApplet<SequenceX, 14, 0x02>
-    , DeclareApplet<ShiftGate, 48, 0x45>
+    , DeclareApplet<ScaleDuet, 26, CAT_QUANTIZER>
+    , DeclareApplet<Schmitt, 40, CAT_LOGIC>
+    , DeclareApplet<Scope, 23, CAT_OTHER>
+    , DeclareApplet<Seq32, 75, CAT_SEQUENCER>
+    , DeclareApplet<SeqPlay7, 76, CAT_SEQUENCER>
+    , DeclareApplet<SequenceX, 14, CAT_SEQUENCER>
+    , DeclareApplet<ShiftGate, 48, CAT_LOGIC | CAT_MODULATOR | CAT_CLOCKING>
 #ifdef PEWPEWPEW
-    , DeclareApplet<ShiftReg, 77, 0x45>
+    , DeclareApplet<ShiftReg, 77, CAT_LOGIC | CAT_MODULATOR | CAT_CLOCKING>
 #endif
-    , DeclareApplet<Shredder, 58, 0x01>
-    , DeclareApplet<Shuffle, 36, 0x04>
-    , DeclareApplet<Slew, 19, 0x01>
-    , DeclareApplet<Squanch, 46, 0x08>
-    , DeclareApplet<Stairs, 61, 0x01>
-    , DeclareApplet<Strum, 74, 0x08>
-    , DeclareApplet<Switch, 3, 0x10>
-    , DeclareApplet<SwitchSeq, 38, 0x10>
-    , DeclareApplet<TB_3PO, 60, 0x02>
-    , DeclareApplet<TLNeuron, 13, 0x40>
+    , DeclareApplet<Shredder, 58, CAT_MODULATOR>
+    , DeclareApplet<Shuffle, 36, CAT_CLOCKING>
+    , DeclareApplet<Slew, 19, CAT_MODULATOR>
+    , DeclareApplet<Squanch, 46, CAT_QUANTIZER>
+    , DeclareApplet<Stairs, 61, CAT_MODULATOR>
+    , DeclareApplet<Strum, 74, CAT_QUANTIZER>
+    , DeclareApplet<Switch, 3, CAT_UTILITY>
+    , DeclareApplet<SwitchSeq, 38, CAT_UTILITY>
+    , DeclareApplet<TB_3PO, 60, CAT_SEQUENCER>
+    , DeclareApplet<TLNeuron, 13, CAT_LOGIC>
 #ifdef PEWPEWPEW
-    , DeclareApplet<Trending, 37, 0x40>
+    , DeclareApplet<Trending, 37, CAT_LOGIC>
 #endif
-    , DeclareApplet<TrigSeq, 11, 0x06>
-    , DeclareApplet<TrigSeq16, 25, 0x06>
-    , DeclareApplet<TruthCat3, 85, 0x46>
-    , DeclareApplet<TruthCat4, 84, 0x46>
-    , DeclareApplet<Tuner, 39, 0x80>
-    , DeclareApplet<TwoRings, 18, 0x02>
-    , DeclareApplet<VectorEG, 52, 0x01>
-    , DeclareApplet<VectorLFO, 49, 0x01>
-//    , DeclareApplet<VectorMod, 53, 0x01> // awkward middle child
-    , DeclareApplet<VectorMorph, 54, 0x01>
-    , DeclareApplet<Voltage, 43, 0x10>
+    , DeclareApplet<TrigSeq, 11, CAT_SEQUENCER | CAT_CLOCKING>
+    , DeclareApplet<TrigSeq16, 25, CAT_SEQUENCER | CAT_CLOCKING>
+    , DeclareApplet<TruthCat3, 85, CAT_LOGIC | CAT_SEQUENCER | CAT_CLOCKING>
+    , DeclareApplet<TruthCat4, 84, CAT_LOGIC | CAT_SEQUENCER | CAT_CLOCKING>
+    , DeclareApplet<Tuner, 39, CAT_OTHER>
+    , DeclareApplet<TwoRings, 18, CAT_SEQUENCER>
+    , DeclareApplet<VectorEG, 52, CAT_MODULATOR>
+    , DeclareApplet<VectorLFO, 49, CAT_MODULATOR>
+//    , DeclareApplet<VectorMod, 53, CAT_MODULATOR> // awkward middle child
+    , DeclareApplet<VectorMorph, 54, CAT_MODULATOR>
+    , DeclareApplet<Voltage, 43, CAT_UTILITY>
 #ifdef PEWPEWPEW
-    , DeclareApplet<WTVCO, 67, 0x80>
+    , DeclareApplet<WTVCO, 67, CAT_OTHER>
 #endif
-    , DeclareApplet<Xfader, 33, 0x10>
+    , DeclareApplet<Xfader, 33, CAT_UTILITY>
 >{};
 
 

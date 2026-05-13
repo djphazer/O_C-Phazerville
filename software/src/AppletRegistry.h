@@ -13,14 +13,14 @@ template<typename T, RegID Id, uint8_t Categories>
 struct DeclareApplet {
     using type = T;
     static constexpr RegID id = Id;
-    /*static constexpr uint8_t categories = Categories;*/
+    static constexpr uint8_t categories = Categories;
 };
 
 template<typename T>
 struct DeclareFancyApplet {
     using type = T;
     static constexpr RegID id = strhash(type::applet_name_());
-    /*static constexpr uint8_t categories = Categories;*/
+    static constexpr uint8_t categories = 0;
 };
 
 // --- Duplicate ID check ---
@@ -64,6 +64,9 @@ struct Registry {
       return arr;
     }
 
+    static constexpr std::array<uint8_t, sizeof...(Declarations)> getCategories() {
+      return {Declarations::categories ...};
+    }
     static constexpr std::array<const char *, sizeof...(Declarations)> getNames() {
       return {Declarations::type::applet_name_() ...};
     }

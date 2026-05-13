@@ -49,6 +49,18 @@
 
 namespace HS {
 
+enum AppletCategory : uint8_t {
+  CAT_NONE = 0,
+  CAT_MODULATOR = (1 << 0), // 0x01
+  CAT_SEQUENCER = (1 << 1), // 0x02
+  CAT_CLOCKING  = (1 << 2), // 0x04
+  CAT_QUANTIZER = (1 << 3), // 0x08
+  CAT_UTILITY   = (1 << 4), // 0x10
+  CAT_MIDI      = (1 << 5), // 0x20
+  CAT_LOGIC     = (1 << 6), // 0x40
+  CAT_OTHER     = (1 << 7), // 0x80
+};
+
 class HemisphereApplet;
 
 struct Applet {
