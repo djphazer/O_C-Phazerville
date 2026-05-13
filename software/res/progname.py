@@ -15,7 +15,6 @@ def get_version():
 
     return last_line 
 
-
 tag = get_git_rev()
 
 build_flags = env.ParseFlags(env['BUILD_FLAGS'])
@@ -27,3 +26,10 @@ if "USB_MTPDISK" in defines:
     tag += "+MTP"
 
 env.Append(BUILD_FLAGS=[ f'-DOC_BUILD_TAG=\\"{tag}\\"' ])
+
+if "T41" not in env['PIOENV']:
+    version = get_version()
+    for item in defines:
+        if item[0] == 'OC_VERSION_EXTRA':
+            version += item[1].strip('"')
+    env.Replace(PROGNAME=f"o_C-phazerville-{version}-{tag}")
