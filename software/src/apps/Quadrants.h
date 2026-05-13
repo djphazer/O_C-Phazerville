@@ -932,7 +932,7 @@ public:
     }
 
     void SetConfigPageFromCursor() {
-      if (config_cursor <= CONFIG_DUMMY) config_page = LOADSAVE_POPUP;
+      if (config_cursor <= RANDOMIZE_PRESET) config_page = LOADSAVE_POPUP;
       else if (config_cursor < TRIGMAP1) config_page = CONFIG_SETTINGS;
       else if (config_cursor < QUANT1) config_page = INPUT_SETTINGS;
       else if (config_cursor < MIDIMAP1) config_page = QUANTIZER_SETTINGS;
@@ -1057,7 +1057,7 @@ private:
         DELETE_PRESET,
         LOAD_PRESET, SAVE_PRESET,
         AUTO_SAVE,
-        CONFIG_DUMMY, // past this point goes full screen
+        RANDOMIZE_PRESET, // past this point goes full screen
         TRIG_LENGTH,
         SCREENSAVER_MODE,
         CURSOR_MODE,
@@ -1173,7 +1173,7 @@ private:
             SetConfigPageFromCursor();
           }
           ResetCursor();
-          if (config_cursor > CONFIG_DUMMY) HS::popup_tick = 0;
+          if (config_cursor > RANDOMIZE_PRESET) HS::popup_tick = 0;
           return;
         }
 
@@ -1276,7 +1276,7 @@ private:
         }
 
         switch (config_cursor) {
-          case CONFIG_DUMMY:
+          case RANDOMIZE_PRESET:
             // reset input mappings to defaults
             HS::Init();
             Randomizer(true);
@@ -1490,82 +1490,78 @@ private:
         }
     }
 
-    void DrawConfigMenu() const {
-        // --- Config Selection
-        gfxHeader("< General Settings  >");
-
-        gfxPrint(1, 15, "Trig Length:  ");
-        gfxPrint(HS::trig_length);
-        gfxPrint("ms");
-
-        gfxPrint(1, 25, "Screensaver:  ");
-        gfxPrint( ssmodes[HS::screensaver_mode] );
-
-        gfxPrint(1, 35, "Cursor wrap:  ");
-        gfxPrint(OC::Strings::off_on[HS::cursor_wrap]);
-
-        if (config_cursor == PRESET_JUMP_TRIG) {
-          int y = 45;
-          int x = 100;
-          gfxPrint(18, y, "Jump Trig:");
-          int w = strlen(jump_trig_.InputName()) * 6 + 2;
-          CONSTRAIN(x, 3, 126-w);
-
-          graphics.clearRect(x - 2, y - 1, w + 3, 12);
-          gfxFrame(x - 1, y - 1, w + 1, 11);
-          gfxPrint(x, y + 1, jump_trig_.InputName());
-          if (EditMode()) gfxInvert(x - 1, y - 1, w + 1, 11);
-
-          gfxIcon(x - 8, y, RIGHT_ICON);
-        } else {
-          gfxPrint(1, 45, "Preset Bank#  ");
+    void DrawConfigRow(int row, int y, bool cur) const {
+      switch (row) {
+        case 0:
+          gfxPrint(1, y, "Trig Length:  ");
+          gfxPrint(HS::trig_length);
+          gfxPrint("ms");
+          break;
+        case 1:
+          gfxPrint(1, y, "Screensaver:  ");
+          gfxPrint( ssmodes[HS::screensaver_mode] );
+          break;
+        case 2:
+          gfxPrint(1, y, "Cursor wrap:  ");
+          gfxPrint(OC::Strings::off_on[HS::cursor_wrap]);
+          break;
+        case 3:
+          gfxPrint(1, y, "Preset Bank#  ");
           gfxPrint(bank_num);
+          break;
+        case 4: {
+          gfxPrint(1, y, "Jump Trig:");
+          gfxPrint(84, y, jump_trig_.InputName());
           gfxPrint("  ");
           gfxPrint(jump_trig_);
+          break;
         }
-
-        if (AUTO_MIDI == config_cursor) {
-          gfxPrint(1, 55, "Auto MIDI-Out:  ");
-          gfxPrint( OC::Strings::off_on[HS::frame.autoMIDIOut]);
-        } else if (MIDI_THRU_TOGGLE == config_cursor) {
-          gfxPrint(1, 55, "MIDI Thru:  ");
-          gfxPrint( OC::Strings::off_on[HS::midi_thru_enabled]);
-        } else {
+        case 5: {
           const uint8_t pc_ch = HS::frame.MIDIState.pc_channel;
-          gfxPrint(1, 55, "MIDI-PC Ch:   ");
+          gfxPrint(1, y, "MIDI-PC Ch:   ");
           if (pc_ch == 0) gfxPrint("Omni");
           else if (pc_ch <= 16) gfxPrint(pc_ch);
           else gfxPrint("Off");
+          break;
+        }
+        case 6:
+          gfxPrint(1, y, "AutoMIDI-Out  ");
+          gfxPrint(OC::Strings::off_on[HS::frame.autoMIDIOut]);
+          break;
+        case 7:
+          gfxPrint(1, y, "MIDI Thru:    ");
+          gfxPrint(OC::Strings::off_on[HS::midi_thru_enabled]);
+          break;
+        default: break;
+      }
+
+      if (cur) {
+        gfxIcon(73, y, RIGHT_ICON);
+        if (EditMode()) gfxInvert(82, y - 1, 45, 10);
+      }
+    }
+    void DrawConfigMenu() const {
+        // --- Config Selection
+        gfxHeader("< General Settings  >");
+        const int NUM_ROWS = TRIGMAP1 - TRIG_LENGTH; // lol weird
+        const int SHOW_ROWS = 6; // originally 5
+        const int ROW_HEIGHT = 8; // originally 10
+
+        int scroll_top = config_cursor - TRIG_LENGTH - 2;
+        CONSTRAIN(scroll_top, 0, NUM_ROWS - SHOW_ROWS);
+
+        // Draw 6 visible rows from scroll_top (scroll_top is a row index)
+        for (int i = 0; i < SHOW_ROWS; ++i) {
+            int row = scroll_top + i;
+            if (row >= NUM_ROWS) break;
+            DrawConfigRow(row, 15 + i * ROW_HEIGHT, (config_cursor - TRIG_LENGTH) == row);
         }
 
-        switch (config_cursor) {
-        case TRIG_LENGTH:
-            gfxIcon(73, 15, RIGHT_ICON);
-            if (isEditing) gfxInvert(82, 14, 45, 10);
-            break;
-        case SCREENSAVER_MODE:
-            gfxIcon(73, 25, RIGHT_ICON);
-            if (isEditing) gfxInvert(82, 24, 45, 10);
-            break;
-        case CURSOR_MODE:
-            gfxIcon(73, 35, RIGHT_ICON);
-            break;
-        case PRESET_BANK_NUM:
-            gfxIcon(73, 45, RIGHT_ICON);
-            if (isEditing) gfxInvert(82, 44, 45, 10);
-            break;
-        case AUTO_MIDI:
-        case MIDI_THRU_TOGGLE:
-            gfxIcon(89, 55, RIGHT_ICON);
-            break;
-        case MIDI_PC_CHANNEL:
-            gfxIcon(73, 55, RIGHT_ICON);
-            if (isEditing) gfxInvert(82, 54, 45, 10);
-            break;
-        case CONFIG_DUMMY:
-            gfxIcon(2, 1, LEFT_ICON);
-            break;
-        }
+        // Scroll arrows
+        if (scroll_top > 0)
+            gfxIcon(121, 14, UP_ICON);
+        if (scroll_top + SHOW_ROWS < NUM_ROWS)
+            gfxIcon(121, 56, DOWN_ICON);
 
         gfxDisplayInputMapEditor();
     }
