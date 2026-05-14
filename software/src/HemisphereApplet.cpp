@@ -51,13 +51,16 @@ void HemisphereApplet::DrawConfigHelp() const {
       int y = 14;
       const int mult = clockrun ? HS::clock_m.GetMultiply(ch + io_offset) : 0;
 
-      graphics.setPrintPos(ch*64, y);
-      if (mult != 0) { // Multipliers
-        graphics.print( (mult > 0) ? "x" : "/" );
-        graphics.print( (mult > 0) ? mult : 1 - mult );
-      } else { // Trigger mapping
-        graphics.print( HS::trigmap[ch + io_offset].InputName() );
+      if (mult != 0) { // Draw Multipliers
+        graphics.clearRect(ch * 64, y - 9, 30, 8);
+        graphics.drawBitmap8(ch * 64, y - 9, 8, CLOCK_ICON);
+        graphics.setPrintPos(ch * 64 + 8, y - 9);
+        graphics.print((mult >= 0) ? "x" : "/");
+        graphics.print((mult >= 0) ? mult : 1 - mult);
       }
+      // Trigger mapping
+      graphics.setPrintPos(ch*64, y);
+      graphics.print( HS::trigmap[ch + io_offset].InputName() );
       graphics.invertRect(ch*64, y - 1, 19, 9);
 
       graphics.setPrintPos(ch*64 + 20, y);

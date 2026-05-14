@@ -540,15 +540,14 @@ public:
         DrawAppletList(CursorBlink());
         // dotted screen border during applet select
         gfxFrame(0, 0, 128, 64, true);
-      } else {
-        active_applet[zoom_slot]->BaseView(true, zoom_cursor < 0);
-        // Applets 3 and 4 get inverted titles
-        if (zoom_slot > 1) gfxInvert(0 + (zoom_slot%2)*64, 0, 63, 10);
-
-        gfxDisplayInputMapEditor();
+        return;
       }
 
-      // draw cursor for editing applet select and input maps
+      active_applet[zoom_slot]->BaseView(true, zoom_cursor < 0);
+      // Applets 3 and 4 get inverted titles
+      if (zoom_slot > 1) gfxInvert(0 + (zoom_slot%2)*64, 0, 63, 10);
+
+      // draw cursors for editing applet select and input maps
       if (zoom_cursor < 0) {
         gfxIcon(64 - 8*(zoom_slot & 1), 1, DOWN_ICON, true);
       } else if (0 == zoom_cursor) {
@@ -559,6 +558,19 @@ public:
         const int y = 13 + 10*((zoom_cursor-1)/2);
         gfxInvert(x, y, 19, 9);
         gfxFrame(x, y, 19, 9, true);
+        if (zoom_cursor <= 2) {
+          // trigmap & clock multiplier
+          const int io_chan = zoom_slot * 2 + zoom_cursor - 1;
+          const int mult = HS::clock_m.GetMultiply(io_chan);
+
+          graphics.clearRect(x, y - 9, 36, 8);
+          graphics.drawBitmap8(x, y - 9, 8, RIGHT_ICON);
+          graphics.drawBitmap8(x + 8, y - 9, 8, CLOCK_ICON);
+          graphics.setPrintPos(x + 16, y - 9);
+          graphics.print((mult >= 0) ? "x" : "/");
+          graphics.print((mult >= 0) ? mult : 1 - mult);
+        }
+
         if (zoom_cursor >= 5) {
           gfxIcon(x + 18, y + 1, DOWN_ICON, true);
 
@@ -579,6 +591,8 @@ public:
           gfxIcon(x, y, LEFT_ICON, true);
         }
       }
+
+      gfxDisplayInputMapEditor();
     }
 
     void DrawOverview() const {
@@ -740,7 +754,7 @@ public:
                 break;
             case 1:
             case 2:
-              if (!clock_m.IsRunning() && CheckEditInputMapPress(
+              if (h == RIGHT_HEMISPHERE && CheckEditInputMapPress(
                     zoom_cursor,
                     IndexedInput(1, trigmap[zoom_slot*2]),
                     IndexedInput(2, trigmap[zoom_slot*2+1])
@@ -894,8 +908,7 @@ public:
                 case 2:
                 {
                   const int chan = zoom_slot*2 + zoom_cursor - 1;
-                  if (clock_m.IsRunning()) // && clock_m.GetMultiply(chan))
-                  {
+                  if (h == LEFT_HEMISPHERE) {
                     clock_m.SetMultiply(clock_m.GetMultiply(chan) + increment, chan);
                   } else if (!EditSelectedInputMap(increment))
                     HS::trigmap[chan].ChangeSource(increment);
