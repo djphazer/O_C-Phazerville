@@ -153,7 +153,7 @@ class HandSawApplet : public HemisphereAudioApplet {
                 case PITCH_CV4: {
                     // shortcut for auto-learn
                     auto& p = pitch_cv[(cursor - PITCH_CV1) / 2];
-                    if (p.IsMidi()) p.AutoLearn();
+                    p.AutoLearn();
                     break;
                 }
             }

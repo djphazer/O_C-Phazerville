@@ -231,7 +231,7 @@ public:
     void OnEncoderMove(int direction) {
         if(EditMode()) {
           if (aux_cursor && cursor > DUOTET_PARAM_OFFSET) {
-            cv_inputs[cursor].RotateSource(direction);
+            cv_inputs[cursor].ChangeSource(direction);
           } else {
             params[cursor] += direction;
             if(direction != 0) conditionParams();

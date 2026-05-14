@@ -31,11 +31,8 @@ struct CVInputMap {
 
   static constexpr size_t Size = 16; // Make this compatible with Packable
 
-  const bool IsMidi() const {
-    return source > ADC_CHANNEL_COUNT + DAC_CHANNEL_COUNT;
-  }
   void AutoLearn() {
-    if (IsMidi()) {
+    if (source_type() == TYPE_MIDI) {
       frame.MIDIState.mapping[source - ADC_CHANNEL_COUNT - DAC_CHANNEL_COUNT - 1].AutoLearn();
     }
   }
@@ -47,6 +44,25 @@ struct CVInputMap {
   }
   inline uint8_t index() const {
     return source & 0x1f; // lower 5 bits
+  }
+  constexpr int channel_count(SourceType t) const {
+    switch(t) {
+      default:
+        return 0;
+      case TYPE_NONE:
+        return 1;
+      case TYPE_ADC:
+        // strictly hardware inputs
+        return ADC_CHANNEL_COUNT;
+      case TYPE_DAC:
+        // This one can have virtual signals.
+        // 2 outputs per applet slot, including Clock and Audio Applets...
+        return 2 * APPLET_CURSOR_COUNT;
+      case TYPE_MIDI:
+        return MIDIMAP_MAX;
+      case TYPE_INTERNAL:
+        return 1;
+    }
   }
 
   int RawIn() const {
@@ -90,25 +106,6 @@ struct CVInputMap {
     return Proportion(In(), (source_type() == TYPE_ADC)?HEMISPHERE_MAX_INPUT_CV:HEMISPHERE_MAX_CV, max_value);
   }
 
-  const int channel_count(SourceType t) const {
-    switch(t) {
-      default:
-        return 0;
-      case TYPE_NONE:
-        return 1;
-      case TYPE_ADC:
-        // strictly hardware inputs
-        return ADC_CHANNEL_COUNT;
-      case TYPE_DAC:
-        // This one can have virtual signals.
-        // 2 outputs per applet slot, including Clock and Audio Applets...
-        return 2 * APPLET_CURSOR_COUNT;
-      case TYPE_MIDI:
-        return MIDIMAP_MAX;
-      case TYPE_INTERNAL:
-        return 1;
-    }
-  }
   bool ChangeSourceType(int dir) {
     const int count = sizeof(ordered_types);
     int tidx = 0;
@@ -135,23 +132,22 @@ struct CVInputMap {
     CONSTRAIN(sidx, 0, channel_count(source_type()) - 1);
     source = source_type() | uint8_t(sidx);
   }
-  void RotateSource(int dir) {
-    // TODO: maybe just deprecate this method
-    int x = source + dir;
-    if (x < 0) x = TYPE_ADC + num_sources;
-    if (x > TYPE_ADC + num_sources) x = 0;
-    if (x > 1 && x <= TYPE_ADC) x = TYPE_ADC*(dir>0);
-    source = uint8_t(x);
-  }
 
   void SetMidiMap(uint8_t midx) {
+    CONSTRAIN(midx, 0, channel_count(TYPE_MIDI) - 1);
     source = TYPE_MIDI | (midx & 0x1f);
   }
   void SetInput(uint8_t idx) {
+    CONSTRAIN(idx, 0, channel_count(TYPE_ADC) - 1);
     source = TYPE_ADC | (idx & 0x1f);
   }
   void SetOutput(uint8_t idx) {
+    CONSTRAIN(idx, 0, channel_count(TYPE_DAC) - 1);
     source = TYPE_DAC | (idx & 0x1f);
+  }
+  void SetInternal(uint8_t idx) {
+    CONSTRAIN(idx, 0, channel_count(TYPE_INTERNAL) - 1);
+    source = TYPE_INTERNAL | (idx & 0x1f);
   }
 
   const char * InputName() const {
@@ -225,6 +221,9 @@ struct CVInputMap {
       else // if (source <= DAC_CHANNEL_COUNT + ADC_CHANNEL_COUNT + MIDIMAP_MAX)
         SetMidiMap(source - ADC_CHANNEL_COUNT - DAC_CHANNEL_COUNT - 1);
     }
+    // enforce constrain for presets saved with v2.0-alpha
+    if (source_type() == TYPE_INTERNAL) SetInternal(index());
+
     attenuversion = extract_value<int8_t>(data >> 8);
   }
 };
@@ -237,22 +236,29 @@ constexpr CVInputMap& pack(CVInputMap& input) {
 struct DigitalInputMap {
   // upper 3 bits
   enum DigitalSourceType : uint8_t {
-    NONE = 0,
+    TYPE_NONE = 0,
     DEPRECATED = (1 << 5),
 
-    CLOCK = (7 << 5), // -1 and -2 fall here
-
-    DIGITAL_INPUT = (2 << 5),
-    CV_INPUT = (3 << 5),
-    CV_OUTPUT = (4 << 5),
-    MIDI_MAP = (5 << 5),
+    TYPE_DIGITAL_INPUT = (2 << 5),
+    TYPE_ADC = (3 << 5),
+    TYPE_DAC = (4 << 5),
+    TYPE_MIDI_MAP = (5 << 5),
 
     RESERVED = (6 << 5),
+    TYPE_INTERNAL = (7 << 5), // -1 and -2 fall here
+  };
+
+  const DigitalSourceType ordered_types[6] = {
+    TYPE_NONE,
+    TYPE_DIGITAL_INPUT,
+    TYPE_ADC,
+    TYPE_DAC,
+    TYPE_MIDI_MAP,
+    TYPE_INTERNAL,
   };
 
   static const int ppqn = 4;
   static constexpr float internal_clocked_gate_pw = 0.5f;
-  static const int num_sources = 4 * IO_CHANNEL_COUNT;
 
   static constexpr size_t Size = 16; // Make this compatible with Packable
 
@@ -265,26 +271,52 @@ struct DigitalInputMap {
   bool last_gate_state = false; // for detecting clocks
   uint32_t clkcount = 0;
 
+  bool ChangeSourceType(int dir) {
+    const int count = sizeof(ordered_types);
+    int tidx = 0;
+    while (source_type() != ordered_types[tidx] && tidx < count) ++tidx;
+    if (tidx >= count) tidx = 0;
+    tidx += (dir>0?1:-1);
+    CONSTRAIN(tidx, 0, count - 1);
+    int sidx = constrain(index(), 0, channel_count(ordered_types[tidx]) - 1);
+
+    DigitalSourceType oldtype = source_type();
+    source = ordered_types[tidx] | sidx;
+    return oldtype != source_type();
+  }
   void ChangeSource(int dir) {
-    uint8_t x = source + dir + 2;
-
-    if (x > DIGITAL_INPUT + num_sources + 1) return;
-    if (x > 2 && x < DIGITAL_INPUT + 2) x = 2 + DIGITAL_INPUT * (dir > 0);
-
-    source = uint8_t(x) - 2;
+    int sidx = index() + dir;
+    if (sidx < 0) {
+      if (ChangeSourceType(-1))
+        sidx = channel_count(source_type()) - 1;
+    }
+    if (sidx >= channel_count(source_type())) {
+      if (ChangeSourceType(1))
+        sidx = 0;
+    }
+    CONSTRAIN(sidx, 0, channel_count(source_type()) - 1);
+    source = source_type() | uint8_t(sidx);
   }
 
   void SetGateInput(uint8_t idx) {
-    source = DIGITAL_INPUT | (idx & 0x1f);
+    CONSTRAIN(idx, 0, channel_count(TYPE_DIGITAL_INPUT) - 1);
+    source = TYPE_DIGITAL_INPUT | (idx & 0x1f);
   }
   void SetInput(uint8_t idx) {
-    source = CV_INPUT | (idx & 0x1f);
+    CONSTRAIN(idx, 0, channel_count(TYPE_ADC) - 1);
+    source = TYPE_ADC | (idx & 0x1f);
   }
   void SetOutput(uint8_t idx) {
-    source = CV_OUTPUT | (idx & 0x1f);
+    CONSTRAIN(idx, 0, channel_count(TYPE_DAC) - 1);
+    source = TYPE_DAC | (idx & 0x1f);
   }
   void SetMidiMap(uint8_t midx) {
-    source = MIDI_MAP | (midx & 0x1f);
+    CONSTRAIN(midx, 0, channel_count(TYPE_MIDI_MAP) - 1);
+    source = TYPE_MIDI_MAP | (midx & 0x1f);
+  }
+  void SetClockSource(uint8_t idx) {
+    CONSTRAIN(idx, 0, channel_count(TYPE_INTERNAL) - 1);
+    source = TYPE_INTERNAL | (idx & 0x1f);
   }
 
   void Reset(bool hard = false) {
@@ -296,33 +328,22 @@ struct DigitalInputMap {
 
   bool Gate() const {
     switch (source_type()) {
-      case CLOCK: {
-        if (!clock_m.IsRunning()) return false;
+      case TYPE_INTERNAL:
+        // Formerly hardcoded clock sources.
+        // Now, the ClockSetup applet provides virtual outputs I/J/K/L
+        return frame.ViewOut(DAC_CHANNEL_COUNT + index()) > GATE_THRESHOLD;
 
-        uint32_t ticks_since_beat = OC::CORE::ticks - clock_m.BeatTick();
-        uint32_t tpb = clock_m.GetTempoTicks();
-        int mult = (source == 0xfe) ? 1 : ppqn;
-
-        // TODO: this doesn't work for larger divisions, because beat_tick gets reset
-        //if (div_mult.steps < 0) tpb = tpb * -div_mult.steps;
-        //if (div_mult.steps == 0) tpb = tpb;
-        //if (div_mult.steps > 0) tpb = tpb / (div_mult.steps+1);
-
-        uint32_t tick_phase = (mult * ticks_since_beat) % tpb;
-        bool gate = tick_phase < (internal_clocked_gate_pw * tpb);
-        return gate;
-      }
-      case DIGITAL_INPUT:
+      case TYPE_DIGITAL_INPUT:
         return frame.gate_high[index()];
-      case CV_INPUT:
+      case TYPE_ADC:
         return frame.gate_high[DIGITAL_INPUT_COUNT + index()];
         // gate_high is already calculated for ADC
         //return frame.inputs[index()] > GATE_THRESHOLD;
-      case CV_OUTPUT:
+      case TYPE_DAC:
         return frame.ViewOut(index()) > GATE_THRESHOLD;
-      case MIDI_MAP:
+      case TYPE_MIDI_MAP:
         return frame.MIDIState.mapping[index()].output > GATE_THRESHOLD;
-      case NONE:
+      case TYPE_NONE:
       default:
         return false;
     }
@@ -352,24 +373,24 @@ struct DigitalInputMap {
 
   uint8_t const* Icon() const {
     switch (source_type()) {
-      case CLOCK:
+      case TYPE_INTERNAL:
         return (clkcount & 1) ? METRO_L_ICON : METRO_R_ICON;
-      case MIDI_MAP:
+      case TYPE_MIDI_MAP:
         return PhzIcons::midiIn;
 
-      case DIGITAL_INPUT:
+      case TYPE_DIGITAL_INPUT:
         if (index() < 4)
           return DIGITAL_INPUT_ICONS + index() * 8;
-      case CV_INPUT:
+      case TYPE_ADC:
         if (index() < 8)
           return PARAM_MAP_ICONS + (1 + index()) * 8;
-      case CV_OUTPUT:
+      case TYPE_DAC:
         if (index() < 8)
           return PARAM_MAP_ICONS + (1 + ADC_CHANNEL_COUNT + index()) * 8;
 
         return ZAP_ICON;
 
-      case NONE:
+      case TYPE_NONE:
       default:
         return PARAM_MAP_ICONS + 0;
     }
@@ -377,22 +398,24 @@ struct DigitalInputMap {
   char const* InputName() const {
     static char in_label[] = "T 1";
     const char type[] = {' ', '-', 'T', 'C', '#', 'M', '?', '*'};
+    const char* clktype[] = {"CL1", "CL4", "RUN", "RST"};
 
-    if (source == 0xff) return "CL4";
-    if (source == 0xfe) return "CL1";
     if (!source) return " - ";
 
     in_label[0] = type[source_type() >> 5];
-    uint8_t idx = index();
+    uint8_t idx = constrain(index(), 0, channel_count(source_type()));
     switch (source_type()) {
-      case CV_OUTPUT:
+      case TYPE_INTERNAL:
+        return clktype[idx];
+
+      case TYPE_DAC:
         in_label[1] = OC::Strings::capital_letters[idx][0];
         in_label[2] = ' ';
         break;
 
-      case DIGITAL_INPUT:
-      case CV_INPUT:
-      case MIDI_MAP:
+      case TYPE_DIGITAL_INPUT:
+      case TYPE_ADC:
+      case TYPE_MIDI_MAP:
         ++idx;
         if (idx / 10)
           in_label[1] = char('0' + idx / 10);
@@ -429,6 +452,14 @@ struct DigitalInputMap {
         SetMidiMap(source - DIGITAL_INPUT_COUNT - ADC_CHANNEL_COUNT - DAC_CHANNEL_COUNT - 1);
     }
 
+    // migrate old clock sources -1 and -2
+    if (source_type() == TYPE_INTERNAL) {
+      if (0xff == source) // "CL4"
+        SetClockSource(1);
+      if (0xfe == source) // "CL1"
+        SetClockSource(0);
+    }
+
     div_mult.Set(extract_value<int8_t>(data >> 8));
     if (0 == div_mult.steps) div_mult.steps = 1;
   }
@@ -439,6 +470,29 @@ private:
   }
   inline uint8_t index() const {
     return source & 0x1f;
+  }
+  constexpr int channel_count(DigitalSourceType t) const {
+    switch (t) {
+      default: return 0;
+
+      case TYPE_NONE:
+        return 1;
+
+      case TYPE_INTERNAL:
+        return 4; // 1x, 4x, RUN, RESET
+
+      case TYPE_DIGITAL_INPUT:
+        return DIGITAL_INPUT_COUNT;
+      case TYPE_ADC:
+        // strictly hardware inputs
+        return ADC_CHANNEL_COUNT;
+      case TYPE_DAC:
+        // This one can have virtual signals.
+        // 2 outputs per applet slot, including Clock and Audio Applets...
+        return 2 * APPLET_CURSOR_COUNT;
+      case TYPE_MIDI_MAP:
+        return MIDIMAP_MAX;
+    }
   }
 };
 
