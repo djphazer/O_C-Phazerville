@@ -15,6 +15,14 @@ struct CVInputMap {
     TYPE_INTERNAL = (7 << 5), // for noise, LFOs, S&H, etc.
   };
 
+  const SourceType ordered_types[5] = {
+    TYPE_NONE,
+    TYPE_ADC,
+    TYPE_DAC,
+    TYPE_MIDI,
+    TYPE_INTERNAL,
+  };
+
   uint8_t source = 0; // 3 bits type | 5 bits index
   int8_t attenuversion = 60; // 60 is 100%
                              // max range is +/- 127 (448%)
@@ -54,7 +62,9 @@ struct CVInputMap {
 
       case TYPE_INTERNAL:
         // noise source
-        if (source == 0xff) return int(random(ONE_OCTAVE * HS::octave_max * 2)) - ONE_OCTAVE * HS::octave_max;
+        if (index() == 0)
+          return int(random(ONE_OCTAVE * HS::octave_max * 2)) - ONE_OCTAVE * HS::octave_max;
+        // TODO: LFOs and other basic stuff
         // else, fall through to default
       default:
         return 0;
@@ -80,18 +90,58 @@ struct CVInputMap {
     return Proportion(In(), (source_type() == TYPE_ADC)?HEMISPHERE_MAX_INPUT_CV:HEMISPHERE_MAX_CV, max_value);
   }
 
+  const int channel_count(SourceType t) const {
+    switch(t) {
+      default:
+        return 0;
+      case TYPE_NONE:
+        return 1;
+      case TYPE_ADC:
+        // strictly hardware inputs
+        return ADC_CHANNEL_COUNT;
+      case TYPE_DAC:
+        // This one can have virtual signals.
+        // 2 outputs per applet slot, including Clock and Audio Applets...
+        return 2 * APPLET_CURSOR_COUNT;
+      case TYPE_MIDI:
+        return MIDIMAP_MAX;
+      case TYPE_INTERNAL:
+        return 1;
+    }
+  }
+  bool ChangeSourceType(int dir) {
+    const int count = sizeof(ordered_types);
+    int tidx = 0;
+    while (source_type() != ordered_types[tidx] && tidx < count) ++tidx;
+    if (tidx >= count) tidx = 0;
+    tidx += (dir>0?1:-1);
+    CONSTRAIN(tidx, 0, count - 1);
+    int sidx = constrain(index(), 0, channel_count(ordered_types[tidx]) - 1);
+
+    SourceType oldtype = source_type();
+    source = ordered_types[tidx] | sidx;
+    return oldtype != source_type();
+  }
   void ChangeSource(int dir) {
-    uint8_t x = source + dir + 1;
-    if (x > TYPE_ADC + num_sources) return;
-    if (x > 1 && x <= TYPE_ADC) x = 1 + TYPE_ADC*(dir>0);
-    source = uint8_t(x) - 1;
+    int sidx = index() + dir;
+    if (sidx < 0) {
+      if (ChangeSourceType(-1))
+        sidx = channel_count(source_type()) - 1;
+    }
+    if (sidx >= channel_count(source_type())) {
+      if (ChangeSourceType(1))
+        sidx = 0;
+    }
+    CONSTRAIN(sidx, 0, channel_count(source_type()) - 1);
+    source = source_type() | uint8_t(sidx);
   }
   void RotateSource(int dir) {
-    int x = source + dir + 1;
+    // TODO: maybe just deprecate this method
+    int x = source + dir;
     if (x < 0) x = TYPE_ADC + num_sources;
     if (x > TYPE_ADC + num_sources) x = 0;
-    if (x > 1 && x <= TYPE_ADC) x = 1 + TYPE_ADC*(dir>0);
-    source = uint8_t(x) - 1;
+    if (x > 1 && x <= TYPE_ADC) x = TYPE_ADC*(dir>0);
+    source = uint8_t(x);
   }
 
   void SetMidiMap(uint8_t midx) {
