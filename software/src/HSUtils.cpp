@@ -287,8 +287,11 @@ namespace HS {
         pw = 88; ph = 28;
         break;
       case MESSAGE_POPUP:
-        px = 16; py = 23;
-        pw = 96; ph = 18;
+        pw = 6 * strlen(popup_msg) + 10;
+        pw = min(pw, 124);
+        ph = 18;
+        px = 62 - (pw/2);
+        py = 23;
         break;
       default:
         px = 23; py = 23;
