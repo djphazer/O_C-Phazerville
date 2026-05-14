@@ -680,6 +680,20 @@ public:
 
     uint64_t OnDataRequest() {
         uint64_t data = 0;
+
+        uint8_t* p = (uint8_t*)steps;
+        size_t i = 0;
+        while (i < num_steps * sizeof(EnvSeqManager::Step)) {
+          Pack(data, PackLocation{(i % 8) * 8, 8}, *p++);
+          if ((i % 8) == 7) {
+            SetData(i / 8, data);
+            data = 0;
+          }
+          ++i;
+        }
+        if (data) SetData(i / 8, data);
+
+        data = 0;
         Pack(data, PackLocation {0, 1}, trigger2);
         Pack(data, PackLocation {1, 5}, num_steps - 1);
         Pack(data, PackLocation {6, 3}, mod1_mode);
@@ -704,7 +718,6 @@ public:
         Pack(data, PackLocation {41, 1}, random_retrigger_levels);
         Pack(data, PackLocation {42, 1}, random_gate_lengths);
         Pack(data, PackLocation {43, 1}, random_probabilities);
-
         return data;
     }
 
@@ -736,6 +749,16 @@ public:
         random_retrigger_levels = Unpack(data, PackLocation {41, 1});
         random_gate_lengths = Unpack(data, PackLocation {42, 1});
         random_probabilities = Unpack(data, PackLocation {43, 1});
+
+        uint8_t* p = (uint8_t*)steps;
+        size_t i = 0;
+        while (i < num_steps * sizeof(EnvSeqManager::Step)) {
+          if ((i % 8) == 0) {
+            if (!GetData(i / 8, data)) break;
+          }
+          *p++ = Unpack(data, PackLocation{(i % 8) * 8, 8});
+          ++i;
+        }
 
         Reset();
     }
