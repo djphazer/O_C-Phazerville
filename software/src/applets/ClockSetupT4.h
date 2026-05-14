@@ -130,11 +130,19 @@ public:
 
         // 8 internal clock flashers
         for (int i = 0; i < 8; ++i) {
-            if (HS::clock_m.Tock(i))
+            if (HS::clock_m.Tock(i)) {
                 flash_ticker[i] = HEMISPHERE_PULSE_ANIMATION_TIME;
-            else if (flash_ticker[i])
+            } else if (flash_ticker[i])
                 --flash_ticker[i];
         }
+
+        // Virtual outputs: #I, #J, #K, and #L
+        if (HS::clock_m.Tock(HS::ClockManager::ONE_BEAT_CLOCK))
+          ClockOut(0); // 1x pulse
+        if (HS::clock_m.Tock(HS::ClockManager::SIXTEENTH_CLOCK))
+          ClockOut(1); // 4x pulse
+        GateOut(2, HS::clock_m.IsRunning()); // RUN
+        GateOut(3, !HS::clock_m.IsRunning()); // RESET
 
         if (button_ticker) --button_ticker;
         if (slide_anim) --slide_anim;

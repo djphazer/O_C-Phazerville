@@ -55,6 +55,8 @@ public:
         RIGHT2_CLOCK1,
         RIGHT2_CLOCK2,
         MIDI_CLOCK,
+        ONE_BEAT_CLOCK,
+        SIXTEENTH_CLOCK,
         NR_OF_CLOCKS
     };
 
@@ -71,9 +73,9 @@ public:
     uint32_t clock_tick[2] = {0,0}; // previous ticks when a physical clock was received on DIGITAL 1
     uint32_t beat_tick = 0; // The tick to count from
     uint32_t beat_count = 0;
-    bool tock[NR_OF_CLOCKS] = {0,0,0,0,0,0,0,0,0}; // The current tock value
-    int8_t tocks_per_beat[NR_OF_CLOCKS] = {0,0, 0,0, 0,0, 0,0, MIDI_OUT_PPQN}; // Multiplier
-    int count[NR_OF_CLOCKS] = {0,0,0,0, 0,0,0,0, 0}; // Multiple counter, 0 is a special case when first starting the clock
+    bool tock[NR_OF_CLOCKS] = {0,0,0,0,0,0,0,0,0,0,0}; // The current tock value
+    int8_t tocks_per_beat[NR_OF_CLOCKS] = {0,0, 0,0, 0,0, 0,0, MIDI_OUT_PPQN, 1, 4}; // Multiplier
+    int count[NR_OF_CLOCKS] = {0,0,0,0, 0,0,0,0, 0,0,0}; // Multiple counter, 0 is a special case when first starting the clock
     int8_t shuffle = 0; // 0 to 100
     int8_t shuffle_setting = 0;
 
