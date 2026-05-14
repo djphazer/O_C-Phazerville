@@ -39,6 +39,7 @@ struct CVInputMap {
 
   util::SemitoneQuantizer semitone_quant;
 
+  const bool enabled() const { return source != 0; }
   SourceType source_type() const {
     return (SourceType)(source & (0x7 << 5)); // upper 3 bits
   }
@@ -464,7 +465,7 @@ struct DigitalInputMap {
     if (0 == div_mult.steps) div_mult.steps = 1;
   }
 
-private:
+  const bool enabled() const { return source != 0; }
   DigitalSourceType source_type() const {
     return (DigitalSourceType)(source & (0x7 << 5)); // upper 3 bits
   }

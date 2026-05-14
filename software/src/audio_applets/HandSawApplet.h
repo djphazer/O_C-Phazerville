@@ -52,7 +52,10 @@ class HandSawApplet : public HemisphereAudioApplet {
             float phaseValue  = phase  + (phase_cv.In()  * 0.01f);
 
             for (int v = 0; v < 4; v++) {
-                float freq = PitchToRatio(pitch[v] + pitch_cv[v].In()) * C3;
+                int cvmod = pitch_cv[v].In();
+                if (!pitch_cv[v].enabled()) cvmod = pitch_cv[0].In();
+
+                float freq = PitchToRatio(pitch[v] + cvmod) * C3;
                 for (int o = 0; o < 3; o++) {
                     int idx = v * 3 + o;
                     synths[idx].frequency(freq + HANDSAW_DETUNE[idx] * detuneValue / detuneFactor);
@@ -66,20 +69,6 @@ class HandSawApplet : public HemisphereAudioApplet {
         }
 
         void View() override {
-            for (int i = 0; i < 4; ++i) {
-                gfxStartCursor(1 + 15*i, 15);
-                gfxPrintTuningIndicator(pitch[i]);
-                gfxEndCursor(cursor == PITCH1 + i);
-                if (cursor == PITCH1 + i) {
-                    gfxIcon(1 + 15*i, 25, UP_ICON, true);
-                }
-            }
-            // CV mappings sit on top of the pitch row
-            for (int i = 0; i < 4; ++i) {
-                gfxStartCursor(10 + 15*i, 15);
-                gfxPrint(pitch_cv[i]);
-                gfxEndCursor(cursor == PITCH_CV1 + i, false, pitch_cv[i].InputName());
-            }
 
             gfxPrint(1, 25, "Wave: ");
             gfxStartCursor();
@@ -112,6 +101,22 @@ class HandSawApplet : public HemisphereAudioApplet {
             gfxStartCursor();
             gfxPrint(amp_cv);
             gfxEndCursor(cursor == AMP_CV, false, amp_cv.InputName());
+
+            // Draw voice pitch and CV maps last, so cursors sit on top
+            for (int i = 0; i < 4; ++i) {
+                gfxStartCursor(1 + 15*i, 15);
+                gfxPrintTuningIndicator(pitch[i]);
+                gfxEndCursor(cursor == PITCH1 + i);
+                if (cursor == PITCH1 + i) {
+                    gfxIcon(1 + 15*i, 25, UP_ICON, true);
+                }
+            }
+            // CV mappings sit on top of the pitch row
+            for (int i = 0; i < 4; ++i) {
+                gfxStartCursor(10 + 15*i, 15);
+                gfxPrint(pitch_cv[i]);
+                gfxEndCursor(cursor == PITCH_CV1 + i, false, pitch_cv[i].InputName());
+            }
 
             gfxDisplayInputMapEditor();
         }
