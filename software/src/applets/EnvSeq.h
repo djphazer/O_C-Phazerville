@@ -26,7 +26,7 @@
 class EnvSeq : public HemisphereApplet {
 public:
     static constexpr int MAX_NUM_STEPS = 32;
-    static constexpr int OFFSET_SCALE_INCREMENT = 64;
+    static constexpr int OFFSET_SCALE_INCREMENT = 128;
     static constexpr int GATE_STOP_TICKS = 5 * HEMISPHERE_CLOCK_TICKS; // 5ms
     static constexpr int STEPSEL_MAX_CV = 5 * ONE_OCTAVE; // unipolar 0-5v
 
@@ -683,7 +683,7 @@ public:
 
         uint8_t* p = (uint8_t*)steps;
         size_t i = 0;
-        while (i < num_steps * sizeof(EnvSeqManager::Step)) {
+        while (i < MAX_NUM_STEPS * sizeof(EnvSeqManager::Step)) {
           Pack(data, PackLocation{(i % 8) * 8, 8}, *p++);
           if ((i % 8) == 7) {
             SetData(i / 8, data);
@@ -752,7 +752,7 @@ public:
 
         uint8_t* p = (uint8_t*)steps;
         size_t i = 0;
-        while (i < num_steps * sizeof(EnvSeqManager::Step)) {
+        while (i < MAX_NUM_STEPS * sizeof(EnvSeqManager::Step)) {
           if ((i % 8) == 0) {
             if (!GetData(i / 8, data)) break;
           }

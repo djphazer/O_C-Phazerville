@@ -87,17 +87,19 @@ namespace EnvSeqManager {
     };
     const char* const option_txt[MAX_OPTIONS] = {"None", "FoldUp", "FoldDw", "ZeroUp", "ZeroDw"};
 
+    // This one determines save data ordering/packing
+    // Last time I checked: 9 bytes
     struct Step {
-        uint16_t shape; // Shape for the step. 0..VOSC-1 is the enum value, >=VOSC is the VOSC waveform number.
-        int16_t offset; // Scaled step offset CV (by OFFSET_SCALE_INCREMENT)
-        int16_t amp; // Scaled step amp CV (by OFFSET_SCALE_INCREMENT)
-        bool waveform_revert; // Reverts the waveform (VOSC only)
-        bool waveform_invert; // Inverts the waveform (VOSC only)
+        int8_t amp; // Scaled step amp CV (by OFFSET_SCALE_INCREMENT)
+        int8_t offset; // Scaled step offset CV (by OFFSET_SCALE_INCREMENT)
+        uint8_t shape; // Shape for the step. 0..VOSC-1 is the enum value, >=VOSC is the VOSC waveform number.
         uint8_t length; // Length 1-200% of envelope duration for this step
         uint8_t gate_length; // Length of the gate pulse. 0-155 is 1->1000ms. 156-255 is 1-100% of the step length (actual time before applying modulation to it). 205 is 50% (this is the default value).
-        bool mod_mark; // Whether this step is marked for modulation
+        bool waveform_revert : 1; // Reverts the waveform (VOSC only)
+        bool waveform_invert : 1; // Inverts the waveform (VOSC only)
+        bool mod_mark : 1; // Whether this step is marked for modulation
 
-        uint8_t waveform_offset : 7; // Offset where the envelope offset is on the waveform (0..100) in 1% steps (VOSC only)
+        uint8_t waveform_offset : 7; // Offset (aka phase?) where the envelope is on the waveform (0..100) in 1% steps (VOSC only)
         Option waveform_option : 3; // Option for the waveform (VOSC only)
         uint8_t triggers : 3; // Number of times to trigger the step (0-7)
         uint8_t clocks : 3; // Number of clocks this step lasts for (0-7)
