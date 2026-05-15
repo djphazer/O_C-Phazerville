@@ -132,9 +132,11 @@ private:
   }
 };
 
+FLASHMEM
 void AppBackup::Init() {
     Resume();
 }
+FLASHMEM
 void AppBackup::DrawMenu() const {
     View();
 }
@@ -150,16 +152,20 @@ void AppBackup::DrawDebugInfo() const {
 size_t AppBackup::SaveAppData(util::StreamBufferWriter &) const { return 0; }
 size_t AppBackup::RestoreAppData(util::StreamBufferReader &) { return 0; }
 
+FLASHMEM
 void AppBackup::HandleAppEvent(OC::AppEvent event) {
   if (event == OC::APP_EVENT_RESUME) Resume();
 }
 void AppBackup::Loop() {} // Deprecated
+FLASHMEM
 void AppBackup::DrawScreensaver() const {
   View();
 }
+FLASHMEM
 void AppBackup::HandleEncoderEvent(const UI::Event& event) {
   ToggleCalibration();
 }
+FLASHMEM
 void AppBackup::HandleButtonEvent(const UI::Event& event) {
   if (event.type == UI::EVENT_BUTTON_PRESS) {
     if (event.control == OC::CONTROL_BUTTON_L) ToggleReceiveMode();

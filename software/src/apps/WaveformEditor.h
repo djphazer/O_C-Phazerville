@@ -89,7 +89,8 @@ public:
         for (int ch = 0; ch < 4; ch++) Out(ch, test[ch].Next());
     }
 
-    void View() const {
+    void View() const;
+    void MainView() const {
         gfxHeader("Waveform Editor");
         if (add_delete_confirm) DrawAddDelete();
         else DrawInterface();
@@ -367,6 +368,7 @@ private:
 };
 
 // App stubs
+FLASHMEM
 void AppWaveformEditor::Init() {
     BaseStart();
 }
@@ -396,6 +398,7 @@ void AppWaveformEditor::GetIOConfig(OC::IOConfig &ioconfig) const {
 void AppWaveformEditor::DrawDebugInfo() const {
   gfxPrint("TODO");
 }
+FLASHMEM
 void AppWaveformEditor::HandleAppEvent(OC::AppEvent event) {
     if (event ==  OC::APP_EVENT_RESUME) {
         Resume();
@@ -407,12 +410,12 @@ void AppWaveformEditor::HandleAppEvent(OC::AppEvent event) {
 
 void AppWaveformEditor::Loop() {} // Deprecated
 
-void AppWaveformEditor::DrawMenu() const {
-    BaseView();
-}
+FLASHMEM void AppWaveformEditor::DrawMenu() const { BaseView(); }
+FLASHMEM void AppWaveformEditor::View() const { MainView(); }
 
 void AppWaveformEditor::DrawScreensaver() const {} // Deprecated
 
+FLASHMEM
 void AppWaveformEditor::HandleButtonEvent(const UI::Event &event) {
     // For left encoder, handle press and long press
     if (event.control == OC::CONTROL_BUTTON_L) {
@@ -433,6 +436,7 @@ void AppWaveformEditor::HandleButtonEvent(const UI::Event &event) {
     }
 }
 
+FLASHMEM
 void AppWaveformEditor::HandleEncoderEvent(const UI::Event &event) {
     // Left encoder turned
     if (event.control == OC::CONTROL_ENCODER_L) OnLeftEncoderMove(event.value);

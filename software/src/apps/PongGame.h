@@ -397,7 +397,8 @@ public:
      * to constrain the speed of the paddle. See the bottom of MoveBall() for more deets.
      */
 
-    void View() const {
+    void View() const;
+    void MainView() const {
         // Frame
         gfxFrame(0, 9, 128, 55);
 
@@ -409,10 +410,10 @@ public:
         int p1_score = player1.getScore();
         int p2_score = player2.getScore();
 
-        if(player1.enabled) gfxPrint(0,0,p1_score); // left
-        gfxPrint(46,0,"HI:"); // center
+        if (player1.enabled) gfxPrint(0, 0, p1_score); // left
+        gfxPrint(46, 0, "HI:"); // center
         gfxPrint(hi_score); // center
-        if(player2.enabled) gfxPrint(110,0,p2_score); // right
+        if (player2.enabled) gfxPrint(110, 0, p2_score); // right
 
         DrawGame();
     }
@@ -452,10 +453,10 @@ void AppPong::GetIOConfig(OC::IOConfig &ioconfig) const
 }
 void AppPong::DrawDebugInfo() const { }
 
-void AppPong::DrawMenu() const {
-  BaseView();
-}
+FLASHMEM void AppPong::DrawMenu() const { BaseView(); }
+FLASHMEM void AppPong::View() const { MainView(); }
 
+FLASHMEM
 void AppPong::DrawScreensaver() const {
   // Game pieces only
   DrawGame();

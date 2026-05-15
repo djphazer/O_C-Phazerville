@@ -57,7 +57,8 @@ public:
         Out(1, current_quantized);
     }
 
-    void View() const {
+    void View() const;
+    void MainView() const {
         gfxHeader("Scale Editor    ");
         gfxPrint(OC::scale_names_short[current_scale]);
         if (import_mode) DrawImportScreen();
@@ -342,6 +343,7 @@ private:
     }
 };
 
+FLASHMEM
 void AppScaleEditor::Init() {
     BaseStart();
 }
@@ -364,6 +366,7 @@ void AppScaleEditor::DrawDebugInfo() const {
   gfxPrint("TODO");
 }
 
+FLASHMEM
 void AppScaleEditor::HandleAppEvent(OC::AppEvent event) {
     if (event == OC::APP_EVENT_SUSPEND) {
         OnSendSysEx();
@@ -375,12 +378,12 @@ void AppScaleEditor::HandleAppEvent(OC::AppEvent event) {
 
 void AppScaleEditor::Loop() {}
 
-void AppScaleEditor::DrawMenu() const {
-    BaseView();
-}
+FLASHMEM void AppScaleEditor::DrawMenu() const { BaseView(); }
+FLASHMEM void AppScaleEditor::View() const { MainView(); }
 
 void AppScaleEditor::DrawScreensaver() const {}
 
+FLASHMEM
 void AppScaleEditor::HandleButtonEvent(const UI::Event &event) {
     // For left encoder, handle press and long press
     if (event.control == OC::CONTROL_BUTTON_L) {
@@ -401,6 +404,7 @@ void AppScaleEditor::HandleButtonEvent(const UI::Event &event) {
     }
 }
 
+FLASHMEM
 void AppScaleEditor::HandleEncoderEvent(const UI::Event &event) {
     // Left encoder turned
     if (event.control == OC::CONTROL_ENCODER_L) OnLeftEncoderMove(event.value);
