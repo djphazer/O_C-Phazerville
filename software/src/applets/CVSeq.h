@@ -377,6 +377,20 @@ public:
     uint64_t OnDataRequest() override {
         uint64_t data = 0;
 
+        uint8_t* p = (uint8_t*)cv_values;
+        size_t i = 0;
+        while (i < sizeof(cv_values) + sizeof(steps)) {
+            if (i == sizeof(cv_values)) p = (uint8_t*)steps;
+            Pack(data, PackLocation{(i % 8) * 8, 8}, *p++);
+            if ((i % 8) == 7) {
+                SetData(i / 8, data);
+                data = 0;
+            }
+            ++i;
+        }
+        if (i % 8 != 0) SetData(i / 8, data);
+
+        data = 0;
         Pack(data, PackLocation {0, 2}, input2_mode);
         Pack(data, PackLocation {2, 3}, output2_mode);
         Pack(data, PackLocation {5, 3}, qselect);
@@ -384,6 +398,14 @@ public:
         Pack(data, PackLocation {9, 1}, transpose_in_semitones);
         Pack(data, PackLocation {10, 1}, random_channels[0]);
         Pack(data, PackLocation {11, 1}, random_channels[1]);
+        Pack(data, PackLocation {12, 6}, num_steps[0] - 1);
+        Pack(data, PackLocation {18, 6}, num_steps[1] - 1);
+        Pack(data, PackLocation {24, 6}, loops[0].points[0]);
+        Pack(data, PackLocation {30, 6}, loops[0].points[1]);
+        Pack(data, PackLocation {36, 1}, loops[0].enabled);
+        Pack(data, PackLocation {37, 6}, loops[1].points[0]);
+        Pack(data, PackLocation {43, 6}, loops[1].points[1]);
+        Pack(data, PackLocation {49, 1}, loops[1].enabled);
 
         return data;
     }
@@ -396,6 +418,23 @@ public:
         transpose_in_semitones = Unpack(data, PackLocation {9, 1});
         random_channels[0] = Unpack(data, PackLocation {10, 1});
         random_channels[1] = Unpack(data, PackLocation {11, 1});
+        num_steps[0] = constrain(Unpack(data, PackLocation {12, 6}) + 1, 1, MAX_STEPS);
+        num_steps[1] = constrain(Unpack(data, PackLocation {18, 6}) + 1, 1, MAX_STEPS);
+        loops[0].points[0] = constrain(Unpack(data, PackLocation {24, 6}), 0, MAX_STEPS - 1);
+        loops[0].points[1] = constrain(Unpack(data, PackLocation {30, 6}), 0, MAX_STEPS - 1);
+        loops[0].enabled = Unpack(data, PackLocation {36, 1});
+        loops[1].points[0] = constrain(Unpack(data, PackLocation {37, 6}), 0, MAX_STEPS - 1);
+        loops[1].points[1] = constrain(Unpack(data, PackLocation {43, 6}), 0, MAX_STEPS - 1);
+        loops[1].enabled = Unpack(data, PackLocation {49, 1});
+
+        uint8_t* p = (uint8_t*)cv_values;
+        size_t i = 0;
+        while (i < sizeof(cv_values) + sizeof(steps)) {
+            if (i == sizeof(cv_values)) p = (uint8_t*)steps;
+            if ((i % 8) == 0 && !GetData(i / 8, data)) break;
+            *p++ = Unpack(data, PackLocation{(i % 8) * 8, 8});
+            ++i;
+        }
 
         // Suppress any half-boundary event from stale clock state, then reset
         // everything immediately so playback starts cleanly from the new preset.
