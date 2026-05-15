@@ -4,6 +4,23 @@ nav_order: 1
 ---
 
 # Phazerville Suite
+
+## Key Features:
+* Support for next-gen [Teensy 4.1-based "O.R.N.8" hardware](https://github.com/PaulStoffregen/O_C_T41) using [**Quadrants**](Quadrants) App
+    * includes Audio Applet subsystem for DSP effects, synths, and samplers.
+* Support for Teensy 4.0 on original O_C hardware
+* Multiple Apps can fit into the original Teensy 3.2 ([choose your own App selection](https://github.com/djphazer/O_C-Phazerville/discussions/38))
+* Many new and improved [Hemisphere Applets](App-and-Applet-Index#hemisphere-applets)
+* New full screen apps: [Scenery](Scenery) and [Calibr8or](Calibr8or)
+* New UI features, codebase optimizations, and QoL improvements
+    * [Presets](Hemisphere-Presets) — with auto-save and loading via MIDI Program Changes
+    * [Trigger and CV Input re-mapping](Hemisphere-Input-Mapping) (including internal routing)
+    * [Internal Clock improvements](Clock-Setup): sync to external CV or MIDI clock, swing, per-channel multiplication / division
+    * [Multiple Quantizer Engines](Hemisphere-Quantizer-Setup) (with pop-up editor and performance transposition)
+    * [Expanded MIDI Input](MIDI-Input) options for MIDI-to-CV, including polyphony
+
+![Various O_C modules running the firmware](images/three_criminals.jpg)
+
 #### _Note from the Mayor:_
 > Thanks for checking out my firmware! I've made efforts to hoard all the notable [Apps and Applets](App-and-Applet-Index) in one repo! All the full-screen Apps from [Hemisphere Suite](https://github.com/Chysn/O_C-HemisphereSuite/wiki) are here, plus all of the [stock O&C firmware](https://ornament-and-cri.me/user-manual-v1_3/) Apps, and a few new ones, albeit in limited combinations depending on which hardware variant you have... see the [Build Choices](Build-Choices) page for details.
 > 
@@ -12,22 +29,6 @@ nav_order: 1
 > Read a bit about my [Development Philosophy](Development-Philosophy) to understand my motives behind this project.
 > 
 > &mdash; _[DJ Phazer](https://ko-fi.com/djphazer)_
-
-![Various O_C modules running the firmware](images/three_criminals.jpg)
-
-## Key Features:
-* Support for next-gen [Teensy 4.1-based "O.R.N.8" hardware](https://github.com/PaulStoffregen/O_C_T41) using [**Quadrants**](Quadrants) App
-    * includes Audio Applet subsystem for DSP effects, synths, and samplers.
-* Support for Teensy 4.0 on original O_C hardware
-* More Apps can fit into the original Teensy 3.2 ([choose your own App selection](https://github.com/djphazer/O_C-Phazerville/discussions/38))
-* Many new and improved [Hemisphere Applets](App-and-Applet-Index#hemisphere-applets)
-* New full screen apps: [Scenery](Scenery) and [Calibr8or](Calibr8or)
-* New UI features, codebase optimizations, and QoL improvements
-    * [Hemisphere Presets](Hemisphere-Presets) — with auto-save and loading via MIDI Program Changes
-    * [Trigger and CV Input re-mapping](Hemisphere-Input-Mapping) (including internal routing)
-    * [Internal Clock improvements](Clock-Setup): sync to external CV or MIDI clock, swing, per-channel multiplication / division
-    * [Multiple Quantizer Engines](Hemisphere-Quantizer-Setup) (with pop-up editor and performance transposition)
-    * [Expanded MIDI Input](MIDI-Input) options for MIDI-to-CV, including polyphony
 
 ***
 
