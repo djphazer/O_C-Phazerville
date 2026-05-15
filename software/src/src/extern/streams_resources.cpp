@@ -31,6 +31,7 @@
 
 #include <cstdint>
 #include "streams_resources.h"
+#include <Arduino.h>
 
 namespace streams {
 
@@ -1356,6 +1357,7 @@ const uint32_t lut_log2[] = {
   589824,
 };
 */
+PROGMEM
 const uint32_t lut_lorenz_rate[] = {
        3,      3,      3,      4,
        4,      4,      4,      4,

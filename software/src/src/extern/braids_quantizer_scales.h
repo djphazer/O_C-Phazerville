@@ -33,6 +33,7 @@
 
 namespace braids {
 
+PROGMEM
 const Scale scales[] = {
   // Off
   { 0, 0, { } },

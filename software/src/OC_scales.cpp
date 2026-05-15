@@ -101,6 +101,7 @@ void Scales::LoadScala(Scale &scale, File &file) {
   scale.span = (12 << 7) * (1+largespan);
 }
 
+PROGMEM
 const char* const scale_names_short[Scales::NUM_SCALES] = {
     "USR1",
     "USR2",
@@ -259,6 +260,7 @@ const char* const scale_names_short[Scales::NUM_SCALES] = {
     
     };
 
+PROGMEM
 const char* const scale_names[Scales::NUM_SCALES] = {
     "User-defined 1",
     "User-defined 2",
@@ -417,6 +419,7 @@ const char* const scale_names[Scales::NUM_SCALES] = {
 
     };
 
+PROGMEM
 const char* const voltage_scalings[] = {
     " 1V/O", // 1V/octave
     "alpha", // Wendy Carlos alpha scale

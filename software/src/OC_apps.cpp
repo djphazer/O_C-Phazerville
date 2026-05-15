@@ -60,13 +60,13 @@ namespace OC {
 // NOTE These are slightly wasteful, in that the PageStorage implementation and
 // the local data both retain a copy of the data. Removing this would in theory
 // reclaim some memory, although RAM isn't currently an issue.
-/*extern*/ GlobalSettings global_settings;
+/*extern*/ DMAMEM GlobalSettings global_settings;
 /*extern*/ AppSwitcher app_switcher;
-static AppData app_data;
+static DMAMEM AppData app_data;
 #ifndef __IMXRT1062__
 static GlobalSettingsStorage global_settings_storage;
 #endif
-static AppDataStorage app_data_storage;
+static DMAMEM AppDataStorage app_data_storage;
 
 #ifdef __IMXRT1062__
 enum GlobalSettingsDataKeys : uint16_t {

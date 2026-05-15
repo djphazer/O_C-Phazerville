@@ -35,6 +35,7 @@ CalibrationData calibration_data;
 
 bool calibration_data_loaded = false;
 
+PROGMEM
 const CalibrationData kCalibrationDefaults = {
   // DAC
   { {
@@ -85,6 +86,7 @@ const CalibrationData kCalibrationDefaults = {
   #endif
 };
 
+PROGMEM
 const CalibrationData kNLMCalibrationDefaults = {
   // DAC
   { {
@@ -125,6 +127,7 @@ const CalibrationData kNLMCalibrationDefaults = {
   0 // reserved1
 };
 
+PROGMEM
 const DAC::CalibrationData kDAC20VppDefaults = {
   {
   #ifdef ARDUINO_TEENSY41
@@ -215,6 +218,7 @@ const char * const long_press_hint = "Hold [DOWN] to set";
 #endif
 const char * const select_help    = "[R] => Select";
 
+PROGMEM
 const CalibrationStep calibration_steps[CALIBRATION_STEP_LAST] = {
   { HELLO, "Setup: Calibrate", "Start fresh? ", select_help, start_footer, CALIBRATE_NONE, 0, OC::Strings::no_yes, 0, 1 },
   { CENTER_DISPLAY, "Center Display", "Pixel offset ", default_help_r, default_footer, CALIBRATE_DISPLAY, 0, nullptr, 0, 2 },

@@ -33,6 +33,7 @@ const int Nr_of_arp_chords = 55; // counting from 0....
 // 1 b2 2 b3 3 4 b5 5 b6 6 b7  7  8
 // 0  1 2  3 4 5  6 7  8 9 10 11 12
 
+PROGMEM
 const hem_arp_chord Arp_Chords[] = {
   //ARPEGGIATE
   {"Maj triad",{0, 4, 7}, 3,1},
