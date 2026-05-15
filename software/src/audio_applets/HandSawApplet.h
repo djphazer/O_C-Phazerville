@@ -25,11 +25,14 @@ class HandSawApplet : public HemisphereAudioApplet {
               PatchCable(synths[i], 0, outputMixer, i);
             }
 
-            PatchCable(input_stream,  0, outputMixer, 12);
             PatchCable(outputMixer,   0, vca,         0);
             PatchCable(vca_level,     0, vca,         1);
 
-            outputMixer.gain(12, 1.0f); // passthru
+            PatchCable(vca,           0, final_out, 0);
+            PatchCable(input_stream,  0, final_out, 1);
+
+            final_out.gain(0, 1.0f); // voice
+            final_out.gain(1, 1.0f); // passthru
 
             for (int i = 0; i < 12; i++) {
                 synths[i].amplitude(1.0f);
@@ -248,7 +251,7 @@ class HandSawApplet : public HemisphereAudioApplet {
         }
 
         AudioStream* InputStream()  override { return &input_stream; }
-        AudioStream* OutputStream() override { return &vca; }
+        AudioStream* OutputStream() override { return &final_out; }
 
     protected:
         void SetHelp() override {}
@@ -306,7 +309,8 @@ class HandSawApplet : public HemisphereAudioApplet {
 
         AudioPassthrough<MONO>  input_stream;
         AudioSynthWaveform      synths[12];
-        AudioMixer<13>          outputMixer;
+        AudioMixer<12>          outputMixer;
         AudioVCA                vca;
         InterpolatingStream<>   vca_level;
+        AudioMixer<2>           final_out;
 };
