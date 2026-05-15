@@ -4,12 +4,22 @@ static constexpr int CLOCKDIV_MAX = 64;
 static constexpr int CLOCKDIV_MIN = -24;
 
 struct ClkDivMult {
+  // settings
   int8_t steps = 1; // positive for division, negative for multiplication
+  uint8_t swing = 0; // 0 to 99
+  // state
   uint8_t clock_count = 0; // Number of clocks since last output (for clock divide)
   uint32_t next_clock = 0; // Tick number for the next output (for clock multiply)
   uint32_t last_clock = 0;
   int cycle_time = 0; // Cycle time between the last two clock inputs
 
+  const int get_tick_interval() const {
+    const int interval = cycle_time / -steps;
+    const int swing_ticks = swing * interval / 100;
+    if (clock_count & 1)
+      return interval - swing_ticks;
+    return interval + swing_ticks;
+  }
   void Set(int s) {
     steps = constrain(s, CLOCKDIV_MIN, CLOCKDIV_MAX);
   }
@@ -32,9 +42,8 @@ struct ClkDivMult {
       }
       if (steps < 0) {
           // Calculate next clock for multiplication on each clock
-          int tick_interval = (cycle_time / -steps);
-          next_clock = this_tick + tick_interval;
           clock_count = 0;
+          next_clock = this_tick + get_tick_interval();
           trigout = 1;
       }
     }
@@ -42,9 +51,8 @@ struct ClkDivMult {
     // Handle clock multiplication
     if (steps < 0 && next_clock > 0) {
         if ( this_tick >= next_clock && clock_count+1 < -steps) {
-            int tick_interval = (cycle_time / -steps);
-            next_clock += tick_interval;
             ++clock_count;
+            next_clock += get_tick_interval();
             trigout = 1;
         }
     }
