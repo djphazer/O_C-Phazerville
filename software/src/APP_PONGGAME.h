@@ -26,8 +26,14 @@
 
 #include "HSApplication.h"
 
+enum playerInputMode {
+  ANALOG_INPUT_MODE,
+  DIGITAL_INPUT_MODE
+};
+
 class Pong : public HSApplication {
 private:
+  int bounces;
   int ball_delay; // The ball's delay at the next movement
   int ball_countdown; // Time (in increments of 60 microseconds) until the ball moves
   int hi_score; // The highest number of hits in a game since initialization
@@ -60,7 +66,6 @@ public:
     const bool high = (bleep_ticker % BEEP_TICKS) < (BEEP_TICKS / 2);
     const int amp = bleep_ticker * ONE_OCTAVE * 3 / BEEP_LEN * (high ? 1 : -1);
     return amp;
-    // Out(3, amp);
   }
   int Bloop() {
     const bool high = (bloop_ticker % BOOP_TICKS) < (BOOP_TICKS / 2);
@@ -71,8 +76,6 @@ public:
     const int amp = crash_ticker * random(HSAPPLICATION_5V) / CRASH_LEN - (HSAPPLICATION_5V / 2);
     return amp;
   }
-
-  enum playerModeOption { MODE_NONE, MODE_HUMAN, MODE_CPU };
 
   /* Define the screen boundaries. There's a frame around the screen, so these numbers need to
    * take that into account.
@@ -102,40 +105,55 @@ public:
   static constexpr int Y_POSITION_COEFF = 128;
 
   struct Player {
-      int score; // The number of hits in this game
-      playerModeOption player_mode = MODE_HUMAN;
-      int paddle_x = 8 << PRECISION;
-      int paddle_y = BOUNDARY_TOP;
-      int paddle_h = 16 << PRECISION;
-      int movement_countdown = 0; // Used to limit the speed
+    bool enabled = true;
+    int score; // The number of hits in this game
+    bool use_analog_input;
+    int paddle_x = 8 << PRECISION;
+    int paddle_y = BOUNDARY_TOP;
+    int paddle_h = 16 << PRECISION;
+    int movement_countdown = 0; // Used to limit the speed
 
-      void SetPosition(int ypos) {
+    void SetPosition(int ypos) {
+      if(use_analog_input) {
         paddle_y = constrain(ypos, BOUNDARY_TOP - (2 << PRECISION), BOUNDARY_BOTTOM - paddle_h + (2 << PRECISION));
       }
-      void MovePaddleUp() {
-          if (movement_countdown <= 0) {
-              paddle_y -= (1 << PRECISION);
-              if (paddle_y < BOUNDARY_TOP) paddle_y = BOUNDARY_TOP;
-              movement_countdown = PADDLE_DELAY;
-          }
-      }
+    }
 
-      /* Like MovePaddleUp(), only more down */
-      void MovePaddleDown() {
-          if (movement_countdown <= 0) {
-              paddle_y += (1 << PRECISION);
-              if (paddle_y > (BOUNDARY_BOTTOM - paddle_h)) paddle_y = BOUNDARY_BOTTOM - paddle_h;
-              movement_countdown = PADDLE_DELAY;
-          }
+    void SetDigitalInput(int detented_ypos) {
+      if(!use_analog_input) {
+        // tweak for NLM to center the inputs around 5 octaves (6V on 1.2V/oct)
+        if (NorthernLightModular && detented_ypos) detented_ypos -= HSAPPLICATION_5V;
+        // check the detent again, just for NLM
+        if (detented_ypos < -HEMISPHERE_CENTER_DETENT) MovePaddleUp();
+        if (detented_ypos > HEMISPHERE_CENTER_DETENT) MovePaddleDown();
       }
+    }
 
-      /* Allows the paddle to be moved without an enforced delay, for use with encoder play */
-      void ResetPaddle() {
-          movement_countdown = 0;
-      }
+    void MovePaddleUp(int distance = 1) {
+        if (movement_countdown <= 0) {
+          paddle_y -= (distance << PRECISION);
+          if (paddle_y < BOUNDARY_TOP) paddle_y = BOUNDARY_TOP;
+          movement_countdown = PADDLE_DELAY;
+        }
+    }
 
-      /* The player paddle is a filled rectangle of fixed width and adjustable height. */
-      void DrawPaddle() {
+    /* Like MovePaddleUp(), only more down */
+    void MovePaddleDown(int distance = 1) {
+        if (movement_countdown <= 0) {
+          paddle_y += (distance << PRECISION);
+          if (paddle_y > (BOUNDARY_BOTTOM - paddle_h)) paddle_y = BOUNDARY_BOTTOM - paddle_h;
+          movement_countdown = PADDLE_DELAY;
+        }
+    }
+
+    /* Allows the paddle to be moved without an enforced delay, for use with encoder play */
+    void ResetPaddle() {
+      movement_countdown = 0;
+    }
+
+    /* The player paddle is a filled rectangle of fixed width and adjustable height. */
+    void DrawPaddle() {
+      if(enabled){
         graphics.drawRect(
           paddle_x >> PRECISION,
           paddle_y >> PRECISION,
@@ -143,8 +161,9 @@ public:
           paddle_h >> PRECISION
         );
       }
+    }
 
-      int getScore() {return score;}
+    int getScore() {return score;}
   };
 
   Player player1;
@@ -155,26 +174,30 @@ public:
      * to start a new game.
      */
     void Start() {
-        hi_score = 27;
-        player1.player_mode = MODE_HUMAN;
-        player2.player_mode = MODE_CPU;
-        player2.paddle_x = 116 << PRECISION;
+      hi_score = 27;
+      player2.use_analog_input = true;
+      player2.paddle_x = 116 << PRECISION;
 
-        StartNewGame();
+      StartNewGame();
     }
     void Resume() {
       ResetMappings();
     }
 
     void ServeBall() {
-        // Game state
-        ball_countdown = ball_delay;
+      // Game state
+      ball_countdown = ball_delay;
 
-        // Ball properties
-        vel_x = (random(0,100) > 50 ? 1 : -1) << PRECISION;
-        vel_y = (random(0, 100) > 50 ? 1 : -1) << PRECISION; // Start off in a random direction
-        ball_x = (vel_x > 0 ? 32 : 96) << PRECISION;
-        ball_y = random((BOUNDARY_TOP + 2), (BOUNDARY_BOTTOM - 2)); // Start off in a random spot
+      // Ball properties
+      vel_x = (random(0,100) > 50 ? 1 : -1) << PRECISION;
+      vel_y = (random(0, 100) > 50 ? 1 : -1) << PRECISION; // Start off in a random direction
+      ball_x = (vel_x > 0 ? 32 : 96) << PRECISION;
+      ball_y = random((BOUNDARY_TOP + 2), (BOUNDARY_BOTTOM - 2)); // Start off in a random spot
+    
+      // Crash sfx
+      bleep_ticker = CRASH_LEN/4;
+      bloop_ticker = CRASH_LEN/4;
+      crash_ticker = CRASH_LEN;
     }
 
     void StartNewGame() {
@@ -199,22 +222,20 @@ public:
 
         // handle direct CV inputs
         const int paddle_range = BOUNDARY_BOTTOM - BOUNDARY_TOP;
-        const int Y_CENTER = BOUNDARY_TOP + paddle_range/2;
 
-        player1.SetPosition(BOUNDARY_BOTTOM - (player1.paddle_h/2) - (In(0) >> 7) * paddle_range / 60);
+        player1.SetPosition(BOUNDARY_BOTTOM - (player1.paddle_h/2) - (In(1) >> 7) * paddle_range / 60);
         player2.SetPosition(BOUNDARY_BOTTOM - (player2.paddle_h/2) - (In(3) >> 7) * paddle_range / 60);
 
-        // TODO:find out if i still need NLM / Buchla tweaks????
-        // tweak for NLM to center the inputs around 5 octaves (6V on 1.2V/oct)
-        //if (NorthernLightModular && p1_cv) p1_cv -= HSAPPLICATION_5V;
-        // check the detent again, just for NLM
-        // if (move_cv < -HEMISPHERE_CENTER_DETENT) MovePaddleUp();
-        // if (move_cv > HEMISPHERE_CENTER_DETENT) MovePaddleDown();
+        // handle digital CV inputs
+        player1.SetDigitalInput(DetentedIn(0));
+        player2.SetDigitalInput(DetentedIn(2));
 
-        /*if(Gate(0) && !Gate(1)) player1.MovePaddleUp();*/
-        /*if(Gate(1) && !Gate(0)) player1.MovePaddleDown();*/
-        /*if(Gate(2) && !Gate(3)) player2.MovePaddleUp();*/
-        /*if(Gate(3) && !Gate(2)) player2.MovePaddleDown();*/
+        // Read gate inputs as digital up and down
+        // up/dn corresponds to first/second (same as arrows on a uO_c)
+        if(Gate(0) && !Gate(1)) player1.MovePaddleUp();
+        if(Gate(1) && !Gate(0)) player1.MovePaddleDown();
+        if(Gate(2) && !Gate(3)) player2.MovePaddleUp();
+        if(Gate(3) && !Gate(2)) player2.MovePaddleDown();
 
         /* Handle output states:
          *
@@ -271,6 +292,7 @@ public:
 
             // Check collision with Player 1
             if (vel_x < 0
+                && player1.enabled
                 && (ball_x <= player1.paddle_x + PADDLE_WIDTH)
                 && (ball_x >= player1.paddle_x)
                 && (ball_y <= player1.paddle_y + player1.paddle_h)
@@ -278,6 +300,7 @@ public:
 
               // If so, bounce the ball, increase the score, and set the hit
               // trigger to fire the reward CV trigger at the next loop() call.
+              if(!player2.enabled) ++player1.score;
               vel_x = abs(vel_x);
               vel_y = (ball_y - (player1.paddle_y + player1.paddle_h / 2))
                 / ((player1.paddle_h / 4) >> PRECISION);
@@ -288,13 +311,15 @@ public:
 
             // Check collision with Player 2
             if (vel_x > 0
-                && (ball_x <= player2.paddle_x + PADDLE_WIDTH)
-                && (ball_x >= player2.paddle_x)
-                && (ball_y <= player2.paddle_y + player2.paddle_h)
-                && (ball_y >= player2.paddle_y)) {
+              && player2.enabled
+              && (ball_x <= player2.paddle_x + PADDLE_WIDTH)
+              && (ball_x >= player2.paddle_x)
+              && (ball_y <= player2.paddle_y + player2.paddle_h)
+              && (ball_y >= player2.paddle_y)) {
 
               // If so, bounce the ball, increase the score, and set the hit
               // trigger to fire the reward CV trigger at the next loop() call.
+              if(!player1.enabled) ++player2.score;
               vel_x = -abs(vel_x);
               vel_y = (ball_y - (player2.paddle_y + player2.paddle_h / 2))
                 / ((player2.paddle_h / 4) >> PRECISION);
@@ -304,22 +329,40 @@ public:
             }
 
             if (ball_x < BOUNDARY_LEFT) {
-              player2.score++;
-              // Level up!!
-              if (!(player2.score % 5)) LevelUp();
-              ServeBall();
-              bleep_ticker = CRASH_LEN/4;
-              bloop_ticker = CRASH_LEN/4;
-              crash_ticker = CRASH_LEN;
+              if(player1.enabled){
+                if(player2.enabled){
+                  // Score!
+                  if (!(++player2.score % 5)) LevelUp();
+                  ServeBall();
+                }else{
+                  // P1 Solitaire Game Over!
+                  StartNewGame();
+                }
+              }else{
+                // Bounce!
+                vel_x = abs(vel_x);
+                ball_x = BOUNDARY_LEFT; // snap to edge
+                ClockOut(1);
+                bleep_ticker = BEEP_LEN;
+              }
             }
             if (ball_x > BOUNDARY_RIGHT) {
-              player1.score++;
-              // Level up!!
-              if (!(player1.score % 5)) LevelUp();
-              ServeBall();
-              bleep_ticker = CRASH_LEN/4;
-              bloop_ticker = CRASH_LEN/4;
-              crash_ticker = CRASH_LEN;
+              if(player2.enabled){
+                if(player1.enabled){
+                  // Score!
+                  if (!(++player1.score % 5)) LevelUp();
+                  ServeBall();
+                }else{
+                  // P2 Solitaire Game Over!
+                  StartNewGame();
+                }
+              }else{
+                // Bounce!
+                vel_x = -abs(vel_x);
+                ball_x = BOUNDARY_RIGHT; // snap to edge
+                ClockOut(1);
+                bleep_ticker = BEEP_LEN;
+              }
             }
 
             if (player1.score > hi_score) {
@@ -371,10 +414,10 @@ public:
         int p1_score = player1.getScore();
         int p2_score = player2.getScore();
 
-        gfxPrint(0,0,p1_score); // left
+        if(player1.enabled) gfxPrint(0,0,p1_score); // left
         gfxPrint(46,0,"HI:"); // center
         gfxPrint(hi_score); // center
-        gfxPrint(110,0,p2_score); // right
+        if(player2.enabled) gfxPrint(110,0,p2_score); // right
 
         DrawGame();
     }
@@ -428,47 +471,49 @@ void PONGGAME_screensaver() {
     pong_instance.player2.DrawPaddle();
 }
 
-/* Controlling the game with the buttons is the worst experience ever, so this is really just here
- * to demonstrate how the buttons work.
- */
+// Allow players to toggle between analog and digital input modes
 void PONGGAME_handleButtonEvent(const UI::Event &event) {
-    if (UI::EVENT_BUTTON_DOWN == event.type && OC::CONTROL_BUTTON_L == event.control) {
-        // pong_instance.SnapToBall();
-    }
-    if (UI::EVENT_BUTTON_PRESS == event.type) {
-        switch (event.control) {
-          case OC::CONTROL_BUTTON_UP:
-                // pong_instance.MovePaddleUp();
-                // pong_instance.ResetPaddle();
-            break;
+  if (UI::EVENT_BUTTON_PRESS == event.type) {
+    switch (event.control) {
+      case OC::CONTROL_BUTTON_UP:
+        pong_instance.player1.enabled = !pong_instance.player1.enabled;
+        pong_instance.player1.score = 0;
+        pong_instance.player2.score = 0;
+        break;
 
-          case OC::CONTROL_BUTTON_DOWN:
-                // pong_instance.MovePaddleDown();
-                // pong_instance.ResetPaddle();
-            break;
+      case OC::CONTROL_BUTTON_DOWN:
+        pong_instance.player2.enabled = !pong_instance.player1.enabled;
+        pong_instance.player1.score = 0;
+        pong_instance.player2.score = 0;
+        break;
 
-          case OC::CONTROL_BUTTON_R:
-                // pong_instance.ToggleTwoPlayer();
-            break;
-        }
+      case OC::CONTROL_ENCODER_L:
+        pong_instance.player1.use_analog_input = !pong_instance.player1.use_analog_input;
+        break;
+
+      case OC::CONTROL_BUTTON_R:
+        pong_instance.player2.use_analog_input = !pong_instance.player2.use_analog_input;
+        break;
     }
-    if (UI::EVENT_BUTTON_LONG_PRESS == event.type && OC::CONTROL_BUTTON_L == event.control) {
-      pong_instance.LevelUp();
-    }
+  }
 }
 
 /* The UI::Event has a value property, which is positive when the encoder is turned clockwise and
  * negative when it's turned widdershins. I just wanted to say "widdershins."
  */
 void PONGGAME_handleEncoderEvent(const UI::Event &event) {
-    if (OC::CONTROL_ENCODER_L == event.control) {
-        if (event.value < 0) pong_instance.player1.MovePaddleUp();
-        if (event.value > 0) pong_instance.player1.MovePaddleDown();
-    }
-    if (OC::CONTROL_ENCODER_R == event.control) {
-        if (event.value < 0) pong_instance.player2.MovePaddleDown();
-        if (event.value > 0) pong_instance.player2.MovePaddleUp();
-    }
+  if (OC::CONTROL_ENCODER_L == event.control) {
+    if (event.value < 0) pong_instance.player1.MovePaddleUp(4);
+    if (event.value > 0) pong_instance.player1.MovePaddleDown(4);
+    pong_instance.player1.enabled = true;
+    pong_instance.player1.use_analog_input = false;
+  }
+  if (OC::CONTROL_ENCODER_R == event.control) {
+    if (event.value < 0) pong_instance.player2.MovePaddleDown(4);
+    if (event.value > 0) pong_instance.player2.MovePaddleUp(4);
+    pong_instance.player2.enabled = true;
+    pong_instance.player2.use_analog_input = false;
+  }
 }
 
 #endif

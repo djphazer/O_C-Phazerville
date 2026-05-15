@@ -2,64 +2,62 @@
 layout: default
 ---
 
-# Pong 2.0 Notes
+# Pong 2.0
 
-The goal of Pong 2.0 app is going to be to make it have more features and more closely resemble and play like Pong ome consoles from the 1970s.
+This is a faithful receation of Pong home consoles that works significantly better than the original Pong app.
 
-## Features We Want To Add
+## How To Play
 
-- [x] a dotted line "net" for the tennis court
-- [x] bloop sound effect on one of the outputs
-- [-] 2 player option
-  - [x] scores for both players
-  - [x] digital input for right side
-  - [-] new cpu algorithm instead of just a wall
-  - [-] a way to toggle a player between CPU and manual control
-- [x] high score should update in real time as score increases
-- [ ] direct CV control over the paddle instead of just digital inputs
-- [ ] ??? menu for selecting input mode (cv or encoder) or find a way to handle both elegantly
-- [ ] self-patching Y position of the ball into the righthand paddle should recreate the original version of the game
-- [ ] random starting position of the ball
-- [ ] ?? start the paddle for both players
-- [ ] ball should change angle/direction based on where it touches the paddle - like real Pong
-- [ ] ball should also account for paddle velocity to affect angle
-- [ ] highlight the high score player with gfxInvert() after rendering txt
-- [ ] ball should slow down if its going too fast???
-- [ ] encoder rotation acceleration
-- [ ] make bloop sounds through-zero Out() instead of GateOut()
-- [ ] improve precision of calculations (see bitshift for ball x/y)
+There are 2 game modes which can be changed by enableing or disabling either player using the button:
 
-## Stretch Goals
+1. Solitaire - scores when you hit the ball
+2. Versus - scores when you hit your opponent's wall
 
-- [ ] Make Pong into a Hemispheres app?????
-  - Left side the applet starts with a left side paddle, right side with a right side paddle, and if you load it on both sides the ball teleports to the other applet
+## Digital Inputs
 
-# Pong (original documentation)
+Each player can use digital inputs or analog inputs by pushing the encoder in.
 
-Like twenty years ago, I owned a Kurzweil K2000. It had what we call today--but didn't call back then--an Easter Egg. It was a Pong game that you could play from the panel, and it generated MIDI notes when the ball bounced off a wall.
+The oiginal detented digital input has been preserved. It uses the left CV input for both players. (1 and 3 respectively)
 
-This is the Pong we all know and love, with a few twists. As a ball bounces its way across the screen, the player defends the left side of the screen with a "paddle," and the module defends the right side. It's an unfair game, though, because the module can't lose. As you return the ball and level up, the ball gets faster, and your paddle gets smaller and closer to your opponent. The odds are not in your favor!
+- Positive voltages move the paddle up
+- Negative voltages move the paddle down
 
-## Controls
+Encoders can be rotated to move the paddles up and down as well. The speed of the paddles has been improved for better playability.
 
-- Up/Down Buttons: Move the paddle up and down. This is really to illustrate the use of the buttons' event handler, and you really don't want to play the game with these things.
-- Encoders: Both encoders move the paddle up and down.
-- Trig 1: P1 up
-- Trig 2: P1 down
+In addition, you can use the Gate inputs to move the paddle up and down with classic on/off CV
 
-- CV Input 1: Negative values move the paddle up, and positive values move the paddle down. There's a "center detent," a small range that doesn't move the paddle at all. This is to compensate for noise that gets into the ADC.
-- Output A: When the ball bounces off your paddle, a short 5V trigger is sent to Output A.
-- Output B: When the ball bounces off anything else, a short 5V trigger is sent to Output B.
-- Output C: Sends 0 to 4-ish volts, based on the Y position of the ball. 0V is the top of the screen.
-- Output D: Sends 0 to 4-ish volts, based on the Y position of the player paddle. 0V is the top of the screen.
+- left gate - moves the paddle up
+- right gate - moves the paddle down
+
+## Analog Inputs
+
+The left CV input for both players is a non-detented input that can be used to move the paddle with an external analog CV signal. The range is bipolar and closely resembles the natural CV range of the Ornament and Crime outputs.
+
+## Recreate The Unbeatable CPU
+
+The original Pong app featured an unbeatable CPU. You can now mimic this behavior in one of two ways: The simplest method is to disable a player by pressing the button associated with the side the player is on.
+
+- up - enable/disable player 1
+- down - enable/disable player 2
+
+The second method which recreates the moving paddle that tracks the ball is to simply self-patch O_c from output 3 which tracks the Y position of the ball and feed it into the analog input for either paddle. You can lower the CPU difficulty by feeding the signal through a slew limiter, a delay module, or whatever other silliness you can dream up.
+
+## Outputs
+
+1. impact with a paddle
+2. impact with a wall
+3. Y position of the ball
+4. bleep bloop sound effects
 
 ## Exercises
 
 1. Create a patch that can be played by this game
 2. Create a patch that can play this game
 
-My patch's high score is 24, using Maths and Distro. Update 8/31/2018: 27 with just Maths!
+Note: Chysn's original high score of 27 has been inserted as the default for 1-player vs the wall. See if you can beat it!
 
 ## Credits
 
-App © 2018-2022 by Jason Justian and Beige Maze Laboratories. Wiki text by [Chysn](https://github.com/Chysn/O_C-HemisphereSuite/wiki/Pong), under MIT License
+Original App © 2018-2022 by Jason Justian and Beige Maze Laboratories. Wiki text by [Chysn](https://github.com/Chysn/O_C-HemisphereSuite/wiki/Pong), under MIT License
+
+Improvements 2026 by [Swamp Flux](https://github.com/swampflux)
