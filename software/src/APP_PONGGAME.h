@@ -79,7 +79,7 @@ public:
    */
   static constexpr int BOUNDARY_TOP = 11 << PRECISION;
   static constexpr int BOUNDARY_BOTTOM = 61 << PRECISION;
-  static constexpr int BOUNDARY_RIGHT = 116 << PRECISION;
+  static constexpr int BOUNDARY_RIGHT = 126 << PRECISION;
   static constexpr int BOUNDARY_LEFT = 2 << PRECISION;
 
   /* Define player properties. INITIAL_BALL_DELAY is how many ISR cycles the ball takes to move. It
@@ -171,10 +171,10 @@ public:
         ball_countdown = ball_delay;
 
         // Ball properties
-        ball_x = 32 << PRECISION;
-        ball_y = random((BOUNDARY_TOP + 2), (BOUNDARY_BOTTOM - 2)); // Start off in a random spot
-        vel_x = 1 << PRECISION;
+        vel_x = (random(0,100) > 50 ? 1 : -1) << PRECISION;
         vel_y = (random(0, 100) > 50 ? 1 : -1) << PRECISION; // Start off in a random direction
+        ball_x = (vel_x > 0 ? 32 : 96) << PRECISION;
+        ball_y = random((BOUNDARY_TOP + 2), (BOUNDARY_BOTTOM - 2)); // Start off in a random spot
     }
 
     void StartNewGame() {
