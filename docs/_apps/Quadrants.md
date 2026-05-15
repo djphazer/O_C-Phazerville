@@ -79,6 +79,8 @@ To switch a slot between dual mono and stereo, select that slot with both cursor
 
 ### Preset Storage
 
-Presets are stored internally in Flash using LittleFS, with 512KB of space allocated. There can be multiple Bank files, with 32 Presets per Bank. Input Mappings and Clock settings are stored _per Preset_. Quantizer scale settings are stored _per Bank_.
+_Note:_ Using a microSD card is highly recommended! It's more reliable, and doesn't stutter while saving. We've had reports of preset banks disappearing when using internal LFS storage...
 
-If a microSD card is detected, it becomes the primary storage for Bank files, using internal LFS as a fallback when loading if a file is not found on the card. Some utilities for copying between LFS <-> SD card are planned.
+Presets are stored internally in Flash using LittleFS, with a 512KB partition, or on a microSD card inserted in the slot on Teensy 4.1. There can be multiple Bank files, with 32 Presets per Bank. Input Mappings and Clock settings are stored _per Preset_. Quantizer scale settings are stored _per Bank_.
+
+If a microSD card is detected, it becomes the primary storage for Bank files, only using internal LFS as a fallback when loading if a file is not found on the card. This means you can effectively copy banks from internal storage to SD by re-saving a preset.
