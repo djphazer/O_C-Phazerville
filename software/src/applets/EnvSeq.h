@@ -1431,9 +1431,9 @@ private:
         const int max_units = HEMISPHERE_MAX_CV / OFFSET_SCALE_INCREMENT;
         const int offset_max = max_units * 0.2;
 
-        // Randomize amp only between 20% and 50%
+        // Randomize amp only between 20% and 80%
         const int amp_min = max_units * 0.2;
-        const int amp_max = max_units * 0.5;
+        const int amp_max = max_units * 0.8;
 
         const uint8_t total_waveform_count = WaveformManager::WaveformCount() + HS::WAVEFORM_LIBRARY_COUNT;
 
