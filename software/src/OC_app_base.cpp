@@ -70,13 +70,24 @@ void AppBase::Draw(UiMode ui_mode) const
 
   if (z_button_hold) {
     graphics.clearRect(0, 0, 128, 10);
-    graphics.clearRect(0, 10, 10, 44);
-    graphics.clearRect(118, 10, 10, 44);
+    graphics.clearRect(0, 10, 9, 44);
+    graphics.clearRect(119, 10, 9, 44);
     graphics.clearRect(0, 54, 128, 10);
 
-    graphics.drawFrame(10, 10, 108, 44);
+    graphics.drawFrame(9, 10, 110, 44);
 
-    gfxPrint(12, 1, "Z=Clock");
+    if (OC::CORE::ticks & (1 << 8)) {
+      // grayed out view
+      for (int y = 11; y < 54; ++y) {
+        gfxDottedLine(10, y, 118, y, 3 + (y % 4));
+      }
+    }
+
+    gfxPrint(12, 1, "Z= ");
+    if (id() == TWOCCS("QS") || id() == TWOCCS("HS") || id() == TWOCCS("C8"))
+      gfxPrint("Clock");
+    else
+      gfxPrint("???");
     gfxPrint(1, 56, "L:I/O Cfg  R:App Menu");
   }
 }
