@@ -67,7 +67,7 @@ class HandSawApplet : public HemisphereAudioApplet {
             }
 
             float m = amp < LVL_MIN_DB ? 0.0f : dbToScalar(amp);
-            m += amp_cv.InF();
+            m += (amp_cv.InF() * amp_cv.InF());
             vca_level.Push(float_to_q15(m));
         }
 

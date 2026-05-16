@@ -50,8 +50,8 @@ public:
     if (level_cv.source) {
       vca.bias(0.0f);
       vca.level(gain);
-      vca_cv.Push(float_to_q15(dbToScalar(-48 * (1.0f - level_cv.InF())))
-      );
+      float cv = level_cv.InF();
+      vca_cv.Push(float_to_q15(cv * cv));
     } else {
       vca.bias(gain);
       vca.level(0.0f);
