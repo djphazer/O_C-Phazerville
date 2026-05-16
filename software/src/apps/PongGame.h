@@ -478,7 +478,7 @@ void AppPong::HandleButtonEvent(const UI::Event &event) {
         player2.score = 0;
         break;
 
-      case OC::CONTROL_ENCODER_L:
+      case OC::CONTROL_BUTTON_L:
         player1.use_analog_input = !player1.use_analog_input;
         break;
 
