@@ -558,6 +558,7 @@ public:
         const int y = 13 + 10*((zoom_cursor-1)/2);
         gfxInvert(x, y, 19, 9);
         gfxFrame(x, y, 19, 9, true);
+
         if (zoom_cursor <= 2) {
           // trigmap & clock multiplier
           const int io_chan = zoom_slot * 2 + zoom_cursor - 1;
@@ -570,7 +571,6 @@ public:
           graphics.print((mult >= 0) ? "x" : "/");
           graphics.print((mult >= 0) ? mult : 1 - mult);
         }
-
         if (zoom_cursor >= 5) {
           gfxIcon(x + 18, y + 1, DOWN_ICON, true);
 
@@ -868,7 +868,7 @@ public:
           return;
         }
         if (HS::midi_edit) {
-          HS::MEditEncoderMove(h, event.value);
+          HS::MEditEncoderMove(h, increment);
           return;
         }
 

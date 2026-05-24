@@ -763,6 +763,67 @@ public:
         HemisphereApplet::ProcessCursors();
     }
 
+    void DrawFullScreen() const {
+      int index = my_applet[zoom_slot];
+
+      if (select_mode == zoom_slot) {
+        showhide_cursor.Scroll(next_applet[zoom_slot] - showhide_cursor.cursor_pos());
+        DrawAppletList(CursorBlink());
+        // dotted screen border during applet select
+        gfxFrame(0, 0, 128, 64, true);
+        return;
+      }
+
+      HS::get_applet(index, zoom_slot)->BaseView(true, zoom_cursor < 0);
+
+      // draw cursor for editing applet select and input maps
+      if (zoom_cursor < 0) {
+        gfxIcon(64 - 8*zoom_slot, 1, DOWN_ICON, true);
+      } else if (0 == zoom_cursor) {
+        if (select_mode != zoom_slot && CursorBlink())
+          gfxIcon(64 - 8*zoom_slot, 1, zoom_slot? RIGHT_ICON : LEFT_ICON, true);
+      } else if (isEditing) {
+        const int x = 64*((zoom_cursor-1)%2);
+        const int y = 13 + 10*((zoom_cursor-1)/2);
+        gfxInvert(x, y, 19, 9);
+        gfxFrame(x, y, 19, 9, true);
+
+        if (zoom_cursor <= 2) {
+          // trigmap & clock multiplier
+          const int io_chan = zoom_slot * 2 + zoom_cursor - 1;
+          const int mult = HS::clock_m.GetMultiply(io_chan);
+
+          graphics.clearRect(x, y - 9, 36, 8);
+          graphics.drawBitmap8(x, y - 9, 8, RIGHT_ICON);
+          graphics.drawBitmap8(x + 8, y - 9, 8, CLOCK_ICON);
+          graphics.setPrintPos(x + 16, y - 9);
+          graphics.print((mult >= 0) ? "x" : "/");
+          graphics.print((mult >= 0) ? mult : 1 - mult);
+        }
+        if (zoom_cursor >= 5) {
+          gfxIcon(x + 18, y + 1, DOWN_ICON, true);
+
+          graphics.clearRect(0, y + 10, 127, 20);
+          gfxPrint(x, y+10, "Slew=");
+          gfxPrint(HS::frame.output_slew[zoom_slot*2 + zoom_cursor-5]);
+          gfxPrint("%");
+
+          const int att = Atten(HS::frame.output_atten[zoom_slot*2 + zoom_cursor-5]);
+          gfxPrint(x, y+20, "Lvl=");
+          if (att < 0) gfxPrint("-");
+          graphics.printf("%d.%d%%", abs(att) / 10, abs(att) % 10);
+        }
+      } else {
+        if (CursorBlink()) {
+          const int x = 18 + 64*((zoom_cursor-1)%2);
+          const int y = 14 + 10*((zoom_cursor-1)/2);
+          gfxIcon(x, y, LEFT_ICON, true);
+        }
+      }
+
+      gfxDisplayInputMapEditor();
+    }
+
     void View() const {
         bool draw_applets = true;
 
@@ -816,52 +877,7 @@ public:
 
         if (draw_applets) {
           if (zoom_slot > -1) {
-            int index = my_applet[zoom_slot];
-
-            if (select_mode == zoom_slot) {
-              showhide_cursor.Scroll(next_applet[zoom_slot] - showhide_cursor.cursor_pos());
-              DrawAppletList(CursorBlink());
-              // dotted screen border during applet select
-              gfxFrame(0, 0, 128, 64, true);
-            }
-            else {
-              HS::get_applet(index, zoom_slot)->BaseView(true, zoom_cursor < 0);
-              gfxDisplayInputMapEditor();
-            }
-
-            // draw cursor for editing applet select and input maps
-            if (zoom_cursor < 0) {
-              gfxIcon(64 - 8*zoom_slot, 1, DOWN_ICON, true);
-            } else if (0 == zoom_cursor) {
-              if (select_mode != zoom_slot && CursorBlink())
-                gfxIcon(64 - 8*zoom_slot, 1, zoom_slot? RIGHT_ICON : LEFT_ICON, true);
-            } else if (isEditing) {
-              const int x = 64*((zoom_cursor-1)%2);
-              const int y = 13 + 10*((zoom_cursor-1)/2);
-              gfxInvert(x, y, 19, 9);
-              gfxFrame(x, y, 19, 9, true);
-              if (zoom_cursor >= 5) {
-                gfxIcon(x + 18, y + 1, DOWN_ICON, true);
-
-                graphics.clearRect(0, y + 10, 127, 20);
-                gfxPrint(x, y+10, "Slew=");
-                gfxPrint(HS::frame.output_slew[zoom_slot*2 + zoom_cursor-5]);
-                gfxPrint("%");
-
-                const int att = Atten(HS::frame.output_atten[zoom_slot*2 + zoom_cursor-5]);
-                gfxPrint(x, y+20, "Lvl=");
-                if (att < 0) gfxPrint("-");
-                graphics.printf("%d.%d%%", abs(att) / 10, abs(att) % 10);
-              }
-            } else {
-              if (CursorBlink()) {
-                const int x = 18 + 64*((zoom_cursor-1)%2);
-                const int y = 14 + 10*((zoom_cursor-1)/2);
-                gfxIcon(x, y, LEFT_ICON, true);
-              }
-            }
-
-            draw_applets = false;
+            DrawFullScreen();
           } else {
             for (int h = 0; h < 2; h++)
             {
@@ -942,7 +958,7 @@ public:
                 break;
             case 1:
             case 2:
-              if (!clock_m.IsRunning() && CheckEditInputMapPress(
+              if (h == RIGHT_HEMISPHERE && CheckEditInputMapPress(
                     zoom_cursor,
                     IndexedInput(1, trigmap[zoom_slot*2]),
                     IndexedInput(2, trigmap[zoom_slot*2+1])
@@ -1080,44 +1096,50 @@ public:
 
     void DelegateEncoderMovement(const UI::Event &event) {
         HEM_SIDE h = (event.control == OC::CONTROL_ENCODER_L) ? LEFT_HEMISPHERE : RIGHT_HEMISPHERE;
+        int increment = event.value;
+        if (event.mask & (OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_R)) {
+          // push-and-turn for coarse adjustments
+          OC::ui.SetButtonIgnoreMask();
+          increment *= 10;
+        }
 
         if (HS::q_edit) {
-          HS::QEditEncoderMove(h, event.value);
+          HS::QEditEncoderMove(h, increment);
           return;
         }
         if (HS::midi_edit) {
-          HS::MEditEncoderMove(h, event.value);
+          HS::MEditEncoderMove(h, increment);
           return;
         }
 
         if (view_state == CONFIG_MENU) {
-          ConfigEncoderAction(h, event.value);
+          ConfigEncoderAction(h, increment);
           return;
         }
 #ifdef ARDUINO_TEENSY41
         if (view_state == AUDIO_SETUP) {
-          // OC::AudioDSP::AudioMenuAdjust(h, event.value);
+          // OC::AudioDSP::AudioMenuAdjust(h, increment);
           return;
         }
 #endif
 
         if (clock_setup) {
           if (h == LEFT_HEMISPHERE)
-            ClockSetup_instance.OnLeftEncoderMove(event.value);
+            ClockSetup_instance.OnLeftEncoderMove(increment);
           else
-            ClockSetup_instance.OnEncoderMove(event.value);
+            ClockSetup_instance.OnEncoderMove(increment);
 
           return;
         }
 
         // Fullscreen cursor stuff
         if (zoom_slot > -1) {
-          if (select_mode == zoom_slot) ChangeApplet(HEM_SIDE(zoom_slot), event.value);
+          if (select_mode == zoom_slot) ChangeApplet(HEM_SIDE(zoom_slot), increment);
           else if (!isEditing && LEFT_HEMISPHERE == h) // left enc jumps between applet or config
             zoom_cursor = (event.value > 0)? 0 : -1;
           else if (zoom_cursor < 0) { // right enc is normal applet behavior
             int index = my_applet[zoom_slot];
-            HS::get_applet(index, zoom_slot)->OnEncoderMove(event.value);
+            HS::get_applet(index, zoom_slot)->OnEncoderMove(increment);
           } else if (isEditing) { // either enc changes config value
             switch (zoom_cursor)
             {
@@ -1125,40 +1147,39 @@ public:
               case 2:
               {
                 int chan = zoom_slot*2 + zoom_cursor - 1;
-                if (clock_m.IsRunning()) // && clock_m.GetMultiply(chan))
-                {
-                  clock_m.SetMultiply(clock_m.GetMultiply(chan) + event.value, chan);
-                } else if (!EditSelectedInputMap(event.value))
-                  HS::trigmap[zoom_slot*2 + zoom_cursor - 1].ChangeSource(event.value);
+                if (h == LEFT_HEMISPHERE) {
+                  clock_m.SetMultiply(clock_m.GetMultiply(chan) + increment, chan);
+                } else if (!EditSelectedInputMap(increment))
+                  HS::trigmap[zoom_slot*2 + zoom_cursor - 1].ChangeSource(increment);
                 break;
               }
               case 3:
               case 4:
-                if (!EditSelectedInputMap(event.value))
-                  HS::cvmap[zoom_slot*2 + zoom_cursor - 3].ChangeSource(event.value);
+                if (!EditSelectedInputMap(increment))
+                  HS::cvmap[zoom_slot*2 + zoom_cursor - 3].ChangeSource(increment);
                 break;
               case 5:
               case 6:
                 if (h == LEFT_HEMISPHERE)
-                  HS::frame.NudgeAtten(zoom_slot*2 + zoom_cursor - 5, event.value);
+                  HS::frame.NudgeAtten(zoom_slot*2 + zoom_cursor - 5, increment);
                 else
-                  HS::frame.NudgeSlew(zoom_slot*2 + zoom_cursor - 5, event.value);
+                  HS::frame.NudgeSlew(zoom_slot*2 + zoom_cursor - 5, increment);
                 break;
               default:
                 isEditing = false;
                 break;
             }
           } else { // right enc moves cursor
-            zoom_cursor = constrain(zoom_cursor + event.value, 0, 6);
+            zoom_cursor = constrain(zoom_cursor + increment, 0, 6);
             ResetCursor();
           }
         } else if (select_mode == h) {
           // old style select mode
-          ChangeApplet(h, event.value);
+          ChangeApplet(h, increment);
           SetApplet(h, next_applet[h]);
         } else {
             int index = my_applet[h];
-            HS::get_applet(index, h)->OnEncoderMove(event.value);
+            HS::get_applet(index, h)->OnEncoderMove(increment);
         }
     }
 
