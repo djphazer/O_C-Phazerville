@@ -64,7 +64,7 @@ public:
             ForEachChannel(ch)
             {
                 signal[ch] = int2simfloat(cv[ch][step]);
-                byte next_step = step + 1;
+                int next_step = step + 1;
                 if (next_step > end) next_step = start;
                 if (smooth) rise[ch] = (int2simfloat(cv[ch][next_step]) - int2simfloat(cv[ch][step])) / ClockCycleTicks(0);
                 else rise[ch] = 0;
@@ -135,6 +135,23 @@ public:
 
     uint64_t OnDataRequest() {
         uint64_t data = 0;
+
+        // save full CV data in extra storage
+        // 256 total slots using SetData/GetData
+        uint16_t* p;
+        size_t i = 0;
+        ForEachChannel(ch) {
+          p = (uint16_t*)cv[ch];
+          while (i < CVREC_MAX_STEP) {
+            Pack(data, PackLocation{(i % 4) * 16, 16}, *p++);
+            if ((i % 4) == 3) {
+              SetData(i / 4, data);
+              data = 0;
+            }
+            ++i;
+          }
+        }
+
         Pack(data, PackLocation {0,9}, start);
         Pack(data, PackLocation {9,9}, end);
         Pack(data, PackLocation {18,1}, smooth);
@@ -145,6 +162,19 @@ public:
         start = constrain(Unpack(data, PackLocation {0,9}), 0, CVREC_MAX_STEP - 2);
         end = constrain(Unpack(data, PackLocation {9,9}), start + 1, CVREC_MAX_STEP - 1);
         smooth = Unpack(data, PackLocation {18,1});
+
+        uint16_t* p;
+        size_t i = 0;
+        ForEachChannel(ch) {
+          p = (uint16_t*)cv[ch];
+          while (i < CVREC_MAX_STEP) {
+            if ((i % 4) == 0) {
+              if (!GetData(i / 4, data)) break;
+            }
+            *p++ = Unpack(data, PackLocation{(i % 4) * 16, 16});
+            ++i;
+          }
+        }
     }
 
 protected:
