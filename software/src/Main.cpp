@@ -362,11 +362,14 @@ void setup() {
   vbias_m->SetState(VBiasManager::BI);
 #endif
 
+  // use default global config file in LFS
+  bool firstrun = !PhzConfig::load_config();
+
   // initialize apps
-  OC::app_switcher.Init(reset_settings);
+  OC::app_switcher.Init(reset_settings || firstrun);
 
   // Welcome splash
-  OC::ui.Splashscreen(reset_settings, 1);
+  OC::ui.Splashscreen(firstrun, 1);
 
   if (start_cal)
     OC::start_calibration();

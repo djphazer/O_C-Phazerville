@@ -99,6 +99,7 @@ static void SaveGlobalSettings() {
   //global_settings.DAC_scaling = OC::DAC::store_scaling();
   Pack(data, PackLocation{0, 16}, global_settings.current_app_id);
   Pack(data, PackLocation{16, 1}, global_settings.encoders_enable_acceleration);
+  Pack(data, PackLocation{17, 1}, 1); // v2.0 first-run validation
   PhzConfig::setValue(METADATA_KEY, data);
 
   // User Scales
@@ -371,7 +372,19 @@ void AppSwitcher::Init(bool reset_settings) {
   global_settings.current_app_id = DEFAULT_APP_ID;
   memset(HS::user_turing_machines, 0, sizeof(HS::user_turing_machines));
 
-  if (reset_settings) {
+  uint64_t data = 0;
+  // check metadata for validity
+  if (PhzConfig::getValue(METADATA_KEY, data)) {
+    global_settings.current_app_id = Unpack(data, PackLocation{0, 16});
+    global_settings.encoders_enable_acceleration = Unpack(data, PackLocation{16, 1});
+    global_settings.valid = Unpack(data, PackLocation{17, 1});
+    // 15 bits empty...
+    // TODO:
+    //global_settings.DAC_scaling = Unpack(data, PackLocation{32, 32});
+    //OC::DAC::restore_scaling(global_settings.DAC_scaling);
+  }
+
+  if (reset_settings || !global_settings.valid) {
     if (ui.ConfirmReset()) {
       APPS_SERIAL_PRINTLN("Erase EEPROM ...");
       EEPtr d = EEPROM_GLOBALSETTINGS_START;
@@ -386,6 +399,8 @@ void AppSwitcher::Init(bool reset_settings) {
       global_settings_storage.Init();
 #endif
       app_data_storage.Init();
+      global_settings.valid = true;
+      SaveGlobalSettings();
     } else {
       reset_settings = false;
     }
@@ -393,10 +408,9 @@ void AppSwitcher::Init(bool reset_settings) {
 
   if (!reset_settings) {
 #ifdef __IMXRT1062__
-    bool scala_file_loaded[Scales::SCALE_USER_COUNT] = {false};
-
     // User Scales
     char filename[] = "000.SCL";
+    bool scala_file_loaded[Scales::SCALE_USER_COUNT] = {false};
     for (size_t i = 0; i < Scales::SCALE_USER_COUNT; ++i) {
       if (SDcard_Ready && SD.exists(filename)) {
         filename[2] = char('0' + i);
@@ -408,18 +422,9 @@ void AppSwitcher::Init(bool reset_settings) {
         file.close();
       }
     }
-    PhzConfig::load_config(); // use default config file
 
     // Metadata
-    uint64_t data = 0;
-    if (PhzConfig::getValue(METADATA_KEY, data)) {
-      global_settings.current_app_id = Unpack(data, PackLocation{0, 16});
-      global_settings.encoders_enable_acceleration = Unpack(data, PackLocation{16, 1});
-      // 15 bits empty...
-      // TODO:
-      //global_settings.DAC_scaling = Unpack(data, PackLocation{32, 32});
-      //OC::DAC::restore_scaling(global_settings.DAC_scaling);
-
+    if (global_settings.valid) {
       // User Scales
       for (size_t i = 0; i < Scales::SCALE_USER_COUNT; ++i) {
         if (scala_file_loaded[i] ||

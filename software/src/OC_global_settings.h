@@ -56,6 +56,8 @@ public:
   uint32_t reserved2;
   uint16_t current_app_id;
 
+  bool valid = false; // added in v2.0
+
   // TODO[PLD] We should be able to use these structs directly to save space
   Scale user_scales[Scales::SCALE_USER_COUNT];
   Pattern user_patterns[Patterns::PATTERN_USER_COUNT];

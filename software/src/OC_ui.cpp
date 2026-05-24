@@ -287,10 +287,17 @@ UiMode Ui::Splashscreen(bool &reset_settings, uint8_t phase) {
       ZapScreensaver();
 
       graphics.clearRect(27, 22, 74, 22);
-      graphics.setPrintPos(28, 23);
-      graphics.print(" Welcome to");
-      graphics.setPrintPos(28, 33);
-      graphics.print("Phazerville!");
+      if (reset_settings) {
+        graphics.setPrintPos(28, 23);
+        graphics.print("Time for a ");
+        graphics.setPrintPos(28, 33);
+        graphics.print("Fresh Start!");
+      } else {
+        graphics.setPrintPos(28, 23);
+        graphics.print(" Welcome to");
+        graphics.setPrintPos(28, 33);
+        graphics.print("Phazerville!");
+      }
       //graphics.print(OC::Strings::RELEASE_NAME);
 
       while (event_queue_.available())
