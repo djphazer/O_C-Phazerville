@@ -216,6 +216,12 @@ public:
     calstate.auto_scale_set[ch] = true;
   }
 
+  void set_all_octave(int oct) {
+    for (int i = 0; i < DAC_CHANNEL_COUNT; ++i) {
+      Out(i, oct * ONE_OCTAVE);
+    }
+  }
+
   void Controller()
   {
     using namespace OC;
@@ -232,42 +238,42 @@ public:
 
       switch (step->calibration_type) {
         case CALIBRATE_NONE:
-          DAC::set_all_octave(0);
+          set_all_octave(0);
           break;
         case CALIBRATE_OCTAVE:
           OC::calibration_data.dac.calibrated_octaves[step_to_channel(step->step)][current_octave] =
             calstate.encoder_value;
-          DAC::set_all_octave((current_octave - DAC::kOctaveZero)*(1+DAC_20Vpp));
+          set_all_octave((current_octave - DAC::kOctaveZero)*(1+DAC_20Vpp));
           break;
         #ifdef VOR
         case CALIBRATE_VBIAS_BIPOLAR:
           /* set 0V @ bipolar range */
-          DAC::set_all_octave(5);
+          set_all_octave(5);
           OC::calibration_data.v_bias = (OC::calibration_data.v_bias & 0xFFFF0000) | calstate.encoder_value;
           DAC::set_Vbias(0xFFFF & OC::calibration_data.v_bias);
           break;
         case CALIBRATE_VBIAS_ASYMMETRIC:
           /* set 0V @ asym. range */
-          DAC::set_all_octave(3);
+          set_all_octave(3);
           OC::calibration_data.v_bias = (OC::calibration_data.v_bias & 0xFFFF) | (calstate.encoder_value << 16);
           DAC::set_Vbias(OC::calibration_data.v_bias >> 16);
         break;
         #endif
         case CALIBRATE_ADC_OFFSET:
-          DAC::set_all_octave(0);
+          set_all_octave(0);
           break;
         case CALIBRATE_ADC_1V:
-          DAC::set_all_octave(1);
+          set_all_octave(1);
           break;
         case CALIBRATE_ADC_3V:
-          DAC::set_all_octave(3);
+          set_all_octave(3);
           break;
         case CALIBRATE_DISPLAY:
           OC::calibration_data.display_offset = calstate.encoder_value;
           display::AdjustOffset(OC::calibration_data.display_offset);
           break;
         case CALIBRATE_SCREENSAVER:
-          DAC::set_all_octave(0);
+          set_all_octave(0);
           OC::calibration_data.screensaver_timeout = calstate.encoder_value;
           break;
       }
@@ -609,8 +615,7 @@ public:
     }
 
     void FactoryReset() {
-      // TODO:
-        //OC::apps::Init(1);
+      OC::app_switcher.Init(true);
     }
 };
 
