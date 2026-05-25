@@ -62,6 +62,8 @@ public:
         bool midi_sync = false;
         bool clock_sync = HS::frame.synctrig;
 
+        hemisphere = HS::CLOCK_CURSOR;
+
         // MIDI Clock is filtered to 2 PPQN
         if (frame.MIDIState.clock_q) {
             frame.MIDIState.clock_q = 0;
@@ -109,6 +111,14 @@ public:
         }
         */
 
+        // Virtual outputs: #E, #F, #G, and #H
+        if (HS::clock_m.Tock(HS::ClockManager::ONE_BEAT_CLOCK))
+          ClockOut(0); // 1x pulse
+        if (HS::clock_m.Tock(HS::ClockManager::SIXTEENTH_CLOCK))
+          ClockOut(1); // 4x pulse
+        GateOut(2, HS::clock_m.IsRunning()); // RUN
+        GateOut(3, !HS::clock_m.IsRunning()); // RESET
+
         if (button_ticker) --button_ticker;
         if (slide_anim) --slide_anim;
     }
@@ -127,7 +137,6 @@ public:
       }
     }
     void View() {
-      hemisphere = HS::GLOBAL_CURSOR;
       if (OC::CORE::ticks - view_tick > 1000) {
         slide_anim = SLIDEOUT_TIME;
       }

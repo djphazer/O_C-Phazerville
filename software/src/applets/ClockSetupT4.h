@@ -85,7 +85,7 @@ public:
         bool midi_sync = false;
         bool clock_sync = HS::frame.synctrig;
 
-        hemisphere = HS::GLOBAL_CURSOR;
+        hemisphere = HS::CLOCK_CURSOR;
 
         // MIDI Clock is filtered to 2 PPQN
         if (frame.MIDIState.clock_q) {

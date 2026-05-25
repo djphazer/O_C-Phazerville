@@ -46,13 +46,13 @@ namespace HS {
     LEFT2_HEMISPHERE = 2,
     RIGHT2_HEMISPHERE = 3,
 #endif
-    GLOBAL_CURSOR,
+    CLOCK_CURSOR,
     GLOBAL_CURSOR_EXTRA,
     AUDIO_SLOT_L,
     AUDIO_SLOT_R,
 
     APPLET_CURSOR_COUNT,
-    APPLET_SLOTS = GLOBAL_CURSOR,
+    APPLET_SLOTS = CLOCK_CURSOR,
   };
 
   // Codes for help system labels
