@@ -6,16 +6,15 @@ nav_order: 1
 # Phazerville Suite
 
 ## Officially Supported Devices:
-* After Later Audio - [**Ornate Criminal** in Phazerville](https://afterlateraudio.com/products/ornate-criminal)
-  - also standard 8hp or 1U uO_C with Teensy 4.0
-* Tunefish Modular / TLM Audio - [Phazerville **O.R.N.8**](https://www.tlm-audio.com/product-page/oc-4-1-phazerville)
-* Northern Light Modular - [**Xenomorpher**](https://northernlightmodular.com/product/xenomorpher-model-2x0/)
-  - variants for Buchla or Serge systems
-* CalSynth - [**XLOC2**](https://calsynth.com/products/xloc2-preorder-calsynth-exclusive-next-gen-4-1-ornament-and-crime-special-intro-price)
-  - also standard [8hp uO_C](https://calsynth.com/products/uoc_s) [with Teensy 4.0](https://calsynth.com/products/uoc_b)
-* RÖMHOLD Modular - [Ornament & Crime T4.1](https://rmodular.com/produkt/ornament-crime-t4-1-mxmxmx-eurorack-module-o_c-t4-0-black-panel/)
-  - also standard 8hp [O_C with T4.0](https://rmodular.com/produkt/ornament-crime-mxmxmx-eurorack-module-o_c-t4-0-black-white/)
-* Plum Audio - [**OCP X**](https://www.plum-audio.com/product-page/ocp-x) (using firmware v1.x only for T32+VOR)
+
+Maker | Product
+-- | --
+After Later Audio | [**Ornate Criminal** in Phazerville](https://afterlateraudio.com/products/ornate-criminal)<br>- also standard 8hp or 1U uO_C with Teensy 4.0
+Tunefish Modular / TLM Audio | [OC 4.1 Phazerville **O.R.N.8**](https://www.tlm-audio.com/product-page/oc-4-1-phazerville)
+Northern Light Modular | [**Xenomorpher**](https://northernlightmodular.com/product/xenomorpher-model-2x0/)<br>- 4U variants for [Buchla](https://northernlightmodular.com/product-category/4ub/) or [Serge](https://northernlightmodular.com/product-category/4us/) systems
+CalSynth | [**XLOC2**](https://calsynth.com/products/xloc2-preorder-calsynth-exclusive-next-gen-4-1-ornament-and-crime-special-intro-price)<br>- also standard [8hp uO_C](https://calsynth.com/products/uoc_s) [with Teensy 4.0](https://calsynth.com/products/uoc_b)
+RÖMHOLD Modular | [Ornament & Crime T4.1](https://rmodular.com/produkt/ornament-crime-t4-1-mxmxmx-eurorack-module-o_c-t4-0-black-panel/)<br>- also standard 8hp [O_C with T4.0](https://rmodular.com/produkt/ornament-crime-mxmxmx-eurorack-module-o_c-t4-0-black-white/)
+Plum Audio | [**OCP X**](https://www.plum-audio.com/product-page/ocp-x) (using firmware v1.x only for T32+VOR)
 
 ## Key Features:
 * Support for next-gen [Teensy 4.1-based "O.R.N.8" hardware](https://github.com/PaulStoffregen/O_C_T41) using [**Quadrants**](Quadrants) App
