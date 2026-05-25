@@ -80,12 +80,24 @@ namespace HS {
 
   FLASHMEM
   void Init() {
+    const int default_scales[8] = {
+      OC::Scales::SCALE_SEMI + 0,
+      OC::Scales::SCALE_SEMI + 1, // Ionian
+      OC::Scales::SCALE_SEMI + 6, // Aeolian
+      OC::Scales::SCALE_SEMI + 137, // Harmonic Minor
+
+      OC::Scales::SCALE_SEMI + 5, // Mixolydian
+      OC::Scales::SCALE_SEMI + 7, // Locrian
+      OC::Scales::SCALE_SEMI + 10, // Pentatonic Major
+      OC::Scales::SCALE_SEMI + 11, // Pentatonic Minor
+    };
+
     for (auto &iq : input_quant)
       iq.Init();
 
     for (int i = 0; i < QUANT_CHANNEL_COUNT; ++i) {
       q_engine[i].quantizer.Init();
-      q_engine[i].Configure( (i<4)? OC::Scales::SCALE_SEMI : i-4, 0xffff);
+      q_engine[i].Configure(default_scales[i], 0xffff);
     }
 
     ResetMappings();
