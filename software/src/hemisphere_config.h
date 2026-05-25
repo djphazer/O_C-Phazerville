@@ -108,6 +108,16 @@
 #include "applets/Xfader.h"
 #include "applets/hMIDIIn.h"
 #include "applets/hMIDIOut.h"
+#include "applets/Ponglet.h"
+
+#ifdef PEWPEWPEW
+#include "applets/MarkoV.h"
+#include "applets/MarkovPerc.h"
+#include "applets/EuclidO.h"
+#include "applets/TruthCat3.h"
+#include "applets/TruthCat4.h"
+#include "applets/CVSeq.h"
+#endif
 
 template<class A>
 struct DeclareApplet {
@@ -141,6 +151,15 @@ private:
 };
 
 AppletRegistry reg{
+    DeclareApplet<Ponglet>{99, 0x00},
+#ifdef PEWPEWPEW
+    DeclareApplet<MarkoV>{98, 0x00},
+    DeclareApplet<MarkovPerc>{97, 0x00},
+    DeclareApplet<EuclidO>{96, 0x00},
+    DeclareApplet<CVSeq>{95, 0x00},
+    DeclareApplet<TruthCat3>{94, 0x00},
+    DeclareApplet<TruthCat4>{93, 0x00},
+#endif
     DeclareApplet<ADSREG>{8, 0x01},
     DeclareApplet<ADEG>{34, 0x01},
     DeclareApplet<ASR>{47, 0x09},
