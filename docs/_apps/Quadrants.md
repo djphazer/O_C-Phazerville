@@ -15,39 +15,36 @@ This quick-reference diagram shows how to navigate between various screens and f
 
 ### Controls
 
-Some controls are exclusive to new hardware with 5 buttons + 2 encoders:
+Many controls are exclusive to new hardware with 5 buttons + 2 encoders.
 
 | Button | Action |
 | ------ | ------ |
 | Press **A/B/X/Y** | switch corresponding applet into view (NW, NE, SW, SE) |
 | Double-click **A/B/X/Y** | view applet full-screen or help/config<br>- adjust input mappings for triggers/CV, or clock trigger multipliers if Clock is running<br>- switch loaded applet |
+| Hold **X** or **Y**, and rotate either Encoder | Quick-switch visible applet on each side |
+| Press **A + B** | Clock Setup |
 | Press **Z** | Start/Stop/Arm the Clock |
-| Press **A + Y** or **X + B** | Overview |
+| Press **A + Y** or **X + B** (diagonal combos) | Overview |
+| Long-press **B** | Config menu (presets, general settings, input mapping, quantizers, etc) |
 | Press **A + X** | Load Preset shortcut |
 | Press **B + Y** | Input Mapping Config shortcut |
 | Press **X + Y** | Audio DSP subsystem<br>- use A or B to jump back out |
-
-Other controls are identical to Hemispheres:
-
-| Button | Action |
-| ------ | ------ |
-| Press **A + B** | Clock Setup |
-| Long-press **A** | Invoke Screensaver (global) |
-| Long-press **B** | Config menu (presets, general settings, input mapping, quantizers, etc) |
 
 The encoders behave intuitively in split-screen views - rotate to move the corresponding Left/Right cursor, push to select or toggle editing.
 
 In full-screen views, rotating **Left Encoder** typically switches pages or makes coarse adjustments; **Right Encoder** moves the cursor, or makes fine adjustments; push either Encoder button to select or toggle editing.
 
-### Input Mapping
+## Input Mapping
 
-Each applet still has only 2 trigger inputs, 2 CV inputs, and 2 outputs.
+Each applet still has only 2 trigger inputs, 2 CV inputs, and 2 outputs. The full-screen Help/Config screen (double-click applet select button) can be used for quick reference or editing of these mappings.
 
-The output routing is hardcoded and not configurable - the "North-West" applet uses DAC outputs A & B, "North-East" uses DAC outputs C & D, etc.
+![Applet Config screen](images/Applet-Config-output.png)
 
-The inputs, however, can be completely reassigned, allowing triggers to be derived from TR1..4 as well as CV1..8 or even looped back from one of the outputs. Same with CV. Complex internal feedback patterns can be achieved this way, but also simple use cases such as clocking all 4 applets from TR1, or sampling the same CV input with several instances of Squanch.
+The output routing is hardcoded and not configurable - the "North-West" applet uses DAC outputs A & B, "North-East" uses DAC outputs C & D, etc. You can, however, adjust Slew and Attenuversion for each output.
 
-### Audio DSP
+The inputs can be completely reassigned, allowing triggers to be derived from TR1..4 as well as CV1..8 or even looped back from one of the outputs. Same with CV. Complex internal feedback patterns can be achieved this way, but also simple use cases such as clocking all 4 applets from TR1, or sampling the same CV input with several instances of Squanch.
+
+## Audio DSP
 
 ![Audio Applet Overview](images/AudioAppletOverview.png)
 
@@ -65,7 +62,7 @@ The animated bars above and below the slots indicate audio level before and afte
 
 Check the sidebar navigation for details about each Audio Applet.
 
-#### Controls
+### Controls
 
 | Button / Encoder | Action |
 | ---------------- | ------ |
@@ -77,7 +74,7 @@ Check the sidebar navigation for details about each Audio Applet.
 
 To switch a slot between dual mono and stereo, select that slot with both cursors and press both encoders simultaneously.
 
-### Preset Storage
+## Preset Storage
 
 _Note:_ Using a microSD card is highly recommended! It's more reliable, and doesn't stutter while saving. We've had reports of preset banks disappearing when using internal LFS storage...
 
