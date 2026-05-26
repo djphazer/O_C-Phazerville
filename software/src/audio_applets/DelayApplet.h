@@ -25,7 +25,7 @@ public:
     set_taps(taps);
     MAX_DELAY_SECS = channels[0].delaystream.MAX_DELAY_SECS;
     MIN_DELAY_SECS = channels[0].delaystream.MIN_DELAY_SECS;
-    clock_source.source = -2; // CLK1
+    clock_source.SetClockSource(0); // CL1
   }
 
   void Unload() {
@@ -160,10 +160,10 @@ public:
       case CLOCK:
         gfxStartCursor();
         gfxPrint(clock_source);
-        if (clock_source.source < 0)
-          gfxPrint(1 + 3*(clock_source.source==-1));
+        if (clock_source.source_type() == HS::DigitalInputMap::TYPE_INTERNAL)
+          gfxPrint(1 + 3 * (clock_source.index() == 1));
         gfxEndCursor(cursor == CLOCK_SOURCE);
-        if (clock_source.source >= 0)
+        if (clock_source.source_type() != HS::DigitalInputMap::TYPE_INTERNAL)
           gfxPrint(" ");
 
         gfxStartCursor();

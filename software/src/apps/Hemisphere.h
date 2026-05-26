@@ -745,7 +745,7 @@ public:
           // The paradox is we need to process the clock first, in case jump_trig needs it,
           // but then jump_trig will queue another preset load,
           // so we have to process the queue again.
-          if (jump_trig_.source < 0) ProcessQueue();
+          if (jump_trig_.is_clock()) ProcessQueue();
         }
 
         // execute Applets

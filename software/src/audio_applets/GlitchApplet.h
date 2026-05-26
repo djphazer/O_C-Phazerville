@@ -38,7 +38,7 @@ public:
         for (int ch = 0; ch < Channels; ch++) {
             channels[ch].Start(this, ch, input_stream, output_stream);
         }
-        clock_source.source = -2; // default to CLK1
+        clock_source.SetClockSource(0); // default to CL1
     }
 
     void Unload() override {

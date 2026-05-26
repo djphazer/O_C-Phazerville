@@ -42,12 +42,12 @@ public:
     pwm_stream.Push(
       float_to_q15(0.01f * static_cast<float>(pw * 2 - 100) + pw_cv.InF())
     );
-    if (mod_cv.source) mod_cv_stream.Push(float_to_q15(mod_cv.InF()));
+    if (mod_cv.enabled()) mod_cv_stream.Push(float_to_q15(mod_cv.InF()));
 
     float m
       = constrain(static_cast<float>(mix) * 0.01f + mix_cv.InF(), 0.0f, 1.0f);
     float gain = dbToScalar(level);
-    if (level_cv.source) {
+    if (level_cv.enabled()) {
       vca.bias(0.0f);
       vca.level(gain);
       float cv = level_cv.InF();

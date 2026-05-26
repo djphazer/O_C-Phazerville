@@ -23,7 +23,9 @@ struct CVInputMap {
     TYPE_INTERNAL,
   };
 
+private:
   uint8_t source = 0; // 3 bits type | 5 bits index
+public:
   int8_t attenuversion = 60; // 60 is 100%
                              // max range is +/- 127 (448%)
 
@@ -264,7 +266,9 @@ struct DigitalInputMap {
   static constexpr size_t Size = 16; // Make this compatible with Packable
 
   // settings
+private:
   uint8_t source = 0;
+public:
   ClkDivMult div_mult;
   int8_t e_length, e_beats, e_rotate;
 
@@ -325,6 +329,10 @@ struct DigitalInputMap {
     div_mult.Reset();
     last_gate_state = false;
     clkcount = 0;
+  }
+  void Clear() {
+    source = 0;
+    Reset(true);
   }
 
   bool Gate() const {
@@ -471,6 +479,9 @@ struct DigitalInputMap {
   }
   inline uint8_t index() const {
     return source & 0x1f;
+  }
+  const bool is_clock() const {
+    return (source_type() == TYPE_INTERNAL) && (index() <= 1);
   }
   constexpr int channel_count(DigitalSourceType t) const {
     switch (t) {

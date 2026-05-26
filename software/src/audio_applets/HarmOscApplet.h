@@ -46,7 +46,7 @@ public:
 
         // stolen from OscApplet
         float gain = dbToScalar(level);
-        if (level_cv.source) {
+        if (level_cv.enabled()) {
             vca.bias(0.0f);
             vca.level(gain);
             float cv = level_cv.InF();
