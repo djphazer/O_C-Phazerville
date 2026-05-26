@@ -450,12 +450,16 @@ public:
 
     // does not modify the preset, only the current state
     void SetApplet(HEM_SIDE hemisphere, int index) {
-        if (active_applet[hemisphere])
-          active_applet[hemisphere]->Unload();
-
+        /*noInterrupts();*/
+        HemisphereApplet* next_ = HS::get_applet(index, hemisphere);
+        HemisphereApplet* old_ = active_applet[hemisphere];
+        next_->BaseStart(hemisphere);
+        // make sure we've called Start before changing the shared pointer
+        active_applet[hemisphere] = next_;
+        // unload previous applet after swapping
+        if (old_) old_->Unload();
         next_applet_index[hemisphere] = active_applet_index[hemisphere] = index;
-        active_applet[hemisphere] = HS::get_applet(index, hemisphere);
-        active_applet[hemisphere]->BaseStart(hemisphere);
+        /*interrupts();*/
     }
     void ChangeApplet(HEM_SIDE h, int dir) {
         int index = HS::get_next_applet_index(next_applet_index[h], dir);
