@@ -423,13 +423,13 @@ void HS::IOFrame::Load(OC::IOFrame *ioframe) {
       // TODO: implement div/mult within DigitalInputMap and get rid of
       //       this call to clock_m
       if (clock_m.IsRunning() && clock_m.GetMultiply(virt_chan) != 0)
-          result = clock_m.Tock(virt_chan);
+          result = clock_m.Tock(virt_chan) && CheckSkip(virt_chan);
       else {
-          result = trigmap[ch].Clock();
+          result = trigmap[ch].Clock() && CheckSkip(ch);
       }
 
       // Try to eat a boop
-      result = result || clock_m.Beep(virt_chan);
+      result = result || (clock_m.Beep(virt_chan) && CheckSkip(virt_chan));
 
       if (result) {
           cycle_ticks[ch] = OC::CORE::ticks - last_clock[ch];

@@ -562,12 +562,9 @@ struct IOFrame {
       outputs[channel].set(value, override);
     }
     void ClockOut(DAC_CHANNEL ch, const int pulselength = HEMISPHERE_CLOCK_TICKS * trig_length) {
-        // short circuit if skip probability is zero to avoid consuming random numbers
-        if (0 == clockskip[ch] || random(100) >= clockskip[ch]) {
-            clock_countdown[ch] = pulselength;
-            // assign to both to override slew - instant attack
-            Out(ch, HEMISPHERE_MAX_CV, true);
-        }
+        clock_countdown[ch] = pulselength;
+        // assign to both to override slew - instant attack
+        Out(ch, HEMISPHERE_MAX_CV, true);
     }
     void NudgeSkip(int ch, int dir) {
         clockskip[ch] = constrain(clockskip[ch] + dir, 0, 100);
@@ -577,6 +574,10 @@ struct IOFrame {
     }
     void NudgeAtten(int ch, int dir) {
         output_atten[ch] = constrain(output_atten[ch] + dir, -127, 127);
+    }
+    bool CheckSkip(int ch) {
+        // short circuit if skip probability is zero to avoid consuming random numbers
+        return (0 == clockskip[ch] || random(100) >= clockskip[ch]);
     }
 
     // --- Hard IO ---
