@@ -85,7 +85,7 @@ public:
                     GateOut(ch, frame.MIDIState.clock_run);
                     break;
                 default:
-                    Out(ch, map.output);
+                    Out(ch, map.ViewOut());
                     break;
             }
         }
