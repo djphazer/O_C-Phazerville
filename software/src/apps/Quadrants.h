@@ -168,7 +168,7 @@ public:
         FILTERMASK1_KEY = 100,
         FILTERMASK2_KEY = 101,
 
-        PC_CHANNEL_KEY  = 110,
+        MIDI_GLOBALS_KEY  = 110,
         PRESET_JUMP_KEY = 111,
 
         MIDI_MAPS_KEY   = 150, // + 0..32
@@ -258,7 +258,11 @@ public:
         PhzConfig::setValue(FILTERMASK1_KEY, HS::hidden_applets[0]);
         PhzConfig::setValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
 
-        PhzConfig::setValue(PC_CHANNEL_KEY, HS::frame.MIDIState.pc_channel);
+        data = PackPackables(
+          HS::frame.MIDIState.pc_channel,
+          HS::frame.MIDIState.bend_range
+        );
+        PhzConfig::setValue(MIDI_GLOBALS_KEY, data);
 
         data = PackPackables(jump_trig_);
         PhzConfig::setValue(PRESET_JUMP_KEY, data);
@@ -385,8 +389,12 @@ public:
         PhzConfig::getValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
 
         uint64_t data = 0;
-        if (PhzConfig::getValue(PC_CHANNEL_KEY, data))
-          HS::frame.MIDIState.pc_channel = (uint8_t)data;
+        if (PhzConfig::getValue(MIDI_GLOBALS_KEY, data)) {
+          UnpackPackables(data,
+              HS::frame.MIDIState.pc_channel,
+              HS::frame.MIDIState.bend_range
+          );
+        }
 
         if (PhzConfig::getValue(PRESET_JUMP_KEY, data))
           UnpackPackables(data, jump_trig_);
@@ -1078,6 +1086,7 @@ private:
         CURSOR_MODE,
         PRESET_BANK_NUM,
         PRESET_JUMP_TRIG,
+        MIDI_BEND_RANGE,
         MIDI_PC_CHANNEL,
         AUTO_MIDI,
         MIDI_THRU_TOGGLE,
@@ -1237,6 +1246,10 @@ private:
         case PRESET_BANK_NUM:
             bank_num = constrain(bank_num + dir, 0, 99);
             break;
+        case MIDI_BEND_RANGE:
+            HS::frame.MIDIState.bend_range =
+              constrain(HS::frame.MIDIState.bend_range + dir, 0, 36);
+            break;
         case MIDI_PC_CHANNEL:
             HS::frame.MIDIState.pc_channel =
               constrain(HS::frame.MIDIState.pc_channel + dir, 0, 17);
@@ -1361,6 +1374,7 @@ private:
                 ))
               break;
           case TRIG_LENGTH:
+          case MIDI_BEND_RANGE:
           case MIDI_PC_CHANNEL:
           case SCREENSAVER_MODE:
             isEditing = !isEditing;
@@ -1530,7 +1544,11 @@ private:
           gfxPrint(jump_trig_);
           break;
         }
-        case 5: {
+        case 5:
+          gfxPrint(1, y, "Pitch Bend:   ");
+          gfxPrint(HS::frame.MIDIState.bend_range);
+          break;
+        case 6: {
           const uint8_t pc_ch = HS::frame.MIDIState.pc_channel;
           gfxPrint(1, y, "MIDI-PC Ch:   ");
           if (pc_ch == 0) gfxPrint("Omni");
@@ -1538,11 +1556,11 @@ private:
           else gfxPrint("Off");
           break;
         }
-        case 6:
+        case 7:
           gfxPrint(1, y, "AutoMIDI-Out  ");
           gfxPrint(OC::Strings::off_on[HS::frame.autoMIDIOut]);
           break;
-        case 7:
+        case 8:
           gfxPrint(1, y, "MIDI Thru:    ");
           gfxPrint(OC::Strings::off_on[HS::midi_thru_enabled]);
           break;

@@ -3,6 +3,11 @@
 #include "HSUtils.h"
 #include "HSIOFrame.h"
 
+const int HS::MIDIMapping::ViewOut() const {
+  if (IsPitch()) return output + Proportion(pitch_bend, 8192, frame.MIDIState.bend_range << 7);
+  return output;
+}
+
 // arguments are raw data from MIDI system, so channel starts at 1 (not 0)
 void HS::MIDIFrame::ProcessMIDIMsg(const MIDIMessage msg) {
     const uint8_t m_ch = msg.channel - 1;
@@ -44,6 +49,7 @@ void HS::MIDIFrame::ProcessMIDIMsg(const MIDIMessage msg) {
             ClearPolyBuffer();
             for (MIDIMapping& map : mapping) {
                 map.output = 0;
+                map.pitch_bend = 0;
                 map.trigout_countdown = 0;
             }
             return;
@@ -287,10 +293,12 @@ bool HS::MIDIMapping::ProcessMsg(const MIDIMessage msg, HS::MIDIFrame &state) {
     }
     case usbMIDI.PitchBend: {
         if (function == HEM_MIDI_PB_OUT) {
-            int data = (msg.data2 << 7) + msg.data1 - 8192;
-            output = Proportion(data, 8192, HEMISPHERE_3V_CV);
+            pitch_bend = (msg.data2 << 7) + msg.data1 - 8192;
+            output = Proportion(pitch_bend, 8192, HEMISPHERE_3V_CV);
             log_this = 1;
-        }
+        } else if (IsPitch())
+            pitch_bend = (msg.data2 << 7) + msg.data1 - 8192;
+
         break;
     }
   } // switch

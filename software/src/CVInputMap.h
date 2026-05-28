@@ -77,7 +77,7 @@ public:
         return frame.ViewOut(index());
 
       case TYPE_MIDI:
-        return frame.MIDIState.mapping[index()].output;
+        return frame.MIDIState.mapping[index()].ViewOut();
 
       case TYPE_INTERNAL:
         // noise source
@@ -351,7 +351,7 @@ public:
       case TYPE_DAC:
         return frame.ViewOut(index()) > GATE_THRESHOLD;
       case TYPE_MIDI_MAP:
-        return frame.MIDIState.mapping[index()].output > GATE_THRESHOLD;
+        return frame.MIDIState.mapping[index()].ViewOut() > GATE_THRESHOLD;
       case TYPE_NONE:
       default:
         return false;

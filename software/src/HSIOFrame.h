@@ -86,6 +86,7 @@ struct MIDIMapping : public MIDIMapSettings {
   int16_t trigout_countdown;
   uint16_t semitone_mask; // which notes are currently on
   int16_t output; // translated CV values
+  int16_t pitch_bend = 0;
 
   const bool IsClock() const {
     return (function >= HEM_MIDI_CLOCK_OUT);
@@ -97,6 +98,14 @@ struct MIDIMapping : public MIDIMapSettings {
          || function == HEM_MIDI_START_OUT
          || IsClock());
   }
+  const bool IsPitch() const {
+    return (function == HEM_MIDI_NOTE_OUT
+         || function == HEM_MIDI_NOTE_POLY_OUT
+         || function == HEM_MIDI_NOTE_INV_OUT
+         || function == HEM_MIDI_NOTE_MIN_OUT
+         || function == HEM_MIDI_NOTE_MAX_OUT
+         || function == HEM_MIDI_NOTE_PEDAL_OUT);
+  }
   constexpr int clock_mod() const {
     uint8_t mod = 1;
     if (function == HEM_MIDI_CLOCK_OUT) mod = 12;
@@ -104,6 +113,7 @@ struct MIDIMapping : public MIDIMapSettings {
     if (function == HEM_MIDI_CLOCK_16_OUT) mod = 3;
     return mod;
   }
+  const int ViewOut() const;
   void ClockOut() {
     trigout_countdown = HEMISPHERE_CLOCK_TICKS * HS::trig_length;
     output = HEMISPHERE_MAX_CV;
@@ -121,6 +131,8 @@ struct MIDIMapping : public MIDIMapSettings {
   }
   void AdjustFunction(int dir) {
     function = constrain(function + dir, 0, HEM_MIDI_MAX_FUNCTION);
+    output = 0;
+    pitch_bend = 0;
     if (function == HEM_MIDI_CC_OUT)
       function_cc = -1; // auto-learn MIDI CC
   }
@@ -177,6 +189,7 @@ struct MIDIFrame {
     uint16_t sustain_latch; // each bit is a MIDI channel's sustain state
 
     uint8_t pc_channel = 0; // program change channel filter, used for preset selection
+    uint8_t bend_range = 12; // in semitones, for pitch bend
     static constexpr uint8_t PC_OMNI = 0;
 
     PolyphonyData poly_buffer[DAC_CHANNEL_COUNT]; // buffer for polyphonic data tracking
@@ -200,6 +213,7 @@ struct MIDIFrame {
         mapping[ch].function = HEM_MIDI_NOOP;
         mapping[ch].transpose = 0;
         mapping[ch].output = 0;
+        mapping[ch].pitch_bend = 0;
         mapping[ch].dac_polyvoice = ch / 2 % DAC_CHANNEL_COUNT; // each quad is a unique voice
         mapping[ch].range_low = 0;
         mapping[ch].range_high = 127;
@@ -209,6 +223,7 @@ struct MIDIFrame {
         outmap[ch].function_cc = ch + 1;
         outmap[ch].transpose = 0;
         outmap[ch].output = 0;
+        outmap[ch].pitch_bend = 0;
         outmap[ch].range_low = 0;
         outmap[ch].range_high = 127;
       }
