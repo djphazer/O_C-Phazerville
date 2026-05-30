@@ -257,9 +257,11 @@ namespace HS {
         case 2: // mode
           map.AdjustFunction(dir);
           frame.MIDIState.UpdateMidiChannelFilter();
+          frame.MIDIState.UpdateMaxPolyphony();
           break;
         case 3: // voice (poly only)
           map.AdjustVoice(dir);
+          frame.MIDIState.UpdateMaxPolyphony();
           break;
         case 4: // low
           map.AdjustRangeLow(dir);
@@ -406,7 +408,7 @@ namespace HS {
       {
         MIDIMapping& map = frame.MIDIState.mapping[mview];
         graphics.printf(
-          "Ch:%s  %s", midi_channels[map.channel], midi_fn_name[map.function]
+          "Ch:%s %s", midi_channels[map.channel], midi_fn_name[map.function]
         );
         if (map.function == HEM_MIDI_CC_OUT) gfxPrint(map.function_cc);
 

@@ -1090,6 +1090,7 @@ private:
         MIDI_PC_CHANNEL,
         AUTO_MIDI,
         MIDI_THRU_TOGGLE,
+        MIDI_POLY_MODE,
 
         // Input Remapping
         TRIGMAP1, TRIGMAP2, TRIGMAP3, TRIGMAP4,
@@ -1254,6 +1255,10 @@ private:
             HS::frame.MIDIState.pc_channel =
               constrain(HS::frame.MIDIState.pc_channel + dir, 0, 17);
             break;
+        case MIDI_POLY_MODE:
+            HS::frame.MIDIState.poly_mode =
+              constrain(HS::frame.MIDIState.poly_mode + dir, 0, HS::MIDIPolyMode::POLY_LAST);
+            break;
         case SCREENSAVER_MODE:
             HS::screensaver_mode = constrain(HS::screensaver_mode + dir, 0, SCREENSAVER_MODE_COUNT - 1);
             break;
@@ -1376,6 +1381,7 @@ private:
           case TRIG_LENGTH:
           case MIDI_BEND_RANGE:
           case MIDI_PC_CHANNEL:
+          case MIDI_POLY_MODE:
           case SCREENSAVER_MODE:
             isEditing = !isEditing;
             break;
@@ -1563,6 +1569,10 @@ private:
         case 8:
           gfxPrint(1, y, "MIDI Thru:    ");
           gfxPrint(OC::Strings::off_on[HS::midi_thru_enabled]);
+          break;
+        case 9:
+          gfxPrint(1, y, "MIDI PolyMd:  ");
+          gfxPrint(HS::midi_poly_mode_name[HS::frame.MIDIState.poly_mode]);
           break;
         default: break;
       }

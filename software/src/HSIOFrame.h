@@ -106,6 +106,12 @@ struct MIDIMapping : public MIDIMapSettings {
          || function == HEM_MIDI_NOTE_MAX_OUT
          || function == HEM_MIDI_NOTE_PEDAL_OUT);
   }
+  const bool IsPoly() const {
+    return (function == HEM_MIDI_NOTE_POLY_OUT
+         || function == HEM_MIDI_GATE_POLY_OUT
+         || function == HEM_MIDI_VEL_POLY_OUT
+         || function == HEM_MIDI_AT_KEY_POLY_OUT);
+  }
   constexpr int clock_mod() const {
     uint8_t mod = 1;
     if (function == HEM_MIDI_CLOCK_OUT) mod = 12;
@@ -127,7 +133,7 @@ struct MIDIMapping : public MIDIMapSettings {
   }
 
   void AdjustChannel(int dir) {
-    channel = constrain(channel + dir, 0, 16);
+    channel = constrain(channel + dir, 0, 16); // 16 = omni
   }
   void AdjustFunction(int dir) {
     function = constrain(function + dir, 0, HEM_MIDI_MAX_FUNCTION);
@@ -276,7 +282,7 @@ struct MIDIFrame {
     void UpdateMaxPolyphony() { // find max voice number to determine how much to buffer
         int voice = 0;
         for (auto &map : mapping) {
-            if (map.function == HEM_MIDI_NOOP) continue;
+            if (map.function == HEM_MIDI_NOOP || !map.IsPoly()) continue;
             if (map.dac_polyvoice > voice) voice = map.dac_polyvoice;
         }
         if (max_voice != voice+1) {

@@ -151,17 +151,18 @@ public:
                 break;
             case hMIDIIn_A_MIDI_CHANNEL:
             case hMIDIIn_B_MIDI_CHANNEL:
-                map.channel = constrain(map.channel + direction, 0, 16); // 16 = omni
+                map.AdjustChannel(direction); // 16 = omni
                 frame.MIDIState.UpdateMidiChannelFilter();
                 break;
             case hMIDIIn_A_OUTPUT_MODE:
             case hMIDIIn_B_OUTPUT_MODE:
                 map.AdjustFunction(direction);
                 frame.MIDIState.UpdateMidiChannelFilter();
+                frame.MIDIState.UpdateMaxPolyphony();
                 break;
             case hMIDIIn_A_POLY_VOICE:
             case hMIDIIn_B_POLY_VOICE:
-                map.dac_polyvoice = constrain(map.dac_polyvoice + direction, 0, DAC_CHANNEL_COUNT - 1);
+                map.AdjustVoice(direction);
                 frame.MIDIState.UpdateMaxPolyphony();
                 break;
             case MAP_A_RANGELOW:
