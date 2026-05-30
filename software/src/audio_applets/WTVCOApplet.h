@@ -23,6 +23,7 @@ public:
         vca.rectify(true);
 
         PatchCable(input_stream, 0, mixer, 0);
+        PatchCable(vca_cv, 0, vca, 1);
         PatchCable(synth, 0, vca, 0);
         PatchCable(vca, 0, mixer, 1);
         PatchCable(mixer, 0, output_stream, 0);
