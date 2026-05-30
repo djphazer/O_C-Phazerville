@@ -154,6 +154,7 @@ public:
         OUTSKIP_KEY = 5,
         OUTSLEW_KEY = 6,
         OUTATTEN_KEY = 7,
+        INSKIP_KEY = 8,
 
         APPLET_L1_DATA_KEY = 10,
         APPLET_R1_DATA_KEY = 11,
@@ -226,7 +227,12 @@ public:
 
         data = 0;
         for (size_t i = 0; i < 8; ++i) {
-          Pack(data, PackLocation{i*8, 8}, HS::frame.clockskip[i]);
+          Pack(data, PackLocation{i*8, 8}, HS::frame.clockinskip[i]);
+        }
+        PhzConfig::setValue(preset_key | INSKIP_KEY, data);
+        data = 0;
+        for (size_t i = 0; i < 8; ++i) {
+          Pack(data, PackLocation{i*8, 8}, HS::frame.clockoutskip[i]);
         }
         PhzConfig::setValue(preset_key | OUTSKIP_KEY, data);
         data = 0;
@@ -360,10 +366,16 @@ public:
           }
         }
 
+        data = 0;
+        PhzConfig::getValue(preset_key | INSKIP_KEY, data);
+        for (size_t i = 0; i < 8; ++i) {
+          HS::frame.clockinskip[i] = Unpack(data, PackLocation{i*8, 8});
+        }
+
         PhzConfig::getValue(preset_key | OUTSKIP_KEY, data);
         for (size_t i = 0; i < 8; ++i)
         {
-          HS::frame.clockskip[i] = Unpack(data, PackLocation{i*8, 8});
+          HS::frame.clockoutskip[i] = Unpack(data, PackLocation{i*8, 8});
         }
 
         PhzConfig::getValue(preset_key | OUTSLEW_KEY, data);

@@ -111,7 +111,8 @@ namespace HS {
       cvmap[i].attenuversion = 60;
       frame.output_slew[i] = 0;
       frame.output_atten[i] = 60;
-      frame.clockskip[i] = 0;
+      frame.clockoutskip[i] = 0;
+      frame.clockinskip[i] = 0;
       clock_m.SetMultiply(0, i);
     }
 

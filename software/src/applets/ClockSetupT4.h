@@ -54,6 +54,14 @@ public:
         BOOP6,
         BOOP7,
         BOOP8,
+        INSKIP1,
+        INSKIP2,
+        INSKIP3,
+        INSKIP4,
+        INSKIP5,
+        INSKIP6,
+        INSKIP7,
+        INSKIP8,
         OUTSKIP1,
         OUTSKIP2,
         OUTSKIP3,
@@ -62,15 +70,7 @@ public:
         OUTSKIP6,
         OUTSKIP7,
         OUTSKIP8,
-        OUTSLEW1,
-        OUTSLEW2,
-        OUTSLEW3,
-        OUTSLEW4,
-        OUTSLEW5,
-        OUTSLEW6,
-        OUTSLEW7,
-        OUTSLEW8,
-        LAST_SETTING = OUTSLEW8
+        LAST_SETTING = OUTSKIP8
     };
 
     const char* applet_name() {
@@ -238,6 +238,17 @@ public:
             button_ticker = HEMISPHERE_PULSE_ANIMATION_TIME_LONG;
             break;
 
+        case INSKIP1:
+        case INSKIP2:
+        case INSKIP3:
+        case INSKIP4:
+        case INSKIP5:
+        case INSKIP6:
+        case INSKIP7:
+        case INSKIP8:
+            HS::frame.NudgeInSkip(cursor-INSKIP1, direction);
+            break;
+
         case OUTSKIP1:
         case OUTSKIP2:
         case OUTSKIP3:
@@ -246,18 +257,7 @@ public:
         case OUTSKIP6:
         case OUTSKIP7:
         case OUTSKIP8:
-            HS::frame.NudgeSkip(cursor-OUTSKIP1, direction);
-            break;
-
-        case OUTSLEW1:
-        case OUTSLEW2:
-        case OUTSLEW3:
-        case OUTSLEW4:
-        case OUTSLEW5:
-        case OUTSLEW6:
-        case OUTSLEW7:
-        case OUTSLEW8:
-            HS::frame.NudgeSlew(cursor-OUTSLEW1, direction);
+            HS::frame.NudgeOutSkip(cursor-OUTSKIP1, direction);
             break;
 
         case EXT_PPQN:
@@ -396,7 +396,7 @@ private:
         graphics.clearRect(0, 0, 128, 24);
         graphics.clearRect(0, 24, 52, 12); // label box
 
-        const char* const lbl[] = { "Tempo", "Clk Mult", "Trig Ins", "Boop!" };
+        const char* const lbl[] = { "Tempo", "Clk Mult", "Trig Ins", "Boop!", "Skip %" };
         gfxLine(0, 35, 50, 35);
         gfxLine(50, 23, 50, 35);
         gfxPrint(0, 25, lbl[(cursor >= MULT1) * (1 + (cursor-MULT1) / 8)]);
@@ -410,7 +410,7 @@ private:
 
         gfxLine(0, 30, 50, 30);
         gfxLine(50, 30, 50, 41);
-        gfxPrint(0, 33, (cursor<OUTSLEW1) ? "TrigSkip" : "Out Slew");
+        gfxPrint(0, 33, "Out Skip");
         gfxLine(0, 42, 127, 42);
         gfxDottedLine(0, 43, 127, 43);
       }
@@ -475,28 +475,23 @@ private:
             // Manual trigger buttons
             gfxIcon(4 + x, y, (button_ticker && ch == cursor-BOOP1)?BTN_ON_ICON:BTN_OFF_ICON);
         }
+      } else if (cursor <= INSKIP8) {
+        int y = 1;
+        for (int ch=0; ch<8; ++ch) {
+            const int x = (ch % 4) * 32;
+            if (ch == 4) y += 10;
+
+            gfxPrint(1 + x + pad(100, HS::frame.clockinskip[ch]), y, HS::frame.clockinskip[ch] );
+            gfxPrint(23 + x, y, "%");
+        }
       } else if (cursor <= OUTSKIP8) {
         int y = 45;
         for (int ch=0; ch<8; ++ch) {
             const int x = (ch % 4) * 32;
             if (ch == 4) y += 10;
 
-            gfxPrint(1 + x + pad(100, HS::frame.clockskip[ch]), y, HS::frame.clockskip[ch] );
+            gfxPrint(1 + x + pad(100, HS::frame.clockoutskip[ch]), y, HS::frame.clockoutskip[ch] );
             gfxPrint(23 + x, y, "%");
-        }
-      } else if (cursor <= OUTSLEW8) {
-        int y = 45;
-        for (int ch=0; ch<8; ++ch) {
-            const int x = (ch % 4) * 32;
-            if (ch == 4) y += 10;
-
-            const int slew = HS::frame.output_slew[ch];
-            if (slew < 0)
-              gfxPrint(1 + x, y, "Env");
-            else {
-              gfxPrint(1 + x + pad(100, HS::frame.output_slew[ch]), y, HS::frame.output_slew[ch] );
-              gfxPrint(23 + x, y, "%");
-            }
         }
       }
 
@@ -537,9 +532,18 @@ private:
         case TRIG6:
         case TRIG7:
         case TRIG8:
+        case INSKIP1:
+        case INSKIP2:
+        case INSKIP3:
+        case INSKIP4:
+        case INSKIP5:
+        case INSKIP6:
+        case INSKIP7:
+        case INSKIP8:
         {
-          const int x_ = 1 + 32 * ((cursor-TRIG1) % 4);
-          const int y_ = 9 + ((cursor-TRIG1) / 4 * 10);
+          const int cur = (cursor - TRIG1) % 8;
+          const int x_ = 1 + 32 * (cur % 4);
+          const int y_ = 9 + (cur / 4 * 10);
           gfxCursor(x_, y_, 19);
           break;
         }
@@ -555,21 +559,6 @@ private:
         {
           const int x_ = 1 + 32 * ((cursor-OUTSKIP1) % 4);
           const int y_ = 53 + ((cursor-OUTSKIP1) / 4 * 10);
-          gfxCursor(x_, y_, 19);
-          break;
-        }
-
-        case OUTSLEW1:
-        case OUTSLEW2:
-        case OUTSLEW3:
-        case OUTSLEW4:
-        case OUTSLEW5:
-        case OUTSLEW6:
-        case OUTSLEW7:
-        case OUTSLEW8:
-        {
-          const int x_ = 1 + 32 * ((cursor-OUTSLEW1) % 4);
-          const int y_ = 53 + ((cursor-OUTSLEW1) / 4 * 10);
           gfxCursor(x_, y_, 19);
           break;
         }
