@@ -263,7 +263,7 @@ struct DigitalInputMap {
   static const int ppqn = 4;
   static constexpr float internal_clocked_gate_pw = 0.5f;
 
-  static constexpr size_t Size = 16; // Make this compatible with Packable
+  static constexpr size_t Size = 32; // Make this compatible with Packable
 
   // settings
 private:
@@ -373,7 +373,7 @@ public:
     // process trigger filters here - Euclidean, etc
     if (tock) {
       if (e_length > 0)
-        tock = EuclideanFilter(e_length, e_beats, e_rotate, clkcount);
+        tock = EuclideanFilter(e_length + 1, e_beats, e_rotate, clkcount);
       ++clkcount;
     }
 
@@ -442,11 +442,11 @@ public:
     return in_label;
   }
 
-  uint16_t Pack() const {
-    return (source & 0xFF) | as_unsigned(div_mult.steps << 8);
+  uint32_t Pack() const {
+    return (source & 0xFF) | as_unsigned(div_mult.steps << 8) | (e_length & 0x1f) << 16 | (e_beats & 0x3f) << 21 | (e_rotate & 0x1f) << 27;
   }
 
-  void Unpack(uint16_t data) {
+  void Unpack(uint32_t data) {
     source = data & 0xFF;
 
     // migrate old data; zero is still disabled; -1 and -2 are still valid
@@ -471,6 +471,10 @@ public:
 
     div_mult.Set(extract_value<int8_t>(data >> 8));
     if (0 == div_mult.steps) div_mult.steps = 1;
+
+    e_length = (data >> 16) & 0x1f; // 5 bits
+    e_beats  = (data >> 21) & 0x3f; // 6 bits
+    e_rotate = (data >> 27) & 0x1f; // 5 bits
   }
 
   const bool enabled() const { return source != 0; }

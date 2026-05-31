@@ -255,17 +255,24 @@ public:
 #define GLITCH_PARAMS  pack<3>(div), pack<2>(mode), pack<3>(ratchet), mix, \
                        pack<4>(bits_), pack<4>(decimate_), pack<4>(offset_)
     FLASHMEM void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
+        uint16_t clk = clock_source.Pack();
+        uint16_t hld = hold_input.Pack();
+        uint16_t frz = freeze_input.Pack();
         data[0] = PackPackables(GLITCH_PARAMS);
-        data[1] = PackPackables(clock_source, hold_input, freeze_input, mix_cv);
+        data[1] = PackPackables(clk, hld, frz, mix_cv);
         data[2] = PackPackables(mode_cv, ratchet_cv, bits_cv, dec_cv); // 4×16=64 bits
         data[3] = PackPackables(off_cv);
     }
 
     FLASHMEM void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
+        uint16_t clk, hld, frz;
         UnpackPackables(data[0], GLITCH_PARAMS);
-        UnpackPackables(data[1], clock_source, hold_input, freeze_input, mix_cv);
+        UnpackPackables(data[1], clk, hld, frz, mix_cv);
         UnpackPackables(data[2], mode_cv, ratchet_cv, bits_cv, dec_cv);
         UnpackPackables(data[3], off_cv);
+        clock_source.Unpack(clk);
+        hold_input.Unpack(hld);
+        freeze_input.Unpack(frz);
     }
 #undef GLITCH_PARAMS
 

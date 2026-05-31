@@ -249,17 +249,20 @@ public:
     }
 
     FLASHMEM void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
+        uint16_t trigga = trg.Pack(); // abandon extra Euclidean params
         data[0] = PackPackables(pitch_hz, pack<12>(dec), swp, rto, fmi, pack<12>(fmd));
-        data[1] = PackPackables(noi, ndc, mix, trg, mix_cv);
+        data[1] = PackPackables(noi, ndc, mix, trigga, mix_cv);
         data[2] = PackPackables(pitch_cv, dec_cv, swp_cv, rto_cv);
         data[3] = PackPackables(fmi_cv, fmd_cv, noi_cv, ndc_cv);
     }
 
     FLASHMEM void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
+        uint16_t trigga;
         UnpackPackables(data[0], pitch_hz, pack<12>(dec), swp, rto, fmi, pack<12>(fmd));
-        UnpackPackables(data[1], noi, ndc, mix, trg, mix_cv);
+        UnpackPackables(data[1], noi, ndc, mix, trigga, mix_cv);
         UnpackPackables(data[2], pitch_cv, dec_cv, swp_cv, rto_cv);
         UnpackPackables(data[3], fmi_cv, fmd_cv, noi_cv, ndc_cv);
+        trg.Unpack(trigga);
         preset_idx = 9;  // sentinel "---": params from savestate, not a named preset
     }
 

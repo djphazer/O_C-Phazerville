@@ -319,13 +319,17 @@ public:
 
   void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
     data[0] = PackPackables(DELAY_PARAMS);
-    data[1] = PackPackables(delay_time_cv, feedback_cv, wet_cv, clock_source);
+    data[1] = PackPackables(delay_time_cv, feedback_cv, wet_cv);
+    data[2] = PackPackables(clock_source);
   }
 
   void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
+    uint16_t oldclk = 0;
     UnpackPackables(data[0], DELAY_PARAMS);
     set_taps(taps);
-    UnpackPackables(data[1], delay_time_cv, feedback_cv, wet_cv, clock_source);
+    UnpackPackables(data[1], delay_time_cv, feedback_cv, wet_cv, oldclk);
+    UnpackPackables(data[2], clock_source);
+    if (oldclk) clock_source.Unpack(oldclk);
   }
 
   AudioStream* InputStream() {

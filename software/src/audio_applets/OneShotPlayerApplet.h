@@ -370,24 +370,24 @@ public:
       folder_num, // 8 bits
       sample_index, // 16 bits
       sample_cv, // 16 bits
-      playrate // 16 bits
+      playrate, // 16 bits
+      level // 8 bits
     );
     data[1] = PackPackables(
       playrate_cv, // 16 bits
-      level, // 8 bits
       level_cv, // 16 bits
-      trigger_cv // 16 bits
+      trigger_cv // 32 bits
     );
     data[2] = PackPackables(
       trig_mode,  // 8 bits
       attack,     // 8 bits
-      release     // 8 bits
+      release    // 8 bits
     );
   }
 
   void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
-    UnpackPackables(data[0], folder_num, sample_index, sample_cv, playrate);
-    UnpackPackables(data[1], playrate_cv, level, level_cv, trigger_cv);
+    UnpackPackables(data[0], folder_num, sample_index, sample_cv, playrate, level);
+    UnpackPackables(data[1], playrate_cv, level_cv, trigger_cv);
     UnpackPackables(data[2], trig_mode, attack, release);
 
     folder_changed = true;

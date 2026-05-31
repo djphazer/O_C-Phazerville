@@ -234,15 +234,19 @@ public:
 
 #define MODAL_PARAMS pitch, structure, brightness, damping, position, mix, velocity
     FLASHMEM void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
+        uint16_t dummy = 0;
         data[0] = PackPackables(MODAL_PARAMS);
         data[1] = PackPackables(freq_cv, struct_cv, bright_cv, damp_cv);
-        data[2] = PackPackables(pos_cv, mix_cv, strike_input, vel_cv);
+        data[2] = PackPackables(pos_cv, mix_cv, dummy, vel_cv);
+        data[3] = PackPackables(strike_input);
     }
 
     FLASHMEM void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
+        uint16_t dummy = 0;
         UnpackPackables(data[0], MODAL_PARAMS);
         UnpackPackables(data[1], freq_cv, struct_cv, bright_cv, damp_cv);
-        UnpackPackables(data[2], pos_cv, mix_cv, strike_input, vel_cv);
+        UnpackPackables(data[2], pos_cv, mix_cv, dummy, vel_cv);
+        UnpackPackables(data[3], strike_input);
     }
 #undef MODAL_PARAMS
 

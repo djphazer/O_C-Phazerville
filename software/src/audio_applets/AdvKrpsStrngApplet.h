@@ -217,15 +217,18 @@ public:
 #define ADVKS_PARAMS pitch, decay, brightness, body, mix
 
   void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
+    uint16_t dummy = 0;
     data[0] = PackPackables(ADVKS_PARAMS);
-    data[1] = PackPackables(pitch_cv, trig_cv, decay_cv, brightness_cv);
-    data[2] = PackPackables(body_cv, mix_cv);
+    data[1] = PackPackables(pitch_cv, dummy, decay_cv, brightness_cv);
+    data[2] = PackPackables(body_cv, mix_cv, trig_cv);
   }
 
   void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
+    uint16_t dummy = 0;
     UnpackPackables(data[0], ADVKS_PARAMS);
-    UnpackPackables(data[1], pitch_cv, trig_cv, decay_cv, brightness_cv);
-    UnpackPackables(data[2], body_cv, mix_cv);
+    UnpackPackables(data[1], pitch_cv, dummy, decay_cv, brightness_cv);
+    UnpackPackables(data[2], body_cv, mix_cv, trig_cv);
+    if (dummy) trig_cv.Unpack(dummy);
     // Re-apply brightness so iir_alpha_ is recomputed on load
     synth.setBrightness(brightness * 0.01f);
   }

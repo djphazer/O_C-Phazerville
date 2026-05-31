@@ -361,7 +361,7 @@ public:
         OLD_INPUT_MAP_KEY = 3,
 
         OUTSKIP_KEY = 4,
-        TRIGMAP_KEY = 5, // 4 x 16-bit DigitalInputMap
+        OLD_TRIGMAP_KEY = 5, // 4 x 16-bit DigitalInputMap
         CVMAP_KEY = 6, // 4 x 16-bit CVInputMap
 
         OUTSLEW_KEY = 7,
@@ -371,6 +371,8 @@ public:
 
         APPLET_L_DATA_KEY = 10,
         APPLET_R_DATA_KEY = 11,
+
+        TRIGMAP_KEY = 20, // 4 x 32-bit DigitalInputMap
 
         // globals, 100-500
         FILTERMASK1_KEY = 100,
@@ -403,8 +405,10 @@ public:
 
         uint64_t data = 0;
         // Input Mappings
-        data = PackPackables(HS::trigmap[0], HS::trigmap[1], HS::trigmap[2], HS::trigmap[3]);
+        data = PackPackables(HS::trigmap[0], HS::trigmap[1]);
         PhzConfig::setValue(preset_key | TRIGMAP_KEY, data);
+        data = PackPackables(HS::trigmap[2], HS::trigmap[3]);
+        PhzConfig::setValue(preset_key | (TRIGMAP_KEY + 1), data);
 
         data = PackPackables(HS::cvmap[0], HS::cvmap[1], HS::cvmap[2], HS::cvmap[3]);
         PhzConfig::setValue(preset_key | CVMAP_KEY, data);
@@ -526,11 +530,23 @@ public:
         ClockSetup_instance.SetGlobals(global_data);
 
         // Input Mappings
+
+        if (PhzConfig::getValue(preset_key | TRIGMAP_KEY, data)) {
+          UnpackPackables(data, HS::trigmap[0], HS::trigmap[1]);
+          PhzConfig::getValue(preset_key | (TRIGMAP_KEY + 1), data);
+          UnpackPackables(data, HS::trigmap[2], HS::trigmap[3]);
+        } else if (PhzConfig::getValue(preset_key | OLD_TRIGMAP_KEY, data)) {
+          // migrate from v1.x
+          uint16_t mapdata[4];
+          UnpackPackables(data, mapdata[0], mapdata[1], mapdata[2], mapdata[3]);
+          HS::trigmap[0].Unpack(mapdata[0]);
+          HS::trigmap[1].Unpack(mapdata[1]);
+          HS::trigmap[2].Unpack(mapdata[2]);
+          HS::trigmap[3].Unpack(mapdata[3]);
+        }
+
         if (PhzConfig::getValue(preset_key | CVMAP_KEY, data)) {
           UnpackPackables(data, HS::cvmap[0], HS::cvmap[1], HS::cvmap[2], HS::cvmap[3]);
-
-          PhzConfig::getValue(preset_key | TRIGMAP_KEY, data);
-          UnpackPackables(data, HS::trigmap[0], HS::trigmap[1], HS::trigmap[2], HS::trigmap[3]);
 
           PhzConfig::getValue(preset_key | OUTSKIP_KEY, data);
           for (size_t i = 0; i < DAC_CHANNEL_COUNT; ++i)

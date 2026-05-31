@@ -149,8 +149,8 @@ public:
         APPLET_METADATA_KEY = 0, // applet ids
         CLOCK_DATA_KEY = 1,
         GLOBALS_KEY = 2,
-        OLD_TRIGMAP_KEY = 3, // from v1.9
-        OLD_CVMAP_KEY = 4, // from v1.9
+        ANCIENT_TRIGMAP_KEY = 3, // from v1.9
+        ANCIENT_CVMAP_KEY = 4, // from v1.9
         OUTSKIP_KEY = 5,
         OUTSLEW_KEY = 6,
         OUTATTEN_KEY = 7,
@@ -163,7 +163,8 @@ public:
 
         CVMAP_KEY = 20, // 16-bit CVInputMap, multiple pages
 
-        TRIGMAP_KEY = 30, // 16-bit DigitalInputMap
+        OLD_TRIGMAP_KEY = 30, // 2 blobs, 16-bit DigitalInputMap
+        TRIGMAP_KEY = 32, // 32-bit DigitalInputMap, 4 pages
 
         // 100s = Globals
         FILTERMASK1_KEY = 100,
@@ -218,12 +219,16 @@ public:
         uint64_t data = 0;
         // Input Mappings
         for (size_t i = 0; i < ADC_CHANNEL_COUNT/4; ++i) {
-          data = PackPackables(HS::trigmap[i*4], HS::trigmap[i*4+1], HS::trigmap[i*4+2], HS::trigmap[i*4+3]);
-          PhzConfig::setValue(preset_key | (TRIGMAP_KEY + i), data);
+          data = PackPackables(HS::trigmap[i*4], HS::trigmap[i*4+1]);
+          PhzConfig::setValue(preset_key | (TRIGMAP_KEY + i*2), data);
+          data = PackPackables(HS::trigmap[i*4+2], HS::trigmap[i*4+3]);
+          PhzConfig::setValue(preset_key | (TRIGMAP_KEY + i*2 + 1), data);
 
           data = PackPackables(HS::cvmap[i*4], HS::cvmap[i*4+1], HS::cvmap[i*4+2], HS::cvmap[i*4+3]);
           PhzConfig::setValue(preset_key | (CVMAP_KEY + i), data);
         }
+        PhzConfig::deleteKey(preset_key | OLD_TRIGMAP_KEY);
+        PhzConfig::deleteKey(preset_key | OLD_TRIGMAP_KEY + 1);
 
         data = 0;
         for (size_t i = 0; i < 8; ++i) {
@@ -353,10 +358,24 @@ public:
 
         // Input Mappings
         if (PhzConfig::getValue(preset_key | TRIGMAP_KEY, data)) {
-          for (size_t i = 0; i < ADC_CHANNEL_COUNT/4; ++i) {
-            UnpackPackables(data, HS::trigmap[i*4], HS::trigmap[i*4+1], HS::trigmap[i*4+2], HS::trigmap[i*4+3]);
+          for (size_t i = 0; i < ADC_CHANNEL_COUNT/2; ++i) {
+            UnpackPackables(data, HS::trigmap[i*2], HS::trigmap[i*2+1]);
             if (!PhzConfig::getValue(preset_key | (TRIGMAP_KEY + i+1), data)) break;
           }
+        } else if (PhzConfig::getValue(preset_key | OLD_TRIGMAP_KEY, data)) {
+          // migrate from v1.x
+          uint16_t mapdata[4];
+          UnpackPackables(data, mapdata[0], mapdata[1], mapdata[2], mapdata[3]);
+          HS::trigmap[0].Unpack(mapdata[0]);
+          HS::trigmap[1].Unpack(mapdata[1]);
+          HS::trigmap[2].Unpack(mapdata[2]);
+          HS::trigmap[3].Unpack(mapdata[3]);
+          PhzConfig::getValue(preset_key | OLD_TRIGMAP_KEY + 1, data);
+          UnpackPackables(data, mapdata[0], mapdata[1], mapdata[2], mapdata[3]);
+          HS::trigmap[4].Unpack(mapdata[0]);
+          HS::trigmap[5].Unpack(mapdata[1]);
+          HS::trigmap[6].Unpack(mapdata[2]);
+          HS::trigmap[7].Unpack(mapdata[3]);
         }
 
         if (PhzConfig::getValue(preset_key | CVMAP_KEY, data)) {
