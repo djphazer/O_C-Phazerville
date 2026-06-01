@@ -153,6 +153,9 @@ public:
 		makeupdb = constrain(gain, -12.0f, 30.0f);
 	}
 
+    const float get_total_gain() const {
+      return gatedb + compdb + makeupdb + limitdb;
+    }
 private:
 	audio_block_t *inputQueueArray[1];
 

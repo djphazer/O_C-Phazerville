@@ -94,6 +94,19 @@ public:
     }
   }
 
+  void DrawFullScreen() {
+    graphics.drawLine(64 - gfx_offset, 26, 127 - gfx_offset, 26, 3);
+    for (int i = 0; i < BANDZ; i++) {
+      const int x = 5 + i*20 + (64 - gfx_offset);
+      const int h = Proportion(int(complimit[0][i].get_total_gain()), 60, 30); // 60 dB == 30 px
+      if (h > 0)
+        graphics.drawRect(x, 26 - h, 10, h);
+      else
+        graphics.drawRect(x, 26, 10, -h);
+    }
+    View();
+  }
+
   void View() {
     const int label_x = 1;
     const int page = (cursor > B1_SPLIT) + (cursor > B2_SPLIT);
