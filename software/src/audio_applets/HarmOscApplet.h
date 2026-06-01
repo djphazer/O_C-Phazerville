@@ -6,9 +6,9 @@ public:
         return "HarmOsc";
     }
 
-    static constexpr int max_partials = 16;
-    static constexpr float detune_resolution = 256.0f;
-    static constexpr float amplitude_resolution = 255.0f;
+    static constexpr int MAX_PARTIALS = 16;
+    static constexpr float DETUNE_RESOLUTION = 256.0f;
+    static constexpr float AMPLITUDE_RESOLUTION = 255.0f;
 
     void Start() override {
         vca_cv.Acquire();
@@ -16,13 +16,13 @@ public:
         vca.rectify(true);
 
         PatchCable(input_stream, 0, mixer, 0);
-        for (int i = 0; i < max_partials; ++i) {
+        for (int i = 0; i < MAX_PARTIALS; ++i) {
             PatchCable(partial[i], 0, harmosc, i);
         }
         PatchCable(vca_cv, 0, vca, 1);
         PatchCable(harmosc, 0, vca, 0);
         PatchCable(vca, 0, mixer, 1);
-        InitWaveform(amplitudes, partial_ratios, max_partials);
+        InitWaveform(amplitudes, partial_ratios, MAX_PARTIALS);
     }
 
     void Unload() override {
@@ -34,13 +34,13 @@ public:
         float freq = PitchToRatio(pitch + pitch_cv.In()) * C3;
         float amp = 0.0f;
         float total_amp = 0.0f;
-        for (int i = 0; i < max_partials; ++i) {
-            partial[i].frequency(freq * ((float)partial_ratios[i] / detune_resolution));
-            amp = constrain(((float)amplitudes[i] + (float)amp_cv[i].InRescaled(255)) / amplitude_resolution, 0.0f, 1.0f);
+        for (int i = 0; i < MAX_PARTIALS; ++i) {
+            partial[i].frequency(freq * ((float)partial_ratios[i] / DETUNE_RESOLUTION));
+            amp = constrain(((float)amplitudes[i] + (float)amp_cv[i].InRescaled(255)) / AMPLITUDE_RESOLUTION, 0.0f, 1.0f);
             partial[i].amplitude(amp);  // probably a better way to do this
             total_amp += amp;
         }
-        for (int i = 0; i < max_partials; ++i) {
+        for (int i = 0; i < MAX_PARTIALS; ++i) {
             harmosc.gain(i, (total_amp > 0.0f) ? 1.0f / total_amp : 0.0f);  // normalize waveform, don't divide by 0
         }
 
@@ -131,13 +131,13 @@ public:
 
                 } else if (partial_param == 1) {
                     graphics.printf("R %X:", cursor - PARTIAL1);
-                    shifted_val = ((float)partial_ratios[cursor - PARTIAL1] / detune_resolution) * 100;
+                    shifted_val = ((float)partial_ratios[cursor - PARTIAL1] / DETUNE_RESOLUTION) * 100;
                     int_part = shifted_val / 100;
                     dec_part = shifted_val % 100;
 
                 } else if (partial_param == 0) {
                     graphics.printf("A %X:", cursor - PARTIAL1);
-                    shifted_val = ((float)amplitudes[cursor - PARTIAL1] / amplitude_resolution) * 100;
+                    shifted_val = ((float)amplitudes[cursor - PARTIAL1] / AMPLITUDE_RESOLUTION) * 100;
                     int_part = shifted_val / 100;
                     dec_part = shifted_val % 100;
                 }
@@ -149,11 +149,11 @@ public:
         }
 
         // draw parial sliders
-        for (int i = 0; i < max_partials; ++i) {
+        for (int i = 0; i < MAX_PARTIALS; ++i) {
             const int y0 = 36;
             const int y1 = 64;
-            int x = i * (64 / max_partials) + 2;
-            float amp = constrain(((float)amplitudes[i] + (float)amp_cv[i].InRescaled(255)) / amplitude_resolution, 0.0f, 1.0f);
+            int x = i * (64 / MAX_PARTIALS) + 2;
+            float amp = constrain(((float)amplitudes[i] + (float)amp_cv[i].InRescaled(255)) / AMPLITUDE_RESOLUTION, 0.0f, 1.0f);
             int y = amp * (y1 - y0);
             gfxDottedLine(x, y0, x, y1, (uint8_t)2U);
             if (cursor == PARTIAL1 + i) gfxInvert(x, y0, 1, y1 - y0);
@@ -164,8 +164,8 @@ public:
     }
 
     void OnButtonPress() override {
-        if (cursor > PARTIAL1 && partial_param == 2) {
-            if (CheckEditInputMapPress( cursor,
+        if (cursor >= PARTIAL1 && partial_param == 2) {
+            if (CheckEditInputMapPress(cursor,
                 IndexedInput(cursor, amp_cv[cursor - PARTIAL1])
             )) return;
         } else {
@@ -228,17 +228,50 @@ public:
     void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
         data[0] = PackPackables(pitch, level, mix);
         data[1] = PackPackables(pitch_cv, level_cv, mix_cv);
-        for (size_t i = 0; i < max_partials; ++i) {
-          Pack(data[2 + i / 8], PackLocation{(i % 8) * 8, 8}, amplitudes[i]);
+        for (size_t i = 0; i < MAX_PARTIALS; ++i) {
+            Pack(data[2 + i / 8], PackLocation{(i % 8) * 8, 8}, amplitudes[i]);
         }
-        // no room for amp CV
+        // save CV mapping in extra storage
+        // 256 total slots using SetData/GetData
+        for (size_t i = 0; i < MAX_PARTIALS / 4; ++i) {
+            uint64_t d = PackPackables(
+                amp_cv[i * 4 + 0],
+                amp_cv[i * 4 + 1],
+                amp_cv[i * 4 + 2],
+                amp_cv[i * 4 + 3]
+            );
+            SetData(i, d);
+            d = PackPackables(
+                partial_ratios[i * 4 + 0],
+                partial_ratios[i * 4 + 1],
+                partial_ratios[i * 4 + 2],
+                partial_ratios[i * 4 + 3]
+            );
+            SetData(4 + i, d);
+        }
     }
 
     void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
         UnpackPackables(data[0], pitch, level, mix);
         UnpackPackables(data[1], pitch_cv, level_cv, mix_cv);
-        for (size_t i = 0; i < max_partials; ++i) {
-          amplitudes[i] = Unpack(data[2 + i / 8], PackLocation{(i % 8) * 8, 8});
+        for (size_t i = 0; i < MAX_PARTIALS; ++i) {
+            amplitudes[i] = Unpack(data[2 + i / 8], PackLocation{(i % 8) * 8, 8});
+        }
+        for (size_t i = 0; i < MAX_PARTIALS / 4; ++i) {
+            uint64_t a, p;
+            if (!GetData(i, a) || !GetData(4 + i, p)) break;
+            UnpackPackables(a,
+                amp_cv[i * 4 + 0],
+                amp_cv[i * 4 + 1],
+                amp_cv[i * 4 + 2],
+                amp_cv[i * 4 + 3]
+            );
+            UnpackPackables(p,
+                partial_ratios[i * 4 + 0],
+                partial_ratios[i * 4 + 1],
+                partial_ratios[i * 4 + 2],
+                partial_ratios[i * 4 + 3]
+            );
         }
     }
 
@@ -272,19 +305,19 @@ private:
     uint8_t partial_param = 0;  // 0 = amplitude, 1 = detune, 3 = cvmap
     bool partial_map = false;
 
-    uint8_t amplitudes[max_partials];
-    uint16_t partial_ratios[max_partials];
+    uint8_t amplitudes[MAX_PARTIALS];
+    uint16_t partial_ratios[MAX_PARTIALS];
 
     CVInputMap pitch_cv;
     CVInputMap level_cv;
     CVInputMap mix_cv;
-    CVInputMap amp_cv[max_partials];
+    CVInputMap amp_cv[MAX_PARTIALS];
 
     AudioPassthrough<MONO> input_stream;
-    AudioSynthWaveform partial[max_partials];
+    AudioSynthWaveform partial[MAX_PARTIALS];
     InterpolatingStream<> vca_cv;
     AudioVCA vca;
-    AudioMixer<max_partials> harmosc;
+    AudioMixer<MAX_PARTIALS> harmosc;
     AudioMixer<2> mixer;
 
     void InitWaveform(uint8_t* amp, uint16_t* rat, int n_partials) {
