@@ -4,8 +4,10 @@
 #include "HemisphereAudioApplet.h"
 #include "OC_ui.h"
 #include "PhzConfig.h"
+#include "elapsedMillis.h"
 #include "waveheaderparser.h"
 #include "src/UI/ui_events.h"
+#include "util/util_math.h"
 #include "util/util_tuples.h"
 
 #define ForEachSide(ch) for (HEM_SIDE ch : {LEFT_HEMISPHERE, RIGHT_HEMISPHERE})
@@ -103,18 +105,28 @@ public:
   }
 
   void View() {
-    for (size_t i = 0; i < Slots; i++) {
-      print_applet_line(i);
-    }
-
     gfxDottedLine(0, 0, 127, 0);
+
+    const bool forcemenu = state[0] != EDIT_APPLET && state[1] != EDIT_APPLET;
+
+    if (forcemenu || (state[0] != EDIT_APPLET && menutimer[0] < MENU_TIMEOUT)
+                  || (state[1] != EDIT_APPLET && menutimer[1] < MENU_TIMEOUT)) {
+      for (size_t i = 0; i < Slots; i++) {
+        print_applet_line(i);
+      }
+    }
 
     ForEachSide(side) {
       if (state[side] == EDIT_APPLET) {
         HemisphereAudioApplet& applet = get_selected_applet(side);
         applet.SetDisplaySide(static_cast<HEM_SIDE>(side + AUDIO_SLOT_L));
-        applet.BaseView();
-      } else {
+        const bool full = (state[1 - side] != EDIT_APPLET)
+          && menutimer[1 - side] > MENU_TIMEOUT + MENU_ANIMATE;
+        applet.BaseView(full, full);
+        continue;
+      }
+
+      if (forcemenu || menutimer[side] < MENU_TIMEOUT) {
         int y = cursor[side] * 10 + 14;
         if (state[side] == SWITCH_APPLET) {
           int x = IsStereo(cursor[side]) && state[1 - side] != EDIT_APPLET
@@ -131,13 +143,20 @@ public:
         gfxPos(1 + 64 * side, 2);
         if (side) graphics.printf("MEM%3d%%) R", mem_percent);
         else graphics.printf("L (CPU%3d%%", cpu_percent);
+      } else if (menutimer[side] < MENU_TIMEOUT + MENU_ANIMATE) {
+        // a smooth wipe transition
+        int x = Proportion(menutimer[side] - MENU_TIMEOUT, MENU_ANIMATE, 62);
+        if (side) x += 64;
+        else x = 63 - x;
+        gfxLine(x, 11, x, 63);
+        if (side) ++x;
+        else --x;
+        gfxDottedLine(x, 11, x, 63);
       }
     }
 
-    // Recall that unsigned substraction rolls over correclty, so when millis()
-    // rolls over, this will still work.
-    if (millis() - last_stats_update > 250) {
-      last_stats_update = millis();
+    if (last_stats_update > STATS_TIMEOUT) {
+      last_stats_update = 0;
       mem_percent = static_cast<int16_t>(
         100 * static_cast<float>(AudioMemoryUsageMax())
         / OC::AudioIO::AUDIO_MEMORY
@@ -155,10 +174,12 @@ public:
         case OC::CONTROL_BUTTON_A:
           if (MOVE_CURSOR == state[0]) return true;
           state[0] = MOVE_CURSOR;
+          menutimer[0] = 0;
           break;
         case OC::CONTROL_BUTTON_B:
           if (MOVE_CURSOR == state[1]) return true;
           state[1] = MOVE_CURSOR;
+          menutimer[1] = 0;
           break;
         case OC::CONTROL_BUTTON_X:
           if (MOVE_CURSOR != state[0])
@@ -288,11 +309,13 @@ public:
     switch (state[side]) {
       case MOVE_CURSOR:
         c = constrain(c + dir, 0, static_cast<int>(Slots) - 1);
+        menutimer[side] = 0;
         break;
       case SWITCH_APPLET: {
         int n = IsStereo(c) ? (c == 0 ? NumStereoSources : NumStereoProcessors)
                             : (c == 0 ? NumMonoSources : NumMonoProcessors);
         candidate[side] = constrain(candidate[side] + dir, 0, n - 1);
+        menutimer[side] = 0;
         break;
       }
       case EDIT_APPLET:
@@ -509,7 +532,9 @@ private:
 
   int16_t mem_percent = 0;
   int16_t cpu_percent = 0;
-  uint32_t last_stats_update = 0;
+
+  elapsedMillis last_stats_update = 0;
+  static constexpr int STATS_TIMEOUT = 250;
 
   // enum ViewState { NORMAL, RECORD_CONFIG, MASTER_FX };
   // ViewState view_state = NORMAL;
@@ -519,6 +544,11 @@ private:
     SWITCH_APPLET,
     EDIT_APPLET,
   };
+
+  // cursor movement to show menu
+  elapsedMillis menutimer[2];
+  static constexpr int MENU_TIMEOUT = 5000;
+  static constexpr int MENU_ANIMATE = 500;
 
   EditState state[2];
   int cursor[2]; // selected slot for each side
