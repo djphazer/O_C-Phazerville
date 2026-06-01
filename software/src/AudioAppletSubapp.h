@@ -415,7 +415,8 @@ public:
         if (data) {
           LoadAppletData(
             preset_key | key(STEREO_APPLET_PARAMS, slot * APPLET_CONFIG_SIZE),
-            get_selected_stereo_applet(slot)
+            get_selected_stereo_applet(slot),
+            slot
           );
         }
       } else {
@@ -436,7 +437,8 @@ public:
           if (data) {
             LoadAppletData(
               preset_key | key(MONO_APPLET_PARAMS, slot_key * APPLET_CONFIG_SIZE),
-              get_selected_mono_applet(ch, slot)
+              get_selected_mono_applet(ch, slot),
+              slot
             );
           }
         }
@@ -462,7 +464,9 @@ public:
       PhzConfig::setValue(preset_key | key(STEREO_APPLETS, slot), applet_id);
 
       SaveAppletData(
-        preset_key | key(STEREO_APPLET_PARAMS, slot * APPLET_CONFIG_SIZE), stereo_applet
+        preset_key | key(STEREO_APPLET_PARAMS, slot * APPLET_CONFIG_SIZE),
+        stereo_applet,
+        slot
       );
 
       ForEachSide(ch) {
@@ -474,13 +478,15 @@ public:
         PhzConfig::setValue(preset_key | key(MONO_APPLETS, slot_key), applet_id);
 
         SaveAppletData(
-          preset_key | key(MONO_APPLET_PARAMS, slot_key * APPLET_CONFIG_SIZE), mono_applet
+          preset_key | key(MONO_APPLET_PARAMS, slot_key * APPLET_CONFIG_SIZE),
+          mono_applet,
+          slot
         );
       }
     }
   }
 
-  void LoadAppletData(uint16_t key, HemisphereAudioApplet& applet) {
+  void LoadAppletData(uint16_t key, HemisphereAudioApplet& applet, size_t slot) {
     array<uint64_t, APPLET_CONFIG_SIZE> data;
     for (uint_fast8_t i = 0; i < APPLET_CONFIG_SIZE; ++i) {
       if (PhzConfig::getValue(key + i, data[i])) {
@@ -491,11 +497,13 @@ public:
         data[i] = 0;
       }
     }
+    applet.SetSlot(slot);
     applet.OnDataReceive(data);
   }
 
-  void SaveAppletData(uint16_t key, HemisphereAudioApplet& applet) {
-    array<uint64_t, APPLET_CONFIG_SIZE> data = {0};
+  void SaveAppletData(uint16_t key, HemisphereAudioApplet& applet, size_t slot) {
+    array<uint64_t, APPLET_CONFIG_SIZE> data;
+    applet.SetSlot(slot);
     applet.OnDataRequest(data);
     for (uint_fast8_t i = 0; i < APPLET_CONFIG_SIZE; ++i) {
       // We default to 0, so may as well skip them to save space

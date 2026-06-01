@@ -232,23 +232,29 @@ public:
             Pack(data[2 + i / 8], PackLocation{(i % 8) * 8, 8}, amplitudes[i]);
         }
         // save CV mapping in extra storage
-        // 256 total slots using SetData/GetData
-        for (size_t i = 0; i < MAX_PARTIALS / 4; ++i) {
-            uint64_t d = PackPackables(
-                amp_cv[i * 4 + 0],
-                amp_cv[i * 4 + 1],
-                amp_cv[i * 4 + 2],
-                amp_cv[i * 4 + 3]
-            );
-            SetData(i, d);
+        // 256 total blobs using SetData/GetData
+        // slot_index uses 3 bits, so actual key is 5 bits
+        // Effectively 32 extra blobs per audio applet slot
+        const size_t key = slot_index << 5;
+        const size_t blobs = MAX_PARTIALS / 4;
+        uint64_t d;
+        for (size_t i = 0; i < blobs; ++i) {
             d = PackPackables(
-                partial_ratios[i * 4 + 0],
-                partial_ratios[i * 4 + 1],
-                partial_ratios[i * 4 + 2],
-                partial_ratios[i * 4 + 3]
+                amp_cv[i * blobs + 0],
+                amp_cv[i * blobs + 1],
+                amp_cv[i * blobs + 2],
+                amp_cv[i * blobs + 3]
             );
-            SetData(4 + i, d);
+            SetData(key | i, d);
+            d = PackPackables(
+                partial_ratios[i * blobs + 0],
+                partial_ratios[i * blobs + 1],
+                partial_ratios[i * blobs + 2],
+                partial_ratios[i * blobs + 3]
+            );
+            SetData(key | (blobs + i), d);
         }
+        // using 8 out of 32 extra blobs
     }
 
     void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
@@ -257,20 +263,22 @@ public:
         for (size_t i = 0; i < MAX_PARTIALS; ++i) {
             amplitudes[i] = Unpack(data[2 + i / 8], PackLocation{(i % 8) * 8, 8});
         }
-        for (size_t i = 0; i < MAX_PARTIALS / 4; ++i) {
-            uint64_t a, p;
-            if (!GetData(i, a) || !GetData(4 + i, p)) break;
+        const size_t key = slot_index << 5;
+        const size_t blobs = MAX_PARTIALS / 4;
+        uint64_t a, p;
+        for (size_t i = 0; i < blobs; ++i) {
+            if (!GetData(key | i, a) || !GetData(key | (blobs + i), p)) break;
             UnpackPackables(a,
-                amp_cv[i * 4 + 0],
-                amp_cv[i * 4 + 1],
-                amp_cv[i * 4 + 2],
-                amp_cv[i * 4 + 3]
+                amp_cv[i * blobs + 0],
+                amp_cv[i * blobs + 1],
+                amp_cv[i * blobs + 2],
+                amp_cv[i * blobs + 3]
             );
             UnpackPackables(p,
-                partial_ratios[i * 4 + 0],
-                partial_ratios[i * 4 + 1],
-                partial_ratios[i * 4 + 2],
-                partial_ratios[i * 4 + 3]
+                partial_ratios[i * blobs + 0],
+                partial_ratios[i * blobs + 1],
+                partial_ratios[i * blobs + 2],
+                partial_ratios[i * blobs + 3]
             );
         }
     }

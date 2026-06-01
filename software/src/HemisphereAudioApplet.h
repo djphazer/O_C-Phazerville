@@ -26,6 +26,10 @@ public:
 
   AudioConnection* cables = nullptr;
   size_t cable_count;
+  size_t slot_index = 0;
+  void SetSlot(size_t slot) {
+    slot_index = slot;
+  }
 
   // If applet_name() can return different things at different times, you
   // *must* override this or saving and loading won't work!
