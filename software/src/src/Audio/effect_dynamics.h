@@ -58,19 +58,14 @@ public:
 		limitdb = MIN_DB;
 	}
 
-  void Acquire() {
-    samplesSquared = (uint32_t*)extmem_malloc(sampleBufferSize * 4); //new uint32_t[sampleBufferSize];
-    if (samplesSquared)
-      std::fill_n(samplesSquared, sampleBufferSize, 0);
-  }
+	void Acquire() {
+		samplesSquared = new uint32_t[sampleBufferSize];
+		std::fill_n(samplesSquared, sampleBufferSize, 0);
+	}
 
-  void Release() {
-    if (samplesSquared) {
-      extmem_free(samplesSquared);
-      samplesSquared = nullptr;
-    }
-    //delete[] samplesSquared;
-  }
+	void Release() {
+		delete[] samplesSquared;
+	}
 
 	//Sets the gate parameters.
 	//threshold is in dbFS
