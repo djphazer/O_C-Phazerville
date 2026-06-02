@@ -67,7 +67,7 @@ public:
     gfxPrint(WAVEFORM_NAMES[waveform]);
     gfxEndCursor(cursor == WAVEFORM);
 
-    if (WAVEFORMS[waveform] != WAVEFORM_SINE) {
+    if (WAVEFORMS[waveform] != WAVEFORM_SINE && WAVEFORMS[waveform] != WAVEFORM_BANDLIMIT_SAWTOOTH) {
       gfxStartCursor(1 + 3 * 6 + 2 * 6, 15);
       graphics.printf("%3d%%", pw);
       gfxEndCursor(cursor == PW);
@@ -157,7 +157,8 @@ public:
       do {
         MoveCursor(cursor, direction, MIX_CV);
       } while ((cursor == PW || cursor == PW_CV)
-               && WAVEFORMS[waveform] == WAVEFORM_SINE);
+               && (WAVEFORMS[waveform] == WAVEFORM_SINE
+               ||  WAVEFORMS[waveform] == WAVEFORM_BANDLIMIT_SAWTOOTH));
       return;
     }
     if (EditSelectedInputMap(direction)) return;
@@ -217,7 +218,7 @@ public:
   }
 
   void SetWaveform(int wf) {
-    waveform = constrain(wf, 0, 2);
+    waveform = constrain(wf, 0, 3);
     synth.begin(WAVEFORMS[waveform]);
   }
 
@@ -259,9 +260,9 @@ private:
   };
 
   int8_t cursor = WAVEFORM;
-  static constexpr int8_t WAVEFORMS[3]
-    = {WAVEFORM_SINE, WAVEFORM_TRIANGLE_VARIABLE, WAVEFORM_BANDLIMIT_PULSE};
-  static constexpr char const* WAVEFORM_NAMES[3] = {"SIN", "TRI", "PLS"};
+  static constexpr int8_t WAVEFORMS[4]
+    = {WAVEFORM_SINE, WAVEFORM_TRIANGLE_VARIABLE, WAVEFORM_BANDLIMIT_PULSE, WAVEFORM_BANDLIMIT_SAWTOOTH};
+  static constexpr char const* WAVEFORM_NAMES[4] = {"SIN", "TRI", "PLS", "SAW"};
   static constexpr char const* MOD_TYPE_NAMES[2] = {"FM", "PM"};
   enum ModType : uint8_t { FM, PM };
   static const int MOD_DEPTH_MAX = 500;
