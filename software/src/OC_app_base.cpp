@@ -76,11 +76,9 @@ void AppBase::Draw(UiMode ui_mode) const
 
     graphics.drawFrame(9, 10, 110, 44);
 
-    if (OC::CORE::ticks & (1 << 8)) {
-      // grayed out view
-      for (int y = 11; y < 54; ++y) {
-        gfxDottedLine(10, y, 118, y, 3 + (y % 4));
-      }
+    // grayed out view
+    for (int y = 11; y < 54; ++y) {
+      gfxDottedLine(10, y, 118, y, 3 + (y % 4));
     }
 
     gfxPrint(12, 1, "Z= ");
