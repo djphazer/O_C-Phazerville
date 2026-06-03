@@ -296,11 +296,10 @@ public:
         auto_reset = !p;
         if (!p && midi_out_enabled) {
             usbMIDI.sendRealTime(usbMIDI.Start);
-#if defined(__IMXRT1062__)
-            usbHostMIDI.sendRealTime(usbMIDI.Start);
 #ifdef ARDUINO_TEENSY41
+            // TODO: DeferTask?
+            usbHostMIDI.sendRealTime(usbMIDI.Start);
             MIDI1.sendRealTime(midi::MidiType(usbMIDI.Start));
-#endif
 #endif
         }
     }
@@ -311,11 +310,10 @@ public:
         extsync = false;
         if (midi_out_enabled) {
             usbMIDI.sendRealTime(usbMIDI.Stop);
-#if defined(__IMXRT1062__)
-            usbHostMIDI.sendRealTime(usbMIDI.Stop);
 #ifdef ARDUINO_TEENSY41
+            // TODO: DeferTask?
+            usbHostMIDI.sendRealTime(usbMIDI.Stop);
             MIDI1.sendRealTime(midi::MidiType(usbMIDI.Stop));
-#endif
 #endif
         }
         EnableMIDIOut();

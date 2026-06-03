@@ -703,13 +703,8 @@ public:
         next_applet[h] = index;
     }
 
-#if defined(__IMXRT1062__)
-    template <typename T1, typename T2>
-    void ProcessMIDI(T1 &device, T2 &next_device) {
-#else
     template <typename T1>
     void ProcessMIDI(T1 &device) {
-#endif
         HS::IOFrame &f = HS::frame;
         int load_slot = -1;
 
@@ -730,9 +725,6 @@ public:
             }
 
             f.MIDIState.ProcessMIDIMsg({device.getChannel(), message, data1, data2});
-#if defined(__IMXRT1062__)
-            next_device.send(message, data1, data2, device.getChannel(), 0);
-#endif
         }
         if (load_slot >= 0 && load_slot < HEM_NR_OF_PRESETS) {
             QueuePresetLoad(load_slot);
@@ -742,12 +734,7 @@ public:
     void mainloop() {
         timeout = 0;
         // top-level MIDI-to-CV handling - alters frame outputs
-#if defined(__IMXRT1062__)
-        ProcessMIDI(usbMIDI, usbHostMIDI);
-        ProcessMIDI(usbHostMIDI, usbMIDI);
-#else
         ProcessMIDI(usbMIDI);
-#endif
     }
 
     void Controller() {

@@ -49,11 +49,10 @@
 #if defined(__IMXRT1062__)
 #include "PhzConfig.h"
 
+#if defined(ARDUINO_TEENSY41)
 USBHost thisUSB;
 USBHub hub1(thisUSB);
 MIDIDevice_BigBuffer usbHostMIDI(thisUSB);
-
-#if defined(ARDUINO_TEENSY41)
 MIDI_CREATE_INSTANCE(HardwareSerial, Serial8, MIDI1);
 #include "AudioIO.h"
 #include "usb_desc.h"
@@ -337,13 +336,13 @@ void setup() {
   if (I2S2_Audio_ADC && I2S2_Audio_DAC) {
     OC::AudioIO::Init();
   }
+
+  // USB Host support for 4.1 only
+  usbHostMIDI.begin();
   #endif
 
   // initialize LittleFS for config files
   PhzConfig::Init();
-
-  // USB Host support for both 4.0 and 4.1
-  usbHostMIDI.begin();
 #endif
 
   // Display loading splash screen and optional calibration
@@ -390,7 +389,7 @@ void FASTRUN loop() {
   uint32_t last_redraw_time = 0;
 
   while (true) {
-#ifdef __IMXRT1062__
+#if defined(ARDUINO_TEENSY41)
     thisUSB.Task();
 #endif
 
