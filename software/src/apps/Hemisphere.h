@@ -284,12 +284,10 @@ public:
 
     void Resume() {
 #ifdef __IMXRT1062__
-        // XXX: this assumes no other config file gets loaded while Hemisphere is active...
-        // Also notice that this loads only from LFS,
-        // assuming Hemisphere is only used by T40 and not T41.
-        // Of course, T40 also supports SD cards,
-        // so I should write code instead of comments, yeah?
-        PhzConfig::load_config(PRESET_FILENAME);
+        // This loads only from LFS, assuming Hemisphere is only used on T40 without SD cards...
+        if (PhzConfig::load_config(PRESET_FILENAME))
+          LoadGlobals();
+
         if (preset_id < 0)
           LoadFromPreset(0);
 #else
@@ -574,12 +572,37 @@ public:
           HS::frame.output_atten[i] = has_output_atten ? Unpack(data, PackLocation{i*8, 8}) : 60;
         }
 
+#else
+        // T3.2 uses EEPROM interface
+        hem_active_preset = (HemispherePreset*)(hem_presets + id);
+        if (hem_active_preset->is_valid()) {
+            clock_data = hem_active_preset->GetClockData();
+            ClockSetup_instance.OnDataReceive(clock_data);
+
+            global_data = hem_active_preset->GetGlobals();
+            ClockSetup_instance.SetGlobals(global_data);
+
+            hem_active_preset->LoadInputMap();
+
+            for (int h = 0; h < 2; h++)
+            {
+                int index = HS::get_applet_index_by_id( hem_active_preset->GetAppletId(h) );
+                applet_data[h] = hem_active_preset->GetData(HEM_SIDE(h));
+                SetApplet(HEM_SIDE(h), index);
+                HS::get_applet(index, h)->OnDataReceive(applet_data[h]);
+            }
+        }
+#endif
+        PokePopup(PRESET_POPUP);
+    }
+
+    void LoadGlobals() {
         // --- Global stuff ---
         // (per file, not per preset)
-
         PhzConfig::getValue(FILTERMASK1_KEY, HS::hidden_applets[0]);
         PhzConfig::getValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
 
+        uint64_t data;
         if (PhzConfig::getValue(PC_CHANNEL_KEY, data)) HS::frame.MIDIState.pc_channel = (uint8_t) data;
 
         if (PhzConfig::getValue(PRESET_JUMP_KEY, data))
@@ -617,30 +640,8 @@ public:
             OC::user_patterns[i].notes[step] = Unpack(data, PackLocation{(step & 0x3)*16, 16});
           }
         }
-
-#else
-        // T3.2 uses EEPROM interface
-        hem_active_preset = (HemispherePreset*)(hem_presets + id);
-        if (hem_active_preset->is_valid()) {
-            clock_data = hem_active_preset->GetClockData();
-            ClockSetup_instance.OnDataReceive(clock_data);
-
-            global_data = hem_active_preset->GetGlobals();
-            ClockSetup_instance.SetGlobals(global_data);
-
-            hem_active_preset->LoadInputMap();
-
-            for (int h = 0; h < 2; h++)
-            {
-                int index = HS::get_applet_index_by_id( hem_active_preset->GetAppletId(h) );
-                applet_data[h] = hem_active_preset->GetData(HEM_SIDE(h));
-                SetApplet(HEM_SIDE(h), index);
-                HS::get_applet(index, h)->OnDataReceive(applet_data[h]);
-            }
-        }
-#endif
-        PokePopup(PRESET_POPUP);
     }
+
     void ProcessQueue() {
       if (queued_preset >= 0) {
         LoadFromPreset(queued_preset);
