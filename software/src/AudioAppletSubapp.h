@@ -502,7 +502,7 @@ public:
   }
 
   void SaveAppletData(uint16_t key, HemisphereAudioApplet& applet, size_t slot) {
-    array<uint64_t, APPLET_CONFIG_SIZE> data;
+    array<uint64_t, APPLET_CONFIG_SIZE> data = {0};
     applet.SetSlot(slot);
     applet.OnDataRequest(data);
     for (uint_fast8_t i = 0; i < APPLET_CONFIG_SIZE; ++i) {
