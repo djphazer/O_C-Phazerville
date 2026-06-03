@@ -229,9 +229,7 @@ bool load_chunk(uint8_t *buf, const char *sig, ConfigMap &store) {
       ++record_count;
       pos = 0;
 
-      // XXX: if we utilize the expected record count,
-      // multiple chunks could be packed in series in one file... for whatever purpose.
-      // For now, we'll just load everything regardless.
+      // Multiple chunks can be packed in series in one file
       if (record_count == expected_record_count) break;
     }
   }
@@ -242,7 +240,10 @@ bool load_chunk(uint8_t *buf, const char *sig, ConfigMap &store) {
   SERIAL_PRINTLN("(File header checksum: %lx%lx)\n",
       (uint32_t)expected_checksum, (uint32_t)(expected_checksum >> 32));
 
-  return true;
+  if (computed_checksum != expected_checksum)
+    HS::PokePopup(HS::MESSAGE_POPUP, "Corrupt File!!");
+
+  return (computed_checksum == expected_checksum);
 }
 
 bool load_config(const char* filename, FS &fs)
