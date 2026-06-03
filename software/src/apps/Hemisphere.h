@@ -704,13 +704,8 @@ public:
     }
 
 #if defined(__IMXRT1062__)
-  #if defined(ARDUINO_TEENSY41)
-    template <typename T1, typename T2, typename T3>
-    void ProcessMIDI(T1 &device, T2 &next_device, T3 &dev3) {
-  #else
     template <typename T1, typename T2>
     void ProcessMIDI(T1 &device, T2 &next_device) {
-  #endif
 #else
     template <typename T1>
     void ProcessMIDI(T1 &device) {
@@ -737,9 +732,6 @@ public:
             f.MIDIState.ProcessMIDIMsg({device.getChannel(), message, data1, data2});
 #if defined(__IMXRT1062__)
             next_device.send(message, data1, data2, device.getChannel(), 0);
-  #if defined(ARDUINO_TEENSY41)
-            dev3.send((midi::MidiType)message, data1, data2, device.getChannel());
-  #endif
 #endif
         }
         if (load_slot >= 0 && load_slot < HEM_NR_OF_PRESETS) {
@@ -751,14 +743,8 @@ public:
         timeout = 0;
         // top-level MIDI-to-CV handling - alters frame outputs
 #if defined(__IMXRT1062__)
-  #if defined(ARDUINO_TEENSY41)
-        ProcessMIDI(usbMIDI, usbHostMIDI, MIDI1);
-        ProcessMIDI(usbHostMIDI, usbMIDI, MIDI1);
-        ProcessMIDI(MIDI1, usbMIDI, usbHostMIDI);
-  #else
         ProcessMIDI(usbMIDI, usbHostMIDI);
         ProcessMIDI(usbHostMIDI, usbMIDI);
-  #endif
 #else
         ProcessMIDI(usbMIDI);
 #endif
@@ -868,7 +854,6 @@ public:
           case LOADSAVE_POPUP:
             PokePopup(MENU_POPUP);
             // but still draw the applets
-            // the popup will linger when moving onto the Config Dummy
             break;
 
           case INPUT_SETTINGS:
@@ -886,21 +871,17 @@ public:
             draw_applets = false;
             break;
 
+          case MIDI_MAPS:
+            DrawMidiMaps(config_cursor - MIDIMAP1);
+            draw_applets = false;
+            break;
+
           case SHOWHIDE_APPLETS:
             DrawAppletList();
             draw_applets = false;
             break;
           }
-
-          if (!draw_applets && popup_type == MENU_POPUP) PokePopup(POPUP_NONE); // cancel popup
         }
-#ifdef ARDUINO_TEENSY41
-        if (view_state == AUDIO_SETUP) {
-          gfxHeader("Audio DSP Setup");
-          // OC::AudioDSP::DrawAudioSetup();
-          draw_applets = false;
-        }
-#endif
 
         if (HS::q_edit)
           PokePopup(QUANTIZER_POPUP);
@@ -947,12 +928,6 @@ public:
             if (!down) ConfigButtonPush(h);
             return;
         }
-#ifdef ARDUINO_TEENSY41
-        if (view_state == AUDIO_SETUP) {
-          // if (!down) OC::AudioDSP::AudioSetupButtonAction(h);
-          return;
-        }
-#endif
 
         // button down
         if (down) {
@@ -1012,48 +987,6 @@ public:
             HS::get_applet(index, h)->OnButtonPress();
         }
     }
-
-#ifdef ARDUINO_TEENSY41
-    void ExtraButtonPush(const UI::Event &event) {
-        bool down = (event.type == UI::EVENT_BUTTON_DOWN);
-        int h = (event.control == OC::CONTROL_BUTTON_UP2) ? LEFT_HEMISPHERE : RIGHT_HEMISPHERE;
-
-        if (down) {
-          // dual press for Audio Setup
-          if (event.mask == (OC::CONTROL_BUTTON_UP2 | OC::CONTROL_BUTTON_DOWN2) && h != first_click) {
-              view_state = AUDIO_SETUP;
-              OC::ui.SetButtonIgnoreMask(); // ignore button release
-              return;
-          }
-
-          // mark this single click
-          click_tick = OC::CORE::ticks;
-          first_click = h;
-          return;
-        }
-
-        // --- Button Release
-        if (preset_cursor || view_state != APPLETS) {
-            // cancel config screen, etc. on select button release
-            preset_cursor = 0;
-            view_state = APPLETS;
-            HS::popup_tick = 0;
-            return;
-        }
-
-        if (clock_setup) {
-            clock_setup = 0; // Turn off clock setup with any single-click button release
-            return;
-        }
-
-        if (event.control == OC::CONTROL_BUTTON_DOWN2)
-            ToggleConfigMenu();
-
-        if (event.control == OC::CONTROL_BUTTON_UP2)
-            ShowPresetSelector();
-
-    }
-#endif
 
     void DelegateSelectButtonPush(const UI::Event &event) {
         bool down = (event.type == UI::EVENT_BUTTON_DOWN);
@@ -1148,12 +1081,6 @@ public:
           ConfigEncoderAction(h, increment);
           return;
         }
-#ifdef ARDUINO_TEENSY41
-        if (view_state == AUDIO_SETUP) {
-          // OC::AudioDSP::AudioMenuAdjust(h, increment);
-          return;
-        }
-#endif
 
         if (clock_setup) {
           if (h == LEFT_HEMISPHERE)
@@ -1254,8 +1181,6 @@ private:
     uint32_t click_tick; // Measure time between clicks for double-click
     int first_click; // The first button pushed of a double-click set, to see if the same one is pressed
 
-    DigitalInputMap jump_trig_;
-
     elapsedMicros timeout = 0;
 
     // State machine
@@ -1265,9 +1190,6 @@ private:
       CONFIG_MENU,
       PRESET_PICKER,
       CLOCK_SETUP,
-#ifdef ARDUINO_TEENSY41
-      AUDIO_SETUP,
-#endif
     };
     HEMView view_state = APPLETS;
 
@@ -1275,33 +1197,49 @@ private:
         DELETE_PRESET,
         LOAD_PRESET, SAVE_PRESET,
         AUTO_SAVE,
-        CONFIG_DUMMY, // past this point goes full screen
+        RANDOMIZER, // past this point goes full screen
+
+        // General Settings
         TRIG_LENGTH,
         SCREENSAVER_MODE,
         CURSOR_MODE,
-        AUTO_MIDI,
-        MIDI_PC_CHANNEL,
         PRESET_JUMP_TRIG,
-
-        // Global Quantizers: 4x(Scale, Root, Octave, Mask?)
-        QUANT1, QUANT2, QUANT3, QUANT4,
-        QUANT5, QUANT6, QUANT7, QUANT8,
+        MIDI_BEND_RANGE,
+        MIDI_PC_CHANNEL,
+        AUTO_MIDI,
+        MIDI_THRU_TOGGLE,
+        MIDI_POLY_MODE,
 
         // Input Remapping
         TRIGMAP1, TRIGMAP2, TRIGMAP3, TRIGMAP4,
         CVMAP1, CVMAP2, CVMAP3, CVMAP4,
 
+        // Global Quantizers: 4x(Scale, Root, Octave, Mask?)
+        QUANT1, QUANT2, QUANT3, QUANT4,
+        QUANT5, QUANT6, QUANT7, QUANT8,
+
+        // MIDI Mappings
+        MIDIMAP1, MIDIMAP2, MIDIMAP3, MIDIMAP4,
+        MIDIMAP5, MIDIMAP6, MIDIMAP7, MIDIMAP8,
+        MIDIMAP9, MIDIMAP10, MIDIMAP11, MIDIMAP12,
+        MIDIMAP13, MIDIMAP14, MIDIMAP15, MIDIMAP16,
+        MIDIMAP17, MIDIMAP18, MIDIMAP19, MIDIMAP20,
+        MIDIMAP21, MIDIMAP22, MIDIMAP23, MIDIMAP24,
+        MIDIMAP25, MIDIMAP26, MIDIMAP27, MIDIMAP28,
+        MIDIMAP29, MIDIMAP30, MIDIMAP31, MIDIMAP32,
+
         // Applet visibility (dummy position)
         SHOWHIDELIST,
 
-        MAX_CURSOR = CVMAP4
+        MAX_CURSOR = MIDIMAP32
     };
 
     enum HEMConfigPage {
       LOADSAVE_POPUP,
       CONFIG_SETTINGS,
-      QUANTIZER_SETTINGS,
       INPUT_SETTINGS,
+      QUANTIZER_SETTINGS,
+      MIDI_MAPS,
       SHOWHIDE_APPLETS,
 
       LAST_PAGE = SHOWHIDE_APPLETS
@@ -1312,22 +1250,23 @@ private:
           if (h == 0) { // change pages
             config_page = constrain(config_page + dir, 0, LAST_PAGE);
 
-            const int cursorpos[] = { LOAD_PRESET, TRIG_LENGTH, QUANT1, TRIGMAP1, SHOWHIDELIST };
+            const int cursorpos[] = { LOAD_PRESET, TRIG_LENGTH, TRIGMAP1, QUANT1, MIDIMAP1, SHOWHIDELIST };
             config_cursor = cursorpos[config_page];
           } else if (config_page == SHOWHIDE_APPLETS) {
             showhide_cursor.Scroll(dir);
           } else { // move cursor
             config_cursor = constrain(config_cursor + dir, LOAD_PRESET, MAX_CURSOR);
 
-            if (config_cursor <= CONFIG_DUMMY) config_page = LOADSAVE_POPUP;
-            else if (config_cursor < QUANT1) config_page = CONFIG_SETTINGS;
-            else if (config_cursor < TRIGMAP1) config_page = QUANTIZER_SETTINGS;
-            else if (config_cursor < SHOWHIDELIST) config_page = INPUT_SETTINGS;
+            if (config_cursor <= RANDOMIZER) config_page = LOADSAVE_POPUP;
+            else if (config_cursor < TRIGMAP1) config_page = CONFIG_SETTINGS;
+            else if (config_cursor < QUANT1) config_page = INPUT_SETTINGS;
+            else if (config_cursor < MIDIMAP1) config_page = QUANTIZER_SETTINGS;
+            else if (config_cursor < SHOWHIDELIST) config_page = MIDI_MAPS;
             //else config_page = SHOWHIDE_APPLETS;
 
             ResetCursor();
           }
-          if (config_cursor > CONFIG_DUMMY) HS::popup_tick = 0;
+          if (config_cursor > RANDOMIZER) HS::popup_tick = 0;
           return;
         }
 
@@ -1349,13 +1288,21 @@ private:
         case TRIG_LENGTH:
             HS::trig_length = (uint32_t) constrain( int(HS::trig_length + dir), 1, 127);
             break;
+        case PRESET_JUMP_TRIG:
+            if (!EditSelectedInputMap(dir))
+              jump_trig_.ChangeSource(dir);
+            break;
+        case MIDI_BEND_RANGE:
+            HS::frame.MIDIState.bend_range =
+              constrain(HS::frame.MIDIState.bend_range + dir, 0, 36);
+            break;
         case MIDI_PC_CHANNEL:
             HS::frame.MIDIState.pc_channel =
               constrain(HS::frame.MIDIState.pc_channel + dir, 0, 17);
             break;
-        case PRESET_JUMP_TRIG:
-            if (!EditSelectedInputMap(dir))
-              jump_trig_.ChangeSource(dir);
+        case MIDI_POLY_MODE:
+            HS::frame.MIDIState.poly_mode =
+              constrain(HS::frame.MIDIState.poly_mode + dir, 0, HS::MIDIPolyMode::POLY_LAST);
             break;
         case SCREENSAVER_MODE:
             HS::screensaver_mode = constrain(HS::screensaver_mode + dir, 0, SCREENSAVER_MODE_COUNT - 1);
@@ -1404,7 +1351,7 @@ private:
         }
 
         switch (config_cursor) {
-        case CONFIG_DUMMY:
+        case RANDOMIZER:
             ++dummy_count;
             // reset input mappings to defaults
             HS::ResetMappings();
@@ -1460,9 +1407,10 @@ private:
                 ))
               break;
         case TRIG_LENGTH:
+        case MIDI_BEND_RANGE:
         case MIDI_PC_CHANNEL:
+        case MIDI_POLY_MODE:
         case SCREENSAVER_MODE:
-        default:
             isEditing = !isEditing;
             break;
 
@@ -1481,6 +1429,10 @@ private:
             HS::frame.autoMIDIOut = !HS::frame.autoMIDIOut;
             break;
 
+        case MIDI_THRU_TOGGLE:
+            HS::midi_thru_enabled = !HS::midi_thru_enabled;
+            break;
+
         case SHOWHIDELIST:
             if (h == 0) // left encoder inverts selection
             {
@@ -1490,6 +1442,12 @@ private:
             else // right encoder toggles current
               HS::showhide_applet(showhide_cursor.cursor_pos());
             break;
+        default: {
+            // I'm not going to paste 32 different MIDI cursor positions so it's just the default :P
+            int midx = constrain(config_cursor - MIDIMAP1, 0, 31);
+            HS::MidiMapEdit(midx);
+            break;
+          }
         }
     }
 
@@ -1581,70 +1539,30 @@ private:
         // --- Config Selection
         gfxHeader("< General Settings >");
 
-        gfxPrint(1, 15, "Trig Length:  ");
-        gfxPrint(HS::trig_length);
-        gfxPrint("ms");
+        const int NUM_ROWS = TRIGMAP1 - TRIG_LENGTH; // lol weird
+        const int SHOW_ROWS = 6;
+        const int ROW_HEIGHT = 8;
 
-        gfxPrint(1, 25, "Screensaver:  ");
-        gfxPrint( ssmodes[HS::screensaver_mode] );
+        int scroll_top = config_cursor - TRIG_LENGTH - 2;
+        CONSTRAIN(scroll_top, 0, NUM_ROWS - SHOW_ROWS);
 
-        gfxPrint(1, 35, "Cursor wrap:  ");
-        gfxPrint(OC::Strings::off_on[HS::cursor_wrap]);
-
-        gfxPrint(1, 45, "Auto MIDI-Out:  ");
-        gfxPrint( OC::Strings::off_on[HS::frame.autoMIDIOut]);
-
-        const uint8_t pc_ch = HS::frame.MIDIState.pc_channel;
-        gfxPrint(1, 55, "MIDI-PC Ch:   ");
-        if (pc_ch == 0) gfxPrint("Omni");
-        else if (pc_ch <= 16) gfxPrint(pc_ch);
-        else gfxPrint("Off");
-
-        // Preset jump trigger mapping
-        int x = 118;
-        int y = 54;
-        gfxPos(x, y);
-        gfxPrint(jump_trig_);
-        if (config_cursor == PRESET_JUMP_TRIG) {
-          int w = strlen(jump_trig_.InputName()) * 6 + 2;
-          CONSTRAIN(x, 3, 126-w);
-
-          graphics.clearRect(x - 2, y - 1, w + 3, 12);
-          gfxFrame(x - 1, y - 1, w + 1, 11);
-          gfxPrint(x, y + 1, jump_trig_.InputName());
-          if (EditMode()) gfxInvert(x - 1, y - 1, w + 1, 11);
+        // Draw 6 visible rows from scroll_top (scroll_top is a row index)
+        for (int i = 0; i < SHOW_ROWS; ++i) {
+            int row = scroll_top + i;
+            if (row >= NUM_ROWS) break;
+            HS::DrawConfigRow(
+              row,
+              15 + i * ROW_HEIGHT,
+              (config_cursor - TRIG_LENGTH) == row,
+              EditMode()
+            );
         }
 
-        switch (config_cursor) {
-        case CVMAP1:
-        case CVMAP2:
-        case CVMAP3:
-        case CVMAP4:
-          gfxCursor(1 + 32*(config_cursor - CVMAP1), 63, 19);
-          break;
-
-        case TRIG_LENGTH:
-            gfxIcon(73, 15, RIGHT_ICON);
-            if (isEditing) gfxInvert(82, 14, 45, 10);
-            break;
-        case SCREENSAVER_MODE:
-            gfxIcon(73, 25, RIGHT_ICON);
-            if (isEditing) gfxInvert(82, 24, 45, 10);
-            break;
-        case CURSOR_MODE:
-            gfxIcon(73, 35, RIGHT_ICON);
-            break;
-        case AUTO_MIDI:
-            gfxIcon(89, 45, RIGHT_ICON);
-            break;
-        case MIDI_PC_CHANNEL:
-            gfxIcon(73, 55, RIGHT_ICON);
-            if (isEditing) gfxInvert(82, 54, 45, 10);
-            break;
-        case CONFIG_DUMMY:
-            gfxIcon(2, 1, LEFT_ICON);
-            break;
-        }
+        // Scroll arrows
+        if (scroll_top > 0)
+            gfxIcon(121, 14, UP_ICON);
+        if (scroll_top + SHOW_ROWS < NUM_ROWS)
+            gfxIcon(121, 56, DOWN_ICON);
 
         gfxDisplayInputMapEditor();
     }
@@ -1845,10 +1763,10 @@ void AppHemisphere::HandleButtonEvent(const UI::Event &event) {
         if (HS::midi_edit) {
           if (event.control == OC::CONTROL_BUTTON_A) {
             mview = constrain(mview - 1, 0, MIDIMAP_MAX-1);
-            //config_cursor = MIDIMAP1 + mview;
+            config_cursor = MIDIMAP1 + mview;
           } else if (event.control == OC::CONTROL_BUTTON_B) {
             mview = constrain(mview + 1, 0, MIDIMAP_MAX-1);
-            //config_cursor = MIDIMAP1 + mview;
+            config_cursor = MIDIMAP1 + mview;
           } else {
             // TODO: auto-learn from Z button
             HS::midi_edit = 0;
@@ -1866,10 +1784,6 @@ void AppHemisphere::HandleButtonEvent(const UI::Event &event) {
         } else if (event.control == OC::CONTROL_BUTTON_L || event.control == OC::CONTROL_BUTTON_R) {
             DelegateEncoderPush(event);
         }
-#ifdef ARDUINO_TEENSY41
-        else // new buttons
-            ExtraButtonPush(event);
-#endif
 
         break;
 

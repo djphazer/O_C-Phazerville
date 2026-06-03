@@ -33,6 +33,8 @@ namespace HS {
   int midi_edit = 0;
   uint8_t mview = 0;
 
+  DigitalInputMap jump_trig_;
+
   util::SemitoneQuantizer input_quant[ADC_CHANNEL_COUNT];
   util::TuringShiftRegister* turing_machine_[ADC_CHANNEL_COUNT];
   peaks::MultistageEnvelope env_[DAC_CHANNEL_COUNT];
@@ -274,6 +276,78 @@ namespace HS {
     }
   }
 
+  void DrawMidiMaps(int curpos) {
+    const int w = 16;
+    const int h = 13;
+    CVInputMap cv_;
+    gfxHeader("<    MIDI Maps     >");
+    for (size_t midx = 0; midx < MIDIMAP_MAX; ++midx) {
+      cv_.SetMidiMap(midx);
+      int x = 1 + (midx % 8) * w;
+      int y = 12 + (midx / 8) * h;
+      gfxPos(x, y);
+      gfxPrint(cv_);
+      if (frame.MIDIState.mapping[midx].function > 0)
+        gfxInvert(x, y, 9, 9);
+    }
+    int curx = 9 + (curpos % 8) * w;
+    int cury = 12 + (curpos / 8) * h;
+    gfxIcon(curx, cury, LEFT_ICON);
+  }
+  void DrawConfigRow(int row, int y, bool cur, bool editing) {
+    switch (row) {
+      case 0:
+        gfxPrint(1, y, "Trig Length:  ");
+        gfxPrint(trig_length);
+        gfxPrint("ms");
+        break;
+      case 1:
+        gfxPrint(1, y, "Screensaver:  ");
+        gfxPrint( ssmodes[screensaver_mode] );
+        break;
+      case 2:
+        gfxPrint(1, y, "Cursor wrap:  ");
+        gfxPrint(OC::Strings::off_on[cursor_wrap]);
+        break;
+      case 3: {
+        gfxPrint(1, y, "Jump Trig:");
+        gfxPrint(84, y, jump_trig_.InputName());
+        gfxPrint("  ");
+        gfxPrint(jump_trig_);
+        break;
+      }
+      case 4:
+        gfxPrint(1, y, "Pitch Bend:   ");
+        gfxPrint(frame.MIDIState.bend_range);
+        break;
+      case 5: {
+        const uint8_t pc_ch = frame.MIDIState.pc_channel;
+        gfxPrint(1, y, "MIDI-PC Ch:   ");
+        if (pc_ch == 0) gfxPrint("Omni");
+        else if (pc_ch <= 16) gfxPrint(pc_ch);
+        else gfxPrint("Off");
+        break;
+      }
+      case 6:
+        gfxPrint(1, y, "AutoMIDI-Out  ");
+        gfxPrint(OC::Strings::off_on[frame.autoMIDIOut]);
+        break;
+      case 7:
+        gfxPrint(1, y, "MIDI Thru:    ");
+        gfxPrint(OC::Strings::off_on[midi_thru_enabled]);
+        break;
+      case 8:
+        gfxPrint(1, y, "MIDI PolyMd:  ");
+        gfxPrint(midi_poly_mode_name[frame.MIDIState.poly_mode]);
+        break;
+      default: break;
+    }
+
+    if (cur) {
+      gfxIcon(73, y, RIGHT_ICON);
+      if (editing) gfxInvert(82, y - 1, 45, 10);
+    }
+  }
   void DrawPopup(const int config_cursor, const int preset_id, const bool blink) {
 
     enum ConfigCursor {

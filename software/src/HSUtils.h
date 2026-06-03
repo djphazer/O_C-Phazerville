@@ -213,6 +213,8 @@ namespace HS {
   static constexpr int octave_max = 6;
 #endif
 
+  extern DigitalInputMap jump_trig_;
+
   extern int preset_id;
   extern bool midi_thru_enabled;
   extern bool cursor_wrap;
@@ -243,6 +245,8 @@ namespace HS {
   void MidiMapEdit(int ch);
   void QEditEncoderMove(bool rightenc, int dir);
   void MEditEncoderMove(bool rightenc, int dir);
+  void DrawMidiMaps(int curpos);
+  void DrawConfigRow(int row, int y, bool cur, bool editing);
   void DrawPopup(const int config_cursor = 0, const int preset_id = 0, const bool blink = 0);
   void ToggleClockRun();
   void PokePopup(PopupType pop, ErrMsgIndex err = NO_ERROR);

@@ -684,11 +684,10 @@ public:
           case LOADSAVE_POPUP:
             PokePopup(MENU_POPUP);
             // but still draw the applets
-            // the popup will linger when moving onto the Config Dummy
             break;
 
           case MIDI_MAPS_PAGE:
-            DrawMidiMaps();
+            DrawMidiMaps(config_cursor - MIDIMAP1);
             draw_applets = false;
             break;
 
@@ -874,7 +873,6 @@ public:
 
         // cancel preset select or config screens
         if (config_page || preset_cursor) {
-          if (isEditing && config_cursor == PRESET_BANK_NUM) SetBank(bank_num);
           preset_cursor = 0;
           config_page = HIDE_CONFIG;
           HS::popup_tick = 0;
@@ -1070,8 +1068,6 @@ private:
     uint32_t click_tick; // Measure time between clicks for double-click
     int first_click; // The first button pushed of a double-click set, to see if the same one is pressed
 
-    DigitalInputMap jump_trig_;
-
     // Button combos can cause multiple triggers if the buttons are pressed
     // close enough together. Each press will have its own event with both
     // button marked in the mask. So, we track mask history to ensure button
@@ -1112,10 +1108,11 @@ private:
         LOAD_PRESET, SAVE_PRESET,
         AUTO_SAVE,
         RANDOMIZE_PRESET, // past this point goes full screen
+
+        // General Settings
         TRIG_LENGTH,
         SCREENSAVER_MODE,
         CURSOR_MODE,
-        PRESET_BANK_NUM,
         PRESET_JUMP_TRIG,
         MIDI_BEND_RANGE,
         MIDI_PC_CHANNEL,
@@ -1268,15 +1265,13 @@ private:
             if (!EditSelectedInputMap(dir))
               HS::cvmap[config_cursor-CVMAP5 + 4].ChangeSource(dir);
             break;
+
         case TRIG_LENGTH:
             HS::trig_length = (uint32_t) constrain( int(HS::trig_length + dir), 1, 127);
             break;
         case PRESET_JUMP_TRIG:
             if (!EditSelectedInputMap(dir))
               jump_trig_.ChangeSource(dir);
-            break;
-        case PRESET_BANK_NUM:
-            bank_num = constrain(bank_num + dir, 0, 99);
             break;
         case MIDI_BEND_RANGE:
             HS::frame.MIDIState.bend_range =
@@ -1293,6 +1288,7 @@ private:
         case SCREENSAVER_MODE:
             HS::screensaver_mode = constrain(HS::screensaver_mode + dir, 0, SCREENSAVER_MODE_COUNT - 1);
             break;
+
         case DELETE_PRESET:
         case LOAD_PRESET:
         case SAVE_PRESET:
@@ -1424,11 +1420,6 @@ private:
               isEditing ^= 1;
             break;
 
-          case PRESET_BANK_NUM:
-            isEditing = !isEditing;
-            if (!isEditing) SetBank(bank_num);
-            break;
-
           case CURSOR_MODE:
             HS::cursor_wrap = !HS::cursor_wrap;
             break;
@@ -1458,24 +1449,6 @@ private:
         }
     }
 
-    void DrawMidiMaps() const {
-      const int w = 16;
-      const int h = 13;
-      CVInputMap cv_;
-      gfxHeader("<    MIDI Maps     >");
-      for (size_t midx = 0; midx < MIDIMAP_MAX; ++midx) {
-        cv_.SetMidiMap(midx);
-        int x = 1 + (midx%8)*w;
-        int y = 12 + (midx/8)*h;
-        gfxPos(x, y);
-        gfxPrint(cv_);
-        if (frame.MIDIState.mapping[midx].function > 0)
-          gfxInvert(x, y, 9, 9);
-      }
-      int curx = 9 + ((config_cursor - MIDIMAP1)%8)*w;
-      int cury = 12 + ((config_cursor - MIDIMAP1)/8)*h;
-      gfxIcon(curx, cury, LEFT_ICON);
-    }
     void DrawInputMappings() const {
         gfxHeader("<  Input Mapping    >");
         gfxIcon(25, 13, TR_ICON); gfxIcon(89, 13, TR_ICON);
@@ -1555,64 +1528,6 @@ private:
         }
     }
 
-    void DrawConfigRow(int row, int y, bool cur) const {
-      switch (row) {
-        case 0:
-          gfxPrint(1, y, "Trig Length:  ");
-          gfxPrint(HS::trig_length);
-          gfxPrint("ms");
-          break;
-        case 1:
-          gfxPrint(1, y, "Screensaver:  ");
-          gfxPrint( ssmodes[HS::screensaver_mode] );
-          break;
-        case 2:
-          gfxPrint(1, y, "Cursor wrap:  ");
-          gfxPrint(OC::Strings::off_on[HS::cursor_wrap]);
-          break;
-        case 3:
-          gfxPrint(1, y, "Preset Bank#  ");
-          gfxPrint(bank_num);
-          break;
-        case 4: {
-          gfxPrint(1, y, "Jump Trig:");
-          gfxPrint(84, y, jump_trig_.InputName());
-          gfxPrint("  ");
-          gfxPrint(jump_trig_);
-          break;
-        }
-        case 5:
-          gfxPrint(1, y, "Pitch Bend:   ");
-          gfxPrint(HS::frame.MIDIState.bend_range);
-          break;
-        case 6: {
-          const uint8_t pc_ch = HS::frame.MIDIState.pc_channel;
-          gfxPrint(1, y, "MIDI-PC Ch:   ");
-          if (pc_ch == 0) gfxPrint("Omni");
-          else if (pc_ch <= 16) gfxPrint(pc_ch);
-          else gfxPrint("Off");
-          break;
-        }
-        case 7:
-          gfxPrint(1, y, "AutoMIDI-Out  ");
-          gfxPrint(OC::Strings::off_on[HS::frame.autoMIDIOut]);
-          break;
-        case 8:
-          gfxPrint(1, y, "MIDI Thru:    ");
-          gfxPrint(OC::Strings::off_on[HS::midi_thru_enabled]);
-          break;
-        case 9:
-          gfxPrint(1, y, "MIDI PolyMd:  ");
-          gfxPrint(HS::midi_poly_mode_name[HS::frame.MIDIState.poly_mode]);
-          break;
-        default: break;
-      }
-
-      if (cur) {
-        gfxIcon(73, y, RIGHT_ICON);
-        if (EditMode()) gfxInvert(82, y - 1, 45, 10);
-      }
-    }
     void DrawConfigMenu() const {
         // --- Config Selection
         gfxHeader("< General Settings  >");
@@ -1627,7 +1542,12 @@ private:
         for (int i = 0; i < SHOW_ROWS; ++i) {
             int row = scroll_top + i;
             if (row >= NUM_ROWS) break;
-            DrawConfigRow(row, 15 + i * ROW_HEIGHT, (config_cursor - TRIG_LENGTH) == row);
+            HS::DrawConfigRow(
+              row,
+              15 + i * ROW_HEIGHT,
+              (config_cursor - TRIG_LENGTH) == row,
+              EditMode()
+            );
         }
 
         // Scroll arrows
