@@ -68,15 +68,87 @@ struct PolyphonyData {
     bool gate;
 };
 
+// All this determines the serialized binary format of MIDI Maps
+// Values are explicitly defined, because changing them will break preset data.
 struct MIDIMapSettings {
-  int8_t function_cc; // CC#, or some secret parameter for non-CC functions ;)
+  // upper 3 bits
+  enum Type : uint8_t {
+    NONE = 0,
+    PITCH = (1 << 5),
+    GATE  = (2 << 5),
+    TRIGGER = (3 << 5),
+    MODULATOR = (4 << 5),
+    CCONTROL = (5 << 5),
+    RESERVED0 = (6 << 5),
+
+    TYPE_MASK = (7 << 5),
+  };
+  enum PitchType : int8_t {
+    NOTE_MONO = 0,
+    NOTE_POLY = 1,
+    NOTE_MIN = 2,
+    NOTE_MAX = 3,
+    NOTE_PEDAL = 4,
+    NOTE_INVERT = 5,
+
+    PITCH_TYPE_COUNT
+  };
+  enum GateType : int8_t {
+    GATE_MONO = 0,
+    GATE_POLY = 1,
+    GATE_RETRIG = 2,
+    GATE_INVERT = 3,
+
+    GATE_RUN = 4,
+    GATE_RESET = 5,
+
+    GATE_TYPE_COUNT
+  };
+  enum TrigType : int8_t {
+    TRIG_NORMAL = 0,
+    TRIG_FIRST = 1,
+    TRIG_ALWAYS = 2,
+
+    TRIG_START = 3,
+    TRIG_STOP = 4,
+    TRIG_CLOCK = 5, // quarter note, 1ppqn
+    TRIG_CLOCK2 = 6, // eighth note, 2ppqn
+    TRIG_CLOCK4 = 7, // sixteenth note, 4ppqn
+    TRIG_CLOCK8 = 8, // 32nd note, 8ppqn
+    TRIG_CLOCK24 = 9, // 24ppqn
+
+    TRIG_TYPE_COUNT
+  };
+  enum ModType : int8_t {
+    MOD_VEL_MONO = 0,
+    MOD_VEL_POLY = 1,
+    MOD_AT_CHAN = 2,
+    MOD_AT_POLY = 3,
+    MOD_BEND = 4,
+
+    MOD_TYPE_COUNT
+  };
+  constexpr int subtype_count(Type t) {
+    switch (t) {
+      case NONE: return 1;
+      case PITCH: return PITCH_TYPE_COUNT;
+      case GATE: return GATE_TYPE_COUNT;
+      case TRIGGER: return TRIG_TYPE_COUNT;
+      case MODULATOR: return MOD_TYPE_COUNT;
+      case CCONTROL: return 128;
+      default: break;
+    }
+    return 0;
+  }
+
+  int8_t function_cc; // CC#, or index of other subtypes
   uint8_t function; // which type of message
   uint8_t channel; // MIDI channel number
   uint8_t dac_polyvoice; // select which voice to send from output
   int8_t transpose;
   uint8_t range_low, range_high;
 };
-struct MIDIMapping : public MIDIMapSettings {
+struct MIDIMapping : protected MIDIMapSettings {
   MIDIMapping() {}
   ~MIDIMapping() {}
 
@@ -89,37 +161,165 @@ struct MIDIMapping : public MIDIMapSettings {
   int16_t output; // translated CV values
   int16_t pitch_bend = 0;
 
-  const bool IsClock() const {
-    return (function >= HEM_MIDI_CLOCK_OUT);
+  // functions
+  const Type get_type() const {
+    return Type(function & TYPE_MASK);
+  }
+  const int8_t get_subtype() const {
+    return function_cc;
+  }
+  const uint8_t get_channel() const {
+    return channel;
+  }
+  const int8_t get_transpose() const {
+    return transpose;
+  }
+  const uint8_t get_voice() const {
+    return dac_polyvoice;
+  }
+  const uint8_t get_low() const {
+    return range_low;
+  }
+  const uint8_t get_high() const {
+    return range_high;
+  }
+  const bool enabled() const {
+    return get_type() != NONE;
+  }
+  const bool learning() const {
+    return function_cc < 0;
+  }
+
+  const char * const get_label() const {
+    if (get_type() == CCONTROL) return "CC#"; // special case for "CC#-1" auto-learn
+    if (get_subtype() < 0) return "(learn)";
+
+    switch (get_type()) {
+      case NONE: return "None";
+      case PITCH:
+        switch (PitchType(get_subtype())) {
+          case NOTE_MONO:   return "Note";
+          case NOTE_POLY:   return "PolyN";
+          case NOTE_MIN:    return "LoNote";
+          case NOTE_MAX:    return "HiNote";
+          case NOTE_PEDAL:  return "PdlNote";
+          case NOTE_INVERT: return "InvNote";
+          default: break;
+        }
+        break;
+      case GATE:
+        switch (GateType(get_subtype())) {
+          case GATE_MONO:   return "Gate";
+          case GATE_POLY:   return "PolyG";
+          case GATE_RETRIG: return "GateRT";
+          case GATE_INVERT: return "InvGate";
+          case GATE_RUN:    return "RunGate";
+          case GATE_RESET:  return "Reset";
+          default: break;
+        }
+        break;
+      case TRIGGER:
+        switch (TrigType(get_subtype())) {
+          case TRIG_NORMAL: return "Trig";
+          case TRIG_FIRST:  return "Trig1st";
+          case TRIG_ALWAYS: return "TrgAlws";
+          case TRIG_START:  return "Start";
+          case TRIG_STOP:   return "Stop";
+          case TRIG_CLOCK:  return "Clk-1";
+          case TRIG_CLOCK2: return "Clk-2";
+          case TRIG_CLOCK4: return "Clk-4";
+          case TRIG_CLOCK8: return "Clk-8";
+          case TRIG_CLOCK24: return "Clk24";
+          default: break;
+        }
+        break;
+      case MODULATOR:
+        switch (ModType(get_subtype())) {
+          case MOD_VEL_MONO: return "Veloc";
+          case MOD_VEL_POLY: return "PolyV";
+          case MOD_AT_CHAN:  return "ChnAft";
+          case MOD_AT_POLY:  return "KeyAft";
+          case MOD_BEND:     return "Bend";
+          default: break;
+        }
+        break;
+      default: break;
+    }
+    return "???";
+  }
+
+  // Setters
+  void Init() {
+    function = NONE;
+    function_cc = 0;
+    dac_polyvoice = 0;
+    transpose = 0;
+    output = 0;
+    pitch_bend = 0;
+    range_low = 0;
+    range_high = 127;
+  }
+  // -1 means armed to auto-learn
+  void SetPitch(int8_t subtype) {
+    function = PITCH;
+    function_cc = constrain(subtype, -1, subtype_count(PITCH));
+  }
+  void SetTrigger(int8_t subtype) {
+    function = TRIGGER;
+    function_cc = constrain(subtype, -1, subtype_count(TRIGGER));
+  }
+  void SetGate(int8_t subtype) {
+    function = GATE;
+    function_cc = constrain(subtype, -1, subtype_count(GATE));
+  }
+  void SetModulator(int8_t subtype) {
+    function = MODULATOR;
+    function_cc = constrain(subtype, -1, subtype_count(MODULATOR));
+  }
+  void SetCC(int8_t subtype) {
+    function = CCONTROL;
+    function_cc = constrain(subtype, -1, subtype_count(CCONTROL));
+  }
+
+  void SetChannel(uint8_t ch) {
+    channel = ch;
+  }
+  void SetTranspose(int8_t tr) {
+    transpose = tr;
+  }
+
+  const bool IsPitch() const {
+    return get_type() == PITCH;
+  }
+  const bool IsGate() const {
+    return get_type() == GATE;
   }
   const bool IsTrigger() const {
-    return (function == HEM_MIDI_TRIG_OUT
-         || function == HEM_MIDI_TRIG_1ST_OUT
-         || function == HEM_MIDI_TRIG_ALWAYS_OUT
-         || function == HEM_MIDI_START_OUT
-         || IsClock());
+    return get_type() == TRIGGER;
   }
-  const bool IsPitch() const {
-    return (function == HEM_MIDI_NOTE_OUT
-         || function == HEM_MIDI_NOTE_POLY_OUT
-         || function == HEM_MIDI_NOTE_INV_OUT
-         || function == HEM_MIDI_NOTE_MIN_OUT
-         || function == HEM_MIDI_NOTE_MAX_OUT
-         || function == HEM_MIDI_NOTE_PEDAL_OUT);
+  const bool IsClock() const {
+    return IsTrigger() && get_subtype() >= TRIG_CLOCK;
+  }
+  const bool IsMod() const {
+    return get_type() == MODULATOR;
+  }
+  const bool IsCC() const {
+    return get_type() == CCONTROL;
   }
   const bool IsPoly() const {
-    return (function == HEM_MIDI_NOTE_POLY_OUT
-         || function == HEM_MIDI_GATE_POLY_OUT
-         || function == HEM_MIDI_VEL_POLY_OUT
-         || function == HEM_MIDI_AT_KEY_POLY_OUT);
+    return (IsPitch() && get_subtype() == NOTE_POLY)
+      || (IsGate() && get_subtype() == GATE_POLY)
+      || (IsMod() && ((get_subtype() == MOD_AT_POLY) || (get_subtype() == MOD_VEL_POLY)));
   }
   constexpr int clock_mod() const {
-    uint8_t mod = 1;
-    if (function == HEM_MIDI_CLOCK_OUT) mod = 12;
-    if (function == HEM_MIDI_CLOCK_8_OUT) mod = 6;
-    if (function == HEM_MIDI_CLOCK_16_OUT) mod = 3;
+    uint8_t mod = 1; // 24ppqn aka 1/96th note
+    if (function_cc == TRIG_CLOCK) mod = 24; // quarter note, 1ppqn
+    if (function_cc == TRIG_CLOCK2) mod = 12; // eighth note, 2ppqn
+    if (function_cc == TRIG_CLOCK4) mod = 6; // sixteenth note, 4ppqn
+    if (function_cc == TRIG_CLOCK8) mod = 3; // 32nd note, 8ppqn
     return mod;
   }
+
   const int ViewOut() const;
   void ClockOut() {
     trigout_countdown = HEMISPHERE_CLOCK_TICKS * HS::trig_length;
@@ -136,12 +336,38 @@ struct MIDIMapping : public MIDIMapSettings {
   void AdjustChannel(int dir) {
     channel = constrain(channel + dir, 0, 16); // 16 = omni
   }
+
+  const Type ordered_types[6] = {
+    NONE, PITCH, GATE, TRIGGER, MODULATOR, CCONTROL
+  };
+  bool AdjustType(int dir) {
+    const int count = sizeof(ordered_types);
+    int tidx = 0;
+    while (get_type() != ordered_types[tidx] && tidx < count) ++tidx;
+    if (tidx >= count) tidx = 0;
+    tidx += (dir>0?1:-1);
+    CONSTRAIN(tidx, 0, count - 1);
+    int sidx = constrain(get_subtype(), 0, subtype_count(ordered_types[tidx]) - 1);
+
+    Type oldtype = get_type();
+    function = ordered_types[tidx];
+    function_cc = sidx;
+    return oldtype != get_type();
+  }
   void AdjustFunction(int dir) {
-    function = constrain(function + dir, 0, HEM_MIDI_MAX_FUNCTION);
+    int sidx = get_subtype() + dir;
+    if (sidx < 0) {
+      if (AdjustType(-1))
+        sidx = subtype_count(get_type()) - 1;
+    }
+    if (sidx >= subtype_count(get_type())) {
+      if (AdjustType(1))
+        sidx = (get_type() == CCONTROL) ? -1 : 0; // auto-learn for CC#
+    }
+    CONSTRAIN(sidx, -1, subtype_count(get_type()) - 1);
+    function_cc = sidx;
     output = 0;
     pitch_bend = 0;
-    if (function == HEM_MIDI_CC_OUT)
-      function_cc = -1; // auto-learn MIDI CC
   }
 
   void AdjustVoice(int dir) {
@@ -150,7 +376,7 @@ struct MIDIMapping : public MIDIMapSettings {
 
   void AutoLearn() {
     channel = 16; // omni
-    function = HEM_MIDI_LEARN;
+    //function = NONE;
     function_cc = -1; // auto-learn MIDI CC or precise NoteOn
   }
 
@@ -168,8 +394,42 @@ struct MIDIMapping : public MIDIMapSettings {
   }
   void Unpack(uint64_t data) {
     UnpackPackables(data, function_cc, function, channel, dac_polyvoice, transpose, range_low, range_high);
+    // migrate old data
+    if (function && get_type() == NONE) {
+      switch (function) {
+        case HEM_MIDI_NOTE_OUT: SetPitch(NOTE_MONO); break;
+        case HEM_MIDI_NOTE_POLY_OUT: SetPitch(NOTE_POLY); break;
+        case HEM_MIDI_NOTE_MIN_OUT: SetPitch(NOTE_MIN); break;
+        case HEM_MIDI_NOTE_MAX_OUT: SetPitch(NOTE_MAX); break;
+        case HEM_MIDI_NOTE_PEDAL_OUT: SetPitch(NOTE_PEDAL); break;
+        case HEM_MIDI_NOTE_INV_OUT: SetPitch(NOTE_INVERT); break;
+
+        case HEM_MIDI_GATE_OUT: SetGate(GATE_MONO); break;
+        case HEM_MIDI_GATE_POLY_OUT: SetGate(GATE_POLY); break;
+        case HEM_MIDI_GATE_INV_OUT: SetGate(GATE_INVERT); break;
+        case HEM_MIDI_RUN_OUT: SetGate(GATE_RUN); break;
+
+        case HEM_MIDI_TRIG_OUT: SetTrigger(TRIG_NORMAL); break;
+        case HEM_MIDI_TRIG_1ST_OUT: SetTrigger(TRIG_FIRST); break;
+        case HEM_MIDI_TRIG_ALWAYS_OUT: SetTrigger(TRIG_ALWAYS); break;
+        case HEM_MIDI_START_OUT: SetTrigger(TRIG_START); break;
+        case HEM_MIDI_CLOCK_OUT: SetTrigger(TRIG_CLOCK2); break;
+        case HEM_MIDI_CLOCK_8_OUT: SetTrigger(TRIG_CLOCK4); break;
+        case HEM_MIDI_CLOCK_16_OUT: SetTrigger(TRIG_CLOCK8); break;
+        case HEM_MIDI_CLOCK_24_OUT: SetTrigger(TRIG_CLOCK24); break;
+
+        case HEM_MIDI_VEL_OUT: SetModulator(MOD_VEL_MONO); break;
+        case HEM_MIDI_VEL_POLY_OUT: SetModulator(MOD_VEL_POLY); break;
+        case HEM_MIDI_AT_CHAN_OUT: SetModulator(MOD_AT_CHAN); break;
+        case HEM_MIDI_AT_KEY_POLY_OUT: SetModulator(MOD_AT_POLY); break;
+        case HEM_MIDI_PB_OUT: SetModulator(MOD_BEND); break;
+
+        case HEM_MIDI_CC_OUT: function = CCONTROL; break;
+
+        default: function = NONE; break;
+      }
+    }
     // validation for safety
-    if (function > HEM_MIDI_MAX_FUNCTION) function = HEM_MIDI_NOOP;
     channel &= 0x1F;
     dac_polyvoice &= 0x0F;
     if (range_low == 0 && range_high == 0) range_high = 127;
@@ -217,59 +477,51 @@ struct MIDIFrame {
     void Init() {
       // TODO: populate with some sensible defaults
       for (int ch = 0; ch < MIDIMAP_MAX; ++ch) {
-        mapping[ch].function = HEM_MIDI_NOOP;
-        mapping[ch].transpose = 0;
-        mapping[ch].output = 0;
-        mapping[ch].pitch_bend = 0;
-        mapping[ch].dac_polyvoice = ch / 2 % DAC_CHANNEL_COUNT; // each quad is a unique voice
-        mapping[ch].range_low = 0;
-        mapping[ch].range_high = 127;
+        mapping[ch].Init();
+        mapping[ch].AdjustVoice(ch / 2 % DAC_CHANNEL_COUNT); // each quad is a unique voice
       }
       for (int ch = 0; ch < ADC_CHANNEL_COUNT; ++ch) {
-        outmap[ch].function = (ch & 1) ? HEM_MIDI_GATE_OUT : HEM_MIDI_NOTE_OUT;
-        outmap[ch].function_cc = ch + 1;
-        outmap[ch].transpose = 0;
-        outmap[ch].output = 0;
-        outmap[ch].pitch_bend = 0;
-        outmap[ch].range_low = 0;
-        outmap[ch].range_high = 127;
+        outmap[ch].Init();
+        if (ch & 1) outmap[ch].SetGate(0);
+        else outmap[ch].SetPitch(0);
+        //outmap[ch].function_cc = ch + 1; // idk why I did this
       }
       clock_count = 0;
     }
 
     // getters for access to mappings
     uint8_t get_in_assign(int ch) {
-      return mapping[ch].function;
+      return mapping[ch].get_type() | mapping[ch].get_subtype();
     }
     uint8_t get_in_channel(int ch) {
-      return mapping[ch].channel;
+      return mapping[ch].get_channel();
     }
     int8_t get_in_transpose(int ch) {
-      return mapping[ch].transpose;
+      return mapping[ch].get_transpose();
     }
     bool in_in_range(int ch, uint8_t note) {
       return mapping[ch].InRange(note);
     }
 
     uint8_t get_out_assign(int ch) {
-      return outmap[ch].function;
+      return outmap[ch].get_type() | outmap[ch].get_subtype();
     }
     uint8_t get_out_channel(int ch) {
-      return outmap[ch].channel;
+      return outmap[ch].get_channel();
     }
     int8_t get_out_transpose(int ch) {
-      return outmap[ch].transpose;
+      return outmap[ch].get_transpose();
     }
     bool in_out_range(int ch, int note) {
-      return (note >= outmap[ch].range_low && note <= outmap[ch].range_high);
+      return outmap[ch].InRange(note);
     }
 
     void UpdateMidiChannelFilter() {
         uint16_t filter = 0;
         bool omni = false;
         for (auto &map : mapping) {
-            if (map.function == HEM_MIDI_NOOP) continue;
-            if (map.channel < 16) filter |= (1 << map.channel);
+            if (map.get_type() == MIDIMapSettings::NONE) continue;
+            if (map.get_channel() < 16) filter |= (1 << map.get_channel());
             else omni = true;
         }
         midi_channel_filter = filter;
@@ -283,8 +535,8 @@ struct MIDIFrame {
     void UpdateMaxPolyphony() { // find max voice number to determine how much to buffer
         int voice = 0;
         for (auto &map : mapping) {
-            if (map.function == HEM_MIDI_NOOP || !map.IsPoly()) continue;
-            if (map.dac_polyvoice > voice) voice = map.dac_polyvoice;
+            if (map.get_type() == MIDIMapSettings::NONE || !map.IsPoly()) continue;
+            if (map.get_voice() > voice) voice = map.get_voice();
         }
         if (max_voice != voice+1) {
             ClearPolyBuffer();

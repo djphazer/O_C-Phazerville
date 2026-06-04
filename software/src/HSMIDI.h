@@ -94,7 +94,6 @@ enum MIDIFunctions : uint8_t {
 
     HEM_MIDI_GATE_OUT,
     HEM_MIDI_GATE_POLY_OUT,
-    HEM_MIDI_GATE_RT_OUT,
     HEM_MIDI_GATE_INV_OUT,
 
     HEM_MIDI_VEL_OUT,
@@ -123,7 +122,7 @@ const char* const midi_fn_name[HEM_MIDI_FN_COUNT] = {
     "None",
     "Note", "PolyN", "LoNote", "HiNote", "PdlNote", "InvNote",
     "Trig", "Trig1st", "TrgAlws",
-    "Gate", "PolyG", "GateRT", "GateInv",
+    "Gate", "PolyG", "GateInv",
     "Veloc", "PolyV",
     "CC#",
     "ChnAft", "KeyAft",

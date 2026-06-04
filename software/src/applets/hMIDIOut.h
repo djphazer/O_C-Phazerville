@@ -22,6 +22,7 @@
 // See https://www.pjrc.com/teensy/td_midi.html
 
 // The functions available for each output
+#include "HSIOFrame.h"
 class hMIDIOut : public HemisphereApplet {
 public:
     enum MIDIOutCursor : uint8_t {
@@ -187,53 +188,49 @@ public:
     // from applet to global MIDIFrame
     void CommitSettings() {
       auto& hMIDI = HS::frame.MIDIState;
-      auto &mapA = hMIDI.outmap[io_offset + 0];
-      auto &mapB = hMIDI.outmap[io_offset + 1];
+      HS::MIDIMapping &mapA = hMIDI.outmap[io_offset + 0];
+      HS::MIDIMapping &mapB = hMIDI.outmap[io_offset + 1];
 
-      mapA.channel = channel;
-
+      mapA.SetChannel(channel);
       if (functionA == NOTE) {
-        mapA.function = HEM_MIDI_NOTE_OUT;
-        mapA.transpose = transpose;
+        mapA.SetPitch(0);
+        mapA.SetTranspose(transpose);
       } else {
-        mapA.function = HEM_MIDI_CC_OUT;
-        mapA.function_cc = functionA - CC_CONTROL;
+        mapA.SetCC(functionA - CC_CONTROL);
       }
 
-      mapB.channel = channel;
+      mapB.SetChannel(channel);
       if (functionB >= CC_CONTROL) {
-        mapB.function = HEM_MIDI_CC_OUT;
-        mapB.function_cc = functionB - CC_CONTROL;
+        mapB.SetCC(functionB - CC_CONTROL);
       } else
-        mapB.function = HEM_MIDI_GATE_OUT;
+        mapB.SetGate(0);
     }
     // from MIDIFrame to applet settings
     void ReloadSettings() {
       auto &hMIDI = HS::frame.MIDIState;
-      auto &map = hMIDI.outmap[io_offset + 0];
+      HS::MIDIMapping &map = hMIDI.outmap[io_offset + 0];
+      HS::MIDIMapping &mapB = hMIDI.outmap[io_offset + 1];
 
-      channel = map.channel;
-      transpose = map.transpose;
-      if (map.function == HEM_MIDI_NOTE_OUT) {
+      channel = map.get_channel();
+      transpose = map.get_transpose();
+      if (map.IsPitch()) {
         functionA = NOTE;
       } else
-        functionA = CC_CONTROL + map.function_cc;
+        functionA = CC_CONTROL + map.get_subtype();
 
-      switch (hMIDI.outmap[io_offset + 1].function) {
-        default:
-          break;
-        case HEM_MIDI_PB_OUT:
-          functionB = PITCHBEND;
-          break;
-        case HEM_MIDI_VEL_OUT:
-          functionB = VELOCITY;
-          break;
-        case HEM_MIDI_CC_OUT:
-          functionB = CC_CONTROL + hMIDI.outmap[io_offset + 1].function_cc;
-          break;
-        case HEM_MIDI_AT_CHAN_OUT:
-          functionB = AFTERTOUCH;
-          break;
+      if (mapB.IsCC())
+        functionB = CC_CONTROL + mapB.get_subtype();
+      if (mapB.get_type() == HS::MIDIMapSettings::MODULATOR) {
+        switch (mapB.get_subtype()) {
+          case HS::MIDIMapSettings::MOD_VEL_MONO:
+            functionB = VELOCITY;
+            break;
+          case HS::MIDIMapSettings::MOD_AT_CHAN:
+            functionB = AFTERTOUCH;
+            break;
+          default:
+            functionB = PITCHBEND;
+        }
       }
     }
 

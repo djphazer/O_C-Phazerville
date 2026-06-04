@@ -287,7 +287,7 @@ namespace HS {
       int y = 12 + (midx / 8) * h;
       gfxPos(x, y);
       gfxPrint(cv_);
-      if (frame.MIDIState.mapping[midx].function > 0)
+      if (frame.MIDIState.mapping[midx].enabled())
         gfxInvert(x, y, 9, 9);
     }
     int curx = 9 + (curpos % 8) * w;
@@ -483,16 +483,16 @@ namespace HS {
       {
         MIDIMapping& map = frame.MIDIState.mapping[mview];
         graphics.printf(
-          "Ch:%s %s", midi_channels[map.channel], midi_fn_name[map.function]
+          "Ch:%s %s", midi_channels[map.get_channel()], map.get_label()
         );
-        if (map.function == HEM_MIDI_CC_OUT) gfxPrint(map.function_cc);
+        if (map.get_type() == MIDIMapSettings::CCONTROL) gfxPrint(map.get_subtype());
 
         graphics.setPrintPos(px + 5, py + 15);
         graphics.printf(
           "V:%d<%s:%s>",
-          map.dac_polyvoice + 1,
-          midi_note_numbers[map.range_low],
-          midi_note_numbers[map.range_high]
+          map.get_voice() + 1,
+          midi_note_numbers[map.get_low()],
+          midi_note_numbers[map.get_high()]
         );
 
         if (midi_edit) {

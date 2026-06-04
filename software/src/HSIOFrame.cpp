@@ -30,7 +30,7 @@ void HS::MIDIFrame::ProcessMIDIMsg(const MIDIMessage msg) {
             clock_run = true;
 
             for (MIDIMapping& map : mapping) {
-              if (map.function == HEM_MIDI_START_OUT) {
+              if (map.IsClock() && map.get_subtype() == MIDIMapSettings::TRIG_START) {
                 map.ClockOut();
               }
             }
@@ -74,10 +74,10 @@ void HS::MIDIFrame::ProcessMIDIMsg(const MIDIMessage msg) {
     uint8_t m_ch_prev = 255; // initialize to invalid channel
 
     for (MIDIMapping& map : mapping) {
-        if (!map.function) continue;
+        if (!map.enabled()) continue;
 
         // skip unwanted MIDI Channels
-        if (map.channel != m_ch && map.channel != 16) continue;
+        if (map.get_channel() != m_ch && map.get_channel() != 16) continue;
 
         last_midi_channel = m_ch;
 
@@ -93,37 +93,41 @@ void HS::MIDIFrame::ProcessMIDIMsg(const MIDIMessage msg) {
 }
 
 bool HS::MIDIMapping::ProcessMsg(const MIDIMessage msg, HS::MIDIFrame &state) {
-  if (function == HEM_MIDI_NOOP) return false;
-
   const uint8_t m_ch = msg.channel - 1;
-  NoteBuffer &buf = state.note_buffer[m_ch];
 
-  bool log_this = false;
-
-  if (function == HEM_MIDI_LEARN) {
+  // Auto-Learn
+  if (learning()) {
     switch (msg.message) {
       case usbMIDI.NoteOn:
-        //TODO: set range based on polyphony, or alternate learn modes
-        if (function_cc < 0) {
+        if (!enabled()) function = PITCH;
+        if (enabled() && IsPitch()) {
+          // focused pitch range capture
+          // todo: set range based on polyphony, or alternate learn modes
           range_low = min(range_low, msg.data1);
           range_high = max(range_high, msg.data1);
+          channel = m_ch;
         }
-        // function = HEM_MIDI_NOTE_OUT;
-        // function_cc = 0;
-        channel = m_ch;
         break;
       case usbMIDI.ControlChange:
-        function = HEM_MIDI_CC_OUT;
-        function_cc = msg.data1;
-        channel = msg.channel - 1;
+        if (!enabled() || IsCC()) {
+          SetCC(msg.data1);
+          channel = m_ch;
+        }
         break;
       case usbMIDI.PitchBend:
-        function = HEM_MIDI_PB_OUT;
-        channel = msg.channel - 1;
+        if (!enabled()) {
+          SetModulator(MOD_BEND);
+          channel = m_ch;
+        }
         break;
       default: break;
     }
   }
+
+  if (!enabled()) return false;
+
+  NoteBuffer &buf = state.note_buffer[m_ch];
+  bool log_this = false;
 
   switch (msg.message) {
     case usbMIDI.NoteOn: {
@@ -131,62 +135,78 @@ bool HS::MIDIMapping::ProcessMsg(const MIDIMessage msg, HS::MIDIFrame &state) {
         semitone_mask = semitone_mask | (1u << (msg.data1 % 12));
 
         // Should this message go out on this channel?
-        switch (function) {
+        switch (get_type()) {
+          case PITCH:
+            switch (get_subtype()) {
             // note # output functions
-            case HEM_MIDI_NOTE_OUT:
+            case NOTE_MONO:
                 output = MIDIQuantizer::CV(state.GetNoteLast(buf));
                 break;
 
-            case HEM_MIDI_NOTE_POLY_OUT:
+            case NOTE_POLY:
                 if (state.CheckPolyVoice(dac_polyvoice)) output = MIDIQuantizer::CV(state.poly_buffer[dac_polyvoice].note);
                 break;
 
-            case HEM_MIDI_NOTE_MIN_OUT:
+            case NOTE_MIN:
                 output = MIDIQuantizer::CV(state.GetNoteMin(buf));
                 break;
 
-            case HEM_MIDI_NOTE_MAX_OUT:
+            case NOTE_MAX:
                 output = MIDIQuantizer::CV(state.GetNoteMax(buf));
                 break;
 
-            case HEM_MIDI_NOTE_PEDAL_OUT:
+            case NOTE_PEDAL:
                 output = MIDIQuantizer::CV(state.GetNoteFirst(buf));
                 break;
 
-            case HEM_MIDI_NOTE_INV_OUT:
+            case NOTE_INVERT:
                 output = MIDIQuantizer::CV(state.GetNoteLastInv(buf));
                 break;
-
-            case HEM_MIDI_TRIG_1ST_OUT:
+            }
+            break;
+          case TRIGGER:
+            switch (get_subtype()) {
+            case TRIG_FIRST:
                 if (buf.size() != 1) break;
-            case HEM_MIDI_TRIG_OUT:
-            case HEM_MIDI_TRIG_ALWAYS_OUT:
+            case TRIG_NORMAL:
+            case TRIG_ALWAYS:
                 ClockOut();
                 break;
+            }
+            break;
 
-            case HEM_MIDI_GATE_RT_OUT:
+          case GATE:
+            switch (get_subtype()) {
+            case GATE_RETRIG:
                 if (output > 0) {
                     gate_retrig = true;
                     trigout_countdown = HEMISPHERE_CLOCK_TICKS * HS::trig_length;
                     output = 0;
                     break;
                 }
-            case HEM_MIDI_GATE_OUT:
+            case GATE_MONO:
                 output = PULSE_VOLTAGE * (12 << 7);
                 break;
-            case HEM_MIDI_GATE_INV_OUT:
+            case GATE_INVERT:
                 output = 0;
                 break;
-            case HEM_MIDI_GATE_POLY_OUT:
+            case GATE_POLY:
                 if (state.CheckPolyVoice(dac_polyvoice)) output = PULSE_VOLTAGE * (12 << 7);
                 break;
+            }
+            break;
 
-            case HEM_MIDI_VEL_OUT:
+          case MODULATOR:
+            switch (get_subtype()) {
+            case MOD_VEL_MONO:
                 output = (buf.size() > 0) ? Proportion(state.GetVel(buf, 1), 127, HEMISPHERE_MAX_CV) : 0;
                 break;
-            case HEM_MIDI_VEL_POLY_OUT:
+            case MOD_VEL_POLY:
                 output = (state.CheckPolyVoice(dac_polyvoice)) ? Proportion(state.poly_buffer[dac_polyvoice].vel, 127, HEMISPHERE_MAX_CV) : 0;
                 break;
+            }
+            break;
+          default: break;
         }
 
         log_this = 1; // Log all MIDI notes. Other stuff is conditional.
@@ -196,57 +216,60 @@ bool HS::MIDIMapping::ProcessMsg(const MIDIMessage msg, HS::MIDIFrame &state) {
         if (!InRange(msg.data1)) break;
         semitone_mask = semitone_mask & ~(1u << (msg.data1 % 12));
 
-        if (function == HEM_MIDI_LEARN && semitone_mask == 0) {
-          function = HEM_MIDI_NOTE_OUT;
-          function_cc = 0;
+        // this is here instead of up top because of the mask update
+        if (learning() && semitone_mask == 0) {
+          SetPitch(NOTE_MONO);
         }
 
         // don't update output when last note is released
         // or if sustain is engaged
-        if (buf.size() > 0 && !state.CheckSustainLatch(m_ch)) {
-            switch(function) { // note # output functions
-                case HEM_MIDI_NOTE_OUT:
+        if (IsPitch() && buf.size() > 0 && !state.CheckSustainLatch(m_ch)) {
+            switch(get_subtype()) { // note # output functions
+                case NOTE_MONO:
                     output = MIDIQuantizer::CV(state.GetNoteLast(buf));
                     break;
 
-                case HEM_MIDI_NOTE_POLY_OUT:
+                case NOTE_POLY:
                     if (state.CheckPolyVoice(dac_polyvoice)) output = MIDIQuantizer::CV(state.poly_buffer[dac_polyvoice].note);
                     break;
 
-                case HEM_MIDI_NOTE_MIN_OUT:
+                case NOTE_MIN:
                     output = MIDIQuantizer::CV(state.GetNoteMin(buf));
                     break;
 
-                case HEM_MIDI_NOTE_MAX_OUT:
+                case NOTE_MAX:
                     output = MIDIQuantizer::CV(state.GetNoteMax(buf));
                     break;
 
-                case HEM_MIDI_NOTE_PEDAL_OUT:
+                case NOTE_PEDAL:
                     output = MIDIQuantizer::CV(state.GetNoteFirst(buf));
                     break;
 
-                case HEM_MIDI_NOTE_INV_OUT:
+                case NOTE_INVERT:
                     output = MIDIQuantizer::CV(state.GetNoteLastInv(buf));
                     break;
             }
         }
 
-        if (function == HEM_MIDI_TRIG_ALWAYS_OUT) ClockOut();
+        if (IsTrigger() && get_subtype() == TRIG_ALWAYS) ClockOut();
 
-        if (!state.CheckSustainLatch(m_ch)) {
-            if (buf.size() == 0) { // turn mono gate off, only when all notes are off
-                if (function == HEM_MIDI_GATE_OUT || function == HEM_MIDI_GATE_RT_OUT) output = 0;
-                if (function == HEM_MIDI_GATE_INV_OUT) output = PULSE_VOLTAGE * (12 << 7);
-            }
-            if (function == HEM_MIDI_GATE_POLY_OUT) {
-                if (!state.CheckPolyVoice(dac_polyvoice)) output = 0;
-            }
+        if (IsGate() && !state.CheckSustainLatch(m_ch)) {
+          if (buf.size() == 0) { // turn mono gate off, only when all notes are off
+            if (get_subtype() == GATE_MONO || get_subtype() == GATE_RETRIG)
+              output = 0;
+            if (get_subtype() == GATE_INVERT)
+              output = PULSE_VOLTAGE * (12 << 7);
+          }
+          if (get_subtype() == GATE_POLY && !state.CheckPolyVoice(dac_polyvoice))
+            output = 0;
         }
 
-        if (function == HEM_MIDI_VEL_OUT)
-            output = (buf.size() > 0) ? Proportion(state.GetVel(buf, 1), 127, HEMISPHERE_MAX_CV) : 0;
-        if (function == HEM_MIDI_VEL_POLY_OUT)
-            output = (state.CheckPolyVoice(dac_polyvoice)) ? Proportion(state.poly_buffer[dac_polyvoice].vel, 127, HEMISPHERE_MAX_CV) : 0;
+        if (IsMod()) {
+          if (get_subtype() == MOD_VEL_MONO)
+              output = (buf.size() > 0) ? Proportion(state.GetVel(buf, 1), 127, HEMISPHERE_MAX_CV) : 0;
+          if (get_subtype() == MOD_VEL_POLY)
+              output = (state.CheckPolyVoice(dac_polyvoice)) ? Proportion(state.poly_buffer[dac_polyvoice].vel, 127, HEMISPHERE_MAX_CV) : 0;
+        }
 
         log_this = 1;
         break;
@@ -254,58 +277,58 @@ bool HS::MIDIMapping::ProcessMsg(const MIDIMessage msg, HS::MIDIFrame &state) {
     case usbMIDI.ControlChange: { // Modulation wheel or other CC
         // handle sustain pedal
         if (msg.data1 == 64) {
-            if (msg.data2 > 63) {
-                if (!state.CheckSustainLatch(m_ch)) state.sustain_latch |= (1 << m_ch);
-            } else {
-                state.ClearSustainLatch(m_ch);
-                if (!(buf.size() > 0)) {
-                    switch (function) {
-                        case HEM_MIDI_GATE_OUT:
-                        case HEM_MIDI_GATE_RT_OUT:
-                        case HEM_MIDI_GATE_POLY_OUT:
-                            output = 0;
-                            break;
-                        case HEM_MIDI_GATE_INV_OUT:
-                            output = PULSE_VOLTAGE * (12 << 7);
-                            break;
-                    }
-                }
+          if (msg.data2 > 63) {
+            if (!state.CheckSustainLatch(m_ch))
+              state.sustain_latch |= (1 << m_ch);
+          } else {
+            state.ClearSustainLatch(m_ch);
+            if (IsGate() && !(buf.size() > 0)) {
+              switch (get_subtype()) {
+                case GATE_MONO:
+                case GATE_POLY:
+                case GATE_RETRIG:
+                  output = 0;
+                  break;
+                case GATE_INVERT:
+                  output = PULSE_VOLTAGE * (12 << 7);
+                  break;
+              }
             }
+          }
         }
 
-        if (function == HEM_MIDI_CC_OUT) {
-            if (function_cc < 0) { // auto-learn CC#
-              function_cc = msg.data1;
-            }
-            if (function_cc == msg.data1) {
-                output = Proportion(msg.data2, 127, HEMISPHERE_MAX_CV);
-                log_this = 1;
-            }
+        if (IsCC()) {
+          if (get_subtype() == msg.data1) {
+            output = Proportion(msg.data2, 127, HEMISPHERE_MAX_CV);
+            log_this = 1;
+          }
         }
         break;
     }
     case usbMIDI.AfterTouchPoly: {
-        if (function == HEM_MIDI_AT_KEY_POLY_OUT) {
-            if (state.FindPolyNoteIndex(msg.data1) == dac_polyvoice)
-                output = Proportion(msg.data2, 127, HEMISPHERE_MAX_CV);
-            log_this = 1;
+        if (IsMod() && get_subtype() == MOD_AT_POLY) {
+          if (state.FindPolyNoteIndex(msg.data1) == dac_polyvoice)
+            output = Proportion(msg.data2, 127, HEMISPHERE_MAX_CV);
+          log_this = 1;
         }
         break;
     }
     case usbMIDI.AfterTouchChannel: {
-        if (function == HEM_MIDI_AT_CHAN_OUT) {
-            output = Proportion(msg.data1, 127, HEMISPHERE_MAX_CV);
-            log_this = 1;
+        if (IsMod() && get_subtype() == MOD_AT_CHAN) {
+          output = Proportion(msg.data1, 127, HEMISPHERE_MAX_CV);
+          log_this = 1;
         }
         break;
     }
     case usbMIDI.PitchBend: {
-        if (function == HEM_MIDI_PB_OUT) {
+        if (IsMod()) {
+          if (MOD_BEND == get_subtype()) {
             pitch_bend = (msg.data2 << 7) + msg.data1 - 8192;
             output = Proportion(pitch_bend, 8192, HEMISPHERE_3V_CV);
             log_this = 1;
+          }
         } else if (IsPitch())
-            pitch_bend = (msg.data2 << 7) + msg.data1 - 8192;
+          pitch_bend = (msg.data2 << 7) + msg.data1 - 8192;
 
         break;
     }
@@ -316,7 +339,7 @@ bool HS::MIDIMapping::ProcessMsg(const MIDIMessage msg, HS::MIDIFrame &state) {
 void HS::MIDIFrame::Send(const SlewedValue *outvals) {
     // first pass - calculate things and turn off notes
     for (int i = 0; i < DAC_CHANNEL_COUNT; ++i) {
-        const uint8_t midi_ch = outmap[i].channel;
+        const uint8_t midi_ch = outmap[i].get_channel();
 
         int input = outvals[i].get();
         gate_high[i] = input > (12 << 7);
@@ -326,29 +349,31 @@ void HS::MIDIFrame::Send(const SlewedValue *outvals) {
             last_cv[i] = input;
         } else changed_cv[i] = 0;
 
-        switch (outmap[i].function) {
-            case HEM_MIDI_NOTE_OUT:
-                if (changed_cv[i]) {
-                    // a note has changed, turn the last one off first
-                    SendNoteOff(outchan_last[i]);
-                    current_note[midi_ch] = MIDIQuantizer::NoteNumber( input );
-                }
-                break;
-
-            case HEM_MIDI_GATE_OUT:
-                if (!gate_high[i] && changed_cv[i])
-                    SendNoteOff(midi_ch);
-                break;
-
-            case HEM_MIDI_CC_OUT:
-            {
-                const uint8_t newccval = ProportionCV(abs(input), 127);
-                if (newccval != current_ccval[i]) {
-                  SendCC(midi_ch, outmap[i].function_cc, newccval);
-                  current_ccval[i] = newccval;
-                }
-                break;
+        // outmaps don't discriminate on subtypes, we keep it simple
+        switch (outmap[i].get_type()) {
+          case MIDIMapSettings::PITCH:
+            if (changed_cv[i]) {
+              // a note has changed, turn the last one off first
+              SendNoteOff(outchan_last[i]);
+              current_note[midi_ch] = MIDIQuantizer::NoteNumber(input);
             }
+            break;
+
+          case MIDIMapSettings::GATE:
+            if (!gate_high[i] && changed_cv[i])
+              SendNoteOff(midi_ch);
+            break;
+
+          case MIDIMapSettings::CCONTROL: {
+            const uint8_t newccval = ProportionCV(abs(input), 127);
+            if (newccval != current_ccval[i]) {
+              SendCC(midi_ch, outmap[i].get_subtype(), newccval);
+              current_ccval[i] = newccval;
+            }
+            break;
+          }
+
+          default: break;
         }
 
         // Handle clock pulse timing
@@ -362,17 +387,17 @@ void HS::MIDIFrame::Send(const SlewedValue *outvals) {
         const int chA = i*2;
         const int chB = chA + 1;
 
-        if (outmap[chB].function == HEM_MIDI_GATE_OUT) {
+        if (outmap[chB].IsGate()) {
             if (clocked[chB]) {
-                SendNoteOn(outmap[chB].channel);
+                SendNoteOn(outmap[chB].get_channel());
                 // no countdown
-                outchan_last[chB] = outmap[chB].channel;
+                outchan_last[chB] = outmap[chB].get_channel();
             }
-        } else if (outmap[chA].function == HEM_MIDI_NOTE_OUT) {
+        } else if (outmap[chA].IsPitch()) {
             if (changed_cv[chA]) {
-                SendNoteOn(outmap[chA].channel);
+                SendNoteOn(outmap[chA].get_channel());
                 note_countdown[chA] = HEMISPHERE_CLOCK_TICKS * trig_length;
-                outchan_last[chA] = outmap[chA].channel;
+                outchan_last[chA] = outmap[chA].get_channel();
             }
         }
     }

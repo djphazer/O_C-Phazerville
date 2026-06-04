@@ -78,15 +78,18 @@ public:
         ForEachChannel(ch) {
             int ch_ = map_index[ch];
             MIDIMapping &map = frame.MIDIState.mapping[ch_];
-            switch (map.function) {
-                case HEM_MIDI_NOOP:
-                    break;
-                case HEM_MIDI_RUN_OUT:
-                    GateOut(ch, frame.MIDIState.clock_run);
-                    break;
-                default:
-                    Out(ch, map.ViewOut());
-                    break;
+            switch (map.get_type()) {
+              case MIDIMapSettings::NONE:
+                break;
+              case MIDIMapSettings::GATE:
+                if (map.get_subtype() == MIDIMapSettings::GATE_RUN) {
+                  // TODO: this needs to be handled elsewhere
+                  GateOut(ch, frame.MIDIState.clock_run);
+                  break;
+                }
+              default:
+                Out(ch, map.ViewOut());
+                break;
             }
         }
     }
@@ -206,8 +209,8 @@ protected:
         //help[HELP_DIGITAL2] = "";
         //help[HELP_CV1]      = "";
         //help[HELP_CV2]      = "";
-        help[HELP_OUT1]       = midi_fn_name[frame.MIDIState.mapping[map_index[0]].function];
-        help[HELP_OUT2]       = midi_fn_name[frame.MIDIState.mapping[map_index[1]].function];
+        help[HELP_OUT1]       = frame.MIDIState.mapping[map_index[0]].get_label();
+        help[HELP_OUT2]       = frame.MIDIState.mapping[map_index[1]].get_label();
         //help[HELP_EXTRA1]   = "";
         //help[HELP_EXTRA2]   = "";
         //                      "---------------------" <-- Extra text size guide
@@ -223,9 +226,9 @@ private:
     void DrawMonitor() {
         if ((OC::CORE::ticks - frame.MIDIState.last_msg_tick) < 100) {
             // reset icon display timers
-            if (frame.MIDIState.mapping[map_index[0]].channel == frame.MIDIState.last_midi_channel)
+            if (frame.MIDIState.mapping[map_index[0]].get_channel() == frame.MIDIState.last_midi_channel)
                 last_icon_ticks[0] = OC::CORE::ticks;
-            if (frame.MIDIState.mapping[map_index[1]].channel == frame.MIDIState.last_midi_channel)
+            if (frame.MIDIState.mapping[map_index[1]].get_channel() == frame.MIDIState.last_midi_channel)
                 last_icon_ticks[1] = OC::CORE::ticks;
         }
 
@@ -241,22 +244,21 @@ private:
         gfxLine(1, 22, 63, 22);
 
         MIDIMapping &map = frame.MIDIState.mapping[map_index[io_page]];
-        uint8_t m_ch = map.channel;
+        uint8_t m_ch = map.get_channel();
         gfxPrint(1, 25, "MIDICh:");
         if (m_ch > 15) graphics.printf("%3s", "Om");
         else graphics.printf("%3d", m_ch + 1);
 
         gfxIcon(2, 34, MIDI_ICON);
-        if (map.function < HEM_MIDI_FN_COUNT)
-          gfxPrint(13, 35, midi_fn_name[map.function]);
-        if (map.function == HEM_MIDI_CC_OUT)
-            gfxPrint(map.function_cc);
+        gfxPrint(13, 35, map.get_label());
+        if (map.get_type() == MIDIMapSettings::CCONTROL)
+          gfxPrint(map.get_subtype());
 
         if (cursor >= (MAP_A_RANGELOW + io_page*(MAP_A_RANGEHIGH+1))) {
-          gfxPrint(1, 45, "<"); gfxPrint(HS::midi_note_numbers[map.range_low]);
-          gfxPrint(34, 45, HS::midi_note_numbers[map.range_high]); gfxPrint(">");
+          gfxPrint(1, 45, "<"); gfxPrint(HS::midi_note_numbers[map.get_low()]);
+          gfxPrint(34, 45, HS::midi_note_numbers[map.get_high()]); gfxPrint(">");
         } else {
-          gfxPrint(1, 45, "Voice:"); gfxPrint(55, 45, map.dac_polyvoice + 1);
+          gfxPrint(1, 45, "Voice:"); gfxPrint(55, 45, map.get_voice() + 1);
         }
 
         // Cursor

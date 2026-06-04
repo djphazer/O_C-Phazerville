@@ -265,20 +265,6 @@ public:
         log_index = 0;
         log_view = 0;
         Reset();
-
-        // default everything off
-        for (int i = 0; i < MIDIMAP_MAX; ++i) {
-          frame.MIDIState.mapping[i].function = HEM_MIDI_NOOP;
-        }
-#ifdef __IMXRT1062__
-#else
-        // Go through all the Setups and change the default high ranges to G9
-        for (int s = 0; s < MIDI_SETUP_COUNT; s++)
-        {
-            for (int p = 0; p < 8; p++)
-                if (values_[s * MIDI_PARAMETER_COUNT + 32 + p] == 0) values_[s * MIDI_PARAMETER_COUNT + 32 + p] = 127;
-        }
-#endif
     }
 
     void Suspend() {
@@ -286,19 +272,15 @@ public:
         OnSendSysEx();
     }
     void StoreData() {
-#ifdef __IMXRT1062__
         PhzConfig::setValue(SETUP_KEY, active_setup);
         StoreSetup();
         PhzConfig::save_config("CAPTAIN.DAT");
-#endif
     }
     void Resume() {
-#ifdef __IMXRT1062__
         PhzConfig::load_config("CAPTAIN.DAT");
         uint64_t data = 0;
         PhzConfig::getValue(SETUP_KEY, data);
         active_setup = data;
-#endif
         SelectSetup(get_setup_number(), 0);
     }
 
@@ -343,13 +325,16 @@ public:
 
         switch (screen) {
           case 0:
-            m.function = constrain(m.function + dir, 0,
-                input? HEM_MIDI_MAX_FUNCTION : MIDI_OUT_FUNCTION_COUNT-1);
-            if (input && m.function == HEM_MIDI_CC_OUT)
-              m.function_cc = -1; // learn
+            if (input)
+              m.AdjustFunction(dir);
+            else
+              m.AdjustType(dir);
+
+            if (input && m.IsCC())
+              m.AutoLearn(); // learn
             break;
           case 1:
-            m.channel = constrain(m.channel + dir, 0, 16);
+            m.AdjustChannel(dir);
             break;
           case 2:
             m.AdjustTranspose(dir);
@@ -709,11 +694,11 @@ private:
           frame.MIDIState.mapping[pos] :
           frame.MIDIState.outmap[pos - DAC_CHANNEL_COUNT];
       switch (screen) {
-        case 0: return m.function;
-        case 1: return m.channel;
-        case 2: return m.transpose;
-        case 3: return m.range_low;
-        case 4: return m.range_high;
+        case 0: return (m.get_type() | m.get_subtype()); // idk man
+        case 1: return m.get_channel();
+        case 2: return m.get_transpose();
+        case 3: return m.get_low();
+        case 4: return m.get_high();
         default: return 0;
       }
     }
