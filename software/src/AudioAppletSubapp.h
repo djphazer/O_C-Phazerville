@@ -90,7 +90,21 @@ public:
         get_selected_mono_applet(RIGHT_HEMISPHERE, i).Controller();
       }
     }
-    AudioInterrupts();
+
+    if (last_stats_update > STATS_TIMEOUT) {
+      last_stats_update = 0;
+      mem_percent = static_cast<int16_t>(
+        100 * static_cast<float>(AudioMemoryUsageMax())
+        / OC::AudioIO::AUDIO_MEMORY
+      );
+      cpu_percent = static_cast<int16_t>(AudioProcessorUsageMax());
+      AudioProcessorUsageMaxReset();
+      AudioMemoryUsageMaxReset();
+      AudioInterrupts(); // force usage refresh?
+    }
+
+    if (cpu_percent <= 103)
+      AudioInterrupts();
   }
 
   void mainloop() {
@@ -153,17 +167,6 @@ public:
         else --x;
         gfxDottedLine(x, 11, x, 63);
       }
-    }
-
-    if (last_stats_update > STATS_TIMEOUT) {
-      last_stats_update = 0;
-      mem_percent = static_cast<int16_t>(
-        100 * static_cast<float>(AudioMemoryUsageMax())
-        / OC::AudioIO::AUDIO_MEMORY
-      );
-      cpu_percent = static_cast<int16_t>(AudioProcessorUsageMax());
-      AudioProcessorUsageMaxReset();
-      AudioMemoryUsageMaxReset();
     }
   }
 
