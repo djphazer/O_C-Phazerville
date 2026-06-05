@@ -5,7 +5,7 @@ nav_order: 7
 
 # App and Applet Index
 
-Jump to the lists of [Full Screen Apps](App-and-Applet-Index#full-screen-apps) or [Hemisphere Applets](App-and-Applet-Index#hemisphere-applets), also organized [by function](App-and-Applet-Index#apps-and-applets-by-function)
+Jump to the lists of [Full Screen Apps](App-and-Applet-Index#full-screen-apps) or [Hemisphere Applets](App-and-Applet-Index#cv-applets), also organized [by function](App-and-Applet-Index#apps-and-applets-by-function)
 
 ## Full Screen Apps
 Full screen apps in Phazerville are mostly from the original Ornament and Crime firmware, with a few notable additions ([Calibr8or](Calibr8or), [Scenery](Scenery), and [Passencore](Passencore)). Each of the full screen apps takes advantage of all inputs and outputs in their own way, which is usually configurable.
@@ -21,7 +21,7 @@ Not everything can fit at once on Teensy 3.2 hardware, but you can use the [defa
  * [Dialectic Ping Pong](Dialectic-Ping-Pong)
  * [Enigma](Enigma) – Sequencer of shift registers (Turing Machines)
  * [Harrington 1200](Harrington-1200) - Neo-Riemannian transformations for triad chord progressions
- * Hemisphere - 2 [Applets](#hemisphere-applets) at a time
+ * Hemisphere - 2 [Applets](#cv-applets) at a time
  * [Low-rents](Low-rents) - Lorenz attractor
  * [Meta-Q](Meta-Q) - Dual sequenced quantizer
  * [Neural Net](Neural-Net) - 6 Neuron logic processor
