@@ -52,7 +52,10 @@ public:
     }
   }
 
-  void View() {
+  void DrawFullScreen() final;
+  void View() final;
+
+  void MainView() {
     const int label_x = 1;
 
     gfxPrint(label_x, 15, "Gate:");
@@ -154,3 +157,20 @@ private:
   std::array<AudioEffectDynamics, Channels> complimit;
   AudioPassthrough<Channels> output;
 };
+
+template <AudioChannels Channels>
+FLASHMEM void DynamicsApplet<Channels>::View() {
+  MainView();
+}
+
+template <AudioChannels Channels>
+FLASHMEM void DynamicsApplet<Channels>::DrawFullScreen() {
+  graphics.drawLine(64 - gfx_offset, 26, 127 - gfx_offset, 26, 3);
+  const int x = 25 + (64 - gfx_offset);
+  const int h = Proportion(int(complimit[0].get_total_gain()), 60, 30); // 60 dB == 30 px
+  if (h > 0)
+    graphics.drawRect(x, 26 - h, 10, h);
+  else
+    graphics.drawRect(x, 26, 10, -h);
+  View();
+}
