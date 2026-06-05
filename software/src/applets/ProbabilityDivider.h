@@ -141,9 +141,7 @@ public:
         }
     }
 
-    void View() {
-        DrawInterface();
-    }
+    void View() final;
 
     // void OnButtonPress() { }
 
@@ -331,3 +329,7 @@ private:
         return value;
     }
 };
+
+FLASHMEM void ProbabilityDivider::View() {
+  DrawInterface();
+}

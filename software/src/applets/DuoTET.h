@@ -38,12 +38,7 @@
 #define DUOTET_SCALE_MAX_LEN 32
 
 class DuoTET : public HemisphereApplet {
-public:
-
-    const char* applet_name() {
-        return "DuoTET";
-    }
-    const uint8_t* applet_icon() { return PhzIcons::scaleDuet; }
+  APPLET_INTERFACE_LITE("DuoTET", PhzIcons::scaleDuet);
 
     static int cmpfunc(const void * a, const void * b) {
         return ( *(int16_t*)a - *(int16_t*)b );
@@ -175,7 +170,8 @@ public:
         Out(0, outA); Out(1, outB);
     }
 
-    void View() {
+    void View() final;
+    void MainView() {
         int len = params[DUOTET_PARAM_SCALELEN];
         int tet = params[DUOTET_PARAM_TET];
         int yoff = 14;
@@ -362,3 +358,7 @@ private:
     bool aux_cursor = false;
     bool continuous[2] = {true};
 };
+
+FLASHMEM void DuoTET::View() {
+  MainView();
+}

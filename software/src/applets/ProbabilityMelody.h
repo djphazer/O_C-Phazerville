@@ -135,10 +135,7 @@ public:
         }
     }
 
-    void View() {
-        DrawParams();
-        DrawKeyboard();
-    }
+    void View() final;
 
     // void OnButtonPress() { }
 
@@ -466,3 +463,8 @@ private:
         return out;
     }
 };
+
+FLASHMEM void ProbabilityMelody::View() {
+  DrawParams();
+  DrawKeyboard();
+}

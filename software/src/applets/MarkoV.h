@@ -229,7 +229,8 @@ public:
         }
     }
 
-    void View() {
+    void View() final;
+    void MainView() {
         // --- Header: cursor parameter name, right-justified, shown only while editing ---
         if (EditMode()) {
             const char* label = MarkoVData::cursor_labels[cursor];
@@ -398,3 +399,7 @@ private:
         return NUM_STATES - 1;
     }
 };
+
+FLASHMEM void MarkoV::View() {
+  MainView();
+}

@@ -175,9 +175,7 @@ class TB_3PO: public HemisphereApplet {
     update_regeneration();
   }
 
-  void View() {
-    DrawGraphics();
-  }
+  void View() final;
 
   void OnButtonPress() override {
     if (cursor == TRANS_MODE) {
@@ -796,3 +794,7 @@ private:
   }
 
 };
+
+FLASHMEM void TB_3PO::View() {
+  DrawGraphics();
+}

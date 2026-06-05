@@ -258,7 +258,8 @@ public:
         }
     }
 
-    void View() {
+    void View() final;
+    void MainView() {
         // --- Cursor label at top, right-justified, shown only while editing ---
         if (EditMode()) {
             const char* label = MarkovPercData::cursor_labels[cursor];
@@ -557,3 +558,7 @@ private:
         return NUM_STATES - 1;
     }
 };
+
+FLASHMEM void MarkovPerc::View() {
+  MainView();
+}

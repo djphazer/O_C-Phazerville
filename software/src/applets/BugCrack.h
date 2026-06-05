@@ -219,9 +219,7 @@ public:
         Out(1, sd_signal + (mix_outs ? bd_signal : 0));
     }
 
-    void View() {
-        DrawInterface();
-    }
+    void View() final;
 
     void OnButtonPress() {
       if (cursor == 10) mix_outs = !mix_outs;
@@ -512,3 +510,7 @@ private:
             8000 - Proportion(decay, BNC_MAX_PARAM, 4000));
     }
 };
+
+FLASHMEM void BugCrack::View() {
+  DrawInterface();
+}

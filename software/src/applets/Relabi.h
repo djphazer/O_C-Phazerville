@@ -181,7 +181,8 @@ public:
     return powf(10.0f, lin * 2); // 0.01..100
   }
 
-  void View() {
+  void View() final;
+  void MainView() {
     if (linked && (hemisphere & 1)) {
       gfxPrint(1, 55, "C:");
       DrawOutputOption(13, 55, outputAssign[2]); // OUT3
@@ -578,3 +579,7 @@ private:
     }
   }
 };
+
+FLASHMEM void Relabi::View() {
+  MainView();
+}

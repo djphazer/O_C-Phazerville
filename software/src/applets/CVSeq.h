@@ -188,9 +188,7 @@ public:
         write_outputs(new_ch0_step);
     }
 
-    void View() override {
-        draw_interface();
-    }
+    void View() final;
 
     void OnButtonPress() override {
         if (random_menu_active) {
@@ -282,11 +280,6 @@ public:
         }
     }
 
-    void CancelEdit() {
-        cv_value_select = step_select = false;
-        HemisphereApplet::CancelEdit();
-    }
-
     void AuxButton() override {
         if (random_menu_active) {
             // Just exit random menu on aux button.
@@ -303,7 +296,10 @@ public:
         } else if (cursor > CVSeqCursor::CHANNEL_INDEX && cursor <= CVSeqCursor::CHANNEL_CLOCKS) {
             // Toggle between selecting step or selecting which step to edit.
             step_select ^= true;
-        } else CancelEdit();
+        } else {
+          cv_value_select = step_select = false;
+          CancelEdit();
+        }
     }
 
     void OnEncoderMove(int direction) override {
@@ -1089,3 +1085,7 @@ private:
         steps[1][1] = Step{5, 4};
     }
 };
+
+FLASHMEM void CVSeq::View() {
+  draw_interface();
+}

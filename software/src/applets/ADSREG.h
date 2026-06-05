@@ -207,10 +207,7 @@ public:
         }
     }
 
-    void View() {
-        DrawIndicator();
-        DrawADSR();
-    }
+    void View() final;
 
     /*
     void AuxButton() {
@@ -376,3 +373,8 @@ private:
         return mod;
     }
 };
+
+FLASHMEM void ADSREG::View() {
+  DrawIndicator();
+  DrawADSR();
+}

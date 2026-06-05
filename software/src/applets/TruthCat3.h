@@ -128,9 +128,7 @@ public:
         }
     }
 
-    void View() {
-        DrawInterface();
-    }
+    void View() final;
 
     void OnButtonPress() {
         CursorToggle();
@@ -379,3 +377,7 @@ private:
         }
     }
 };
+
+FLASHMEM void TruthCat3::View() {
+  DrawInterface();
+}
