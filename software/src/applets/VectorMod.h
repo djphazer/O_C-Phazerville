@@ -50,9 +50,7 @@ public:
         }
     }
 
-    void View() {
-        DrawInterface();
-    }
+    void View() final;
 
     //void OnButtonPress() { }
 
@@ -174,3 +172,7 @@ private:
     int ones(int n) {return (n / 100);}
     int hundredths(int n) {return (n % 100);}
 };
+
+FLASHMEM void VectorMod::View() {
+  DrawInterface();
+}

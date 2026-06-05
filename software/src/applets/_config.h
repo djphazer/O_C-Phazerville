@@ -255,7 +255,7 @@ constexpr Registry reg = Registry<HemisphereApplet, HS::APPLET_SLOTS
     , DeclareApplet<TwoRings, 18, CAT_SEQUENCER>
     , DeclareApplet<VectorEG, 52, CAT_MODULATOR>
     , DeclareApplet<VectorLFO, 49, CAT_MODULATOR>
-//    , DeclareApplet<VectorMod, 53, CAT_MODULATOR> // awkward middle child
+    , DeclareApplet<VectorMod, 53, CAT_MODULATOR> // awkward middle child
     , DeclareApplet<VectorMorph, 54, CAT_MODULATOR>
     , DeclareApplet<Voltage, 43, CAT_UTILITY>
 #ifdef PEWPEWPEW
