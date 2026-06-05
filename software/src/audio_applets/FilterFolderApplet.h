@@ -10,6 +10,7 @@ public:
     FILTMODE,
     FILTER_FREQ,
     FILTER_FREQ_CV,
+    FILTER_FREQ_CV2,
     FILTER_RES,
     FILTER_RES_CV,
     AMP,
@@ -44,7 +45,7 @@ public:
   }
 
   void Controller() {
-    const int cv = pitch + pitch_cv.In();
+    const int cv = pitch + pitch_cv.In() + pitch_cv2.In();
     const bool tiltmode = filtfolder[0].modesel == FILT_TILT;
     const bool djmode = filtfolder[0].modesel == FILT_DJ;
     const int bias = tiltmode ? tiltbias + res_cv.InRescaled(LVL_MAX_DB)
@@ -92,11 +93,18 @@ public:
       default:
       label_y += 10;
       gfxStartCursor(label_x, label_y);
-      gfxPrintPitchHz(pitch);
+      if (filtfolder[0].modesel == FILT_DJ) {
+        gfxPrint(pitch * 100 / (8*ONE_OCTAVE));
+        gfxPrint("%");
+      } else
+        gfxPrintPitchHz(pitch);
       gfxEndCursor(cursor == FILTER_FREQ);
       gfxStartCursor();
       gfxPrint(pitch_cv);
       gfxEndCursor(cursor == FILTER_FREQ_CV, false, pitch_cv.InputName());
+      gfxStartCursor();
+      gfxPrint(pitch_cv2);
+      gfxEndCursor(cursor == FILTER_FREQ_CV2, false, pitch_cv2.InputName());
 
       label_y += 10;
       if (filtfolder[0].modesel < FILT_TILT
@@ -138,6 +146,7 @@ public:
     if (CheckEditInputMapPress(
           cursor,
           IndexedInput(FILTER_FREQ_CV, pitch_cv),
+          IndexedInput(FILTER_FREQ_CV2, pitch_cv2),
           IndexedInput(FILTER_RES_CV, res_cv),
           IndexedInput(FOLD_CV, fold_cv),
           IndexedInput(AMP_CV, amp_cv)
@@ -162,6 +171,9 @@ public:
         break;
       case FILTER_FREQ_CV:
         pitch_cv.ChangeSource(direction);
+        break;
+      case FILTER_FREQ_CV2:
+        pitch_cv2.ChangeSource(direction);
         break;
       case FILTER_RES:
         if (filtfolder[0].modesel == FILT_TILT)
@@ -190,11 +202,13 @@ public:
   void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
     data[0] = PackPackables(pitch, res, fold, amplevel, filtfolder[0].modesel);
     data[1] = PackPackables(pitch_cv, res_cv, fold_cv, amp_cv);
+    data[2] = PackPackables(pitch_cv2);
   }
 
   void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
     UnpackPackables(data[0], pitch, res, fold, amplevel, filtfolder[0].modesel);
     UnpackPackables(data[1], pitch_cv, res_cv, fold_cv, amp_cv);
+    UnpackPackables(data[2], pitch_cv2);
     if (Channels == STEREO)
       filtfolder[1].modesel = filtfolder[0].modesel;
   }
@@ -213,6 +227,7 @@ private:
   int cursor = 0;
   int16_t pitch = 1 * 12 * 128; // C4
   CVInputMap pitch_cv;
+  CVInputMap pitch_cv2;
   int16_t res = 75;
   CVInputMap res_cv;
   int16_t fold = 6; // 0% is mute, 6% is dry, max 400% but could go higher
