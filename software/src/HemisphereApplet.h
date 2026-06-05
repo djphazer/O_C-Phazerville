@@ -117,7 +117,10 @@ public:
     virtual void OnButtonPress() { CursorToggle(); };
     virtual void OnEncoderMove(int direction) = 0;
     virtual void Unload() { }
-    virtual void DrawFullScreen() { View(); }
+    virtual void DrawFullScreen() {
+      View();
+      graphics.drawBitmap8(96 - (hemisphere & 1)*64, 28, 8, (hemisphere & 1) ? RIGHT_ICON : LEFT_ICON);
+    }
     virtual void AuxButton() { CancelEdit(); }
 
     // Arbitrary applet data blobs, key format:
