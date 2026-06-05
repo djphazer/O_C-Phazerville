@@ -12,11 +12,14 @@ Note for T4.1 hardware, "UP" has been re-labeled as "A" and "DOWN" as "B".
 
 ## Global
 
+_Attention!_ As of v2.0, the global UI gestures have changed! No more global long-press actions...
+
 | Action    | Gesture    |   Notes   |
 | --------- |:----------:|:---------:|
-| **Invoke screensaver** | Long-press UP (or A) button from any App | |
-| **Return to main menu** | Long-press RIGHT encoder | Execution continues in the background. |
-| **[Save Global Settings to EEPROM](Saving-State)** | Long-press RIGHT encoder _again_ while on main menu | This includes the currently selected App, user scales, saved sequence patterns, etc. Use [Presets](Hemisphere-Config#presets-floating-menu) instead to store Applet settings inside Hemispheres or Quadrants |
+| **Return to main menu** | Hold 'Z' or 'A' and press RIGHT Encoder | Execution continues in the background. |
+| **Open IO Settings** | Hold 'Z' or 'A' and press LEFT Encoder | Used to configure settings for current App.<br>Press 'A' again to invoke screensaver. |
+| **Invoke screensaver** | Hold 'Z' and press 'A' button | Unavailable on O_C. Instead, open IO Settings and then press 'A' |
+| **[Save Global Settings to EEPROM](Saving-State)** | Long-press RIGHT encoder while on main menu | This includes the currently selected App, user scales, saved sequence patterns, etc. Use [Presets](Hemisphere-Presets) instead to store Applet settings inside Hemispheres or Quadrants |
 
 ## Hemispheres
 
@@ -56,8 +59,8 @@ Only 2 applets are visible at a given time (although all are active). To swap vi
 | **Open full-screen applet help/config** | With applet visible, double-press the corresponding A/B/X/Y button. Press the same button again to exit. Press a different Select button to switch to that applet slot. | RIGHT encoder is always used to move cursor and edit params; LEFT encoder swaps between applet config and full-screen view. |
 | **View applet UI in full-screen**   | Open help/config screen (see above), and rotate LEFT encoder. Then, use RIGHT encoder to interact with the Applet. | Applets that make use of full-screen view currently include Scope, EuclidX, and Ebb&LFO. More to come.    |
 | **Open [Clock / Trigger Setup](Clock-Setup)**  |  Press both A + B buttons together  |  Adjust internal BPM, swing, external sync, and per-trigger clock mult/div; remap trigger inputs (also available within the [Config menus](Hemisphere-Config) or in applet help/config view).  |
-| **Cycle Internal Clock state**  |  Press Z button  |  Stop -> Arm _(i.e. play on next input trigger)_ -> Start  |
-| **Open [Config menu](Hemisphere-Config)** |  Long-press B button, or press B+Y to jump to Input Mapping page. Scroll pages with LEFT encoder, scroll options with RIGHT encoder  |  Load/save presets; adjust trigger length; select screensaver and cursor mode; toggle auto-MIDI out; trigger and CV input mapping; quantizer settings; applet filtering  |
+| **Cycle Internal Clock state**  |  Press Z button  | Action happens on button release.<br>Stop -> Arm _(i.e. play on next input trigger)_ -> Start  |
+| **Open [Config menu](Hemisphere-Config)** |  Long-press B button, or press B+Y to jump to Input Mapping page. Scroll pages with LEFT encoder, scroll options with RIGHT encoder  |  Load/save presets; adjust trigger length; screensaver and cursor mode; MIDI options; trigger and CV input mapping; quantizer settings; MIDI Maps; applet filtering  |
 | **AuxButton**  | _**After pushing encoder to highlight a parameter for editing**_, press the corresponding select button (A/B/X/Y) | This gesture is only enabled in certain applets for secondary functions, typically indicated with a dotted cursor line. Use it to mute/unmute steps in DivSeq, SequenceX, Seq32, etc.; re-randomize sequences in Shredder; Toggle additional CV mapping in DuoTET; and directly edit the current [Quantizer engine](Hemisphere-Quantizer-Setup) |
 | **Quick access Save/Load preset slots**  |  Press A + X together. Toggle between load and save by rotating LEFT encoder. Press LEFT encoder to switch banks. Select slot by rotating RIGHT encoder, and press to engage.  |  This menu is also accessible via the floating config menu  |
 | **Enter Audio DSP**  |  Press X + Y buttons together. Exit by pressing A or B  |  |

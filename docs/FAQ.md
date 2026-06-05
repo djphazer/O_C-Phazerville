@@ -11,7 +11,10 @@ nav_order: 2
 
 ## Q: How do I switch Apps?
 
-A: Long-press the Right Encoder to find the main App Menu. The _Applets_ can be found within **Hemispheres** or [**Quadrants**](Quadrants).
+A: As of v2.0, hold 'Z' or 'A' (or the UP button on O_C) and press the Right Encoder to find the main App Menu. See the [UI Gestures](Hemisphere-Gestures) page for more info.
+_(in v1.x firmwares, Long-press the Right Encoder for main menu.)_
+
+The _Applets_ can be found within **Hemispheres** App on O_C or [**Quadrants**](Quadrants) App on ORN8.
 
 ## Q: How do I set the default app on startup?
 
