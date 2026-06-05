@@ -32,7 +32,7 @@
  */
 
 class TwoRings : public HemisphereApplet {
-public:
+  APPLET_INTERFACE_LITE("TwoRings", PhzIcons::DualTM);
 
     static constexpr int MAX_SCALE = OC::Scales::NUM_SCALES;
     static constexpr int MIN_LENGTH = 2;
@@ -90,13 +90,6 @@ public:
       // 7 char max each
       "Slew", "Length", "p mod", "Q mod", "Range", "Trans1", "Trans2", "Xfade"
     };
-
-    const char* applet_name() {
-        return "TwoRings";
-    }
-    const uint8_t* applet_icon() {
-        return PhzIcons::DualTM;
-    }
 
     void Start() {
         reg[0] = random(0xFFFFFFFF);
@@ -274,14 +267,8 @@ public:
         }
     }
 
-    void View() {
-        DrawIndicator();
-        DrawSelector();
-    }
-
-    void DrawFullScreen() {
-        DrawSequence();
-    }
+    void View();
+    void DrawFullScreen();
 
     void OnButtonPress() {
       if (cursor == HOLD_PITCH_A) {
@@ -691,5 +678,12 @@ private:
           gfxDottedLine(x_, 45, x_, 62);
         }
     }
-
 };
+
+FLASHMEM void TwoRings::View() {
+  DrawIndicator();
+  DrawSelector();
+}
+FLASHMEM void TwoRings::DrawFullScreen() {
+  DrawSequence();
+}

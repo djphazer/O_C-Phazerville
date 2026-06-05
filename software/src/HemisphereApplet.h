@@ -47,6 +47,11 @@
 #include "PhzConfig.h"
 #include <variant>
 
+#define APPLET_INTERFACE_LITE(name, icon) \
+public: \
+  virtual const char* applet_name() { return name; } \
+  virtual const uint8_t* applet_icon() { return icon; }
+
 #define APPLET_INTERFACE(clazz, name, icon) \
 protected: \
   virtual void SetHelp() final; \
