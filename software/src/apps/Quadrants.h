@@ -1430,6 +1430,10 @@ private:
 
           case MIDI_THRU_TOGGLE:
             HS::midi_thru_enabled = !HS::midi_thru_enabled;
+            if (midi_thru_enabled)
+              MIDI1.turnThruOn();
+            else
+              MIDI1.turnThruOff();
             break;
 
           case SHOWHIDELIST:
