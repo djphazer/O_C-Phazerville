@@ -77,6 +77,7 @@ using namespace HS;
 #include "Logic.h"
 #include "LowerRenz.h"
 #include "Metronome.h"
+#include "MiniArp.h"
 #ifdef __IMXRT1062__
 #include "MidiLoop.h"
 #endif
@@ -144,6 +145,7 @@ constexpr Registry reg = Registry<HemisphereApplet, HS::APPLET_SLOTS
     , DeclareApplet<ADSREG, 8, CAT_MODULATOR>
     , DeclareApplet<ADEG, 34, CAT_MODULATOR>
     , DeclareApplet<MiniASR, 47, CAT_MODULATOR | CAT_QUANTIZER>
+    , DeclareApplet<MiniArp, 95, CAT_SEQUENCER | CAT_QUANTIZER>
     , DeclareApplet<AttenuateOffset, 56, CAT_UTILITY>
 #ifdef PEWPEWPEW
     , DeclareApplet<Binary, 41, CAT_LOGIC | CAT_MODULATOR>
