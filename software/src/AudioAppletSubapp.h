@@ -90,8 +90,11 @@ public:
         get_selected_mono_applet(RIGHT_HEMISPHERE, i).Controller();
       }
     }
+    if (cpu_percent <= 100)
+      AudioInterrupts();
 
     if (last_stats_update > STATS_TIMEOUT) {
+      AudioInterrupts(); // force usage refresh
       last_stats_update = 0;
       mem_percent = static_cast<int16_t>(
         100 * static_cast<float>(AudioMemoryUsageMax())
@@ -100,11 +103,7 @@ public:
       cpu_percent = static_cast<int16_t>(AudioProcessorUsageMax());
       AudioProcessorUsageMaxReset();
       AudioMemoryUsageMaxReset();
-      AudioInterrupts(); // force usage refresh?
     }
-
-    if (cpu_percent <= 103)
-      AudioInterrupts();
   }
 
   void mainloop() {
