@@ -333,12 +333,12 @@ namespace HS {
         gfxPrint(OC::Strings::off_on[frame.autoMIDIOut]);
         break;
       case 7:
-        gfxPrint(1, y, "MIDI Thru:    ");
-        gfxPrint(OC::Strings::off_on[midi_thru_enabled]);
-        break;
-      case 8:
         gfxPrint(1, y, "MIDI PolyMd:  ");
         gfxPrint(midi_poly_mode_name[frame.MIDIState.poly_mode]);
+        break;
+      case 8: // this one needs to be last for exclusion in Hemisphere
+        gfxPrint(1, y, "MIDI Thru:    ");
+        gfxPrint(OC::Strings::off_on[midi_thru_enabled]);
         break;
       default: break;
     }

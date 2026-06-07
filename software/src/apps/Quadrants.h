@@ -134,8 +134,10 @@ public:
         }
       }
       if (preset_file_revision < 1) {
-        // migrations from v1.x to v2.0
+        // migrations from v1.x to v2.0 go here
+        // these are handled elsewhere in Unpack() functions:
         // - CVInputMap sources got remapped
+        // - MIDI Map functions got remapped
       }
 
       // update version key after all data migrations
@@ -269,9 +271,11 @@ public:
         PhzConfig::setValue(FILTERMASK1_KEY, HS::hidden_applets[0]);
         PhzConfig::setValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
 
+        bool disable_thru = !midi_thru_enabled;
         data = PackPackables(
           HS::frame.MIDIState.pc_channel,
-          HS::frame.MIDIState.bend_range
+          HS::frame.MIDIState.bend_range,
+          disable_thru
         );
         PhzConfig::setValue(MIDI_GLOBALS_KEY, data);
 
@@ -420,12 +424,17 @@ public:
         PhzConfig::getValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
 
         uint64_t data = 0;
+        bool disable_thru = false;
         if (PhzConfig::getValue(MIDI_GLOBALS_KEY, data)) {
           UnpackPackables(data,
               HS::frame.MIDIState.pc_channel,
-              HS::frame.MIDIState.bend_range
+              HS::frame.MIDIState.bend_range,
+              disable_thru
           );
         }
+        midi_thru_enabled = !disable_thru;
+        if (midi_thru_enabled) MIDI1.turnThruOn();
+        else MIDI1.turnThruOff();
 
         if (PhzConfig::getValue(PRESET_JUMP_KEY, data))
           UnpackPackables(data, jump_trig_);
@@ -1117,8 +1126,8 @@ private:
         MIDI_BEND_RANGE,
         MIDI_PC_CHANNEL,
         AUTO_MIDI,
-        MIDI_THRU_TOGGLE,
         MIDI_POLY_MODE,
+        MIDI_THRU_TOGGLE,
 
         // Input Remapping
         TRIGMAP1, TRIGMAP2, TRIGMAP3, TRIGMAP4,

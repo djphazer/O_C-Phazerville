@@ -1195,8 +1195,8 @@ private:
         MIDI_BEND_RANGE,
         MIDI_PC_CHANNEL,
         AUTO_MIDI,
-        MIDI_THRU_TOGGLE,
         MIDI_POLY_MODE,
+        // MIDI_THRU_TOGGLE,
 
         // Input Remapping
         TRIGMAP1, TRIGMAP2, TRIGMAP3, TRIGMAP4,
@@ -1417,9 +1417,11 @@ private:
             HS::frame.autoMIDIOut = !HS::frame.autoMIDIOut;
             break;
 
+            /*
         case MIDI_THRU_TOGGLE:
             HS::midi_thru_enabled = !HS::midi_thru_enabled;
             break;
+            */
 
         case SHOWHIDELIST:
             if (h == 0) // left encoder inverts selection
