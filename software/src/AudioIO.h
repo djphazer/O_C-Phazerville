@@ -4,7 +4,9 @@
 
 namespace OC {
   namespace AudioIO {
-    const int AUDIO_MEMORY = 512;
+    // total block size including header is 260 bytes
+    // 252 * 260 fits nicely into two 32KB pages
+    const int AUDIO_MEMORY = 252;
     AudioStream& InputStream(int interface = 0);
     AudioStream& OutputStream();
     void Init();
