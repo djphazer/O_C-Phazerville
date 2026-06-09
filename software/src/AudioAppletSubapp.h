@@ -48,6 +48,7 @@ public:
     selected_mono_applets[0][0] = 1;
     selected_mono_applets[1][0] = 1;
     selected_stereo_applets[0] = 1;
+    stereo = 1; // stereo for top slot
   }
 
   void Init() {
@@ -67,11 +68,13 @@ public:
   }
 
   void ReInit() {
+    stereo |= 1;
     for (size_t slot = 0; slot < Slots; slot++) {
       // reset to defaults here
       if (IsStereo(slot)) {
         ChangeStereoApplet(LEFT_HEMISPHERE, slot, slot ? 0 : 1);
-        stereo ^= 1 << slot; // change it back to dual mono
+        if (slot)
+          stereo ^= 1 << slot; // change it back to dual mono
         SwapMonoStereo(slot);
       }
       ForEachSide(side) {
