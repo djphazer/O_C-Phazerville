@@ -1,2 +1,2 @@
 // NOTE: DO NOT INCLUDE DIRECTLY, USE OC::Strings::VERSION
-"v2.0-beta"
+"v2.0"
