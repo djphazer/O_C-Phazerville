@@ -3,6 +3,7 @@ layout: default
 ---
 # Quadrants
 
+(TODO: some of these button gestures have changed. Please refer to the [UI Gestures](Hemisphere-Gestures) page, or scroll down to Controls.)
 ![O_CT4.1 Control Guide](images/front_panel_desc.png)
 
 **Quadrants** is an alternate frontend for Hemispheres applets, upgraded to host **four** CV applets at a time, taking advantage of new 8-channel hardware shields with Teensy 4.1. There are also 5 slots per channel of Audio DSP processing applets.

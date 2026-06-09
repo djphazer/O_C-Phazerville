@@ -12,7 +12,7 @@ Note for T4.1 hardware, "UP" has been re-labeled as "A" and "DOWN" as "B".
 
 ## Global
 
-_Attention!_ As of v2.0, the global UI gestures have changed! No more global long-press actions...
+_Attention!_ As of v2.0, the global UI gestures have changed!
 
 | Action    | Gesture    |   Notes   |
 | --------- |:----------:|:---------:|
