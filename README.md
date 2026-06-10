@@ -1,4 +1,4 @@
-[![PlatformIO CI](https://github.com/djphazer/O_C-Phazerville/actions/workflows/firmware.yml/badge.svg)](https://github.com/djphazer/O_C-Phazerville/actions/workflows/firmware.yml)
+[![PlatformIO CI](https://github.com/djphazer/O_C-Phazerville/actions/workflows/firmware.yml/badge.svg)](https://github.com/djphazer/O_C-Phazerville/actions/workflows/firmware.yml) [![GitHub Release](https://img.shields.io/github/v/release/djphazer/O_C-Phazerville)](https://github.com/djphazer/O_C-Phazerville/releases/latest)
 
 Phazerville Suite - an active o_C firmware fork
 ===
@@ -13,7 +13,7 @@ Phazerville Suite - an active o_C firmware fork
   [![DualTM & O_C T4.1 Hardware](http://img.youtube.com/vi/51cchuLNIDU/0.jpg)](http://www.youtube.com/watch?v=51cchuLNIDU "Next-gen O_C T4.1 Hardware + DualTM applet")
 </details>
 
-Watch some **video overviews** (above) or check the [**project website**](https://firmware.phazerville.com) for more info.
+Watch some **video overviews** (above) or check the [**project website**](https://firmware.phazerville.com) for more info, including commercial product links.
 
 [Download a firmware **Release**](https://github.com/djphazer/O_C-Phazerville/releases) or [Request a **Custom Build**](https://github.com/djphazer/O_C-Phazerville/discussions/38) (for Teensy 3.2).
 

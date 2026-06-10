@@ -2,14 +2,11 @@ TODO (Roadmap)
 ===
 
 # v2.0
-* T4.1 - expand to 8 channels: Quantermain, Piqued, Quadraturia, Captain MIDI
-* **Fully merge "abandoned/refactoring" branch from pld**
-  - this is mostly done on the dev/2.0 branch
+* T4.1 - expand to 8 channels: Quantermain, Quadraturia, Sequins
 * Auto-tuner with floor/ceiling detection (fail gracefully)
 * generalized AppletParams for flexible assignment, extra virtual I/O
 * Integrate Calibr8or with DAC for global tracking adjustments
 * USB Gamepad support
-* MTP_Teensy lib for file management over USB
 * Config option for LFS vs. SD for preset storage
 
 # ???
@@ -23,7 +20,6 @@ TODO (Roadmap)
     - MIDI output for all apps?
     - Implement some MIDI SysEx commands, sheesh
     - WebMIDI interface
-* Add BugCrack-style sounds to Pong
 
 # APP IDEAS
 * Modul8or
@@ -35,6 +31,10 @@ TODO (Roadmap)
 * Tetris
 
 # [DONE]
+* T4.1 - expanded to 8 channels: Piqued, Captain MIDI
+* MTP Disk mode for file management over USB
+* Pong 2.0 with sound effects
+* **Fully merge "abandoned/refactoring" branch from pld**
 * Pop-up MIDI Map editor
 - 3-band EQ / multi-band dynamics
 * MIDI mapping for param modulation sources
