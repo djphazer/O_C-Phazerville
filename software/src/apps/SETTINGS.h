@@ -116,10 +116,16 @@ public:
           case DAC_A_VOLT_HIGH:
             if (calstate.used_defaults) {
               // copy DAC A to the rest of them, to make life easier
-              // WARNING: this doesn't work in flipped mode!
+              const DAC_CHANNEL chan[DAC_CHANNEL_COUNT] = {
+                DAC_CHANNEL_A, DAC_CHANNEL_B, DAC_CHANNEL_C, DAC_CHANNEL_D,
+#ifdef ARDUINO_TEENSY41
+                DAC_CHANNEL_E, DAC_CHANNEL_F, DAC_CHANNEL_G, DAC_CHANNEL_H,
+#endif
+              };
               for (int ch = 1; ch < DAC_CHANNEL_COUNT; ++ch) {
                 for (int i = 0; i < OCTAVES; ++i) {
-                  OC::calibration_data.dac.calibrated_octaves[ch][i] = OC::calibration_data.dac.calibrated_octaves[0][i];
+                  OC::calibration_data.dac.calibrated_octaves[chan[ch]][i]
+                    = OC::calibration_data.dac.calibrated_octaves[chan[0]][i];
                 }
               }
             }
