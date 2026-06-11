@@ -53,7 +53,11 @@ namespace HS {
   int octave_max = 6;
 #endif
 
-  bool midi_thru_enabled = 1;
+  // MidiMask toggles
+  uint8_t midi_rt_disable = 0; // midi clock i/o
+  uint8_t midi_msg_disable = 0; // note, cc, etc.
+  uint8_t midi_thru_disable = 0;
+
   bool cursor_wrap = 0;
   bool auto_save_enabled = false;
   DigitalInputMap trigmap[ADC_CHANNEL_COUNT];
@@ -336,10 +340,32 @@ namespace HS {
         gfxPrint(1, y, "MIDI PolyMd:  ");
         gfxPrint(midi_poly_mode_name[frame.MIDIState.poly_mode]);
         break;
-      case 8: // this one needs to be last for exclusion in Hemisphere
-        gfxPrint(1, y, "MIDI Thru:    ");
-        gfxPrint(OC::Strings::off_on[midi_thru_enabled]);
+
+      // these need to be last for exclusion in Hemisphere
+      case 8:
+        gfxPrint(1, y, "Thru MIDI:    ");
+        gfxPrint(OC::Strings::off_on[!(midi_thru_disable & mRxSerial)]);
         break;
+      case 9:
+        gfxPrint(1, y, "Thru USBDev:  ");
+        gfxPrint(OC::Strings::off_on[!(midi_thru_disable & mRxUSBDev)]);
+        break;
+      case 10:
+        gfxPrint(1, y, "Thru Host1:   ");
+        gfxPrint(OC::Strings::off_on[!(midi_thru_disable & mRxUSBHost)]);
+        break;
+      case 11:
+        gfxPrint(1, y, "Thru Host2:   ");
+        gfxPrint(OC::Strings::off_on[!(midi_thru_disable & mRxUSBHost2)]);
+        break;
+      // TODO: extended midi toggles for Tx/Rx for Clock and maybe Message
+      // for each:
+      // - SerialMidi
+      // - USB Device
+      // - USB Host 1
+      // - USB Host 2
+      // ...do we need more than that? That's already like 20 separate flags
+
       default: break;
     }
 

@@ -123,6 +123,18 @@ namespace HS {
     SCREENSAVER_MODE_COUNT
   };
 
+  enum MidiMask : uint8_t {
+    mRxSerial = (1 << 0),
+    mRxUSBDev = (1 << 1),
+    mRxUSBHost = (1 << 2),
+    mRxUSBHost2 = (1 << 3),
+
+    mTxSerial = (1 << 4),
+    mTxUSBDev = (1 << 5),
+    mTxUSBHost = (1 << 6),
+    mTxUSBHost2 = (1 << 7),
+  };
+
   struct QuantEngineSettings {
     int16_t scale; // = OC::Scales::SCALE_SEMI;
     int8_t root_note;
@@ -216,7 +228,10 @@ namespace HS {
   extern DigitalInputMap jump_trig_;
 
   extern int preset_id;
-  extern bool midi_thru_enabled;
+
+  extern uint8_t midi_thru_disable;
+  extern uint8_t midi_rt_disable;
+  extern uint8_t midi_msg_disable;
   extern bool cursor_wrap;
   extern bool auto_save_enabled;
   extern uint8_t trig_length;

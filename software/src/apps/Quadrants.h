@@ -271,11 +271,12 @@ public:
         PhzConfig::setValue(FILTERMASK1_KEY, HS::hidden_applets[0]);
         PhzConfig::setValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
 
-        bool disable_thru = !midi_thru_enabled;
         data = PackPackables(
           HS::frame.MIDIState.pc_channel,
           HS::frame.MIDIState.bend_range,
-          disable_thru
+          midi_thru_disable,
+          midi_rt_disable,
+          midi_msg_disable
         );
         PhzConfig::setValue(MIDI_GLOBALS_KEY, data);
 
@@ -424,17 +425,19 @@ public:
         PhzConfig::getValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
 
         uint64_t data = 0;
-        bool disable_thru = false;
+        uint8_t midi_rt_disable = 0; // midi clock i/o
+        uint8_t midi_msg_disable = 0;
         if (PhzConfig::getValue(MIDI_GLOBALS_KEY, data)) {
           UnpackPackables(data,
               HS::frame.MIDIState.pc_channel,
               HS::frame.MIDIState.bend_range,
-              disable_thru
+              midi_thru_disable,
+              midi_rt_disable,
+              midi_msg_disable
           );
         }
-        midi_thru_enabled = !disable_thru;
-        if (midi_thru_enabled) MIDI1.turnThruOn();
-        else MIDI1.turnThruOff();
+        if (midi_thru_disable & mRxSerial) MIDI1.turnThruOff();
+        else MIDI1.turnThruOn();
 
         if (PhzConfig::getValue(PRESET_JUMP_KEY, data))
           UnpackPackables(data, jump_trig_);
@@ -514,36 +517,55 @@ public:
         next_applet_index[h] = index;
     }
 
-    template <typename T1, typename T2, typename T3>
-    void ProcessMIDI(T1 &device, T2 &next_device, T3 &dev3) {
+    void SendMIDIThru(const MIDIMessage &msg, uint8_t exclude_mask) {
+      exclude_mask |= midi_thru_disable;
+      if (~exclude_mask & mRxUSBDev) {
+        usbMIDI.send(msg.message, msg.data1, msg.data2, msg.channel, 0);
+      }
+      if (~exclude_mask & mRxUSBHost) {
+        usbHostMIDI.send(msg.message, msg.data1, msg.data2, msg.channel);
+      }
+      if (~exclude_mask & mRxSerial) {
+        MIDI1.send((midi::MidiType)msg.message, msg.data1, msg.data2, msg.channel);
+      }
+    }
+
+    template <typename T1>
+    void ProcessMIDI(T1 &device) {
         HS::IOFrame &f = HS::frame;
         int load_slot = -1;
 
+        uint8_t thrumask = 0;
+        // who needs types? we have pointers! will it work?
+        if ((void*)&device == (void*)&usbMIDI) thrumask = mRxUSBDev;
+        if ((void*)&device == (void*)&usbHostMIDI) thrumask = mRxUSBHost;
+        if ((void*)&device == (void*)&MIDI1) thrumask = mRxSerial;
+        // Serial-to-Serial Thru still happens in the library, if enabled
+
         while (timeout < 60 && device.read()) {
-            const uint8_t message = device.getType();
-            const uint8_t data1 = device.getData1();
-            const uint8_t data2 = device.getData2();
+          const MIDIMessage msg = {
+            device.getChannel(),
+            device.getType(),
+            device.getData1(),
+            device.getData2()
+          };
 
-            if (message == usbMIDI.SystemExclusive) {
-                QuadrantSysExHandler();
-                continue;
-            }
+          if (msg.message == midi::SystemExclusive) {
+            QuadrantSysExHandler();
+            continue;
+          }
 
-            if (message == usbMIDI.ProgramChange
-            && (device.getChannel() == f.MIDIState.pc_channel || f.MIDIState.pc_channel == f.MIDIState.PC_OMNI)) {
-                load_slot = device.getData1();
-                //continue;
-            }
+          if (msg.message == midi::ProgramChange
+            && (msg.channel == f.MIDIState.pc_channel || f.MIDIState.pc_channel == f.MIDIState.PC_OMNI)) {
+            load_slot = msg.data1;
+            // continue;
+          }
 
-            // receive it
-            f.MIDIState.ProcessMIDIMsg({device.getChannel(), message, data1, data2});
+          // receive it
+          f.MIDIState.ProcessMIDIMsg(msg);
 
-            // TODO: even more options for forwarding only certain traffic to certain places, etc.
-            if (HS::midi_thru_enabled) {
-              // send it along
-              next_device.send(message, data1, data2, device.getChannel(), 0);
-              dev3.send((midi::MidiType)message, data1, data2, device.getChannel());
-            }
+          // send it along
+          SendMIDIThru(msg, thrumask);
         }
         if (load_slot >= 0 && load_slot < QUAD_PRESET_COUNT) {
             QueuePresetLoad(load_slot);
@@ -553,9 +575,9 @@ public:
     void mainloop() {
         timeout = 0;
         // top-level MIDI-to-CV handling - alters frame outputs
-        ProcessMIDI(usbMIDI, usbHostMIDI, MIDI1);
-        ProcessMIDI(usbHostMIDI, usbMIDI, MIDI1);
-        ProcessMIDI(MIDI1, usbMIDI, usbHostMIDI);
+        ProcessMIDI(usbMIDI);
+        ProcessMIDI(usbHostMIDI);
+        ProcessMIDI(MIDI1);
     }
     void Controller() {
         // Clock Setup applet handles internal clock duties
@@ -1127,7 +1149,10 @@ private:
         MIDI_PC_CHANNEL,
         AUTO_MIDI,
         MIDI_POLY_MODE,
-        MIDI_THRU_TOGGLE,
+        MIDI_THRU_SERIAL,
+        MIDI_THRU_USBDEV,
+        MIDI_THRU_USBHOST1,
+        MIDI_THRU_USBHOST2,
 
         // Input Remapping
         TRIGMAP1, TRIGMAP2, TRIGMAP3, TRIGMAP4,
@@ -1437,12 +1462,21 @@ private:
             HS::frame.autoMIDIOut = !HS::frame.autoMIDIOut;
             break;
 
-          case MIDI_THRU_TOGGLE:
-            HS::midi_thru_enabled = !HS::midi_thru_enabled;
-            if (midi_thru_enabled)
-              MIDI1.turnThruOn();
-            else
+          case MIDI_THRU_SERIAL:
+            HS::midi_thru_disable ^= mRxSerial;
+            if (midi_thru_disable & mRxSerial)
               MIDI1.turnThruOff();
+            else
+              MIDI1.turnThruOn();
+            break;
+          case MIDI_THRU_USBDEV:
+            HS::midi_thru_disable ^= mRxUSBDev;
+            break;
+          case MIDI_THRU_USBHOST1:
+            HS::midi_thru_disable ^= mRxUSBHost;
+            break;
+          case MIDI_THRU_USBHOST2:
+            HS::midi_thru_disable ^= mRxUSBHost2;
             break;
 
           case SHOWHIDELIST:
