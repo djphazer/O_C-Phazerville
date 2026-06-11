@@ -331,7 +331,7 @@ private:
     int log_index;
 
     void UpdateLog(uint8_t message, uint8_t data1, uint8_t data2) {
-        log[log_index++] = {message, data1, data2};
+        log[log_index++] = {channel, message, data1, data2};
         if (log_index == 7) {
             for (int i = 0; i < 6; i++) {
                 memcpy(&log[i], &log[i+1], sizeof(log[i+1]));
