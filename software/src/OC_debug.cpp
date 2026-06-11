@@ -142,6 +142,13 @@ static void debug_menu_core() {
 
 static void debug_menu_version()
 {
+  static int hwid = 0;
+  static elapsedMillis refresh = 2000;
+  if (refresh > 2000) {
+    hwid = int(GetIDVoltage() * 1000);
+    refresh = 0;
+  }
+
   graphics.setPrintPos(2, 12);
   graphics.print(DAC_is_inverted ? Strings::NAME_NLM : Strings::NAME);
   graphics.setPrintPos(2, 22);
@@ -172,7 +179,7 @@ static void debug_menu_version()
 
 #ifdef __IMXRT1062__
   graphics.setPrintPos(2, 52);
-  graphics.printf("HW_ID= 0.%03dV", int(GetIDVoltage() * 1000));
+  graphics.printf("HW_ID= 0.%03dV", hwid);
   if (DAC_20Vpp) graphics.print(", 20Vpp");
 #endif
 }
