@@ -28,6 +28,7 @@
 
 #include "OC_core.h"
 #include "HSMIDI.h"
+#include "HSUtils.h"
 #include <functional>
 #include <vector>
 
@@ -295,12 +296,18 @@ public:
         paused = p;
         auto_reset = !p;
         if (!p && midi_out_enabled) {
-            usbMIDI.sendRealTime(usbMIDI.Start);
-#ifdef ARDUINO_TEENSY41
             // TODO: DeferTask?
-            usbHostMIDI[0].sendRealTime(usbMIDI.Start);
-            usbHostMIDI[1].sendRealTime(usbMIDI.Start);
-            MIDI1.sendRealTime(midi::MidiType(usbMIDI.Start));
+#ifdef ARDUINO_TEENSY41
+            if (~midi_clktx_disable & mMaskUSBDev)
+              usbMIDI.sendRealTime(usbMIDI.Start);
+            if (~midi_clktx_disable & mMaskUSBHost)
+              usbHostMIDI[0].sendRealTime(usbMIDI.Start);
+            if (~midi_clktx_disable & mMaskUSBHost2)
+              usbHostMIDI[1].sendRealTime(usbMIDI.Start);
+            if (~midi_clktx_disable & mMaskSerial)
+              MIDI1.sendRealTime(midi::MidiType(usbMIDI.Start));
+#else
+            usbMIDI.sendRealTime(usbMIDI.Start);
 #endif
         }
     }
@@ -310,12 +317,18 @@ public:
         paused = 0;
         extsync = false;
         if (midi_out_enabled) {
-            usbMIDI.sendRealTime(usbMIDI.Stop);
 #ifdef ARDUINO_TEENSY41
             // TODO: DeferTask?
-            usbHostMIDI[0].sendRealTime(usbMIDI.Stop);
-            usbHostMIDI[1].sendRealTime(usbMIDI.Stop);
-            MIDI1.sendRealTime(midi::MidiType(usbMIDI.Stop));
+            if (~midi_clktx_disable & mMaskUSBDev)
+              usbMIDI.sendRealTime(usbMIDI.Stop);
+            if (~midi_clktx_disable & mMaskUSBHost)
+              usbHostMIDI[0].sendRealTime(usbMIDI.Stop);
+            if (~midi_clktx_disable & mMaskUSBHost2)
+              usbHostMIDI[1].sendRealTime(usbMIDI.Stop);
+            if (~midi_clktx_disable & mMaskSerial)
+              MIDI1.sendRealTime(midi::MidiType(usbMIDI.Stop));
+#else
+            usbMIDI.sendRealTime(usbMIDI.Stop);
 #endif
         }
         EnableMIDIOut();

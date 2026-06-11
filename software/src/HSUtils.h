@@ -124,15 +124,15 @@ namespace HS {
   };
 
   enum MidiMask : uint8_t {
-    mRxSerial = (1 << 0),
-    mRxUSBDev = (1 << 1),
-    mRxUSBHost = (1 << 2),
-    mRxUSBHost2 = (1 << 3),
+    mMaskSerial = (1 << 0),
+    mMaskUSBDev = (1 << 1),
+    mMaskUSBHost = (1 << 2),
+    mMaskUSBHost2 = (1 << 3),
+    mMaskUSBHost3 = (1 << 4),
 
-    mTxSerial = (1 << 4),
-    mTxUSBDev = (1 << 5),
-    mTxUSBHost = (1 << 6),
-    mTxUSBHost2 = (1 << 7),
+    mMaskReserved0 = (1 << 5),
+    mMaskReserved1 = (1 << 6),
+    mMaskReserved2 = (1 << 7),
   };
 
   struct QuantEngineSettings {
@@ -230,8 +230,10 @@ namespace HS {
   extern int preset_id;
 
   extern uint8_t midi_thru_disable;
-  extern uint8_t midi_rt_disable;
-  extern uint8_t midi_msg_disable;
+  extern uint8_t midi_clkrx_disable;
+  extern uint8_t midi_clktx_disable;
+  extern uint8_t midi_msgrx_disable;
+  extern uint8_t midi_msgtx_disable;
   extern bool cursor_wrap;
   extern bool auto_save_enabled;
   extern uint8_t trig_length;

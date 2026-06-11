@@ -54,8 +54,10 @@ namespace HS {
 #endif
 
   // MidiMask toggles
-  uint8_t midi_rt_disable = 0; // midi clock i/o
-  uint8_t midi_msg_disable = 0; // note, cc, etc.
+  uint8_t midi_clkrx_disable = 0; // Clock, Start, Stop
+  uint8_t midi_clktx_disable = 0;
+  uint8_t midi_msgrx_disable = 0; // Note, CC, etc.
+  uint8_t midi_msgtx_disable = 0;
   uint8_t midi_thru_disable = 0;
 
   bool cursor_wrap = 0;
@@ -344,27 +346,88 @@ namespace HS {
       // these need to be last for exclusion in Hemisphere
       case 8:
         gfxPrint(1, y, "Thru MIDI:    ");
-        gfxPrint(OC::Strings::off_on[!(midi_thru_disable & mRxSerial)]);
+        gfxPrint(OC::Strings::off_on[!(midi_thru_disable & mMaskSerial)]);
         break;
       case 9:
         gfxPrint(1, y, "Thru USBDev:  ");
-        gfxPrint(OC::Strings::off_on[!(midi_thru_disable & mRxUSBDev)]);
+        gfxPrint(OC::Strings::off_on[!(midi_thru_disable & mMaskUSBDev)]);
         break;
       case 10:
         gfxPrint(1, y, "Thru Host1:   ");
-        gfxPrint(OC::Strings::off_on[!(midi_thru_disable & mRxUSBHost)]);
+        gfxPrint(OC::Strings::off_on[!(midi_thru_disable & mMaskUSBHost)]);
         break;
       case 11:
         gfxPrint(1, y, "Thru Host2:   ");
-        gfxPrint(OC::Strings::off_on[!(midi_thru_disable & mRxUSBHost2)]);
+        gfxPrint(OC::Strings::off_on[!(midi_thru_disable & mMaskUSBHost2)]);
         break;
-      // TODO: extended midi toggles for Tx/Rx for Clock and maybe Message
-      // for each:
-      // - SerialMidi
-      // - USB Device
-      // - USB Host 1
-      // - USB Host 2
-      // ...do we need more than that? That's already like 20 separate flags
+
+      case 12:
+        gfxPrint(1, y, "ClkRx MIDI:   ");
+        gfxPrint(OC::Strings::off_on[!(midi_clkrx_disable & mMaskSerial)]);
+        break;
+      case 13:
+        gfxPrint(1, y, "ClkRx USBDev: ");
+        gfxPrint(OC::Strings::off_on[!(midi_clkrx_disable & mMaskUSBDev)]);
+        break;
+      case 14:
+        gfxPrint(1, y, "ClkRx Host1:  ");
+        gfxPrint(OC::Strings::off_on[!(midi_clkrx_disable & mMaskUSBHost)]);
+        break;
+      case 15:
+        gfxPrint(1, y, "ClkRx Host2:  ");
+        gfxPrint(OC::Strings::off_on[!(midi_clkrx_disable & mMaskUSBHost2)]);
+        break;
+
+      case 16:
+        gfxPrint(1, y, "ClkTx MIDI:   ");
+        gfxPrint(OC::Strings::off_on[!(midi_clktx_disable & mMaskSerial)]);
+        break;
+      case 17:
+        gfxPrint(1, y, "ClkTx USBDev: ");
+        gfxPrint(OC::Strings::off_on[!(midi_clktx_disable & mMaskUSBDev)]);
+        break;
+      case 18:
+        gfxPrint(1, y, "ClkTx Host1:  ");
+        gfxPrint(OC::Strings::off_on[!(midi_clktx_disable & mMaskUSBHost)]);
+        break;
+      case 19:
+        gfxPrint(1, y, "ClkTx Host2:  ");
+        gfxPrint(OC::Strings::off_on[!(midi_clktx_disable & mMaskUSBHost2)]);
+        break;
+
+      case 20:
+        gfxPrint(1, y, "MsgRx MIDI:   ");
+        gfxPrint(OC::Strings::off_on[!(midi_msgrx_disable & mMaskSerial)]);
+        break;
+      case 21:
+        gfxPrint(1, y, "MsgRx USBDev: ");
+        gfxPrint(OC::Strings::off_on[!(midi_msgrx_disable & mMaskUSBDev)]);
+        break;
+      case 22:
+        gfxPrint(1, y, "MsgRx Host1:  ");
+        gfxPrint(OC::Strings::off_on[!(midi_msgrx_disable & mMaskUSBHost)]);
+        break;
+      case 23:
+        gfxPrint(1, y, "MsgRx Host2:  ");
+        gfxPrint(OC::Strings::off_on[!(midi_msgrx_disable & mMaskUSBHost2)]);
+        break;
+
+      case 24:
+        gfxPrint(1, y, "MsgTx MIDI:   ");
+        gfxPrint(OC::Strings::off_on[!(midi_msgtx_disable & mMaskSerial)]);
+        break;
+      case 25:
+        gfxPrint(1, y, "MsgTx USBDev: ");
+        gfxPrint(OC::Strings::off_on[!(midi_msgtx_disable & mMaskUSBDev)]);
+        break;
+      case 26:
+        gfxPrint(1, y, "MsgTx Host1:  ");
+        gfxPrint(OC::Strings::off_on[!(midi_msgtx_disable & mMaskUSBHost)]);
+        break;
+      case 27:
+        gfxPrint(1, y, "MsgTx Host2:  ");
+        gfxPrint(OC::Strings::off_on[!(midi_msgtx_disable & mMaskUSBHost2)]);
+        break;
 
       default: break;
     }

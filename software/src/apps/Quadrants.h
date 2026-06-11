@@ -275,8 +275,10 @@ public:
           HS::frame.MIDIState.pc_channel,
           HS::frame.MIDIState.bend_range,
           midi_thru_disable,
-          midi_rt_disable,
-          midi_msg_disable
+          midi_clkrx_disable,
+          midi_clktx_disable,
+          midi_msgrx_disable,
+          midi_msgtx_disable
         );
         PhzConfig::setValue(MIDI_GLOBALS_KEY, data);
 
@@ -425,18 +427,18 @@ public:
         PhzConfig::getValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
 
         uint64_t data = 0;
-        uint8_t midi_rt_disable = 0; // midi clock i/o
-        uint8_t midi_msg_disable = 0;
         if (PhzConfig::getValue(MIDI_GLOBALS_KEY, data)) {
           UnpackPackables(data,
               HS::frame.MIDIState.pc_channel,
               HS::frame.MIDIState.bend_range,
               midi_thru_disable,
-              midi_rt_disable,
-              midi_msg_disable
+              midi_clkrx_disable,
+              midi_clktx_disable,
+              midi_msgrx_disable,
+              midi_msgtx_disable
           );
         }
-        if (midi_thru_disable & mRxSerial) MIDI1.turnThruOff();
+        if (midi_thru_disable & mMaskSerial) MIDI1.turnThruOff();
         else MIDI1.turnThruOn();
 
         if (PhzConfig::getValue(PRESET_JUMP_KEY, data))
@@ -519,16 +521,16 @@ public:
 
     void SendMIDIThru(const MIDIMessage &msg, uint8_t exclude_mask) {
       exclude_mask |= midi_thru_disable;
-      if (~exclude_mask & mRxUSBDev) {
+      if (~exclude_mask & mMaskUSBDev) {
         usbMIDI.send(msg.message, msg.data1, msg.data2, msg.channel, 0);
       }
-      if (~exclude_mask & mRxUSBHost) {
+      if (~exclude_mask & mMaskUSBHost) {
         usbHostMIDI[0].send(msg.message, msg.data1, msg.data2, msg.channel);
       }
-      if (~exclude_mask & mRxUSBHost2) {
+      if (~exclude_mask & mMaskUSBHost2) {
         usbHostMIDI[1].send(msg.message, msg.data1, msg.data2, msg.channel);
       }
-      if (~exclude_mask & mRxSerial) {
+      if (~exclude_mask & mMaskSerial) {
         MIDI1.send((midi::MidiType)msg.message, msg.data1, msg.data2, msg.channel);
       }
     }
@@ -540,11 +542,14 @@ public:
 
         uint8_t thrumask = 0;
         // who needs types? we have pointers!
-        if ((void*)&device == (void*)&usbMIDI) thrumask = mRxUSBDev;
-        if ((void*)&device == (void*)&usbHostMIDI[0]) thrumask = mRxUSBHost;
-        if ((void*)&device == (void*)&usbHostMIDI[1]) thrumask = mRxUSBHost2;
-        if ((void*)&device == (void*)&MIDI1) thrumask = mRxSerial;
+        if ((void*)&device == (void*)&usbMIDI) thrumask = mMaskUSBDev;
+        if ((void*)&device == (void*)&usbHostMIDI[0]) thrumask = mMaskUSBHost;
+        if ((void*)&device == (void*)&usbHostMIDI[1]) thrumask = mMaskUSBHost2;
+        if ((void*)&device == (void*)&MIDI1) thrumask = mMaskSerial;
         // Serial-to-Serial Thru still happens in the library, if enabled
+
+        const bool clkrx = ~midi_clkrx_disable & thrumask;
+        const bool msgrx = ~midi_msgrx_disable & thrumask;
 
         while (timeout < 60 && device.read()) {
           const MIDIMessage msg = {
@@ -554,19 +559,27 @@ public:
             device.getData2()
           };
 
-          if (msg.message == midi::SystemExclusive) {
-            QuadrantSysExHandler();
-            continue;
-          }
+          switch (msg.message) {
+            case midi::SystemExclusive:
+              QuadrantSysExHandler();
+              continue;
 
-          if (msg.message == midi::ProgramChange
-            && (msg.channel == f.MIDIState.pc_channel || f.MIDIState.pc_channel == f.MIDIState.PC_OMNI)) {
-            load_slot = msg.data1;
-            // continue;
-          }
+            case midi::ProgramChange:
+              if (msg.channel == f.MIDIState.pc_channel || f.MIDIState.pc_channel == f.MIDIState.PC_OMNI) {
+                load_slot = msg.data1;
+              }
+              break;
 
-          // receive it
-          f.MIDIState.ProcessMIDIMsg(msg);
+            case midi::Clock:
+            case midi::Start:
+            case midi::Stop:
+              if (clkrx) f.MIDIState.ProcessMIDIMsg(msg); // receive it
+                break;
+
+            default:
+              if (msgrx && (msg.message >> 4) != 0xF) f.MIDIState.ProcessMIDIMsg(msg); // receive it
+                break;
+          }
 
           // send it along
           SendMIDIThru(msg, thrumask);
@@ -1158,6 +1171,22 @@ private:
         MIDI_THRU_USBDEV,
         MIDI_THRU_USBHOST1,
         MIDI_THRU_USBHOST2,
+        MIDI_CLKRX_SERIAL,
+        MIDI_CLKRX_USBDEV,
+        MIDI_CLKRX_USBHOST1,
+        MIDI_CLKRX_USBHOST2,
+        MIDI_CLKTX_SERIAL,
+        MIDI_CLKTX_USBDEV,
+        MIDI_CLKTX_USBHOST1,
+        MIDI_CLKTX_USBHOST2,
+        MIDI_MSGRX_SERIAL,
+        MIDI_MSGRX_USBDEV,
+        MIDI_MSGRX_USBHOST1,
+        MIDI_MSGRX_USBHOST2,
+        MIDI_MSGTX_SERIAL,
+        MIDI_MSGTX_USBDEV,
+        MIDI_MSGTX_USBHOST1,
+        MIDI_MSGTX_USBHOST2,
 
         // Input Remapping
         TRIGMAP1, TRIGMAP2, TRIGMAP3, TRIGMAP4,
@@ -1468,20 +1497,72 @@ private:
             break;
 
           case MIDI_THRU_SERIAL:
-            HS::midi_thru_disable ^= mRxSerial;
-            if (midi_thru_disable & mRxSerial)
+            HS::midi_thru_disable ^= mMaskSerial;
+            if (midi_thru_disable & mMaskSerial)
               MIDI1.turnThruOff();
             else
               MIDI1.turnThruOn();
             break;
           case MIDI_THRU_USBDEV:
-            HS::midi_thru_disable ^= mRxUSBDev;
+            HS::midi_thru_disable ^= mMaskUSBDev;
             break;
           case MIDI_THRU_USBHOST1:
-            HS::midi_thru_disable ^= mRxUSBHost;
+            HS::midi_thru_disable ^= mMaskUSBHost;
             break;
           case MIDI_THRU_USBHOST2:
-            HS::midi_thru_disable ^= mRxUSBHost2;
+            HS::midi_thru_disable ^= mMaskUSBHost2;
+            break;
+
+          case MIDI_CLKRX_SERIAL:
+            HS::midi_clkrx_disable ^= mMaskSerial;
+            break;
+          case MIDI_CLKRX_USBDEV:
+            HS::midi_clkrx_disable ^= mMaskUSBDev;
+            break;
+          case MIDI_CLKRX_USBHOST1:
+            HS::midi_clkrx_disable ^= mMaskUSBHost;
+            break;
+          case MIDI_CLKRX_USBHOST2:
+            HS::midi_clkrx_disable ^= mMaskUSBHost2;
+            break;
+
+          case MIDI_CLKTX_SERIAL:
+            HS::midi_clktx_disable ^= mMaskSerial;
+            break;
+          case MIDI_CLKTX_USBDEV:
+            HS::midi_clktx_disable ^= mMaskUSBDev;
+            break;
+          case MIDI_CLKTX_USBHOST1:
+            HS::midi_clktx_disable ^= mMaskUSBHost;
+            break;
+          case MIDI_CLKTX_USBHOST2:
+            HS::midi_clktx_disable ^= mMaskUSBHost2;
+            break;
+
+          case MIDI_MSGRX_SERIAL:
+            HS::midi_msgrx_disable ^= mMaskSerial;
+            break;
+          case MIDI_MSGRX_USBDEV:
+            HS::midi_msgrx_disable ^= mMaskUSBDev;
+            break;
+          case MIDI_MSGRX_USBHOST1:
+            HS::midi_msgrx_disable ^= mMaskUSBHost;
+            break;
+          case MIDI_MSGRX_USBHOST2:
+            HS::midi_msgrx_disable ^= mMaskUSBHost2;
+            break;
+
+          case MIDI_MSGTX_SERIAL:
+            HS::midi_msgtx_disable ^= mMaskSerial;
+            break;
+          case MIDI_MSGTX_USBDEV:
+            HS::midi_msgtx_disable ^= mMaskUSBDev;
+            break;
+          case MIDI_MSGTX_USBHOST1:
+            HS::midi_msgtx_disable ^= mMaskUSBHost;
+            break;
+          case MIDI_MSGTX_USBHOST2:
+            HS::midi_msgtx_disable ^= mMaskUSBHost2;
             break;
 
           case SHOWHIDELIST:

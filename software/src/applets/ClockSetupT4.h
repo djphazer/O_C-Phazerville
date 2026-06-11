@@ -126,13 +126,13 @@ public:
         // ------------ //
         if (HS::clock_m.IsRunning() && HS::clock_m.MIDITock()) {
           OC::CORE::DeferTask([](){
-            if (~midi_rt_disable & mTxUSBDev)
+            if (~midi_clktx_disable & mMaskUSBDev)
               usbMIDI.sendRealTime(usbMIDI.Clock);
-            if (~midi_rt_disable & mTxUSBHost)
+            if (~midi_clktx_disable & mMaskUSBHost)
               usbHostMIDI[0].sendRealTime(usbMIDI.Clock);
-            if (~midi_rt_disable & mTxUSBHost2)
+            if (~midi_clktx_disable & mMaskUSBHost2)
               usbHostMIDI[1].sendRealTime(usbMIDI.Clock);
-            if (~midi_rt_disable & mTxSerial)
+            if (~midi_clktx_disable & mMaskSerial)
               MIDI1.sendRealTime(midi::MidiType(usbMIDI.Clock));
           });
         }
