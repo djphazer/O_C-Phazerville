@@ -635,10 +635,11 @@ bool Ui::AppSettings(bool drawmenu) {
       item.selected = current == cursor.cursor_pos();
       item.SetPrintPos();
       graphics.movePrintPos(weegfx::Graphics::kFixedFontW, 0);
-      if (NorthernLightModular)
-        graphics.print(app_container[current]->boring_name());
-      else
-        graphics.print(app_container[current]->name());
+      // todo: make a secret button combo to switch to boring names
+      // if (your_mom_is_boring)
+      //   graphics.print(app_container[current]->boring_name());
+      // else
+      graphics.print(app_container[current]->name());
       if (global_settings.current_app_id == app_container[current]->id())
         graphics.drawBitmap8(0, item.y + 1, 8, ZAP_ICON);
 
