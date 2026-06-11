@@ -24,6 +24,8 @@ extern char _extram_start[], _extram_end[];
 #endif
 extern char _ebss[], _heap_end[], *__brkval, _estack;
 
+extern USBHost thisUSB;
+
 #ifdef POLYLFO_DEBUG  
 extern void POLYLFO_debug();
 #endif // POLYLFO_DEBUG
@@ -152,7 +154,6 @@ static void debug_menu_version()
 #else
   graphics.print(" PROD");
 #endif
-  if (DAC_20Vpp) graphics.print(", 20Vpp");
 
   graphics.setPrintPos(2, 42);
   graphics.print("usb=");
@@ -172,6 +173,7 @@ static void debug_menu_version()
 #ifdef __IMXRT1062__
   graphics.setPrintPos(2, 52);
   graphics.printf("HW_ID= 0.%03dV", int(GetIDVoltage() * 1000));
+  if (DAC_20Vpp) graphics.print(", 20Vpp");
 #endif
 }
 
@@ -274,6 +276,16 @@ static void debug_menu_adc_value() {
   graphics.printf("T1=%u T2=%u T3=%u T4=%u", trigz[0], trigz[1], trigz[2], trigz[3]);
 }
 
+static size_t midi_rx_counter[3] = {0};
+static void debug_menu_midi() {
+  graphics.setPrintPos(2, 12);
+  graphics.printf("Serial Rx: %u", midi_rx_counter[0]);
+  graphics.setPrintPos(2, 22);
+  graphics.printf("USB Dev Rx: %u", midi_rx_counter[1]);
+  graphics.setPrintPos(2, 32);
+  graphics.printf("USB Host Rx: %u", midi_rx_counter[2]);
+}
+
 static void debug_menu_audio() {
   static SmoothedValue<int, 64> smooth_cpu;
   smooth_cpu.push(AudioProcessorUsage() * 100);
@@ -320,7 +332,13 @@ static void debug_menu_app() {
     graphics.print(app->name());
     app->DrawDebugInfo();
   } else {
+#ifdef ARDUINO_TEENSY41
+    // midi monitor from Boot Menu
+    graphics.print("MIDI");
+    debug_menu_midi();
+#else
     graphics.print("?");
+#endif
   }
 }
 
@@ -374,6 +392,20 @@ static const DebugMenu debug_menus[] = {
 #endif
 };
 
+void midi_monitor() {
+#ifdef ARDUINO_TEENSY41
+  while (MIDI1.read()) {
+    ++midi_rx_counter[0];
+  }
+  while (usbMIDI.read()) {
+    ++midi_rx_counter[1];
+  }
+  while (usbHostMIDI[0].read()) {
+    ++midi_rx_counter[2];
+  }
+#endif
+}
+
 void Ui::DebugStats() {
   SERIAL_PRINTLN("DEBUG/STATS MENU");
 
@@ -385,7 +417,12 @@ void Ui::DebugStats() {
     // Run current app
     if (CORE::app_loop_enabled)
       app_switcher.current_app()->DispatchLoop();
+    else {
+      // typically only happens from Boot menu
+      midi_monitor();
+    }
 
+    thisUSB.Task();
     CORE::FlushTasks();
 
     const auto &current_menu = debug_menus[current_menu_index];

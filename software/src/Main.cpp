@@ -46,7 +46,6 @@
 #include "VBiasManager.h"
 #include "HSMIDI.h"
 
-#if defined(__IMXRT1062__)
 #include "PhzConfig.h"
 
 #if defined(ARDUINO_TEENSY41)
@@ -91,8 +90,6 @@ void ScanI2C() {
   interrupts();
 }
 #endif // ARDUINO_TEENSY41
-
-#endif // __IMXRT1062__
 
 uint_fast8_t MENU_REDRAW = true;
 static OC::UiMode ui_mode = OC::UI_MODE_MENU;
@@ -185,25 +182,25 @@ void BootMenu() {
 
     GRAPHICS_BEGIN_FRAME(true);
     graphics.setPrintPos(1, 5);
-    graphics.print("Boot Menu:");
+    graphics.print("USB Device Mode:");
 
     graphics.setPrintPos(1, 15);
-    graphics.print("A: Phazerville");
+    graphics.print("A: MIDI + Audio");
     if (any_held && 0 == OC::calibration_data.bootchoice()) {
       graphics.invertRect(1, 15, 127, 9);
     }
     graphics.setPrintPos(1, 25);
-    graphics.print("B: Phz + USB Audio");
+    graphics.print("B: MIDI");
     if (any_held && 1 == OC::calibration_data.bootchoice()) {
       graphics.invertRect(1, 25, 127, 9);
     }
     graphics.setPrintPos(1, 35);
-    graphics.print("X: Stock + MTP");
+    graphics.print("X: MTP + O_C Stock");
     if (any_held && 2 == OC::calibration_data.bootchoice()) {
       graphics.invertRect(1, 35, 127, 9);
     }
     graphics.setPrintPos(1, 45);
-    graphics.print("Y: ????");
+    graphics.print("Y: (HW Debug)");
     if (any_held && 3 == OC::calibration_data.bootchoice()) {
       graphics.invertRect(1, 45, 127, 9);
     }
@@ -225,7 +222,6 @@ void setup() {
   delay(50);
   Serial.begin(9600);
 
-#if defined(__IMXRT1062__)
   if (CrashReport) {
     while (!Serial && millis() < 3000) ; // wait
     Serial.println(CrashReport);
@@ -235,7 +231,6 @@ void setup() {
   #if defined(ARDUINO_TEENSY41)
   OC::Pinout_Detect();
   #endif
-#endif
 #if defined(__MK20DX256__)
   NVIC_SET_PRIORITY(IRQ_PORTB, 0); // TR1 = 0 = PTB16
 #endif
@@ -307,46 +302,52 @@ void setup() {
   graphics.print("*Main Screen Turn On*");
   GRAPHICS_END_FRAME();
 
+#if defined(ARDUINO_TEENSY41)
+  // Standard MIDI I/O on Serial8, only for Teensy 4.1
+  if (MIDI_Uses_Serial8) {
+    Serial8.begin(31250);
+    MIDI1.begin(MIDI_CHANNEL_OMNI);
+  }
+  // USB Host support for 4.1 only
+  thisUSB.begin();
+#endif
+
 #ifdef MULTIBOOT
   delay(100);
   if (OC::ui.read_immediate(OC::CONTROL_BUTTON_Z)) {
     BootMenu();
   }
 
-  if (OC::calibration_data.bootchoice()) {
+  if (OC::calibration_data.bootchoice() == 3) {
+    for (int i = 0; i < DAC_CHANNEL_COUNT; ++i) {
+      // -3V to +4V
+      OC::DAC::set_octave(DAC_CHANNEL(i), i-3);
+    }
+    OC::ui.DebugStats();
+  } else if (OC::calibration_data.bootchoice()) {
     GRAPHICS_BEGIN_FRAME(true);
     graphics.setPrintPos(1, 28);
     graphics.print("Switching to alt mode!");
     GRAPHICS_END_FRAME();
-    delay(200);
+    AudioNoInterrupts();
+    delay(10);
     disableCache();
     jump_to_alt(OC::calibration_data.bootchoice());
   }
 #endif
 
   // --- more hardware init
-#ifdef __IMXRT1062__
-  #if defined(ARDUINO_TEENSY41)
+#if defined(ARDUINO_TEENSY41)
   // this takes a couple seconds to timeout if no card
   SDcard_Ready = SD.begin(BUILTIN_SDCARD);
-
-  // Standard MIDI I/O on Serial8, only for Teensy 4.1
-  if (MIDI_Uses_Serial8) {
-    Serial8.begin(31250);
-    MIDI1.begin(MIDI_CHANNEL_OMNI);
-  }
 
   if (I2S2_Audio_ADC && I2S2_Audio_DAC) {
     OC::AudioIO::Init();
   }
-
-  // USB Host support for 4.1 only
-  thisUSB.begin();
-  #endif
+#endif
 
   // initialize LittleFS for config files
   PhzConfig::Init();
-#endif
 
   // Display loading splash screen and optional calibration
   bool reset_settings = false;

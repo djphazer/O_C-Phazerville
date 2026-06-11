@@ -20,12 +20,12 @@ tag = get_git_rev()
 build_flags = env.ParseFlags(env['BUILD_FLAGS'])
 defines = build_flags.get("CPPDEFINES")
 
+env.Append(BUILD_FLAGS=[ f'-DOC_BUILD_TAG=\\"{tag}\\"' ])
+
 if "USB_AUDIO" in defines:
     tag += "+audio"
 if "USB_MTPDISK" in defines:
     tag += "+MTP"
-
-env.Append(BUILD_FLAGS=[ f'-DOC_BUILD_TAG=\\"{tag}\\"' ])
 
 if "T41" not in env['PIOENV']:
     version = get_version()
