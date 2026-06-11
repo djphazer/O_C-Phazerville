@@ -523,7 +523,10 @@ public:
         usbMIDI.send(msg.message, msg.data1, msg.data2, msg.channel, 0);
       }
       if (~exclude_mask & mRxUSBHost) {
-        usbHostMIDI.send(msg.message, msg.data1, msg.data2, msg.channel);
+        usbHostMIDI[0].send(msg.message, msg.data1, msg.data2, msg.channel);
+      }
+      if (~exclude_mask & mRxUSBHost2) {
+        usbHostMIDI[1].send(msg.message, msg.data1, msg.data2, msg.channel);
       }
       if (~exclude_mask & mRxSerial) {
         MIDI1.send((midi::MidiType)msg.message, msg.data1, msg.data2, msg.channel);
@@ -536,9 +539,10 @@ public:
         int load_slot = -1;
 
         uint8_t thrumask = 0;
-        // who needs types? we have pointers! will it work?
+        // who needs types? we have pointers!
         if ((void*)&device == (void*)&usbMIDI) thrumask = mRxUSBDev;
-        if ((void*)&device == (void*)&usbHostMIDI) thrumask = mRxUSBHost;
+        if ((void*)&device == (void*)&usbHostMIDI[0]) thrumask = mRxUSBHost;
+        if ((void*)&device == (void*)&usbHostMIDI[1]) thrumask = mRxUSBHost2;
         if ((void*)&device == (void*)&MIDI1) thrumask = mRxSerial;
         // Serial-to-Serial Thru still happens in the library, if enabled
 
@@ -576,7 +580,8 @@ public:
         timeout = 0;
         // top-level MIDI-to-CV handling - alters frame outputs
         ProcessMIDI(usbMIDI);
-        ProcessMIDI(usbHostMIDI);
+        ProcessMIDI(usbHostMIDI[0]);
+        ProcessMIDI(usbHostMIDI[1]);
         ProcessMIDI(MIDI1);
     }
     void Controller() {

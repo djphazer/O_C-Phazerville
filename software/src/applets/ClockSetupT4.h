@@ -19,6 +19,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+/*
+ * 8-channel variant of ClockSetup.h
+ * only used on T41 build; T40 uses the other one
+ */
 #pragma once
 
 class ClockSetup : public HemisphereApplet {
@@ -122,11 +126,14 @@ public:
         // ------------ //
         if (HS::clock_m.IsRunning() && HS::clock_m.MIDITock()) {
           OC::CORE::DeferTask([](){
-            usbMIDI.sendRealTime(usbMIDI.Clock);
-            usbHostMIDI.sendRealTime(usbMIDI.Clock);
-#ifdef ARDUINO_TEENSY41
-            MIDI1.sendRealTime(midi::MidiType(usbMIDI.Clock));
-#endif
+            if (~midi_rt_disable & mTxUSBDev)
+              usbMIDI.sendRealTime(usbMIDI.Clock);
+            if (~midi_rt_disable & mTxUSBHost)
+              usbHostMIDI[0].sendRealTime(usbMIDI.Clock);
+            if (~midi_rt_disable & mTxUSBHost2)
+              usbHostMIDI[1].sendRealTime(usbMIDI.Clock);
+            if (~midi_rt_disable & mTxSerial)
+              MIDI1.sendRealTime(midi::MidiType(usbMIDI.Clock));
           });
         }
 

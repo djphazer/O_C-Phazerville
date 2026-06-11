@@ -288,7 +288,8 @@ public:
         // Process incoming MIDI traffic
         process_midi_in(usbMIDI);
 #ifdef ARDUINO_TEENSY41
-        process_midi_in(usbHostMIDI);
+        process_midi_in(usbHostMIDI[0]);
+        process_midi_in(usbHostMIDI[1]);
         process_midi_in(MIDI1);
 #endif
 

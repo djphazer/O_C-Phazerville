@@ -372,21 +372,23 @@ public:
         }
 
 #if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
-        while (usbHostMIDI.read()) {
-            const uint8_t message = usbHostMIDI.getType();
-            const uint8_t data1 = usbHostMIDI.getData1();
-            const uint8_t data2 = usbHostMIDI.getData2();
+        ForEachChannel(ch) { // works because we only have two usbHostMIDI's
+          while (usbHostMIDI[ch].read()) {
+              const uint8_t message = usbHostMIDI[ch].getType();
+              const uint8_t data1 = usbHostMIDI[ch].getData1();
+              const uint8_t data2 = usbHostMIDI[ch].getData2();
 
-            if (message == usbMIDI.SystemExclusive) {
-                // TODO: consider implementing SysEx import/export for Calibr8or
-                continue;
-            }
+              if (message == usbMIDI.SystemExclusive) {
+                  // TODO: consider implementing SysEx import/export for Calibr8or
+                  continue;
+              }
 
-            f.MIDIState.ProcessMIDIMsg({usbHostMIDI.getChannel(), message, data1, data2});
+              f.MIDIState.ProcessMIDIMsg({usbHostMIDI[ch].getChannel(), message, data1, data2});
 
-            if (message == usbMIDI.NoteOn || message == usbMIDI.NoteOff) {
-              dothething = true;
-            }
+              if (message == usbMIDI.NoteOn || message == usbMIDI.NoteOff) {
+                dothething = true;
+              }
+          }
         }
         while (MIDI1.read()) {
             const uint8_t message = MIDI1.getType();

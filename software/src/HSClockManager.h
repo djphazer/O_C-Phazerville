@@ -298,7 +298,8 @@ public:
             usbMIDI.sendRealTime(usbMIDI.Start);
 #ifdef ARDUINO_TEENSY41
             // TODO: DeferTask?
-            usbHostMIDI.sendRealTime(usbMIDI.Start);
+            usbHostMIDI[0].sendRealTime(usbMIDI.Start);
+            usbHostMIDI[1].sendRealTime(usbMIDI.Start);
             MIDI1.sendRealTime(midi::MidiType(usbMIDI.Start));
 #endif
         }
@@ -312,7 +313,8 @@ public:
             usbMIDI.sendRealTime(usbMIDI.Stop);
 #ifdef ARDUINO_TEENSY41
             // TODO: DeferTask?
-            usbHostMIDI.sendRealTime(usbMIDI.Stop);
+            usbHostMIDI[0].sendRealTime(usbMIDI.Stop);
+            usbHostMIDI[1].sendRealTime(usbMIDI.Stop);
             MIDI1.sendRealTime(midi::MidiType(usbMIDI.Stop));
 #endif
         }

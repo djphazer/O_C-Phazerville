@@ -728,14 +728,16 @@ struct MIDIFrame {
     void SendAfterTouch(const uint8_t midi_ch, uint8_t val) {
         usbMIDI.sendAfterTouch(val, midi_ch + 1);
 #ifdef ARDUINO_TEENSY41
-        usbHostMIDI.sendAfterTouch(val, midi_ch + 1);
+        usbHostMIDI[0].sendAfterTouch(val, midi_ch + 1);
+        usbHostMIDI[1].sendAfterTouch(val, midi_ch + 1);
         MIDI1.sendAfterTouch(val, midi_ch + 1);
 #endif
     }
     void SendPitchBend(const uint8_t midi_ch, uint16_t bend) {
         usbMIDI.sendPitchBend(bend, midi_ch + 1);
 #ifdef ARDUINO_TEENSY41
-        usbHostMIDI.sendPitchBend(bend, midi_ch + 1);
+        usbHostMIDI[0].sendPitchBend(bend, midi_ch + 1);
+        usbHostMIDI[1].sendPitchBend(bend, midi_ch + 1);
         MIDI1.sendPitchBend(bend, midi_ch + 1);
 #endif
     }
@@ -743,7 +745,8 @@ struct MIDIFrame {
     void SendCC(const uint8_t midi_ch, uint8_t ccnum, uint8_t val) {
         usbMIDI.sendControlChange(ccnum, val, midi_ch + 1);
 #ifdef ARDUINO_TEENSY41
-        usbHostMIDI.sendControlChange(ccnum, val, midi_ch + 1);
+        usbHostMIDI[0].sendControlChange(ccnum, val, midi_ch + 1);
+        usbHostMIDI[1].sendControlChange(ccnum, val, midi_ch + 1);
         MIDI1.sendControlChange(ccnum, val, midi_ch + 1);
 #endif
     }
@@ -753,7 +756,8 @@ struct MIDIFrame {
 
         usbMIDI.sendNoteOn(note, vel, midi_ch + 1);
 #ifdef ARDUINO_TEENSY41
-        usbHostMIDI.sendNoteOn(note, vel, midi_ch + 1);
+        usbHostMIDI[0].sendNoteOn(note, vel, midi_ch + 1);
+        usbHostMIDI[1].sendNoteOn(note, vel, midi_ch + 1);
         MIDI1.sendNoteOn(note, vel, midi_ch + 1);
 #endif
     }
@@ -761,7 +765,8 @@ struct MIDIFrame {
         if (note > 127) note = current_note[midi_ch];
         usbMIDI.sendNoteOff(note, vel, midi_ch + 1);
 #ifdef ARDUINO_TEENSY41
-        usbHostMIDI.sendNoteOff(note, vel, midi_ch + 1);
+        usbHostMIDI[0].sendNoteOff(note, vel, midi_ch + 1);
+        usbHostMIDI[1].sendNoteOff(note, vel, midi_ch + 1);
         MIDI1.sendNoteOff(note, vel, midi_ch + 1);
 #endif
     }

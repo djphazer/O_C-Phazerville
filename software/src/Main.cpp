@@ -52,7 +52,10 @@
 #if defined(ARDUINO_TEENSY41)
 USBHost thisUSB;
 USBHub hub1(thisUSB);
-MIDIDevice_BigBuffer usbHostMIDI(thisUSB);
+MIDIDevice_BigBuffer usbHostMIDI[2] {
+  MIDIDevice_BigBuffer(thisUSB),
+  MIDIDevice_BigBuffer(thisUSB)
+};
 MIDI_CREATE_INSTANCE(HardwareSerial, Serial8, MIDI1);
 #include "AudioIO.h"
 #include "usb_desc.h"
@@ -338,7 +341,7 @@ void setup() {
   }
 
   // USB Host support for 4.1 only
-  usbHostMIDI.begin();
+  thisUSB.begin();
   #endif
 
   // initialize LittleFS for config files
