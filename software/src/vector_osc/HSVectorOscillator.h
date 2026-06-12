@@ -221,14 +221,14 @@ private:
         if (total_time != 0) time_unit = 0xffffffff / total_time;
     }
 
-    void find_segment(
+    constexpr void find_segment(
         uint32_t phase,
         bool sustain,
         uint8_t& segment,
         uint8_t& segment_start,
         int16_t& segment_start_level,
         uint16_t& segment_phase
-    ) {
+    ) const {
         if (total_time == 0) return; // vector osc hasn't been setup yet so bail
         uint32_t start_phase = time_unit * segment_start;
         uint32_t end_phase = segment == segment_count - 1

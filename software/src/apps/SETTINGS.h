@@ -337,7 +337,7 @@ public:
       gfxPrint(0, 55, reflash ? "[Reflash]" : "[CALIBRATE]   [RESET]");
   }
 
-  void DrawCalibration() {
+  void DrawCalibration() const {
     const OC::CalibrationStep *step = calstate.current_step;
 
     menu::DefaultTitleBar::Draw();

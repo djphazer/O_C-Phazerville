@@ -506,7 +506,7 @@ public:
     *settings++ = REF_SETTING_AUTOTUNE;
     //*settings++ = REF_SETTING_AUTOTUNE_ERROR;
 
-    if (DAC_CHANNEL_FTM == dac_channel_) {
+    if (DAC_CHANNEL_FTM == (int)dac_channel_) {
       *settings++ = REF_SETTING_NOTES_OR_BPM;
       *settings++ = REF_SETTING_A_ABOVE_MID_C_INTEGER;
       *settings++ = REF_SETTING_A_ABOVE_MID_C_MANTISSA;

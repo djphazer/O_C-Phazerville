@@ -29,7 +29,9 @@ namespace menu = OC::menu;
 #include "apps/BBGEN.h"
 #include "apps/Viznutcracker.h"
 #include "apps/Chords.h"
+#ifdef ENABLE_APP_REFERENCES
 #include "apps/References.h"
+#endif
 // #include "apps/Passencore.h"
 #include "apps/CaptainMIDI.h"
 #include "apps/TheDarkestTimeline.h"

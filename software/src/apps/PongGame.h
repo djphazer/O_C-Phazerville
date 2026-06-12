@@ -147,7 +147,7 @@ public:
     }
 
     /* The player paddle is a filled rectangle of fixed width and adjustable height. */
-    void DrawPaddle() {
+    void DrawPaddle() const {
       if(enabled){
         graphics.drawRect(
           paddle_x >> PRECISION,
@@ -158,7 +158,7 @@ public:
       }
     }
 
-    int getScore() {return score;}
+    int getScore() const {return score;}
   };
 
   Player player1;

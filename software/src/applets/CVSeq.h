@@ -996,6 +996,7 @@ private:
             case Output2Mode::CV1_IN:
                 Out(1, ch1_input_cv);
                 break;
+            default: break;
         }
     }
 

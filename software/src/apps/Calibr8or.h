@@ -689,7 +689,7 @@ public:
     SegmentDisplay segment{SegmentSize::BIG_SEGMENTS};
     Cal8ChannelConfig channel[DAC_CHANNEL_COUNT];
 
-    void DrawPresetSelector() {
+    void DrawPresetSelector() const {
         // index is the currently loaded preset (0-3)
         // preset_select is current selection (1-4, 5=clear)
         int y = 5 + 10*preset_select;
@@ -707,7 +707,7 @@ public:
             gfxPrint(60, 55, "[CLEAR]");
     }
 
-    void DrawTabs() {
+    void DrawTabs() const {
         // Draw channel tabs
         const size_t w = 128 / DAC_CHANNEL_COUNT;
         const size_t y = 11;
@@ -736,7 +736,7 @@ public:
         gfxLine(127, y, 127, y+10); // vertical line
         gfxLine(0, y+11, 127, y+11);
     }
-    void DrawInterface() {
+    void DrawInterface() const {
         DrawTabs();
 
         // Draw parameters for selected channel

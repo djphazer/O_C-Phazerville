@@ -230,7 +230,7 @@ public:
           PhzConfig::setValue(preset_key | (CVMAP_KEY + i), data);
         }
         PhzConfig::deleteKey(preset_key | OLD_TRIGMAP_KEY);
-        PhzConfig::deleteKey(preset_key | OLD_TRIGMAP_KEY + 1);
+        PhzConfig::deleteKey(preset_key | (OLD_TRIGMAP_KEY + 1));
 
         data = 0;
         for (size_t i = 0; i < 8; ++i) {
@@ -260,7 +260,7 @@ public:
             Pack(data, PackLocation{h*8,8}, HS::appletIds[index]);
 
             // applet data
-            applet_data[h] = HS::get_applet(index, h)->OnDataRequest();
+            applet_data[h] = HS::get_applet(index, HEM_SIDE(h))->OnDataRequest();
             PhzConfig::setValue(preset_key | (APPLET_L1_DATA_KEY + h), applet_data[h]);
         }
 
@@ -351,7 +351,7 @@ public:
             // applet data
             PhzConfig::getValue(preset_key | (APPLET_L1_DATA_KEY + h), applet_data[h]);
             SetApplet(HEM_SIDE(h), index);
-            HS::get_applet(index, h)->OnDataReceive(applet_data[h]);
+            HS::get_applet(index, HEM_SIDE(h))->OnDataReceive(applet_data[h]);
         }
 
         // clock data
@@ -377,7 +377,7 @@ public:
           HS::trigmap[1].Unpack(mapdata[1]);
           HS::trigmap[2].Unpack(mapdata[2]);
           HS::trigmap[3].Unpack(mapdata[3]);
-          PhzConfig::getValue(preset_key | OLD_TRIGMAP_KEY + 1, data);
+          PhzConfig::getValue(preset_key | (OLD_TRIGMAP_KEY + 1), data);
           UnpackPackables(data, mapdata[0], mapdata[1], mapdata[2], mapdata[3]);
           HS::trigmap[4].Unpack(mapdata[0]);
           HS::trigmap[5].Unpack(mapdata[1]);
@@ -1700,7 +1700,7 @@ private:
         uint64_t data = 0;
         PhzConfig::getValue(id << 11 | APPLET_METADATA_KEY, data);
         int idx = HS::get_applet_index_by_id( Unpack(data, PackLocation{h*8, 8}) );
-        return HS::get_applet(idx, h);
+        return HS::get_applet(idx, HEM_SIDE(h));
     }
     void DrawPresetSelector() const {
         const char * const hdrtxt[] = { "DEL!", "Load", "Save", "???" };

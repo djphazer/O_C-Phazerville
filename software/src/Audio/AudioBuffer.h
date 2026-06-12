@@ -161,7 +161,7 @@ public:
     }
   }
 
-  inline bool IsReady() {
+  inline bool IsReady() const {
     return this->buffer != nullptr;
   }
 };

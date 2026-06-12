@@ -954,7 +954,7 @@ private:
     }
 
     // Prepare the shape parameters for the VOSC oscillator. Returns the waveform number.
-    uint16_t prepare_shape(const uint16_t& shape, uint8_t& offset, bool& revert, bool& invert, EnvSeqManager::Option& option) {
+    uint16_t prepare_shape(const uint8_t& shape, uint8_t& offset, bool& revert, bool& invert, EnvSeqManager::Option& option) {
         switch (shape) {
         case Shape::EXP_DOWN:
         case Shape::EXP_UP:
@@ -1583,7 +1583,7 @@ private:
       return EnvSeqManager::output_mode_txt[mode];
     }
 
-    const char* shape_string(Shape shape) {
+    const char* shape_string(const uint8_t shape) {
       if (shape >= VOSC) return shape_txt[VOSC];
       return shape_txt[shape];
     }

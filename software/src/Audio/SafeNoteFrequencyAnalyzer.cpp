@@ -236,8 +236,7 @@ uint16_t SafeNoteFrequencyAnalyzer::estimate( uint64_t *yin, uint64_t *rs, uint1
     const float thresh = yin_threshold;
     _tau = tau;
     _head = head;
-    const float plast = periodicity;
-    
+
     if ( _tau > 4 ) {
         
         uint16_t idx0, idx1, idx2;

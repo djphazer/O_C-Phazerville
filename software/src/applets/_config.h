@@ -290,7 +290,7 @@ namespace HS {
     return reg.getIcon(index);
   }
 
-  constexpr int get_applet_index_by_id(const int& id) {
+  constexpr int get_applet_index_by_id(const RegID id) {
     int index = 0;
     for (int i = 0; i < HEMISPHERE_AVAILABLE_APPLETS; i++)
     {
