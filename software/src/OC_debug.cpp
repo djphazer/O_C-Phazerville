@@ -142,12 +142,7 @@ static void debug_menu_core() {
 
 static void debug_menu_version()
 {
-  static int hwid = 0;
-  static elapsedMillis refresh = 2000;
-  if (refresh > 2000) {
-    hwid = int(GetIDVoltage() * 1000);
-    refresh = 0;
-  }
+  static int hwid = int(GetIDVoltage() * 1000);
 
   graphics.setPrintPos(2, 12);
   graphics.print(DAC_is_inverted ? Strings::NAME_NLM : Strings::NAME);
