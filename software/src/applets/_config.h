@@ -101,6 +101,7 @@ using namespace HS;
 #include "SequenceX.h"
 #include "Seq32.h"
 #include "SeqPlay7.h"
+#include "ShiftArp.h"
 #include "ShiftGate.h"
 #ifdef PEWPEWPEW
 #include "ShiftReg.h"
@@ -230,6 +231,7 @@ constexpr Registry reg = Registry<HemisphereApplet, HS::APPLET_SLOTS
     , DeclareApplet<Seq32, 75, CAT_SEQUENCER>
     , DeclareApplet<SeqPlay7, 76, CAT_SEQUENCER>
     , DeclareApplet<SequenceX, 14, CAT_SEQUENCER>
+    , DeclareApplet<ShiftArp, 96, CAT_SEQUENCER>
     , DeclareApplet<ShiftGate, 48, CAT_LOGIC | CAT_MODULATOR | CAT_CLOCKING>
 #ifdef PEWPEWPEW
     , DeclareApplet<ShiftReg, 77, CAT_LOGIC | CAT_MODULATOR | CAT_CLOCKING>
