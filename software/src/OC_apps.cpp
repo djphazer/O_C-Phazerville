@@ -236,8 +236,7 @@ static constexpr size_t totalsize = total_storage_size();
 static_assert(totalsize < OC::AppData::kAppDataSize, "EEPROM Allocation Exceeded");
 */
 
-FLASHMEM
-static void SaveAppData() {
+FLASHMEM void SaveAppData() {
   SaveGlobalSettings(); // yeah, why not
   APPS_SERIAL_PRINTLN("Save app data... (%u bytes available)", OC::AppData::kAppDataSize);
 

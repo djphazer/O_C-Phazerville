@@ -5,13 +5,18 @@
 // sections and the section attribute is silently ignored; out-of-line
 // definitions in a translation unit do not have this problem.
 
+/* ^ actually, let's not put this one in FLASHMEM,
+ * because we want it to be fast, yeah?
+ * - djphazer
+ */
+
 #ifdef ARDUINO_TEENSY41
 
 #include "synth_advanced_karplus.h"
 
 // --- Lifecycle -----------------------------------------------------------
 
-FLASHMEM void AudioSynthAdvancedKarplus::Acquire() {
+void AudioSynthAdvancedKarplus::Acquire() {
     if (delay_line_) return;
     delay_line_ = static_cast<float*>(calloc(BUFFER_SIZE, sizeof(float)));
     if (delay_line_) {
@@ -22,7 +27,7 @@ FLASHMEM void AudioSynthAdvancedKarplus::Acquire() {
     }
 }
 
-FLASHMEM void AudioSynthAdvancedKarplus::Release() {
+void AudioSynthAdvancedKarplus::Release() {
     if (!delay_line_) return;
     free(delay_line_);
     delay_line_ = nullptr;
@@ -30,35 +35,35 @@ FLASHMEM void AudioSynthAdvancedKarplus::Release() {
 
 // --- Parameter setters ---------------------------------------------------
 
-FLASHMEM void AudioSynthAdvancedKarplus::setFrequency(float hz) {
+void AudioSynthAdvancedKarplus::setFrequency(float hz) {
     target_hz_ = constrain(hz, MIN_HZ, MAX_HZ);
     recalculateDelay();
 }
 
-FLASHMEM void AudioSynthAdvancedKarplus::setDecay(float d) {
+void AudioSynthAdvancedKarplus::setDecay(float d) {
     decay_param_ = constrain(d, 0.0f, 1.0f);
 }
 
-FLASHMEM void AudioSynthAdvancedKarplus::setBrightness(float b) {
+void AudioSynthAdvancedKarplus::setBrightness(float b) {
     brightness_param_ = constrain(b, 0.0f, 1.0f);
     iir_alpha_ = 0.05f + brightness_param_ * 0.95f;
     recalculateDelay();
 }
 
-FLASHMEM void AudioSynthAdvancedKarplus::setBody(float body) {
+void AudioSynthAdvancedKarplus::setBody(float body) {
     body_param_ = constrain(body, 0.0f, 1.0f);
 }
 
 // --- Trigger -------------------------------------------------------------
 
-FLASHMEM void AudioSynthAdvancedKarplus::noteOn(float velocity) {
+void AudioSynthAdvancedKarplus::noteOn(float velocity) {
     trigger_velocity_ = constrain(velocity, 0.0f, 1.0f);
     trigger_pending_  = true;
 }
 
 // --- Private helper ------------------------------------------------------
 
-FLASHMEM void AudioSynthAdvancedKarplus::recalculateDelay() {
+void AudioSynthAdvancedKarplus::recalculateDelay() {
     float filter_delay = (1.0f - iir_alpha_) / iir_alpha_;
     float d = AUDIO_SAMPLE_RATE_EXACT / target_hz_ - filter_delay;
     if (d < 2.0f) d = 2.0f;
@@ -67,7 +72,7 @@ FLASHMEM void AudioSynthAdvancedKarplus::recalculateDelay() {
 
 // --- Audio DSP (hot path) ------------------------------------------------
 
-FLASHMEM __attribute__((noinline)) void AudioSynthAdvancedKarplus::updateCore() {
+__attribute__((noinline)) void AudioSynthAdvancedKarplus::updateCore() {
     audio_block_t* out = allocate();
     if (!out) return;
 

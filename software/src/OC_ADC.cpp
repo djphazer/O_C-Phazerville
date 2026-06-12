@@ -650,7 +650,7 @@ void ADC::Read(IOFrame *ioframe)
 }
 
 #if defined(ARDUINO_TEENSY41) // Teensy 4.1 - A17 pin identifies PCB hardware
-FLASHMEM static
+static
 float read_id_voltage() {
   const unsigned int count = 50;
   unsigned int sum=0;
@@ -661,7 +661,6 @@ float read_id_voltage() {
   return (float)sum * (3.3f / 1023.0f / (float)count);
 }
 
-FLASHMEM
 float ADC::Read_ID_Voltage() {
   pinMode(A17, INPUT_PULLUP);
   float volts_pullup = read_id_voltage();
@@ -672,7 +671,7 @@ float ADC::Read_ID_Voltage() {
   return read_id_voltage();
 }
 #else // Teensy 4.0
-FLASHMEM float ADC::Read_ID_Voltage() { return 0; }
+float ADC::Read_ID_Voltage() { return 0; }
 #endif
 
 

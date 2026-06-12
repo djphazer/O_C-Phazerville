@@ -11,7 +11,7 @@ public:
     AudioStream* InputStream()  override { return &input_stream; }
     AudioStream* OutputStream() override { return &output_mixer; }
 
-    FLASHMEM void Start() override {
+    void Start() override {
         // Acquire interpolating streams
         fm_idx_stream.Acquire();
         fm_idx_stream.Method(INTERPOLATION_LINEAR);
@@ -80,7 +80,7 @@ public:
         noise_env_stream.Push(float_to_q15(0.0f));
     }
 
-    FLASHMEM void Unload() override {
+    void Unload() override {
         fm_idx_stream.Release();
         amp_env_stream.Release();
         noise_env_stream.Release();
@@ -161,7 +161,7 @@ public:
         output_mixer.gain(1, constrain(eff_noi * mix_gain * 0.01f, 0.f, 2.f));
     }
 
-    FLASHMEM void View() override {
+    void View() override {
         if (trigger_flash)
             gfxIcon(56, 2, ZAP_ICON);
 
@@ -181,7 +181,7 @@ public:
         gfxDisplayInputMapEditor();
     }
 
-    FLASHMEM void OnEncoderMove(int direction) override {
+    void OnEncoderMove(int direction) override {
         if (!EditMode()) {
             MoveCursor(cursor, direction, NUM_CURSORS - 1);
             // Scroll to keep active row visible
@@ -227,7 +227,7 @@ public:
         }
     }
 
-    FLASHMEM void OnButtonPress() override {
+    void OnButtonPress() override {
         if (CheckEditInputMapPress(cursor,
               IndexedInput(TRG,    trg),
               IndexedInput(CV_PIT, pitch_cv),
@@ -243,12 +243,12 @@ public:
         CursorToggle();
     }
 
-    FLASHMEM void AuxButton() override {
+    void AuxButton() override {
         preset_idx = (preset_idx >= NUM_PRESETS) ? 0 : preset_idx + 1;
         LoadPreset(preset_idx);
     }
 
-    FLASHMEM void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
+    void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
         uint16_t trigga = trg.Pack(); // abandon extra Euclidean params
         data[0] = PackPackables(pitch_hz, pack<12>(dec), swp, rto, fmi, pack<12>(fmd));
         data[1] = PackPackables(noi, ndc, mix, trigga, mix_cv);
@@ -256,7 +256,7 @@ public:
         data[3] = PackPackables(fmi_cv, fmd_cv, noi_cv, ndc_cv);
     }
 
-    FLASHMEM void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
+    void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
         uint16_t trigga;
         UnpackPackables(data[0], pitch_hz, pack<12>(dec), swp, rto, fmi, pack<12>(fmd));
         UnpackPackables(data[1], noi, ndc, mix, trigga, mix_cv);
@@ -267,7 +267,7 @@ public:
     }
 
 protected:
-    FLASHMEM void SetHelp() override {}
+    void SetHelp() override {}
 
 private:
     enum Cursor : int8_t {
@@ -366,7 +366,7 @@ private:
         { 562,   300,   0,  50,  80,  100,   5, 100, "Cowbl" },
     };
 
-    FLASHMEM void LoadPreset(int idx) {
+    void LoadPreset(int idx) {
         if (idx < NUM_PRESETS) {
             const auto& p = PRESETS[idx];
             pitch_hz = p.pitch_hz;
@@ -392,7 +392,7 @@ private:
 
     // DrawRow renders a display row (by row index 0..NUM_ROWS-1).
     // Each param row shows value cursor then CV source cursor inline.
-    FLASHMEM void DrawRow(int row, int y) {
+    void DrawRow(int row, int y) {
         switch (row) {
             case 0: // TRG
                 gfxPrint(1, y, "TRG:");

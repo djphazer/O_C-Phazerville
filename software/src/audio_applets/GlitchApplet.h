@@ -97,7 +97,7 @@ public:
         }
     }
 
-    FLASHMEM void View() override {
+    void View() override {
         if (!channels[0].glitch_stream.IsReady()) {
             gfxPrint(1, 15, "No PSRAM");
             return;
@@ -117,7 +117,7 @@ public:
         gfxDisplayInputMapEditor();
     }
 
-    FLASHMEM void DrawRow(int row, int y) {
+    void DrawRow(int row, int y) {
         switch (row) {
             case 0:
                 gfxPos(1, y);
@@ -199,12 +199,12 @@ public:
     }
 
     // AuxButton latches/unlatches manual hold for performance without a patch.
-    FLASHMEM void AuxButton() override {
+    void AuxButton() override {
         manual_hold_ ^= 1;
         CancelEdit();
     }
 
-    FLASHMEM void OnButtonPress() override {
+    void OnButtonPress() override {
         if (CheckEditInputMapPress(
                 cursor,
                 IndexedInput(CLOCK_SRC,   clock_source),
@@ -220,7 +220,7 @@ public:
         CursorToggle();
     }
 
-    FLASHMEM void OnEncoderMove(int direction) override {
+    void OnEncoderMove(int direction) override {
         if (!EditMode()) {
             cursor = (Cursor)constrain(cursor + direction, 0, CURSOR_LENGTH - 1);
             int row = cursorToRow(cursor);
@@ -254,7 +254,7 @@ public:
 
 #define GLITCH_PARAMS  pack<3>(div), pack<2>(mode), pack<3>(ratchet), mix, \
                        pack<4>(bits_), pack<4>(decimate_), pack<4>(offset_)
-    FLASHMEM void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
+    void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
         uint16_t clk = clock_source.Pack();
         uint16_t hld = hold_input.Pack();
         uint16_t frz = freeze_input.Pack();
@@ -264,7 +264,7 @@ public:
         data[3] = PackPackables(off_cv);
     }
 
-    FLASHMEM void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
+    void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
         uint16_t clk, hld, frz;
         UnpackPackables(data[0], GLITCH_PARAMS);
         UnpackPackables(data[1], clk, hld, frz, mix_cv);
@@ -280,7 +280,7 @@ public:
     AudioStream* OutputStream() override { return &output_stream; }
 
 protected:
-    FLASHMEM void SetHelp() override {}
+    void SetHelp() override {}
 
 private:
     static const uint8_t NUM_DIVS  = 8;
