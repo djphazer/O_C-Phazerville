@@ -52,13 +52,6 @@ enum MIDI_IN_FUNCTION : uint8_t {
     MIDI_IN_MOD = HEM_MIDI_CC_OUT,
     MIDI_IN_AFTERTOUCH = HEM_MIDI_AT_CHAN_OUT,
     MIDI_IN_PITCHBEND = HEM_MIDI_PB_OUT,
-    /*
-    if (in_fn == MIDI_IN_EXPRESSION) cc = 11;
-    if (in_fn == MIDI_IN_PAN) cc = 10;
-    if (in_fn == MIDI_IN_HOLD) cc = 64;
-    if (in_fn == MIDI_IN_BREATH) cc = 2;
-    if (in_fn == MIDI_IN_Y_AXIS) cc = 74;
-    */
     MIDI_IN_EXPRESSION,
     MIDI_IN_PAN,
     MIDI_IN_HOLD,
@@ -72,6 +65,10 @@ enum MIDI_IN_FUNCTION : uint8_t {
     MIDI_IN_CLOCK_24PPQN = HEM_MIDI_CLOCK_24_OUT,
 };
 
+using Type = MIDIMapSettings::Type;
+using PitchType = MIDIMapSettings::PitchType;
+using GateType = MIDIMapSettings::GateType;
+
 enum MIDI_OUT_FUNCTION : uint8_t {
     MIDI_OUT_OFF,
     MIDI_OUT_NOTE,
@@ -80,20 +77,12 @@ enum MIDI_OUT_FUNCTION : uint8_t {
     MIDI_OUT_MOD,
     MIDI_OUT_AFTERTOUCH,
     MIDI_OUT_PITCHBEND,
-    MIDI_OUT_EXPRESSION,
-    MIDI_OUT_PAN,
-    MIDI_OUT_HOLD,
-    MIDI_OUT_BREATH,
-    MIDI_OUT_Y_AXIS,
 
     MIDI_OUT_FUNCTION_COUNT
 };
 
-const char* const midi_in_functions[17] = {
-    "--", "Note", "Gate", "Trig", "Veloc", "Mod", "Aft", "Bend",  "Expr", "Pan", "Hold", "Brth", "yAxis", "Qtr", "8th", "16th", "24ppq"
-};
 const char* const midi_out_functions[MIDI_OUT_FUNCTION_COUNT] = {
-    "--", "Note", "Leg.", "Veloc", "Mod", "Aft", "Bend", "Expr", "Pan", "Hold", "Brth", "yAxis"
+    "--", "Note", "Leg.", "Veloc", "CC", "Aft", "Bend"
 };
 
 const char* const midi2cv_label[] = {
@@ -105,49 +94,6 @@ const char* const cv2midi_label[] = {
   "5 > MIDI", "6 > MIDI", "7 > MIDI", "8 > MIDI",
 };
 
-#define MIDI_SETUP_PARAMETER_LIST \
-{ 0, 0, 16, midi2cv_label[0], midi_in_functions, settings::STORAGE_TYPE_U8 },\
-{ 0, 0, 16, midi2cv_label[1], midi_in_functions, settings::STORAGE_TYPE_U8 },\
-{ 0, 0, 16, midi2cv_label[2], midi_in_functions, settings::STORAGE_TYPE_U8 },\
-{ 0, 0, 16, midi2cv_label[3], midi_in_functions, settings::STORAGE_TYPE_U8 },\
-{ 0, 0, 11, cv2midi_label[0], midi_out_functions, settings::STORAGE_TYPE_U8 },\
-{ 0, 0, 11, cv2midi_label[1], midi_out_functions, settings::STORAGE_TYPE_U8 },\
-{ 0, 0, 11, cv2midi_label[2], midi_out_functions, settings::STORAGE_TYPE_U8 },\
-{ 0, 0, 11, cv2midi_label[3], midi_out_functions, settings::STORAGE_TYPE_U8 },\
-{ 0, 0, 16, midi2cv_label[0], midi_channels, settings::STORAGE_TYPE_U8 },\
-{ 0, 0, 16, midi2cv_label[1], midi_channels, settings::STORAGE_TYPE_U8 },\
-{ 0, 0, 16, midi2cv_label[2], midi_channels, settings::STORAGE_TYPE_U8 },\
-{ 0, 0, 16, midi2cv_label[3], midi_channels, settings::STORAGE_TYPE_U8 },\
-{ 0, 0, 16, cv2midi_label[0], midi_channels, settings::STORAGE_TYPE_U8 },\
-{ 0, 0, 16, cv2midi_label[1], midi_channels, settings::STORAGE_TYPE_U8 },\
-{ 0, 0, 16, cv2midi_label[2], midi_channels, settings::STORAGE_TYPE_U8 },\
-{ 0, 0, 16, cv2midi_label[3], midi_channels, settings::STORAGE_TYPE_U8 },\
-{ 0, -24, 24, midi2cv_label[0], NULL, settings::STORAGE_TYPE_I8 },\
-{ 0, -24, 24, midi2cv_label[1], NULL, settings::STORAGE_TYPE_I8 },\
-{ 0, -24, 24, midi2cv_label[2], NULL, settings::STORAGE_TYPE_I8 },\
-{ 0, -24, 24, midi2cv_label[3], NULL, settings::STORAGE_TYPE_I8 },\
-{ 0, -24, 24, cv2midi_label[0], NULL, settings::STORAGE_TYPE_I8 },\
-{ 0, -24, 24, cv2midi_label[1], NULL, settings::STORAGE_TYPE_I8 },\
-{ 0, -24, 24, cv2midi_label[2], NULL, settings::STORAGE_TYPE_I8 },\
-{ 0, -24, 24, cv2midi_label[3], NULL, settings::STORAGE_TYPE_I8 },\
-{ 0, 0, 127, midi2cv_label[0], midi_note_numbers, settings::STORAGE_TYPE_U8 },\
-{ 0, 0, 127, midi2cv_label[1], midi_note_numbers, settings::STORAGE_TYPE_U8 },\
-{ 0, 0, 127, midi2cv_label[2], midi_note_numbers, settings::STORAGE_TYPE_U8 },\
-{ 0, 0, 127, midi2cv_label[3], midi_note_numbers, settings::STORAGE_TYPE_U8 },\
-{ 0, 0, 127, cv2midi_label[0], midi_note_numbers, settings::STORAGE_TYPE_U8 },\
-{ 0, 0, 127, cv2midi_label[1], midi_note_numbers, settings::STORAGE_TYPE_U8 },\
-{ 0, 0, 127, cv2midi_label[2], midi_note_numbers, settings::STORAGE_TYPE_U8 },\
-{ 0, 0, 127, cv2midi_label[3], midi_note_numbers, settings::STORAGE_TYPE_U8 },\
-{ 0, 0, 127, midi2cv_label[0], midi_note_numbers, settings::STORAGE_TYPE_U8 },\
-{ 0, 0, 127, midi2cv_label[1], midi_note_numbers, settings::STORAGE_TYPE_U8 },\
-{ 0, 0, 127, midi2cv_label[2], midi_note_numbers, settings::STORAGE_TYPE_U8 },\
-{ 0, 0, 127, midi2cv_label[3], midi_note_numbers, settings::STORAGE_TYPE_U8 },\
-{ 127, 0, 127, cv2midi_label[0], midi_note_numbers, settings::STORAGE_TYPE_U8 },\
-{ 127, 0, 127, cv2midi_label[1], midi_note_numbers, settings::STORAGE_TYPE_U8 },\
-{ 127, 0, 127, cv2midi_label[2], midi_note_numbers, settings::STORAGE_TYPE_U8 },\
-{ 127, 0, 127, cv2midi_label[3], midi_note_numbers, settings::STORAGE_TYPE_U8 },
-
-#ifdef __IMXRT1062__
 // per channel
 const settings::ValueAttributes CaptainSettings[] = {
   // Assigned function
@@ -165,7 +111,6 @@ const settings::ValueAttributes CaptainSettings[] = {
   // Range High
   { 0, 0, 127, "", midi_note_numbers, settings::STORAGE_TYPE_U8 },
 };
-#endif
 
 enum CaptainsKeys : uint16_t {
   SETUP_KEY = 0,
@@ -247,9 +192,6 @@ struct CaptainMIDILog {
 
 OC_APP_CLASS(AppCaptainMIDI, TWOCCS("MI"), "Captain MIDI", "MIDI I/O"),
   public HSApplication, public SystemExclusiveHandler
-#ifndef __IMXRT1062__
-  , public settings::SettingsBase<AppCaptainMIDI, MIDI_SETTING_COUNT>
-#endif
 {
 public:
   OC_APP_INTERFACE_DECLARE(AppCaptainMIDI, 0); // TODO
@@ -317,7 +259,6 @@ public:
     }
 
     void EncoderEdit(int dir) {
-#ifdef __IMXRT1062__
       int pos = cursor.cursor_pos();
       bool input = pos < DAC_CHANNEL_COUNT;
       MIDIMapping &m = input ?
@@ -329,10 +270,10 @@ public:
             if (input)
               m.AdjustFunction(dir);
             else
-              m.AdjustType(dir);
+              m.AdjustType(dir); // TODO
 
-            if (input && m.IsCC())
-              m.AutoLearn(); // learn
+            // if (input && m.IsCC())
+            //   m.AutoLearn(); // learn
             break;
           case 1:
             m.AdjustChannel(dir);
@@ -348,16 +289,11 @@ public:
             break;
           default: break;
         }
-#else
-        change_value(cursor.cursor_pos(), dir);
-        ConstrainRangeValue(cursor.cursor_pos());
-#endif
     }
     void MoveCursor(int dir) {
         cursor.Scroll(dir);
     }
 
-#ifdef __IMXRT1062__
     void StoreSetup() {
         for (int i = 0; i < MIDIMAP_MAX; ++i) {
           PhzConfig::setValue(INPUT_MAP_KEY + i + active_setup*MIDIMAP_MAX,
@@ -368,11 +304,9 @@ public:
               PackPackables(frame.MIDIState.outmap[i]));
         }
     }
-#endif
     void SelectSetup(int setup_number, int new_screen = -1) {
         // moving to another setup?
         if (setup_number != get_setup_number()) {
-#ifdef __IMXRT1062__
           // store current settings
           StoreSetup();
 
@@ -393,26 +327,12 @@ public:
             }
             UnpackPackables(data, frame.MIDIState.outmap[i]);
           }
-#endif
           Reset();
         }
 
         // Screen switching, default to same
         if (new_screen == -1) new_screen = screen;
 
-#ifdef __IMXRT1062__
-#else
-        // Find the cursor position, and new start and end menu items
-        int prev_cursor = cursor.cursor_pos() - ((screen * 8) + (get_setup_number() * MIDI_PARAMETER_COUNT));
-        int start = (new_screen * 8) + (setup_number * MIDI_PARAMETER_COUNT);
-        int end = (new_screen * 8) + (setup_number * MIDI_PARAMETER_COUNT) + 7;
-
-        // And go to there
-        cursor.Init(start, end);
-        cursor.Scroll(prev_cursor);
-
-        values_[MIDI_CURRENT_SETUP] = setup_number;
-#endif
         screen = new_screen;
     }
 
@@ -476,13 +396,10 @@ public:
         uint8_t V[MIDI_PARAMETER_COUNT];
         for (int i = 0; i < MIDI_PARAMETER_COUNT; i++)
         {
-#ifdef __IMXRT1062__
-        // TODO
+          // TODO
             int p = 0;
-#else
-            uint8_t offset = MIDI_PARAMETER_COUNT * get_setup_number();
-            int p = values_[i + offset];
-#endif
+            // uint8_t offset = MIDI_PARAMETER_COUNT * get_setup_number();
+            // int p = values_[i + offset];
             if (i > 15 && i < 24) p += 24; // These are signed, so they need to be converted
             V[i] = static_cast<uint8_t>(p);
         }
@@ -503,12 +420,9 @@ public:
             {
                 int p = (int)V[i];
                 if (i > 15 && i < 24) p -= 24; // Restore the sign removed in OnSendSysEx()
-#ifdef __IMXRT1062__
                 // TODO
-#else
-                uint8_t offset = MIDI_PARAMETER_COUNT * get_setup_number();
-                apply_value(i + offset, p);
-#endif
+                // uint8_t offset = MIDI_PARAMETER_COUNT * get_setup_number();
+                // apply_value(i + offset, p);
             }
             UpdateLog(1, 0, 5, 0, 'M', 0);
         } else {
@@ -535,7 +449,6 @@ public:
        if (source == target) {
            OnSendSysEx();
        } else {
-#ifdef __IMXRT1062__
           uint64_t data = 0;
           for (int i = 0; i < MIDIMAP_MAX; ++i) {
             if (!PhzConfig::getValue(INPUT_MAP_KEY + i + source*MIDIMAP_MAX, data))
@@ -547,32 +460,11 @@ public:
               break;
             PhzConfig::setValue(OUTPUT_MAP_KEY + i + target*ADC_CHANNEL_COUNT, data);
           }
-#else
-           int source_offset = MIDI_PARAMETER_COUNT * source;
-           int target_offset = MIDI_PARAMETER_COUNT * target;
-           for (int c = 0; c < MIDI_PARAMETER_COUNT; c++)
-           {
-               values_[target_offset + c] = values_[source_offset + c];
-           }
-#endif
            SelectSetup(target);
            Resume();
        }
        copy_mode = 0;
    }
-
-#ifdef __IMXRT1062__
-        // TODO?
-#else
-   /* If the changed value is a high or low range, make sure that the high range doesn't go
-    * below the low range, or that the low range doesn't go above the high range
-    */
-   void ConstrainRangeValue(int ix) {
-       int page = ix / 8; // Page within a Setup
-       if (page == 4 && values_[ix] < values_[ix - 8]) values_[ix] = values_[ix - 8];
-       if (page == 3 && values_[ix] > values_[ix + 8]) values_[ix] = values_[ix + 8];
-   }
-#endif
 
 private:
     // Housekeeping
@@ -621,9 +513,10 @@ private:
             bool suppress = 0; // Don't show the setting if it's not relevant
             const int current = settings_list.Next(list_item);
             int p = current % (DAC_CHANNEL_COUNT+ADC_CHANNEL_COUNT);
+            const bool is_input = p < DAC_CHANNEL_COUNT;
 
             // MIDI In and Out indicators for all screens
-            if (p < DAC_CHANNEL_COUNT) { // It's a MIDI In assignment
+            if (is_input) { // It's a MIDI In assignment
                 int in_fn = get_in_assign(p);
                 if (in_fn == MIDI_IN_OFF && screen > 0) suppress = 1;
 
@@ -650,7 +543,7 @@ private:
 
             } else { // It's a MIDI Out assignment
                 p -= DAC_CHANNEL_COUNT;
-                int out_fn = get_out_assign(p);
+                MIDI_OUT_FUNCTION out_fn = get_out_assign(p);
 
                 if (out_fn == MIDI_OUT_OFF && screen > 0) suppress = 1;
 
@@ -671,16 +564,12 @@ private:
 
             // Draw the item last so that if it's selected, the icons are reversed, too
             if (!suppress) {
-#ifdef __IMXRT1062__
-              const int idx = (current < DAC_CHANNEL_COUNT && screen == 0) ? 0 : screen + 1;
+              const int idx = (is_input && screen == 0) ? 0 : screen + 1;
               list_item.SetPrintPos();
-              graphics.print(current < DAC_CHANNEL_COUNT ?
+              graphics.print(is_input ?
                   midi2cv_label[current] :
                   cv2midi_label[current - DAC_CHANNEL_COUNT]);
-              list_item.DrawDefault(GetValue(current), CaptainSettings[idx]);
-#else
-              list_item.DrawDefault(get_value(current), CaptainMIDI::value_attr(current));
-#endif
+              list_item.DrawDefault(GetLabel(current), GetValue(current), CaptainSettings[idx]);
             } else {
                 list_item.SetPrintPos();
                 graphics.print("                   --");
@@ -690,7 +579,7 @@ private:
     }
 
     // The value of the parameter at the given cursor position
-    int GetValue(int pos) {
+    int GetValue(int pos) const {
       MIDIMapping &m = (pos < DAC_CHANNEL_COUNT) ?
           frame.MIDIState.mapping[pos] :
           frame.MIDIState.outmap[pos - DAC_CHANNEL_COUNT];
@@ -702,6 +591,11 @@ private:
         case 4: return m.get_high();
         default: return 0;
       }
+    }
+    const char* const GetLabel(int pos) const {
+      if (pos < DAC_CHANNEL_COUNT)
+        return frame.MIDIState.mapping[pos].get_label();
+      return midi_out_functions[get_out_assign(pos - DAC_CHANNEL_COUNT)];
     }
 
     void DrawLogScreen() {
@@ -747,12 +641,8 @@ private:
         graphics.print(copy_setup_source == copy_setup_target ? "[DUMP]" : "[COPY]");
     }
 
-    int get_setup_number() {
-#ifdef __IMXRT1062__
+    int get_setup_number() const {
         return active_setup;
-#else
-        return values_[MIDI_CURRENT_SETUP];
-#endif
     }
 
     // CV inputs translated to MIDI messages
@@ -760,7 +650,7 @@ private:
         auto &hMIDI = HS::frame.MIDIState;
         for (int ch = 0; ch < ADC_CHANNEL_COUNT; ch++)
         {
-            int out_fn = get_out_assign(ch);
+            MIDI_OUT_FUNCTION out_fn = get_out_assign(ch);
             if (out_fn == MIDI_OUT_OFF) continue;
 
             int out_ch = get_out_channel(ch);
@@ -823,13 +713,8 @@ private:
             // Handle other messages
             if (Changed(ch)) {
                 // Modulation wheel
-                if (out_fn == MIDI_OUT_MOD || out_fn >= MIDI_OUT_EXPRESSION) {
-                    int cc = 1; // Modulation wheel
-                    if (out_fn == MIDI_OUT_EXPRESSION) cc = 11;
-                    if (out_fn == MIDI_OUT_PAN) cc = 10;
-                    if (out_fn == MIDI_OUT_HOLD) cc = 64;
-                    if (out_fn == MIDI_OUT_BREATH) cc = 2;
-                    if (out_fn == MIDI_OUT_Y_AXIS) cc = 74;
+                if (out_fn == MIDI_OUT_MOD) {
+                    int cc = get_out_cc(ch);
 
                     int value = Proportion(In(ch), HSAPPLICATION_5V, 127);
                     CONSTRAIN(value, 0, 127);
@@ -990,7 +875,6 @@ private:
         }
     }
 
-#ifdef __IMXRT1062__
     uint8_t get_in_assign(int ch) {
       return frame.MIDIState.get_in_assign(ch);
     }
@@ -1007,8 +891,19 @@ private:
       return frame.MIDIState.in_in_range(ch, note);
     }
 
-    uint8_t get_out_assign(int ch) {
-      return frame.MIDIState.get_out_assign(ch);
+    MIDI_OUT_FUNCTION get_out_assign(int ch) {
+      switch (frame.MIDIState.get_out_assign(ch) & Type::TYPE_MASK) {
+        default:
+        case Type::NONE: return MIDI_OUT_OFF;
+        case Type::PITCH: return MIDI_OUT_NOTE;
+        case Type::GATE: return MIDI_OUT_LEGATO;
+        case Type::TRIGGER: return MIDI_OUT_VELOCITY;
+        case Type::MODULATOR: return MIDI_OUT_PITCHBEND;
+        case Type::CCONTROL: return MIDI_OUT_MOD;
+      }
+    }
+    uint8_t get_out_cc(int ch) {
+      return frame.MIDIState.get_out_assign(ch) & ~Type::TYPE_MASK;
     }
 
     uint8_t get_out_channel(int ch) {
@@ -1022,51 +917,6 @@ private:
     bool in_out_range(int ch, int note) {
       return frame.MIDIState.in_out_range(ch, note);
     }
-#else
-    int get_in_assign(int ch) {
-        int setup_offset = get_setup_number() * MIDI_PARAMETER_COUNT;
-        return values_[ch + setup_offset];
-    }
-
-    int get_in_channel(int ch) {
-        int setup_offset = get_setup_number() * MIDI_PARAMETER_COUNT;
-        return values_[8 + ch + setup_offset];
-    }
-
-    int get_in_transpose(int ch) {
-        int setup_offset = get_setup_number() * MIDI_PARAMETER_COUNT;
-        return values_[16 + ch + setup_offset];
-    }
-
-    bool in_in_range(int ch, int note) {
-        int setup_offset = get_setup_number() * MIDI_PARAMETER_COUNT;
-        int range_low = values_[24 + ch + setup_offset];
-        int range_high = values_[32 + ch + setup_offset];
-        return (note >= range_low && note <= range_high);
-    }
-
-    int get_out_assign(int ch) {
-        int setup_offset = get_setup_number() * MIDI_PARAMETER_COUNT;
-        return values_[4 + ch + setup_offset];
-    }
-
-    int get_out_channel(int ch) {
-        int setup_offset = get_setup_number() * MIDI_PARAMETER_COUNT;
-        return values_[12 + ch + setup_offset];
-    }
-
-    int get_out_transpose(int ch) {
-        int setup_offset = get_setup_number() * MIDI_PARAMETER_COUNT;
-        return values_[20 + ch + setup_offset];
-    }
-
-    bool in_out_range(int ch, int note) {
-        int setup_offset = get_setup_number() * MIDI_PARAMETER_COUNT;
-        int range_low = values_[28 + ch + setup_offset];
-        int range_high = values_[36 + ch + setup_offset];
-        return (note >= range_low && note <= range_high);
-    }
-#endif
 
     void UpdateLog(bool midi_in, int ch, uint8_t message, uint8_t channel, int16_t data1, int16_t data2) {
         // Don't log SysEx unless the user is on the log display screen
@@ -1085,44 +935,19 @@ private:
         if (log_view < 0) log_view = 0;
     }
 
-#ifndef __IMXRT1062__
-// TOTAL EEPROM SIZE: 40*4 + 1 == 161 bytes
-SETTINGS_ARRAY_DECLARE() {{
-    MIDI_SETUP_PARAMETER_LIST
-    MIDI_SETUP_PARAMETER_LIST
-    MIDI_SETUP_PARAMETER_LIST
-    MIDI_SETUP_PARAMETER_LIST
-    { 0, 0, 1, "Setup", NULL, settings::STORAGE_TYPE_U8 }
-}};
-#endif
 };
-#ifndef __IMXRT1062__
-SETTINGS_ARRAY_DEFINE(AppCaptainMIDI);
-#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 //// App Functions
 ////////////////////////////////////////////////////////////////////////////////
 void AppCaptainMIDI::Init() { BaseStart(); }
 
-#ifdef __IMXRT1062__
 size_t AppCaptainMIDI::SaveAppData(util::StreamBufferWriter &stream_buffer) const {
   return 0;
 }
 size_t AppCaptainMIDI::RestoreAppData(util::StreamBufferReader &stream_buffer) {
   return 0;
 }
-#else
-size_t AppCaptainMIDI::SaveAppData(util::StreamBufferWriter &stream_buffer) const {
-  Save(stream_buffer);
-  return stream_buffer.written();
-}
-size_t AppCaptainMIDI::RestoreAppData(util::StreamBufferReader &stream_buffer) {
-  Restore(stream_buffer);
-  Resume();
-  return stream_buffer.read();
-}
-#endif
 
 void AppCaptainMIDI::Process(OC::IOFrame *ioframe) {
   BaseController(ioframe);
