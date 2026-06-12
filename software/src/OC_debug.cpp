@@ -71,6 +71,7 @@ namespace DEBUG {
   }
 }; // namespace DEBUG
 
+FLASHMEM
 static void debug_menu_ram() {
 
 #ifdef __IMXRT1062__
@@ -105,6 +106,7 @@ static void debug_menu_ram() {
 #endif
 }
 
+FLASHMEM
 static void debug_menu_core() {
   int y = 12;
   graphics.setPrintPos(2, y);
@@ -140,6 +142,7 @@ static void debug_menu_core() {
                   debug::cycles_to_us(DEBUG::LOOP_cycles.max_value()));
 }
 
+FLASHMEM
 static void debug_menu_version()
 {
   static int hwid = int(GetIDVoltage() * 1000);
@@ -179,6 +182,7 @@ static void debug_menu_version()
 #endif
 }
 
+FLASHMEM
 static void debug_menu_gfx() {
   graphics.drawFrame(0, 0, 128, 64);
 
@@ -192,6 +196,7 @@ static void debug_menu_gfx() {
                   debug::cycles_to_us(DEBUG::MENU_draw_cycles.max_value()));
 }
 
+FLASHMEM
 static void debug_menu_adc() {
 #ifdef ARDUINO_TEENSY41
   graphics.setPrintPos(2, 12);
@@ -229,6 +234,7 @@ static void debug_menu_adc() {
 }
 
 #ifdef ARDUINO_TEENSY41
+FLASHMEM
 static void debug_menu_adc_noise() {
   static debug::AveragedCycles chan[ADC_CHANNEL_COUNT];
   static elapsedMillis timeout;
@@ -255,6 +261,7 @@ static void debug_menu_adc_noise() {
   graphics.print("(5 sec reset)");
 }
 
+FLASHMEM
 static void debug_menu_adc_value() {
   graphics.setPrintPos(2, 12);
   graphics.printf("C1 %5ld C5 %5ld", ADC::value(ADC_CHANNEL_1), ADC::value(ADC_CHANNEL_5));
@@ -279,6 +286,8 @@ static void debug_menu_adc_value() {
 }
 
 static size_t midi_rx_counter[3] = {0};
+
+FLASHMEM
 static void debug_menu_midi() {
   graphics.setPrintPos(2, 12);
   graphics.printf("Serial Rx: %u", midi_rx_counter[0]);
@@ -288,6 +297,7 @@ static void debug_menu_midi() {
   graphics.printf("USB Host Rx: %u", midi_rx_counter[2]);
 }
 
+FLASHMEM
 static void debug_menu_audio() {
   static SmoothedValue<int, 64> smooth_cpu;
   smooth_cpu.push(AudioProcessorUsage() * 100);
@@ -308,6 +318,7 @@ static void debug_menu_audio() {
 #endif
 
 #ifdef PEWPEWPEW
+FLASHMEM
 static void debug_menu_pewpewpew() {
   uint32_t i = 0;
   do {
@@ -317,6 +328,7 @@ static void debug_menu_pewpewpew() {
 #endif
 
 #ifdef OC_DEBUG_ADC_STATS
+FLASHMEM
 static void debug_menu_adc2() {
   weegfx::coord_t y = 12;
   for (int channel = 0; channel < ADC_CHANNEL_COUNT; ++channel) {
@@ -328,6 +340,7 @@ static void debug_menu_adc2() {
 }
 #endif
 
+FLASHMEM
 static void debug_menu_app() {
   auto app = app_switcher.current_app();
   if (app) {
