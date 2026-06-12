@@ -301,19 +301,32 @@ FLASHMEM
 static void debug_menu_audio() {
   static SmoothedValue<int, 64> smooth_cpu;
   smooth_cpu.push(AudioProcessorUsage() * 100);
-  graphics.setPrintPos(2, 12);
+
+  weegfx::coord_t y = 12;
+  graphics.setPrintPos(2, y);
   graphics.printf("Total CPU %2d.%02d%%", smooth_cpu.value()/100, smooth_cpu.value()%100);
 
+  y += 10;
   float whole = AudioProcessorUsageMax();
   int part = int(whole * 100) % 100;
-  graphics.setPrintPos(2, 22);
+  graphics.setPrintPos(2, y);
   graphics.printf("Max CPU %2d.%02d%%", int(whole), part);
 
-  graphics.setPrintPos(2, 32);
+  y += 10;
+  graphics.setPrintPos(2, y);
   graphics.printf("Rate: %lu Hz", uint32_t(AUDIO_SAMPLE_RATE));
 
-  graphics.setPrintPos(2, 42);
+  y += 10;
+  graphics.setPrintPos(2, y);
   graphics.printf("PSRAM: %2u MB", external_psram_size);
+
+  y += 10;
+  graphics.setPrintPos(2, y);
+  if (SDcard_Ready) {
+    graphics.printf("SDcard: ");
+    graphics.drawBitmap8(50, y, 8, CHECK_ICON);
+  } else
+    graphics.print("(no SD card)");
 }
 #endif
 
