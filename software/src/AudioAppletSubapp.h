@@ -123,7 +123,8 @@ public:
   void View() {
     gfxDottedLine(0, 0, 127, 0);
 
-    const bool forcemenu = state[0] != EDIT_APPLET && state[1] != EDIT_APPLET;
+    const bool forcemenu = (state[0] != EDIT_APPLET && state[1] != EDIT_APPLET)
+      || state[0] == SWITCH_APPLET || state[1] == SWITCH_APPLET;
 
     if (forcemenu || (state[0] != EDIT_APPLET && menutimer[0] < MENU_TIMEOUT)
                   || (state[1] != EDIT_APPLET && menutimer[1] < MENU_TIMEOUT)) {
@@ -136,7 +137,7 @@ public:
       if (state[side] == EDIT_APPLET) {
         HemisphereAudioApplet& applet = get_selected_applet(side);
         applet.SetDisplaySide(static_cast<HEM_SIDE>(side + AUDIO_SLOT_L));
-        const bool full = (state[1 - side] != EDIT_APPLET)
+        const bool full = (state[1 - side] == MOVE_CURSOR)
           && menutimer[1 - side] > MENU_TIMEOUT + MENU_ANIMATE;
         applet.BaseView(full, full);
         continue;
