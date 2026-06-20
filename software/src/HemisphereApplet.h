@@ -81,12 +81,6 @@ enum AppletCategory : uint8_t {
 
 class HemisphereApplet;
 
-struct Applet {
-  const int id;
-  const uint8_t categories;
-  std::array<HemisphereApplet *, APPLET_SLOTS> instance;
-};
-
 struct EncoderEditor {
   bool isEditing;
   bool aux_action = false;
@@ -106,8 +100,8 @@ public:
     // Virtual Method signatures
     // - These need to be defined by an actual Applet implementation
     // - Some have default implementations here.
-    virtual const char* applet_name() = 0; // Maximum of 9 characters
-    virtual const uint8_t* applet_icon() { return ZAP_ICON; }
+    virtual const char* applet_name() const = 0; // Maximum of 9 characters
+    virtual const uint8_t* applet_icon() const { return ZAP_ICON; }
     virtual void Start() = 0;
     virtual void Reset() { };
     virtual void Controller() = 0;

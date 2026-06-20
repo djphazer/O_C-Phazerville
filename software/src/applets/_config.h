@@ -4,12 +4,18 @@
 
 using namespace HS;
 
+#ifdef ARDUINO_TEENSY41
+#include "ClockSetupT4.h"
+#else
+#include "ClockSetup.h"
+#endif
+
 // hacks to effectively rewrite part of the applet boilerplate,
 // making names and icons static
-#define applet_name applet_name() final { return applet_name_(); } \
+#define applet_name applet_name() const final { return applet_name_(); } \
   static constexpr const char* applet_name_
 
-#define applet_icon applet_icon() final { return applet_icon_(); } \
+#define applet_icon applet_icon() const final { return applet_icon_(); } \
   static constexpr const uint8_t* applet_icon_
 
 #include "ADSREG.h"
@@ -33,11 +39,6 @@ using namespace HS;
 #include "Chordinator.h"
 #include "ClockDivider.h"
 #include "ClkToGate.h"
-#ifdef ARDUINO_TEENSY41
-#include "ClockSetupT4.h"
-#else
-#include "ClockSetup.h"
-#endif
 #include "ClockSkip.h"
 #include "Combin8.h"
 #include "Compare.h"

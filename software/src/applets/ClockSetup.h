@@ -54,10 +54,10 @@ public:
         LAST_SETTING = OUTSKIP4
     };
 
-    const char* applet_name() {
+    const char* applet_name() const final {
         return "ClockSet";
     }
-    const uint8_t* applet_icon() { return CLOCK_ICON; }
+    const uint8_t* applet_icon() const final { return CLOCK_ICON; }
 
     void Start() { }
 

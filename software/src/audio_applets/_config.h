@@ -13,10 +13,10 @@
 
 // hacks to effectively rewrite part of the applet boilerplate,
 // making names and icons static
-#define applet_name applet_name() override { return applet_name_(); } \
+#define applet_name applet_name() const final { return applet_name_(); } \
   static constexpr const char* applet_name_
 
-#define applet_icon applet_icon() override { return applet_icon_(); } \
+#define applet_icon applet_icon() const final { return applet_icon_(); } \
   static constexpr const uint8_t* applet_icon_
 
 // actual applets
