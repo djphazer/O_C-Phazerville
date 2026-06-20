@@ -99,7 +99,6 @@ public:
   virtual void DrawScreensaver() const = 0;
   virtual void HandleButtonEvent(const UI::Event &) = 0;
   virtual void HandleEncoderEvent(const UI::Event &) = 0;
-  virtual void Process(IOFrame *ioframe) = 0;
   virtual void GetIOConfig(IOConfig &) const = 0;
   virtual void DrawDebugInfo() const = 0;
 
@@ -157,7 +156,7 @@ public: \
   virtual void DrawScreensaver() const final; \
   virtual void HandleButtonEvent(const UI::Event &) final; \
   virtual void HandleEncoderEvent(const UI::Event &) final; \
-  virtual void Process(OC::IOFrame *ioframe) final; \
+  void Process(OC::IOFrame *ioframe); \
   virtual void GetIOConfig(OC::IOConfig &) const final; \
   virtual void DrawDebugInfo() const final; \
   static constexpr size_t kAppDataStorageSize = s

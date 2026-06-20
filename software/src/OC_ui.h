@@ -9,6 +9,8 @@
 #include "src/UI/ui_encoder.h"
 #include "src/UI/ui_event_queue.h"
 
+struct RuntimeSlot;
+
 namespace OC {
 
 enum EncoderConfig : uint32_t;
@@ -79,7 +81,7 @@ public:
   bool ConfirmReset();
   void DebugStats();
   bool AppSettings(bool drawmenu);
-  UiMode DispatchEvents(AppBase *app);
+  UiMode DispatchEvents(const RuntimeSlot &appslot);
 
   void Poll();
   void Poke();

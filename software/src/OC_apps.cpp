@@ -263,7 +263,8 @@ FLASHMEM void SaveAppData() {
 
   size_t start_app = random(app_container.num_apps());
   for (size_t i = 0; i < app_container.num_apps(); ++i) {
-    const auto app = app_container[(start_app + i) % app_container.num_apps()];
+    const AppBase* app = (AppBase*)app_container[(start_app + i) % app_container.num_apps()].instance;
+    if (!app) continue;
     size_t storage_size = app->storage_size() + sizeof(AppChunkHeader);
     if (storage_size & 1) ++storage_size; // Align chunks on 2-byte boundaries
     if (storage_size > sizeof(AppChunkHeader)) {
@@ -353,7 +354,7 @@ FLASHMEM
 void AppSwitcher::set_current_app(size_t index)
 {
   current_app_ = app_container[index];
-  global_settings.current_app_id = current_app_->id();
+  global_settings.current_app_id = current_app_.id();
   #ifdef VOR
   VBiasManager *vbias_m = vbias_m->get();
   vbias_m->SetStateForApp(current_app_);
@@ -364,9 +365,9 @@ FLASHMEM
 void AppSwitcher::Init(bool reset_settings) {
 
   APPS_SERIAL_PRINTLN("Init");
-  app_container.for_each([](AppBase *app) {
+  app_container.for_each([](RuntimeSlot app) {
     APPS_SERIAL_PRINTLN("> %s", app->name());
-    app->InitDefaults();
+    app.InitDefaults(app.instance);
   });
 
   current_app_ = app_container[DEFAULT_APP_INDEX];
@@ -655,8 +656,8 @@ bool Ui::AppSettings(bool drawmenu) {
       // if (your_mom_is_boring)
       //   graphics.print(app_container[current]->boring_name());
       // else
-      graphics.print(app_container[current]->name());
-      if (global_settings.current_app_id == app_container[current]->id())
+      graphics.print(app_container[current].name());
+      if (global_settings.current_app_id == app_container[current].id())
         graphics.drawBitmap8(0, item.y + 1, 8, ZAP_ICON);
 
       item.DrawCustom();

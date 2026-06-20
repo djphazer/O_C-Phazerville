@@ -28,8 +28,19 @@
 #include <array>
 #include <tuple>
 #include "OC_apps.h"
+#include "OC_io.h"
 #include "OC_storage.h"
 #include "util/util_templates.h"
+
+// lightweight type switcher
+struct RuntimeSlot {
+  void* instance = nullptr;
+  void (*Process)(void* data, OC::IOFrame * ioframe);
+  void (*InitDefaults)(void* data);
+  const uint16_t id() const { if (instance) return static_cast<OC::AppBase *>(instance)->id(); return 0; }
+  const char* name() const { if (instance) return static_cast<OC::AppBase *>(instance)->name(); return "?_?"; }
+  const OC::IOSettings& io_settings() const { return static_cast<OC::AppBase *>(instance)->io_settings(); }
+};
 
 namespace OC { 
 
@@ -43,18 +54,19 @@ public:
   void Init(bool reset_settings);
 
   void set_current_app(size_t index);
-  inline AppBase *current_app() const { return current_app_; }
+  inline AppBase *current_app() const { return static_cast<AppBase *>(current_app_.instance); }
+  inline const RuntimeSlot &current_slot() const { return current_app_; }
 
   inline void Process(IOFrame *ioframe) __attribute__((always_inline)) {
-    if (current_app_) {
-      IO::Read(ioframe, &current_app_->io_settings());
-      current_app_->Process(ioframe);
-      IO::Write(ioframe, &current_app_->io_settings());
+    if (current_app_.instance) {
+      IO::Read(ioframe, &current_app_.io_settings());
+      current_app_.Process(current_app_.instance, ioframe);
+      IO::Write(ioframe, &current_app_.io_settings());
     }
   }
 
 private:
-  AppBase *current_app_ = nullptr;
+  RuntimeSlot current_app_;
 
   DISALLOW_COPY_AND_ASSIGN(AppSwitcher);
 };
@@ -63,13 +75,33 @@ extern AppSwitcher app_switcher;
 
 // Helpers
 
+// creates direct call binding for Process functions (avoids vtable)
+template <typename AppType>
+RuntimeSlot bind_to_slot(AppType *app) {
+  if (!app) return {};
+
+  RuntimeSlot slot;
+  slot.instance = app;
+  slot.Process = [](void* data, IOFrame * ioframe) {
+    static_cast<AppType*>(data)->Process(ioframe);
+  };
+  slot.InitDefaults = [](void* data) {
+    static_cast<AppType*>(data)->InitDefaults();
+  };
+  return slot;
+}
+
+// Quick helper variable template (Standard C++17 style) - to be used later
+//template <typename T> inline constexpr bool has_override_v = has_override<T>::value;
+
+
 template <typename Tuple, size_t... Is>
-std::array<AppBase *, std::tuple_size<Tuple>::value> tuple_to_array(Tuple &tuple, util::index_sequence<Is...>) {
-    return std::array<AppBase *, std::tuple_size<Tuple>::value>{ &std::get<Is>(tuple)... };
+std::array<RuntimeSlot, std::tuple_size<Tuple>::value> tuple_to_array(Tuple &tuple, util::index_sequence<Is...>) {
+    return std::array<RuntimeSlot, std::tuple_size<Tuple>::value>{ bind_to_slot(&std::get<Is>(tuple))... };
 }
 
 template <typename Tuple>
-std::array<AppBase *, std::tuple_size<Tuple>::value> tuple_to_array(Tuple &tuple) {
+std::array<RuntimeSlot, std::tuple_size<Tuple>::value> tuple_to_array(Tuple &tuple) {
     return tuple_to_array(tuple, typename util::make_index_sequence<std::tuple_size<Tuple>::value>::type());
 }
 
@@ -77,10 +109,10 @@ template <typename Empty, typename... Ts>
 class AppContainer {
 private:
   using TupleType = std::tuple<Ts...>;
-  using ArrayType = std::array<AppBase *, sizeof...(Ts)>;
+  using ArrayType = std::array<RuntimeSlot, sizeof...(Ts)>;
 
   TupleType instances_;
-  const ArrayType pointers_ = tuple_to_array(instances_);
+  const ArrayType slots_ = tuple_to_array(instances_);
 
 public:
 
@@ -101,25 +133,27 @@ public:
     return kNumApps;
   }
 
-  inline AppBase * operator [](size_t i) { return pointers_[i < kNumApps ? i : 0]; }
+  inline const RuntimeSlot& operator[](size_t i) const {
+    return slots_[i < kNumApps ? i : 0];
+  }
 
   template <typename T>
   void for_each(T op) {
-    std::for_each(std::begin(pointers_), std::end(pointers_), op);
+    std::for_each(std::begin(slots_), std::end(slots_), op);
   }
 
   AppBase *FindAppByID(uint16_t id) const {
     auto result =
-      std::find_if(std::begin(pointers_), std::end(pointers_),
-                   [&id](AppBase *app) { return app->id() == id; });
-    return result != std::end(pointers_) ? *result : nullptr;
+      std::find_if(std::begin(slots_), std::end(slots_),
+                   [&id](RuntimeSlot app) { return app.id() == id; });
+    return result != std::end(slots_) ? static_cast<AppBase*>(result->instance) : nullptr;
   }
 
   size_t IndexOfAppByID(uint16_t id) const {
     auto result =
-      std::find_if(std::begin(pointers_), std::end(pointers_),
-                   [&id](AppBase *app) { return app->id() == id; });
-    return result != std::end(pointers_) ? std::distance(std::begin(pointers_), result) : num_apps();
+      std::find_if(std::begin(slots_), std::end(slots_),
+                   [&id](RuntimeSlot app) { return app.id() == id; });
+    return result != std::end(slots_) ? std::distance(std::begin(slots_), result) : num_apps();
   }
 };
 

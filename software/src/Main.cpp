@@ -438,7 +438,7 @@ void FASTRUN loop() {
         ui_mode = UI_MODE_MENU;
       }
     } else {
-      UiMode mode = ui.DispatchEvents(app_switcher.current_app());
+      UiMode mode = ui.DispatchEvents(app_switcher.current_slot());
 
       // State transition for app
       if (mode != ui_mode) {

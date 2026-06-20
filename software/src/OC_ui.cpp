@@ -12,6 +12,7 @@
 #include "OC_menus.h"
 #include "OC_ui.h"
 #include "OC_options.h"
+#include "OC_app_switcher.h"
 #include "src/drivers/display.h"
 #include "HSUtils.h"
 
@@ -135,7 +136,9 @@ void FASTRUN Ui::Poll() {
   button_state_ = button_state;
 }
 
-UiMode Ui::DispatchEvents(AppBase *app) {
+UiMode Ui::DispatchEvents(const RuntimeSlot &appslot) {
+  AppBase* app = static_cast<AppBase*>(appslot.instance);
+  if (!app) return UiMode::UI_MODE_APP_SETTINGS;
 
   while (event_queue_.available()) {
     const UI::Event event = event_queue_.PullEvent();

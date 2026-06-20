@@ -2,6 +2,7 @@ TODO (Roadmap)
 ===
 
 # v2.0
+* Eliminate vtable overhead
 * T4.1 - expand to 8 channels: Quantermain, Quadraturia, Sequins
 * Auto-tuner with floor/ceiling detection (fail gracefully)
 * generalized AppletParams for flexible assignment, extra virtual I/O
