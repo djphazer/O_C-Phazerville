@@ -27,6 +27,32 @@
 class ADEG : public HemisphereApplet {
 public:
 
+        // Inline precomputed LUT for monotonic attack/decay time mapping.
+        // Index 0 gives instant response; indices 1..255 map to 1..33333 ticks.
+        static constexpr uint16_t kStageTicks[HEM_ADEG_MAX_VALUE + 1] = {
+            0, 1, 2, 5, 8, 13, 18, 25, 33, 41, 51, 62, 74, 86, 100, 115,
+            131, 148, 166, 185, 205, 226, 248, 271, 295, 320, 346, 373, 401, 430, 461, 492,
+            524, 558, 592, 627, 664, 701, 739, 779, 819, 861, 903, 947, 992, 1037, 1084, 1131,
+            1180, 1230, 1281, 1332, 1385, 1439, 1494, 1550, 1606, 1664, 1723, 1783, 1844, 1906, 1969, 2033,
+            2098, 2165, 2232, 2300, 2369, 2439, 2511, 2583, 2656, 2730, 2806, 2882, 2959, 3038, 3117, 3198,
+            3279, 3362, 3445, 3530, 3616, 3702, 3790, 3879, 3968, 4059, 4151, 4243, 4337, 4432, 4528, 4625,
+            4723, 4822, 4922, 5023, 5125, 5228, 5332, 5437, 5543, 5650, 5758, 5867, 5978, 6089, 6201, 6314,
+            6429, 6544, 6660, 6778, 6896, 7016, 7136, 7257, 7380, 7504, 7628, 7754, 7880, 8008, 8137, 8266,
+            8397, 8529, 8662, 8795, 8930, 9066, 9203, 9341, 9480, 9620, 9761, 9903, 10046, 10190, 10335, 10481,
+            10628, 10776, 10925, 11075, 11227, 11379, 11532, 11686, 11842, 11998, 12156, 12314, 12473, 12634, 12795, 12958,
+            13121, 13286, 13451, 13618, 13786, 13954, 14124, 14295, 14466, 14639, 14813, 14988, 15164, 15341, 15518, 15697,
+            15877, 16058, 16240, 16423, 16607, 16792, 16978, 17166, 17354, 17543, 17733, 17924, 18116, 18310, 18504, 18699,
+            18896, 19093, 19291, 19491, 19691, 19893, 20095, 20299, 20503, 20709, 20915, 21123, 21332, 21541, 21752, 21964,
+            22177, 22390, 22605, 22821, 23038, 23256, 23475, 23695, 23916, 24137, 24361, 24585, 24810, 25036, 25263, 25491,
+            25720, 25950, 26181, 26414, 26647, 26881, 27117, 27353, 27590, 27829, 28068, 28308, 28550, 28792, 29036, 29280,
+            29526, 29773, 30020, 30269, 30519, 30769, 31021, 31274, 31527, 31782, 32038, 32295, 32553, 32812, 33072, 33333,
+        };
+
+        static int ScaleStageToTicks(int setting) {
+            const int p = constrain(setting, 0, HEM_ADEG_MAX_VALUE);
+            return int(kStageTicks[p]);
+        }
+
     const char* applet_name() { // Maximum 10 characters
         return "AD EG";
     }
@@ -65,7 +91,7 @@ public:
                 simfloat remaining = target - signal;
 
                 // The number of ticks it would take to get from 0 to HEMISPHERE_MAX_CV
-                int max_change = Proportion(segment, HEM_ADEG_MAX_VALUE, HEM_ADEG_MAX_TICKS);
+                int max_change = ScaleStageToTicks(segment);
 
                 // The number of ticks it would take to move the remaining amount at max_change
                 int ticks_to_remaining = Proportion(simfloat2int(remaining), HEMISPHERE_MAX_CV, max_change);
@@ -102,11 +128,11 @@ public:
     void OnEncoderMove(int direction) {
         if (cursor == 0) {
             attack = constrain(attack + direction, 0, HEM_ADEG_MAX_VALUE);
-            last_ms_value = Proportion(attack, HEM_ADEG_MAX_VALUE, HEM_ADEG_MAX_TICKS) / 17;
+            last_ms_value = ScaleStageToTicks(attack) / 17;
         }
         else {
             decay = constrain(decay + direction, 0, HEM_ADEG_MAX_VALUE);
-            last_ms_value = Proportion(decay, HEM_ADEG_MAX_VALUE, HEM_ADEG_MAX_TICKS) / 17;
+            last_ms_value = ScaleStageToTicks(decay) / 17;
         }
         last_change_ticks = OC::CORE::ticks;
     }
