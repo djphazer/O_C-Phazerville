@@ -477,7 +477,7 @@ void Ui::DebugStats() {
 
     ++loopcount;
     OC_DEBUG_RESET_CYCLES(loopcount, 0x1000000, DEBUG::LOOP_cycles);
-    //delay(1);
+    delayMicroseconds(10);
   }
 
   event_queue_.Flush();
