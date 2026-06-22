@@ -52,7 +52,7 @@ public:
     // Release (R): kStageTicks[1..255] * RELEASE_TIME_MULTIPLIER → ~4..133332 ticks (0..~8 seconds).
     // Formula: ticks = p + (n²·extra_max)/(STAGE_MAX_VALUE-1)² where n=p-1, strictly monotonic (Δ≥1 per step).
     // Index 0 is unused: ScaleStageToTicksAD clamps to 1..255, ScaleStageToTicksR returns early for p==0.
-    static constexpr uint32_t kStageTicks[STAGE_MAX_VALUE + 1] = {
+    static constexpr uint16_t kStageTicks[STAGE_MAX_VALUE + 1] = {
       0, 1, 2, 5, 8, 13, 18, 25, 33, 41, 51, 62, 74, 86, 100, 115,
       131, 148, 166, 185, 205, 226, 248, 271, 295, 320, 346, 373, 401, 430, 461, 492,
       524, 558, 592, 627, 664, 701, 739, 779, 819, 861, 903, 947, 992, 1037, 1084, 1131,
