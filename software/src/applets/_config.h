@@ -81,6 +81,7 @@ using namespace HS;
 #endif
 #include "Palimpsest.h"
 #include "Pigeons.h"
+#include "Piquet.h"
 #include "PolyDiv.h"
 #include "Ponglet.h"
 #include "ProbabilityDivider.h"
@@ -200,6 +201,7 @@ constexpr Registry reg = Registry<HemisphereApplet, HS::APPLET_SLOTS
 #endif
     , DeclareApplet<Palimpsest, 20, CAT_SEQUENCER>
     , DeclareApplet<Pigeons, 71, CAT_SEQUENCER>
+    , DeclareApplet<Piquet, 95, CAT_MODULATOR>
     , DeclareApplet<PolyDiv, 72, CAT_SEQUENCER | CAT_CLOCKING>
     , DeclareApplet<Ponglet, 99, CAT_OTHER>
     , DeclareApplet<ProbabilityDivider, 59, CAT_CLOCKING>
