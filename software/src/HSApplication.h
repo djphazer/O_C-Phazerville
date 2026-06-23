@@ -97,8 +97,8 @@ public:
 
     // "Meters" screensaver view, visualizing inputs and outputs
     void BaseScreensaver(bool notenames = 0) {
-        const size_t h = 32 + (OC::DAC::kOctaveZero == 0)*31;
-        const size_t w = 128 / DAC_CHANNEL_COUNT;
+        const int h = 32 + (OC::DAC::kOctaveZero == 0)*31;
+        const int w = 128 / DAC_CHANNEL_COUNT;
 
         gfxDottedLine(0, h, 127, h, 3); // horizontal baseline
 

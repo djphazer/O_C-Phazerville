@@ -129,7 +129,7 @@ enum CalibrationFlags : uint32_t {
 };
 
 struct CalibrationData {
-  static constexpr uint32_t FOURCC = FOURCC<'C', 'A', 'L', 1>::value;
+  static constexpr uint32_t FOURCC = FourCC<'C', 'A', 'L', 1>::value;
 
   DAC::CalibrationData dac;
   ADC::CalibrationData adc;
