@@ -72,7 +72,7 @@ class Quantizer {
       mask >>= 1;
     }
     span_ = scale.span;
-    enabled_ = notes_ != NULL && num_notes_ != 0 && span_ != 0;
+    enabled_ = num_notes_ != 0 && span_ != 0;
   }
 
   bool enabled() const {
