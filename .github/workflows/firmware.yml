@@ -11,6 +11,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v6
+      with:
+        submodules: recursive
 
     - name: Setup env
       run: |
