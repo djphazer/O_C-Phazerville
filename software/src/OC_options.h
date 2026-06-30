@@ -56,7 +56,7 @@
 /* --- special Phazerville mode w/ easter eggs --- */
 // #define PEWPEWPEW
 /* --- alternate Grids patterns for DrumMap applet --- */
-// #define DRUMMAP_GRIDS2
+#define DRUMMAP_GRIDS2
 // 16 presets in Hemisphere
 // #define MOAR_PRESETS
 
@@ -64,11 +64,11 @@
 /* Flags for the full-width apps, these enable/disable them in OC_apps.ino but also zero out the app   */
 /* files to prevent them from taking up space.                                                         */
 
-// #define ENABLE_APP_CALIBR8OR
-// #define ENABLE_APP_SCENES
+#define ENABLE_APP_CALIBR8OR
+#define ENABLE_APP_SCENES
 // #define ENABLE_APP_ENIGMA
 // #define ENABLE_APP_MIDI
-// #define ENABLE_APP_PONG
+#define ENABLE_APP_PONG
 // #define ENABLE_APP_PIQUED
 // #define ENABLE_APP_POLYLFO
 // #define ENABLE_APP_H1200
