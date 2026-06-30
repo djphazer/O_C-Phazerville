@@ -24,17 +24,7 @@
 //
 // Adapted for T4.x and 8-channel hardware by djphazer
 
-#include <Arduino.h>
-#include <EEPROM.h>
-#include <stdint.h>
-#include "OC_config.h"
-#include "OC_apps.h"
-#include "OC_menus.h"
-#include "OC_ui.h"
-#include "src/drivers/display.h"
-#include "util/util_settings.h"
-#include "HSApplication.h"
-#include "HSMIDI.h"
+#pragma once
 
 static constexpr int MIDI_SETUP_COUNT = 4;
 static constexpr int MIDI_PARAMETER_COUNT = 40;

@@ -32,12 +32,25 @@
 #include "OC_app_switcher.h"
 #include "OC_global_settings.h"
 #include "util/util_misc.h"
+#include "util/util_settings.h"
+#include "util/util_integer_sequences.h"
+#include "util/util_trigger_delay.h"
+#include "util/util_logistic_map.h"
+#include "util/util_arp.h"
+#include "util/util_grid.h"
+#include "util/util_ringbuffer.h"
+#include "util/util_settings.h"
+#include "util/util_semitone_quantizer.h"
+#include "util/util_sync.h"
 
+#include "OC_input_maps.h"
+#include "OC_pitch_utils.h"
+#include "OC_euclidean_mask_draw.h"
+#include "OC_trigger_delays.h"
 
 #include "OC_calibration.h"
 #include "OC_patterns.h"
 #include "src/drivers/FreqMeasure/OC_FreqMeasure.h"
-#include "util/util_misc.h"
 #include "util/util_pagestorage.h"
 #include "src/drivers/EEPROMStorage.h"
 #include "PhzConfig.h"
@@ -51,6 +64,10 @@
 #include "audio_applets/_config.h"
 #endif
 #endif
+
+#include "HSApplication.h"
+#include "OC_scale_edit.h"
+#include "OC_visualfx.h"
 
 // actual apps are included and instantiated here
 #include "apps/_config.h"

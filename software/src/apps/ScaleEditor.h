@@ -18,14 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <Arduino.h>
-#include "HSUtils.h"
-#include "OC_apps.h"
-#include "OC_ui.h"
-#include "OC_scales.h"
-#include "HSApplication.h"
-#include "HSMIDI.h"
-#include "SegmentDisplay.h"
+#pragma once
 
 OC_APP_CLASS(AppScaleEditor, TWOCCS("SC"), "ScaleEdit", "Scale Editor"),
   public HSApplication, public SystemExclusiveHandler {

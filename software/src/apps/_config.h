@@ -4,46 +4,46 @@ namespace menu = OC::menu;
 #ifndef NO_HEMISPHERE
 
 #ifdef ARDUINO_TEENSY41
-#include "apps/Quadrants.h"
+#include "Quadrants.h"
 #else
-#include "apps/Hemisphere.h"
+#include "Hemisphere.h"
 #endif
 
 #endif
 
-#include "apps/Calibr8or.h"
-#include "apps/Scenery.h"
-#include "apps/ASR.h"
+#include "Calibr8or.h"
+#include "Scenery.h"
+#include "ASR.h"
 #ifdef ENABLE_APP_H1200
-#include "apps/H1200.h"
+#include "H1200.h"
 #endif
 #ifdef ENABLE_APP_AUTOMATONNETZ
-#include "apps/Automatonnetz.h"
+#include "Automatonnetz.h"
 #endif
-#include "apps/Sequins.h"
-#include "apps/QQ.h"
-#include "apps/DQ.h"
-#include "apps/Quadraturia.h"
-#include "apps/Lorenz.h"
-#include "apps/Piqued.h"
-#include "apps/BBGEN.h"
-#include "apps/Viznutcracker.h"
-#include "apps/Chords.h"
+#include "Sequins.h"
+#include "QQ.h"
+#include "DQ.h"
+#include "Quadraturia.h"
+#include "Lorenz.h"
+#include "Piqued.h"
+#include "BBGEN.h"
+#include "Viznutcracker.h"
+#include "Chords.h"
 #ifdef ENABLE_APP_REFERENCES
-#include "apps/References.h"
+#include "References.h"
 #endif
-// #include "apps/Passencore.h"
-#include "apps/CaptainMIDI.h"
-#include "apps/TheDarkestTimeline.h"
-#include "apps/Enigma.h"
+// #include "Passencore.h"
+#include "CaptainMIDI.h"
+#include "TheDarkestTimeline.h"
+#include "Enigma.h"
 #ifdef ENABLE_APP_NEURAL_NETWORK
-#include "apps/NeuralNetwork.h"
+#include "NeuralNetwork.h"
 #endif
-#include "apps/ScaleEditor.h"
-#include "apps/WaveformEditor.h"
-#include "apps/PongGame.h"
-#include "apps/Backup.h"
-#include "apps/SETTINGS.h"
+#include "ScaleEditor.h"
+#include "WaveformEditor.h"
+#include "PongGame.h"
+#include "Backup.h"
+#include "SETTINGS.h"
 
 
 namespace OC {

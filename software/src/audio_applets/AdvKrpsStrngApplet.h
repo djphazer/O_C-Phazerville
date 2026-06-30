@@ -1,4 +1,4 @@
-#include "../Audio/synth_advanced_karplus.h"
+#include "../src/Audio/synth_advanced_karplus.h"
 
 // AdvKrpsStrngApplet — Advanced Karplus-Strong string synthesizer
 //

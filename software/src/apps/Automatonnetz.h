@@ -55,16 +55,9 @@
 //
 // TODO With fast clocking, trigger out mode might not provide a rising edge
 
-#include "util/util_grid.h"
-#include "util/util_ringbuffer.h"
-#include "util/util_settings.h"
-#include "util/util_semitone_quantizer.h"
-#include "util/util_sync.h"
-#include "src/tonnetz/tonnetz_state.h"
-#include "OC_bitmaps.h"
-#include "OC_menus.h"
-#include "OC_pitch_utils.h"
-#include "OC_trigger_delays.h"
+#pragma once
+
+#include "../src/tonnetz/tonnetz.h"
 
 #define FRACTIONAL_BITS 24
 #define CLOCK_STEP_RES (0x1 << FRACTIONAL_BITS)

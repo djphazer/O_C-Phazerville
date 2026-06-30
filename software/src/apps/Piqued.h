@@ -23,18 +23,7 @@
 // Quad enevelope generator app, based on the multistage envelope implementation
 // from Peaks by Emilie Gillet (see peaks_multistage_envelope.h/cpp)
 
-#include "HSUtils.h"
-#include "OC_apps.h"
-#include "OC_bitmaps.h"
-#include "OC_config.h"
-#include "OC_digital_inputs.h"
-#include "OC_menus.h"
-#include "OC_strings.h"
-#include "util/util_math.h"
-#include "util/util_settings.h"
-#include "src/extern/peaks_multistage_envelope.h"
-#include "src/extern/bjorklund.h"
-#include "OC_euclidean_mask_draw.h"
+#pragma once
 
 static constexpr int ENVGEN_CHANNEL_COUNT = DAC_CHANNEL_COUNT;
 

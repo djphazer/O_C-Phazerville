@@ -24,14 +24,9 @@
 
 // Bouncing balls app
 
-#include "OC_apps.h"
-#include "OC_bitmaps.h"
-#include "OC_digital_inputs.h"
-#include "OC_strings.h"
-#include "util/util_math.h"
-#include "util/util_settings.h"
-#include "OC_menus.h"
-#include "src/extern/peaks_bouncing_balls.h"
+#pragma once
+
+#include "../src/extern/peaks_bouncing_balls.h"
 
 enum BouncingBallSettings {
   BB_SETTING_GRAVITY,

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../HemisphereAudioApplet.h"
-#include "../Audio/SafeNoteFrequencyAnalyzer.h"
+#include "../src/Audio/SafeNoteFrequencyAnalyzer.h"
 
 template <AudioChannels Channels>
 class TuneTrackerApplet : public HemisphereAudioApplet {

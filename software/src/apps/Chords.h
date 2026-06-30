@@ -26,19 +26,9 @@
 // from Braids by Olivier Gillet (see braids_quantizer.h/cc et al.). It has since
 // grown a little bit...
 
-#include "OC_ADC.h"
-#include "OC_apps.h"
-#include "util/util_settings.h"
-#include "util/util_trigger_delay.h"
-#include "src/extern/braids_quantizer.h"
-#include "OC_menus.h"
-#include "OC_scales.h"
-#include "OC_scale_edit.h"
-#include "OC_strings.h"
-#include "OC_chords.h"
-#include "OC_chords_edit.h"
-#include "OC_input_map.h"
-#include "OC_input_maps.h"
+#pragma once
+
+#include "../OC_chords_edit.h"
 
 enum CHORDS_SETTINGS {
   CHORDS_SETTING_SCALE,

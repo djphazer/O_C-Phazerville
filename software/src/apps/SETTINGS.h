@@ -18,19 +18,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <Arduino.h>
-#include <EEPROM.h>
-#include "HSUtils.h"
-#include "OC_apps.h"
-#include "OC_calibration.h"
-#include "OC_core.h"
-#include "OC_io.h"
-#include "OC_ui.h"
-#include "HSApplication.h"
-#include "OC_strings.h"
-#include "src/drivers/display.h"
+#pragma once
+
 #ifdef PEWPEWPEW
-#include "util/pewpewsplash.h"
+#include "../util/pewpewsplash.h"
 #endif
 
 extern "C" void _reboot_Teensyduino_();

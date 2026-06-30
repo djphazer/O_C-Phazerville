@@ -23,12 +23,7 @@
  * Also similar to Mutable Instruments Frames
  */
 
-#include "OC_apps.h"
-#include "HSApplication.h"
-#include "HSMIDI.h"
-#include "util/util_settings.h"
-#include "src/drivers/FreqMeasure/OC_FreqMeasure.h"
-#include "HemisphereApplet.h"
+#pragma once
 
 static const int NR_OF_SCENE_PRESETS = 4;
 #ifdef __IMXRT1062__

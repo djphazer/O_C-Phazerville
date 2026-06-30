@@ -34,8 +34,6 @@
 
 
 #include "streams_lorenz_generator.h"
-
-#include "OC_config.h"
 #include "streams_resources.h"
 
 namespace streams {

@@ -21,30 +21,6 @@
 
 #pragma once
 
-#include "HSUtils.h"
-#include "OC_DAC.h"
-#include "OC_core.h"
-#include "OC_digital_inputs.h"
-#include "OC_visualfx.h"
-#include "OC_apps.h"
-#include "OC_ui.h"
-
-#include "OC_patterns.h"
-#include "src/UI/ui_events.h"
-#include "src/drivers/FreqMeasure/OC_FreqMeasure.h"
-
-#include "HemisphereApplet.h"
-#include "HSApplication.h"
-#include "icons.h"
-#include "HSMIDI.h"
-#include "HSClockManager.h"
-
-#include "PackingUtils.h"
-#include "PhzConfig.h"
-
-//#include "applets/_config.h"
-//#include "audio_applets/_config.h"
-
 // per bank file
 static constexpr int QUAD_PRESET_COUNT = 32;
 static constexpr int PRESET_FILE_REVISION = 1;

@@ -23,15 +23,9 @@
 //
 // Trigger-driven Neo-Riemannian Tonnetz transformations to generate chords
 
-#include "OC_bitmaps.h"
-#include "OC_pitch_utils.h"
-#include "OC_strings.h"
-#include "OC_trigger_delays.h"
-#include "src/tonnetz/tonnetz_state.h"
-#include "util/util_settings.h"
-#include "util/util_ringbuffer.h"
-#include "util/util_semitone_quantizer.h"
-#include "src/extern/bjorklund.h"
+#pragma once
+
+#include "../src/tonnetz/tonnetz.h"
 
 extern uint_fast8_t MENU_REDRAW;
 

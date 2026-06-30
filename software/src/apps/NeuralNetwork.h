@@ -18,18 +18,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <Arduino.h>
-#include <EEPROM.h>
-#include <stdint.h>
-#include "OC_config.h"
-#include "OC_apps.h"
-#include "OC_menus.h"
-#include "OC_ui.h"
-#include "src/drivers/display.h"
-#include "util/util_settings.h"
-#include "HSApplication.h"
-#include "HSMIDI.h"
-#include "neuralnet/LogicGate.h"
+#pragma once
+
+#include "../neuralnet/LogicGate.h"
 
 // 9 sets of 24 bytes allocated for storage
 #define NN_SETTING_LAST 216

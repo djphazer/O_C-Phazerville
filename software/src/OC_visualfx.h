@@ -26,6 +26,7 @@
 #include <stdint.h>
 #include "util/util_history.h"
 #include "OC_bitmaps.h"
+#include "SegmentDisplay.h"
 
 namespace OC {
 

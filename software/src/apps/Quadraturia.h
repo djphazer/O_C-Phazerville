@@ -24,15 +24,8 @@
 // Quadrrature LFO app, based on the Mutable Instruments Frames Easter egg 
 // quadrature wavetable LFO by Olivier Gillet (see frames_poly_lfo_.h/cpp)
 
-#include "OC_apps.h"
-#include "OC_digital_inputs.h"
-#include "OC_menus.h"
-
-#include "util/util_math.h"
-#include "util/util_settings.h"
-#include "src/extern/frames_poly_lfo.h"
-
-#include "VBiasManager.h"
+#pragma once
+#include "../src/extern/frames_poly_lfo.h"
 
 enum POLYLFO_SETTINGS {
   POLYLFO_SETTING_COARSE,

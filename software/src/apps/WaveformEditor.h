@@ -18,15 +18,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <Arduino.h>
-#include "OC_apps.h"
-#include "OC_strings.h"
-#include "OC_ui.h"
+#pragma once
 
-#include "HSApplication.h"
-#include "HSMIDI.h"
-#include "vector_osc/HSVectorOscillator.h"
-#include "vector_osc/WaveformManager.h"
+#include "../vector_osc/HSVectorOscillator.h"
+#include "../vector_osc/WaveformManager.h"
 
 OC_APP_CLASS(AppWaveformEditor, TWOCCS("WA"), "Wave-Edit", "Waveform Editor"),
   public HSApplication, public SystemExclusiveHandler {

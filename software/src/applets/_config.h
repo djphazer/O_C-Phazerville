@@ -1,6 +1,6 @@
 #pragma once
 
-#include "HemisphereApplet.h"
+#include "../HemisphereApplet.h"
 
 using namespace HS;
 
@@ -130,7 +130,7 @@ using namespace HS;
 #undef applet_name
 #undef applet_icon
 
-#include "AppletRegistry.h"
+#include "../AppletRegistry.h"
 
 constexpr Registry reg = Registry<HemisphereApplet, HS::APPLET_SLOTS
     , DeclareApplet<ADSREG, 8, CAT_MODULATOR>

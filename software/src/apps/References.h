@@ -23,14 +23,10 @@
 //
 // Very simple "reference" voltage app (not so simple any more...)
 
+#pragma once
+
 #include <numeric>
-#include "OC_options.h"
-#include "OC_apps.h"
-#include "OC_menus.h"
-#include "OC_strings.h"
-#include "util/util_settings.h"
-#include "OC_autotuner.h"
-#include "src/drivers/FreqMeasure/OC_FreqMeasure.h"
+#include "../OC_autotuner.h"
 
 static constexpr int32_t kMaxOffsetError = (65536 / 5);
 static constexpr double kAaboveMidCtoC0 = 0.03716272234383494188492;

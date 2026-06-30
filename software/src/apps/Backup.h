@@ -18,9 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "../HSApplication.h"
-#include "../extern/avr/eeprom.h"
-#include "../src/drivers/EEPROMStorage.h"
+#pragma once
 
 OC_APP_CLASS(AppBackup, TWOCCS("BU"), "Back It Up!", "Backup / Restore"),
   public SystemExclusiveHandler {

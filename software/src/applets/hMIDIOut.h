@@ -22,7 +22,6 @@
 // See https://www.pjrc.com/teensy/td_midi.html
 
 // The functions available for each output
-#include "HSIOFrame.h"
 class hMIDIOut : public HemisphereApplet {
 public:
     enum MIDIOutCursor : uint8_t {

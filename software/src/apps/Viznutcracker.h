@@ -24,15 +24,9 @@
 
 // Byte beats app
 
-#include "OC_apps.h"
-#include "OC_bitmaps.h"
-#include "OC_digital_inputs.h"
-#include "OC_strings.h"
-#include "util/util_history.h"
-#include "util/util_math.h"
-#include "util/util_settings.h"
-#include "OC_menus.h"
-#include "src/extern/peaks_bytebeat.h"
+#pragma once
+
+#include "../src/extern/peaks_bytebeat.h"
 
 enum ByteBeatSettings {
   BYTEBEAT_SETTING_EQUATION,

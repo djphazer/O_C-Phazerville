@@ -1,15 +1,15 @@
 #pragma once
 
-#include "src/Audio/filter_variable2.h"
-#include "AudioIO.h"
-#include "FS.h"
-#include "HSUtils.h"
-#include "HemisphereAudioApplet.h"
-#include "dsputils_arm.h"
-#include "Audio/AudioMixer.h"
-#include "Audio/AudioPassthrough.h"
-#include "Audio/AudioVCA.h"
-#include "Audio/InterpolatingStream.h"
+#include "../src/Audio/filter_variable2.h"
+#include "../AudioIO.h"
+#include <FS.h>
+#include "../HSUtils.h"
+#include "../HemisphereAudioApplet.h"
+#include "../dsputils_arm.h"
+#include "../Audio/AudioMixer.h"
+#include "../Audio/AudioPassthrough.h"
+#include "../Audio/AudioVCA.h"
+#include "../Audio/InterpolatingStream.h"
 
 // hacks to effectively rewrite part of the applet boilerplate,
 // making names and icons static
@@ -20,34 +20,34 @@
   static constexpr const uint8_t* applet_icon_
 
 // actual applets
-#include "audio_applets/CrosspanApplet.h"
-#include "audio_applets/DelayApplet.h"
-#include "audio_applets/DynamicsApplet.h"
-#include "audio_applets/FilterFolderApplet.h"
-#include "audio_applets/InputApplet.h"
-#include "audio_applets/LadderApplet.h"
-#include "audio_applets/MidSideApplet.h"
-#include "audio_applets/OscApplet.h"
-#include "audio_applets/PassthruApplet.h"
-#include "audio_applets/UpsampledApplet.h"
-#include "audio_applets/VCAApplet.h"
-#include "audio_applets/WAVPlayerApplet.h"
-#include "audio_applets/OneShotPlayerApplet.h"
-#include "audio_applets/HandSawApplet.h"
-#include "audio_applets/FreeverbApplet.h"
-#include "audio_applets/SamverbApplet.h"
-#include "audio_applets/PhaserApplet.h"
-#include "audio_applets/ThreeBandz.h"
-#include "audio_applets/TuneTrackerApplet.h"
-#include "audio_applets/FMDrumApplet.h"
-#include "audio_applets/GlitchApplet.h"
-#include "audio_applets/GritApplet.h"
-#include "audio_applets/MistierApplet.h"
-#include "audio_applets/AdvKrpsStrngApplet.h"
-#include "audio_applets/ModalResonatorApplet.h"
-#include "audio_applets/WAVRecorderApplet.h"
-#include "audio_applets/WTVCOApplet.h"
-#include "audio_applets/HarmOscApplet.h"
+#include "CrosspanApplet.h"
+#include "DelayApplet.h"
+#include "DynamicsApplet.h"
+#include "FilterFolderApplet.h"
+#include "InputApplet.h"
+#include "LadderApplet.h"
+#include "MidSideApplet.h"
+#include "OscApplet.h"
+#include "PassthruApplet.h"
+#include "UpsampledApplet.h"
+#include "VCAApplet.h"
+#include "WAVPlayerApplet.h"
+#include "OneShotPlayerApplet.h"
+#include "HandSawApplet.h"
+#include "FreeverbApplet.h"
+#include "SamverbApplet.h"
+#include "PhaserApplet.h"
+#include "ThreeBandz.h"
+#include "TuneTrackerApplet.h"
+#include "FMDrumApplet.h"
+#include "GlitchApplet.h"
+#include "GritApplet.h"
+#include "MistierApplet.h"
+#include "AdvKrpsStrngApplet.h"
+#include "ModalResonatorApplet.h"
+#include "WAVRecorderApplet.h"
+#include "WTVCOApplet.h"
+#include "HarmOscApplet.h"
 
 #undef applet_name
 #undef applet_icon
@@ -148,7 +148,7 @@ using Unwrap = typename std::remove_reference<
 /*constexpr size_t MONO_PROCESSORS_POOL_SIZE = std::tuple_size<Unwrap<Unwrap<decltype(mono_processors_pool)>>>::value;*/
 /*constexpr size_t STEREO_PROCESSORS_POOL_SIZE = std::tuple_size<Unwrap<decltype(stereo_processors_pool)>>::value;*/
 
-#include "AudioAppletSubapp.h"
+#include "../AudioAppletSubapp.h"
 
 AudioAppletSubapp<NUM_SLOTS, MONO_POOL_SIZE, STEREO_POOL_SIZE, decltype(mono_applets), decltype(stereo_applets)> audio_app(
   mono_applets, stereo_applets

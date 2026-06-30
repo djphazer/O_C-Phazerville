@@ -22,7 +22,7 @@
 //   Acquire() / Release(): call from Start() / Unload() in main loop only
 
 #include <Audio.h>
-#include "../dsputils.h"
+#include "../../dsputils.h"
 
 class AudioSynthAdvancedKarplus : public AudioStream {
 public:

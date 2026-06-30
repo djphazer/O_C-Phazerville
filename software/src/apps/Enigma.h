@@ -18,14 +18,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "HSApplication.h"
+#pragma once
 
-#include "OC_strings.h"
-#include "enigma/TuringMachine.h"
-#include "enigma/TuringMachineState.h"
-#include "enigma/EnigmaStep.h"
-#include "enigma/EnigmaOutput.h"
-#include "enigma/EnigmaTrack.h"
+#include "../enigma/TuringMachine.h"
+#include "../enigma/TuringMachineState.h"
+#include "../enigma/EnigmaStep.h"
+#include "../enigma/EnigmaOutput.h"
+#include "../enigma/EnigmaTrack.h"
 
 // Modes
 enum EnigmaMode {

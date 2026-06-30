@@ -24,9 +24,9 @@
 
 // Lorenz and Rössler generator app
 
-#include "src/extern/streams_lorenz_generator.h"
-#include "util/util_math.h"
-#include "OC_digital_inputs.h"
+#pragma once
+
+#include "../src/extern/streams_lorenz_generator.h"
 
 enum LORENZ_SETTINGS {
   LORENZ_SETTING_FREQ1,

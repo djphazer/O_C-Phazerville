@@ -18,21 +18,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "util/util_settings.h"
-#include "util/util_trigger_delay.h"
-#include "util/util_turing.h"
-#include "util/util_ringbuffer.h"
-#include "util/util_integer_sequences.h"
-#include "OC_ADC.h"
-#include "OC_DAC.h"
-#include "OC_menus.h"
-#include "OC_pitch_utils.h"
-#include "OC_cv_utils.h"
-#include "OC_scales.h"
-#include "OC_scale_edit.h"
-#include "OC_strings.h"
-#include "OC_visualfx.h"
-#include "src/extern/peaks_bytebeat.h"
+#pragma once
+
+#include "../src/extern/peaks_bytebeat.h"
 
 extern uint_fast8_t MENU_REDRAW;
 

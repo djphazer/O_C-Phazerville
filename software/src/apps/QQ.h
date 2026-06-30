@@ -25,24 +25,9 @@
 // from Braids by Olivier Gillet (see braids_quantizer.h/cc et al.). It has since
 // grown a little bit...
 
-#include "HSUtils.h"
-#include "OC_apps.h"
-#include "util/util_logistic_map.h"
-#include "util/util_settings.h"
-#include "util/util_trigger_delay.h"
-#include "util/util_turing.h"
-#include "util/util_integer_sequences.h"
-#include "util/util_math.h"
-#include "src/extern/peaks_bytebeat.h"
-#include "src/extern/braids_quantizer.h"
-#include "OC_config.h"
-#include "OC_io.h"
-#include "OC_menus.h"
-#include "OC_visualfx.h"
-#include "OC_scales.h"
-#include "OC_scale_edit.h"
-#include "OC_strings.h"
-#include "HSIOFrame.h"
+#pragma once
+
+#include "../src/extern/peaks_bytebeat.h"
 
 #ifdef NORTHERNLIGHT
  #define QQ_OFFSET_X 20

@@ -22,8 +22,6 @@
 * SOFTWARE.
 */
 
-#include "HSApplication.h"
-
 OC_APP_CLASS(AppPong, TWOCCS("PO"), "Pong 2.0", "Pong"),
   public HSApplication {
 private:

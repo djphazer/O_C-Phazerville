@@ -18,25 +18,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "util/util_settings.h"
-#include "util/util_trigger_delay.h"
-#include "HSUtils.h"
-#include "OC_apps.h"
-#include "OC_DAC.h"
-#include "OC_menus.h"
-#include "OC_ui.h"
-#include "OC_strings.h"
-#include "OC_visualfx.h"
-#include "OC_sequence_edit.h"
-#include "OC_patterns.h"
-#include "OC_scales.h"
-#include "OC_scale_edit.h"
-#include "OC_input_map.h"
-#include "OC_input_maps.h"
-#include "src/extern/braids_quantizer.h"
-#include "util/util_arp.h"
-#include "src/extern/peaks_multistage_envelope.h"
-#include "HSIOFrame.h"
+#pragma once
+
+#include "../OC_sequence_edit.h"
 
 static constexpr uint8_t NUM_CHANNELS = 2;
 static constexpr uint8_t MULT_MAX = 26;    // max multiplier
@@ -48,14 +32,6 @@ static constexpr uint32_t TICKS_TO_MS = 43691; // 0.6667f : fraction, if TU_CORE
 static constexpr uint32_t TICK_JITTER = 0xFFFFFFF;  // 1/16 : threshold/double triggers reject -> ext_frequency_in_ticks_
 static constexpr uint32_t TICK_SCALE  = 0xC0000000; // 0.75 for signed_multiply_32x32
 static constexpr uint32_t COPYTIMEOUT = 200000; // in ticks
-
-void SEQ_leftButton();
-void SEQ_leftButtonLong();
-void SEQ_upButtonLong();
-void SEQ_downButtonLong();
-void SEQ_upButton();
-void SEQ_downButton();
-void SEQ_rightButton();
 
 uint32_t ticks_src1 = 0; // main clock frequency (top)
 uint32_t ticks_src2 = 0; // sec. clock frequency (bottom)

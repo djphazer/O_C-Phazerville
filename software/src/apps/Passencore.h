@@ -22,19 +22,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <algorithm>
-
-#include "OC_apps.h"
-#include "util/util_settings.h"
-#include "util/util_trigger_delay.h"
-#include "OC_menus.h"
-#include "OC_scales.h"
-#include "OC_scale_edit.h"
-#include "OC_strings.h"
-#include "OC_chords.h"
-#include "OC_chords_edit.h"
-#include "OC_input_map.h"
-#include "OC_input_maps.h"
+#pragma once
 
 #define POSSIBLE_LEN 32
 

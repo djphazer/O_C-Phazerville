@@ -25,19 +25,10 @@
 #pragma once
 #ifdef ENABLE_APP_CALIBR8OR
 
-#include "HSApplication.h"
-#include "HSMIDI.h"
-#include "HSClockManager.h"
-#include "util/util_settings.h"
-#include "OC_scales.h"
-#include "OC_autotuner.h"
-#include "SegmentDisplay.h"
-#include "src/drivers/FreqMeasure/OC_FreqMeasure.h"
-#include "HemisphereApplet.h"
 #ifdef ARDUINO_TEENSY41
-#include "applets/ClockSetupT4.h"
+#include "../applets/ClockSetupT4.h"
 #else
-#include "applets/ClockSetup.h"
+#include "../applets/ClockSetup.h"
 #endif
 
 static constexpr int CAL8_MAX_TRANSPOSE = 60;

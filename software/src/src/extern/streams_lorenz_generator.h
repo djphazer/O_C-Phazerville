@@ -38,8 +38,7 @@
 #include "../../util/util_macros.h"
 // #include "stmlib/stmlib.h"
 // #include "streams/meta_parameters.h"
-#include "OC_DAC.h"
-#include "OC_config.h"
+#include "../../OC_config.h"
 
 namespace streams {
 

@@ -20,25 +20,6 @@
 
 #pragma once
 
-#include "OC_DAC.h"
-#include "OC_digital_inputs.h"
-#include "OC_visualfx.h"
-#include "OC_apps.h"
-#include "OC_ui.h"
-#include "util/util_semitone_quantizer.h"
-
-#include "OC_patterns.h"
-#include "src/drivers/FreqMeasure/OC_FreqMeasure.h"
-
-#include "HemisphereApplet.h"
-#include "HSApplication.h"
-#include "icons.h"
-#include "HSMIDI.h"
-#include "HSClockManager.h"
-#ifdef __IMXRT1062__
-#include "PhzConfig.h"
-#endif
-
 // The settings specify the selected applets, and 64 bits of data for each applet,
 // plus 64 bits of data for the ClockSetup applet (which includes some misc config).
 // TRIGMAP and CVMAP are packed nibbles.
