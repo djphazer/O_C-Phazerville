@@ -42,6 +42,7 @@ public:
     }
 
     void Reset() {
+        frame.MIDIState.any_channel_omni = true; // track every channel
         frame.MIDIState.ClearMonoBuffer();
         frame.MIDIState.ClearPolyBuffer();
 
@@ -119,6 +120,7 @@ public:
 
       // continuously capture new notes while gated or overdubbing
       if (rec_gate && (overdub || Gate(0)) && rec_step >= 0) {
+        frame.MIDIState.any_channel_omni = true;
         if (midi_ch > 15) {
           // omni channel
           for (int i = 0; i < 16; ++i) {
@@ -201,6 +203,7 @@ public:
         switch (cursor) {
           case MIDI_CHAN:
             midi_ch = constrain(midi_ch + direction, 0, 16); // 16 = omni
+            frame.MIDIState.any_channel_omni = true; // track every channel
             break;
           case LENGTH:
             length = constrain(length + direction, 1, MAX_LOOP_LENGTH);

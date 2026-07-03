@@ -36,6 +36,7 @@ public:
   void AutoLearn() {
     if (source_type() == TYPE_MIDI) {
       frame.MIDIState.mapping[index()].AutoLearn();
+      frame.MIDIState.UpdateMidiChannelFilter();
     }
   }
 

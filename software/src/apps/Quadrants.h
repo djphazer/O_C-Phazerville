@@ -1887,6 +1887,7 @@ void AppQuadrants::HandleButtonEvent(const UI::Event &event) {
           config_cursor = MIDIMAP1 + mview;
         } else if (event.control == OC::CONTROL_BUTTON_Z) {
           frame.MIDIState.mapping[mview].AutoLearn();
+          frame.MIDIState.UpdateMidiChannelFilter();
         } else {
           HS::midi_edit = 0;
           HS::popup_tick = 0;
