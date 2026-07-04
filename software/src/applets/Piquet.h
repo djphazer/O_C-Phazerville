@@ -496,14 +496,18 @@ public:
 
       // Load shapes from auxiliary storage
       uint16_t shapes_ch0 = 0;
-      if (GetData(1, shapes_ch0)) {
+      PhzConfig::VALUE shapes_ch0_data = 0;
+      if (GetData(1, shapes_ch0_data)) {
+        shapes_ch0 = static_cast<uint16_t>(shapes_ch0_data & 0x0FFFu);
         channels[0].attack_shape = constrain((shapes_ch0 & 0x0F), 0, SHAPE_LAST - 1);
         channels[0].decay_shape = constrain(((shapes_ch0 >> 4) & 0x0F), 0, SHAPE_LAST - 1);
         channels[0].release_shape = constrain(((shapes_ch0 >> 8) & 0x0F), 0, SHAPE_LAST - 1);
       }
 
       uint16_t shapes_ch1 = 0;
-      if (GetData(2, shapes_ch1)) {
+      PhzConfig::VALUE shapes_ch1_data = 0;
+      if (GetData(2, shapes_ch1_data)) {
+        shapes_ch1 = static_cast<uint16_t>(shapes_ch1_data & 0x0FFFu);
         channels[1].attack_shape = constrain((shapes_ch1 & 0x0F), 0, SHAPE_LAST - 1);
         channels[1].decay_shape = constrain(((shapes_ch1 >> 4) & 0x0F), 0, SHAPE_LAST - 1);
         channels[1].release_shape = constrain(((shapes_ch1 >> 8) & 0x0F), 0, SHAPE_LAST - 1);
