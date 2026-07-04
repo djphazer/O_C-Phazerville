@@ -20,33 +20,37 @@ public:
 
   void Start() {
     for (int i = 0; i < Channels; i++) {
-      complimit[i].Acquire();
+      complimit[i] = GetComp();
+      if (!complimit[i]) return;
 
-      PatchCable(input, i, complimit[i], 0);
-      PatchCable(complimit[i], 0, output, i);
-
-      SetParams();
+      PatchCable(input, i, *complimit[i], 0);
+      PatchCable(*complimit[i], 0, output, i);
     }
+    alloc_ok = true;
+    SetParams();
   }
 
   void Unload() {
-    for (auto& cl : complimit) cl.Release();
+    for (auto& cl : complimit) ReleaseComp(cl);
+    alloc_ok = false;
     AllowRestart();
   }
 
   void SetParams() {
+    if (!alloc_ok) return;
     for (int i = 0; i < Channels; i++) {
-      complimit[i].gate(gate_threshold * 1.0f);
-      complimit[i].compression(comp_threshold * 1.0f);
-      complimit[i].limit(limit_threshold * 1.0f);
+      complimit[i]->gate(gate_threshold * 1.0f);
+      complimit[i]->compression(comp_threshold * 1.0f);
+      complimit[i]->limit(limit_threshold * 1.0f);
       if (makeupgain < 0)
-        complimit[i].autoMakeupGain();
+        complimit[i]->autoMakeupGain();
       else
-        complimit[i].makeupGain(makeupgain);
+        complimit[i]->makeupGain(makeupgain);
     }
   }
 
   void Controller() {
+    if (!alloc_ok) return;
     for (int i = 0; i < Channels; i++) {
       // TODO: connect modulated param values to stuff
     }
@@ -56,6 +60,11 @@ public:
   void View() final;
 
   void MainView() {
+    if (!alloc_ok) {
+      gfxPrint(2, 15, "Out of RAM!!");
+      return;
+    }
+
     const int label_x = 1;
 
     gfxPrint(label_x, 15, "Gate:");
@@ -145,6 +154,8 @@ private:
   int8_t limit_threshold = -1;
   int8_t makeupgain = 0; // negative means auto
 
+  bool alloc_ok = false;
+
   // TODO: more params for attack/release of each stage, comp ratio & knee
   //
   // for reference, from effect_dynamics.h:
@@ -154,7 +165,7 @@ private:
   //void limit(float threshold = -3.0f, float attack = MIN_T, float release = MIN_T)
 
   AudioPassthrough<Channels> input;
-  std::array<AudioEffectDynamics, Channels> complimit;
+  std::array<AudioEffectDynamics*, Channels> complimit;
   AudioPassthrough<Channels> output;
 };
 
@@ -165,9 +176,10 @@ FLASHMEM void DynamicsApplet<Channels>::View() {
 
 template <AudioChannels Channels>
 FLASHMEM void DynamicsApplet<Channels>::DrawFullScreen() {
+  if (!alloc_ok) return;
   graphics.drawLine(64 - gfx_offset, 26, 127 - gfx_offset, 26, 3);
   const int x = 25 + (64 - gfx_offset);
-  const int h = Proportion(int(complimit[0].get_total_gain()), 60, 30); // 60 dB == 30 px
+  const int h = Proportion(int(complimit[0]->get_total_gain()), 60, 30); // 60 dB == 30 px
   if (h > 0)
     graphics.drawRect(x, 26 - h, 10, h);
   else

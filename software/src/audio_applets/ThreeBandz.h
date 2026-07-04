@@ -42,45 +42,52 @@ public:
 
   void Start() {
     for (int ch = 0; ch < Channels; ++ch) {
-      PatchCable(input, ch, filter[ch][0], 0); // low split
-      PatchCable(filter[ch][0], 2, filter[ch][1], 0); // hi split
+      for (int b = 0; b < BANDZ; ++b) {
+        complimit[ch][b] = GetComp();
+        if (!complimit[ch][b]) return;
 
-      PatchCable(filter[ch][0], 0, complimit[ch][0], 0); // low band
-      PatchCable(filter[ch][1], 0, complimit[ch][1], 0); // mid band
-      PatchCable(filter[ch][1], 2, complimit[ch][2], 0); // hi band
-
-      for (int b = 0; b < BANDZ; b++) {
-        complimit[ch][b].Acquire();
-        PatchCable(complimit[ch][b], 0, mixout[ch], b);
+        PatchCable(*complimit[ch][b], 0, mixout[ch], b);
         //mixout[ch].gain(b, 1.0f);
         mixout[ch].gain(b, (b==1)?-1.0f:1.0f); // invert mid band
       }
+
+      PatchCable(input, ch, filter[ch][0], 0); // low split
+      PatchCable(filter[ch][0], 2, filter[ch][1], 0); // hi split
+
+      PatchCable(filter[ch][0], 0, *complimit[ch][0], 0); // low band
+      PatchCable(filter[ch][1], 0, *complimit[ch][1], 0); // mid band
+      PatchCable(filter[ch][1], 2, *complimit[ch][2], 0); // hi band
 
       PatchCable(mixout[ch], 0, output, ch);
 
       filter[ch][0].resonance(0.70f);
       filter[ch][1].resonance(0.70f);
     }
+    alloc_ok = true;
     SetParams();
   }
 
   void Unload() {
     for (int ch = 0; ch < Channels; ++ch) {
-      for (auto& cl : complimit[ch]) cl.Release();
+      for (int b = 0; b < BANDZ; ++b) {
+        ReleaseComp(complimit[ch][b]);
+      }
     }
+    alloc_ok = false;
     AllowRestart();
   }
 
   void SetParams() {
+    if (!alloc_ok) return;
     for (int ch = 0; ch < Channels; ++ch) {
       for (int i = 0; i < BANDZ; i++) {
-        complimit[ch][i].gate(gate_threshold[i] * 1.0f);
-        complimit[ch][i].compression(comp_threshold[i] * 1.0f);
-        complimit[ch][i].limit(limit_threshold[i] * 1.0f);
+        complimit[ch][i]->gate(gate_threshold[i] * 1.0f);
+        complimit[ch][i]->compression(comp_threshold[i] * 1.0f);
+        complimit[ch][i]->limit(limit_threshold[i] * 1.0f);
         if (makeupgain[i] < 0)
-          complimit[ch][i].autoMakeupGain();
+          complimit[ch][i]->autoMakeupGain();
         else
-          complimit[ch][i].makeupGain(makeupgain[i]);
+          complimit[ch][i]->makeupGain(makeupgain[i]);
       }
 
       filter[ch][0].frequency(splitfreq[0]);
@@ -89,6 +96,7 @@ public:
   }
 
   void Controller() {
+    if (!alloc_ok) return;
     for (int i = 0; i < BANDZ; i++) {
       // TODO: connect modulated param values to stuff
     }
@@ -97,6 +105,11 @@ public:
   void DrawFullScreen() final;
   void View() final;
   void MainView() {
+    if (!alloc_ok) {
+      gfxPrint(2, 15, "Out of RAM!!");
+      return;
+    }
+
     const int label_x = 1;
     const int page = (cursor > B1_SPLIT) + (cursor > B2_SPLIT);
     const char * const bandname[] = { "Low", "Mid", "Hi" };
@@ -246,9 +259,11 @@ private:
 
   uint16_t splitfreq[2] = {250, 2500};
 
+  bool alloc_ok = false;
+
   AudioPassthrough<Channels> input;
-  std::array<AudioFilterStateVariable2, Channels> filter[2];
-  std::array<std::array<AudioEffectDynamics, BANDZ>, Channels> complimit;
+  AudioFilterStateVariable2 filter[Channels][2];
+  AudioEffectDynamics* complimit[Channels][BANDZ];
   std::array<AudioMixer<BANDZ>, Channels> mixout;
   // TODO: maybe a final limiter after the mix?
   AudioPassthrough<Channels> output;
@@ -258,10 +273,11 @@ FLASHMEM void ThreeBandzApplet::View() {
   MainView();
 }
 FLASHMEM void ThreeBandzApplet::DrawFullScreen() {
+  if (!alloc_ok) return;
   graphics.drawLine(64 - gfx_offset, 26, 127 - gfx_offset, 26, 3);
   for (int i = 0; i < BANDZ; i++) {
     const int x = 5 + i*20 + (64 - gfx_offset);
-    const int h = Proportion(int(complimit[0][i].get_total_gain()), 60, 30); // 60 dB == 30 px
+    const int h = Proportion(int(complimit[0][i]->get_total_gain()), 60, 30); // 60 dB == 30 px
     if (h > 0)
       graphics.drawRect(x, 26 - h, 10, h);
     else

@@ -46,30 +46,23 @@
 class AudioEffectDynamics : public AudioStream
 {
 public:
-	AudioEffectDynamics(void) : AudioStream(1, inputQueueArray) {
+    AudioEffectDynamics(void) : AudioStream(1, inputQueueArray) {
+      reset();
 
-		gate();
-		compression();
-		limit();
-		autoMakeupGain();
+      gate();
+      compression();
+      limit();
+      autoMakeupGain();
 
-		gatedb = MIN_DB;
-		compdb = MIN_DB;
-		limitdb = MIN_DB;
-	}
-
-    void Acquire() {
-      if (!samplesSquared) {
-        samplesSquared = new uint32_t[sampleBufferSize];
-        std::fill_n(samplesSquared, sampleBufferSize, 0);
-      }
+      gatedb = MIN_DB;
+      compdb = MIN_DB;
+      limitdb = MIN_DB;
     }
 
-    void Release() {
-      if (samplesSquared) {
-        delete[] samplesSquared;
-        samplesSquared = nullptr;
-      }
+    void reset() {
+      sumOfSamplesSquared = 0;
+      sampleIndex = 0;
+      std::fill_n(samplesSquared, sampleBufferSize, 0);
     }
 
 	//Sets the gate parameters.
@@ -103,8 +96,8 @@ public:
 		compThreshold = constrain(threshold, MIN_DB, MAX_DB);
 		float compAttackTime = constrain(attack, MIN_T, MAX_T);
 		float compReleaseTime = constrain(release, MIN_T, MAX_T);
-		compRatio = 1.0f / constrain(abs(ratio), RATIO_OFF, RATIO_INFINITY);
-		float compKneeWidth = constrain(abs(kneeWidth), 0.0f, 32.0f);
+		compRatio = 1.0f / constrain(fabsf(ratio), RATIO_OFF, RATIO_INFINITY);
+		float compKneeWidth = constrain(fabsf(kneeWidth), 0.0f, 32.0f);
 		computeMakeupGain();
 
 		aCompAttack = timeToAlpha(compAttackTime);
@@ -157,23 +150,30 @@ public:
       return gatedb + compdb + makeupdb + limitdb;
     }
 private:
+	static constexpr unsigned int sampleBufferSize = AUDIO_SAMPLE_RATE / 20; // number of samples to use for running RMS calulation = 1/20th of a second = 50ms
+
+	uint32_t samplesSquared[sampleBufferSize] = {0};
+	uint64_t sumOfSamplesSquared = 0;
+	uint16_t sampleIndex = 0;
+
 	audio_block_t *inputQueueArray[1];
 
 	bool gateEnabled = false;
+	bool compEnabled = false;
+	bool limiterEnabled = false;
+	bool mgAutoEnabled = false;
+
 	float gateThresholdOpen;
 	float gateThresholdClose;
 	float gatedb;
 
-	bool compEnabled = false;
 	float compThreshold;
 	float compRatio;
 	float compdb;
 
-	bool limiterEnabled = false;
 	float limitThreshold;
 	float limitdb;
 
-	bool mgAutoEnabled;
 	float mgHeadroom;
 	float makeupdb;
 
@@ -193,17 +193,14 @@ private:
 	float aLimitAttack;
 	float aOneMinusLimitAttack;
 	float aLimitRelease;
-	const static unsigned int sampleBufferSize = AUDIO_SAMPLE_RATE / 20; // number of samples to use for running RMS calulation = 1/20th of a second = 50ms
-	static constexpr float invSampleBufferSize = 1.0f / (float)sampleBufferSize;
-	uint64_t sumOfSamplesSquared = 0;
-	uint32_t* samplesSquared;
-	uint16_t sampleIndex = 0;
 
-	void computeMakeupGain() {
-		if (mgAutoEnabled) {
-			makeupdb = -compThreshold + (compThreshold * compRatio) + limitThreshold - mgHeadroom;
-		}
-	}
+    void computeMakeupGain() {
+      if (mgAutoEnabled) {
+        // I'm deciding not to include the Limiter threshold in the makeup gain.
+        // It can serve as a ceiling. -djphazer
+        makeupdb = -compThreshold + (compThreshold * compRatio) - mgHeadroom; // - limitThreshold;
+      }
+    }
 
 	//Computes smoothing time constants for a 10% to 90% change
 	float timeToAlpha(float time) {

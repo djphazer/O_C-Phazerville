@@ -3,6 +3,7 @@
 #include "HemisphereApplet.h"
 #include "dsputils.h"
 #include "Audio/effect_reverb_schroeder.h"
+#include "src/Audio/effect_dynamics.h"
 #include <AudioStream.h>
 
 enum AudioChannels : uint8_t {
@@ -16,6 +17,7 @@ public:
 
   static Factory<AudioEffectReverbSchroeder, 8> bung_factory;
   static Factory<AudioEffectFreeverb, 8> verb_factory;
+  static Factory<AudioEffectDynamics, 20> compressor_factory;
 
   static const uint_fast8_t CONFIG_SIZE = 4;
   static const uint_fast8_t MAX_CABLES = 32;
@@ -91,6 +93,13 @@ public:
   }
   void ReleaseFreeverb(AudioEffectFreeverb* verb) {
     verb_factory.release(verb);
+  }
+
+  AudioEffectDynamics *GetComp() {
+    return compressor_factory.get();
+  }
+  void ReleaseComp(AudioEffectDynamics* comp) {
+    compressor_factory.release(comp);
   }
 
   void Disconnect() {

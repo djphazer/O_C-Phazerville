@@ -56,6 +56,7 @@ const size_t NUM_SLOTS = 5;
 
 Factory<AudioEffectReverbSchroeder, 8> HemisphereAudioApplet::bung_factory;
 Factory<AudioEffectFreeverb, 8> HemisphereAudioApplet::verb_factory;
+Factory<AudioEffectDynamics, 20> HemisphereAudioApplet::compressor_factory;
 
 // TODO: categories
 constexpr Registry mono_applets = Registry<HemisphereAudioApplet, NUM_SLOTS * 2
