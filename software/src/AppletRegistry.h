@@ -12,6 +12,7 @@ using RegID = uint64_t;
 template<typename T, RegID Id, uint8_t Categories>
 struct DeclareApplet {
     using type = T;
+    static constexpr size_t size = sizeof(T);
     static constexpr RegID id = Id;
     static constexpr uint8_t categories = Categories;
 };
@@ -19,6 +20,7 @@ struct DeclareApplet {
 template<typename T>
 struct DeclareFancyApplet {
     using type = T;
+    static constexpr size_t size = sizeof(T);
     static constexpr RegID id = strhash(type::applet_name_());
     static constexpr uint8_t categories = 0;
 };
@@ -43,7 +45,12 @@ struct Registry {
     // Compile-time build of factories array
     static constexpr std::array<FactoryFn, Size> buildFactories() {
         std::array<FactoryFn, Size> arr{
-          (+[]() -> T* { return new typename Declarations::type(); }) ...
+          (+[]() -> T* {
+            void* block = calloc(1, Declarations::size);
+            if (!block) block = extmem_calloc(1, Declarations::size);
+            if (block) return new (block) typename Declarations::type();
+            return nullptr;
+           }) ...
         };
         return arr;
     }

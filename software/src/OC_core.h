@@ -56,8 +56,12 @@ struct Factory {
     for (size_t i = 0; i < max_instances; ++i) {
       if (mask & (1 << i)) continue;
 
-      if (!pool[i] && OC::CORE::FreeRam() > (int)sizeof(T) + 1000) { // 1KB of padding to be safe
-        pool[i] = new T();
+      if (!pool[i]) {
+        // && OC::CORE::FreeRam() > (int)sizeof(T) + 1000
+        void *block = calloc(1, sizeof(T)); // use RAM2 first
+        if (!block) block = extmem_calloc(1, sizeof(T)); // fallback to PSRAM
+        if (block) pool[i] = new (block) T(); // place new object
+        // else cry about it
       }
       if (pool[i]) {
         mask |= (1 << i);
