@@ -1,6 +1,7 @@
 #include "OC_core.h"
+#include <malloc.h>
 
-extern char _heap_end[], *__brkval;
+extern "C" char _heap_end[], *__brkval;
 
 /*volatile*/ std::queue<Task> fn_queue;
 //volatile bool fn_queue_lock = false;
@@ -25,8 +26,9 @@ void OC::CORE::FlushTasks() {
 
 int OC::CORE::FreeRam() {
 #ifdef __IMXRT1062__
+  auto mi = mallinfo();
   auto heap = _heap_end - __brkval;
-  return heap;
+  return heap + mi.fordblks;
 #else
   char top;
   return &top - __brkval;

@@ -20,9 +20,9 @@
 #include <Audio.h>
 
 extern "C" uint8_t external_psram_size;
-extern char _extram_start[], _extram_end[];
+extern "C" char _extram_start[], _extram_end[];
 #endif
-extern char _ebss[], _heap_end[], *__brkval, _estack;
+extern "C" char _ebss[], _heap_end[], *__brkval, _estack;
 
 extern USBHost thisUSB;
 

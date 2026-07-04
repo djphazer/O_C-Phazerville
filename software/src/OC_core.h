@@ -21,6 +21,8 @@ namespace OC {
     extern volatile bool display_update_enabled;
     extern volatile bool app_loop_enabled;
 
+    static constexpr int RAM2_HEADROOM = 10240;
+
     void DeferTask(Task func);
     void FlushTasks();
     int FreeRam();
@@ -57,8 +59,8 @@ struct Factory {
       if (mask & (1 << i)) continue;
 
       if (!pool[i]) {
-        // && OC::CORE::FreeRam() > (int)sizeof(T) + 1000
-        void *block = calloc(1, sizeof(T)); // use RAM2 first
+        // use RAM2 first
+        void *block = (OC::CORE::FreeRam() > OC::CORE::RAM2_HEADROOM) ? calloc(1, sizeof(T)) : nullptr;
         if (!block) block = extmem_calloc(1, sizeof(T)); // fallback to PSRAM
         if (block) pool[i] = new (block) T(); // place new object
         // else cry about it

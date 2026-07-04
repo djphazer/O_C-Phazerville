@@ -46,7 +46,7 @@ struct Registry {
     static constexpr std::array<FactoryFn, Size> buildFactories() {
         std::array<FactoryFn, Size> arr{
           (+[]() -> T* {
-            void* block = calloc(1, Declarations::size);
+            void* block = (OC::CORE::FreeRam() > OC::CORE::RAM2_HEADROOM) ? calloc(1, Declarations::size) : nullptr;
             if (!block) block = extmem_calloc(1, Declarations::size);
             if (block) return new (block) typename Declarations::type();
             return nullptr;
