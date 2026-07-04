@@ -127,6 +127,23 @@ const CalibrationData kNLMCalibrationDefaults = {
   0 // reserved1
 };
 
+#ifdef ARDUINO_TEENSY41
+PROGMEM
+const DAC::CalibrationData kDACSergeDefaults = {
+  {
+    // Xenomorpher for Serge
+    {2200, 8200, 14200, 20200, 26200, 32200, 38100, 44050, 50050, 55950, 61900},
+    {2200, 8200, 14200, 20200, 26200, 32200, 38100, 44050, 50050, 55950, 61900},
+    {2200, 8200, 14200, 20200, 26200, 32200, 38100, 44050, 50050, 55950, 61900},
+    {2200, 8200, 14200, 20200, 26200, 32200, 38100, 44050, 50050, 55950, 61900},
+    {2200, 8200, 14200, 20200, 26200, 32200, 38100, 44050, 50050, 55950, 61900},
+    {2200, 8200, 14200, 20200, 26200, 32200, 38100, 44050, 50050, 55950, 61900},
+    {2200, 8200, 14200, 20200, 26200, 32200, 38100, 44050, 50050, 55950, 61900},
+    {2200, 8200, 14200, 20200, 26200, 32200, 38100, 44050, 50050, 55950, 61900}
+  }
+};
+#endif
+
 PROGMEM
 const DAC::CalibrationData kDAC20VppDefaults = {
   {
@@ -150,8 +167,13 @@ static constexpr uint16_t DAC_OFFSET = 4890; // DAC offset, initial approx., ish
 #endif
 
 FLASHMEM void calibration_reset() {
-  if (NorthernLightModular) {
+  if (NorthernLightModular || NLMSerge) {
     memcpy(&OC::calibration_data, &kNLMCalibrationDefaults, sizeof(OC::calibration_data));
+#ifdef ARDUINO_TEENSY41
+    if (NLMSerge) {
+      memcpy(&OC::calibration_data.dac, &kDACSergeDefaults, sizeof(OC::calibration_data.dac));
+    }
+#endif
   } else {
     memcpy(&OC::calibration_data, &kCalibrationDefaults, sizeof(OC::calibration_data));
     if (DAC_20Vpp) {

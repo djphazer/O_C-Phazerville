@@ -31,6 +31,7 @@ bool SDcard_Ready = false;
 #ifdef ARDUINO_TEENSY41
 bool DAC_20Vpp = false;
 bool CalSynthXL = false;
+bool NLMSerge = false;
 bool DAC_is_inverted = false;
 #endif
 
@@ -189,7 +190,8 @@ void OC::Pinout_Detect() {
   DAC_20Vpp = (id_voltage >= 0.11 && id_voltage <= 0.25);
 
   // 0.4v for Serge variant from NLM, or others that want -5v to +5v output range
-  if (id_voltage >= 0.35 && id_voltage <= 0.45) {
+  NLMSerge = (id_voltage >= 0.35 && id_voltage <= 0.45);
+  if (NLMSerge) {
     DAC::kOctaveZero = 5;
     HS::octave_max = 5;
 
