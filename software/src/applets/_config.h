@@ -143,7 +143,7 @@ constexpr Registry reg = Registry<HemisphereApplet, HS::APPLET_SLOTS
     , DeclareApplet<AttenuateOffset, 56, CAT_UTILITY>
     , DeclareApplet<Binary, 41, CAT_LOGIC | CAT_MODULATOR>
     , DeclareApplet<BitBeat, 79, CAT_MODULATOR>
-    , DeclareApplet<BootsNCat, 55, CAT_OTHER>
+    // , DeclareApplet<BootsNCat, 55, CAT_OTHER>
     , DeclareApplet<Brancher, 4, CAT_UTILITY | CAT_CLOCKING>
     , DeclareApplet<BugCrack, 51, CAT_OTHER>
     , DeclareApplet<Burst, 31, CAT_CLOCKING>
@@ -238,13 +238,13 @@ constexpr Registry reg = Registry<HemisphereApplet, HS::APPLET_SLOTS
     , DeclareApplet<Trending, 37, CAT_LOGIC>
     , DeclareApplet<TrigSeq, 11, CAT_SEQUENCER | CAT_CLOCKING>
     , DeclareApplet<TrigSeq16, 25, CAT_SEQUENCER | CAT_CLOCKING>
-    , DeclareApplet<TruthCat3, 85, CAT_LOGIC | CAT_SEQUENCER | CAT_CLOCKING>
-    , DeclareApplet<TruthCat4, 84, CAT_LOGIC | CAT_SEQUENCER | CAT_CLOCKING>
+    // , DeclareApplet<TruthCat3, 85, CAT_LOGIC | CAT_SEQUENCER | CAT_CLOCKING>
+    // , DeclareApplet<TruthCat4, 84, CAT_LOGIC | CAT_SEQUENCER | CAT_CLOCKING>
     , DeclareApplet<Tuner, 39, CAT_OTHER>
     , DeclareApplet<TwoRings, 18, CAT_SEQUENCER>
     , DeclareApplet<VectorEG, 52, CAT_MODULATOR>
     , DeclareApplet<VectorLFO, 49, CAT_MODULATOR>
-    , DeclareApplet<VectorMod, 53, CAT_MODULATOR> // awkward middle child
+    // , DeclareApplet<VectorMod, 53, CAT_MODULATOR> // awkward middle child
     , DeclareApplet<VectorMorph, 54, CAT_MODULATOR>
     , DeclareApplet<Voltage, 43, CAT_UTILITY>
 #ifdef PEWPEWPEW

@@ -70,12 +70,12 @@ constexpr Registry mono_applets = Registry<HemisphereAudioApplet, NUM_SLOTS * 2
     , DeclareFancyApplet<HarmOscApplet>
     , DeclareFancyApplet<FMDrumApplet>
     , DeclareFancyApplet<WavPlayerApplet<MONO>>
-    , DeclareFancyApplet<OneShotPlayerApplet<MONO>>
+//    , DeclareFancyApplet<OneShotPlayerApplet<MONO>>
     , DeclareFancyApplet<VcaApplet<MONO>>
     , DeclareFancyApplet<LadderApplet<MONO>>
     , DeclareFancyApplet<FilterFolderApplet<MONO>>
     , DeclareFancyApplet<DelayApplet<MONO>>
-    , DeclareFancyApplet<AbyssApplet<MONO>>
+    , DeclareFancyApplet<AbyssApplet<STEREO>>
     , DeclareFancyApplet<AnimorfApplet<MONO>>
     , DeclareFancyApplet<PhazerApplet>
     // , DeclareFancyApplet<ReverbApplet>
@@ -86,12 +86,12 @@ constexpr Registry mono_applets = Registry<HemisphereAudioApplet, NUM_SLOTS * 2
     , DeclareFancyApplet<GlitchApplet<MONO>>
     , DeclareFancyApplet<GritApplet<MONO>>
 #ifndef AUDIO_INTERFACE
-    , DeclareFancyApplet<MistierApplet<MONO>>
+    // , DeclareFancyApplet<MistierApplet<MONO>>
 #endif
     , DeclareFancyApplet<AdvKrpsStrngApplet>
-    , DeclareFancyApplet<ModalResonatorApplet<MONO>>
     , DeclareFancyApplet<WTVCOApplet>
 #ifndef AUDIO_INTERFACE
+    , DeclareFancyApplet<ModalResonatorApplet<MONO>>
     , DeclareFancyApplet<WavRecorderApplet<MONO>>
 #endif
 >{};
@@ -111,7 +111,7 @@ constexpr Registry stereo_applets = Registry<HemisphereAudioApplet, NUM_SLOTS
   , DeclareFancyApplet<LadderApplet<STEREO>>
   , DeclareFancyApplet<FilterFolderApplet<STEREO>>
   , DeclareFancyApplet<WavPlayerApplet<STEREO>>
-  , DeclareFancyApplet<OneShotPlayerApplet<STEREO>>
+//  , DeclareFancyApplet<OneShotPlayerApplet<STEREO>>
 #ifndef AUDIO_INTERFACE
   , DeclareFancyApplet<ModalResonatorApplet<STEREO>>
   , DeclareFancyApplet<WavRecorderApplet<STEREO>>
