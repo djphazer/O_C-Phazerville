@@ -142,8 +142,8 @@ public:
         uint64_t data = 0;
         Pack(data, PackLocation {0,6}, waveform_number[0]);
         Pack(data, PackLocation {6,6}, waveform_number[1]);
-        Pack(data, PackLocation {12,16}, pitch[0]);
-        Pack(data, PackLocation {28,16}, pitch[1]);
+        Pack(data, PackLocation {12,16}, uint16_t(pitch[0]));
+        Pack(data, PackLocation {28,16}, uint16_t(pitch[1]));
         Pack(data, PackLocation {44, 1}, modshape);
         return data;
     }
