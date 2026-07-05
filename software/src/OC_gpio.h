@@ -32,6 +32,7 @@ extern bool DAC_is_inverted;
 static constexpr bool DAC_20Vpp = false;
 static constexpr bool CalSynthXL = false;
 static constexpr bool DAC_is_inverted = false;
+static constexpr bool NLMSerge = false;
 #endif
 
 #ifdef NORTHERNLIGHT
