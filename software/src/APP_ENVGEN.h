@@ -808,7 +808,13 @@ public:
     cv4.push(OC::ADC::value<ADC_CHANNEL_4>());
 #endif
 
-    const int32_t cvs[ENVGEN_CHANNEL_COUNT] = { cv1.value(), cv2.value(), cv3.value(), cv4.value() };
+    const bool cv_flip = OC::calibration_data.flipcontrols();
+    const int32_t cvs[ENVGEN_CHANNEL_COUNT] = {
+      cv_flip ? cv4.value() : cv1.value(),
+      cv_flip ? cv3.value() : cv2.value(),
+      cv_flip ? cv2.value() : cv3.value(),
+      cv_flip ? cv1.value() : cv4.value()
+    };
     uint32_t triggers = OC::DigitalInputs::clocked();
 
     uint32_t internal_trigger_mask =
