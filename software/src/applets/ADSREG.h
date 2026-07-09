@@ -352,8 +352,10 @@ private:
           } else {
             total_stage_ticks = ScaleStageToTicksAD(adsr.setting[stage]);
           }
-          int ms_value = total_stage_ticks / 17;
-          gfxPrint(ms_value);
+          const int ms_value = total_stage_ticks * 10 / 17;
+          gfxPrint(ms_value / 10);
+          gfxPrint(".");
+          gfxPrint(ms_value % 10);
           gfxPrint("ms");
         }
     }
