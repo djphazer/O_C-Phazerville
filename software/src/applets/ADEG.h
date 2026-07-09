@@ -128,11 +128,11 @@ public:
     void OnEncoderMove(int direction) {
         if (cursor == 0) {
             attack = constrain(attack + direction, 0, HEM_ADEG_MAX_VALUE);
-            last_ms_value = ScaleStageToTicks(attack) / 17;
+            last_ticks_val = ScaleStageToTicks(attack);
         }
         else {
             decay = constrain(decay + direction, 0, HEM_ADEG_MAX_VALUE);
-            last_ms_value = ScaleStageToTicks(decay) / 17;
+            last_ticks_val = ScaleStageToTicks(decay);
         }
         last_change_ticks = OC::CORE::ticks;
     }
@@ -167,7 +167,7 @@ private:
     simfloat signal; // Current signal level for each channel
     int phase; // 0=Not running 1=Attack 2=Decay
     int cursor; // 0 = Attack, 1 = Decay
-    int last_ms_value;
+    int last_ticks_val;
     int last_change_ticks;
     int effective_attack; // Attack and decay for this particular triggering
     int effective_decay;  // of the EG, so that it can be triggered in reverse!
@@ -193,7 +193,10 @@ private:
 
         // Change indicator, if necessary
         if (OC::CORE::ticks - last_change_ticks < 20000) {
-            gfxPrint(15, 43, last_ms_value);
+            const int ms_value = last_ticks_val * 10 / 17;
+            gfxPrint(ms_value / 10);
+            gfxPrint(".");
+            gfxPrint(ms_value % 10);
             gfxPrint("ms");
         }
     }
