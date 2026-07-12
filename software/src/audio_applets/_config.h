@@ -75,8 +75,8 @@ constexpr Registry mono_applets = Registry<HemisphereAudioApplet, NUM_SLOTS * 2
     , DeclareFancyApplet<LadderApplet<MONO>>
     , DeclareFancyApplet<FilterFolderApplet<MONO>>
     , DeclareFancyApplet<DelayApplet<MONO>>
-    // , DeclareFancyApplet<AbyssApplet<MONO>>
-    // , DeclareFancyApplet<AnimorfApplet<MONO>>
+    , DeclareFancyApplet<AbyssApplet<MONO>>
+    , DeclareFancyApplet<AnimorfApplet<MONO>>
     , DeclareFancyApplet<PhazerApplet>
     , DeclareFancyApplet<ReverbApplet>
     , DeclareFancyApplet<BungverbApplet>
@@ -85,7 +85,9 @@ constexpr Registry mono_applets = Registry<HemisphereAudioApplet, NUM_SLOTS * 2
     , DeclareFancyApplet<TuneTrackerApplet<MONO>>
     , DeclareFancyApplet<GlitchApplet<MONO>>
     , DeclareFancyApplet<GritApplet<MONO>>
+#ifndef AUDIO_INTERFACE
     , DeclareFancyApplet<MistierApplet<MONO>>
+#endif
     , DeclareFancyApplet<AdvKrpsStrngApplet>
     , DeclareFancyApplet<ModalResonatorApplet<MONO>>
     , DeclareFancyApplet<WTVCOApplet>
@@ -104,8 +106,8 @@ constexpr Registry stereo_applets = Registry<HemisphereAudioApplet, NUM_SLOTS
   , DeclareFancyApplet<DynamicsApplet<STEREO>>
   , DeclareFancyApplet<ThreeBandzApplet<STEREO>>
   , DeclareFancyApplet<DelayApplet<STEREO>>
-  // , DeclareFancyApplet<AbyssApplet<STEREO>>
-  // , DeclareFancyApplet<AnimorfApplet<STEREO>>
+  , DeclareFancyApplet<AbyssApplet<STEREO>>
+  , DeclareFancyApplet<AnimorfApplet<STEREO>>
   , DeclareFancyApplet<LadderApplet<STEREO>>
   , DeclareFancyApplet<FilterFolderApplet<STEREO>>
   , DeclareFancyApplet<WavPlayerApplet<STEREO>>
