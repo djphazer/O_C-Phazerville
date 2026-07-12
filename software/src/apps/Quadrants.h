@@ -21,6 +21,35 @@
 
 #pragma once
 
+#include "HSUtils.h"
+#include "OC_DAC.h"
+#include "OC_core.h"
+#include "OC_digital_inputs.h"
+#include "OC_visualfx.h"
+#include "OC_apps.h"
+#include "OC_ui.h"
+
+#include "OC_patterns.h"
+#include "src/UI/ui_events.h"
+#include "src/drivers/FreqMeasure/OC_FreqMeasure.h"
+
+#include "HemisphereApplet.h"
+#include "HSApplication.h"
+#include "icons.h"
+#include "HSMIDI.h"
+#include "HSClockManager.h"
+
+#include "PackingUtils.h"
+#include "PhzConfig.h"
+
+#include "OC_app_switcher.h" // for QuadCapture_Render() dispatch (4-up capture)
+#ifdef QUAD_CAPTURE
+#include "quad_scope.h"      // oscilloscope ring buffers for the external viewer ('O')
+#endif
+
+//#include "applets/_config.h"
+//#include "audio_applets/_config.h"
+
 // per bank file
 static constexpr int QUAD_PRESET_COUNT = 32;
 static constexpr int PRESET_FILE_REVISION = 1;
@@ -477,6 +506,64 @@ public:
         QueuePresetLoad(next_id);
     }
 
+    // External: step to the prev/next valid preset (dir -1/+1).
+    void ChangePreset(int dir) {
+      if (dir == 0) return;
+      int id = (preset_id < 0) ? 0 : preset_id;
+      for (int i = 0; i < QUAD_PRESET_COUNT; i++) {
+        id = (id + dir + QUAD_PRESET_COUNT) % QUAD_PRESET_COUNT;
+        if (isValidPreset(id)) { QueuePresetLoad(id); return; }
+      }
+    }
+
+    // External: enter/leave the Audio Setup view (so injected events drive the
+    // audio stack). Mirrors the device's X+Y combo / cancel behaviour.
+    void SetAudioSetup(bool on) {
+      view_state = on ? AUDIO_SETUP : APPLETS;
+    }
+
+    // --- External 4-up screen capture (see quad_capture.h) -------------------
+    // Renders all four live applets into a 128x128 (2048-byte) frame for an
+    // external USB display. Does NOT touch the live OLED framebuffer: it points
+    // the global `graphics` object at the caller's scratch buffer, draws, then
+    // releases it. Layout matches the host viewer's 2x2 grid:
+    //     top    1024 bytes (pages  0..7)  = applet 0 | applet 1  (NW | NE)
+    //     bottom 1024 bytes (pages  8..15) = applet 2 | applet 3  (SW | SE)
+    // Each applet already carries its own hemisphere (0..3); gfx_offset =
+    // (hemisphere & 1) * 64 places 0,2 on the left and 1,3 on the right, so the
+    // two pages only differ by which pair we ask to draw.
+    void RenderQuadCapture(uint8_t *frame) {
+        // Top page: applets 0 (NW) and 1 (NE)
+        graphics.Begin(frame, weegfx::CLEAR_FRAME_ENABLE);
+        active_applet[0]->BaseView();
+        active_applet[1]->BaseView();
+        graphics.End();
+
+        // Bottom page: applets 2 (SW) and 3 (SE)
+        graphics.Begin(frame + 1024, weegfx::CLEAR_FRAME_ENABLE);
+        active_applet[2]->BaseView();
+        active_applet[3]->BaseView();
+        // Match on-device convention: B-side applets (slots > 1) get inverted titles
+        gfxInvert(0, 0, 63, 10);
+        gfxInvert(64, 0, 63, 10);
+        graphics.End();
+    }
+
+    // Renders the audio DSP stack (list of audio applets in use) into a 128x64
+    // frame for external capture ('A'). Uses the same graphics-redirect trick.
+    void RenderAudioCapture(uint8_t *frame) {
+        graphics.Begin(frame, weegfx::CLEAR_FRAME_ENABLE);
+        audio_app.DrawMonitor();   // always-on stack view (not the auto-hiding menu)
+        graphics.End();
+    }
+
+    // Renders the MIDI map page into a 128x64 frame for external capture ('M').
+    void RenderMidiMapCapture(uint8_t *frame) {
+        graphics.Begin(frame, weegfx::CLEAR_FRAME_ENABLE);
+        DrawMidiMaps(0);
+        graphics.End();
+    }
+
     // does not modify the preset, only the current state
     void SetApplet(HEM_SIDE hemisphere, int index) {
         /*noInterrupts();*/
@@ -493,6 +580,13 @@ public:
     void ChangeApplet(HEM_SIDE h, int dir) {
         int index = HS::get_next_applet_index(next_applet_index[h], dir);
         next_applet_index[h] = index;
+    }
+
+    // External: change the applet loaded in a slot (0..3) to prev/next (dir -1/+1).
+    void ChangeAppletInSlot(int slot, int dir) {
+        if (slot < 0 || slot > 3) return;
+        ChangeApplet((HEM_SIDE)slot, dir);
+        SetApplet((HEM_SIDE)slot, next_applet_index[slot]);
     }
 
     void SendMIDIThru(const MIDIMessage &msg, uint8_t exclude_mask) {
@@ -1049,6 +1143,41 @@ public:
     void SwitchToSlot(HEM_SIDE h) {
       view_slot[h % 2] = h / 2;
       zoom_slot = h;
+    }
+
+    // For the external viewer: which slot each side's encoder is currently
+    // driving (left = 0/NW or 2/SW; right = 1/NE or 3/SE), the fullscreen slot
+    // (0..3) or -1, and the currently-loaded preset id (-1 = none).
+    void GetActiveSlots(int &left, int &right, int &full, int &preset) {
+      left  = view_slot[0] * 2;
+      right = view_slot[1] * 2 + 1;
+      full  = (view_state == APPLET_FULLSCREEN) ? (int)zoom_slot : -1;
+      preset = preset_id;
+    }
+
+    // Save the current state into preset slot id (persists the bank to flash),
+    // and make it the current preset.
+    void SavePresetSlot(int id) {
+      if (id < 0 || id >= QUAD_PRESET_COUNT) return;
+      StoreToPreset(id);
+      preset_id = id;
+    }
+
+    // Stream the current bank file (all presets) to the host as:
+    //   BANK <filename> <size>\n<hex bytes>\n
+    void StreamBankBackup() {
+      File f = PhzConfig::myfs.open(bank_filename, FILE_READ);
+      if (!f) { Serial.println("BANK ERR"); Serial.flush(); return; }
+      Serial.print("BANK "); Serial.print(bank_filename);
+      Serial.print(" "); Serial.println((uint32_t)f.size());
+      while (f.available()) {
+        uint8_t b = f.read();
+        if (b < 16) Serial.print("0");
+        Serial.print(b, HEX);
+      }
+      Serial.println();
+      Serial.flush();
+      f.close();
     }
 
     void ExitFullScreen() {
@@ -1723,6 +1852,193 @@ void QuadrantSysExHandler() {
   // TODO
 }
 
+// Bridge for the external 4-up capture (declared in quad_capture.h, used by
+// Main.cpp's serial handler). Lives here because it needs the AppQuadrants
+// definition to reach the live applet instances. Returns false (and renders
+// nothing) unless Quadrants is the currently-running app.
+static AppQuadrants *QuadCapture_CurrentApp() {
+  OC::AppBase *app = OC::app_switcher.current_app();
+  if (!app || app->id() != TWOCCS("QS")) return nullptr;
+  return static_cast<AppQuadrants *>(app);
+}
+
+FLASHMEM __attribute__((noinline)) bool QuadCapture_Render(uint8_t *frame2048) {
+  AppQuadrants *q = QuadCapture_CurrentApp();
+  if (!q) return false;
+  q->RenderQuadCapture(frame2048);
+  return true;
+}
+
+FLASHMEM __attribute__((noinline)) bool QuadCapture_RenderAudio(uint8_t *frame1024) {
+  AppQuadrants *q = QuadCapture_CurrentApp();
+  if (!q) return false;
+  q->RenderAudioCapture(frame1024);
+  return true;
+}
+
+FLASHMEM __attribute__((noinline)) bool QuadCapture_RenderMidi(uint8_t *frame1024) {
+  AppQuadrants *q = QuadCapture_CurrentApp();
+  if (!q) return false;
+  q->RenderMidiMapCapture(frame1024);
+  return true;
+}
+
+// Current L/R audio input peak levels (0..1) for the viewer's level graphs.
+FLASHMEM __attribute__((noinline)) bool QuadCapture_InputLevels(float &l, float &r) {
+  if (!QuadCapture_CurrentApp()) return false;
+  l = audio_app.InputPeak(0);
+  r = audio_app.InputPeak(1);
+  return true;
+}
+
+static int g_focused_slot = 0;   // last slot the viewer focused (for prev/next app)
+
+// Click-to-activate: bring slot (0..3) onto its side so its encoder drives it.
+FLASHMEM __attribute__((noinline)) bool QuadCapture_SwitchToSlot(int slot) {
+  AppQuadrants *q = QuadCapture_CurrentApp();
+  if (!q || slot < 0 || slot > 3) return false;
+  q->SwitchToSlot((HEM_SIDE)slot);
+  g_focused_slot = slot;
+  return true;
+}
+
+// Change the focused slot's applet to prev/next (dir -1/+1).
+FLASHMEM __attribute__((noinline)) bool QuadCapture_ChangeApplet(int dir) {
+  AppQuadrants *q = QuadCapture_CurrentApp();
+  if (!q) return false;
+  q->ChangeAppletInSlot(g_focused_slot, dir);
+  return true;
+}
+
+// Step to prev/next preset (dir -1/+1).
+FLASHMEM __attribute__((noinline)) bool QuadCapture_ChangePreset(int dir) {
+  AppQuadrants *q = QuadCapture_CurrentApp();
+  if (!q) return false;
+  q->ChangePreset(dir);
+  return true;
+}
+
+// Enter/leave the Audio Setup view.
+FLASHMEM __attribute__((noinline)) bool QuadCapture_SetAudioView(bool on) {
+  AppQuadrants *q = QuadCapture_CurrentApp();
+  if (!q) return false;
+  q->SetAudioSetup(on);
+  return true;
+}
+
+// Which slots are currently active + current preset (for the viewer).
+FLASHMEM __attribute__((noinline)) bool QuadCapture_ControlState(int &left, int &right, int &full, int &preset) {
+  AppQuadrants *q = QuadCapture_CurrentApp();
+  if (!q) return false;
+  q->GetActiveSlots(left, right, full, preset);
+  return true;
+}
+
+// Save current state into preset slot (0..31); persists the bank to flash.
+FLASHMEM __attribute__((noinline)) bool QuadCapture_SavePreset(int slot) {
+  AppQuadrants *q = QuadCapture_CurrentApp();
+  if (!q) return false;
+  q->SavePresetSlot(slot);
+  return true;
+}
+
+// Stream the whole bank file to the host for backup.
+FLASHMEM __attribute__((noinline)) bool QuadCapture_BackupBank() {
+  AppQuadrants *q = QuadCapture_CurrentApp();
+  if (!q) return false;
+  q->StreamBankBackup();
+  return true;
+}
+
+#ifdef QUAD_CAPTURE
+// Dual oscilloscope for the external viewer ('O' command): select a slot's
+// source + time window and copy a snapshot of its recent waveform into dst as
+// 256 big-endian int16 samples (512 bytes). slot: 'A'/'B'; sel: '1'..'8' = CV
+// outs A..H (millivolts), 'a'..'h' = CV ins 1..8 (millivolts), 't'..'w' =
+// trigger ins 1..4 (0/5000 mV gate trace), 'L'/'R' = audio outs, 'i'/'j' =
+// audio ins L/R (raw 16-bit PCM); win: '0'..'3' time base. See quad_scope.h /
+// PROTOCOL.md.
+// FLASHMEM: cold path (a few calls/s from the serial handler) — keeps the
+// selection/snapshot code out of ITCM, which is allocated in 32 KB blocks
+// and was overflowing RAM1.
+FLASHMEM bool QuadCapture_ScopeCapture(char slot_c, char sel, char win_c, uint8_t *dst) {
+  if (!QuadCapture_CurrentApp()) return false;
+  const int slot = (slot_c == 'A') ? 0 : (slot_c == 'B') ? 1 : -1;
+  if (slot < 0) return false;
+  const uint8_t win = (win_c >= '0' && win_c <= '3') ? (uint8_t)(win_c - '0') : 0;
+  QuadScope::Chan &c = QuadScope::chans[slot];
+  if (sel >= '1' && sel <= '8') {
+    const int ch = sel - '1';
+    if (c.source != ch || c.win != win) c.SelectCV(ch, win);
+  } else if (sel >= 'a' && sel <= 'h') {
+    const int ch = sel - 'a';
+    if (c.source != QuadScope::CVIN_BASE + ch || c.win != win) c.SelectCVIn(ch, win);
+  } else if (sel >= 't' && sel <= 'w') {
+    const int ch = sel - 't';
+    if (c.source != QuadScope::TR_BASE + ch || c.win != win) c.SelectTR(ch, win);
+  } else if (sel == 'L' || sel == 'R') {
+    // Audio out: tap the cached final-stage stream. The cache is maintained
+    // by the subapp's re-patch hook (QuadScopeTapOutput), which also moves
+    // the tap automatically when applets change.
+    const int ch = (sel == 'R') ? 1 : 0;
+    c.SelectAudioSrc((int8_t)(QuadScope::AUDIO_L + ch), win);
+    QuadScope::RetargetAudio(slot, QuadScope::out_stream[ch], QuadScope::out_ch[ch]);
+  } else if (sel == 'i' || sel == 'j') {
+    // Audio in: tap the permanent input object (never re-patched, never stale).
+    const int ch = (sel == 'j') ? 1 : 0;
+    c.SelectAudioSrc((int8_t)(QuadScope::AUDIO_IN_L + ch), win);
+    QuadScope::RetargetAudio(slot, &OC::AudioIO::InputStream(), ch);
+  } else {
+    return false;
+  }
+  int16_t snap[QuadScope::kSamples];
+  c.snapshot(snap);
+  for (size_t i = 0; i < QuadScope::kSamples; i++) {
+    dst[2*i]     = (uint8_t)(((uint16_t)snap[i]) >> 8);
+    dst[2*i + 1] = (uint8_t)((uint16_t)snap[i] & 0xFF);
+  }
+  return true;
+}
+
+// One-line diagnostic dump ('O' <slot> '?' <win>): protocol version, whether a
+// CrashReport is pending (i.e. the module hard-faulted and rebooted), the live
+// CV-in pitch values in raw array order, the DAC codes, the runtime channel
+// remap tables, and both scope slots' state. Lets the viewer/console reveal
+// exactly what the firmware sees without a debugger.
+FLASHMEM void QuadCapture_ScopeDebug() {
+  Serial.print("DBG v3 crash=");
+  Serial.print((bool)CrashReport ? 1 : 0);
+  Serial.print(" pv=[");
+  for (int i = 0; i < ADC_CHANNEL_COUNT; i++) {
+    if (i) Serial.print(',');
+    Serial.print(HS::frame.In(i));
+  }
+  Serial.print("] dac=[");
+  for (int i = 0; i < DAC_CHANNEL_COUNT; i++) {
+    if (i) Serial.print(',');
+    Serial.print(OC::DAC::value(i));
+  }
+  Serial.print("] adcmap=[");
+  const int am[8] = { ADC_CHANNEL_1, ADC_CHANNEL_2, ADC_CHANNEL_3, ADC_CHANNEL_4,
+                      ADC_CHANNEL_5, ADC_CHANNEL_6, ADC_CHANNEL_7, ADC_CHANNEL_8 };
+  for (int i = 0; i < 8; i++) { if (i) Serial.print(','); Serial.print(am[i]); }
+  Serial.print("] dacmap=[");
+  const int dm[8] = { DAC_CHANNEL_A, DAC_CHANNEL_B, DAC_CHANNEL_C, DAC_CHANNEL_D,
+                      DAC_CHANNEL_E, DAC_CHANNEL_F, DAC_CHANNEL_G, DAC_CHANNEL_H };
+  for (int i = 0; i < 8; i++) { if (i) Serial.print(','); Serial.print(dm[i]); }
+  Serial.print("] scopes=[");
+  for (int s = 0; s < 2; s++) {
+    if (s) Serial.print(';');
+    Serial.print(QuadScope::chans[s].source); Serial.print('/');
+    Serial.print(QuadScope::chans[s].phys);   Serial.print('/');
+    Serial.print(QuadScope::chans[s].win);    Serial.print('/');
+    Serial.print(QuadScope::tap_srcs[s] ? 1 : 0);
+  }
+  Serial.println("]");
+  Serial.flush();
+}
+#endif // QUAD_CAPTURE
+
 ////////////////////////////////////////////////////////////////////////////////
 //// O_C App Functions
 ////////////////////////////////////////////////////////////////////////////////
@@ -1741,6 +2057,9 @@ size_t AppQuadrants::RestoreAppData(util::StreamBufferReader &stream_buffer) {
 
 void AppQuadrants::Process(OC::IOFrame *ioframe) {
   BaseController(ioframe);
+#ifdef QUAD_CAPTURE
+  QuadScope::Sample(ioframe);   // feed the external viewer's oscilloscopes ('O')
+#endif
 }
 void AppQuadrants::GetIOConfig(OC::IOConfig &ioconfig) const
 {
