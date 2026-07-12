@@ -41,6 +41,10 @@
 #include "OC_ui.h"
 #include "OC_options.h"
 #include "src/drivers/display.h"
+#ifdef QUAD_CAPTURE
+#include "quad_capture.h" // 4-up Quadrants screen capture ('Q' command)
+#include "quad_capture_midi.h" // same capture over USB-MIDI SysEx (for iPad/iOS)
+#endif
 #include "src/drivers/ADC/OC_util_ADC.h"
 #include "util/util_debugpins.h"
 #include "VBiasManager.h"
@@ -379,10 +383,44 @@ void setup() {
 
   OC::app_switcher.current_app()->DispatchAppEvent(OC::APP_EVENT_RESUME);
 
+#ifdef QUAD_CAPTURE
+  QuadMidi::begin();   // register the SysEx capture handler (iPad/USB-MIDI path)
+#endif
+
   SERIAL_PRINTLN("[End of setup()]");
 }
 
 /*  ---------    main loop  --------  */
+
+#ifdef QUAD_CAPTURE
+// Remote control from the web/desktop viewer. A '~' byte over serial is followed
+// by one selector byte that maps to a button click or an encoder detent.
+static void RemoteControl(int sel) {
+  using namespace OC;
+  switch (sel) {
+    case 'A': ui.InjectButton(CONTROL_BUTTON_A); break;
+    case 'B': ui.InjectButton(CONTROL_BUTTON_B); break;
+    case 'X': ui.InjectButton(CONTROL_BUTTON_X); break;
+    case 'Y': ui.InjectButton(CONTROL_BUTTON_Y); break;
+    case 'Z': ui.InjectButton(CONTROL_BUTTON_Z); break;
+    case 'l': ui.InjectButton(CONTROL_BUTTON_L); break;   // left encoder push
+    case 'r': ui.InjectButton(CONTROL_BUTTON_R); break;   // right encoder push
+    case '(': ui.InjectEncoder(CONTROL_ENCODER_L, -1); break;
+    case ')': ui.InjectEncoder(CONTROL_ENCODER_L,  1); break;
+    case '[': ui.InjectEncoder(CONTROL_ENCODER_R, -1); break;
+    case ']': ui.InjectEncoder(CONTROL_ENCODER_R,  1); break;
+    case '0': case '1': case '2': case '3':
+      QuadCapture_SwitchToSlot(sel - '0'); break;   // click-to-activate a quadrant
+    case '<': QuadCapture_ChangeApplet(-1); break;  // focused slot: previous applet
+    case '>': QuadCapture_ChangeApplet( 1); break;  // focused slot: next applet
+    case 'o': QuadCapture_ChangePreset(-1); break;  // previous preset
+    case 'p': QuadCapture_ChangePreset( 1); break;  // next preset
+    case 'S': QuadCapture_SetAudioView(true);  break; // enter Audio Setup view
+    case 'Q': QuadCapture_SetAudioView(false); break; // back to Quadrants view
+    default: break;
+  }
+}
+#endif // QUAD_CAPTURE
 
 void FASTRUN loop() {
   using namespace OC;
@@ -542,6 +580,89 @@ void FASTRUN loop() {
             // simulate Right Encoder turn
             break;
 #endif
+#ifdef QUAD_CAPTURE
+          case 'Q':
+            // 4-up Quadrants capture: render all four applets into a 128x128
+            // frame and stream it below. Falls through to nothing if Quadrants
+            // isn't the active app. Stock single-frame capture is unaffected.
+            QuadCapture::request();
+            break;
+          case 'A':
+            // Audio DSP stack view (128x64) for the external viewer.
+            QuadCapture::requestAudio();
+            break;
+          case 'M':
+            // MIDI map page (128x64) for the external viewer.
+            QuadCapture::requestMidi();
+            break;
+          case 'O': {
+            // Oscilloscope: 'O' <slot 'A'|'B'> <src> <win '0'-'3'>. src:
+            // '1'-'8' CV out, 'a'-'h' CV in, 't'-'w' trig in, 'L'/'R' audio out.
+            // Streams a 512-byte snapshot (256 big-endian int16 samples) of
+            // that slot's ring via the chunked hex sender below.
+            char b[3];
+            int n = 0;
+            uint32_t t0 = millis();
+            while (n < 3 && (millis() - t0) < 8) {
+              if (Serial.available()) b[n++] = Serial.read();
+            }
+            if (n == 3) {
+              if (b[1] == '?') {
+                // diagnostic state line (protocol version, crash flag, live values)
+                QuadCapture_ScopeDebug();
+              } else if (b[1] == '!') {
+                // dump + clear the CrashReport from the last hard fault, if any
+                if (CrashReport) Serial.print(CrashReport);
+                else Serial.println("NOCRASH");
+                Serial.println("ENDCRASH");
+                Serial.flush();
+              } else {
+                QuadCapture::requestScope(b[0], b[1], b[2]);
+              }
+            }
+            break;
+          }
+          case '~': {
+            // Remote control: the next byte selects a button/encoder to inject.
+            uint32_t t0 = millis();
+            while (!Serial.available() && (millis() - t0) < 5) { /* await selector */ }
+            if (Serial.available()) RemoteControl(Serial.read());
+            break;
+          }
+          case 'T': {
+            // Control state: reply "left,right,full,preset\n".
+            int l = 0, r = 0, f = -1, pre = -1;
+            if (QuadCapture_ControlState(l, r, f, pre)) {
+              Serial.print(l);   Serial.print(',');
+              Serial.print(r);   Serial.print(',');
+              Serial.print(f);   Serial.print(',');
+              Serial.println(pre);
+              Serial.flush();
+            }
+            break;
+          }
+          case 'W': {
+            // Save current state to a preset slot: next byte = slot + 33.
+            uint32_t t0 = millis();
+            while (!Serial.available() && (millis() - t0) < 5) { /* await slot */ }
+            if (Serial.available()) QuadCapture_SavePreset(Serial.read() - 33);
+            break;
+          }
+          case 'B':
+            // Backup: stream the whole bank file to the host.
+            QuadCapture_BackupBank();
+            break;
+          case 'V': {
+            // Audio input levels: reply immediately with "L,R\n" (peaks 0..1).
+            float lvl_l = 0.f, lvl_r = 0.f;
+            if (QuadCapture_InputLevels(lvl_l, lvl_r)) {
+              Serial.print(lvl_l, 4); Serial.print(',');
+              Serial.println(lvl_r, 4);
+              Serial.flush();
+            }
+            break;
+          }
+#endif // QUAD_CAPTURE
           default:
             capreq = true;
             break;
@@ -552,6 +673,20 @@ void FASTRUN loop() {
         cap_idx = 0;
       }
     }
+
+#ifdef QUAD_CAPTURE
+    // stream an armed quad/audio frame quickly (its own faster pacing than the
+    // stock 'S' path) so the external display updates smoothly. 128 bytes every
+    // 250us ~= a 2048-byte quad frame in ~4ms; USB CDC handles this easily.
+    static elapsedMicros quad_send_time = 0;
+    if (QuadCapture::busy() && quad_send_time > 250) {
+      quad_send_time = 0;
+      QuadCapture::service(128);
+    }
+
+    // service any pending USB-MIDI SysEx capture request (iPad path)
+    QuadMidi::service();
+#endif // QUAD_CAPTURE
 
     // check for frame buffer to have capture data ready
     const uint8_t *capture_data = display::frame_buffer.captured();
