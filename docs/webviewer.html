@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<!--
+  Phazerville Quad Viewer  —  zero-install WebSerial display
+  ==========================================================
+  External monitor for a CalSynth XLOC2 / ORN8 / Teensy 4.1 running Phazerville
+  Suite with the quad_capture firmware patch.
+
+  Left column : Quadrants 4-up (all four CV applets)          command 'Q' (2048B)
+  Right column: audio DSP stack                               command 'A' (1024B)
+                + two real-time L/R audio input-level graphs  command 'V' ("l,r")
+  Bottom row  : two independent oscilloscopes, each with      command 'O'+slot+
+                source (CV out 1-8 / audio out L/R), vertical  src+win (512B)
+                scale, time base, and freeze
+
+  Capture is USB *Serial* (CDC), not HID. Needs Chrome / Edge / Arc. Open this
+  file, click Connect, pick the module's serial port.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Phazerville Quad Viewer</title>
+<style>
+  html,body { margin:0; height:100%; background:#000; color:#ccc;
+              font-family: ui-monospace, Menlo, Consolas, monospace; }
+  #bar { display:flex; gap:8px; align-items:center; padding:8px 12px;
+         background:#0c0c0e; border-bottom:1px solid #222; flex-wrap:wrap; }
+  button { background:#1b1b20; color:#ddd; border:1px solid #333; border-radius:6px;
+           padding:6px 12px; cursor:pointer; font:inherit; }
+  button:hover { background:#26262d; }
+  button:disabled { opacity:.4; cursor:default; }
+  button.on { background:#2b3b2b; border-color:#4a7a4a; color:#dfe; }
+  #status { color:#888; margin-left:auto; font-size:13px; }
+  #tag { padding:2px 8px; border:1px solid #444; border-radius:10px; font-size:12px; color:#aaa; }
+  .sep { width:1px; align-self:stretch; background:#282830; margin:0 2px; }
+  #panels { display:flex; flex-direction:column; align-items:center;
+            gap:20px; padding:16px; height:calc(100% - 49px); box-sizing:border-box; overflow:auto; }
+  #toprow, #scoperow { display:flex; flex-direction:row; align-items:flex-start;
+                       justify-content:center; gap:20px; }
+  .col { display:flex; flex-direction:column; align-items:center; gap:10px; }
+  .panel { display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .plabel { font-size:12px; color:#777; letter-spacing:.05em; text-transform:uppercase; }
+  canvas { image-rendering: pixelated; display:block; }
+  #panel-quad canvas { cursor: pointer; }
+  :fullscreen #bar { display:none; }
+  :fullscreen #panels { height:100%; }
+  #control { display:flex; flex-wrap:wrap; gap:18px; align-items:center; justify-content:center;
+             padding:12px; background:#0c0c0e; border-top:1px solid #222; }
+  .cgroup { display:flex; align-items:center; gap:6px; padding:6px 10px;
+            background:#141418; border:1px solid #262630; border-radius:10px; }
+  .clbl { font-size:11px; color:#888; letter-spacing:.05em; margin-right:2px; }
+  .cbtn { min-width:38px; height:38px; font-size:15px; }
+  .jog { width:150px; accent-color:#4a7a4a; }
+  #quadctl { display:flex; flex-wrap:wrap; gap:5px; justify-content:center; margin-top:8px; box-sizing:border-box; }
+  #mode { font-size:12px; color:#9c9; border:1px solid #2a3a2a; border-radius:10px; padding:2px 8px; }
+  #mode.audio { color:#fe6; border-color:#5a4a1a; }
+  #preset { font-size:12px; color:#bbb; }
+  #preset.dirty { color:#fe6; }
+  #saveslot { width:48px; background:#141418; color:#ddd; border:1px solid #333; border-radius:6px; padding:5px; font:inherit; }
+  #panel-audio.audio-active { outline:3px solid rgba(255,225,80,.95); outline-offset:3px; border-radius:4px; }
+  .sctl { display:flex; flex-wrap:wrap; gap:6px; align-items:center; justify-content:center; margin-top:2px; }
+  .sctl select { background:#141418; color:#ddd; border:1px solid #333; border-radius:6px; padding:5px; font:inherit; font-size:12px; }
+  .s-freeze.on { background:#3b2b2b; border-color:#7a4a4a; color:#fdd; }
+</style>
+</head>
+<body>
+  <div id="bar">
+    <button id="connect">Connect</button>
+    <button id="disconnect" disabled>Disconnect</button>
+    <span id="tag">–</span>
+    <span class="sep"></span>
+    <button id="t-quad"   class="on" disabled>Quadrants</button>
+    <button id="t-audio"  class="on" disabled>Audio</button>
+    <button id="t-graphs" class="on" disabled>Graphs</button>
+    <button id="t-scope" class="on" disabled>Scope</button>
+    <button id="t-control" disabled>Control</button>
+    <span id="mode" title="Space toggles Quadrants / Audio">MODE: QUADRANTS</span>
+    <span class="sep"></span>
+    <span id="preset" title="current preset (● = unsaved remote changes)">Preset: –</span>
+    <input id="saveslot" type="number" min="0" max="31" value="0" title="slot to save into">
+    <button id="savebtn" disabled>Save</button>
+    <button id="backupbtn" disabled>Backup</button>
+    <span class="sep"></span>
+    <button id="color">Color</button>
+    <button id="save" disabled>Save PNG</button>
+    <button id="full">Fullscreen</button>
+    <span id="status">Web Serial: click Connect and pick the module's serial port.</span>
+  </div>
+
+  <div id="panels">
+   <div id="toprow">
+    <div class="col" id="col-left">
+      <div class="panel" id="panel-quad"><div class="plabel">Quadrants — 4-up</div><canvas></canvas></div>
+      <div id="quadctl">
+        <button class="cbtn" data-q="cursorPrev" title="cursor up (W / ↑)">▲</button>
+        <button class="cbtn" data-q="cursorNext" title="cursor down (S / ↓)">▼</button>
+        <button class="cbtn" data-q="edit" title="select param (X)">edit</button>
+        <button class="cbtn" data-q="valDn" title="value − (C)">val −</button>
+        <button class="cbtn" data-q="valUp" title="value + (Z)">val +</button>
+        <button class="cbtn" data-q="prevApp" title="previous applet (Q)">◀ app</button>
+        <button class="cbtn" data-q="nextApp" title="next applet (E)">app ▶</button>
+        <button class="cbtn" data-q="prevPre" title="previous preset (O)">◀ preset</button>
+        <button class="cbtn" data-q="nextPre" title="next preset (P)">preset ▶</button>
+      </div>
+    </div>
+    <div class="col" id="col-right">
+      <div class="panel" id="panel-audio"><div class="plabel">Audio stack</div><canvas></canvas></div>
+      <div class="panel" id="graph-l"><canvas></canvas></div>
+      <div class="panel" id="graph-r"><canvas></canvas></div>
+    </div>
+   </div>
+   <div id="scoperow">
+      <div class="panel scopepanel" id="scope-0">
+        <canvas></canvas>
+        <div class="sctl">
+          <select class="s-src" title="scope A source"></select>
+          <select class="s-vs" title="vertical scale"></select>
+          <select class="s-win" title="time base (window length)"></select>
+          <button class="s-odn" title="shift view down (see higher voltages)">▼</button>
+          <button class="s-oz" title="reset offset">0</button>
+          <button class="s-oup" title="shift view up (see lower voltages)">▲</button>
+          <button class="s-freeze" title="freeze / resume the trace">Freeze</button>
+        </div>
+      </div>
+      <div class="panel scopepanel" id="scope-1">
+        <canvas></canvas>
+        <div class="sctl">
+          <select class="s-src" title="scope B source"></select>
+          <select class="s-vs" title="vertical scale"></select>
+          <select class="s-win" title="time base (window length)"></select>
+          <button class="s-odn" title="shift view down (see higher voltages)">▼</button>
+          <button class="s-oz" title="reset offset">0</button>
+          <button class="s-oup" title="shift view up (see lower voltages)">▲</button>
+          <button class="s-freeze" title="freeze / resume the trace">Freeze</button>
+        </div>
+      </div>
+   </div>
+  </div>
+
+  <div id="control" hidden>
+    <div class="cgroup">
+      <span class="clbl">Buttons</span>
+      <button class="cbtn" data-ctl="A">A</button>
+      <button class="cbtn" data-ctl="B">B</button>
+      <button class="cbtn" data-ctl="X">X</button>
+      <button class="cbtn" data-ctl="Y">Y</button>
+      <button class="cbtn" data-ctl="Z">Z</button>
+    </div>
+    <div class="cgroup">
+      <span class="clbl">L enc</span>
+      <button class="cbtn" data-hold="(">◀</button>
+      <button class="cbtn" data-ctl="l">push</button>
+      <button class="cbtn" data-hold=")">▶</button>
+      <input class="jog" type="range" min="-30" max="30" value="0" data-cw=")" data-ccw="(">
+    </div>
+    <div class="cgroup">
+      <span class="clbl">R enc</span>
+      <button class="cbtn" data-hold="[">◀</button>
+      <button class="cbtn" data-ctl="r">push</button>
+      <button class="cbtn" data-hold="]">▶</button>
+      <input class="jog" type="range" min="-30" max="30" value="0" data-cw="]" data-ccw="[">
+    </div>
+  </div>
+
+<script>
+const OLED_W = 128;
+const BG = [8, 8, 10];
+const PHOSPHORS = [
+  { name:"amber", rgb:[255,176,0] },
+  { name:"green", rgb:[0,255,120] },
+  { name:"white", rgb:[235,235,245] },
+  { name:"blue",  rgb:[90,180,255] },
+];
+
+// framebuffer panels
+const PANELS = {
+  quad:  { cmd:"Q", on:true, el:"panel-quad",  btn:"t-quad",  native:null, grid:true  },
+  audio: { cmd:"A", on:true, el:"panel-audio", btn:"t-audio", native:null, grid:false },
+};
+const GRAPHS = { on:true, btn:"t-graphs" };
+// Oscilloscopes: two independent slots (A/B). src "1".."8" = CV outs A..H
+// (mV), "L"/"R" = audio outs (PCM), "" = off. win 0..3 = firmware time base
+// (decimation x1/2/4/8). vs = vertical-scale index. misses: consecutive
+// no-replies; at 3 we stop polling that slot (old firmware treats our bytes
+// as stock-capture requests, which freezes the module's display).
+const SCOPE = { on:true };
+const SCOPES = [
+  { src:"1", vs:0, win:0, off:0, frozen:false, data:null, misses:0 },
+  { src:"L", vs:0, win:0, off:0, frozen:false, data:null, misses:0 },
+];
+const SCOPE_CV_RATE = 16666.6/16, SCOPE_AUDIO_RATE = 44100/2;   // win-0 rates, per PROTOCOL.md
+// vertical-scale tables: [label, vMin, vMax]
+const CV_VS = [["±10 V",-10,10],["-3…+6 V",-3,6],["±3 V",-3,3],["±1 V",-1,1],["±0.5 V",-0.5,0.5]];
+const AU_VS = [["±1.0",-1,1],["±0.5",-0.5,0.5],["±0.25",-0.25,0.25],["±0.1",-0.1,0.1]];
+const isAudioSrc = src => src === "L" || src === "R" || src === "i" || src === "j";
+
+let curL = 0, curR = 0, peakL = 0, peakR = 0, levelsSeen = false;
+let activeSlots = { left: 0, right: 1, full: -1 };   // which quadrants are being driven
+let focusedSlot = 0;                                 // quadrant targeted for control/params
+let mode = "quad";                                   // "quad" or "audio"
+let audioLevel = 0;                                  // 0 stack, 1 slot-selected, 2 in-applet
+let presetId = -1, presetDirty = false;              // current preset + unsaved-remote-changes flag
+let ioBusy = false;                                  // pause frame polling during backup
+const SLOT_NAMES = ["NW","NE","SW","SE"];
+const clamp01 = v => Math.min(1, Math.max(0, v||0));
+
+let port=null, reader=null, writer=null, running=false;
+let colorIdx=0, lastFrameFetch=0;
+
+const $ = id => document.getElementById(id);
+const enc = new TextEncoder();
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+const setStatus = t => $("status").textContent = t;
+const setTag = t => $("tag").textContent = t;
+
+// --- persisted prefs (local file, not a sandboxed artifact -> storage is fine)
+try {
+  const s = JSON.parse(localStorage.getItem("phaz_prefs2")||"{}");
+  if (typeof s.colorIdx==="number") colorIdx = s.colorIdx;
+  if (typeof s.quad==="boolean")   PANELS.quad.on = s.quad;
+  if (typeof s.audio==="boolean")  PANELS.audio.on = s.audio;
+  if (typeof s.graphs==="boolean") GRAPHS.on = s.graphs;
+  if (typeof s.scope==="boolean")  SCOPE.on = s.scope;
+  if (Array.isArray(s.scopes)) s.scopes.forEach((p,i)=>{
+    if (!SCOPES[i] || !p) return;
+    if (typeof p.src==="string") SCOPES[i].src = p.src;
+    if (typeof p.vs==="number")  SCOPES[i].vs  = Math.min(4, Math.max(0, p.vs));
+    if (typeof p.win==="number") SCOPES[i].win = Math.min(3, Math.max(0, p.win));
+    if (typeof p.off==="number") SCOPES[i].off = Math.min(20, Math.max(-20, p.off));
+  });
+} catch(e){}
+function savePrefs(){
+  try { localStorage.setItem("phaz_prefs2", JSON.stringify(
+    { colorIdx, quad:PANELS.quad.on, audio:PANELS.audio.on, graphs:GRAPHS.on,
+      scope:SCOPE.on,
+      scopes:SCOPES.map(sc=>({src:sc.src, vs:sc.vs, win:sc.win, off:sc.off})) })); } catch(e){}
+}
+
+function syncUI(){
+  $("t-quad").classList.toggle("on", PANELS.quad.on);
+  $("t-audio").classList.toggle("on", PANELS.audio.on);
+  $("t-graphs").classList.toggle("on", GRAPHS.on);
+  $("t-scope").classList.toggle("on", SCOPE.on);
+  $("panel-quad").hidden  = !PANELS.quad.on;
+  $("panel-audio").hidden = !PANELS.audio.on;
+  $("graph-l").hidden = !GRAPHS.on;
+  $("graph-r").hidden = !GRAPHS.on;
+  $("scoperow").hidden = !SCOPE.on;
+  $("col-left").hidden  = !PANELS.quad.on;
+  $("col-right").hidden = !(PANELS.audio.on || GRAPHS.on);
+}
+$("t-quad").onclick   = ()=>{ PANELS.quad.on  = !PANELS.quad.on;  syncUI(); savePrefs(); };
+$("t-audio").onclick  = ()=>{ PANELS.audio.on = !PANELS.audio.on; syncUI(); savePrefs(); };
+$("t-graphs").onclick = ()=>{ GRAPHS.on = !GRAPHS.on; syncUI(); savePrefs(); };
+$("t-scope").onclick  = ()=>{ SCOPE.on = !SCOPE.on; syncUI(); savePrefs(); };
+syncUI();
+
+// --- oscilloscope controls ----------------------------------------------------
+// Each scope panel has: source, vertical scale, time base, freeze. The scale
+// and time labels depend on the source type (CV vs audio), so they're rebuilt
+// on source change (indices are preserved).
+function scopeEl(i, cls){ return $("scope-"+i).querySelector(cls); }
+
+function scopeWinLabel(i, w){
+  const sc = SCOPES[i];
+  const rate = (isAudioSrc(sc.src) ? SCOPE_AUDIO_RATE : SCOPE_CV_RATE) / (1 << w);
+  const shown = isAudioSrc(sc.src) ? 128 : 256;    // audio draws half (trigger hunt)
+  const ms = shown / rate * 1000;
+  return ms >= 1000 ? (ms/1000).toFixed(ms >= 2000 ? 0 : 1) + " s" : Math.round(ms) + " ms";
+}
+
+function rebuildScopeSelects(i){
+  const sc = SCOPES[i];
+  const src = scopeEl(i, ".s-src");
+  if (!src.options.length) {
+    let h = '<option value="">Off</option>';
+    for (let n=1; n<=8; n++) h += `<option value="${n}">CV out ${n}</option>`;
+    h += '<option value="L">Audio out L</option><option value="R">Audio out R</option>';
+    h += '<option value="i">Audio in L</option><option value="j">Audio in R</option>';
+    for (let n=1; n<=8; n++) h += `<option value="${"abcdefgh"[n-1]}">CV in ${n}</option>`;
+    for (let n=1; n<=4; n++) h += `<option value="${"tuvw"[n-1]}">Trig in ${n}</option>`;
+    src.innerHTML = h;
+  }
+  src.value = sc.src;
+  const vsTable = isAudioSrc(sc.src) ? AU_VS : CV_VS;
+  scopeEl(i, ".s-vs").innerHTML =
+    vsTable.map((v,ix)=>`<option value="${ix}">${v[0]}</option>`).join("");
+  scopeEl(i, ".s-vs").value = String(sc.vs);
+  scopeEl(i, ".s-win").innerHTML =
+    [0,1,2,3].map(w=>`<option value="${w}">${scopeWinLabel(i,w)}</option>`).join("");
+  scopeEl(i, ".s-win").value = String(sc.win);
+  const dis = !sc.src;
+  for (const c of [".s-vs",".s-win",".s-freeze",".s-odn",".s-oz",".s-oup"]) scopeEl(i, c).disabled = dis;
+}
+
+// vertical-offset step: one grid division of the current range
+function scopeOffStep(i){
+  const sc = SCOPES[i];
+  const t = isAudioSrc(sc.src) ? AU_VS : CV_VS;
+  const vs = t[Math.min(sc.vs, t.length-1)];
+  return (vs[2] - vs[1]) / 8;
+}
+
+for (let i=0; i<2; i++){
+  rebuildScopeSelects(i);
+  scopeEl(i, ".s-src").onchange = ()=>{
+    const sc = SCOPES[i];
+    sc.src = scopeEl(i, ".s-src").value;
+    sc.data = null;             // stale waveform from the old source
+    sc.misses = 0;              // give the firmware another chance
+    sc.off = 0;                 // offset is range-relative; reset on source change
+    rebuildScopeSelects(i);     // scale/time labels follow the source type
+    drawScope(i); savePrefs();
+  };
+  scopeEl(i, ".s-oup").onclick = ()=>{
+    const sc = SCOPES[i];
+    sc.off = Math.max(-20, sc.off - scopeOffStep(i));   // view up = window down
+    drawScope(i); savePrefs();
+  };
+  scopeEl(i, ".s-odn").onclick = ()=>{
+    const sc = SCOPES[i];
+    sc.off = Math.min(20, sc.off + scopeOffStep(i));    // view down = window up
+    drawScope(i); savePrefs();
+  };
+  scopeEl(i, ".s-oz").onclick = ()=>{
+    SCOPES[i].off = 0;
+    drawScope(i); savePrefs();
+  };
+  scopeEl(i, ".s-vs").onchange = ()=>{
+    SCOPES[i].vs = +scopeEl(i, ".s-vs").value;
+    drawScope(i); savePrefs();
+  };
+  scopeEl(i, ".s-win").onchange = ()=>{
+    const sc = SCOPES[i];
+    sc.win = +scopeEl(i, ".s-win").value;
+    sc.data = null;             // firmware clears its ring on window change
+    sc.misses = 0;
+    drawScope(i); savePrefs();
+  };
+  scopeEl(i, ".s-freeze").onclick = ()=>{
+    const sc = SCOPES[i], b = scopeEl(i, ".s-freeze");
+    sc.frozen = !sc.frozen;
+    b.classList.toggle("on", sc.frozen);
+    b.textContent = sc.frozen ? "Run" : "Freeze";
+    drawScope(i);
+  };
+}
+
+// --- remote control (buttons / encoders) ------------------------------------
+let showControl = false;
+$("t-control").onclick = ()=>{
+  showControl = !showControl;
+  $("t-control").classList.toggle("on", showControl);
+  $("control").hidden = !showControl;
+};
+// Send a control command: "~" + selector. Selectors: A B X Y Z (buttons),
+// l r (encoder push), ( ) (L enc -/+), [ ] (R enc -/+).
+async function sendControl(sel){
+  if (!writer) return;
+  try { await writer.write(enc.encode("~" + sel)); } catch(e){}
+}
+function wireControl(){
+  document.querySelectorAll("#control [data-ctl]").forEach(b=>{
+    b.addEventListener("click", ()=> sendControl(b.dataset.ctl));
+  });
+  document.querySelectorAll("#control [data-hold]").forEach(b=>{     // auto-repeat while held
+    let iv = null;
+    const start = (e)=>{ e.preventDefault(); sendControl(b.dataset.hold); iv = setInterval(()=>sendControl(b.dataset.hold), 110); };
+    const stop  = ()=>{ if (iv){ clearInterval(iv); iv = null; } };
+    b.addEventListener("pointerdown", start);
+    for (const ev of ["pointerup","pointerleave","pointercancel"]) b.addEventListener(ev, stop);
+  });
+  document.querySelectorAll("#control .jog").forEach(s=>{            // scrub = relative detents
+    let last = 0;
+    s.addEventListener("input", ()=>{
+      const v = +s.value; const d = v - last; last = v;
+      if (!d) return;
+      const sel = d > 0 ? s.dataset.cw : s.dataset.ccw;
+      const n = Math.min(Math.abs(d), 4);   // cap per event (16-deep device queue)
+      for (let i=0;i<n;i++) sendControl(sel);
+    });
+    const reset = ()=>{ last = 0; s.value = 0; };   // recenter without sending
+    for (const ev of ["pointerup","pointercancel","change"]) s.addEventListener(ev, reset);
+  });
+}
+wireControl();
+
+// --- quad control bar (under the quad) --------------------------------------
+// Buttons act on the focused quadrant's side encoder / applet / preset.
+document.querySelectorAll("#quadctl [data-q]").forEach(b=>{
+  b.addEventListener("click", ()=> quadAction(b.dataset.q));
+});
+function quadAction(a){
+  const side = focusedSlot & 1;                 // 0 = left encoder, 1 = right encoder
+  const turnDn = side ? "[" : "(", turnUp = side ? "]" : ")", push = side ? "r" : "l";
+  switch (a) {
+    case "cursorPrev": sendControl(turnDn); break;   // move applet cursor
+    case "cursorNext": sendControl(turnUp); break;
+    case "edit":       sendControl(push);   break;   // select/edit param
+    case "valDn":      sendControl(turnDn); break;   // value − (when editing)
+    case "valUp":      sendControl(turnUp); break;   // value +
+    case "prevApp":    sendControl(String(focusedSlot)); sendControl("<"); break;
+    case "nextApp":    sendControl(String(focusedSlot)); sendControl(">"); break;
+    case "prevPre":    sendControl("o"); break;
+    case "nextPre":    sendControl("p"); break;
+  }
+  if (a==="edit" || a==="valDn" || a==="valUp" || a==="prevApp" || a==="nextApp") markDirty();
+}
+
+// --- presets ----------------------------------------------------------------
+function updatePresetUI(){
+  const el = $("preset");
+  el.textContent = "Preset: " + (presetId < 0 ? "–" : presetId) + (presetDirty ? " ●" : "");
+  el.classList.toggle("dirty", presetDirty);
+}
+function markDirty(){ if (!presetDirty){ presetDirty = true; updatePresetUI(); } }
+
+async function sendRaw(str){ if (!writer) return; try { await writer.write(enc.encode(str)); } catch(e){} }
+
+function savePreset(){
+  const slot = Math.max(0, Math.min(31, parseInt($("saveslot").value) || 0));
+  sendRaw("W" + String.fromCharCode(33 + slot));   // 'W' + (slot+33)
+  presetId = slot; presetDirty = false; updatePresetUI();
+  setStatus("Saved preset " + slot);
+}
+
+async function backupBank(){
+  if (!writer) return;
+  setStatus("Backing up bank…");
+  ioBusy = true; await sleep(25);                 // pause the poll loop
+  const res = await transactBackup();
+  ioBusy = false;
+  if (!res) { setStatus("Backup failed (no bank file yet? save a preset first)"); return; }
+  const a = document.createElement("a");
+  a.download = res.name || "BANK_000.DAT";
+  a.href = URL.createObjectURL(new Blob([res.bytes]));
+  a.click(); URL.revokeObjectURL(a.href);
+  setStatus("Backed up " + res.name + " (" + res.bytes.length + " bytes)");
+}
+async function transactBackup(timeoutMs=6000){
+  flushInput();
+  await sendRaw("B");
+  const deadline = performance.now() + timeoutMs;
+  let header = null;
+  while (performance.now() < deadline) {
+    while (inbox.length) {
+      const line = inbox.shift();
+      if (!header) {
+        if (line.startsWith("BANK ")) {
+          const p = line.split(" ");
+          if (p[1] === "ERR") return null;
+          header = { name: p[1], size: parseInt(p[2]) || 0 };
+          if (header.size === 0) return { name: header.name, bytes: new Uint8Array(0) };
+        }
+      } else if (line.length >= header.size * 2) {
+        const bytes = new Uint8Array(header.size);
+        for (let i = 0; i < header.size; i++) bytes[i] = parseInt(line.substr(i*2, 2), 16);
+        return { name: header.name, bytes };
+      }
+    }
+    await sleep(3);
+  }
+  return null;
+}
+$("savebtn").onclick = savePreset;
+$("backupbtn").onclick = backupBank;
+
+// --- mode switch (Space) ----------------------------------------------------
+function setMode(m){
+  mode = m;
+  audioLevel = 0;
+  const audio = (m === "audio");
+  $("mode").textContent = "MODE: " + (audio ? "AUDIO" : "QUADRANTS");
+  $("mode").classList.toggle("audio", audio);
+  $("panel-audio").classList.toggle("audio-active", audio);
+  if (!PANELS.audio.on && audio) { PANELS.audio.on = true; syncUI(); savePrefs(); }  // ensure audio visible
+  sendControl(audio ? "S" : "Q");   // enter / leave the device's Audio Setup view
+}
+
+// --- keyboard ---------------------------------------------------------------
+window.addEventListener("keydown", (e)=>{
+  if (!running) return;
+  const t = e.target;
+  if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;   // let sliders work
+
+  // Space toggles mode in any context.
+  if (e.key === " " || e.code === "Space") { setMode(mode === "quad" ? "audio" : "quad"); e.preventDefault(); return; }
+
+  let done = true;
+  if (mode === "quad") {
+    const col = focusedSlot & 1, row = (focusedSlot >> 1) & 1;
+    switch (e.key) {
+      case "ArrowUp": case "w": case "W":    setFocus(0*2 + col); break;
+      case "ArrowDown": case "s": case "S":  setFocus(1*2 + col); break;
+      case "ArrowLeft": case "a": case "A":  setFocus(row*2 + 0); break;
+      case "ArrowRight": case "d": case "D": setFocus(row*2 + 1); break;
+      case "x": case "X": quadAction("edit"); break;      // select param
+      case "z": case "Z": quadAction("valUp"); break;     // increase value
+      case "c": case "C": quadAction("valDn"); break;     // decrease value
+      case "q": case "Q": quadAction("prevApp"); break;
+      case "e": case "E": quadAction("nextApp"); break;
+      case "o": case "O": quadAction("prevPre"); break;
+      case "p": case "P": quadAction("nextPre"); break;
+      default: done = false;
+    }
+  } else {  // audio mode — events route to the audio stack (device is in Audio Setup)
+    switch (e.key) {
+      case "ArrowUp": case "w": case "W":    sendControl("("); break;  // up: cursor / scroll / edit-
+      case "ArrowDown": case "s": case "S":  sendControl(")"); break;  // down
+      case "Shift":                          sendControl("l"); audioLevel = Math.min(audioLevel + 1, 2); break; // select slot (push)
+      case "Enter":
+        if (audioLevel >= 2) { sendControl("A"); audioLevel = 0; }     // in applet -> back up to the stack
+        else { sendControl("l"); audioLevel++; }                       // advance (select slot / enter params)
+        break;
+      case "x": case "X": sendControl("l"); break;   // applet select/push (in applet)
+      case "z": case "Z": sendControl(")"); break;   // value + (in applet)
+      case "c": case "C": sendControl("("); break;   // value −
+      case "a": case "A": sendControl("("); break;   // (wasd like quadrants inside applet)
+      case "d": case "D": sendControl(")"); break;
+      default: done = false;
+    }
+    if (["z","Z","c","C","x","X","a","A","d","D","Enter","Shift"].includes(e.key)) markDirty();
+  }
+  if (done) e.preventDefault();
+});
+
+// Click a quadrant in the 4-up view to focus/activate it (encoder-driven).
+$("panel-quad").querySelector("canvas").addEventListener("click", (e) => {
+  const r = e.currentTarget.getBoundingClientRect();
+  if (!r.width || !r.height) return;
+  const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+  const slot = (y < 0.5 ? 0 : 1) * 2 + (x < 0.5 ? 0 : 1);
+  setFocus(slot);
+});
+
+$("connect").onclick = connect;
+$("disconnect").onclick = disconnect;
+$("color").onclick = ()=>{ colorIdx=(colorIdx+1)%PHOSPHORS.length; savePrefs(); setStatus("color: "+PHOSPHORS[colorIdx].name); };
+$("save").onclick = savePng;
+$("full").onclick = ()=>{ document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); };
+
+// Big receive buffer: the default (255 B) overruns easily against our 4 KB hex
+// lines, which kills the read stream and used to wedge the whole port.
+const OPEN_OPTS = { baudRate:115200, bufferSize:262144 };
+
+async function connect(){
+  if (!("serial" in navigator)) { setStatus("Web Serial not supported. Use Chrome / Edge / Arc."); return; }
+  try {
+    port = await navigator.serial.requestPort({ filters:[{ usbVendorId:0x16C0 }] });
+    await port.open(OPEN_OPTS);
+  } catch(e){ setStatus("Connect cancelled/failed: "+e.message); return; }
+  writer = port.writable.getWriter();
+  reader = port.readable.getReader();
+  running = true;
+  for (const sc of SCOPES) sc.misses = 0;
+  $("connect").disabled = true;
+  $("disconnect").disabled = false;
+  $("save").disabled = false;
+  for (const id of ["t-quad","t-audio","t-graphs","t-scope","t-control","savebtn","backupbtn"]) $(id).disabled = false;
+  setStatus("Connected.");
+  pump().catch(()=>{ if (running) recover(); });
+  probeFirmware("connect").then(loop);
+}
+
+// Release everything in an order that works even after a stream error:
+// abort the writer first (discards pending writes that would otherwise hold
+// the lock and make port.close() hang forever — the "must reload the page"
+// failure), then close. Keeps `port` so recover() can reopen it.
+async function teardown(){
+  try { if (reader) await reader.cancel(); } catch(e){}
+  try { if (reader) reader.releaseLock(); } catch(e){}
+  try { if (writer) await writer.abort(); } catch(e){}
+  try { if (writer) writer.releaseLock(); } catch(e){}
+  try { if (port) await port.close(); } catch(e){}
+  reader = writer = null;
+  flushInput();
+}
+
+function uiDisconnected(){
+  $("connect").disabled=false; $("disconnect").disabled=true; $("save").disabled=true;
+  for (const id of ["t-quad","t-audio","t-graphs","t-scope","t-control","savebtn","backupbtn"]) $(id).disabled = true;
+  setTag("–");
+}
+
+async function disconnect(){
+  running = false;
+  await teardown();
+  port = null;
+  uiDisconnected(); setStatus("Disconnected.");
+}
+
+// Auto-recovery: reopen the SAME port (no permission prompt needed) after the
+// link dies — USB hiccup, buffer overrun, module reset. Shared promise so the
+// read pump and the poll loop can't both start a recovery.
+let recoverPromise = null;
+function recover(){
+  if (!recoverPromise) recoverPromise = _recover().finally(()=>{ recoverPromise = null; });
+  return recoverPromise;
+}
+async function _recover(){
+  setStatus("Link lost — reconnecting…");
+  await teardown();
+  for (let i = 0; i < 20 && running && port; i++){
+    await sleep(500);
+    try {
+      await port.open(OPEN_OPTS);
+      writer = port.writable.getWriter();
+      reader = port.readable.getReader();
+      for (const sc of SCOPES) sc.misses = 0;
+      setStatus("Reconnected.");
+      pump().catch(()=>{ if (running) recover(); });
+      await probeFirmware("reconnect");   // did the module crash-reboot, or just a link blip?
+      return;
+    } catch(e){ setStatus("Link lost — reconnecting… (" + (i+1) + "/20)"); }
+  }
+  running = false;
+  port = null;
+  uiDisconnected();
+  setStatus("Link lost — check the USB cable, then press Connect.");
+}
+
+// --- serial line reader -----------------------------------------------------
+let rxBuf = "";
+const inbox = [];
+async function pump(){
+  const dec = new TextDecoder();
+  while (running && reader) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    rxBuf += dec.decode(value, { stream:true });
+    let nl;
+    while ((nl = rxBuf.indexOf("\n")) >= 0) {
+      const line = rxBuf.slice(0,nl).trim();
+      rxBuf = rxBuf.slice(nl+1);
+      if (line) inbox.push(line);
+    }
+  }
+}
+function flushInput(){ inbox.length = 0; rxBuf = ""; }
+
+// framebuffer transaction: only accept a reply of the expected byte-size.
+async function transact(cmd, expectBytes, timeoutMs=600){
+  flushInput();
+  await writer.write(enc.encode(cmd));
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() < deadline) {
+    while (inbox.length) {
+      const line = inbox.shift();
+      if (line.length % 2 === 0 && line.length/2 === expectBytes) return decodeFrame(line);
+    }
+    await sleep(1);
+  }
+  return null;
+}
+// level transaction: expect a short "l,r" text line.
+async function transactLevels(timeoutMs=250){
+  flushInput();
+  await writer.write(enc.encode("V"));
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() < deadline) {
+    while (inbox.length) {
+      const p = inbox.shift().split(",");
+      if (p.length === 2) { const l=parseFloat(p[0]), r=parseFloat(p[1]); if (!isNaN(l)&&!isNaN(r)) return [l,r]; }
+    }
+    await sleep(1);
+  }
+  return null;
+}
+// Firmware diagnostic probe ("OA?0" -> "DBG v3 crash=... pv=[...] ..."), run at
+// connect and after every auto-reconnect. Logs the firmware's live state to
+// the console, and if the module hard-faulted and rebooted (crash=1), pulls
+// the full CrashReport ("OA!0") into the console so it can be copied.
+async function probeFirmware(context){
+  if (!writer) return;
+  flushInput();
+  try { await writer.write(enc.encode("OA?0")); } catch(e){ return; }
+  let dbg = null;
+  const deadline = performance.now() + 400;
+  while (performance.now() < deadline && !dbg) {
+    while (inbox.length) { const l = inbox.shift(); if (l.startsWith("DBG ")) { dbg = l; break; } }
+    await sleep(2);
+  }
+  if (!dbg) { console.warn("[phaz] " + context + ": no DBG reply — firmware predates scope protocol v3"); return; }
+  console.log("[phaz] " + context + ": " + dbg);
+  if (!/crash=1/.test(dbg)) return;
+  // the module crashed and auto-rebooted since we last looked — fetch the report
+  flushInput();
+  try { await writer.write(enc.encode("OA!0")); } catch(e){ return; }
+  const rpt = [];
+  let end = performance.now() + 800, done = false;
+  while (performance.now() < end && !done) {
+    while (inbox.length) {
+      const l = inbox.shift();
+      if (l === "ENDCRASH") { done = true; break; }
+      rpt.push(l);
+    }
+    await sleep(2);
+  }
+  console.warn("[phaz] MODULE CRASH REPORT:\n" + rpt.join("\n"));
+  setStatus("Module crashed & rebooted — crash report in the console (Cmd-Opt-J), please copy it.");
+}
+
+// scope transaction: "O"+slot+src+win -> 512 bytes = 256 big-endian int16
+// samples, oldest first (1024 hex chars; unique length, frames are 1024/2048 B).
+async function transactScope(i, timeoutMs=400){
+  const sc = SCOPES[i];
+  flushInput();
+  await writer.write(enc.encode("O" + (i ? "B" : "A") + sc.src + sc.win));
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() < deadline) {
+    while (inbox.length) {
+      const line = inbox.shift();
+      if (line.length === 1024) {
+        const s = new Int16Array(256);
+        let ok = true;
+        for (let i = 0; i < 256; i++) {
+          const v = parseInt(line.substr(i*4, 4), 16);
+          if (Number.isNaN(v)) { ok = false; break; }
+          s[i] = v > 32767 ? v - 65536 : v;
+        }
+        if (ok) return s;
+      }
+    }
+    await sleep(1);
+  }
+  return null;
+}
+// control-state transaction: expect "left,right,full" (which quadrants are active).
+async function transactState(timeoutMs=200){
+  flushInput();
+  await writer.write(enc.encode("T"));
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() < deadline) {
+    while (inbox.length) {
+      const p = inbox.shift().split(",");
+      if (p.length === 4) {
+        const l=parseInt(p[0]), r=parseInt(p[1]), f=parseInt(p[2]), pre=parseInt(p[3]);
+        if (![l,r,f,pre].some(isNaN)) return { left:l, right:r, full:f, preset:pre };
+      }
+    }
+    await sleep(1);
+  }
+  return null;
+}
+function decodeFrame(hexline){
+  const n = hexline.length/2;
+  if ((n!==1024 && n!==2048) || hexline.length % 2) return null;
+  const data = new Uint8Array(n);
+  for (let i=0;i<n;i++){ const b=parseInt(hexline.substr(i*2,2),16); if (Number.isNaN(b)) return null; data[i]=b; }
+  return { data, w:OLED_W, h:n/16 };
+}
+
+// --- polling loop -----------------------------------------------------------
+async function loop(){
+  while (running) {
+    try {
+      if (ioBusy) { await sleep(15); continue; }   // paused during backup
+      // Background tabs get their timers throttled hard by the browser, which
+      // makes every transaction time out and desyncs the link — pause instead.
+      if (document.hidden) { await sleep(250); continue; }
+      let cycleOK = false;   // did ANY transaction succeed this cycle?
+      // levels first (fast), then the framebuffers — all as fast as the link allows
+      if (GRAPHS.on) {
+        const lv = await transactLevels();
+        if (lv) { pushLevel(lv[0], lv[1]); levelsSeen = true; cycleOK = true; }
+        drawGraphs();
+      }
+      if (PANELS.quad.on) {
+        const st = await transactState();
+        if (st) {
+          cycleOK = true;
+          activeSlots = st;
+          if (st.preset !== presetId) { presetId = st.preset; presetDirty = false; }  // device loaded a preset
+          updatePresetUI();
+        }
+        let f = await transact("Q", 2048, 500);
+        if (f) { drawPanel("quad", f); setTag("QUAD"); cycleOK = true; }
+        else { f = await transact("S", 1024, 500); if (f) { drawPanel("quad", f); setTag("two-up"); cycleOK = true; } }
+      }
+      if (PANELS.audio.on) { const f = await transact("A", 1024, 500); if (f) { drawPanel("audio", f); cycleOK = true; } }
+      if (SCOPE.on) for (let i=0; i<2; i++) {
+        const sc = SCOPES[i];
+        if (!sc.src || sc.frozen || sc.misses >= 3) continue;
+        const s = await transactScope(i);
+        if (s) { sc.data = s; sc.misses = 0; cycleOK = true; }
+        else if (++sc.misses >= 3)
+          setStatus("Scope " + (i?"B":"A") + ": no reply — flash firmware with the 4-byte 'O' command, then reconnect.");
+        drawScope(i);
+      }
+      // Resync: nothing answered — let any in-flight/garbled reply finish and
+      // drain it before hammering the link again, so one glitch can't spiral.
+      if (!cycleOK && (GRAPHS.on || PANELS.quad.on || PANELS.audio.on)) {
+        await sleep(80);
+        flushInput();
+      }
+      await sleep(2);
+    } catch(e){
+      if (!running) break;
+      await recover();            // link died mid-transaction — try to reopen
+      if (!writer) break;         // recovery gave up; loop ends cleanly
+    }
+  }
+}
+
+function pushLevel(l, r){
+  curL=l; curR=r;
+  peakL = (l>=peakL) ? l : Math.max(l, peakL-0.012);   // peak-hold with slow decay
+  peakR = (r>=peakR) ? r : Math.max(r, peakR-0.012);
+}
+
+// --- layout / rendering -----------------------------------------------------
+function scaleFor(){
+  const box = $("panels");
+  const cols = Math.max((PANELS.quad.on ? 1 : 0) + ((PANELS.audio.on||GRAPHS.on) ? 1 : 0),
+                        SCOPE.on ? 2 : 0) || 1;
+  const availW = (box.clientWidth - 32 - 20*(cols-1)) / cols;
+  // Two rows when the scopes are on: 128 (top) + 128 (scope) native px, plus
+  // the row gap and the scope-controls strip (fixed px, not scaled).
+  const availH = box.clientHeight - 40 - (SCOPE.on ? 64 : 0);
+  const rowsNative = SCOPE.on ? 256 : 128;
+  return Math.max(1, Math.floor(Math.min(availW/OLED_W, availH/rowsNative)));
+}
+
+function buildNative(frame){
+  const { data, w, h } = frame, fg = PHOSPHORS[colorIdx].rgb;
+  const nat = document.createElement("canvas"); nat.width=w; nat.height=h;
+  const ctx = nat.getContext("2d");
+  const img = ctx.createImageData(w,h);
+  for (let y=0;y<h;y++){
+    const page=(y>>3)*w, bit=1<<(y&7);
+    for (let x=0;x<w;x++){
+      const on = data[page+x] & bit, i=(y*w+x)*4;
+      img.data[i]=on?fg[0]:BG[0]; img.data[i+1]=on?fg[1]:BG[1]; img.data[i+2]=on?fg[2]:BG[2]; img.data[i+3]=255;
+    }
+  }
+  ctx.putImageData(img,0,0);
+  return nat;
+}
+
+function drawPanel(key, frame){
+  const p = PANELS[key];
+  p.native = buildNative(frame);
+  const cv = $(p.el).querySelector("canvas");
+  const s = scaleFor();
+  cv.width = frame.w*s; cv.height = frame.h*s;
+  const ctx = cv.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = `rgb(${BG.join(",")})`; ctx.fillRect(0,0,cv.width,cv.height);
+  ctx.drawImage(p.native, 0,0, cv.width, cv.height);
+  if (p.grid && frame.h===128) drawQuadGrid(ctx, cv.width, cv.height);
+  if (key === "quad") $("quadctl").style.width = cv.width + "px";   // match control bar to quad width
+  // keep graph widths matched to the framebuffer panels
+  sizeGraphs(); drawGraphs();
+}
+
+function sizeGraphs(){
+  if (!GRAPHS.on && !SCOPE.on) return;
+  const s = scaleFor();
+  const w = OLED_W * s;
+  // Right column should visually balance the quad panel height when present.
+  const quadH = PANELS.quad.on ? 128*s : 0;
+  const audioH = PANELS.audio.on ? 64*s : 0;
+  let gH = PANELS.quad.on ? Math.floor((quadH - audioH - 30) / 2) : Math.round(46*s/2);
+  gH = Math.max(38, Math.min(gH, 150));
+  for (const id of ["graph-l","graph-r"]) {
+    const cv = $(id).querySelector("canvas");
+    if (cv.width!==w || cv.height!==gH){ cv.width=w; cv.height=gH; }
+  }
+  // Scopes: one per column, square — same footprint/ratio as the displays above.
+  for (let i=0; i<2; i++){
+    const cv = $("scope-"+i).querySelector("canvas");
+    if (cv.width!==w || cv.height!==w){ cv.width=w; cv.height=w; }
+  }
+}
+
+function drawGraphs(){
+  sizeGraphs();
+  if (GRAPHS.on) {
+    drawMeter($("graph-l").querySelector("canvas"), curL, peakL, "L IN");
+    drawMeter($("graph-r").querySelector("canvas"), curR, peakR, "R IN");
+  }
+  if (SCOPE.on){ drawScope(0); drawScope(1); }
+}
+
+// --- oscilloscopes ------------------------------------------------------------
+// CV sources plot in volts, audio in raw PCM (-1..+1), on the user-selected
+// vertical scale; audio uses a rising-edge trigger for a stable trace. The
+// time base (win) is applied firmware-side; freeze stops polling that slot.
+function drawScope(i){
+  if (!SCOPE.on) return;
+  const sc = SCOPES[i];
+  const cv = $("scope-"+i).querySelector("canvas");
+  if (!cv.width) sizeGraphs();
+  const w=cv.width, h=cv.height, ctx=cv.getContext("2d");
+  const isAudio = isAudioSrc(sc.src);
+  ctx.fillStyle="#000"; ctx.fillRect(0,0,w,h);
+  if (!sc.src){
+    ctx.fillStyle="rgba(160,160,175,.6)"; ctx.font="11px ui-monospace, monospace";
+    ctx.textBaseline="top";
+    ctx.fillText("SCOPE " + (i?"B":"A") + " — off", 4, 2);
+    return;
+  }
+  const top=15, bot=4, plotH=h-top-bot;
+  const vsTable = isAudio ? AU_VS : CV_VS;
+  const vs = vsTable[Math.min(sc.vs, vsTable.length-1)];
+  const vMin = vs[1] + sc.off, vMax = vs[2] + sc.off;   // window shifted by offset
+  const yOf = v => top + (vMax - v)/(vMax - vMin)*plotH;
+
+  // grid: 8 horizontal + 10 vertical divisions
+  ctx.strokeStyle="rgba(85,85,100,.35)"; ctx.lineWidth=1;
+  for (let g=0; g<=8; g++){
+    const y = Math.round(top + g*plotH/8)+.5;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+  }
+  for (let g=1; g<10; g++){
+    const x = Math.round(g*w/10)+.5;
+    ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, h-bot); ctx.stroke();
+  }
+  if (vMin < 0 && vMax > 0){                                    // 0 line, brighter
+    ctx.strokeStyle="rgba(160,160,180,.7)";
+    ctx.beginPath(); ctx.moveTo(0, yOf(0)+.5); ctx.lineTo(w, yOf(0)+.5); ctx.stroke();
+  }
+
+  // waveform
+  const d = sc.data;
+  if (d && d.length){
+    let start = 0, count = d.length;
+    if (isAudio){
+      // show half the buffer; hunt for a rising zero-cross in the other half
+      count = d.length >> 1;
+      for (let k=1; k<=d.length-count; k++)
+        if (d[k-1] < 0 && d[k] >= 0){ start = k; break; }
+    }
+    const fg = PHOSPHORS[colorIdx].rgb;
+    ctx.strokeStyle = `rgb(${fg.join(",")})`;
+    ctx.lineWidth = 2; ctx.lineJoin = "round";
+    ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = 4;
+    ctx.beginPath();
+    for (let k=0; k<count; k++){
+      const v = isAudio ? d[start+k]/32768 : d[start+k]/1000;   // PCM->±1, mV->V
+      const x = k/(count-1)*w;
+      const y = Math.max(top, Math.min(h-bot, yOf(v)));
+      k ? ctx.lineTo(x,y) : ctx.moveTo(x,y);
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  // labels: name top-left; time window / status top-right; scale ticks left
+  ctx.fillStyle="rgba(230,230,235,.8)"; ctx.font="11px ui-monospace, monospace"; ctx.textBaseline="top";
+  const name = sc.src === "i" || sc.src === "j" ? ("AUDIO IN " + (sc.src === "i" ? "L" : "R"))
+             : isAudio                          ? ("AUDIO OUT " + sc.src)
+             : sc.src >= "a" && sc.src <= "h"   ? ("CV IN "   + ("abcdefgh".indexOf(sc.src)+1))
+             : sc.src >= "t" && sc.src <= "w"   ? ("TRIG IN " + ("tuvw".indexOf(sc.src)+1))
+             :                                    ("CV OUT "  + sc.src);
+  ctx.fillText("SCOPE " + (i?"B":"A") + " — " + name, 4, 2);
+  ctx.textAlign="right";
+  const offTxt = sc.off ? ("OFS " + (sc.off > 0 ? "+" : "") +
+    (Math.abs(sc.off) < 1 ? sc.off.toFixed(2) : +sc.off.toFixed(2)) + (isAudio ? "" : "V") + "  ") : "";
+  ctx.fillText(offTxt + (sc.frozen ? "FROZEN"
+             : d ? scopeWinLabel(i, sc.win)
+             : sc.misses >= 3 ? "no fw support" : "no data"), w-4, 2);
+  ctx.textAlign="left";
+  ctx.fillStyle="rgba(180,180,195,.55)"; ctx.font="9px ui-monospace, monospace";
+  const unit = isAudio ? "" : "V";
+  const fmt = v => (v > 0 ? "+" : "") + (Math.abs(v) < 1 ? v.toFixed(2).replace("0.",".") : v) + unit;
+  ctx.fillText(fmt(vMax), 2, top+1);
+  if (vMin < 0 && vMax > 0) ctx.fillText("0"+unit, 2, yOf(0)+1);
+  ctx.fillText(fmt(vMin), 2, h-bot-9);
+}
+
+// Segmented LED-style level meter: green -> yellow -> red, unlit = blank,
+// with a floating peak-hold segment.
+function zoneColor(frac){
+  return frac > 0.85 ? [235,45,35]     // red
+       : frac > 0.60 ? [238,208,30]    // yellow
+       :               [70,220,55];    // green
+}
+function drawMeter(cv, level, peak, label){
+  const w=cv.width, h=cv.height, ctx=cv.getContext("2d");
+  ctx.fillStyle="#000"; ctx.fillRect(0,0,w,h);
+  const top = 15, barH = h - top - 3;
+  const N = Math.min(46, Math.max(20, Math.round(w/12)));
+  const gap = Math.max(1, Math.round(w/(N*7)));
+  const segW = (w - gap*(N+1)) / N;
+  const lit = Math.round(clamp01(level)*N);
+  const peakIdx = Math.ceil(clamp01(peak)*N) - 1;
+  ctx.save();
+  for (let i=0;i<N;i++){
+    const on = (i < lit) || (i === peakIdx && peakIdx >= 0);
+    if (!on) continue;                       // blank if the level isn't reached
+    const c = zoneColor((i+1)/N);
+    const x = gap + i*(segW+gap);
+    ctx.shadowColor = `rgb(${c.join(",")})`;
+    ctx.shadowBlur = Math.max(3, segW*0.6);   // soft LED glow
+    ctx.fillStyle = `rgb(${c.join(",")})`;
+    ctx.fillRect(x, top, segW, barH);
+  }
+  ctx.restore();
+  ctx.fillStyle="rgba(230,230,235,.8)"; ctx.font="11px ui-monospace, monospace"; ctx.textBaseline="top";
+  ctx.fillText(label, 4, 2);
+  const right = levelsSeen ? (Math.round(clamp01(level)*100)+"%") : "no data";
+  ctx.textAlign="right"; ctx.fillText(right, w-4, 2); ctx.textAlign="left";
+}
+
+// redraw on window resize
+let rT; window.addEventListener("resize", ()=>{ clearTimeout(rT); rT=setTimeout(()=>{
+  for (const k of Object.keys(PANELS)) if (PANELS[k].native) redrawPanel(k);
+  drawGraphs();
+}, 120); });
+function redrawPanel(key){
+  const p = PANELS[key]; if (!p.native) return;
+  const cv = $(p.el).querySelector("canvas"); const s = scaleFor();
+  cv.width = p.native.width*s; cv.height = p.native.height*s;
+  const ctx = cv.getContext("2d"); ctx.imageSmoothingEnabled=false;
+  ctx.drawImage(p.native,0,0,cv.width,cv.height);
+  if (p.grid && p.native.height===128) drawQuadGrid(ctx, cv.width, cv.height);
+}
+
+// quad 2x2 separators + a highlight box around the active (encoder-driven) slot(s)
+function drawQuadGrid(ctx, w, h){
+  ctx.strokeStyle="rgba(120,120,120,.5)"; ctx.lineWidth=1; ctx.beginPath();
+  ctx.moveTo(w/2,0); ctx.lineTo(w/2,h);
+  ctx.moveTo(0,h/2); ctx.lineTo(w,h/2); ctx.stroke();
+  const outline = (s, inset) => {
+    if (s < 0 || s > 3) return;
+    const col = s & 1, row = (s >> 1) & 1;
+    ctx.strokeRect(col*w/2 + 2 + inset, row*h/2 + 2 + inset, w/2 - 4 - inset*2, h/2 - 4 - inset*2);
+  };
+  // cyan = the slots the encoders are currently driving
+  const slots = activeSlots.full >= 0 ? [activeSlots.full] : [activeSlots.left, activeSlots.right];
+  ctx.strokeStyle = "rgba(120,220,255,.9)"; ctx.lineWidth = 3;
+  for (const s of slots) outline(s, 0);
+  // yellow = the focused quadrant (target of keyboard / Focus panel)
+  ctx.strokeStyle = "rgba(255,225,80,.95)"; ctx.lineWidth = 3;
+  outline(focusedSlot, 5);
+}
+
+// Move focus to a quadrant (0..3): activate it on the module (drives its encoder).
+function setFocus(slot){
+  focusedSlot = ((slot % 4) + 4) % 4;
+  sendControl(String(focusedSlot));   // SwitchToSlot -> active + firmware focus
+}
+
+function savePng(){
+  const cols=[];
+  if (PANELS.quad.on && PANELS.quad.native) cols.push([PANELS.quad.native]);
+  const right=[];
+  if (PANELS.audio.on && PANELS.audio.native) right.push(PANELS.audio.native);
+  if (GRAPHS.on){ right.push($("graph-l").querySelector("canvas"), $("graph-r").querySelector("canvas")); }
+  if (right.length) cols.push(right);
+  if (SCOPE.on){ cols.push([$("scope-0").querySelector("canvas")], [$("scope-1").querySelector("canvas")]); }
+  if (!cols.length) return;
+  const scale=6, gap=10;
+  const colImgs = cols.map(list=>{
+    const w = Math.max(...list.map(c=>c.width))*scale;
+    const h = list.reduce((s,c)=>s+c.height*scale+gap, gap);
+    const cc=document.createElement("canvas"); cc.width=w; cc.height=h;
+    const x=cc.getContext("2d"); x.imageSmoothingEnabled=false;
+    x.fillStyle=`rgb(${BG.join(",")})`; x.fillRect(0,0,w,h);
+    let y=gap; for (const c of list){ x.drawImage(c,0,y,c.width*scale,c.height*scale); y+=c.height*scale+gap; }
+    return cc;
+  });
+  const W = colImgs.reduce((s,c)=>s+c.width+gap, gap);
+  const H = Math.max(...colImgs.map(c=>c.height))+2*gap;
+  const out=document.createElement("canvas"); out.width=W; out.height=H;
+  const c=out.getContext("2d"); c.fillStyle=`rgb(${BG.join(",")})`; c.fillRect(0,0,W,H);
+  let x=gap; for (const ci of colImgs){ c.drawImage(ci,x,gap); x+=ci.width+gap; }
+  const a=document.createElement("a");
+  a.download="phazerville_"+new Date().toISOString().replace(/[:.]/g,"-")+".png";
+  a.href=out.toDataURL("image/png"); a.click();
+}
+</script>
+</body>
+</html>
