@@ -136,6 +136,20 @@ public:
     jump_to_menu_ = true;
   }
 
+  // Inject UI events from an external remote (serial/web control). InjectButton
+  // mimics a physical short click (down + press); InjectEncoder is one detent.
+  void InjectButton(uint16_t control) {
+    noInterrupts();
+    PushEvent(UI::EVENT_BUTTON_DOWN,  control, 0, button_state_ | control);
+    PushEvent(UI::EVENT_BUTTON_PRESS, control, 0, button_state_ | control);
+    interrupts();
+  }
+  void InjectEncoder(uint16_t control, int16_t increment) {
+    noInterrupts();
+    PushEvent(UI::EVENT_ENCODER, control, increment, button_state_);
+    interrupts();
+  }
+
 private:
 
   uint32_t ticks_ = 0;

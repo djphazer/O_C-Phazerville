@@ -12,6 +12,14 @@
 
 #define ForEachSide(ch) for (HEM_SIDE ch : {LEFT_HEMISPHERE, RIGHT_HEMISPHERE})
 
+#ifdef QUAD_CAPTURE
+// External-viewer oscilloscope hook (defined in quad_scope.h): must be told
+// whenever the final stage of the audio stack is rewired, so its audio-out
+// taps follow the new stream instead of going stale (stale taps crash the
+// module on applet changes).
+void QuadScopeTapOutput(int side, AudioStream *stream, int channel);
+#endif
+
 using std::array, std::tuple;
 
 template <class T, size_t N>
@@ -117,6 +125,36 @@ public:
         get_selected_mono_applet(LEFT_HEMISPHERE, slot).mainloop();
         get_selected_mono_applet(RIGHT_HEMISPHERE, slot).mainloop();
       }
+    }
+  }
+
+  // Always-on render of the audio stack for the external monitor: applet names,
+  // CPU / MEM %, and the peak meters, independent of the interactive menu's
+  // state and auto-hide timers (which is why View() goes blank when idle).
+  void DrawMonitor() {
+    gfxDottedLine(0, 0, 127, 0);
+    for (size_t i = 0; i < Slots; i++) print_applet_line(i);
+    ForEachSide(side) {
+      // When a slot is being edited, show that applet's own view (its params).
+      if (state[side] == EDIT_APPLET) {
+        HemisphereAudioApplet& applet = get_selected_applet(side);
+        applet.SetDisplaySide(static_cast<HEM_SIDE>(side + AUDIO_SLOT_L));
+        applet.BaseView(false, false);
+        continue;
+      }
+      // Selection cursor: arrow at the current slot, or an inverted bar while
+      // choosing an applet (SWITCH_APPLET) — matches the device's View().
+      int y = cursor[side] * 10 + 14;
+      if (state[side] == SWITCH_APPLET) {
+        int x = IsStereo(cursor[side]) && state[1 - side] != EDIT_APPLET ? 32 : 64 * side;
+        gfxInvert(x, y, 64, 9);
+      } else {
+        gfxIcon(120 * side, y + 1, side ? LEFT_ICON : RIGHT_ICON);
+      }
+      for (uint_fast8_t slot = 0; slot < Slots + 1; slot++) draw_peak(side, slot);
+      gfxPos(1 + 64 * side, 2);
+      if (side) graphics.printf("MEM%3d%%) R", mem_percent);
+      else      graphics.printf("L (CPU%3d%%", cpu_percent);
     }
   }
 
@@ -354,6 +392,9 @@ public:
     }
     peak_conns[side][slot + 1].disconnect();
     peak_conns[side][slot + 1].connect(*stream, 0, peaks[side][slot + 1], 0);
+#ifdef QUAD_CAPTURE
+    if (slot + 1 >= Slots) QuadScopeTapOutput(side, stream, 0);
+#endif
   }
 
   void ConnectStereoToNext(HEM_SIDE side, size_t slot) {
@@ -372,6 +413,9 @@ public:
     }
     peak_conns[side][slot + 1].disconnect();
     peak_conns[side][slot + 1].connect(*stream, side, peaks[side][slot + 1], 0);
+#ifdef QUAD_CAPTURE
+    if (slot + 1 >= Slots) QuadScopeTapOutput(side, stream, side);
+#endif
   }
 
   // 3 bits, cannot be 0
@@ -392,6 +436,35 @@ public:
   // Returns a reference to the filtered peak dB value for a given side and slot. useful if we want to stop processing at some gated value without instantiating a whole applet.
   float& get_peak_db(HEM_SIDE side, size_t slot) {
     return lpf_peak_db[side][slot];
+  }
+
+  // Input level (0..1, over -48..0 dB) for the L (ch 0) / R (ch 1) audio inputs,
+  // for the external viewer's meters. Mirrors peak_width(): gate on available()
+  // so we never read the analyzer's reset sentinel (which reads as full-scale),
+  // then one-pole filter and floor — same value the on-screen meter uses.
+  float InputPeak(size_t ch) {
+    AudioAnalyzePeak& p = peaks[ch][0];
+    float& db = lpf_peak_db[ch][0];
+    if (p.available()) {
+      ONE_POLE(db, scalarToDb(p.read()), 0.25f);
+      if (db < -48.0f) db = -48.0f;
+    }
+    return (db + 48.0f) / 48.0f;
+  }
+
+  // The stream + channel currently feeding the main audio output on a side —
+  // the signal at the audio out jack. Used by the external viewer's scope tap
+  // (quad_scope.h); re-queried on every read so it follows applet changes.
+  bool OutputTapSource(HEM_SIDE side, AudioStream *&stream, int &channel) {
+    constexpr size_t last = Slots - 1;
+    if (IsStereo(last)) {
+      stream = get_selected_stereo_applet(last).OutputStream();
+      channel = side;
+    } else {
+      stream = get_selected_mono_applet(side, last).OutputStream();
+      channel = 0;
+    }
+    return stream != nullptr;
   }
 
   void LoadPreset(int id) {
