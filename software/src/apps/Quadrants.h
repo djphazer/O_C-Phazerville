@@ -45,6 +45,7 @@
 #include "OC_app_switcher.h" // for QuadCapture_Render() dispatch (4-up capture)
 #ifdef QUAD_CAPTURE
 #include "quad_scope.h"      // oscilloscope ring buffers for the external viewer ('O')
+#include "quad_midilog.h"    // MIDI monitor ring for the external viewer ('N')
 #endif
 
 //#include "applets/_config.h"
@@ -591,6 +592,12 @@ public:
 
     void SendMIDIThru(const MIDIMessage &msg, uint8_t exclude_mask) {
       exclude_mask |= midi_thru_disable;
+#ifdef QUAD_CAPTURE
+      // MIDI monitor: log thru traffic as OUT (only if some port will send it)
+      if (msg.message != midi::Clock &&
+          (~exclude_mask & (mMaskUSBDev | mMaskUSBHost | mMaskUSBHost2 | mMaskSerial)))
+        QuadMidiLog_Push(true, msg.message, msg.channel, msg.data1, msg.data2);
+#endif
       if (~exclude_mask & mMaskUSBDev) {
         usbMIDI.send(msg.message, msg.data1, msg.data2, msg.channel, 0);
       }
@@ -628,6 +635,14 @@ public:
             device.getData1(),
             device.getData2()
           };
+
+#ifdef QUAD_CAPTURE
+          // MIDI monitor: log everything received except the floods (Clock,
+          // Active Sensing) and SysEx (reserved for the display transport).
+          if (msg.message != midi::Clock && msg.message != midi::ActiveSensing
+              && msg.message != midi::SystemExclusive)
+            QuadMidiLog_Push(false, msg.message, msg.channel, msg.data1, msg.data2);
+#endif
 
           switch (msg.message) {
             case midi::SystemExclusive:
@@ -1997,6 +2012,24 @@ FLASHMEM bool QuadCapture_ScopeCapture(char slot_c, char sel, char win_c, uint8_
     dst[2*i]     = (uint8_t)(((uint16_t)snap[i]) >> 8);
     dst[2*i + 1] = (uint8_t)((uint16_t)snap[i] & 0xFF);
   }
+  return true;
+}
+
+// MIDI monitor dump ('N'): the whole event ring as one line, "N:" + 32 events
+// x 12 hex chars (seq4 message2 dirchan2 d1 d2). Host keeps the highest seq
+// seen and shows only newer events. See quad_midilog.h / PROTOCOL.md.
+FLASHMEM bool QuadCapture_MidiLog() {
+  if (!QuadCapture_CurrentApp()) return false;
+  char buf[16];
+  Serial.print("N:");
+  for (size_t i = 0; i < QuadMidiLog::kEvents; i++) {
+    const QuadMidiLog::Ev &e = QuadMidiLog::ring[i];
+    snprintf(buf, sizeof(buf), "%04X%02X%02X%02X%02X",
+             e.seq, e.message, e.dirchan, e.d1, e.d2);
+    Serial.print(buf);
+  }
+  Serial.println();
+  Serial.flush();
   return true;
 }
 

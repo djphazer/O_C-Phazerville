@@ -34,6 +34,7 @@ bool QuadCapture_SavePreset(int slot);             // save current state to slot
 bool QuadCapture_BackupBank();                     // stream the whole bank to host
 bool QuadCapture_ScopeCapture(char slot, char sel, char win, uint8_t *dst512); // scope snapshot ('O')
 void QuadCapture_ScopeDebug();                     // 'O' <any> '?' <any>: print DBG state line
+bool QuadCapture_MidiLog();                        // 'N': print MIDI monitor ring
 
 namespace QuadCapture {
 

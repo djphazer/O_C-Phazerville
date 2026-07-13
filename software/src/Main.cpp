@@ -595,6 +595,10 @@ void FASTRUN loop() {
             // MIDI map page (128x64) for the external viewer.
             QuadCapture::requestMidi();
             break;
+          case 'N':
+            // MIDI monitor: dump the in/out event ring as one "N:..." line.
+            QuadCapture_MidiLog();
+            break;
           case 'O': {
             // Oscilloscope: 'O' <slot 'A'|'B'> <src> <win '0'-'3'>. src:
             // '1'-'8' CV out, 'a'-'h' CV in, 't'-'w' trig in, 'L'/'R' audio out.
