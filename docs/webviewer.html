@@ -8,6 +8,7 @@
   Left column : Quadrants 4-up (all four CV applets)          command 'Q' (2048B)
   Right column: audio DSP stack                               command 'A' (1024B)
                 + two real-time L/R audio input-level graphs  command 'V' ("l,r")
+                + MIDI monitor, in & out                      command 'N' ("N:...")
   Bottom row  : two independent oscilloscopes, each with      command 'O'+slot+
                 source (CV out 1-8 / audio out L/R), vertical  src+win (512B)
                 scale, time base, and freeze
@@ -34,8 +35,21 @@
   .sep { width:1px; align-self:stretch; background:#282830; margin:0 2px; }
   #panels { display:flex; flex-direction:column; align-items:center;
             gap:20px; padding:16px; height:calc(100% - 49px); box-sizing:border-box; overflow:auto; }
-  #toprow, #scoperow { display:flex; flex-direction:row; align-items:flex-start;
+  #toprow, #scoperow { display:flex; flex-direction:row; align-items:stretch;
                        justify-content:center; gap:20px; }
+  /* right column stretches to the quad column's height; the MIDI monitor
+     absorbs the remainder so both columns share the same bottom edge */
+  #col-right { justify-content:flex-start; }
+  #panel-midi { flex:1; min-height:0; align-self:stretch; }
+  /* flex-basis 0 + min-height 0: the log NEVER drives the column height —
+     it fills leftover space and scrolls internally */
+  #panel-midi { flex:1 1 0; min-height:0; overflow:hidden; }
+  #midilog { flex:1 1 0; min-height:48px; background:#000; overflow-y:auto; box-sizing:border-box;
+             padding:3px 7px; font-size:11.5px; line-height:15px; color:#aaa; }
+  #midilog .mrow { white-space:pre; }
+  #midilog .min  { color:#7ed07e; }
+  #midilog .mout { color:#e8b34a; }
+  #panel-midi { display:flex; flex-direction:column; gap:4px; }
   .col { display:flex; flex-direction:column; align-items:center; gap:10px; }
   .panel { display:flex; flex-direction:column; align-items:center; gap:4px; }
   .plabel { font-size:12px; color:#777; letter-spacing:.05em; text-transform:uppercase; }
@@ -50,15 +64,23 @@
   .clbl { font-size:11px; color:#888; letter-spacing:.05em; margin-right:2px; }
   .cbtn { min-width:38px; height:38px; font-size:15px; }
   .jog { width:150px; accent-color:#4a7a4a; }
-  #quadctl { display:flex; flex-wrap:wrap; gap:5px; justify-content:center; margin-top:8px; box-sizing:border-box; }
+  #quadctl { display:flex; flex-direction:column; gap:5px; justify-content:center; margin-top:8px; box-sizing:border-box; }
   #mode { font-size:12px; color:#9c9; border:1px solid #2a3a2a; border-radius:10px; padding:2px 8px; }
   #mode.audio { color:#fe6; border-color:#5a4a1a; }
-  #preset { font-size:12px; color:#bbb; }
+  #preset { font-size:inherit; color:#bbb; }
   #preset.dirty { color:#fe6; }
-  #saveslot { width:48px; background:#141418; color:#ddd; border:1px solid #333; border-radius:6px; padding:5px; font:inherit; }
+  #saveslot { width:52px; background:#141418; color:#ddd; border:1px solid #333; border-radius:6px; padding:5px; font:inherit; }
   #panel-audio.audio-active { outline:3px solid rgba(255,225,80,.95); outline-offset:3px; border-radius:4px; }
-  .sctl { display:flex; flex-wrap:wrap; gap:6px; align-items:center; justify-content:center; margin-top:2px; }
-  .sctl select { background:#141418; color:#ddd; border:1px solid #333; border-radius:6px; padding:5px; font:inherit; font-size:12px; }
+  .sctl { display:flex; flex-direction:column; gap:5px; align-items:center; margin-top:2px; }
+  /* fixed geometry: no wrapping, fixed control widths — the layout must not
+     shift when a selected value's text length changes */
+  .srow { display:flex; flex-wrap:nowrap; gap:6px; align-items:center; justify-content:center; }
+  .qrow { display:flex; flex-wrap:wrap; gap:5px; align-items:center; justify-content:center; }
+  .sctl select { background:#141418; color:#ddd; border:1px solid #333; border-radius:6px; padding:5px 2px; font:inherit; font-size:12px; }
+  .s-src { width:112px; } .s-vs { width:86px; } .s-win { width:76px; }
+  .s-odn, .s-oup { width:40px; padding:6px 0; } .s-oz { width:44px; padding:6px 0; }
+  .s-freeze { width:70px; padding:6px 0; margin-left:14px; }
+  .slbl { font-size:10px; color:#777; letter-spacing:.06em; text-transform:uppercase; width:34px; text-align:right; }
   .s-freeze.on { background:#3b2b2b; border-color:#7a4a4a; color:#fdd; }
 </style>
 </head>
@@ -71,12 +93,13 @@
     <button id="t-quad"   class="on" disabled>Quadrants</button>
     <button id="t-audio"  class="on" disabled>Audio</button>
     <button id="t-graphs" class="on" disabled>Graphs</button>
+    <button id="t-midi" class="on" disabled>MIDI</button>
     <button id="t-scope" class="on" disabled>Scope</button>
     <button id="t-control" disabled>Control</button>
     <span id="mode" title="Space toggles Quadrants / Audio">MODE: QUADRANTS</span>
     <span class="sep"></span>
     <span id="preset" title="current preset (● = unsaved remote changes)">Preset: –</span>
-    <input id="saveslot" type="number" min="0" max="31" value="0" title="slot to save into">
+    <select id="saveslot" title="slot to save into"></select>
     <button id="savebtn" disabled>Save</button>
     <button id="backupbtn" disabled>Backup</button>
     <span class="sep"></span>
@@ -91,46 +114,61 @@
     <div class="col" id="col-left">
       <div class="panel" id="panel-quad"><div class="plabel">Quadrants — 4-up</div><canvas></canvas></div>
       <div id="quadctl">
-        <button class="cbtn" data-q="cursorPrev" title="cursor up (W / ↑)">▲</button>
-        <button class="cbtn" data-q="cursorNext" title="cursor down (S / ↓)">▼</button>
-        <button class="cbtn" data-q="edit" title="select param (X)">edit</button>
-        <button class="cbtn" data-q="valDn" title="value − (C)">val −</button>
-        <button class="cbtn" data-q="valUp" title="value + (Z)">val +</button>
-        <button class="cbtn" data-q="prevApp" title="previous applet (Q)">◀ app</button>
-        <button class="cbtn" data-q="nextApp" title="next applet (E)">app ▶</button>
-        <button class="cbtn" data-q="prevPre" title="previous preset (O)">◀ preset</button>
-        <button class="cbtn" data-q="nextPre" title="next preset (P)">preset ▶</button>
+        <div class="qrow">
+          <button class="cbtn" data-q="cursorPrev" title="cursor up (W / ↑)">▲</button>
+          <button class="cbtn" data-q="cursorNext" title="cursor down (S / ↓)">▼</button>
+          <button class="cbtn" data-q="edit" title="select param (X)">edit</button>
+          <button class="cbtn" data-q="valDn" title="value − (C)">val −</button>
+          <button class="cbtn" data-q="valUp" title="value + (Z)">val +</button>
+        </div>
+        <div class="qrow">
+          <button class="cbtn" data-q="prevApp" title="previous applet (Q)">◀ app</button>
+          <button class="cbtn" data-q="nextApp" title="next applet (E)">app ▶</button>
+          <button class="cbtn" data-q="prevPre" title="previous preset (O)">◀ preset</button>
+          <button class="cbtn" data-q="nextPre" title="next preset (P)">preset ▶</button>
+        </div>
       </div>
     </div>
     <div class="col" id="col-right">
       <div class="panel" id="panel-audio"><div class="plabel">Audio stack</div><canvas></canvas></div>
       <div class="panel" id="graph-l"><canvas></canvas></div>
       <div class="panel" id="graph-r"><canvas></canvas></div>
+      <div class="panel" id="panel-midi"><div class="plabel">MIDI monitor</div><div id="midilog"></div></div>
     </div>
    </div>
    <div id="scoperow">
       <div class="panel scopepanel" id="scope-0">
         <canvas></canvas>
         <div class="sctl">
-          <select class="s-src" title="scope A source"></select>
-          <select class="s-vs" title="vertical scale"></select>
-          <select class="s-win" title="time base (window length)"></select>
-          <button class="s-odn" title="shift view down (see higher voltages)">▼</button>
-          <button class="s-oz" title="reset offset">0</button>
-          <button class="s-oup" title="shift view up (see lower voltages)">▲</button>
-          <button class="s-freeze" title="freeze / resume the trace">Freeze</button>
+          <div class="srow">
+            <span class="slbl">src</span><select class="s-src" title="scope A source"></select>
+            <span class="slbl">scale</span><select class="s-vs" title="vertical scale"></select>
+            <span class="slbl">time</span><select class="s-win" title="time base (window length)"></select>
+          </div>
+          <div class="srow">
+            <span class="slbl">ofs</span>
+            <button class="s-odn" title="move trace down">▼</button>
+            <button class="s-oup" title="move trace up">▲</button>
+            <button class="s-oz" title="reset offset to 0">rst</button>
+            <button class="s-freeze" title="freeze / resume the trace">Freeze</button>
+          </div>
         </div>
       </div>
       <div class="panel scopepanel" id="scope-1">
         <canvas></canvas>
         <div class="sctl">
-          <select class="s-src" title="scope B source"></select>
-          <select class="s-vs" title="vertical scale"></select>
-          <select class="s-win" title="time base (window length)"></select>
-          <button class="s-odn" title="shift view down (see higher voltages)">▼</button>
-          <button class="s-oz" title="reset offset">0</button>
-          <button class="s-oup" title="shift view up (see lower voltages)">▲</button>
-          <button class="s-freeze" title="freeze / resume the trace">Freeze</button>
+          <div class="srow">
+            <span class="slbl">src</span><select class="s-src" title="scope B source"></select>
+            <span class="slbl">scale</span><select class="s-vs" title="vertical scale"></select>
+            <span class="slbl">time</span><select class="s-win" title="time base (window length)"></select>
+          </div>
+          <div class="srow">
+            <span class="slbl">ofs</span>
+            <button class="s-odn" title="move trace down">▼</button>
+            <button class="s-oup" title="move trace up">▲</button>
+            <button class="s-oz" title="reset offset to 0">rst</button>
+            <button class="s-freeze" title="freeze / resume the trace">Freeze</button>
+          </div>
         </div>
       </div>
    </div>
@@ -188,6 +226,8 @@ const SCOPES = [
   { src:"L", vs:0, win:0, off:0, frozen:false, data:null, misses:0 },
 ];
 const SCOPE_CV_RATE = 16666.6/16, SCOPE_AUDIO_RATE = 44100/2;   // win-0 rates, per PROTOCOL.md
+// MIDI monitor ('N'): lastSeq = highest event seq rendered (16-bit, wrap-aware)
+const MIDI = { on:true, lastSeq:null, misses:0 };
 // vertical-scale tables: [label, vMin, vMax]
 const CV_VS = [["±10 V",-10,10],["-3…+6 V",-3,6],["±3 V",-3,3],["±1 V",-1,1],["±0.5 V",-0.5,0.5]];
 const AU_VS = [["±1.0",-1,1],["±0.5",-0.5,0.5],["±0.25",-0.25,0.25],["±0.1",-0.1,0.1]];
@@ -220,6 +260,7 @@ try {
   if (typeof s.audio==="boolean")  PANELS.audio.on = s.audio;
   if (typeof s.graphs==="boolean") GRAPHS.on = s.graphs;
   if (typeof s.scope==="boolean")  SCOPE.on = s.scope;
+  if (typeof s.midi==="boolean")   MIDI.on = s.midi;
   if (Array.isArray(s.scopes)) s.scopes.forEach((p,i)=>{
     if (!SCOPES[i] || !p) return;
     if (typeof p.src==="string") SCOPES[i].src = p.src;
@@ -231,7 +272,7 @@ try {
 function savePrefs(){
   try { localStorage.setItem("phaz_prefs2", JSON.stringify(
     { colorIdx, quad:PANELS.quad.on, audio:PANELS.audio.on, graphs:GRAPHS.on,
-      scope:SCOPE.on,
+      scope:SCOPE.on, midi:MIDI.on,
       scopes:SCOPES.map(sc=>({src:sc.src, vs:sc.vs, win:sc.win, off:sc.off})) })); } catch(e){}
 }
 
@@ -240,18 +281,21 @@ function syncUI(){
   $("t-audio").classList.toggle("on", PANELS.audio.on);
   $("t-graphs").classList.toggle("on", GRAPHS.on);
   $("t-scope").classList.toggle("on", SCOPE.on);
+  $("t-midi").classList.toggle("on", MIDI.on);
   $("panel-quad").hidden  = !PANELS.quad.on;
   $("panel-audio").hidden = !PANELS.audio.on;
   $("graph-l").hidden = !GRAPHS.on;
   $("graph-r").hidden = !GRAPHS.on;
+  $("panel-midi").hidden = !MIDI.on;
   $("scoperow").hidden = !SCOPE.on;
   $("col-left").hidden  = !PANELS.quad.on;
-  $("col-right").hidden = !(PANELS.audio.on || GRAPHS.on);
+  $("col-right").hidden = !(PANELS.audio.on || GRAPHS.on || MIDI.on);
 }
 $("t-quad").onclick   = ()=>{ PANELS.quad.on  = !PANELS.quad.on;  syncUI(); savePrefs(); };
 $("t-audio").onclick  = ()=>{ PANELS.audio.on = !PANELS.audio.on; syncUI(); savePrefs(); };
 $("t-graphs").onclick = ()=>{ GRAPHS.on = !GRAPHS.on; syncUI(); savePrefs(); };
 $("t-scope").onclick  = ()=>{ SCOPE.on = !SCOPE.on; syncUI(); savePrefs(); };
+$("t-midi").onclick   = ()=>{ MIDI.on = !MIDI.on; syncUI(); savePrefs(); };
 syncUI();
 
 // --- oscilloscope controls ----------------------------------------------------
@@ -407,9 +451,14 @@ function quadAction(a){
 }
 
 // --- presets ----------------------------------------------------------------
+// The module labels its 32 preset slots A-Z then a-f; mirror that here.
+const presetLabel = n => n < 0 ? "–"
+  : n < 26 ? String.fromCharCode(65 + n) : String.fromCharCode(97 + n - 26);
+$("saveslot").innerHTML = Array.from({length:32}, (_,n) =>
+  `<option value="${n}">${presetLabel(n)}</option>`).join("");
 function updatePresetUI(){
   const el = $("preset");
-  el.textContent = "Preset: " + (presetId < 0 ? "–" : presetId) + (presetDirty ? " ●" : "");
+  el.textContent = "Preset: " + presetLabel(presetId) + (presetDirty ? " ●" : "");
   el.classList.toggle("dirty", presetDirty);
 }
 function markDirty(){ if (!presetDirty){ presetDirty = true; updatePresetUI(); } }
@@ -420,7 +469,7 @@ function savePreset(){
   const slot = Math.max(0, Math.min(31, parseInt($("saveslot").value) || 0));
   sendRaw("W" + String.fromCharCode(33 + slot));   // 'W' + (slot+33)
   presetId = slot; presetDirty = false; updatePresetUI();
-  setStatus("Saved preset " + slot);
+  setStatus("Saved preset " + presetLabel(slot));
 }
 
 async function backupBank(){
@@ -527,6 +576,7 @@ window.addEventListener("keydown", (e)=>{
 $("panel-quad").querySelector("canvas").addEventListener("click", (e) => {
   const r = e.currentTarget.getBoundingClientRect();
   if (!r.width || !r.height) return;
+  // canvas has QPAD margins + QGUT gutter; the midline splits the quadrants
   const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
   const slot = (y < 0.5 ? 0 : 1) * 2 + (x < 0.5 ? 0 : 1);
   setFocus(slot);
@@ -552,10 +602,11 @@ async function connect(){
   reader = port.readable.getReader();
   running = true;
   for (const sc of SCOPES) sc.misses = 0;
+  MIDI.misses = 0; MIDI.lastSeq = null;
   $("connect").disabled = true;
   $("disconnect").disabled = false;
   $("save").disabled = false;
-  for (const id of ["t-quad","t-audio","t-graphs","t-scope","t-control","savebtn","backupbtn"]) $(id).disabled = false;
+  for (const id of ["t-quad","t-audio","t-graphs","t-midi","t-scope","t-control","savebtn","backupbtn"]) $(id).disabled = false;
   setStatus("Connected.");
   pump().catch(()=>{ if (running) recover(); });
   probeFirmware("connect").then(loop);
@@ -577,7 +628,7 @@ async function teardown(){
 
 function uiDisconnected(){
   $("connect").disabled=false; $("disconnect").disabled=true; $("save").disabled=true;
-  for (const id of ["t-quad","t-audio","t-graphs","t-scope","t-control","savebtn","backupbtn"]) $(id).disabled = true;
+  for (const id of ["t-quad","t-audio","t-graphs","t-midi","t-scope","t-control","savebtn","backupbtn"]) $(id).disabled = true;
   setTag("–");
 }
 
@@ -606,6 +657,7 @@ async function _recover(){
       writer = port.writable.getWriter();
       reader = port.readable.getReader();
       for (const sc of SCOPES) sc.misses = 0;
+      MIDI.misses = 0; MIDI.lastSeq = null;   // module may have rebooted (seq restart)
       setStatus("Reconnected.");
       pump().catch(()=>{ if (running) recover(); });
       await probeFirmware("reconnect");   // did the module crash-reboot, or just a link blip?
@@ -699,6 +751,83 @@ async function probeFirmware(context){
   setStatus("Module crashed & rebooted — crash report in the console (Cmd-Opt-J), please copy it.");
 }
 
+// --- MIDI monitor ('N') --------------------------------------------------------
+// Reply: "N:" + 32 events x 12 hex chars (seq4 message2 dirchan2 d1 d2).
+// seq is a rolling 16-bit counter, 0 = empty slot; we render only events newer
+// than the highest seq seen (wraparound-aware).
+async function transactMidiLog(timeoutMs=250){
+  flushInput();
+  await writer.write(enc.encode("N"));
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() < deadline) {
+    while (inbox.length) {
+      const line = inbox.shift();
+      if (line.startsWith("N:") && line.length === 2 + 32*12) {
+        const evs = [];
+        for (let i = 0; i < 32; i++) {
+          const o = 2 + i*12;
+          const seq = parseInt(line.substr(o, 4), 16);
+          if (!seq) continue;
+          const dc = parseInt(line.substr(o+6, 2), 16);
+          evs.push({ seq,
+            message: parseInt(line.substr(o+4, 2), 16),
+            out: !!(dc & 0x80), chan: dc & 0x7F,
+            d1: parseInt(line.substr(o+8, 2), 16),
+            d2: parseInt(line.substr(o+10, 2), 16) });
+        }
+        return evs;
+      }
+    }
+    await sleep(1);
+  }
+  return null;
+}
+
+const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const noteName = n => NOTE_NAMES[n%12] + (Math.floor(n/12) - 1);
+function fmtMidiEv(e){
+  const dir = e.out ? "OUT" : "IN ";
+  const ch = e.chan ? String(e.chan).padStart(2, "0") : "--";
+  let body;
+  switch (e.message & 0xF0) {
+    case 0x90: body = e.d2 ? "Note On  " + noteName(e.d1).padEnd(4) + " vel " + e.d2
+                           : "Note Off " + noteName(e.d1).padEnd(4) + " (vel 0)"; break;
+    case 0x80: body = "Note Off " + noteName(e.d1).padEnd(4) + " vel " + e.d2; break;
+    case 0xB0: body = "CC " + String(e.d1).padStart(3) + " = " + e.d2; break;
+    case 0xE0: { const v = ((e.d2 << 7) | e.d1) - 8192;
+                 body = "Bend " + (v > 0 ? "+" : "") + v; break; }
+    case 0xC0: body = "Program " + e.d1; break;
+    case 0xD0: body = "AfterTouch " + e.d1; break;
+    case 0xA0: body = "PolyAT " + noteName(e.d1) + " " + e.d2; break;
+    default:   body = ({ 0xFA:"Start", 0xFB:"Continue", 0xFC:"Stop",
+                         0xF2:"SongPos", 0xF1:"MTC", 0xF6:"TuneReq" })[e.message]
+                      || ("Status 0x" + e.message.toString(16).toUpperCase()); break;
+  }
+  return dir + " ch" + ch + "  " + body;
+}
+
+function midiAppend(evs){
+  let fresh;
+  if (MIDI.lastSeq === null) {
+    fresh = evs.slice().sort((a,b)=>a.seq-b.seq).slice(-12);   // seed with recent
+  } else {
+    const age = e => (e.seq - MIDI.lastSeq) & 0xFFFF;
+    fresh = evs.filter(e => age(e) > 0 && age(e) <= 0x7FFF)
+               .sort((a,b) => age(a) - age(b));
+  }
+  if (!fresh.length) return;
+  MIDI.lastSeq = fresh[fresh.length-1].seq;
+  const log = $("midilog");
+  for (const e of fresh) {
+    const row = document.createElement("div");
+    row.className = "mrow " + (e.out ? "mout" : "min");
+    row.textContent = fmtMidiEv(e);
+    log.appendChild(row);
+  }
+  while (log.children.length > 200) log.removeChild(log.firstChild);
+  log.scrollTop = log.scrollHeight;   // keep the newest events in view
+}
+
 // scope transaction: "O"+slot+src+win -> 512 bytes = 256 big-endian int16
 // samples, oldest first (1024 hex chars; unique length, frames are 1024/2048 B).
 async function transactScope(i, timeoutMs=400){
@@ -777,6 +906,12 @@ async function loop(){
         else { f = await transact("S", 1024, 500); if (f) { drawPanel("quad", f); setTag("two-up"); cycleOK = true; } }
       }
       if (PANELS.audio.on) { const f = await transact("A", 1024, 500); if (f) { drawPanel("audio", f); cycleOK = true; } }
+      if (MIDI.on && MIDI.misses < 3) {
+        const evs = await transactMidiLog();
+        if (evs) { midiAppend(evs); MIDI.misses = 0; cycleOK = true; }
+        else if (++MIDI.misses >= 3)
+          setStatus("MIDI monitor: no reply — flash firmware with the 'N' command.");
+      }
       if (SCOPE.on) for (let i=0; i<2; i++) {
         const sc = SCOPES[i];
         if (!sc.src || sc.frozen || sc.misses >= 3) continue;
@@ -836,17 +971,53 @@ function buildNative(frame){
   return nat;
 }
 
+
+// Quad composite: draw the four applet views with a margin (QPAD) and gutter
+// (QGUT) so the cyan/yellow highlight rings sit fully OUTSIDE the displays.
+const QPAD = 8, QGUT = 16;
+function quadCanvasSize(s){ return 128*s + 2*QPAD + QGUT; }
+function drawQuadComposite(cv, native, s){
+  const qs = 64*s;                       // one quadrant, scaled
+  const size = quadCanvasSize(s);
+  cv.width = size; cv.height = size;
+  const ctx = cv.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, size, size);
+  const org = (c) => QPAD + c * (qs + QGUT);   // quadrant origin (col/row 0|1)
+  for (let q = 0; q < 4; q++){
+    const col = q & 1, row = (q >> 1) & 1;
+    ctx.fillStyle = `rgb(${BG.join(",")})`;
+    ctx.fillRect(org(col), org(row), qs, qs);
+    ctx.drawImage(native, col*64, row*64, 64, 64, org(col), org(row), qs, qs);
+  }
+  const ring = (q, gap) => {
+    if (q < 0 || q > 3) return;
+    const col = q & 1, row = (q >> 1) & 1;
+    ctx.strokeRect(org(col) - gap + .5, org(row) - gap + .5, qs + 2*gap - 1, qs + 2*gap - 1);
+  };
+  // cyan = slots the encoders are driving; yellow = focused quadrant —
+  // both drawn in the margin/gutter, never over display pixels
+  const slots = activeSlots.full >= 0 ? [activeSlots.full] : [activeSlots.left, activeSlots.right];
+  ctx.strokeStyle = "rgba(120,220,255,.9)"; ctx.lineWidth = 2;
+  for (const q of slots) ring(q, 3);
+  ctx.strokeStyle = "rgba(255,225,80,.95)"; ctx.lineWidth = 2;
+  ring(focusedSlot, 6);
+}
+
 function drawPanel(key, frame){
   const p = PANELS[key];
   p.native = buildNative(frame);
   const cv = $(p.el).querySelector("canvas");
   const s = scaleFor();
-  cv.width = frame.w*s; cv.height = frame.h*s;
-  const ctx = cv.getContext("2d");
-  ctx.imageSmoothingEnabled = false;
-  ctx.fillStyle = `rgb(${BG.join(",")})`; ctx.fillRect(0,0,cv.width,cv.height);
-  ctx.drawImage(p.native, 0,0, cv.width, cv.height);
-  if (p.grid && frame.h===128) drawQuadGrid(ctx, cv.width, cv.height);
+  if (p.grid && frame.h === 128) {
+    drawQuadComposite(cv, p.native, s);
+  } else {
+    cv.width = frame.w*s; cv.height = frame.h*s;
+    const ctx = cv.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = `rgb(${BG.join(",")})`; ctx.fillRect(0,0,cv.width,cv.height);
+    ctx.drawImage(p.native, 0,0, cv.width, cv.height);
+  }
   if (key === "quad") $("quadctl").style.width = cv.width + "px";   // match control bar to quad width
   // keep graph widths matched to the framebuffer panels
   sizeGraphs(); drawGraphs();
@@ -869,7 +1040,11 @@ function sizeGraphs(){
   for (let i=0; i<2; i++){
     const cv = $("scope-"+i).querySelector("canvas");
     if (cv.width!==w || cv.height!==w){ cv.width=w; cv.height=w; }
+    // (scope control strips have fixed geometry — see .srow CSS — so no width sync)
   }
+  // MIDI monitor matches the column width; its height flexes to bottom-align
+  // the right column with the quad column (see #panel-midi CSS).
+  $("midilog").style.width = w + "px";
 }
 
 function drawGraphs(){
@@ -928,7 +1103,7 @@ function drawScope(i){
       // show half the buffer; hunt for a rising zero-cross in the other half
       count = d.length >> 1;
       for (let k=1; k<=d.length-count; k++)
-        if (d[k-1] < 0 && d[k] >= 0){ start = k; break; }
+        if (d[k-1] > 0 && d[k] <= 0){ start = k; break; }   // rising edge post-inversion
     }
     const fg = PHOSPHORS[colorIdx].rgb;
     ctx.strokeStyle = `rgb(${fg.join(",")})`;
@@ -936,7 +1111,9 @@ function drawScope(i){
     ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = 4;
     ctx.beginPath();
     for (let k=0; k<count; k++){
-      const v = isAudio ? d[start+k]/32768 : d[start+k]/1000;   // PCM->±1, mV->V
+      // audio: PCM -> ±1, NEGATED (the analog output stage inverts, so raw
+      // samples are upside-down relative to the jack); CV: mV -> V
+      const v = isAudio ? -d[start+k]/32768 : d[start+k]/1000;
       const x = k/(count-1)*w;
       const y = Math.max(top, Math.min(h-bot, yOf(v)));
       k ? ctx.lineTo(x,y) : ctx.moveTo(x,y);
@@ -1010,29 +1187,13 @@ let rT; window.addEventListener("resize", ()=>{ clearTimeout(rT); rT=setTimeout(
 function redrawPanel(key){
   const p = PANELS[key]; if (!p.native) return;
   const cv = $(p.el).querySelector("canvas"); const s = scaleFor();
+  if (p.grid && p.native.height === 128) {
+    drawQuadComposite(cv, p.native, s);
+    return;
+  }
   cv.width = p.native.width*s; cv.height = p.native.height*s;
   const ctx = cv.getContext("2d"); ctx.imageSmoothingEnabled=false;
   ctx.drawImage(p.native,0,0,cv.width,cv.height);
-  if (p.grid && p.native.height===128) drawQuadGrid(ctx, cv.width, cv.height);
-}
-
-// quad 2x2 separators + a highlight box around the active (encoder-driven) slot(s)
-function drawQuadGrid(ctx, w, h){
-  ctx.strokeStyle="rgba(120,120,120,.5)"; ctx.lineWidth=1; ctx.beginPath();
-  ctx.moveTo(w/2,0); ctx.lineTo(w/2,h);
-  ctx.moveTo(0,h/2); ctx.lineTo(w,h/2); ctx.stroke();
-  const outline = (s, inset) => {
-    if (s < 0 || s > 3) return;
-    const col = s & 1, row = (s >> 1) & 1;
-    ctx.strokeRect(col*w/2 + 2 + inset, row*h/2 + 2 + inset, w/2 - 4 - inset*2, h/2 - 4 - inset*2);
-  };
-  // cyan = the slots the encoders are currently driving
-  const slots = activeSlots.full >= 0 ? [activeSlots.full] : [activeSlots.left, activeSlots.right];
-  ctx.strokeStyle = "rgba(120,220,255,.9)"; ctx.lineWidth = 3;
-  for (const s of slots) outline(s, 0);
-  // yellow = the focused quadrant (target of keyboard / Focus panel)
-  ctx.strokeStyle = "rgba(255,225,80,.95)"; ctx.lineWidth = 3;
-  outline(focusedSlot, 5);
 }
 
 // Move focus to a quadrant (0..3): activate it on the module (drives its encoder).
