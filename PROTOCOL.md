@@ -89,6 +89,26 @@ and scaling are known from the request — no header line is sent.
 
 *v1.1 (single slot, `O` `<sel>`) is retired; hosts must send all four bytes.*
 
+### MIDI monitor — `N` (v1.3)
+Dumps the firmware's MIDI in/out event ring. Quadrants only (silent
+otherwise). Firmware: `quad_midilog.h`; hooks in the Quadrants MIDI pump
+(IN, all devices), the `MIDIFrame::Send*` wrappers and MIDI-thru (OUT).
+Clock, Active Sensing, and SysEx are not logged (floods / display transport).
+
+Reply: one line, `N:` + **32 events × 12 uppercase hex chars**:
+
+```
+seq(4) message(2) dirchan(2) d1(2) d2(2)
+```
+
+`seq` is a rolling 16-bit counter, 0 = empty slot, never 0 after wrap. The
+ring is dumped in storage order — hosts must track the highest `seq` seen
+(wraparound-aware) and render only newer events, sorted by `seq`.
+`message` = raw MIDI status (0x80 off / 0x90 on / 0xB0 CC / 0xC0 PC /
+0xD0 aftertouch / 0xE0 bend, low nibble clear; 0xFx system). `dirchan`:
+bit 7 = direction (1 = OUT), low 7 bits = channel 1–16 (0 = none). Bend
+value = `(d2 << 7) | d1`, centered at 8192.
+
 ### Action commands (no frame reply)
 | Bytes | Action |
 |---|---|
