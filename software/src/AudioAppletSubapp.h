@@ -452,6 +452,18 @@ public:
     return (db + 48.0f) / 48.0f;
   }
 
+  // Same, for the L/R audio OUTPUTS (the final-stage peak analyzers) — the
+  // external viewer's out meters.
+  float OutputPeak(size_t ch) {
+    AudioAnalyzePeak& p = peaks[ch][Slots];
+    float& db = lpf_peak_db[ch][Slots];
+    if (p.available()) {
+      ONE_POLE(db, scalarToDb(p.read()), 0.25f);
+      if (db < -48.0f) db = -48.0f;
+    }
+    return (db + 48.0f) / 48.0f;
+  }
+
   // The stream + channel currently feeding the main audio output on a side —
   // the signal at the audio out jack. Used by the external viewer's scope tap
   // (quad_scope.h); re-queried on every read so it follows applet changes.

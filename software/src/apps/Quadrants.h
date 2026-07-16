@@ -1906,6 +1906,14 @@ FLASHMEM __attribute__((noinline)) bool QuadCapture_InputLevels(float &l, float 
   return true;
 }
 
+// Current L/R audio OUTPUT peak levels (0..1) — final stage of the stack.
+FLASHMEM __attribute__((noinline)) bool QuadCapture_OutputLevels(float &l, float &r) {
+  if (!QuadCapture_CurrentApp()) return false;
+  l = audio_app.OutputPeak(0);
+  r = audio_app.OutputPeak(1);
+  return true;
+}
+
 static int g_focused_slot = 0;   // last slot the viewer focused (for prev/next app)
 
 // Click-to-activate: bring slot (0..3) onto its side so its encoder drives it.
@@ -2015,17 +2023,32 @@ FLASHMEM bool QuadCapture_ScopeCapture(char slot_c, char sel, char win_c, uint8_
   return true;
 }
 
-// MIDI monitor dump ('N'): the whole event ring as one line, "N:" + 32 events
-// x 12 hex chars (seq4 message2 dirchan2 d1 d2). Host keeps the highest seq
-// seen and shows only newer events. See quad_midilog.h / PROTOCOL.md.
-FLASHMEM bool QuadCapture_MidiLog() {
+// MIDI monitor ring, packed: 32 events x 6 bytes (seq_hi seq_lo message
+// dirchan d1 d2) = 192 B. Shared by the serial hex dump and the SysEx
+// transport. Host keeps the highest seq seen and shows only newer events.
+FLASHMEM bool QuadCapture_MidiLogPack(uint8_t *dst) {
   if (!QuadCapture_CurrentApp()) return false;
-  char buf[16];
-  Serial.print("N:");
   for (size_t i = 0; i < QuadMidiLog::kEvents; i++) {
     const QuadMidiLog::Ev &e = QuadMidiLog::ring[i];
-    snprintf(buf, sizeof(buf), "%04X%02X%02X%02X%02X",
-             e.seq, e.message, e.dirchan, e.d1, e.d2);
+    *dst++ = (uint8_t)(e.seq >> 8);
+    *dst++ = (uint8_t)(e.seq & 0xFF);
+    *dst++ = e.message;
+    *dst++ = e.dirchan;
+    *dst++ = e.d1;
+    *dst++ = e.d2;
+  }
+  return true;
+}
+
+// Serial flavor ('N'): the packed ring as one line, "N:" + 384 hex chars.
+// See quad_midilog.h / PROTOCOL.md.
+FLASHMEM bool QuadCapture_MidiLog() {
+  uint8_t packed[QuadMidiLog::kEvents * 6];
+  if (!QuadCapture_MidiLogPack(packed)) return false;
+  char buf[4];
+  Serial.print("N:");
+  for (size_t i = 0; i < sizeof(packed); i++) {
+    snprintf(buf, sizeof(buf), "%02X", packed[i]);
     Serial.print(buf);
   }
   Serial.println();

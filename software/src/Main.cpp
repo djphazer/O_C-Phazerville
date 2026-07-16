@@ -657,11 +657,15 @@ void FASTRUN loop() {
             QuadCapture_BackupBank();
             break;
           case 'V': {
-            // Audio input levels: reply immediately with "L,R\n" (peaks 0..1).
-            float lvl_l = 0.f, lvl_r = 0.f;
-            if (QuadCapture_InputLevels(lvl_l, lvl_r)) {
-              Serial.print(lvl_l, 4); Serial.print(',');
-              Serial.println(lvl_r, 4);
+            // Audio levels: reply "inL,inR,outL,outR\n" (peaks 0..1). Hosts
+            // that only know the old two-value form can ignore the extras.
+            float il = 0.f, ir = 0.f, ol = 0.f, orr = 0.f;
+            if (QuadCapture_InputLevels(il, ir)) {
+              QuadCapture_OutputLevels(ol, orr);
+              Serial.print(il, 4); Serial.print(',');
+              Serial.print(ir, 4); Serial.print(',');
+              Serial.print(ol, 4); Serial.print(',');
+              Serial.println(orr, 4);
               Serial.flush();
             }
             break;
@@ -688,8 +692,8 @@ void FASTRUN loop() {
       QuadCapture::service(128);
     }
 
-    // service any pending USB-MIDI SysEx capture request (iPad path)
-    QuadMidi::service();
+    // service any pending USB-MIDI SysEx capture request (iPad / Android path)
+    QuadMidi::service(RemoteControl);
 #endif // QUAD_CAPTURE
 
     // check for frame buffer to have capture data ready

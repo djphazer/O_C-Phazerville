@@ -25,6 +25,7 @@ bool QuadCapture_Render(uint8_t *frame2048);       // 2048 bytes (128x128)
 bool QuadCapture_RenderAudio(uint8_t *frame1024);  // 1024 bytes (128x64)
 bool QuadCapture_RenderMidi(uint8_t *frame1024);   // 1024 bytes (128x64)
 bool QuadCapture_InputLevels(float &l, float &r);  // L/R input peaks (0..1)
+bool QuadCapture_OutputLevels(float &l, float &r); // L/R output peaks (0..1)
 bool QuadCapture_SwitchToSlot(int slot);           // activate quadrant 0..3
 bool QuadCapture_ControlState(int &l, int &r, int &full, int &preset); // + current preset
 bool QuadCapture_ChangeApplet(int dir);            // focused slot prev/next applet
@@ -34,7 +35,8 @@ bool QuadCapture_SavePreset(int slot);             // save current state to slot
 bool QuadCapture_BackupBank();                     // stream the whole bank to host
 bool QuadCapture_ScopeCapture(char slot, char sel, char win, uint8_t *dst512); // scope snapshot ('O')
 void QuadCapture_ScopeDebug();                     // 'O' <any> '?' <any>: print DBG state line
-bool QuadCapture_MidiLog();                        // 'N': print MIDI monitor ring
+bool QuadCapture_MidiLog();                        // 'N': print MIDI monitor ring (serial)
+bool QuadCapture_MidiLogPack(uint8_t *dst192);     // pack the ring: 32 events x 6 B
 
 namespace QuadCapture {
 

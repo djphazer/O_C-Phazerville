@@ -57,7 +57,7 @@ fall back to the stock any-byte frame.
 ### Text-reply commands
 | Byte | Reply | Meaning |
 |---|---|---|
-| `V` | `L,R\n` — two floats 0.0–1.0 (4 dp) | audio input peak levels |
+| `V` | `inL,inR,outL,outR\n` — four floats 0.0–1.0 (4 dp) | audio input + output peak levels (v1.4; hosts may ignore the extras) |
 | `T` | `left,right,full,preset\n` — ints | control state (focused slots / view / preset) |
 
 ### Oscilloscope — `O` `<slot>` `<sel>` `<win>` (v1.2: dual slots + time base)
@@ -133,16 +133,23 @@ Reference decoder: `phazerville_quad.py` (desktop viewer).
 
 ---
 
-## 2. MIDI SysEx — iPad app (sub-id `0x7A`)
+## 2. MIDI SysEx — iPad / Android (sub-id `0x7A`)
 
-For hosts that get USB MIDI but not USB serial (iPadOS/iOS). Mirrors the `Q`/`A`/`V`
-serial commands. Manufacturer `0x7D` ("non-commercial"), sub-id `0x7A`.
+For hosts that get USB MIDI but not USB serial (iPadOS/iOS natively; Android
+Chrome via Web MIDI — mobile Chrome has no Web Serial). Mirrors the serial
+commands. Manufacturer `0x7D` ("non-commercial"), sub-id `0x7A`. v1.4 extends
+the original `Q`/`A`/`V` set with `T`/`O`/`N`/`~`.
 
 ```
-request  (host → module):  F0 7D 7A <cmd> F7            cmd = 'Q' | 'A' | 'V'
+request  (host → module):  F0 7D 7A <cmd> [args…] F7
 reply Q  (module → host):  F0 7D 7A 51 <4096 nibbles> F7    -> 2048 B (128×128)
 reply A  (module → host):  F0 7D 7A 41 <2048 nibbles> F7    -> 1024 B (128×64)
-reply V  (module → host):  F0 7D 7A 56 <l7> <r7> F7         -> L/R level 0..127
+reply V  (module → host):  F0 7D 7A 56 <l7> <r7> F7         -> in L/R level 0..127
+reply T  (module → host):  F0 7D 7A 54 <left> <right> <full+1> <preset+1> F7
+request O:                 F0 7D 7A 4F <slot> <src> <win> F7   (ASCII, as §1)
+reply O  (module → host):  F0 7D 7A 4F <1024 nibbles> F7    -> 512 B scope snapshot
+reply N  (module → host):  F0 7D 7A 4E <384 nibbles> F7     -> 192 B MIDI-monitor ring
+request ~:                 F0 7D 7A 7E <selector> F7          (no reply; remote control)
 ```
 
 **Nibble encoding:** every framebuffer byte is sent as two 7-bit-safe bytes —
