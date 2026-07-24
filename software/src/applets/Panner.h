@@ -25,12 +25,15 @@
 // A CV-controllable panner derived from Xfader.
 // One signal (CV1) is routed between OUT1 (left) and OUT2 (right).
 // The encoder sets a base position; CV2 (0..5V, unipolar) adds a rightward offset.
+// Gates override the position entirely: TR1 = hard left, TR2 = hard right,
+// both together = dead center.
 class Panner : public HemisphereApplet {
   APPLET_INTERFACE(Panner, "Panner", PhzIcons::mixerBal);
 
 private:
     uint8_t base_position;
-    int pos = 128;  // live position (base + CV2)
+    int pos = 128;  // live position (base + CV2, or gate override)
+    bool overridden = false;
 
     void DrawInterface() {
         const int bar_x = 14;
@@ -56,6 +59,9 @@ private:
         gfxLine(bx, 46, bx, 54);
         int px = bar_x + Proportion(pos, PANNER_MAX_VALUE, bar_w - 1);
         gfxRect(px - 1, 49, 3, 3);
+
+        // Gate override indicator
+        if (overridden) gfxIcon(bar_x + bar_w + 2, 47, ZAP_ICON);
     }
 };
 
@@ -67,10 +73,20 @@ void Panner::Controller() {
     int signal = In(0);
     int cv2 = In(1);
 
-    int offset = Proportion(constrain(cv2, 0, PANNER_CV_RANGE),
-                            PANNER_CV_RANGE, PANNER_MAX_VALUE);  // 0..5V -> rightward
+    bool left_gate = Gate(0);
+    bool right_gate = Gate(1);
+    overridden = left_gate || right_gate;
 
-    pos = constrain((int)base_position + offset, 0, PANNER_MAX_VALUE);
+    if (overridden) {
+        // Gates win over encoder and CV: both high = center, else hard to one side
+        if (left_gate && right_gate) pos = (PANNER_MAX_VALUE + 1) / 2;
+        else pos = left_gate ? 0 : PANNER_MAX_VALUE;
+    } else {
+        int offset = Proportion(constrain(cv2, 0, PANNER_CV_RANGE),
+                                PANNER_CV_RANGE, PANNER_MAX_VALUE);  // 0..5V -> rightward
+
+        pos = constrain((int)base_position + offset, 0, PANNER_MAX_VALUE);
+    }
 
     Out(0, Proportion(PANNER_MAX_VALUE - pos, PANNER_MAX_VALUE, signal));  // OUT1 = left
     Out(1, Proportion(pos, PANNER_MAX_VALUE, signal));                     // OUT2 = right
@@ -96,13 +112,13 @@ void Panner::OnDataReceive(uint64_t data) {
 
 void Panner::SetHelp() {
     //                    "-------" <-- Label size guide
-    help[HELP_DIGITAL1] = "";
-    help[HELP_DIGITAL2] = "";
+    help[HELP_DIGITAL1] = "Left";
+    help[HELP_DIGITAL2] = "Right";
     help[HELP_CV1]      = "Signal";
     help[HELP_CV2]      = "Pan CV";
     help[HELP_OUT1]     = "Left";
     help[HELP_OUT2]     = "Right";
     help[HELP_EXTRA1]   = "Enc: Position";
-    help[HELP_EXTRA2]   = "";
+    help[HELP_EXTRA2]   = "TR1+TR2: center";
     //                    "---------------------" <-- Extra text size guide
 }
