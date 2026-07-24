@@ -95,6 +95,7 @@ Newer ORN8 hardware (T41) hosts the same set of Applets, four at a time, inside 
 * [MarkovPerc](MarkovPerc) - first-order Markov chain rhythmic generator
 * [MultiScale](MultiScale) - like ScaleDuet, but with 4 scale masks
 * [Palimpsest](Palimpsest) - accent sequencer
+* [Panner](Panner) - routes one CV signal between two outputs, with gate-controllable hard pan
 * [Pigeons](Pigeons) - dual Fibonacci-style melody generator
 * [PolyDiv](PolyDiv) - four concurrent clock dividers with assignable outputs
 * [ProbDiv](ProbDiv) - stochastic trigger generator
@@ -181,7 +182,7 @@ _(note: T41 Audio Applets are not included here)_
 | **Envelope Generator**       | [ADSR](ADSR-EG), [AD EG](AD-EG), [Ebb & LFO](Ebb-&-LFO), [EnvSeq](EnvSeq), [VectorEG](VectorEG)  | [Piqued](Piqued), [Dialectic Ping Pong](Dialectic-Ping-Pong) |
 | **LFO**                      | [Ebb & LFO](Ebb-&-LFO), [LowerRenz](LowerRenz), [Relabi](Relabi), [VectorLFO](VectorLFO)   | [Quadraturia](Quadraturia) |
 | **MIDI**                     | [MIDI In](MIDI-Input), [MIDI Out](MIDI-Out) _(See also: [MIDI Maps](MIDI-Maps), [Auto MIDI Output](Hemisphere-General-Settings#auto-midi-output))_   | [Captain MIDI](Captain-MIDI) |
-| **Mixer**                    | [AttenOff](AttenOff), [Calculate](Calculate), [Combin8](Combin8), [Squanch](Squanch), [Xfader](Xfader) |    |
+| **Mixer**                    | [AttenOff](AttenOff), [Calculate](Calculate), [Combin8](Combin8), [Panner](Panner), [Squanch](Squanch), [Xfader](Xfader) |    |
 | **Modulation Source**        | [GameOfLife](GameOfLife), [Relabi](Relabi) [Stairs](Stairs), [VectorMorph](VectorMorph) | [Low-rents](Low-rents), [Pong](Pong) |
 | **Performance Utility**      | [Button2](Button2), [Voltage](Voltage) |  [Scenery](Scenery) |
 | **Pitch Sequencer**          | [Carpeggio](Carpeggio), [TwoRings](TwoRings), [Enigma Jr.](Enigma-Jr), [MarkoV](MarkoV), [Pigeons](Pigeons), [ProbMeloD](ProbMeloD), [Seq32](Seq32), [SeqPlay7](SeqPlay7), [SequenceX](SequenceX), [Shredder](Shredder), [Strum](Strum), [SwitchSeq](Switch-Seq), [TB-3PO](TB-3PO) | [Enigma](Enigma), [The Darkest Timeline](The-Darkest-Timeline), [Automatonnetz](Automatonnetz), [Sequins](Sequins), [Acid Curds](Acid-Curds), [Passencore](Passencore) |

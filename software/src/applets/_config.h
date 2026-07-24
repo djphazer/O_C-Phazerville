@@ -84,6 +84,7 @@ using namespace HS;
 #include "MultiScale.h"
 #endif
 #include "Palimpsest.h"
+#include "Panner.h"
 #include "Pigeons.h"
 #include "Piquet.h"
 #include "PolyDiv.h"
@@ -205,6 +206,7 @@ constexpr Registry reg = Registry<HemisphereApplet, HS::APPLET_SLOTS  // unused 
     , DeclareApplet<MultiScale, 73, CAT_QUANTIZER>
 #endif
     , DeclareApplet<Palimpsest, 20, CAT_SEQUENCER>
+    , DeclareApplet<Panner, 100, CAT_UTILITY>
     , DeclareApplet<Pigeons, 71, CAT_SEQUENCER>
     //, DeclareApplet<Piquet, 95, CAT_MODULATOR>
     , DeclareApplet<PolyDiv, 72, CAT_SEQUENCER | CAT_CLOCKING>
