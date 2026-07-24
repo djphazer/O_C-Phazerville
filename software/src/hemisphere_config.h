@@ -59,6 +59,7 @@
 #include "applets/MidiLoop.h"
 #include "applets/MultiScale.h"
 #include "applets/Palimpsest.h"
+#include "applets/Panner.h"
 #include "applets/Pigeons.h"
 #include "applets/PolyDiv.h"
 #include "applets/ProbabilityDivider.h"
@@ -288,6 +289,7 @@ AppletRegistry reg{
     DeclareApplet<Tuner>{39, 0x80},
     DeclareApplet<Voltage>{43, 0x10},
     DeclareApplet<Xfader>{33, 0x10},
+    DeclareApplet<Panner>{100, 0x10},
 #endif
 #ifdef APPLETS_WEIRDSTUFF
     DeclareApplet<BitBeat>{79, 0x01},
