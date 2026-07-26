@@ -47,6 +47,7 @@ using namespace HS;
 #include "DivSeq10.h"
 #include "DrumMap.h"
 #include "DualQuant.h"
+#include "SeQuant.h"
 #ifdef PEWPEWPEW
 #include "OffsetQuant.h"
 #endif
@@ -219,6 +220,7 @@ constexpr Registry reg = Registry<HemisphereApplet, HS::APPLET_SLOTS
     , DeclareApplet<Scope, 23, CAT_OTHER>
     , DeclareApplet<Seq32, 75, CAT_SEQUENCER>
     , DeclareApplet<SeqPlay7, 76, CAT_SEQUENCER>
+    , DeclareApplet<SeQuant, 66, CAT_QUANTIZER>
     , DeclareApplet<SequenceX, 14, CAT_SEQUENCER>
     , DeclareApplet<ShiftArp, 96, CAT_SEQUENCER>
     , DeclareApplet<ShiftGate, 48, CAT_LOGIC | CAT_MODULATOR | CAT_CLOCKING>
