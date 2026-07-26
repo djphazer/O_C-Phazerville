@@ -68,6 +68,7 @@
 #include "applets/RndWalk.h"
 #include "applets/RunglBook.h"
 #include "applets/ScaleDuet.h"
+#include "applets/SeQuant.h"
 #include "applets/Schmitt.h"
 #include "applets/Scope.h"
 #include "applets/SequenceX.h"
@@ -243,6 +244,7 @@ AppletRegistry reg{
     DeclareApplet<EnsOscKey>{35, 0x08},
     DeclareApplet<MultiScale>{73, 0x08},
     DeclareApplet<ScaleDuet>{26, 0x08},
+    DeclareApplet<SeQuant>{86, 0x08},
     DeclareApplet<Squanch>{46, 0x08},
 #endif
 #ifdef APPLETS_MODULATION
