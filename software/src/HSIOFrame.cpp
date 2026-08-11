@@ -4,7 +4,7 @@
 #include "HSIOFrame.h"
 
 const int HS::MIDIMapping::ViewOut() const {
-  if (IsPitch()) return output + Proportion(pitch_bend, 8192, frame.MIDIState.bend_range << 7);
+  if (IsPitch()) return output + (transpose * 128) + Proportion(pitch_bend, 8192, frame.MIDIState.bend_range << 7);
   return output;
 }
 

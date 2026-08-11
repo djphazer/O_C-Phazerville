@@ -248,6 +248,7 @@ namespace HS {
     MODE,
     VOICE,
     RANGELOW, RANGEHIGH,
+    TRANSPOSE,
 
     MEDITCURSOR_COUNT
   };
@@ -277,6 +278,9 @@ namespace HS {
           break;
         case 5: // high
           map.AdjustRangeHigh(dir);
+          break;
+        case 6: // transpose
+          map.AdjustTranspose(dir);
           break;
       }
     }
@@ -462,6 +466,9 @@ namespace HS {
         pw = 54; ph = 38;
         break;
       case MIDI_POPUP:
+        px = 14; py = 14;
+        pw = 100; ph = 38;
+        break;
       case QUANTIZER_POPUP:
         px = 14; py = 23;
         pw = 100; ph = 28;
@@ -578,17 +585,25 @@ namespace HS {
 
         graphics.setPrintPos(px + 5, py + 15);
         graphics.printf(
-          "V:%d<%s:%s>",
+          "V:%d <%s:%s>",
           map.get_voice() + 1,
           midi_note_numbers[map.get_low()],
           midi_note_numbers[map.get_high()]
         );
 
+        graphics.setPrintPos(px + 5, py + 25);
+        graphics.printf(
+          "T:%d",
+          map.get_transpose()
+        );
+
         if (midi_edit) {
           if (midi_edit < 3) // chan or mode
-            gfxIcon(px + 5 + 24 * midi_edit, 35, UP_BTN_ICON);
-          else // voice, range low, range high
-            gfxIcon(px + 17 + 20 * (midi_edit - 3), 45, UP_BTN_ICON);
+            gfxIcon(px + 5 + 24 * midi_edit, 25, UP_BTN_ICON);
+          else if (midi_edit < 6) // voice, range low, range high
+            gfxIcon(px + 17 + 20 * (midi_edit - 3), 35, UP_BTN_ICON);
+          else  // transpose
+            gfxIcon(px + 17 + 20 * (midi_edit - 6), 45, UP_BTN_ICON);
 
           // context clues at top/bottom of screen
           gfxFooter("L:cursor     R:adjust");
