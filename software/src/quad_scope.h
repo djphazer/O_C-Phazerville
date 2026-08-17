@@ -63,14 +63,6 @@ static inline DAC_CHANNEL physical(int logical) {
   return map[logical & 7];
 }
 
-static inline ADC_CHANNEL physical_adc(int logical) {
-  const ADC_CHANNEL map[8] = {
-    ADC_CHANNEL_1, ADC_CHANNEL_2, ADC_CHANNEL_3, ADC_CHANNEL_4,
-    ADC_CHANNEL_5, ADC_CHANNEL_6, ADC_CHANNEL_7, ADC_CHANNEL_8,
-  };
-  return map[logical & 7];
-}
-
 struct Chan {
   volatile int8_t source = -1;   // -1 forces a Select on the first request
   int8_t phys = 0;               // physical DAC index for the CV source
@@ -121,7 +113,10 @@ struct Chan {
   }
 
   FLASHMEM void SelectCVIn(int ch, uint8_t w) {    // 0..7 = CV in 1..8
-    phys = (int8_t)physical_adc(ch);
+    // ioframe pitch_values[] is already jack-ordered (the ADC scan stores via
+    // the remap), so indexing by the jack number directly avoids applying the
+    // hardware adcmap twice on non-identity-map builds (e.g. CalSynth XL).
+    phys = (int8_t)ch;
     win = w;
     source = (int8_t)(CVIN_BASE + ch);
     clear();
