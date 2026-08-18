@@ -47,6 +47,8 @@
 #include "HSMIDI.h"
 
 #include "PhzConfig.h"
+#include "PresetEngine.h"
+#include "PresetBus.h"
 
 #if defined(ARDUINO_TEENSY41)
 USBHost thisUSB;
@@ -370,6 +372,8 @@ void setup() {
 
   // initialize apps
   OC::app_switcher.Init(reset_settings || firstrun);
+  OC::PresetEngine::Init();
+  OC::PresetBus::Init();
 
   // Welcome splash
   OC::ui.Splashscreen(firstrun, 1);
@@ -433,6 +437,8 @@ FLASHMEM __attribute__((noinline)) void loop() {
 
     // Take care of queued tasks
     OC::CORE::FlushTasks();
+    OC::PresetEngine::Process();
+    OC::PresetBus::Task();
 
     // UI events
     if (UI_MODE_APP_SETTINGS == ui_mode) {
@@ -486,6 +492,22 @@ FLASHMEM __attribute__((noinline)) void loop() {
           continue;
         }
         switch (cmd) {
+#if defined(ARDUINO_TEENSY41) && defined(PRESET_BUS)
+          // preset-engine bench triggers: ( ) = save/recall slot 0; { } slot 1
+          case '(': OC::PresetEngine::RequestSave(0); break;
+          case ')': OC::PresetEngine::RequestRecall(0); break;
+          case '{': OC::PresetEngine::RequestSave(1); break;
+          case '}': OC::PresetEngine::RequestRecall(1); break;
+          case 'b': OC::PresetBus::DebugDump(); break;
+          case 'B':
+            OC::PresetBus::SetVerbose(!OC::PresetBus::Verbose());
+            Serial.printf("PresetBus verbose = %d\n", OC::PresetBus::Verbose());
+            break;
+          case 'g':
+            Serial.println("Saving global settings + app data...");
+            OC::SaveAppData();
+            break;
+#endif
 #ifdef PRINT_DEBUG
           case 'z':
             Serial.println("-=[ PEW PEW NERDS! ]=-");

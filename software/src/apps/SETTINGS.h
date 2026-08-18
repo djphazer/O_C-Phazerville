@@ -23,6 +23,8 @@
 #ifdef PEWPEWPEW
 #include "../util/pewpewsplash.h"
 #endif
+#include "../PresetBus.h"
+#include "../PhzConfig.h"
 
 extern "C" void _reboot_Teensyduino_();
 using namespace OC;
@@ -33,6 +35,7 @@ public:
   OC_APP_INTERFACE_DECLARE(AppSettings, 0);
 
   bool reflash = false;
+  bool bus_addr_dirty = false;
   bool calibration_mode = false;
   bool calibration_complete = true;
   bool cal_save_q = false;
@@ -62,6 +65,14 @@ public:
     if (cal_save_q) {
       OC::calibration_save();
       cal_save_q = false;
+    }
+    if (bus_addr_dirty) {
+      // persist the live-edited 200e bus address under the globals map
+      // (load first: the shared PhzConfig map may hold another app's file)
+      PhzConfig::load_config();
+      OC::PresetBus::SetModuleAddress(OC::PresetBus::ModuleAddress());
+      PhzConfig::save_config();
+      bus_addr_dirty = false;
     }
   }
 
@@ -324,7 +335,14 @@ public:
       gfxIcon(0, 35, PhzIcons::runglBook);
       gfxPrint(10, 35, OC::Strings::BUILD_TAG);
       gfxIcon(0, 45, PhzIcons::frontBack);
-      gfxPrint(10, 45, "github.com/djphazer");
+      if (OC::PresetBus::Enabled()) {
+        // 200e preset bus: address editable with the right encoder
+        gfxPrint(10, 45, "Bus addr:");
+        graphics.printf(" %02X ", OC::PresetBus::ModuleAddress());
+        gfxPrint(OC::PresetBus::RemoteEnabled() ? "(rem ON)" : "(rem off)");
+      } else {
+        gfxPrint(10, 45, "github.com/djphazer");
+      }
       gfxPrint(0, 55, reflash ? "[Reflash]" : "[CALIBRATE]   [RESET]");
   }
 
@@ -462,6 +480,15 @@ public:
             StartCalibration();
         }
         if (event.control == OC::CONTROL_BUTTON_R && event.type == UI::EVENT_BUTTON_PRESS) FactoryReset();
+
+        // right encoder edits the 200e preset-bus module address (live on
+        // the bus at once; persisted to GLOBALS.CFG on app exit)
+        if (event.control == OC::CONTROL_ENCODER_R && OC::PresetBus::Enabled()) {
+          int a = (int)OC::PresetBus::ModuleAddress() + event.value;
+          CONSTRAIN(a, 0x01, 0x77);
+          OC::PresetBus::SetModuleAddressRuntime((uint8_t)a);
+          bus_addr_dirty = true;
+        }
 
         // dual-press UP+DOWN / A+B to flip screen
         if ( event.type == UI::EVENT_BUTTON_DOWN &&

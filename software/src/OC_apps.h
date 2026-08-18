@@ -43,11 +43,28 @@ void SaveAppData();
 
 static inline void save_app_data() { SaveAppData(); }
 
+#ifdef __IMXRT1062__
+// Preset-engine access to the whole-module state paths (PresetEngine.cpp).
+// Build/Apply operate on a caller-supplied AppData buffer (RAM only);
+// the GlobalSettings pair reads/writes the *currently loaded* PhzConfig map.
+struct AppData;
+void BuildAppData(AppData &data);
+void ApplyAppData(const AppData &data);
+void BuildGlobalSettingsValues();
+void RestoreGlobalSettingsFromConfig(uint8_t scala_loaded_mask = 0);
+// app-container index for an app id; falls back to the current app
+size_t ResolveAppIndexByID(uint16_t app_id);
+#endif
+
 enum AppEvent {
   APP_EVENT_SUSPEND,
   APP_EVENT_RESUME,
   APP_EVENT_SCREENSAVER_ON,
-  APP_EVENT_SCREENSAVER_OFF
+  APP_EVENT_SCREENSAVER_OFF,
+  // Flush volatile state to backing storage (bank files / config maps)
+  // regardless of auto-save settings. Sent before a bus preset capture;
+  // apps that don't care simply ignore it.
+  APP_EVENT_FLUSH
 };
 
 // The original "app" interface was built around structs filled with function

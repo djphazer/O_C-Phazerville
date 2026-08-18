@@ -978,6 +978,12 @@ void AppCaptainMIDI::HandleAppEvent(OC::AppEvent event) {
   if (event == OC::APP_EVENT_RESUME) {
     Resume();
   }
+  if (event == OC::APP_EVENT_FLUSH) {
+    // Preset-bus capture: flush live setup to the file-backed store
+#ifdef __IMXRT1062__
+    StoreData();
+#endif
+  }
 }
 
 void AppCaptainMIDI::Loop() {} // Deprecated

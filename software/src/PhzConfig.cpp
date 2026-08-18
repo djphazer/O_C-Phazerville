@@ -23,7 +23,13 @@ ConfigMap data_store;
 
 // Specify size to use of onboard Teensy Program Flash chip.
 // the maximum flash available for LittleFS is 960 blocks of 1024 bytes
+#if defined(ARDUINO_TEENSY41)
+// 8MB program flash: give the FS real headroom (30 preset-bus slots at
+// ~12KB each plus banks never fit 512KB once LittleFS block overhead bites)
+static constexpr uint32_t diskSize = 1024 * 1024 * 4;
+#else
 static constexpr uint32_t diskSize = 1024 * 512;
+#endif
 // custom file format header
 static constexpr uint32_t HEADER_SIZE = 12;
 
@@ -173,6 +179,45 @@ bool save_config(const char* filename, FS &fs)
       success = fs.rename(TEMPFILE, filename);
       if (!success)
         HS::PokePopup(HS::MESSAGE_POPUP, "TempFile ERR !!");
+    }
+
+    return success;
+}
+
+FLASHMEM bool save_filtered(const char* filename, FS &fs,
+                   bool (*pred)(KEY), KEY (*remap)(KEY))
+{
+    SERIAL_PRINTLN("\nSaving filtered config: %s\n", filename);
+
+    // Build filtered/remapped copies; the live map stays untouched.
+    ConfigMap cfg_out, data_out;
+    for (auto &kv : cfg_store) {
+      if (pred && !pred(kv.first)) continue;
+      cfg_out[remap ? remap(kv.first) : kv.first] = kv.second;
+    }
+    for (auto &kv : data_store) {
+      if (pred && !pred(kv.first)) continue;
+      data_out[remap ? remap(kv.first) : kv.first] = kv.second;
+    }
+
+    const char* const TEMPFILE = "PEWPEW.TMP";
+    bool success = true;
+
+    fs.remove(TEMPFILE);
+    dataFile = fs.open(TEMPFILE, FILE_WRITE_BEGIN);
+    if (dataFile) {
+      size_t sz  = save_chunk( 0, "PZ", cfg_out);
+      if (sz) sz = save_chunk(sz, "PX", data_out);
+      dataFile.close();
+      if (!sz) success = false;
+    } else {
+      SERIAL_PRINTLN("PhzConfig: Error opening %s\n", filename);
+      success = false;
+    }
+
+    if (success) {
+      fs.remove(filename);
+      success = fs.rename(TEMPFILE, filename);
     }
 
     return success;
