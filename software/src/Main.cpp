@@ -384,7 +384,10 @@ void setup() {
 
 /*  ---------    main loop  --------  */
 
-void FASTRUN loop() {
+// FLASHMEM, not FASTRUN: under LTO a FASTRUN loop() gets inlined into
+// main() wholesale, dragging several KB of cold menu/console code into
+// ITCM. noinline keeps an out-of-line body for the section attribute.
+FLASHMEM __attribute__((noinline)) void loop() {
   using namespace OC;
   CORE::app_isr_enabled = true;
   CORE::display_update_enabled = true;
@@ -466,8 +469,22 @@ void FASTRUN loop() {
     // check for request from PC to capture the screen
     if (Serial && Serial.available() > 0) {
       bool capreq = false;
+      // Console lock: hosts like Linux ModemManager AT/MBIM-probe every new
+      // CDC port, and that byte soup lands on real commands ('D' turns the
+      // display off, 'C'/'F' reset or erase the config filesystem). Ignore
+      // all input until the literal sequence "pew!" arrives once per boot.
+      static bool console_unlocked = false;
+      static uint32_t unlock_shift = 0;
       do {
         int cmd = Serial.read();
+        if (!console_unlocked) {
+          unlock_shift = (unlock_shift << 8) | (uint8_t)cmd;
+          if (unlock_shift == 0x70657721) {  // "pew!"
+            console_unlocked = true;
+            Serial.println("-=[ console unlocked ]=-");
+          }
+          continue;
+        }
         switch (cmd) {
 #ifdef PRINT_DEBUG
           case 'z':
