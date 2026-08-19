@@ -157,7 +157,8 @@ extern "C" {
   }
 }
 
-void BootMenu() {
+// boot-time only; noinline so FLASHMEM sticks (free-function LTO rule)
+FLASHMEM __attribute__((noinline)) void BootMenu() {
   bool save = false;
   int choice = -1;
 
@@ -222,7 +223,20 @@ void BootMenu() {
 }
 #endif
 
-void setup() {
+#if defined(__IMXRT1062__)
+// The core never zeroes .bss.dma (DMAMEM is documented as uninitialized), so
+// C++ objects placed there boot with garbage in any member their constructor
+// doesn't touch - USBHost_t36 state machines rely on bss-zero and lock up.
+// Zero the section here: ResetHandler calls this hook after the DTCM bss
+// clear and BEFORE __libc_init_array (C++ ctors). .bss.dma is the first
+// section in RAM2 (origin 0x20200000) and ends at _heap_start per the .ld.
+extern unsigned long _heap_start;
+extern "C" FLASHMEM void startup_middle_hook(void) {
+  memset((void *)0x20200000, 0, (uint32_t)&_heap_start - 0x20200000u);
+}
+#endif
+
+FLASHMEM void setup() {
   delay(50);
   Serial.begin(9600);
 
