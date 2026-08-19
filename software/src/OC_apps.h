@@ -125,6 +125,9 @@ protected:
 void draw_save_message(uint8_t c);
 void save_app_data();
 void start_calibration();
+// remote bench control: suspend/switch/resume to an app (loop context only)
+void SwitchToApp(size_t index);
+void SwitchToDefaultApp();
 
 template <typename T, typename Traits> class AppBaseImpl : public AppBase {
 public:
