@@ -49,6 +49,7 @@
 #include "PhzConfig.h"
 #include "PresetEngine.h"
 #include "PresetBus.h"
+#include "PresetBusUI.h"
 
 #if defined(ARDUINO_TEENSY41)
 USBHost thisUSB;
@@ -94,6 +95,7 @@ void ScanI2C() {
 #endif // ARDUINO_TEENSY41
 
 uint_fast8_t MENU_REDRAW = true;
+volatile uint32_t loop_counter = 0;   // main-loop rate, read by DebugDump
 static OC::UiMode ui_mode = OC::UI_MODE_MENU;
 static OC::IOFrame io_frame;
 
@@ -220,7 +222,7 @@ void BootMenu() {
 }
 #endif
 
-void setup() {
+FLASHMEM void setup() {
   delay(50);
   Serial.begin(9600);
 
@@ -367,13 +369,29 @@ void setup() {
   vbias_m->SetState(VBiasManager::BI);
 #endif
 
+  bool firstrun = false;
+#ifdef __IMXRT1062__
   // use default global config file in LFS
-  bool firstrun = !PhzConfig::load_config();
+  firstrun = !PhzConfig::load_config();
+#endif
 
-  // initialize apps
-  OC::app_switcher.Init(reset_settings || firstrun);
+  // initialize apps (on T3.x firstrun is detected by the EEPROM load inside)
+  firstrun |= !OC::app_switcher.Init(reset_settings || firstrun);
+#if defined(ARDUINO_TEENSY41) && defined(AUDIO_INTERFACE)
+  // Force the audio output path (I2S codec out + host-playback monitor mix)
+  // into existence. It is lazily built and was only ever constructed when an
+  // audio applet wired up the chain - an appletless boot had DEAD panel outs
+  // and no USB monitoring. Called here so it is created after every other
+  // stream (its documented ordering requirement).
+  OC::AudioIO::OutputStream();
+#endif
+
   OC::PresetEngine::Init();
   OC::PresetBus::Init();
+  OC::PresetBusUI::Init();
+  // restores the last bus preset on any T4.1 (bench units included);
+  // no bus traffic is emitted, so non-bus hardware is unaffected
+  OC::PresetEngine::BootRecall();  // gated on I2C_Expansion inside
 
   // Welcome splash
   OC::ui.Splashscreen(firstrun, 1);
@@ -388,9 +406,9 @@ void setup() {
 
 /*  ---------    main loop  --------  */
 
-// FLASHMEM, not FASTRUN: under LTO a FASTRUN loop() gets inlined into
-// main() wholesale, dragging several KB of cold menu/console code into
-// ITCM. noinline keeps an out-of-line body for the section attribute.
+// loop() is the slow path (drawing, UI events, deferred work) — all the
+// real-time work happens in the CORE/UI timer ISRs. Run it from cached
+// flash instead of burning ~4KB of ITCM (it gets inlined into main()).
 FLASHMEM __attribute__((noinline)) void loop() {
   using namespace OC;
   CORE::app_isr_enabled = true;
@@ -400,6 +418,7 @@ FLASHMEM __attribute__((noinline)) void loop() {
   uint32_t last_redraw_time = 0;
 
   while (true) {
+    ++loop_counter;
 #if defined(ARDUINO_TEENSY41)
     thisUSB.Task();
 #endif
@@ -413,6 +432,8 @@ FLASHMEM __attribute__((noinline)) void loop() {
         // Handle events and process state changes elsewhere.
         ui.AppSettings(true);
 
+      } else if (OC::PresetBusUI::Active()) {
+        OC::PresetBusUI::Draw();
       } else { // if (UI_MODE_MENU == ui_mode) {
         OC_DEBUG_RESET_CYCLES(menu_draw_count, 512, DEBUG::MENU_draw_cycles);
         OC_DEBUG_PROFILE_SCOPE(DEBUG::MENU_draw_cycles);
@@ -439,6 +460,7 @@ FLASHMEM __attribute__((noinline)) void loop() {
     OC::CORE::FlushTasks();
     OC::PresetEngine::Process();
     OC::PresetBus::Task();
+    OC::PresetBusUI::Task();
 
     // UI events
     if (UI_MODE_APP_SETTINGS == ui_mode) {
@@ -475,10 +497,10 @@ FLASHMEM __attribute__((noinline)) void loop() {
     // check for request from PC to capture the screen
     if (Serial && Serial.available() > 0) {
       bool capreq = false;
-      // Console lock: hosts like Linux ModemManager AT/MBIM-probe every new
-      // CDC port, and that byte soup lands on real commands ('D' turns the
-      // display off, 'C'/'F' reset or erase the config filesystem). Ignore
-      // all input until the literal sequence "pew!" arrives once per boot.
+      // Console lock: hosts like the Jetson's ModemManager AT/MBIM-probe every
+      // new CDC port, and that byte soup has hit real commands ('D' froze the
+      // display, '(' fired preset saves, 'i'/'C'/'F' are worse). Ignore all
+      // input until the literal sequence "pew!" arrives.
       static bool console_unlocked = false;
       static uint32_t unlock_shift = 0;
       do {
@@ -492,22 +514,6 @@ FLASHMEM __attribute__((noinline)) void loop() {
           continue;
         }
         switch (cmd) {
-#if defined(ARDUINO_TEENSY41) && defined(PRESET_BUS)
-          // preset-engine bench triggers: ( ) = save/recall slot 0; { } slot 1
-          case '(': OC::PresetEngine::RequestSave(0); break;
-          case ')': OC::PresetEngine::RequestRecall(0); break;
-          case '{': OC::PresetEngine::RequestSave(1); break;
-          case '}': OC::PresetEngine::RequestRecall(1); break;
-          case 'b': OC::PresetBus::DebugDump(); break;
-          case 'B':
-            OC::PresetBus::SetVerbose(!OC::PresetBus::Verbose());
-            Serial.printf("PresetBus verbose = %d\n", OC::PresetBus::Verbose());
-            break;
-          case 'g':
-            Serial.println("Saving global settings + app data...");
-            OC::SaveAppData();
-            break;
-#endif
 #ifdef PRINT_DEBUG
           case 'z':
             Serial.println("-=[ PEW PEW NERDS! ]=-");
@@ -544,6 +550,27 @@ FLASHMEM __attribute__((noinline)) void loop() {
           case 'i':
             ScanI2C();
             break;
+          // preset-engine bench triggers: [ = save, ] = recall (slot 0);
+          // { and } use slot 1
+          case '(': OC::PresetEngine::RequestSave(0); break;
+          case ')': OC::PresetEngine::RequestRecall(0); break;
+          case '{': OC::PresetEngine::RequestSave(1); break;
+          case '}': OC::PresetEngine::RequestRecall(1); break;
+          case 'g':
+            Serial.println("Saving global settings + app data...");
+            OC::SaveAppData();
+            break;
+          case 'p':  // toggle the preset-bus overlay (remote UI inspection)
+            if (OC::PresetBusUI::Active()) OC::PresetBusUI::Exit();
+            else OC::PresetBusUI::Enter();
+            Serial.printf("PresetBusUI %s\n",
+                          OC::PresetBusUI::Active() ? "open" : "closed");
+            break;
+          case 'b': OC::PresetBus::DebugDump(); break;
+          case 'B':
+            OC::PresetBus::SetVerbose(!OC::PresetBus::Verbose());
+            Serial.printf("PresetBus verbose = %d\n", OC::PresetBus::Verbose());
+            break;
 #endif
           case 'C':
             Serial.println("Resetting Config File!!");
@@ -572,6 +599,13 @@ FLASHMEM __attribute__((noinline)) void loop() {
           case ']':
             // simulate Encoder button press
             break;
+#if defined(ARDUINO_TEENSY41) && defined(PRESET_BUS)
+          // commander mode: bus-wide preset ops (every module + local engine)
+          case '<': OC::PresetBus::BroadcastRecall(0); break;
+          case '>': OC::PresetBus::BroadcastSave(0); break;
+          case ',': OC::PresetBus::BroadcastRecall(1); break;
+          case '.': OC::PresetBus::BroadcastSave(1); break;
+#else
           case ',':
           case '.':
             // simulate Left Encoder turn
@@ -579,6 +613,7 @@ FLASHMEM __attribute__((noinline)) void loop() {
           case '<':
           case '>':
             // simulate Right Encoder turn
+#endif
             break;
 #endif
           default:

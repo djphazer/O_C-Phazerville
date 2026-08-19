@@ -95,10 +95,16 @@ typedef struct {
   int (*slot_write)(uint8_t slot, const uint8_t *in, uint32_t n);
   int (*card_write)(uint8_t card7, uint32_t off, const uint8_t *d, uint32_t n);
   int (*card_read)(uint8_t card7, uint32_t off, uint8_t *d, uint32_t n);
+  // Bus MIDI (cmd 0x0F long / status-first short). status keeps the 200e
+  // bus mask in its low nibble (0x8 = bus A, 0x4 = bus B); realtime
+  // (>= 0xF8) arrives with data1 = data2 = 0. NULL = log-only.
+  void (*midi_rx)(uint8_t status, uint8_t data1, uint8_t data2);
 } Bus200eOps;
 
 typedef struct {
   uint32_t frames;           // general-call frames parsed
+  uint32_t frames_long;      // long/PRIMO framing seen (v1 dialect)
+  uint32_t frames_short;     // short/V2 framing seen
   uint32_t dropped;          // frames discarded (poisoned/preempted/overlong)
   uint32_t job_errors;       // card transfers aborted on an ops error
   uint32_t restore_rejects;  // restore records rejected by slot_write
@@ -110,6 +116,19 @@ void Bus200eInit(const Bus200eOps *ops);
 
 // Feed one transport event. Call from the main loop, never from an ISR.
 void Bus200eFeedEvent(uint16_t ev);
+
+// Millisecond timestamp (via Bus200eSetNow) of the most recent card
+// BACKUP/RESTORE command seen for ANY module. A preset manager's FRAM
+// window swallows every byte on the bus, so masters must hold off.
+uint32_t Bus200eLastTransferMs(void);
+void Bus200eSetNow(uint32_t now_ms);  // parser has no clock of its own
+
+// Self-echo suppression: when the transport masters a frame with its own
+// slave engine still listening, register the frame here; the next parsed
+// frame that byte-matches is dropped once (we won arbitration and heard
+// ourselves). On arbitration loss do NOT register - the winner's frame
+// must be processed.
+void Bus200eSuppressFrame(const uint8_t *bytes, uint8_t n);
 
 // Run pending card backup/restore work: one slot record per call.
 void Bus200eTask(void);

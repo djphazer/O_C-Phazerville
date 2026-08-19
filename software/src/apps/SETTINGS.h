@@ -336,10 +336,19 @@ public:
       gfxPrint(10, 35, OC::Strings::BUILD_TAG);
       gfxIcon(0, 45, PhzIcons::frontBack);
       if (OC::PresetBus::Enabled()) {
-        // 200e preset bus: address editable with the right encoder
-        gfxPrint(10, 45, "Bus addr:");
-        graphics.printf(" %02X ", OC::PresetBus::ModuleAddress());
-        gfxPrint(OC::PresetBus::RemoteEnabled() ? "(rem ON)" : "(rem off)");
+        // 200e preset bus. The inverted address is THE right-encoder target
+        // on this screen (inversion = focus); presence dots per the system
+        // idiom; caps = active, lowercase = inactive.
+        gfxPrint(10, 45, "Bus");
+        graphics.setPrintPos(34, 45);
+        graphics.printf("%02X", OC::PresetBus::ModuleAddress());
+        graphics.invertRect(32, 44, 16, 10);
+        graphics.setPrintPos(58, 45);
+        gfxPrint(OC::PresetBus::RemoteEnabled() ? "REM" : "rem");
+        graphics.drawCircle(94, 49, 2);
+        if (OC::PresetBus::WpmPresent()) graphics.drawRect(93, 48, 3, 3);
+        graphics.setPrintPos(100, 45);
+        gfxPrint(OC::PresetBus::WpmPresent() ? "WPM" : "wpm");
       } else {
         gfxPrint(10, 45, "github.com/djphazer");
       }

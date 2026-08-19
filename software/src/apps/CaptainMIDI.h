@@ -217,13 +217,9 @@ public:
     }
 
     void Controller() {
-        // Process incoming MIDI traffic
-        process_midi_in(usbMIDI);
-#ifdef ARDUINO_TEENSY41
-        process_midi_in(usbHostMIDI[0]);
-        process_midi_in(usbHostMIDI[1]);
-        process_midi_in(MIDI1);
-#endif
+        // Incoming MIDI is polled from Loop() (main-loop context), not here:
+        // this runs in the 16.67kHz app ISR, and USBHost_t36 is not
+        // interrupt-safe — polling the host port from here locks the module.
 
         // Convert CV inputs to outgoing MIDI messages
         process_midi_out();
@@ -739,7 +735,7 @@ private:
     }
 
     template <typename T1>
-    void process_midi_in(T1 &device) {
+    bool process_midi_in(T1 &device) {
         if (device.read()) {
             uint8_t message = device.getType();
             uint8_t channel = device.getChannel();
@@ -751,7 +747,9 @@ private:
 
             HS::frame.MIDIState.ProcessMIDIMsg({channel, message, data1, data2});
             //old_process_midi_in(message, channel, data1, data2);
+            return true;
         }
+        return false;
     }
 
     [[ deprecated ]] // TODO: verify all this is handled in HS::MIDIState, MIDIMapping
@@ -986,7 +984,22 @@ void AppCaptainMIDI::HandleAppEvent(OC::AppEvent event) {
   }
 }
 
-void AppCaptainMIDI::Loop() {} // Deprecated
+void AppCaptainMIDI::Loop() {
+  // Poll incoming MIDI from loop context: USBHost_t36's transfer queues are
+  // shared with the USB host's own interrupts, so reading it from the
+  // 16.67kHz Controller() ISR deadlocks as soon as a device sends traffic.
+  // A small per-pass budget keeps one chatty source from starving the loop.
+  int budget = 8;
+  while (budget-- > 0 && process_midi_in(usbMIDI)) {}
+#ifdef ARDUINO_TEENSY41
+  budget = 8;
+  while (budget-- > 0 && process_midi_in(usbHostMIDI[0])) {}
+  budget = 8;
+  while (budget-- > 0 && process_midi_in(usbHostMIDI[1])) {}
+  budget = 8;
+  while (budget-- > 0 && process_midi_in(MIDI1)) {}
+#endif
+}
 
 FLASHMEM
 void AppCaptainMIDI::DrawMenu() const { BaseView(); }

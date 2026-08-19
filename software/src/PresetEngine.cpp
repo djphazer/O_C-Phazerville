@@ -40,6 +40,10 @@ static constexpr uint16_t kManifestKey = 8 << 8;    // == PRESETBUS_KEY
 static constexpr uint16_t kSchemaKey  = kManifestKey | 0;
 static constexpr uint16_t kFlagsKey   = kManifestKey | 1;
 static constexpr uint64_t kSchemaVersion = 1;
+// current bus slot, persisted (debounced) into GLOBALS.CFG so boot can
+// restore the preset the case was on -- 200e power-up semantics
+static constexpr uint16_t kCurSlotKey = kManifestKey | 0x13;
+
 // Quadrants writes its live preset id under this bare (bank-globals) key
 // when handling APP_EVENT_FLUSH, so the extractor knows which preset block
 // to pull out of the bank map. 253 is unused in the bank key map.
@@ -56,8 +60,12 @@ static volatile int8_t pending_save = -1;    // last-wins
 static volatile int8_t pending_recall = -1;
 static int8_t last_slot = -1;
 static bool last_was_save = false;
+static uint32_t cur_slot_dirty_ms = 0;   // 0 = clean
+static uint32_t op_count = 0;            // completed save/recall operations
+static bool last_save_ok = false;
 static bool busy = false;
 static int quad_recall_hint = -1;
+static bool skip_captain_restore = false;  // boot recall only
 
 static DMAMEM AppData capture;               // RAM capture buffer (~4KB)
 
@@ -67,6 +75,7 @@ static uint8_t extract_preset;
 // ---- helpers ---------------------------------------------------------------
 
 static FS &slot_fs() { return SDcard_Ready ? (FS &)SD : (FS &)PhzConfig::myfs; }
+static void load_names();  // defined with the name store below
 
 FLASHMEM static void slot_name(char *buf, uint8_t slot, char kind, const char *ext) {
   // PB_NN_K.EXT
@@ -236,6 +245,9 @@ FLASHMEM bool SaveSlot(uint8_t slot) {
 
   last_slot = slot;
   last_was_save = true;
+  last_save_ok = ok && ok2;
+  cur_slot_dirty_ms = millis() | 1;
+  op_count++;
   busy = false;
   (void)name2;
   HS::PokePopup(HS::MESSAGE_POPUP, (ok && ok2) ? "Bus save OK" : "Bus save ERR");
@@ -299,7 +311,11 @@ FLASHMEM bool RecallSlot(uint8_t slot) {
     slot_name(name, slot, 'S', "DAT");
     copy_file(slot_fs(), name, "SCENERY.DAT");
   }
-  if (flags & CONTENT_CAPTAIN) {
+  // Boot recall deliberately keeps the LIVE Captain config: it's the
+  // module's MIDI-interface setup (autosaved continuously), not scene
+  // state - restoring the slot's snapshot at power-up silently rewound
+  // the owner's mapping edits. Explicit recalls still restore it.
+  if ((flags & CONTENT_CAPTAIN) && !skip_captain_restore) {
     slot_name(name, slot, 'C', "DAT");
     copy_file(slot_fs(), name, "CAPTAIN.DAT");
   }
@@ -330,6 +346,8 @@ FLASHMEM bool RecallSlot(uint8_t slot) {
 
   last_slot = slot;
   last_was_save = false;
+  cur_slot_dirty_ms = millis() | 1;
+  op_count++;
   busy = false;
   HS::PokePopup(HS::MESSAGE_POPUP, "Bus recall OK");
   serial_printf("PresetEngine: recall slot %d done (app %04x)\n", slot, slot_app_id);
@@ -341,6 +359,7 @@ FLASHMEM bool RecallSlot(uint8_t slot) {
 FLASHMEM void Init() {
   pending_save = pending_recall = -1;
   quad_recall_hint = -1;
+  load_names();
 }
 
 void RequestSave(uint8_t slot) {
@@ -348,6 +367,36 @@ void RequestSave(uint8_t slot) {
 }
 void RequestRecall(uint8_t slot) {
   if (slot < kNumSlots) pending_recall = slot;
+}
+
+// persist the current slot ~3s after preset activity settles, so
+// trigger-driven preset cycling never write-hammers GLOBALS.CFG
+FLASHMEM static void persist_cur_slot() {
+  cur_slot_dirty_ms = 0;
+  if (last_slot < 0) return;
+  PhzConfig::load_config();
+  uint64_t v = 0;
+  PhzConfig::getValue(kCurSlotKey, v);
+  const bool changed = (int64_t)v != last_slot;
+  if (changed) {
+    PhzConfig::setValue(kCurSlotKey, (uint64_t)last_slot);
+    PhzConfig::save_config();
+  }
+  // CRITICAL: hand the shared map back to the active app. Quadrants
+  // assumes bank-map residency; leaving GLOBALS loaded here would make
+  // its next preset save overwrite the bank file with the wrong map.
+  app_switcher.current_app()->DispatchAppEvent(APP_EVENT_RESUME);
+}
+
+FLASHMEM void BootRecall() {
+  // GLOBALS.CFG is the loaded map right after boot restore
+  uint64_t v = 0;
+  PhzConfig::load_config();
+  if (!PhzConfig::getValue(kCurSlotKey, v) || v >= kNumSlots) return;
+  if (!SlotUsed((uint8_t)v)) return;
+  serial_printf("PresetEngine: boot recall slot %d\n", (int)v);
+  skip_captain_restore = true;   // cleared after the first Process() pass
+  RequestRecall((uint8_t)v);     // local only: no bus broadcast at power-up
 }
 
 FLASHMEM void Process() {
@@ -360,7 +409,10 @@ FLASHMEM void Process() {
   if (r >= 0) {
     pending_recall = -1;
     RecallSlot(r);
+    skip_captain_restore = false;   // only ever true for the boot recall
   }
+  if (cur_slot_dirty_ms && millis() - cur_slot_dirty_ms > 3000)
+    persist_cur_slot();
 }
 
 FLASHMEM int ConsumeQuadrantsRecallHint() {
@@ -370,6 +422,53 @@ FLASHMEM int ConsumeQuadrantsRecallHint() {
 }
 
 int8_t LastSlot() { return last_slot; }
+uint32_t OpCount() { return op_count; }
+bool LastSaveOk() { return last_save_ok; }
+
+// ---- slot names --------------------------------------------------------
+// One flat 30x16 byte file, whole thing cached in RAM. Deliberately not a
+// PhzConfig file: reads/writes must never disturb the shared config map.
+static char name_cache[kNumSlots][kNameLen + 1];  // +1: always NUL-safe
+
+FLASHMEM static void load_names() {
+  memset(name_cache, 0, sizeof(name_cache));
+  File f = slot_fs().open("PBNAMES.BIN", FILE_READ);
+  if (!f) return;
+  for (int i = 0; i < kNumSlots; ++i) {
+    if (f.read((uint8_t *)name_cache[i], kNameLen) != kNameLen) break;
+    name_cache[i][kNameLen] = 0;
+  }
+  f.close();
+}
+
+const char *SlotName(uint8_t slot) {
+  return (slot < kNumSlots) ? name_cache[slot] : "";
+}
+
+FLASHMEM void SetSlotName(uint8_t slot, const char *name) {
+  if (slot >= kNumSlots) return;
+  memset(name_cache[slot], 0, sizeof(name_cache[slot]));
+  strncpy(name_cache[slot], name, kNameLen);
+  // trim trailing spaces so "unnamed" stays honest
+  for (int i = (int)strlen(name_cache[slot]) - 1;
+       i >= 0 && name_cache[slot][i] == ' '; --i)
+    name_cache[slot][i] = 0;
+  File f = slot_fs().open("PBNAMES.BIN", FILE_WRITE_BEGIN);
+  if (!f) return;
+  for (int i = 0; i < kNumSlots; ++i)
+    f.write((const uint8_t *)name_cache[i], kNameLen);
+  f.close();
+}
+
+FLASHMEM bool SlotUsed(uint8_t slot) {
+  if (slot >= kNumSlots) return false;
+  char name[12];
+  slot_name(name, slot, 'G', "CFG");
+  File f = slot_fs().open(name, FILE_READ);
+  const bool used = f && f.size() > 16;
+  if (f) f.close();
+  return used;
+}
 bool LastWasSave() { return last_was_save; }
 bool Busy() { return busy; }
 

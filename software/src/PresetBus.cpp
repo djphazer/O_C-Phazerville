@@ -12,6 +12,8 @@
 #include "OC_core.h"
 #include "PhzConfig.h"
 
+extern volatile uint32_t loop_counter;  // Main.cpp (global scope)
+
 namespace OC {
 namespace PresetBus {
 
@@ -19,7 +21,10 @@ namespace PresetBus {
 static constexpr uint16_t kAddrKey = (8 << 8) | 0x10;
 
 // ---- SPSC event ring: ISR producer, Task() consumer ------------------------
-static constexpr uint8_t kRingSize = 64;  // power of two
+// 256 events (uint8 indices wrap exactly): a save/recall blocks Task()
+// for 100s of ms of file I/O while the ISR keeps filling this - 64 was
+// only ~6 frames of headroom against a chatty preset manager.
+static constexpr uint16_t kRingSize = 256;  // power of two, max for uint8 idx
 static volatile uint16_t ring[kRingSize];
 static volatile uint8_t ring_w = 0;
 static uint8_t ring_r = 0;
@@ -31,7 +36,7 @@ static bool verbose = false;
 static uint32_t last_rx_ms = 0;
 
 static void push_event(uint16_t ev) {
-  if (uint8_t(ring_w - ring_r) >= kRingSize) {
+  if (uint16_t(uint8_t(ring_w - ring_r)) >= kRingSize) {
     ring_ovf = true;  // drop; Task() poisons the frame
     return;
   }
@@ -62,34 +67,215 @@ static void lpi2c1_slave_isr() {
   }
 }
 
+// ---- bus MIDI rings ---------------------------------------------------------
+// RX: producer = Task() (loop, via parser callback), consumer = the active
+// app's MIDI poll (Quadrants: loop; Captain: app ISR). One producer, one
+// consumer -- plain SPSC.
+// TX: producers = app ISR (engine sends) AND loop (thru), so pushes are
+// briefly IRQ-masked. Consumer = Task() (loop).
+static constexpr uint8_t kMidiRing = 32;  // power of two
+static volatile uint32_t midi_rx_q[kMidiRing];
+static volatile uint8_t midi_rx_w = 0;
+static uint8_t midi_rx_r = 0;
+static volatile uint32_t midi_tx_q[kMidiRing];
+static volatile uint8_t midi_tx_w = 0;
+static uint8_t midi_tx_r = 0;
+static uint8_t midi_tx_fails = 0;
+
 // ---- parser callbacks into the preset engine -------------------------------
 static void cb_save(uint8_t slot) { PresetEngine::RequestSave(slot); }
 static void cb_recall(uint8_t slot) { PresetEngine::RequestRecall(slot); }
 
+static void cb_midi(uint8_t status, uint8_t d1, uint8_t d2) {
+  if (uint8_t(midi_rx_w - midi_rx_r) >= kMidiRing) {
+    stats.midi_rx_ovf++;
+    return;
+  }
+  midi_rx_q[midi_rx_w & (kMidiRing - 1)] =
+      uint32_t(status) | (uint32_t(d1) << 8) | (uint32_t(d2) << 16);
+  midi_rx_w = midi_rx_w + 1;
+  stats.midi_rx++;
+}
+
 static const Bus200eOps kOps = {
   cb_save, cb_recall,
   0, nullptr, nullptr, nullptr, nullptr,  // card transfers: phase 2
+  cb_midi,
 };
+
+static bool tx_gate_open();  // defined with Task() below
+
+// ---- commander mode: bus-wide preset commands -------------------------------
+// One pending command, last wins (matches the engine's own request model).
+static volatile int16_t pending_bcast = -1;  // (cmd << 8) | slot, cmd 01/02
+static uint8_t bcast_tries = 0;
+static uint32_t bcast_tx = 0, bcast_drop = 0;
+
+FLASHMEM void BroadcastSave(uint8_t slot) {
+  if (slot < 30) pending_bcast = (0x02 << 8) | slot;
+}
+FLASHMEM void BroadcastRecall(uint8_t slot) {
+  if (slot < 30) pending_bcast = (0x01 << 8) | slot;
+}
+
+FLASHMEM static void pump_broadcast() {
+  const int16_t cmd = pending_bcast;
+  if (cmd < 0) return;
+  if (!tx_gate_open()) return;
+
+  // same long/PRIMO frame a preset manager sends. The slave stays ENABLED
+  // during TX: if we lose arbitration the winner's frame (maybe the WPM's
+  // one-shot recall) must still be heard; on success the parser drops our
+  // own echo via Bus200eSuppressFrame.
+  uint8_t f[5] = { 0x04, 0x00, 0x22, uint8_t(cmd >> 8), uint8_t(cmd & 0x1F) };
+
+  Wire.beginTransmission(0);
+  Wire.write(f, sizeof(f));
+  const uint8_t err = Wire.endTransmission();
+  if (err == 0) Bus200eSuppressFrame(f, sizeof(f));
+
+  if (err == 0) {
+    pending_bcast = -1;
+    bcast_tries = 0;
+    bcast_tx++;
+    // our slave never hears our own TX: dispatch locally so this module
+    // saves/recalls in lockstep with the rest of the bus
+    if ((cmd >> 8) == 0x02) PresetEngine::RequestSave(cmd & 0x1F);
+    else PresetEngine::RequestRecall(cmd & 0x1F);
+    if (verbose) Serial.printf("PresetBus: broadcast %s %d\n",
+                               (cmd >> 8) == 0x02 ? "SAVE" : "RECALL",
+                               cmd & 0x1F);
+  } else if (++bcast_tries >= 50) {  // persistent contention: give up loudly
+    pending_bcast = -1;
+    bcast_tries = 0;
+    bcast_drop++;
+    Serial.printf("PresetBus: broadcast dropped (err %d)\n", err);
+  }
+}
+
+// ---- WPM / preset-manager presence ------------------------------------------
+// A preset manager is whoever ACKs slave address 0x50. Probe with an empty
+// master write (the WPM's receiveEvent sees howMany==0: harmless) every few
+// seconds when the bus is quiet. Hysteresis on the way out so one lost
+// arbitration doesn't demote a live WPM.
+static bool wpm_present = false;
+static uint8_t wpm_misses = 0;
+static uint32_t wpm_last_probe_ms = 0;
+static uint32_t wpm_probes = 0;
+
+bool WpmPresent() { return wpm_present; }
+
+FLASHMEM static void probe_wpm() {
+  if (millis() - wpm_last_probe_ms < 5000) return;
+  if (!tx_gate_open()) return;
+  wpm_last_probe_ms = millis();
+  wpm_probes++;
+
+  // addressed to 0x50: our general-call slave never matches it, so the
+  // slave can stay enabled with no echo concern
+  Wire.beginTransmission(0x50);
+  const uint8_t err = Wire.endTransmission();  // 0 = ACK, 2 = NACK
+
+  if (err == 0) {
+    if (!wpm_present && verbose) Serial.println("PresetBus: WPM detected");
+    wpm_present = true;
+    wpm_misses = 0;
+  } else if (err == 2) {
+    if (wpm_present && ++wpm_misses >= 3) {
+      wpm_present = false;
+      wpm_misses = 0;
+      if (verbose) Serial.println("PresetBus: WPM gone");
+    }
+  }  // arbitration loss etc: no evidence either way, try again later
+}
+
+// ---- bus MIDI public API ----------------------------------------------------
+
+void QueueMidiTx(uint8_t type, uint8_t channel, uint8_t d1, uint8_t d2) {
+  if (!enabled) return;
+  // channel 1-4 -> 200e bus lines A(0x8) B(0x4) C(0x2) D(0x1), else all
+  uint8_t status;
+  if (type >= 0xF8) {
+    status = type;
+    d1 = d2 = 0;
+  } else {
+    const uint8_t mask = (channel >= 1 && channel <= 4)
+                             ? uint8_t(0x8 >> (channel - 1)) : uint8_t(0xF);
+    status = (type & 0xF0) | mask;
+  }
+  // pushes come from both the app ISR and loop: mask IRQs around the ring.
+  // (Unconditional re-enable is fine — ISRs run with PRIMASK clear, and the
+  // loop never calls this with interrupts already masked.)
+  __disable_irq();
+  if (uint8_t(midi_tx_w - midi_tx_r) >= kMidiRing) {
+    stats.midi_tx_drop++;
+  } else {
+    midi_tx_q[midi_tx_w & (kMidiRing - 1)] =
+        uint32_t(status) | (uint32_t(d1) << 8) | (uint32_t(d2) << 16);
+    midi_tx_w = midi_tx_w + 1;
+  }
+  __enable_irq();
+}
+
+bool ReadMidiRx(uint8_t &status, uint8_t &d1, uint8_t &d2) {
+  if (midi_rx_r == midi_rx_w) return false;
+  const uint32_t v = midi_rx_q[midi_rx_r & (kMidiRing - 1)];
+  midi_rx_r = midi_rx_r + 1;
+  status = v & 0xFF;
+  d1 = (v >> 8) & 0xFF;
+  d2 = (v >> 16) & 0xFF;
+  return true;
+}
+
+// master queued MIDI frames onto the bus; quiet-gated like the QUERY reply
+FLASHMEM static void pump_midi_tx() {
+  uint8_t sent = 0;
+  while (midi_tx_r != midi_tx_w && sent < 4) {
+    if (!tx_gate_open()) return;
+
+    const uint32_t v = midi_tx_q[midi_tx_r & (kMidiRing - 1)];
+    // [08][00][22][0F][status|mask][00][d1][d2][00] -- 2WIRELESS long format
+    uint8_t f[9] = { 0x08, 0x00, 0x22, 0x0F,
+                     uint8_t(v & 0xFF), 0x00,
+                     uint8_t((v >> 8) & 0xFF), uint8_t((v >> 16) & 0xFF),
+                     0x00 };
+
+    Wire.beginTransmission(0);
+    Wire.write(f, sizeof(f));
+    const uint8_t err = Wire.endTransmission();
+    if (err == 0) Bus200eSuppressFrame(f, sizeof(f));
+
+    if (err == 0) {
+      midi_tx_r = midi_tx_r + 1;
+      midi_tx_fails = 0;
+      stats.midi_tx++;
+      ++sent;
+    } else {
+      // arbitration loss etc: retry next Task() pass; give up eventually
+      if (++midi_tx_fails >= 100) {
+        midi_tx_r = midi_tx_r + 1;
+        midi_tx_fails = 0;
+        stats.midi_tx_drop++;
+      }
+      return;
+    }
+  }
+}
 
 // ---- QUERY reply (we briefly master the bus) -------------------------------
 static uint8_t query_tries = 0;
 
 FLASHMEM static void try_query_reply() {
-  // only with a quiet bus: not mid-frame, controller idle, >=2ms since RX
-  if (uint8_t(ring_w - ring_r) != 0) return;
-  if (millis() - last_rx_ms < 2) return;
-  if (LPI2C1_MSR & LPI2C_MSR_BBF) return;  // bus busy
+  if (!tx_gate_open()) return;
 
   // [0A][22][ourAddr][13]["30.6"+3 spaces] — module identity / fw version
   uint8_t f[11] = { 0x0A, 0x22, Bus200eModuleAddress(), 0x13,
                     '3', '0', '.', '6', ' ', ' ', ' ' };
 
-  // suppress self-RX while we hold the bus
-  LPI2C1_SCR &= ~LPI2C_SCR_SEN;
   Wire.beginTransmission(0);  // general call
   Wire.write(f, sizeof(f));
   const uint8_t err = Wire.endTransmission();
-  LPI2C1_SCR |= LPI2C_SCR_SEN;
+  if (err == 0) Bus200eSuppressFrame(f, sizeof(f));
 
   if (err == 0) {
     Bus200eClearQueryPending();
@@ -140,8 +326,32 @@ FLASHMEM void Init() {
                 Bus200eModuleAddress());
 }
 
+// Master-TX gate shared by every pump: quiet bus AND no card-transfer
+// window open. A preset manager's FRAM backup/restore swallows every byte
+// on the bus (receiveEvent in fram mode), so any TX during the window
+// corrupts the user's backup; hold off until well past its 1s done-detect.
+static bool tx_gate_open() {
+  if (uint8_t(ring_w - ring_r) != 0) return false;
+  if (millis() - last_rx_ms < 2) return false;
+  const uint32_t t = Bus200eLastTransferMs();
+  if (t && millis() - t < 1500) return false;
+  if (LPI2C1_MSR & LPI2C_MSR_BBF) return false;
+  return true;
+}
+
+static uint32_t loop_rate_hz = 0;
+
 void Task() {
   if (!enabled) return;
+  Bus200eSetNow(millis());
+
+  // rolling main-loop rate (the number behind "feels sluggish")
+  static uint32_t rate_t0 = 0, rate_l0 = 0;
+  if (millis() - rate_t0 >= 500) {
+    loop_rate_hz = (loop_counter - rate_l0) * 1000 / (millis() - rate_t0);
+    rate_t0 = millis();
+    rate_l0 = loop_counter;
+  }
 
   if (ring_ovf) {
     ring_ovf = false;
@@ -151,6 +361,11 @@ void Task() {
 
   bool got = false;
   while (ring_r != ring_w) {
+    if (ring_ovf) {  // overflow mid-drain: poison before the gap parses
+      ring_ovf = false;
+      stats.ring_ovf++;
+      Bus200eFeedEvent(BUS200E_EV_OVF);
+    }
     const uint16_t ev = ring[ring_r & (kRingSize - 1)];
     ring_r = ring_r + 1;
     got = true;
@@ -164,6 +379,10 @@ void Task() {
   if (got) last_rx_ms = millis();
 
   if (Bus200eQueryPending()) try_query_reply();
+  Bus200eTask();   // card-transfer job engine (self-clears with null hooks)
+  pump_broadcast();
+  pump_midi_tx();
+  probe_wpm();
 }
 
 bool Enabled() { return enabled; }
@@ -190,6 +409,7 @@ FLASHMEM void DebugDump() {
   Serial.println("--- PresetBus ---");
   // CORE ISR liveness: two tick samples 5ms apart (16.67kHz => ~83 delta)
   {
+    Serial.printf("loop rate ~%lu Hz\n", (unsigned long)loop_rate_hz);
     const uint32_t t0 = OC::CORE::ticks;
     delay(5);
     Serial.printf("core_ticks=%lu delta5ms=%lu display_en=%d app_isr=%d app_loop=%d\n",
@@ -199,12 +419,27 @@ FLASHMEM void DebugDump() {
   }
   Serial.printf("enabled=%d remote=%d module_addr=%02X verbose=%d\n",
                 enabled, Bus200eRemoteEnabled(), Bus200eModuleAddress(), verbose);
+  {
+    const Bus200eStats *d = Bus200eGetStats();
+    const char *dialect = (d->frames_long || d->frames_short)
+        ? (d->frames_long >= d->frames_short ? "v1/long" : "v2/short")
+        : "unknown";
+    Serial.printf("wpm=%s owner_0x50=%s dialect=%s (long=%lu short=%lu) probes=%lu\n",
+                  wpm_present ? "present" : "absent",
+                  wpm_present ? "WPM" : "none",
+                  dialect, d->frames_long, d->frames_short, wpm_probes);
+    Serial.printf("bcast: tx=%lu drop=%lu pending=%d\n",
+                  bcast_tx, bcast_drop, pending_bcast);
+  }
   Serial.printf("isr=%lu starts=%lu stops=%lu bytes=%lu ring_ovf=%lu\n",
                 stats.isr_count, stats.starts, stats.stops, stats.bytes,
                 stats.ring_ovf);
   const Bus200eStats *ps = Bus200eGetStats();
   Serial.printf("frames=%lu dropped=%lu query_tx=%lu query_retry=%lu\n",
                 ps->frames, ps->dropped, stats.query_replies, stats.query_retries);
+  Serial.printf("midi: rx=%lu rx_ovf=%lu tx=%lu tx_drop=%lu\n",
+                stats.midi_rx, stats.midi_rx_ovf, stats.midi_tx,
+                stats.midi_tx_drop);
   Serial.printf("engine: last_slot=%d was_save=%d busy=%d\n",
                 PresetEngine::LastSlot(), PresetEngine::LastWasSave(),
                 PresetEngine::Busy());

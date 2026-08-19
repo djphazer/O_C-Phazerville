@@ -67,14 +67,22 @@ static int f_card_read(uint8_t card7, uint32_t off, uint8_t *d, uint32_t n) {
   return 0;
 }
 
+static int n_midi = 0;
+static uint8_t midi_last[3];
+static void f_midi(uint8_t status, uint8_t d1, uint8_t d2) {
+  midi_last[0] = status; midi_last[1] = d1; midi_last[2] = d2;
+  n_midi++;
+}
+
 static const Bus200eOps fake_ops = {
   f_save, f_recall, kRecSize, f_slot_read, f_slot_write, f_card_write, f_card_read,
+  f_midi,
 };
 
 static void reset(const Bus200eOps *ops) {
   Bus200eInit(ops);
   Bus200eSetModuleAddress(BUS200E_DEFAULT_MODULE_ADDR);
-  n_save = n_recall = n_cw = n_sw = n_sr = n_cr = 0;
+  n_save = n_recall = n_cw = n_sw = n_sr = n_cr = n_midi = 0;
   fail_card_write = 0;
   reject_odd_writes = 0;
 }
@@ -328,6 +336,70 @@ static void test_log_ring(void) {
   CHECK(!Bus200eLogRead(BUS200E_LOG_SIZE, &c));   // aged out of the ring
 }
 
+static void test_bus_midi(void) {
+  reset(&fake_ops);
+
+  // long/PRIMO note-on to 200e bus A: [08][00][22][0F][98][00][3C][64][00]
+  FRAME(0x08, 0x00, 0x22, 0x0F, 0x98, 0x00, 0x3C, 0x64, 0x00);
+  CHECK(n_midi == 1);
+  CHECK(midi_last[0] == 0x98 && midi_last[1] == 0x3C && midi_last[2] == 0x64);
+  CHECK(last_op() == BUS200E_OP_MIDI);
+
+  // long realtime clock: status >= 0xF8 classifies as CLOCK, hook still fires
+  FRAME(0x08, 0x00, 0x22, 0x0F, 0xF8, 0x00, 0x00, 0x00, 0x00);
+  CHECK(n_midi == 2);
+  CHECK(midi_last[0] == 0xF8);
+  CHECK(last_op() == BUS200E_OP_CLOCK);
+
+  // short/V2 status-first CC to bus B
+  FRAME(0xB4, 0x1F, 0x32);
+  CHECK(n_midi == 3);
+  CHECK(midi_last[0] == 0xB4 && midi_last[1] == 0x1F && midi_last[2] == 0x32);
+  CHECK(last_op() == BUS200E_OP_MIDI);
+
+  // truncated long MIDI frame -> UNKNOWN, no hook call
+  FRAME(0x05, 0x00, 0x22, 0x0F, 0x98, 0x00);
+  CHECK(n_midi == 3);
+
+  // self-echo suppression: registered frame dropped exactly once
+  reset(&fake_ops);
+  const uint8_t echo[] = { 0x04, 0x00, 0x22, 0x01, 0x03 };
+  Bus200eSuppressFrame(echo, sizeof(echo));
+  FRAME(0x04, 0x00, 0x22, 0x01, 0x03);   // our own echo: swallowed
+  CHECK(n_recall == 0);
+  FRAME(0x04, 0x00, 0x22, 0x01, 0x03);   // a real frame with the same bytes
+  CHECK(n_recall == 1);
+
+  // a different frame does NOT clear someone else's suppression... it does
+  // by design (arbitration winner processed, ours already gone). Register,
+  // let a different frame through, then confirm ours is no longer eaten.
+  Bus200eSuppressFrame(echo, sizeof(echo));
+  FRAME(0x04, 0x00, 0x22, 0x02, 0x05);   // different frame: processed
+  CHECK(n_save == 1);
+
+  // expired suppression never eats a genuine identical frame
+  reset(&fake_ops);
+  Bus200eSetNow(1000);
+  Bus200eSuppressFrame(echo, sizeof(echo));
+  Bus200eSetNow(1100);                   // 100ms later: expired
+  FRAME(0x04, 0x00, 0x22, 0x01, 0x03);
+  CHECK(n_recall == 1);
+
+  // card ops for ANY module stamp the transfer clock
+  reset(&fake_ops);
+  Bus200eSetNow(1234);
+  FRAME(0x07, 0x00, 0x22, 0x04, 0x66, 0x00, 0x00, 0x00);  // foreign module
+  CHECK(Bus200eLastTransferMs() != 0);
+
+  // hookless init still parses/logs without crashing
+  Bus200eOps no_midi = fake_ops;
+  no_midi.midi_rx = 0;
+  reset(&no_midi);
+  FRAME(0x08, 0x00, 0x22, 0x0F, 0x98, 0x00, 0x3C, 0x64, 0x00);
+  CHECK(n_midi == 0);
+  CHECK(last_op() == BUS200E_OP_MIDI);
+}
+
 int main() {
   test_short_recall_save();
   test_long_recall_save();
@@ -345,6 +417,8 @@ int main() {
   test_frame_hygiene();
   test_unknown_commands_logged();
   test_log_ring();
+
+  test_bus_midi();
 
   printf("\ntest_bus200e: %d checks, %d failures\n", checks, fails);
   return fails ? 1 : 0;

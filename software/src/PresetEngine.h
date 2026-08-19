@@ -43,6 +43,19 @@ int ConsumeQuadrantsRecallHint();
 
 // status for UI / debug
 int8_t LastSlot();            // -1 = none yet
+uint32_t OpCount();           // bumps when a save/recall finishes
+bool LastSaveOk();            // result of the most recent save
+// Boot-time restore of the last bus preset (200e power-up semantics):
+// reads the persisted current slot and queues a local recall if it still
+// validates. Call once from setup(), after the apps have started.
+void BootRecall();  // skips Captain-config restore: boot keeps live edits
+bool SlotUsed(uint8_t slot);  // slot has a stored preset on disk
+
+// slot names: flat PBNAMES.BIN sidecar (16 chars max, RAM-cached at Init;
+// independent of the slot data so renames never touch preset content)
+static constexpr size_t kNameLen = 16;
+const char *SlotName(uint8_t slot);              // "" when unnamed
+void SetSlotName(uint8_t slot, const char *name);  // persists immediately
 bool LastWasSave();
 bool Busy();
 
@@ -57,6 +70,13 @@ inline bool SaveSlot(uint8_t) { return false; }
 inline bool RecallSlot(uint8_t) { return false; }
 inline int ConsumeQuadrantsRecallHint() { return -1; }
 inline int8_t LastSlot() { return -1; }
+inline uint32_t OpCount() { return 0; }
+inline bool LastSaveOk() { return false; }
+inline void BootRecall() {}
+inline bool SlotUsed(uint8_t) { return false; }
+static constexpr size_t kNameLen = 16;
+inline const char *SlotName(uint8_t) { return ""; }
+inline void SetSlotName(uint8_t, const char *) {}
 inline bool LastWasSave() { return false; }
 inline bool Busy() { return false; }
 
