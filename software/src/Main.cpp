@@ -589,6 +589,14 @@ FLASHMEM __attribute__((noinline)) static void SelfTest() {
       Serial.println("CRASH.LOG: none (no crashes recorded)");
     }
   }
+#if defined(ARDUINO_TEENSY41) && defined(PRESET_BUS)
+  {
+    const OC::PresetBus::Stats &s = OC::PresetBus::GetStats();
+    Serial.printf("bus rings hw: ev=%lu midi_rx=%lu midi_tx=%lu  stuck=%lu/%lu\n",
+                  s.ring_hw, s.midi_rx_hw, s.midi_tx_hw,
+                  s.bus_recovered, s.bus_stuck);
+  }
+#endif
   Serial.println("=== selftest done ===");
 }
 #endif
@@ -719,7 +727,16 @@ FLASHMEM __attribute__((noinline)) void loop() {
                           OC::CORE::app_loop_enabled ? "on" : "OFF");
 #if defined(__IMXRT1062__)
 #if defined(ARDUINO_TEENSY41)
-            Serial.println("i i2c scan");
+            Serial.println("i i2c scan   g save globals+app data");
+            Serial.println("-- preset bus --");
+            Serial.println("local:  ( save0  ) recall0  { save1  } recall1");
+#if defined(PRESET_BUS)
+            Serial.println("bus:    > save0  < recall0  . save1  , recall1  (broadcast!)");
+#endif
+            Serial.printf("p overlay UI [%s]   b bus dump   B verbose [%s]   k card serve [%s]\n",
+                          OC::PresetBusUI::Active() ? "open" : "closed",
+                          OC::PresetBus::Verbose() ? "on" : "off",
+                          OC::PresetBus::CardServing() ? "on" : "off");
 #endif
             Serial.println("-- files --");
             Serial.println("l list LittleFS   s list SD");
@@ -764,6 +781,9 @@ FLASHMEM __attribute__((noinline)) void loop() {
                           OC::PresetBusUI::Active() ? "open" : "closed");
             break;
           case 'b': OC::PresetBus::DebugDump(); break;
+          case 'k':  // toggle 0x50 card serving (WPM-less bus only; hard-gated)
+            OC::PresetBus::CardServeEnable(!OC::PresetBus::CardServing());
+            break;
           case 'B':
             OC::PresetBus::SetVerbose(!OC::PresetBus::Verbose());
             Serial.printf("PresetBus verbose = %d\n", OC::PresetBus::Verbose());

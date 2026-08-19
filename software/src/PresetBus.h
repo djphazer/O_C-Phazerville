@@ -35,6 +35,14 @@ struct Stats {
   uint32_t midi_rx_ovf;    // dropped: RX ring full
   uint32_t midi_tx;        // bus MIDI frames mastered onto the bus
   uint32_t midi_tx_drop;   // dropped: TX ring full or persistent arb loss
+  // high-water marks (selftest): worst observed ring depths
+  uint32_t ring_hw;
+  uint32_t midi_rx_hw;
+  uint32_t midi_tx_hw;
+  // bus-stuck watchdog: times the bus was declared stuck / times the
+  // recovery sequence brought BBF back down
+  uint32_t bus_stuck;
+  uint32_t bus_recovered;
 };
 
 #if defined(ARDUINO_TEENSY41) && defined(PRESET_BUS)
@@ -59,6 +67,14 @@ void BroadcastRecall(uint8_t slot);
 // WPM / preset-manager presence: probed as a master ACK test on address
 // 0x50 every few seconds when the bus is quiet. Hot plug/unplug is normal.
 bool WpmPresent();
+
+// ---- 0x50 card serving ----
+// Serve the storage-card address (32K image, PBCARD.BIN) so 200e modules on
+// a WPM-less bus can BACKUP/RESTORE against us. HARD-GATED: refused while a
+// WPM is present, self-tested at enable, never persisted (off every boot).
+// Returns 0 on success; <0 = refused (WPM present / no memory / self-test).
+int CardServeEnable(bool on);
+bool CardServing();
 
 // ---- bus MIDI ----
 // TX: queue a message for mastering onto the bus (ISR-safe; sent from
@@ -87,6 +103,8 @@ inline bool ReadMidiRx(uint8_t &, uint8_t &, uint8_t &) { return false; }
 inline void BroadcastSave(uint8_t) {}
 inline void BroadcastRecall(uint8_t) {}
 inline bool WpmPresent() { return false; }
+inline int CardServeEnable(bool) { return -1; }
+inline bool CardServing() { return false; }
 inline const Stats &GetStats() { static Stats s = {}; return s; }
 inline void DebugDump() {}
 inline void SetVerbose(bool) {}

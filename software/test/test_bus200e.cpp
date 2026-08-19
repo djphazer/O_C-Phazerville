@@ -3,7 +3,7 @@
 // frame hygiene and the chunked card jobs against fake ops.
 // Vectors ported from the MARF project's test_bus200e.c (framing labels
 // corrected: LONG = PRIMO, SHORT = V2/pre-PRIMO per the 2WIRELESS source).
-// Standalone (no gtest): g++ -std=c++17 -Wall -Werror -O2 \
+// Standalone (no gtest): g++ -std=c++17 -Wall -Werror -O2 (one line:)
 //   -o build/test_bus200e test_bus200e.cpp ../src/PresetBus200e.cpp && ./build/test_bus200e
 #include <cassert>
 #include <cstdio>
