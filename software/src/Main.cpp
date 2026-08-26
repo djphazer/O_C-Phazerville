@@ -222,6 +222,7 @@ void BootMenu() {
 }
 #endif
 
+FLASHMEM
 void setup() {
   delay(50);
   Serial.begin(9600);
@@ -395,6 +396,7 @@ void setup() {
 #ifdef QUAD_CAPTURE
 // Remote control from the web/desktop viewer. A '~' byte over serial is followed
 // by one selector byte that maps to a button click or an encoder detent.
+FLASHMEM __attribute__((noinline))
 static void RemoteControl(int sel) {
   using namespace OC;
   switch (sel) {
