@@ -32,11 +32,7 @@
 #include "applets/Chordinator.h"
 #include "applets/ClockDivider.h"
 #include "applets/ClkToGate.h"
-#ifdef ARDUINO_TEENSY41
-#include "applets/ClockSetupT4.h"
-#else
 #include "applets/ClockSetup.h"
-#endif
 #include "applets/ClockSkip.h"
 #include "applets/Combin8.h"
 #include "applets/Compare.h"

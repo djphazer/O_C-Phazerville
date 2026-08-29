@@ -36,11 +36,7 @@
 #include "SegmentDisplay.h"
 #include "src/drivers/FreqMeasure/OC_FreqMeasure.h"
 #include "HemisphereApplet.h"
-#ifdef ARDUINO_TEENSY41
-#include "applets/ClockSetupT4.h"
-#else
 #include "applets/ClockSetup.h"
-#endif
 
 static constexpr int CAL8_MAX_TRANSPOSE = 60;
 static constexpr int CAL8OR_PRECISION = 10000;
@@ -100,36 +96,6 @@ enum Cal8Settings {
     CAL8_TRANSPOSE_D,
     CAL8_ROOTKEY_AND_CLOCKMODE_D,
     CAL8_SCALEMASK_D,
-
-#ifdef ARDUINO_TEENSY41
-    CAL8_SCALE_E,
-    CAL8_SCALEFACTOR_E,
-    CAL8_OFFSET_E,
-    CAL8_TRANSPOSE_E,
-    CAL8_ROOTKEY_AND_CLOCKMODE_E,
-    CAL8_SCALEMASK_E,
-
-    CAL8_SCALE_F,
-    CAL8_SCALEFACTOR_F,
-    CAL8_OFFSET_F,
-    CAL8_TRANSPOSE_F,
-    CAL8_ROOTKEY_AND_CLOCKMODE_F,
-    CAL8_SCALEMASK_F,
-
-    CAL8_SCALE_G,
-    CAL8_SCALEFACTOR_G,
-    CAL8_OFFSET_G,
-    CAL8_TRANSPOSE_G,
-    CAL8_ROOTKEY_AND_CLOCKMODE_G,
-    CAL8_SCALEMASK_G,
-
-    CAL8_SCALE_H,
-    CAL8_SCALEFACTOR_H,
-    CAL8_OFFSET_H,
-    CAL8_TRANSPOSE_H,
-    CAL8_ROOTKEY_AND_CLOCKMODE_H,
-    CAL8_SCALEMASK_H,
-#endif
 
     CAL8_SETTING_LAST
 };
@@ -233,13 +199,9 @@ public:
     void ClearPreset() {
         for (int ch = 0; ch < QUANT_CHANNEL_COUNT; ++ch) {
             q_engine[ch].quantizer.Init();
-#ifdef ARDUINO_TEENSY41
-            q_engine[ch].Configure(OC::Scales::SCALE_SEMI, 0xffff);
-#else
             // Q1..Q4 default to Semitones
             // Q5..Q8 get initialized as USR1..USR4
             q_engine[ch].Configure((ch<4) ? OC::Scales::SCALE_SEMI : ch - 4, 0xffff);
-#endif
         }
 
         for (int ch = 0; ch < DAC_CHANNEL_LAST; ++ch) {
@@ -310,41 +272,6 @@ public:
               dothething = true;
             }
         }
-
-#if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
-        while (usbHostMIDI.read()) {
-            const uint8_t message = usbHostMIDI.getType();
-            const uint8_t data1 = usbHostMIDI.getData1();
-            const uint8_t data2 = usbHostMIDI.getData2();
-
-            if (message == usbMIDI.SystemExclusive) {
-                // TODO: consider implementing SysEx import/export for Calibr8or
-                continue;
-            }
-
-            f.MIDIState.ProcessMIDIMsg({usbHostMIDI.getChannel(), message, data1, data2});
-
-            if (message == usbMIDI.NoteOn || message == usbMIDI.NoteOff) {
-              dothething = true;
-            }
-        }
-        while (MIDI1.read()) {
-            const uint8_t message = MIDI1.getType();
-            const uint8_t data1 = MIDI1.getData1();
-            const uint8_t data2 = MIDI1.getData2();
-
-            if (message == usbMIDI.SystemExclusive) {
-                // TODO: consider implementing SysEx import/export for Calibr8or
-                continue;
-            }
-
-            f.MIDIState.ProcessMIDIMsg({MIDI1.getChannel(), message, data1, data2});
-
-            if (message == usbMIDI.NoteOn || message == usbMIDI.NoteOff) {
-              dothething = true;
-            }
-        }
-#endif
 
         if (dothething) {
           // reconfigure with MIDI-derived masks
@@ -764,35 +691,6 @@ SETTINGS_DECLARE(Calibr8orPreset, CAL8_SETTING_LAST) {
     {0, 0, 255, "Root Key + Mode D", NULL, settings::STORAGE_TYPE_U8},
     {0, 0, 0xffff, "Scale Mask D", NULL, settings::STORAGE_TYPE_U16},
 
-#ifdef ARDUINO_TEENSY41
-    {0, 0, 65535, "Scale E", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "CV Scaling Factor E", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 255, "Offset Bias E", NULL, settings::STORAGE_TYPE_U8},
-    {0, 0, 255, "Transpose E", NULL, settings::STORAGE_TYPE_U8},
-    {0, 0, 255, "Root Key + Mode E", NULL, settings::STORAGE_TYPE_U8},
-    {0, 0, 0xffff, "Scale Mask E", NULL, settings::STORAGE_TYPE_U16},
-
-    {0, 0, 65535, "Scale F", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "CV Scaling Factor F", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 255, "Offset Bias F", NULL, settings::STORAGE_TYPE_U8},
-    {0, 0, 255, "Transpose F", NULL, settings::STORAGE_TYPE_U8},
-    {0, 0, 255, "Root Key + Mode F", NULL, settings::STORAGE_TYPE_U8},
-    {0, 0, 0xffff, "Scale Mask F", NULL, settings::STORAGE_TYPE_U16},
-
-    {0, 0, 65535, "Scale G", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "CV Scaling Factor G", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 255, "Offset Bias G", NULL, settings::STORAGE_TYPE_U8},
-    {0, 0, 255, "Transpose G", NULL, settings::STORAGE_TYPE_U8},
-    {0, 0, 255, "Root Key + Mode G", NULL, settings::STORAGE_TYPE_U8},
-    {0, 0, 0xffff, "Scale Mask G", NULL, settings::STORAGE_TYPE_U16},
-
-    {0, 0, 65535, "Scale H", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "CV Scaling Factor H", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 255, "Offset Bias H", NULL, settings::STORAGE_TYPE_U8},
-    {0, 0, 255, "Transpose H", NULL, settings::STORAGE_TYPE_U8},
-    {0, 0, 255, "Root Key + Mode H", NULL, settings::STORAGE_TYPE_U8},
-    {0, 0, 0xffff, "Scale Mask H", NULL, settings::STORAGE_TYPE_U16},
-#endif
 };
 
 

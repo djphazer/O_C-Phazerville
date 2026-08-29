@@ -44,48 +44,6 @@
 #include "VBiasManager.h"
 #include "HSMIDI.h"
 
-#if defined(__IMXRT1062__)
-#include "PhzConfig.h"
-
-USBHost thisUSB;
-USBHub hub1(thisUSB);
-MIDIDevice_BigBuffer usbHostMIDI(thisUSB);
-
-#if defined(ARDUINO_TEENSY41)
-MIDI_CREATE_INSTANCE(HardwareSerial, Serial8, MIDI1);
-#include "AudioIO.h"
-#include "usb_desc.h"
-#include "Wire.h"
-
-void ScanI2C() {
-  noInterrupts();
-
-  Serial.println("...Scanning i2c addresses...");
-  uint8_t error;
-  for (uint8_t address = 1; address < 127; address++) {
-    // The i2c_scanner uses the return value of
-    // the Write.endTransmisstion to see if
-    // a device did acknowledge to the address.
-    Wire.beginTransmission(address);
-    error = Wire.endTransmission();
-
-    if (error == 0) {
-      Serial.print("I2C device found at address 0x");
-      if (address < 16) Serial.print("0");
-      Serial.println(address, HEX);
-    } else if (error == 4) {
-      Serial.print("Unknown error at address 0x");
-      if (address < 16) Serial.print("0");
-      Serial.println(address, HEX);
-    } //else { Serial.print("Nothing happened at address 0x"); }
-  }
-
-  interrupts();
-}
-#endif // ARDUINO_TEENSY41
-
-#endif // __IMXRT1062__
-
 unsigned long LAST_REDRAW_TIME = 0;
 uint_fast8_t MENU_REDRAW = true;
 OC::UiMode ui_mode = OC::UI_MODE_MENU;
@@ -145,50 +103,18 @@ void setup() {
   delay(50);
   Serial.begin(9600);
 
-#if defined(__IMXRT1062__)
-  if (CrashReport) {
-    while (!Serial && millis() < 3000) ; // wait
-    Serial.println(CrashReport);
-    delay(1500);
-  }
-
-  #if defined(ARDUINO_TEENSY41)
-  OC::Pinout_Detect();
-  #endif
-#endif
-#if defined(__MK20DX256__)
   NVIC_SET_PRIORITY(IRQ_PORTB, 0); // TR1 = 0 = PTB16
-#endif
   SPI_init();
   SERIAL_PRINTLN("* O&C BOOTING...");
   SERIAL_PRINTLN("* %s", OC::Strings::VERSION);
 
   OC::DEBUG::Init();
 
-#if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
-  if (DAC8568_Uses_SPI) {
-    // DAC8568 Vref does not turn on by default like DAC8565
-    // best to turn on Vref as early as possible for analog
-    // circuitry to settle
-    OC::DAC::DAC8568_Vref_enable();
-  }
-  if (ADC33131D_Uses_FlexIO) {
-    // ADC33131D wants calibration for Vref, takes ~1150 ms
-    OC::ADC::ADC33131D_Vref_calibrate();
-  } else {
-#endif
-    delay(400);
-#if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
-  }
-#endif
+  delay(400);
 
   OC::calibration_load();
   OC::SetFlipMode(OC::calibration_data.flipcontrols());
 
-#if defined(ARDUINO_TEENSY41)
-  Wire.begin();
-  Wire.setClock(100000);
-#endif
   OC::DigitalInputs::Init();
 
   OC::ADC::Init(&OC::calibration_data.adc, OC::calibration_data.flipcontrols());
@@ -220,30 +146,6 @@ void setup() {
   graphics.setPrintPos(1, 28);
   graphics.print("*Main Screen Turn On*");
   GRAPHICS_END_FRAME();
-
-  // --- more hardware init
-#ifdef __IMXRT1062__
-  #if defined(ARDUINO_TEENSY41)
-  // this takes a couple seconds to timeout if no card
-  SDcard_Ready = SD.begin(BUILTIN_SDCARD);
-
-  // Standard MIDI I/O on Serial8, only for Teensy 4.1
-  if (MIDI_Uses_Serial8) {
-    Serial8.begin(31250);
-    MIDI1.begin(MIDI_CHANNEL_OMNI);
-  }
-
-  if (I2S2_Audio_ADC && I2S2_Audio_DAC) {
-    OC::AudioIO::Init();
-  }
-  #endif
-
-  // initialize LittleFS for config files
-  PhzConfig::Init();
-
-  // USB Host support for both 4.0 and 4.1
-  usbHostMIDI.begin();
-#endif
 
   // Display splash screen and optional calibration
   bool reset_settings = false;
@@ -279,9 +181,6 @@ void FASTRUN loop() {
   OC::CORE::app_loop_enabled = true;
   uint32_t menu_redraws = 0;
   while (true) {
-#ifdef __IMXRT1062__
-    thisUSB.Task();
-#endif
 
     // Refresh display
     if (MENU_REDRAW && OC::CORE::display_update_enabled) {
@@ -364,15 +263,6 @@ void FASTRUN loop() {
             Serial.printf("'I' = Toggle App ISR [%s]\n", OC::CORE::app_isr_enabled ? "ON" : "OFF");
             Serial.printf("'D' = Toggle Display Redraw [%s]\n", OC::CORE::display_update_enabled ? "ON" : "OFF");
             Serial.printf("'L' = Toggle App Loop [%s]\n", OC::CORE::app_loop_enabled ? "ON" : "OFF");
-#if defined(__IMXRT1062__)
-#if defined(ARDUINO_TEENSY41)
-            Serial.println("'i' = scan all i2c addresses");
-#endif
-            Serial.println("'l' = list all files in flash (LittleFS)");
-            Serial.println("'s' = list all files on SD card");
-            Serial.println("'C' = clear/reset default Config file");
-            Serial.println("'F' = format/erase all LittleFS files");
-#endif
             break;
 
           case 'I':
@@ -387,30 +277,6 @@ void FASTRUN loop() {
             OC::CORE::app_loop_enabled = !OC::CORE::app_loop_enabled;
             Serial.printf("App Loop = %s\n", OC::CORE::app_loop_enabled ? "ON" : "OFF");
             break;
-
-#if defined(__IMXRT1062__)
-#if defined(ARDUINO_TEENSY41)
-          case 'i':
-            ScanI2C();
-            break;
-#endif
-          case 'C':
-            Serial.println("Resetting Config File!!");
-            PhzConfig::clear_config();
-            PhzConfig::save_config();
-          case 'l':
-            Serial.println(" -=- LittleFS -=- ");
-            PhzConfig::listFiles();
-            break;
-          case 's':
-            Serial.println(" -=- SD Card -=- ");
-            PhzConfig::listFiles(SD);
-            break;
-          case 'F':
-            Serial.println("!! ERASING ALL FILES on LittleFS !!");
-            PhzConfig::eraseFiles();
-            break;
-#endif
 
             // TODO:
           case '+':

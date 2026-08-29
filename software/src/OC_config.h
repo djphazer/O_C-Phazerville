@@ -7,13 +7,8 @@
 
 // --- Hardware details --- //
 static constexpr int DIGITAL_INPUT_COUNT = 4;
-#if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
-static constexpr int DAC_CHANNEL_COUNT = 8;
-static constexpr int ADC_CHANNEL_COUNT = 8;
-#else
 static constexpr int DAC_CHANNEL_COUNT = 4;
 static constexpr int ADC_CHANNEL_COUNT = 4;
-#endif
 
 // --- Timing --- //
 // 60us = 16.666...kHz : Works, SPI transfer ends 2uS before next ISR
@@ -48,15 +43,6 @@ static constexpr unsigned long SETTINGS_SAVE_TIMEOUT_MS = 1000;
 
 #define EEPROM_CALIBRATIONDATA_START 0
 
-#if defined(ARDUINO_TEENSY41)
-// T4.1 - 8 channels, 11 octaves
-#define EEPROM_CALIBRATIONDATA_END 224
-#define EEPROM_GLOBALSETTINGS_END 224
-#elif defined(__IMXRT1062__)
-// T4.0 - 4 channels, 11 octaves
-#define EEPROM_CALIBRATIONDATA_END 128
-#define EEPROM_GLOBALSETTINGS_END 128
-#else
 // T3.2 - 4 channels, 11 octaves
 #define EEPROM_CALIBRATIONDATA_END 128
 
@@ -66,22 +52,17 @@ static constexpr unsigned long SETTINGS_SAVE_TIMEOUT_MS = 1000;
 #define EEPROM_GLOBALSETTINGS_END 1060
 #endif
 
-#endif
 
 #define EEPROM_GLOBALSETTINGS_START EEPROM_CALIBRATIONDATA_END
 
 #define EEPROM_APPDATA_START EEPROM_GLOBALSETTINGS_END
 #define EEPROM_APPDATA_END EEPROMStorage::LENGTH
 
-#ifdef ARDUINO_TEENSY41
-#define EEPROM_APPDATA_BINARY_SIZE (EEPROM_APPDATA_END - EEPROM_APPDATA_START - 160)
-#else
 // This is the available space for all apps' settings (\sa OC_apps.ino)
 #define EEPROM_APPDATA_BINARY_SIZE (EEPROM_APPDATA_END - EEPROM_APPDATA_START - 92)
 // I'm not entirely sure where 92 comes from...
 // it was originally (1000 - 4) which leaves 92 bytes free (1088 total length on T3.2)
 //  -NJM
-#endif
 
 #define OC_UI_DEBUG
 #define OC_UI_SEPARATE_ISR

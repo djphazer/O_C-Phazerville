@@ -13,22 +13,11 @@ extern void set8565_CHA(uint32_t data);
 extern void set8565_CHB(uint32_t data);
 extern void set8565_CHC(uint32_t data);
 extern void set8565_CHD(uint32_t data);
-#if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
-static inline void dac8568_raw_write(uint32_t data) {
-  LPSPI4_TDR = data; // assume writes always at pace SPI FIFO can absorb
-}
-static inline void dac8568_set_channel(uint32_t channel, uint32_t data) {
-  dac8568_raw_write(0x03000000 | ((channel & 0x07) << 20) | ((data & 0xFFFF) << 4));
-}
-#endif
 extern void SPI_init();
 
 using DAC_CHANNEL = int;
 
 extern DAC_CHANNEL DAC_CHANNEL_A, DAC_CHANNEL_B, DAC_CHANNEL_C, DAC_CHANNEL_D;
-#if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
-extern DAC_CHANNEL DAC_CHANNEL_E, DAC_CHANNEL_F, DAC_CHANNEL_G, DAC_CHANNEL_H;
-#endif
 
 // backward compat [deprecated]
 static constexpr int DAC_CHANNEL_LAST = DAC_CHANNEL_COUNT;
@@ -52,7 +41,7 @@ public:
   static constexpr size_t kHistoryDepth = 8;
   static constexpr uint16_t MAX_VALUE = 65535; // DAC fullscale 
 
-#if defined(ARDUINO_TEENSY41) || defined(VOR)
+#if defined(VOR)
   static int kOctaveZero;
 #elif defined(NORTHERNLIGHT)
   static constexpr int kOctaveZero = 0;
@@ -76,10 +65,6 @@ public:
   };
 
   static void Init(CalibrationData *calibration_data, bool flip180 = false);
-  #if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
-  static void DAC8568_Vref_enable();
-  #endif
-
   static uint8_t calibration_data_used(uint8_t channel_id);
   static void set_auto_channel_calibration_data(uint8_t channel_id);
   static void set_default_channel_calibration_data(uint8_t channel_id);
@@ -250,36 +235,10 @@ public:
   }
 
   static void Update() {
-    #if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
-      if (DAC8568_Uses_SPI) {
-        if (DAC_is_inverted) {
-          dac8568_set_channel(0, values_[0]);
-          dac8568_set_channel(1, values_[1]);
-          dac8568_set_channel(2, values_[2]);
-          dac8568_set_channel(3, values_[3]);
-          dac8568_set_channel(4, values_[4]);
-          dac8568_set_channel(5, values_[5]);
-          dac8568_set_channel(6, values_[6]);
-          dac8568_set_channel(7, values_[7]);
-        } else {
-          dac8568_set_channel(0, MAX_VALUE - values_[0]);
-          dac8568_set_channel(1, MAX_VALUE - values_[1]);
-          dac8568_set_channel(2, MAX_VALUE - values_[2]);
-          dac8568_set_channel(3, MAX_VALUE - values_[3]);
-          dac8568_set_channel(4, MAX_VALUE - values_[4]);
-          dac8568_set_channel(5, MAX_VALUE - values_[5]);
-          dac8568_set_channel(6, MAX_VALUE - values_[6]);
-          dac8568_set_channel(7, MAX_VALUE - values_[7]);
-        }
-      } else {
-    #endif
-        set8565_CHA(values_[0]);
-        set8565_CHB(values_[1]);
-        set8565_CHC(values_[2]);
-        set8565_CHD(values_[3]);
-    #if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
-      }
-    #endif
+    set8565_CHA(values_[0]);
+    set8565_CHB(values_[1]);
+    set8565_CHC(values_[2]);
+    set8565_CHD(values_[3]);
 
     size_t tail = history_tail_;
     for (int i = 0; i < DAC_CHANNEL_COUNT; ++i)

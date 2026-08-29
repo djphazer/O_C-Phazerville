@@ -24,8 +24,6 @@ static constexpr uint32_t DIGITAL_INPUT_2_MASK = DIGITAL_INPUT_MASK(DIGITAL_INPU
 static constexpr uint32_t DIGITAL_INPUT_3_MASK = DIGITAL_INPUT_MASK(DIGITAL_INPUT_3);
 static constexpr uint32_t DIGITAL_INPUT_4_MASK = DIGITAL_INPUT_MASK(DIGITAL_INPUT_4);
 
-#if defined(__MK20DX256__) // Teensy 3.2
-
 void tr1_ISR();
 void tr2_ISR();
 void tr3_ISR();
@@ -97,51 +95,6 @@ private:
     }
   }
 };
-
-#elif defined(__IMXRT1062__) // Teensy 4.0 or 4.1
-
-class DigitalInputs {
-public:
-  static void Init();
-  static void reInit() { Init(); }
-  static void Scan();
-
-  // @return mask of all pins clocked since last Scan()
-  static inline uint32_t clocked() {
-    return clocked_mask_;
-  }
-  // @return mask if pin clocked since last Scan()
-  template <DigitalInput input> static inline uint32_t clocked() {
-    return clocked(input);
-  }
-  static inline uint32_t clocked(DigitalInput input) {
-    return clocked_mask_ & (0x1 << input);
-  }
-  template <DigitalInput input> static inline bool read_immediate() {
-    return read_immediate(input);
-  }
-  static inline bool read_immediate(DigitalInput input) {
-#ifdef ARDUINO_TEENSY41
-    auto activated = (ADC33131D_Uses_FlexIO ? HIGH : LOW);
-#else
-    auto activated = LOW;
-#endif
-    switch (input) {
-      case DIGITAL_INPUT_1: return (digitalReadFast(TR1) == activated);
-      case DIGITAL_INPUT_2: return (digitalReadFast(TR2) == activated);
-      case DIGITAL_INPUT_3: return (digitalReadFast(TR3) == activated);
-      case DIGITAL_INPUT_4: return (digitalReadFast(TR4) == activated);
-      case DIGITAL_INPUT_LAST: break;
-    }
-    return false;
-  }
-private:
-  static uint8_t clocked_mask_;
-  static IMXRT_GPIO_t *port[DIGITAL_INPUT_LAST];
-  static uint32_t bitmask[DIGITAL_INPUT_LAST];
-};
-
-#endif
 
 // Helper class for visualizing digital inputs with decay
 // Uses 4 bits for decay

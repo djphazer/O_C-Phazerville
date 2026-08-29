@@ -447,43 +447,23 @@ struct MIDIFrame {
 
     void SendAfterTouch(const uint8_t midi_ch, uint8_t val) {
         usbMIDI.sendAfterTouch(val, midi_ch + 1);
-#ifdef ARDUINO_TEENSY41
-        usbHostMIDI.sendAfterTouch(val, midi_ch + 1);
-        MIDI1.sendAfterTouch(val, midi_ch + 1);
-#endif
     }
     void SendPitchBend(const uint8_t midi_ch, uint16_t bend) {
         usbMIDI.sendPitchBend(bend, midi_ch + 1);
-#ifdef ARDUINO_TEENSY41
-        usbHostMIDI.sendPitchBend(bend, midi_ch + 1);
-        MIDI1.sendPitchBend(bend, midi_ch + 1);
-#endif
     }
 
     void SendCC(const uint8_t midi_ch, uint8_t ccnum, uint8_t val) {
         usbMIDI.sendControlChange(ccnum, val, midi_ch + 1);
-#ifdef ARDUINO_TEENSY41
-        usbHostMIDI.sendControlChange(ccnum, val, midi_ch + 1);
-        MIDI1.sendControlChange(ccnum, val, midi_ch + 1);
-#endif
     }
     void SendNoteOn(const uint8_t midi_ch, uint8_t note = 255, uint8_t vel = 100) {
         if (note > 127) note = current_note[midi_ch];
         else current_note[midi_ch] = note;
 
         usbMIDI.sendNoteOn(note, vel, midi_ch + 1);
-#ifdef ARDUINO_TEENSY41
-        usbHostMIDI.sendNoteOn(note, vel, midi_ch + 1);
-        MIDI1.sendNoteOn(note, vel, midi_ch + 1);
-#endif
     }
     void SendNoteOff(const uint8_t midi_ch, uint8_t note = 255, uint8_t vel = 0) {
         if (note > 127) note = current_note[midi_ch];
         usbMIDI.sendNoteOff(note, vel, midi_ch + 1);
-#ifdef ARDUINO_TEENSY41
-        usbHostMIDI.sendNoteOff(note, vel, midi_ch + 1);
-        MIDI1.sendNoteOff(note, vel, midi_ch + 1);
-#endif
     }
 };
 
@@ -553,9 +533,6 @@ struct IOFrame {
     void Send() {
         const DAC_CHANNEL chan[DAC_CHANNEL_COUNT] = {
           DAC_CHANNEL_A, DAC_CHANNEL_B, DAC_CHANNEL_C, DAC_CHANNEL_D,
-#ifdef ARDUINO_TEENSY41
-          DAC_CHANNEL_E, DAC_CHANNEL_F, DAC_CHANNEL_G, DAC_CHANNEL_H,
-#endif
         };
 
         for (int i = 0; i < DAC_CHANNEL_COUNT; ++i) {

@@ -40,12 +40,6 @@ enum CALIBRATION_STEP {
   DAC_B_VOLT_MIN, DAC_B_VOLT_HIGH,
   DAC_C_VOLT_MIN, DAC_C_VOLT_HIGH,
   DAC_D_VOLT_MIN, DAC_D_VOLT_HIGH,
-#ifdef ARDUINO_TEENSY41
-  DAC_E_VOLT_MIN, DAC_E_VOLT_HIGH,
-  DAC_F_VOLT_MIN, DAC_F_VOLT_HIGH,
-  DAC_G_VOLT_MIN, DAC_G_VOLT_HIGH,
-  DAC_H_VOLT_MIN, DAC_H_VOLT_HIGH,
-#endif
   #endif
 
   ADC_OFFSETS,
@@ -85,12 +79,6 @@ struct CalibrationStep {
 };
 
 static constexpr DAC_CHANNEL &step_to_channel(const int step) {
-#ifdef ARDUINO_TEENSY41
-  if (step >= DAC_H_VOLT_MIN) return DAC_CHANNEL_H;
-  if (step >= DAC_G_VOLT_MIN) return DAC_CHANNEL_G;
-  if (step >= DAC_F_VOLT_MIN) return DAC_CHANNEL_F;
-  if (step >= DAC_E_VOLT_MIN) return DAC_CHANNEL_E;
-#endif
   if (step >= DAC_D_VOLT_MIN) return DAC_CHANNEL_D;
   if (step >= DAC_C_VOLT_MIN) return DAC_CHANNEL_C;
   if (step >= DAC_B_VOLT_MIN) return DAC_CHANNEL_B;
@@ -182,17 +170,10 @@ struct CalibrationData {
   }
 };
 
-#ifndef ARDUINO_TEENSY41
 // 4 channels of I/O
 static_assert(sizeof(DAC::CalibrationData) == 88, "DAC::CalibrationData size changed!");
 static_assert(sizeof(ADC::CalibrationData) == 12, "ADC::CalibrationData size changed!");
 static_assert(sizeof(CalibrationData) == 116, "Calibration data size changed!");
-#else
-// 8 channels of I/O
-static_assert(sizeof(DAC::CalibrationData) == 176, "DAC::CalibrationData size changed!");
-static_assert(sizeof(ADC::CalibrationData) == 20, "ADC::CalibrationData size changed!");
-static_assert(sizeof(CalibrationData) == 212, "Calibration data size changed!");
-#endif
 
 using CalibrationStorage = PageStorage<EEPROMStorage, EEPROM_CALIBRATIONDATA_START, EEPROM_CALIBRATIONDATA_END, CalibrationData>;
 

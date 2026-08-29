@@ -39,13 +39,6 @@
 
 #include "hemisphere_config.h"
 
-#ifdef __IMXRT1062__
-#include "PhzConfig.h"
-#endif
-#ifdef ARDUINO_TEENSY41
-#include "hemisphere_audio_config.h"
-#endif
-
 // The settings specify the selected applets, and 64 bits of data for each applet,
 // plus 64 bits of data for the ClockSetup applet (which includes some misc config).
 // TRIGMAP and CVMAP are packed nibbles.
@@ -71,11 +64,7 @@ enum HEMISPHERE_SETTINGS {
     HEMISPHERE_SETTINGS_COUNT
 };
 
-#ifdef __IMXRT1062__
-// TODO: consider separate, smaller files - this could get slow
-static constexpr int HEM_NR_OF_PRESETS = 50;
-static const char* const PRESET_FILENAME = "HEM_PRESETS.DAT";
-#elif defined(MOAR_PRESETS)
+#if defined(MOAR_PRESETS)
 static constexpr int HEM_NR_OF_PRESETS = 16;
 #elif defined(CUSTOM_BUILD) && !defined(PEWPEWPEW)
 static constexpr int HEM_NR_OF_PRESETS = 4;
@@ -86,8 +75,6 @@ static constexpr int HEM_NR_OF_PRESETS = 8;
 /* Hemisphere Preset
  * - conveniently store/recall multiple configurations
  */
-#ifdef __IMXRT1062__
-#else
 class HemispherePreset : public SystemExclusiveHandler,
     public settings::SettingsBase<HemispherePreset, HEMISPHERE_SETTINGS_COUNT> {
 public:
@@ -222,7 +209,6 @@ public:
 // 1 extra preset for global data... it's a dirty hack for T32.
 HemispherePreset hem_presets[HEM_NR_OF_PRESETS + 1];
 HemispherePreset *hem_active_preset = 0;
-#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 //// Hemisphere Manager
@@ -258,33 +244,16 @@ public:
     }
 
     void Resume() {
-#ifdef __IMXRT1062__
-        // XXX: this assumes no other config file gets loaded while Hemisphere is active...
-        // Also notice that this loads only from LFS,
-        // assuming Hemisphere is only used by T40 and not T41.
-        // Of course, T40 also supports SD cards,
-        // so I should write code instead of comments, yeah?
-        PhzConfig::load_config(PRESET_FILENAME);
-        if (preset_id < 0)
-          LoadFromPreset(0);
-#else
         if (!hem_active_preset)
             LoadFromPreset(0);
-#endif
     }
     void Suspend() {
-#ifdef __IMXRT1062__
-        if (HS::auto_save_enabled)
-            StoreToPreset(preset_id);
-#else
         if (hem_active_preset) {
             if (HS::auto_save_enabled || 0 == preset_id) StoreToPreset(preset_id, !HS::auto_save_enabled);
             hem_active_preset->OnSendSysEx();
         }
-#endif
     }
 
-#if defined(__MK20DX256__)
     void StoreToPreset(HemispherePreset* preset, bool skip_eeprom = false) {
         bool doSave = (preset != hem_active_preset);
 
@@ -325,258 +294,13 @@ public:
           PokePopup(HS::MESSAGE_POPUP, HS::PRESET_SAVED);
         }
     }
-#endif
-
-    // lower 9 bits of PhzConfig KEY
-    enum PresetDataKeys : uint16_t {
-        // preset data, 0-99
-        APPLET_METADATA_KEY = 0, // applet ids
-        CLOCK_DATA_KEY = 1,
-        GLOBALS_KEY = 2,
-        OLD_INPUT_MAP_KEY = 3,
-
-        OUTSKIP_KEY = 4,
-        TRIGMAP_KEY = 5, // 4 x 16-bit DigitalInputMap
-        CVMAP_KEY = 6, // 4 x 16-bit CVInputMap
-
-        OUTSLEW_KEY = 7,
-
-        OUTATTEN_KEY = 8,
-
-        APPLET_L_DATA_KEY = 10,
-        APPLET_R_DATA_KEY = 11,
-
-        // globals, 100-500
-        FILTERMASK1_KEY = 100,
-        FILTERMASK2_KEY = 101,
-
-        PC_CHANNEL_KEY = 110,
-        PRESET_JUMP_KEY = 111,
-
-        MIDI_MAPS_KEY  = 150, // + 0..32
-
-        Q_ENGINE_KEY   = 200, // + slot number
-
-        // 300-500 = Sequences (aka Patterns)
-        SEQUENCES_KEY  = 300, // + blob index
-
-        VERSION_KEY = 0xFFFF
-    };
 
     void StoreToPreset(int id, bool skip_eeprom = false) {
-#ifdef __IMXRT1062__
-        uint16_t preset_key = id << 9;
-
-        // clock data
-        clock_data = ClockSetup_instance.OnDataRequest();
-        PhzConfig::setValue(preset_key | CLOCK_DATA_KEY, clock_data);
-
-        // vague globals
-        global_data = ClockSetup_instance.GetGlobals();
-        PhzConfig::setValue(preset_key | GLOBALS_KEY, global_data);
-
-        uint64_t data = 0;
-        // Input Mappings
-        data = PackPackables(HS::trigmap[0], HS::trigmap[1], HS::trigmap[2], HS::trigmap[3]);
-        PhzConfig::setValue(preset_key | TRIGMAP_KEY, data);
-
-        data = PackPackables(HS::cvmap[0], HS::cvmap[1], HS::cvmap[2], HS::cvmap[3]);
-        PhzConfig::setValue(preset_key | CVMAP_KEY, data);
-
-        data = 0;
-        for (size_t i = 0; i < DAC_CHANNEL_COUNT; ++i) {
-          Pack(data, PackLocation{i*8, 8}, HS::frame.clockskip[i]);
-        }
-        PhzConfig::setValue(preset_key | OUTSKIP_KEY, data);
-        data = 0;
-        for (size_t i = 0; i < DAC_CHANNEL_COUNT; ++i) {
-          Pack(data, PackLocation{i*8, 8}, HS::frame.output_slew[i]);
-        }
-        PhzConfig::setValue(preset_key | OUTSLEW_KEY, data);
-        data = 0;
-        for (size_t i = 0; i < DAC_CHANNEL_COUNT; ++i) {
-          Pack(data, PackLocation{i*8, 8}, static_cast<uint8_t>(HS::frame.output_atten[i]));
-        }
-        PhzConfig::setValue(preset_key | OUTATTEN_KEY, data);
-
-        data = 0;
-        for (size_t h = 0; h < 2; h++)
-        {
-            int index = my_applet[h];
-            Pack(data, PackLocation{h*8,8}, HS::available_applets[index].id);
-
-            // applet data
-            applet_data[h] = HS::available_applets[index].instance[h]->OnDataRequest();
-            PhzConfig::setValue(preset_key | (APPLET_L_DATA_KEY + h), applet_data[h]);
-        }
-
-        // applet ids, and maybe some other stuff?
-        PhzConfig::setValue(preset_key | APPLET_METADATA_KEY, data);
-
-        // -- Globals (per file) --
-        PhzConfig::setValue(FILTERMASK1_KEY, HS::hidden_applets[0]);
-        PhzConfig::setValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
-
-        PhzConfig::setValue(PC_CHANNEL_KEY, HS::frame.MIDIState.pc_channel);
-
-        data = PackPackables(jump_trig_);
-        PhzConfig::setValue(PRESET_JUMP_KEY, data);
-
-        // Global quantizer settings
-        for (size_t qslot = 0; qslot < QUANT_CHANNEL_COUNT; ++qslot) {
-          /* TODO
-            int8_t offset;
-            int16_t scale_factor; // precision of 0.01% as an offset from 100%
-            int8_t transpose; // in semitones
-          */
-          auto &q = q_engine[qslot];
-          data = PackPackables(
-              q.scale,
-              q.octave,
-              q.root_note,
-              q.mask
-              );
-          PhzConfig::setValue(Q_ENGINE_KEY + qslot, data);
-        }
-
-        // Global MIDI Maps
-        for (size_t midx = 0; midx < MIDIMAP_MAX; ++midx) {
-          data = PackPackables(frame.MIDIState.mapping[midx]);
-          PhzConfig::setValue(MIDI_MAPS_KEY + midx, data);
-        }
-
-        // User Patterns aka Sequences
-        for (size_t i = 0; i < OC::Patterns::PATTERN_USER_COUNT; ++i) {
-          data = 0;
-          for (size_t step = 0; step < ARRAY_SIZE(OC::Pattern::notes); ++step) {
-            Pack(data, PackLocation{(step & 0x3)*16, 16}, (uint16_t)OC::user_patterns[i].notes[step]);
-            if ((step & 0x3) == 0x3) {
-              PhzConfig::setValue(SEQUENCES_KEY + ((i << 2) | (step >> 2)), data);
-              data = 0;
-            }
-          }
-        }
-
-        if (PhzConfig::save_config(PRESET_FILENAME))
-          PokePopup(HS::MESSAGE_POPUP, HS::PRESET_SAVED);
-#else
         StoreToPreset( (HemispherePreset*)(hem_presets + id), skip_eeprom );
-#endif
         preset_id = id;
     }
     void LoadFromPreset(int id) {
         preset_id = id;
-#ifdef __IMXRT1062__
-        // T4.x uses a LittleFS file via PhzConfig
-        uint16_t preset_key = id << 9;
-        uint64_t data;
-
-        // applet ids + misc
-        if (!PhzConfig::getValue(preset_key | APPLET_METADATA_KEY, data)) return;
-        if (!data) return;
-
-        for (size_t h = 0; h < 2; h++)
-        {
-            int index = HS::get_applet_index_by_id( Unpack(data, PackLocation{h*8, 8}) );
-
-            // applet data
-            PhzConfig::getValue(preset_key | (APPLET_L_DATA_KEY + h), applet_data[h]);
-            SetApplet(HEM_SIDE(h), index);
-            HS::available_applets[index].instance[h]->OnDataReceive(applet_data[h]);
-        }
-
-        // clock data
-        if (!PhzConfig::getValue(preset_key | CLOCK_DATA_KEY, clock_data)) return;
-        ClockSetup_instance.OnDataReceive(clock_data);
-        // if the first key exists, we are assuming the rest are present...
-
-        // vague globals
-        PhzConfig::getValue(preset_key | GLOBALS_KEY, global_data);
-        ClockSetup_instance.SetGlobals(global_data);
-
-        // Input Mappings
-        if (!PhzConfig::getValue(preset_key | CVMAP_KEY, data)) {
-          PhzConfig::getValue(preset_key | OLD_INPUT_MAP_KEY, data);
-          for (size_t i = 0; i < 4; ++i)
-          {
-            int val = Unpack(data, PackLocation{i*16, 4});
-            if (val != 0) HS::trigmap[i].source = constrain(val - 1, -1, TRIGMAP_MAX);
-
-            val = Unpack(data, PackLocation{4 + i*16, 4});
-            if (val != 0) HS::cvmap[i].source = constrain(val - 1, 0, CVMAP_MAX);
-
-            HS::frame.clockskip[i] = Unpack(data, PackLocation{8 + i*16, 8});
-          }
-        } else {
-          UnpackPackables(data, HS::cvmap[0], HS::cvmap[1], HS::cvmap[2], HS::cvmap[3]);
-
-          PhzConfig::getValue(preset_key | TRIGMAP_KEY, data);
-          UnpackPackables(data, HS::trigmap[0], HS::trigmap[1], HS::trigmap[2], HS::trigmap[3]);
-
-          PhzConfig::getValue(preset_key | OUTSKIP_KEY, data);
-          for (size_t i = 0; i < DAC_CHANNEL_COUNT; ++i)
-          {
-            HS::frame.clockskip[i] = Unpack(data, PackLocation{i*8, 8});
-          }
-        }
-
-        PhzConfig::getValue(preset_key | OUTSLEW_KEY, data);
-        for (size_t i = 0; i < DAC_CHANNEL_COUNT; ++i)
-        {
-          HS::frame.output_slew[i] = Unpack(data, PackLocation{i*8, 8});
-        }
-
-        const bool has_output_atten = PhzConfig::getValue(preset_key | OUTATTEN_KEY, data);
-        for (size_t i = 0; i < DAC_CHANNEL_COUNT; ++i)
-        {
-          HS::frame.output_atten[i] = has_output_atten ? Unpack(data, PackLocation{i*8, 8}) : 60;
-        }
-
-        // --- Global stuff ---
-        // (per file, not per preset)
-
-        PhzConfig::getValue(FILTERMASK1_KEY, HS::hidden_applets[0]);
-        PhzConfig::getValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
-
-        if (PhzConfig::getValue(PC_CHANNEL_KEY, data)) HS::frame.MIDIState.pc_channel = (uint8_t) data;
-
-        if (PhzConfig::getValue(PRESET_JUMP_KEY, data))
-          UnpackPackables(data, jump_trig_);
-
-        for (size_t qslot = 0; qslot < QUANT_CHANNEL_COUNT; ++qslot) {
-          if (!PhzConfig::getValue(Q_ENGINE_KEY + qslot, data))
-              break;
-          auto &q = q_engine[qslot];
-          UnpackPackables(data,
-              q.scale,
-              q.octave,
-              q.root_note,
-              q.mask);
-          q.Reconfig();
-        }
-
-        // Global MIDI Maps
-        for (size_t midx = 0; midx < MIDIMAP_MAX; ++midx) {
-          if (!PhzConfig::getValue(MIDI_MAPS_KEY + midx, data))
-              break;
-          UnpackPackables(data, frame.MIDIState.mapping[midx]);
-        }
-        frame.MIDIState.UpdateMidiChannelFilter();
-        frame.MIDIState.UpdateMaxPolyphony();
-
-        // User Patterns aka Sequences
-        for (size_t i = 0; i < OC::Patterns::PATTERN_USER_COUNT; ++i) {
-          for (size_t step = 0; step < ARRAY_SIZE(OC::Pattern::notes); ++step) {
-            if ((step & 0x3) == 0x0) {
-              data = 0;
-              if (!PhzConfig::getValue(SEQUENCES_KEY + ((i << 2) | (step >> 2)), data))
-                break;
-            }
-            OC::user_patterns[i].notes[step] = Unpack(data, PackLocation{(step & 0x3)*16, 16});
-          }
-        }
-
-#else
         // T3.2 uses EEPROM interface
         hem_active_preset = (HemispherePreset*)(hem_presets + id);
         if (hem_active_preset->is_valid()) {
@@ -596,7 +320,6 @@ public:
                 HS::available_applets[index].instance[h]->OnDataReceive(applet_data[h]);
             }
         }
-#endif
         PokePopup(PRESET_POPUP);
     }
     void ProcessQueue() {
@@ -620,8 +343,6 @@ public:
       if (next_id != preset_id)
         QueuePresetLoad(next_id);
     }
-#ifdef __IMXRT1062__
-#else
     // T32 hacks for extra settings
     void StoreExtras() {
       // store hidden applet mask in secret preset
@@ -643,7 +364,6 @@ public:
       uint64_t data = hem_presets[HEM_NR_OF_PRESETS].GetClockData();
       UnpackPackables(data, jump_trig_);
     }
-#endif
 
     // does not modify the preset, only the manager
     void SetApplet(HEM_SIDE hemisphere, int index) {
@@ -658,18 +378,8 @@ public:
         next_applet[h] = index;
     }
 
-#if defined(__IMXRT1062__)
-  #if defined(ARDUINO_TEENSY41)
-    template <typename T1, typename T2, typename T3>
-    void ProcessMIDI(T1 &device, T2 &next_device, T3 &dev3) {
-  #else
-    template <typename T1, typename T2>
-    void ProcessMIDI(T1 &device, T2 &next_device) {
-  #endif
-#else
     template <typename T1>
     void ProcessMIDI(T1 &device) {
-#endif
         HS::IOFrame &f = HS::frame;
         int load_slot = -1;
 
@@ -690,12 +400,6 @@ public:
             }
 
             f.MIDIState.ProcessMIDIMsg({device.getChannel(), message, data1, data2});
-#if defined(__IMXRT1062__)
-            next_device.send(message, data1, data2, device.getChannel(), 0);
-  #if defined(ARDUINO_TEENSY41)
-            dev3.send((midi::MidiType)message, data1, data2, device.getChannel());
-  #endif
-#endif
         }
         if (load_slot >= 0 && load_slot < HEM_NR_OF_PRESETS) {
             QueuePresetLoad(load_slot);
@@ -705,18 +409,7 @@ public:
     void mainloop() {
         timeout = 0;
         // top-level MIDI-to-CV handling - alters frame outputs
-#if defined(__IMXRT1062__)
-  #if defined(ARDUINO_TEENSY41)
-        ProcessMIDI(usbMIDI, usbHostMIDI, MIDI1);
-        ProcessMIDI(usbHostMIDI, usbMIDI, MIDI1);
-        ProcessMIDI(MIDI1, usbMIDI, usbHostMIDI);
-  #else
-        ProcessMIDI(usbMIDI, usbHostMIDI);
-        ProcessMIDI(usbHostMIDI, usbMIDI);
-  #endif
-#else
         ProcessMIDI(usbMIDI);
-#endif
     }
 
     void Controller() {
@@ -787,13 +480,6 @@ public:
           }
 
         }
-#ifdef ARDUINO_TEENSY41
-        if (view_state == AUDIO_SETUP) {
-          gfxHeader("Audio DSP Setup");
-          // OC::AudioDSP::DrawAudioSetup();
-          draw_applets = false;
-        }
-#endif
 
         if (HS::q_edit)
           PokePopup(QUANTIZER_POPUP);
@@ -885,12 +571,6 @@ public:
             if (!down) ConfigButtonPush(h);
             return;
         }
-#ifdef ARDUINO_TEENSY41
-        if (view_state == AUDIO_SETUP) {
-          // if (!down) OC::AudioDSP::AudioSetupButtonAction(h);
-          return;
-        }
-#endif
 
         // button down
         if (down) {
@@ -950,48 +630,6 @@ public:
             HS::available_applets[index].instance[h]->OnButtonPress();
         }
     }
-
-#ifdef ARDUINO_TEENSY41
-    void ExtraButtonPush(const UI::Event &event) {
-        bool down = (event.type == UI::EVENT_BUTTON_DOWN);
-        int h = (event.control == OC::CONTROL_BUTTON_UP2) ? LEFT_HEMISPHERE : RIGHT_HEMISPHERE;
-
-        if (down) {
-          // dual press for Audio Setup
-          if (event.mask == (OC::CONTROL_BUTTON_UP2 | OC::CONTROL_BUTTON_DOWN2) && h != first_click) {
-              view_state = AUDIO_SETUP;
-              OC::ui.SetButtonIgnoreMask(); // ignore button release
-              return;
-          }
-
-          // mark this single click
-          click_tick = OC::CORE::ticks;
-          first_click = h;
-          return;
-        }
-
-        // --- Button Release
-        if (preset_cursor || view_state != APPLETS) {
-            // cancel config screen, etc. on select button release
-            preset_cursor = 0;
-            view_state = APPLETS;
-            HS::popup_tick = 0;
-            return;
-        }
-
-        if (clock_setup) {
-            clock_setup = 0; // Turn off clock setup with any single-click button release
-            return;
-        }
-
-        if (event.control == OC::CONTROL_BUTTON_DOWN2)
-            ToggleConfigMenu();
-
-        if (event.control == OC::CONTROL_BUTTON_UP2)
-            ShowPresetSelector();
-
-    }
-#endif
 
     void DelegateSelectButtonPush(const UI::Event &event) {
         bool down = (event.type == UI::EVENT_BUTTON_DOWN);
@@ -1080,12 +718,6 @@ public:
           ConfigEncoderAction(h, event.value);
           return;
         }
-#ifdef ARDUINO_TEENSY41
-        if (view_state == AUDIO_SETUP) {
-          // OC::AudioDSP::AudioMenuAdjust(h, event.value);
-          return;
-        }
-#endif
 
         if (clock_setup) {
           if (h == LEFT_HEMISPHERE)
@@ -1217,11 +849,6 @@ public:
             } else if (event.control == OC::CONTROL_BUTTON_L || event.control == OC::CONTROL_BUTTON_R) {
                 DelegateEncoderPush(event);
             }
-#ifdef ARDUINO_TEENSY41
-            else // new buttons
-                ExtraButtonPush(event);
-#endif
-
             break;
 
         case UI::EVENT_BUTTON_LONG_PRESS:
@@ -1266,9 +893,6 @@ private:
       CONFIG_MENU,
       PRESET_PICKER,
       CLOCK_SETUP,
-#ifdef ARDUINO_TEENSY41
-      AUDIO_SETUP,
-#endif
     };
     HEMView view_state = APPLETS;
 
@@ -1373,15 +997,7 @@ private:
         }
     }
     void DeletePreset(int id) {
-#ifdef __IMXRT1062__
-      uint16_t preset_key = id << 9;
-      // non-global values are all 0-99 in the enum
-      for (int i = 0; i < 100; ++i) {
-        PhzConfig::deleteKey(preset_key | i);
-      }
-#else
       hem_presets[id].SetAppletId(0, 0);
-#endif
     }
     void ConfigButtonPush(int h) {
         if (preset_cursor) {
@@ -1651,23 +1267,11 @@ private:
     }
 
     bool isValidPreset(int id) {
-#ifdef __IMXRT1062__
-      uint64_t data;
-      return PhzConfig::getValue(id << 9 | APPLET_METADATA_KEY, data);
-#else
       return hem_presets[id].is_valid();
-#endif
     }
 
     HemisphereApplet* GetApplet(int id, size_t h) {
-#ifdef __IMXRT1062__
-        uint64_t data = 0;
-        PhzConfig::getValue(id << 9 | APPLET_METADATA_KEY, data);
-        int idx = HS::get_applet_index_by_id( Unpack(data, PackLocation{h*8, 8}) );
-        return HS::available_applets[idx].instance[h];
-#else
         return hem_presets[id].GetApplet(h);
-#endif
     }
     void DrawPresetSelector() {
         const char * const hdrtxt[] = { "DEL!", "Load", "Save", "???" };
@@ -1702,8 +1306,6 @@ private:
 
 };
 
-#ifdef __IMXRT1062__
-#else
 // TOTAL EEPROM SIZE: 8 presets * 32 bytes
 SETTINGS_DECLARE(HemispherePreset, HEMISPHERE_SETTINGS_COUNT) {
     {0, 0, 255, "Applet ID L", NULL, settings::STORAGE_TYPE_U8},
@@ -1724,17 +1326,12 @@ SETTINGS_DECLARE(HemispherePreset, HEMISPHERE_SETTINGS_COUNT) {
     {0, 0, 65535, "CV Input Map", NULL, settings::STORAGE_TYPE_U16},
     {0, 0, 65535, "Misc Globals", NULL, settings::STORAGE_TYPE_U16}
 };
-#endif
 
 HemisphereManager manager;
 
 void ReceiveManagerSysEx() {
-#ifdef __IMXRT1062__
-    // TODO: reimplement SysEx backup
-#else
     if (hem_active_preset)
         hem_active_preset->OnReceiveSysEx();
-#endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1747,17 +1344,10 @@ void HEMISPHERE_init() {
 }
 
 static constexpr size_t HEMISPHERE_storageSize() {
-#ifdef __IMXRT1062__
-    return 0;
-#else
     return HemispherePreset::storageSize() * (HEM_NR_OF_PRESETS + 1);
-#endif
 }
 
 static size_t HEMISPHERE_save(void *storage) {
-#ifdef __IMXRT1062__
-    return 0;
-#else
     manager.StoreExtras();
 
     size_t used = 0;
@@ -1765,13 +1355,9 @@ static size_t HEMISPHERE_save(void *storage) {
         used += hem_presets[i].Save(static_cast<char*>(storage) + used);
     }
     return used;
-#endif
 }
 
 static size_t HEMISPHERE_restore(const void *storage) {
-#ifdef __IMXRT1062__
-    return 0;
-#else
     size_t used = 0;
     for (int i = 0; i < HEM_NR_OF_PRESETS + 1; ++i) {
         used += hem_presets[i].Restore(static_cast<const char*>(storage) + used);
@@ -1780,7 +1366,6 @@ static size_t HEMISPHERE_restore(const void *storage) {
     manager.LoadExtras();
 
     return used;
-#endif
 }
 
 void FASTRUN HEMISPHERE_isr() {

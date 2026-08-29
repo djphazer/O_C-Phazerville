@@ -29,13 +29,9 @@
 #include "../../OC_options.h"
 #include "../../util/util_debugpins.h"
 #include "../../util/util_misc.h"
-#if defined(__IMXRT1062__)
-#include <SPI.h>
-#endif
 #include "../../util/util_SPIFIFO.h"
 
 // NOTE: Don't disable DMA unless you absolutely know what you're doing. It will hurt you.
-#if defined(__MK20DX256__)
 #define DMA_PAGE_TRANSFER
 #ifdef DMA_PAGE_TRANSFER
 #include <DMAChannel.h>
@@ -44,14 +40,6 @@ static bool page_dma_active = false;
 #endif
 #ifndef SPI_SR_RXCTR
 #define SPI_SR_RXCTR 0XF0
-#endif
-
-// Teensy 4.1 has large SPI FIFO, so FIFO and interrupt is used rather than DMA
-#elif defined(__IMXRT1062__)
-static void spi_sendpage_isr();
-static volatile int sendpage_state; // 0: inactive, 1..4: active
-static int sendpage_count;
-static const uint32_t *sendpage_src;
 #endif
 
 static uint8_t SH1106_data_start_seq[] = {
@@ -136,7 +124,6 @@ void SH1106_128x64_Driver::Init() {
   digitalWriteFast(OLED_CS, OLED_CS_INACTIVE); // U8G_ESC_CS(0),             /* disable chip */
   delayMicroseconds(1);
 
-#if defined(__MK20DX256__)
 #ifdef DMA_PAGE_TRANSFER
   page_dma.destination((volatile uint8_t&)SPI0_PUSHR);
   page_dma.transferSize(1);
@@ -145,31 +132,6 @@ void SH1106_128x64_Driver::Init() {
   page_dma.triggerAtHardwareEvent(DMAMUX_SOURCE_SPI0_TX);
   page_dma.disable();
 #endif // DMA_PAGE_TRANSFER
-
-#elif defined(__IMXRT1062__)
-  #if defined(ARDUINO_TEENSY41)
-    if (OLED_Uses_SPI1) {
-      LPSPI3_IER = 0;
-      LPSPI3_SR = 0x3F00; // clear any prior pending interrupt flags
-      LPSPI3_FCR = LPSPI_FCR_RXWATER(0) | LPSPI_FCR_TXWATER(3);
-      attachInterruptVector(IRQ_LPSPI3, spi_sendpage_isr);
-      NVIC_CLEAR_PENDING(IRQ_LPSPI3);
-      NVIC_SET_PRIORITY(IRQ_LPSPI3, 48);
-      NVIC_ENABLE_IRQ(IRQ_LPSPI3);
-    } else {
-  #endif
-      // assumes DAC driver already called SPI.begin()
-      LPSPI4_IER = 0;
-      LPSPI4_SR = 0x3F00; // clear any prior pending interrupt flags
-      LPSPI4_FCR = LPSPI_FCR_RXWATER(0) | LPSPI_FCR_TXWATER(3);
-      attachInterruptVector(IRQ_LPSPI4, spi_sendpage_isr);
-      NVIC_CLEAR_PENDING(IRQ_LPSPI4);
-      NVIC_SET_PRIORITY(IRQ_LPSPI4, 48);
-      NVIC_ENABLE_IRQ(IRQ_LPSPI4);
-  #if defined(ARDUINO_TEENSY41)
-    }
-  #endif
-#endif // __IMXRT1062__
 
   Clear();
 }
@@ -187,7 +149,6 @@ void SH1106_128x64_Driver::Flush() {
   // would be pulled high too soon. Why this effect is more pronounced with
   // gcc >= 5.4.1 is a different mystery.
 
-#if defined(__MK20DX256__)
   if (page_dma_active) {
     while (!page_dma.complete()) { }
     while (0 != (SPI0_SR & 0x0000f000)); // SPIx_SR TXCTR
@@ -200,12 +161,6 @@ void SH1106_128x64_Driver::Flush() {
     // DmaSpi.h::post_finishCurrentTransfer_impl
     SPI0_RSER = 0;
     SPI0_SR = 0xFF0F0000;
-  }
-#endif // __MK20DX256__
-#elif defined(__IMXRT1062__)
-  // The same scenario as above can occur with the ISR-driven transfer
-  if (sendpage_state) { 
-    //SERIAL_PRINTLN("display wait / frame drop");
   }
 #endif
 }
@@ -233,7 +188,6 @@ void SH1106_128x64_Driver::Clear() {
   digitalWriteFast(OLED_CS, OLED_CS_INACTIVE);
 }
 
-#if defined(__MK20DX256__)
 /*static*/
 bool SH1106_128x64_Driver::SendPage(uint_fast8_t index, const uint8_t *data) {
   SH1106_data_start_seq[2] = 0xb0 | index;
@@ -258,95 +212,6 @@ bool SH1106_128x64_Driver::SendPage(uint_fast8_t index, const uint8_t *data) {
   return true;
 }
 
-#elif defined(__IMXRT1062__)
-/*static*/
-bool SH1106_128x64_Driver::SendPage(uint_fast8_t index, const uint8_t *data) {
-  if (sendpage_state) return false; // don't interrupt others
-                                    //
-  SH1106_data_start_seq[2] = 0xb0 | index;
-  sendpage_state = 1;
-  sendpage_src = (const uint32_t *)data; // frame buffer is 32 bit aligned
-  sendpage_count = kPageSize >> 2; // number of 32 bit words to write into FIFO
-  #if defined(ARDUINO_TEENSY41)
-  if (OLED_Uses_SPI1) {
-    // DAC does not use SPI1, so we must forcibly trigger first interrupt
-    NVIC_TRIGGER_IRQ(IRQ_LPSPI3);
-  } else {
-  #endif
-    // don't clear SPI status flags, already cleared before DAC data was loaded into FIFO
-    LPSPI4_IER = LPSPI_IER_TCIE; // run spi_sendpage_isr() when DAC data complete
-  #if defined(ARDUINO_TEENSY41)
-  }
-  #endif
-
-  return true;
-}
-
-static void spi_sendpage_isr() {
-  DEBUG_PIN_SCOPE(OC_GPIO_DEBUG_PIN2);
-  #if defined(ARDUINO_TEENSY41)
-  IMXRT_LPSPI_t *lpspi = (OLED_Uses_SPI1) ? &IMXRT_LPSPI3_S : &IMXRT_LPSPI4_S;
-  #else
-  IMXRT_LPSPI_t *lpspi = &IMXRT_LPSPI4_S;
-  #endif
-  uint32_t status = lpspi->SR;
-  lpspi->SR = status; // clear interrupt status flags
-  if (sendpage_state == 1) {
-    // begin command phase
-    digitalWriteFast(OLED_DC, LOW);
-    digitalWriteFast(OLED_CS, OLED_CS_ACTIVE);
-    lpspi->TCR = (lpspi->TCR & 0xF8000000) | LPSPI_TCR_FRAMESZ(23)
-      | LPSPI_TCR_PCS(3) | LPSPI_TCR_RXMSK;
-    lpspi->TDR = (SH1106_data_start_seq[0] << 16) | (SH1106_data_start_seq[1] << 8)
-      | SH1106_data_start_seq[2];
-    sendpage_state = 2;
-    lpspi->IER = LPSPI_IER_TCIE; // run spi_sendpage_isr() when command complete
-    return; // FIFO loaded with 3 byte command
-  }
-  if (sendpage_state == 2) {
-    // begin data phase
-    digitalWriteFast(OLED_DC, HIGH);
-    lpspi->CR |= LPSPI_CR_RRF | LPSPI_CR_RTF; // clear FIFO
-    lpspi->IER = LPSPI_IER_TDIE; // run spi_sendpage_isr() when FIFO wants data
-    const size_t nbits = SH1106_128x64_Driver::kPageSize * 8;
-    lpspi->TCR = (lpspi->TCR & 0xF8000000) | LPSPI_TCR_FRAMESZ(nbits-1)
-      | LPSPI_TCR_PCS(3) | LPSPI_TCR_RXMSK | LPSPI_TCR_BYSW;
-    sendpage_state = 3;
-    return;
-  }
-  if (sendpage_state == 3) {
-    // feed display data into the FIFO
-    if (!(status & LPSPI_SR_TDF)) return;
-    const int fifo_space = 16 - (lpspi->FSR & 0x1F);
-    if (fifo_space < sendpage_count) {
-      // we have more data than the FIFO can hold
-      lpspi->IER = LPSPI_IER_TDIE; // run spi_sendpage_isr() when FIFO wants more data
-      for (int i=0; i < fifo_space; i++) {
-        lpspi->TDR = *sendpage_src++;
-        asm volatile ("dsb":::"memory");
-      }
-      sendpage_count -= fifo_space;
-    } else {
-      // remaining data fits in FIFO
-      lpspi->IER = LPSPI_IER_TCIE; // run spi_sendpage_isr() when all display data finished
-      for (int i=0; i < sendpage_count; i++) {
-        lpspi->TDR = *sendpage_src++;
-        asm volatile ("dsb":::"memory");
-      }
-      sendpage_count = 0;
-      sendpage_state = 4;
-    }
-    return;
-  } else {
-    // finished
-    digitalWriteFast(OLED_CS, OLED_CS_INACTIVE);
-    lpspi->IER = 0;
-    sendpage_state = 0;
-  }
-}
-#endif // __IMXRT1062__
-
-#if defined(__MK20DX256__)
 void SH1106_128x64_Driver::SPI_send(void *bufr, size_t n) {
 
   // adapted from https://github.com/xxxajk/spi4teensy3
@@ -390,25 +255,6 @@ void SH1106_128x64_Driver::SPI_send(void *bufr, size_t n) {
   }
 }
 
-#elif defined(__IMXRT1062__)
-void SH1106_128x64_Driver::SPI_send(void *bufr, size_t n) {
-  #if defined(ARDUINO_TEENSY41)
-    if (OLED_Uses_SPI1) {
-      SPI1.beginTransaction(
-        SPISettings(Large_OLED? 8000000 : 24000000, MSBFIRST, SPI_MODE0)
-      );
-      SPI1.transfer(bufr, NULL, n);
-      SPI1.endTransaction();
-      return;
-    }
-  #endif
-  SPI.beginTransaction(SPISettings(24000000, MSBFIRST, SPI_MODE0));
-  LPSPI4_TCR |= LPSPI_TCR_PCS(3); // do not interfere with DAC's CS pin
-  SPI.transfer(bufr, NULL, n);
-  SPI.endTransaction();
-}
-#endif // __IMXRT1062__
-
 /*static*/
 void SH1106_128x64_Driver::AdjustOffset(uint8_t offset) {
   SH1106_data_start_seq[1] = offset; // lower 4 bits of col adr
@@ -425,13 +271,11 @@ void SH1106_128x64_Driver::SetContrast(uint8_t contrast) {
   SH1106_init_seq[CONTRAST_VALUE] = contrast;
 }
 
-#if defined(__MK20DX256__)
 /*static*/
 void SH1106_128x64_Driver::ChangeSpeed(uint32_t speed) {
-	uint32_t ctar = speed;
-	ctar = speed;
-	ctar |= (ctar & 0x0F) << 12;
-	KINETISK_SPI0.CTAR0 = ctar | SPI_CTAR_FMSZ(7);
-	KINETISK_SPI0.CTAR1 = ctar | SPI_CTAR_FMSZ(15);
+  uint32_t ctar = speed;
+  ctar = speed;
+  ctar |= (ctar & 0x0F) << 12;
+  KINETISK_SPI0.CTAR0 = ctar | SPI_CTAR_FMSZ(7);
+  KINETISK_SPI0.CTAR1 = ctar | SPI_CTAR_FMSZ(15);
 }
-#endif

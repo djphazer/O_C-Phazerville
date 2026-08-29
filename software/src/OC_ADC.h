@@ -14,9 +14,6 @@
 using ADC_CHANNEL = int;
 
 extern ADC_CHANNEL ADC_CHANNEL_1, ADC_CHANNEL_2, ADC_CHANNEL_3, ADC_CHANNEL_4;
-#if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
-extern ADC_CHANNEL ADC_CHANNEL_5, ADC_CHANNEL_6, ADC_CHANNEL_7, ADC_CHANNEL_8;
-#endif
 
 static constexpr int ADC_CHANNEL_LAST = ADC_CHANNEL_COUNT;
 
@@ -49,9 +46,6 @@ public:
   };
 
   static void Init(CalibrationData *calibration_data, bool flip180 = false);
-  #if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
-  static void ADC33131D_Vref_calibrate();
-  #endif
   static void Init_DMA();
   static void DMA_ISR();
   static void Scan_DMA();
@@ -83,8 +77,6 @@ public:
   }
 
   static void CalibratePitch(int32_t c2, int32_t c4);
-
-  static float Read_ID_Voltage();
 
 private:
 

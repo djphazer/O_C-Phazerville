@@ -15,12 +15,6 @@
 #include "extern/dspinst.h"
 #include <malloc.h>
 
-#ifdef ARDUINO_TEENSY41
-#include <Audio.h>
-
-extern "C" uint8_t external_psram_size;
-extern char _extram_start[], _extram_end[];
-#endif
 extern char _ebss[], _heap_end[], *__brkval, _estack;
 
 #ifdef POLYLFO_DEBUG  
@@ -70,11 +64,6 @@ namespace DEBUG {
 
 static void debug_menu_ram() {
 
-#ifdef __IMXRT1062__
-  auto sp = (char*) __builtin_frame_address(0);
-  auto stack = sp - _ebss;
-  int heap = OC::CORE::FreeRam(); // _heap_end - __brkval;
-#else
   // T3.2
   char tos;
   int stack = &_estack - &tos;
@@ -83,7 +72,6 @@ static void debug_menu_ram() {
 
   graphics.setPrintPos(2, 32);
   graphics.printf("FREE  %7d (%dKB)", free, free >> 10);
-#endif
 
   graphics.setPrintPos(2, 12);
   graphics.printf("STACK %7d (%dKB)", stack, stack >> 10);
@@ -91,15 +79,6 @@ static void debug_menu_ram() {
   graphics.setPrintPos(2, 22);
   graphics.printf("HEAP  %7d (%dKB)", heap, heap >> 10);
 
-#if ARDUINO_TEENSY41
-  char *derp = (char*)extmem_malloc(1);
-  //auto psram = _extram_start + (external_psram_size << 20) - _extram_end;
-  auto psram = _extram_start + (external_psram_size << 20) - derp;
-  if (external_psram_size == 0) psram = 0;
-  graphics.setPrintPos(2, 32);
-  graphics.printf("PSRAM %7d (%dKB)", psram, psram >> 10);
-  extmem_free(derp);
-#endif
 }
 
 static void debug_menu_core() {
@@ -166,11 +145,6 @@ static void debug_menu_version()
 #ifdef USB_SERIAL
   graphics.print("+Serial");
 #endif
-
-#ifdef __IMXRT1062__
-  graphics.setPrintPos(2, 52);
-  graphics.printf("HW_ID= 0.%03dV", int(GetIDVoltage() * 1000));
-#endif
 }
 
 static void debug_menu_gfx() {
@@ -187,19 +161,6 @@ static void debug_menu_gfx() {
 }
 
 static void debug_menu_adc() {
-#ifdef ARDUINO_TEENSY41
-  graphics.setPrintPos(2, 12);
-  graphics.printf("C1 %5lu C5 %5lu", ADC::raw_value(ADC_CHANNEL_1), ADC::raw_value(ADC_CHANNEL_5));
-
-  graphics.setPrintPos(2, 22);
-  graphics.printf("C2 %5lu C6 %5lu", ADC::raw_value(ADC_CHANNEL_2), ADC::raw_value(ADC_CHANNEL_6));
-
-  graphics.setPrintPos(2, 32);
-  graphics.printf("C3 %5lu C7 %5lu", ADC::raw_value(ADC_CHANNEL_3), ADC::raw_value(ADC_CHANNEL_7));
-
-  graphics.setPrintPos(2, 42);
-  graphics.printf("C4 %5lu C8 %5lu", ADC::raw_value(ADC_CHANNEL_4), ADC::raw_value(ADC_CHANNEL_8));
-#else
   graphics.setPrintPos(2, 12);
   graphics.printf("C1 %5ld %5lu", ADC::value<ADC_CHANNEL_1>(), ADC::raw_value(ADC_CHANNEL_1));
 
@@ -211,7 +172,6 @@ static void debug_menu_adc() {
 
   graphics.setPrintPos(2, 42);
   graphics.printf("C4 %5ld %5lu", ADC::value<ADC_CHANNEL_4>(), ADC::raw_value(ADC_CHANNEL_4));
-#endif
   const uint8_t trigz[] = {
     OC::DigitalInputs::read_immediate<OC::DIGITAL_INPUT_1>(),
     OC::DigitalInputs::read_immediate<OC::DIGITAL_INPUT_2>(),
@@ -222,7 +182,6 @@ static void debug_menu_adc() {
   graphics.printf("T1=%u T2=%u T3=%u T4=%u", trigz[0], trigz[1], trigz[2], trigz[3]);
 }
 
-#ifdef ARDUINO_TEENSY41
 static void debug_menu_adc_noise() {
   static debug::AveragedCycles chan[ADC_CHANNEL_COUNT];
   static elapsedMillis timeout;
@@ -233,63 +192,18 @@ static void debug_menu_adc_noise() {
   for (int i = 0; i < 4; ++i) {
     if (reset) {
       chan[i].Reset();
-      chan[i+4].Reset();
     }
     chan[i].push(ADC::raw_value(ADC_CHANNEL(i)));
-    chan[i+4].push(ADC::raw_value(ADC_CHANNEL(i+4)));
 
     uint32_t diff1 = chan[i].max_value() - chan[i].min_value();
-    uint32_t diff2 = chan[i+4].max_value() - chan[i+4].min_value();
 
     graphics.setPrintPos(2, 12 + 10*i);
-    graphics.printf("C%d %5lu C%d %5lu", i+1, diff1, i+5, diff2);
+    graphics.printf("C%d %5lu", i+1, diff1);
   }
 
   graphics.setPrintPos(2, 52);
   graphics.print("(5 sec reset)");
 }
-
-static void debug_menu_adc_value() {
-  graphics.setPrintPos(2, 12);
-  graphics.printf("C1 %5ld C5 %5ld", ADC::value(ADC_CHANNEL_1), ADC::value(ADC_CHANNEL_5));
-
-  graphics.setPrintPos(2, 22);
-  graphics.printf("C2 %5ld C6 %5ld", ADC::value(ADC_CHANNEL_2), ADC::value(ADC_CHANNEL_6));
-
-  graphics.setPrintPos(2, 32);
-  graphics.printf("C3 %5ld C7 %5ld", ADC::value(ADC_CHANNEL_3), ADC::value(ADC_CHANNEL_7));
-
-  graphics.setPrintPos(2, 42);
-  graphics.printf("C4 %5ld C8 %5ld", ADC::value(ADC_CHANNEL_4), ADC::value(ADC_CHANNEL_8));
-
-  const uint8_t trigz[] = {
-    OC::DigitalInputs::read_immediate<OC::DIGITAL_INPUT_1>(),
-    OC::DigitalInputs::read_immediate<OC::DIGITAL_INPUT_2>(),
-    OC::DigitalInputs::read_immediate<OC::DIGITAL_INPUT_3>(),
-    OC::DigitalInputs::read_immediate<OC::DIGITAL_INPUT_4>()
-  };
-  graphics.setPrintPos(2, 52);
-  graphics.printf("T1=%u T2=%u T3=%u T4=%u", trigz[0], trigz[1], trigz[2], trigz[3]);
-}
-
-static void debug_menu_audio() {
-  static SmoothedValue<int, 64> smooth_cpu;
-  smooth_cpu.push(AudioProcessorUsage() * 100);
-  graphics.setPrintPos(2, 12);
-  graphics.printf("Total CPU %2d.%02d%%", smooth_cpu.value()/100, smooth_cpu.value()%100);
-
-  float whole = AudioProcessorUsageMax();
-  int part = int(whole * 100) % 100;
-  graphics.setPrintPos(2, 22);
-  graphics.printf("Max CPU %2d.%02d%%", int(whole), part);
-
-  graphics.setPrintPos(2, 32);
-  graphics.printf("Rate: %lu Hz", uint32_t(AUDIO_SAMPLE_RATE));
-
-  graphics.setPrintPos(2, 42);
-  graphics.printf("PSRAM: %2u MB", external_psram_size);
-}
-#endif
 
 #ifdef PEWPEWPEW
 static void debug_menu_pewpewpew() {
@@ -307,19 +221,11 @@ struct DebugMenu {
 
 static const DebugMenu debug_menus[] = {
   { "CORE", debug_menu_core },
-#ifdef __IMXRT1062__
-  { "RAM (free)", debug_menu_ram },
-#else
   { "RAM", debug_menu_ram },
-#endif
   { "VERS", debug_menu_version },
   { "GFX", debug_menu_gfx },
   { "ADC (raw)", debug_menu_adc },
-#ifdef ARDUINO_TEENSY41
-  { "ADC (value)", debug_menu_adc_value },
   { "ADC (noise)", debug_menu_adc_noise },
-  { "AUDIO", debug_menu_audio },
-#endif
 #ifdef POLYLFO_DEBUG  
   { "POLYLFO", POLYLFO_debug },
 #endif // POLYLFO_DEBUG
