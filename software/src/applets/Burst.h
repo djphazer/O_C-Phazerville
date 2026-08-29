@@ -67,7 +67,7 @@ public:
                 ticks_since_clock = 0;
             } else clocked = 1;
 
-            if (passthru)
+            if (passthru & 1)
               ClockOut(0);
         }
         ticks_since_clock++;
@@ -116,6 +116,8 @@ public:
         bool btrig = Clock(1) && (random(100) >= prob);
         if (btrig && number_is_changing) StartADCLag();
 
+        if ((passthru & 0x2) && Clock(1)) ClockOut(0);
+
         if (EndOfADCLag() || (btrig && !number_is_changing)) {
             ClockOut(0);
             GateOut(1, 1);
@@ -132,7 +134,7 @@ public:
 
     void OnButtonPress() {
       if (CLKPASSTHRU == cursor)
-        passthru = !passthru;
+        ++passthru %= 3;
       else
         CursorToggle();
     }
@@ -178,8 +180,8 @@ public:
         Pack(data, PackLocation {24,8}, jitter);
         Pack(data, PackLocation {32,8}, (uint8_t)accel);
 
-        Pack(data, PackLocation {40,1}, passthru);
-        Pack(data, PackLocation {41,7}, prob);
+        Pack(data, PackLocation {40,7}, prob);
+        Pack(data, PackLocation {47,2}, passthru);
         return data;
     }
 
@@ -191,8 +193,8 @@ public:
         accel = Unpack(data, PackLocation {32,8});
         CONSTRAIN(accel, -HEM_BURST_ACCEL_MAX, HEM_BURST_ACCEL_MAX);
 
-        passthru = Unpack(data, PackLocation {40,1});
-        prob = Unpack(data, PackLocation {41,7});
+        prob = Unpack(data, PackLocation {40,7});
+        passthru = Unpack(data, PackLocation {47,2});
     }
 
 protected:
@@ -228,17 +230,19 @@ private:
     uint8_t spacing; // How many ms pass between each burst
     int8_t accel; // Accelleration or deceleration
     uint8_t jitter; // Randomness
-    bool passthru; // regular clock pulses come out, too
+    uint8_t passthru; // regular clock pulses come out, too
     uint8_t prob; // randomly ignore burst triggers
 
     void DrawSelector() {
         int y = 13;
 
+        const uint8_t* icons[] = {CHECK_OFF_ICON, CHECK_ON_ICON, BURST_ICON, ZAP_ICON};
+
         // clock passthru
         gfxIcon(1, y, CLOCK_ICON);
-        gfxIcon(10, y, passthru ? CHECK_ON_ICON : CHECK_OFF_ICON);
+        gfxIcon(10, y, icons[passthru]);
 
-        gfxPrint(32, y, prob);
+        gfxPrint(40, y, prob);
         gfxPrint("%");
 
         y += 9;
@@ -279,7 +283,7 @@ private:
             gfxIcon(19, 13, LEFT_ICON);
             break;
           case PROB:
-            gfxCursor(32, 21, 19, 9, "Skip %");
+            gfxCursor(40, 21, 20, 9, "Skip %");
             break;
           case NUMBER:
             gfxCursor( 1, 30, 13, 9, "Count");

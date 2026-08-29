@@ -57,6 +57,9 @@ public:
           pitch_mod[0] = pitch[0] + DetentedIn(0);
           osc[0].SetPhaseIncrement(ComputePhaseIncrement(pitch_mod[0]));
 
+          // TODO: FM for channel 2? configurable inputs?
+          pitch_mod[1] = pitch[1]; // + DetentedIn(1);
+
           // Input 2 determines signal 1's level on the B/D output mix
           mix_level = DetentedIn(1);
           mix_level = constrain(mix_level, -HEMISPHERE_MAX_CV, HEMISPHERE_MAX_CV);
@@ -142,14 +145,14 @@ public:
         uint64_t data = 0;
         Pack(data, PackLocation {0,6}, waveform_number[0]);
         Pack(data, PackLocation {6,6}, waveform_number[1]);
-        Pack(data, PackLocation {12,16}, pitch[0]);
-        Pack(data, PackLocation {28,16}, pitch[1]);
+        Pack(data, PackLocation {12,16}, uint16_t(pitch[0]));
+        Pack(data, PackLocation {28,16}, uint16_t(pitch[1]));
         Pack(data, PackLocation {44, 1}, modshape);
         return data;
     }
     void OnDataReceive(uint64_t data) {
-        pitch[0] = Unpack(data, PackLocation {12,16});
-        pitch[1] = Unpack(data, PackLocation {28,16});
+        pitch_mod[0] = pitch[0] = Unpack(data, PackLocation {12,16});
+        pitch_mod[1] = pitch[1] = Unpack(data, PackLocation {28,16});
         waveform_number[0] = Unpack(data, PackLocation {0,6});
         waveform_number[1] = Unpack(data, PackLocation {6,6});
         SwitchWaveform(0, waveform_number[0]);

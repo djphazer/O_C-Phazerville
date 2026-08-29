@@ -472,7 +472,8 @@ struct MIDIFrame {
 struct IOFrame {
     // settings
     bool autoMIDIOut = false;
-    uint8_t clockskip[DAC_CHANNEL_COUNT] = {0};
+    uint8_t clockinskip[DAC_CHANNEL_COUNT];
+    uint8_t clockoutskip[DAC_CHANNEL_COUNT];
     int8_t output_slew[DAC_CHANNEL_COUNT] = {0};
     int8_t output_atten[DAC_CHANNEL_COUNT]; // -126 (-200%) to 126 (+200%), 63 is 100%
 
@@ -499,7 +500,10 @@ struct IOFrame {
     void Init() {
       MIDIState.Init();
       for (int i = 0; i < DAC_CHANNEL_COUNT; ++i) {
+        output_slew[i] = 0;
         output_atten[i] = 60; // default to 100%
+        clockinskip[i] = 0;
+        clockoutskip[i] = 0;
       }
     }
 
@@ -511,20 +515,27 @@ struct IOFrame {
     }
     void ClockOut(DAC_CHANNEL ch, const int pulselength = HEMISPHERE_CLOCK_TICKS * trig_length) {
         // short circuit if skip probability is zero to avoid consuming random numbers
-        if (0 == clockskip[ch] || random(100) >= clockskip[ch]) {
+        if (0 == clockoutskip[ch] || random(100) >= clockoutskip[ch]) {
             clock_countdown[ch] = pulselength;
             // assign to both to override slew - instant attack
             Out(ch, HEMISPHERE_MAX_CV, true);
         }
     }
-    void NudgeSkip(int ch, int dir) {
-        clockskip[ch] = constrain(clockskip[ch] + dir, 0, 100);
+    void NudgeOutSkip(int ch, int dir) {
+        clockoutskip[ch] = constrain(clockoutskip[ch] + dir, 0, 100);
+    }
+    void NudgeInSkip(int ch, int dir) {
+        clockinskip[ch] = constrain(clockinskip[ch] + dir, 0, 100);
     }
     void NudgeSlew(int ch, int dir) {
         output_slew[ch] = constrain(output_slew[ch] + dir, 0, 100);
     }
     void NudgeAtten(int ch, int dir) {
         output_atten[ch] = constrain(output_atten[ch] + dir, -127, 127);
+    }
+    bool CheckSkip(int ch) {
+        // short circuit if skip probability is zero to avoid consuming random numbers
+        return (0 == clockinskip[ch] || random(100) >= clockinskip[ch]);
     }
 
     // --- Hard IO ---

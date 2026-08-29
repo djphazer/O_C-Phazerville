@@ -107,6 +107,7 @@
 #include "applets/TruthCat3.h"
 #include "applets/TruthCat4.h"
 #include "applets/CVSeq.h"
+#include "applets/MiniArp.h"
 
 template<class A>
 struct DeclareApplet {
@@ -159,6 +160,7 @@ AppletRegistry reg{
     DeclareApplet<EuclidX>{15, 0x02},
     DeclareApplet<MarkoV>{98, 0x00},
     DeclareApplet<MarkovPerc>{97, 0x00},
+    DeclareApplet<MiniArp>{92, 0x00},
     DeclareApplet<Pigeons>{71, 0x02},
     DeclareApplet<Ponglet>{99, 0x00},
     DeclareApplet<PolyDiv>{72, 0x06},
@@ -211,6 +213,7 @@ AppletRegistry reg{
     DeclareApplet<EnigmaJr>{45, 0x02},
     DeclareApplet<MarkoV>{98, 0x00},
     DeclareApplet<MarkovPerc>{97, 0x00},
+    DeclareApplet<MiniArp>{92, 0x00},
     DeclareApplet<Pigeons>{71, 0x02},
     DeclareApplet<TruthCat3>{94, 0x00},
     DeclareApplet<TruthCat4>{93, 0x00},

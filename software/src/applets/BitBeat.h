@@ -49,6 +49,9 @@ public:
     const char* applet_name() {
         return "BitBeat";
     }
+    const uint8_t* applet_icon() {
+        return ZAP_ICON;
+    }
 
     void Start() {
         current_page = 0;
