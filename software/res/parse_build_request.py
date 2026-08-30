@@ -66,6 +66,21 @@ for item in flags:
         custom_defines += " -DDRUMMAP_GRIDS2"
     if f.startswith('MOAR_PRESETS'):
         custom_defines += " -DMOAR_PRESETS"
+
+    # applet categories
+    if f.startswith('APPLET_SEQ'):
+        custom_defines += " -DAPPLETS_SEQUENCING"
+    if f.startswith('APPLET_Q'):
+        custom_defines += " -DAPPLETS_QUANTIZERS"
+    if f.startswith('APPLET_MOD'):
+        custom_defines += " -DAPPLETS_MODULATION"
+    if f.startswith('APPLET_UTIL'):
+        custom_defines += " -DAPPLETS_LOGIC_UTILITY"
+    if f.startswith('APPLET_WEIRD') or f.startswith('WEIRD'):
+        custom_defines += " -DAPPLETS_WEIRDSTUFF"
+    if f.startswith('APPLET_CRAZY') or f.startswith('CRAZY'):
+        custom_defines += " -DAPPLETS_CRAZYTOWN"
+
     if f.startswith('PEWPEWPEW'):
         custom_defines += " -DPEWPEWPEW"
     elif f.startswith('PEW'):
