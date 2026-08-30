@@ -58,18 +58,29 @@ enum HEMISPHERE_SETTINGS {
     HEMISPHERE_CLOCK_DATA2,
     HEMISPHERE_CLOCK_DATA3,
     HEMISPHERE_CLOCK_DATA4,
-    HEMISPHERE_TRIGMAP,
-    HEMISPHERE_CVMAP,
-    HEMISPHERE_GLOBALS,
+    HEMISPHERE_TRIGMAP1,
+    HEMISPHERE_TRIGMAP2,
+    HEMISPHERE_TRIGMAP3,
+    HEMISPHERE_TRIGMAP4,
+    HEMISPHERE_CVMAP1,
+    HEMISPHERE_CVMAP2,
+    HEMISPHERE_CVMAP3,
+    HEMISPHERE_CVMAP4,
+    HEMISPHERE_GLOBALS1, // in-skip and out-skip
+    HEMISPHERE_GLOBALS2,
+    HEMISPHERE_GLOBALS3,
+    HEMISPHERE_GLOBALS4,
+    HEMISPHERE_OUTPUT1, // slew and atten
+    HEMISPHERE_OUTPUT2,
+    HEMISPHERE_OUTPUT3,
+    HEMISPHERE_OUTPUT4,
     HEMISPHERE_SETTINGS_COUNT
 };
 
 #if defined(MOAR_PRESETS)
-static constexpr int HEM_NR_OF_PRESETS = 16;
-#elif defined(CUSTOM_BUILD) && !defined(PEWPEWPEW)
-static constexpr int HEM_NR_OF_PRESETS = 4;
-#else
 static constexpr int HEM_NR_OF_PRESETS = 8;
+#else
+static constexpr int HEM_NR_OF_PRESETS = 4;
 #endif
 
 /* Hemisphere Preset
@@ -108,37 +119,45 @@ public:
 
     // returns true if changed
     bool StoreInputMap() {
-      uint16_t cvmap = 0;
-      uint16_t trigmap = 0;
+      bool changed = false;
       for (size_t i = 0; i < 4; ++i) {
-        trigmap |= (uint16_t(HS::trigmap[i].source + 1) & 0x0F) << (i*4);
-        cvmap |= (uint16_t(HS::cvmap[i].source + 1) & 0x0F) << (i*4);
+        uint16_t trigmap = HS::trigmap[i].Pack();
+        uint16_t cvmap = HS::cvmap[i].Pack();
+        uint16_t outcfg = (uint16_t(HS::frame.output_atten[i]) & 0xff)
+                        | (uint16_t(HS::frame.output_slew[i]) << 8);
+
+        if ((uint16_t(values_[HEMISPHERE_TRIGMAP1 + i]) != trigmap)
+            || (uint16_t(values_[HEMISPHERE_CVMAP1 + i]) != cvmap)
+            || (uint16_t(values_[HEMISPHERE_OUTPUT1 + i]) != outcfg))
+          changed = true;
+
+        apply_value(HEMISPHERE_TRIGMAP1 + i, trigmap);
+        apply_value(HEMISPHERE_CVMAP1 + i, cvmap);
+        apply_value(HEMISPHERE_OUTPUT1 + i, outcfg);
       }
-
-      bool changed = (uint16_t(values_[HEMISPHERE_TRIGMAP]) != trigmap)
-                   || (uint16_t(values_[HEMISPHERE_CVMAP]) != cvmap);
-      apply_value(HEMISPHERE_TRIGMAP, trigmap);
-      apply_value(HEMISPHERE_CVMAP, cvmap);
-
       return changed;
     }
     void LoadInputMap() {
       for (size_t i = 0; i < 4; ++i) {
-        int val = (uint16_t(values_[HEMISPHERE_TRIGMAP]) >> (i*4)) & 0x0F;
-        if (val != 0)
-          HS::trigmap[i].source = constrain(val - 1, 0, TRIGMAP_MAX);
+        HS::trigmap[i].Unpack(uint16_t(values_[HEMISPHERE_TRIGMAP1 + i]));
+        HS::cvmap[i].Unpack(uint16_t(values_[HEMISPHERE_CVMAP1 + i]));
 
-        val = (uint16_t(values_[HEMISPHERE_CVMAP]) >> (i*4)) & 0x0F;
-        if (val != 0)
-          HS::cvmap[i].source = constrain(val - 1, 0, CVMAP_MAX);
+        HS::frame.output_atten[i] = uint16_t(values_[HEMISPHERE_OUTPUT1 + i]) & 0xff;
+        HS::frame.output_slew[i] = (uint16_t(values_[HEMISPHERE_OUTPUT1 + i]) >> 8) & 0xff;
       }
     }
 
     uint64_t GetGlobals() {
-      return ( uint64_t(values_[HEMISPHERE_GLOBALS]) & 0xffff );
+      return (uint64_t(values_[HEMISPHERE_GLOBALS1]))
+           | (uint64_t(values_[HEMISPHERE_GLOBALS2]) << 16)
+           | (uint64_t(values_[HEMISPHERE_GLOBALS3]) << 32)
+           | (uint64_t(values_[HEMISPHERE_GLOBALS4]) << 48);
     }
     void SetGlobals(const uint64_t &data) {
-        apply_value(HEMISPHERE_GLOBALS, data & 0xffff);
+      apply_value(HEMISPHERE_GLOBALS1, data & 0xffff);
+      apply_value(HEMISPHERE_GLOBALS2, (data >> 16) & 0xffff);
+      apply_value(HEMISPHERE_GLOBALS3, (data >> 32) & 0xffff);
+      apply_value(HEMISPHERE_GLOBALS4, (data >> 48) & 0xffff);
     }
 
     // Manually get data for one side
@@ -222,7 +241,7 @@ class HemisphereManager : public HSApplication {
 public:
     void Start() {
         select_mode = -1; // Not selecting
-        preset_id = -1;
+        preset_id = 0;
         queued_preset = -1;
         preset_cursor = 0;
         my_applet[0] = next_applet[0] = -1;
@@ -245,7 +264,7 @@ public:
 
     void Resume() {
         if (!hem_active_preset)
-            LoadFromPreset(0);
+            LoadFromPreset(preset_id);
     }
     void Suspend() {
         if (hem_active_preset) {
@@ -296,8 +315,8 @@ public:
     }
 
     void StoreToPreset(int id, bool skip_eeprom = false) {
-        StoreToPreset( (HemispherePreset*)(hem_presets + id), skip_eeprom );
         preset_id = id;
+        StoreToPreset( (HemispherePreset*)(hem_presets + id), skip_eeprom );
     }
     void LoadFromPreset(int id) {
         preset_id = id;
@@ -351,7 +370,7 @@ public:
 
       hem_presets[HEM_NR_OF_PRESETS].SetGlobals(HS::frame.MIDIState.pc_channel);
 
-      uint64_t data = PackPackables(jump_trig_);
+      uint64_t data = PackPackables(jump_trig_, preset_id);
       hem_presets[HEM_NR_OF_PRESETS].SetClockData(data);
     }
     void LoadExtras() {
@@ -362,7 +381,7 @@ public:
         constrain((int)hem_presets[HEM_NR_OF_PRESETS].GetGlobals(), 0, 17);
 
       uint64_t data = hem_presets[HEM_NR_OF_PRESETS].GetClockData();
-      UnpackPackables(data, jump_trig_);
+      UnpackPackables(data, jump_trig_, preset_id);
     }
 
     // does not modify the preset, only the manager
@@ -865,7 +884,7 @@ public:
     }
 
 private:
-    int preset_id = -1;
+    int preset_id = 0;
     int queued_preset = -1;
     int preset_cursor = 0;
     int my_applet[2]; // Indexes to available_applets
@@ -1306,7 +1325,7 @@ private:
 
 };
 
-// TOTAL EEPROM SIZE: 8 presets * 32 bytes
+// TOTAL EEPROM SIZE: 58 bytes (per preset)
 SETTINGS_DECLARE(HemispherePreset, HEMISPHERE_SETTINGS_COUNT) {
     {0, 0, 255, "Applet ID L", NULL, settings::STORAGE_TYPE_U8},
     {0, 0, 255, "Applet ID R", NULL, settings::STORAGE_TYPE_U8},
@@ -1322,9 +1341,22 @@ SETTINGS_DECLARE(HemispherePreset, HEMISPHERE_SETTINGS_COUNT) {
     {0, 0, 65535, "Clock data 2", NULL, settings::STORAGE_TYPE_U16},
     {0, 0, 65535, "Clock data 3", NULL, settings::STORAGE_TYPE_U16},
     {0, 0, 65535, "Clock data 4", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Trig Input Map", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "CV Input Map", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Misc Globals", NULL, settings::STORAGE_TYPE_U16}
+    {0, 0, 65535, "Trig 1", NULL, settings::STORAGE_TYPE_U16},
+    {0, 0, 65535, "Trig 2", NULL, settings::STORAGE_TYPE_U16},
+    {0, 0, 65535, "Trig 3", NULL, settings::STORAGE_TYPE_U16},
+    {0, 0, 65535, "Trig 4", NULL, settings::STORAGE_TYPE_U16},
+    {0, 0, 65535, "CV 1", NULL, settings::STORAGE_TYPE_U16},
+    {0, 0, 65535, "CV 2", NULL, settings::STORAGE_TYPE_U16},
+    {0, 0, 65535, "CV 3", NULL, settings::STORAGE_TYPE_U16},
+    {0, 0, 65535, "CV 4", NULL, settings::STORAGE_TYPE_U16},
+    {0, 0, 65535, "Globals 1", NULL, settings::STORAGE_TYPE_U16},
+    {0, 0, 65535, "Globals 2", NULL, settings::STORAGE_TYPE_U16},
+    {0, 0, 65535, "Globals 3", NULL, settings::STORAGE_TYPE_U16},
+    {0, 0, 65535, "Globals 4", NULL, settings::STORAGE_TYPE_U16},
+    {0, 0, 65535, "Out1", NULL, settings::STORAGE_TYPE_U16},
+    {0, 0, 65535, "Out2", NULL, settings::STORAGE_TYPE_U16},
+    {0, 0, 65535, "Out3", NULL, settings::STORAGE_TYPE_U16},
+    {0, 0, 65535, "Out4", NULL, settings::STORAGE_TYPE_U16},
 };
 
 HemisphereManager manager;

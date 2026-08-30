@@ -255,6 +255,18 @@ public:
 
         Pack(data, PackLocation { 45, 4 }, HS::screensaver_mode);
 
+        Pack(data, PackLocation { 49, 1 }, HS::auto_save_enabled);
+        Pack(data, PackLocation { 50, 1 }, HS::cursor_wrap);
+        Pack(data, PackLocation { 51, 7 }, HS::trig_length);
+
+#ifdef VOR
+        // remember Vbias per preset
+        VBiasManager *v = v->get();
+        Pack(data, PackLocation { 58, 2 }, v->GetState());
+#endif
+
+        Pack(data, PackLocation{60, 1}, (clock_m.IsRunning() || clock_m.IsPaused()));
+        // 3 bits free
         return data;
     }
 
@@ -268,39 +280,36 @@ public:
         clock_m.SetClockPPQN(Unpack(data, PackLocation { 40, 5 }));
 
         HS::screensaver_mode = Unpack(data, PackLocation { 45, 4 });
-    }
 
-    uint64_t GetGlobals() {
-        uint64_t data = 0;
-        // only the first 16 bits are actually stored on T3.2
-        Pack(data, PackLocation { 0, 1 }, HS::auto_save_enabled);
-        Pack(data, PackLocation { 1, 1 }, HS::cursor_wrap);
-        //Pack(data, PackLocation { 2, 2 }, HS::screensaver_mode);
-        Pack(data, PackLocation { 4, 7 }, HS::trig_length);
-
-#ifdef VOR
-        // remember Vbias per preset
-        VBiasManager *v = v->get();
-        Pack(data, PackLocation { 11, 2 }, v->GetState());
-#endif
-
-        Pack(data, PackLocation{13, 1}, (clock_m.IsRunning() || clock_m.IsPaused()));
-        return data;
-    }
-    void SetGlobals(const uint64_t &data) {
-        HS::auto_save_enabled = Unpack(data, PackLocation { 0, 1 });
-        HS::cursor_wrap = Unpack(data, PackLocation { 1, 1 });
-        //HS::screensaver_mode = Unpack(data, PackLocation { 2, 2 });
-        HS::trig_length = constrain( Unpack(data, PackLocation { 4, 7 }), 1, 127);
+        HS::auto_save_enabled = Unpack(data, PackLocation { 49, 1 });
+        HS::cursor_wrap = Unpack(data, PackLocation { 50, 1 });
+        HS::trig_length = constrain( Unpack(data, PackLocation { 51, 7 }), 1, 127);
 
 #ifdef VOR
         VBiasManager *v = v->get();
-        VBiasManager::VState bias_state = (VBiasManager::VState)Unpack(data, PackLocation { 11, 2 });
+        VBiasManager::VState bias_state = (VBiasManager::VState)Unpack(data, PackLocation { 58, 2 });
         v->SetState( bias_state );
 #endif
 
-        if (Unpack(data, PackLocation{13, 1}) && !clock_m.IsRunning())
+        if (Unpack(data, PackLocation{60, 1}) && !clock_m.IsRunning())
           clock_m.Start(true);
+    }
+
+    uint64_t GetGlobals() {
+      uint64_t data = 0;
+      for (size_t i = 0; i < 4; ++i) {
+        Pack(data, PackLocation{0 + i*7, 7}, HS::frame.clockinskip[i]);
+        Pack(data, PackLocation{28 + i*7, 7}, HS::frame.clockoutskip[i]);
+      }
+      // 8 bits free
+      return data;
+    }
+    void SetGlobals(const uint64_t &data) {
+      for (size_t i = 0; i < 4; ++i) {
+        // todo: validate?
+        HS::frame.clockinskip[i] = Unpack(data, PackLocation{0 + i*7, 7});
+        HS::frame.clockoutskip[i] = Unpack(data, PackLocation{28 + i*7, 7});
+      }
     }
 
 
