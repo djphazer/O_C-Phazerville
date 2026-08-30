@@ -141,6 +141,8 @@ private:
 };
 
 AppletRegistry reg{
+    // universal test applet :)
+    DeclareApplet<Ponglet>{99, 0x00},
 
   /* Well, we can't have it all.
    * So pick a bundle or two.
@@ -162,7 +164,6 @@ AppletRegistry reg{
     DeclareApplet<MarkovPerc>{97, 0x00},
     DeclareApplet<MiniArp>{92, 0x00},
     DeclareApplet<Pigeons>{71, 0x02},
-    DeclareApplet<Ponglet>{99, 0x00},
     DeclareApplet<PolyDiv>{72, 0x06},
     DeclareApplet<ProbabilityDivider>{59, 0x04},
     DeclareApplet<ProbabilityMelody>{62, 0x04},
@@ -293,7 +294,7 @@ AppletRegistry reg{
     DeclareApplet<Binary>{41, 0x41},
     DeclareApplet<DrLoFi>{16, 0x80},
     DeclareApplet<Palimpsest>{20, 0x02},
-    DeclareApplet<Ponglet>{99, 0x00},
+    //DeclareApplet<Ponglet>{99, 0x00},
     DeclareApplet<RunglBook>{44, 0x01},
 #endif
 #ifdef APPLETS_CRAZYTOWN
