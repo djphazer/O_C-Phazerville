@@ -294,9 +294,14 @@ public:
 
 #ifdef USB_GAMEPAD
         // Global Gamepad Maps
-        for (size_t gpx = 0; gpx < GAMEPAD_MAP_MAX; ++gpx) {
-            data = PackPackables(frame.GamepadState.mapping[gpx]);
-            PhzConfig::setValue(GAMEPAD_MAPS_KEY + gpx, data);
+        for (size_t gpx = 0; gpx < GAMEPAD_MAP_MAX / 4; ++gpx) {
+          data = PackPackables(
+            frame.GamepadState.mapping[gpx * 4 + 0],
+            frame.GamepadState.mapping[gpx * 4 + 1],
+            frame.GamepadState.mapping[gpx * 4 + 2],
+            frame.GamepadState.mapping[gpx * 4 + 3]
+          );
+          PhzConfig::setValue(GAMEPAD_MAPS_KEY + gpx, data);
         }
 #endif
 
@@ -457,6 +462,19 @@ public:
         frame.MIDIState.UpdateMidiChannelFilter();
         frame.MIDIState.UpdateMaxPolyphony();
 
+#ifdef USB_GAMEPAD
+        // Global Gamepad Maps
+        for (size_t gpx = 0; gpx < GAMEPAD_MAP_MAX / 4; ++gpx) {
+          if (!PhzConfig::getValue(GAMEPAD_MAPS_KEY + gpx, data))
+              break;
+          UnpackPackables(data,
+            frame.GamepadState.mapping[gpx * 4 + 0],
+            frame.GamepadState.mapping[gpx * 4 + 1],
+            frame.GamepadState.mapping[gpx * 4 + 2],
+            frame.GamepadState.mapping[gpx * 4 + 3]
+          );
+        }
+#endif
         // User Patterns aka Sequences
         for (size_t i = 0; i < OC::Patterns::PATTERN_USER_COUNT; ++i) {
           for (size_t step = 0; step < ARRAY_SIZE(OC::Pattern::notes); ++step) {

@@ -37,9 +37,7 @@ static constexpr int IO_CHANNEL_COUNT = 32; // virtual inputs and outputs
 static constexpr int MIDIMAP_MAX = 8;
 static constexpr int IO_CHANNEL_COUNT = 32;
 #endif
-#ifdef USB_GAMEPAD
 static constexpr int GAMEPAD_MAP_MAX = 32;
-#endif
 
 struct MIDIFrame;
 struct IOFrame;
@@ -795,39 +793,42 @@ struct alignas(32) MIDIFrame {
 
 #ifdef USB_GAMEPAD
 struct GamepadMapSettings {
-    int function;
-    int gamepad_input;
+  uint8_t function;
+  uint8_t gamepad_input;
 };
 struct GamepadMapping : public GamepadMapSettings {
-    static constexpr size_t Size = 64; // Make this compatible with Packable
+  GamepadMapping() {}
+  ~GamepadMapping() {}
 
-    int16_t trigout_countdown;
-    int output;
+  static constexpr size_t Size = 16; // Make this compatible with Packable
 
-    void CVOut(int value) {
-        output = value;
-    }
+  int16_t trigout_countdown;
+  int output;
 
-    void ClockOut() {
-        trigout_countdown = HEMISPHERE_CLOCK_TICKS * HS::trig_length;
-        output = HEMISPHERE_MAX_CV;
-    }
+  void CVOut(int value) {
+    output = value;
+  }
 
-    void GateOut(bool high) {
-        output = (high ? PULSE_VOLTAGE * (12 << 7) : 0);
-    }
+  void ClockOut() {
+    trigout_countdown = HEMISPHERE_CLOCK_TICKS * HS::trig_length;
+    output = HEMISPHERE_MAX_CV;
+  }
 
-    uint64_t Pack() const {
-        return PackPackables(function, gamepad_input);
-    }
+  void GateOut(bool high) {
+    output = (high ? PULSE_VOLTAGE * (12 << 7) : 0);
+  }
 
-    void Unpack(uint64_t data) {
-        UnpackPackables(data, function, gamepad_input);
-        // validation for safety
-        if (gamepad_input > GAMEPAD_MAP_MAX - 1) gamepad_input = GAMEPAD_MAP_MAX - 1;  // check this
-        if (function > GP_FUNC_LAST) function = GP_NOOP;
-    }
+  uint16_t Pack() const {
+    return PackPackables(function, gamepad_input);
+  }
 
+  void Unpack(uint16_t data) {
+    UnpackPackables(data, function, gamepad_input);
+    // validation for safety
+    if (function > GP_FUNC_LAST) function = GP_NOOP;
+  }
+
+  DISALLOW_COPY_AND_ASSIGN(GamepadMapping);
 };
 
 constexpr GamepadMapping& pack(GamepadMapping& input) {
@@ -837,13 +838,13 @@ constexpr GamepadMapping& pack(GamepadMapping& input) {
 struct GamepadFrame {
     GamepadMapping mapping[GAMEPAD_MAP_MAX];
 
-    GamePad *gamepad = &UNKNOWN;
+    const GamePad *gamepad = &UNKNOWN;
 
     uint16_t vid = 0x0;
     uint16_t pid = 0x0;
 
     int gamepad_type = 0; // UNKNOWN = 0, PS3, PS3_MOTION, PS4, XBOX, XBOX360W, XBOX360USB, XBOXONE, SpaceNav, SWITCH, SNES, N64
-    int prev_gamepad_type = gamepad_type;
+    bool connected = false;
 
     uint32_t button_mask = 0;
     int16_t axis[16];

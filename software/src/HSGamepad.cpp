@@ -50,6 +50,7 @@ void printBits(uint32_t value) {
 }
 
 
+PROGMEM const
 GamePad UNKNOWN {
     .type_name = "UNKNOWN",
     .button_name = (const char*[]){
@@ -73,6 +74,7 @@ GamePad UNKNOWN {
 };
 
 #ifdef ENABLE_PS3
+PROGMEM const
 GamePad PS3 { // WIP
     .type_name = "PS3",
     .button_name = (const char*[]){
@@ -97,6 +99,7 @@ GamePad PS3 { // WIP
 #endif
 
 #ifdef ENABLE_PS3_MOTION
+PROGMEM const
 GamePad PS3_MOTION { // WIP
     .type_name = "PS Move",
     .button_name = (const char*[]){
@@ -116,6 +119,7 @@ GamePad PS3_MOTION { // WIP
 #endif
 
 #ifdef ENABLE_PS4
+PROGMEM const
 GamePad PS4 {
     .type_name = "PS4",
     .button_name = (const char*[]){
@@ -162,6 +166,7 @@ GamePad PS4 {
 #endif
 
 #ifdef ENABLE_XBOX
+PROGMEM const
 GamePad XBOX {  // WIP
     .type_name = "XBOX",
     .button_name = (const char*[]){
@@ -179,6 +184,7 @@ GamePad XBOX {  // WIP
 #endif
 
 #ifdef ENABLE_XBOX360
+PROGMEM const
 GamePad XBOX360 {
     .type_name = "XBOX360",
     .button_name = (const char*[]){
@@ -219,6 +225,7 @@ GamePad XBOX360 {
 #endif
 
 #ifdef ENABLE_XBOXONE
+PROGMEM const
 GamePad XBOXONE {
     .type_name = "XBOXONE",
     .button_name = (const char*[]){
@@ -265,6 +272,7 @@ GamePad XBOXONE {
 // #endif
 
 #ifdef ENABLE_SNES
+PROGMEM const
 GamePad SNES {
     .type_name = "SNES",
     .button_name = (const char*[]){
@@ -286,6 +294,7 @@ GamePad SNES {
 #endif
 
 #ifdef ENABLE_N64
+PROGMEM const
 GamePad N64 {
     .type_name = "N64",
     .button_name = (const char*[]){
@@ -321,10 +330,13 @@ static const int axis_change_threshold = (-HEMISPHERE_MIN_CV) / 8;
 
 // static bool connected = false;
 
-
+FLASHMEM
 void ConnectGamepad(JoystickController &device) {
     HS::IOFrame &f = HS::frame;
 
+#ifdef GAMEPAD_DEBUG
+    Serial.printf("Gamepad Connected! VID: %u  PID: %u \n", device.idVendor(), device.idProduct());
+#endif
     switch (f.GamepadState.gamepad_type) {
 #ifdef ENABLE_PS3_MOTION
         case (JoystickController::joytype_t::PS3_MOTION):
@@ -365,6 +377,7 @@ void ConnectGamepad(JoystickController &device) {
     f.GamepadState.Init();
 }
 
+FLASHMEM
 void ConvertAxisData(int axis, int value) {
     HS::IOFrame &f = HS::frame;
     for(int ch = 0; ch < HS::GAMEPAD_MAP_MAX; ++ch) {
@@ -385,7 +398,8 @@ void ConvertAxisData(int axis, int value) {
     }
 }
 
-void UpdateAxis(JoystickController &device, GamePad &gp_type, const int axis_index) {
+FLASHMEM
+void UpdateAxis(JoystickController &device, const GamePad &gp_type, const int axis_index) {
     HS::IOFrame &f = HS::frame;
 
     int data = ((2 * gp_type.axis_center - 1) * gp_type.axis_inversion[axis_index])
@@ -406,7 +420,8 @@ void UpdateAxis(JoystickController &device, GamePad &gp_type, const int axis_ind
     }
 }
 
-void UpdateDpad(JoystickController &device, GamePad &gp_type, uint32_t &buttons) {
+FLASHMEM
+void UpdateDpad(JoystickController &device, const GamePad &gp_type, uint32_t &buttons) {
     enum HatSwitch {
         UP = 0,
         UP_RIGHT,
@@ -447,12 +462,14 @@ void UpdateDpad(JoystickController &device, GamePad &gp_type, uint32_t &buttons)
     }
 }
 
-void ConvertButtonData(int button, int mask) {
+FLASHMEM
+void ConvertButtonData(const uint8_t button, const uint32_t mask) {
     HS::IOFrame &f = HS::frame;
     for(int ch = 0; ch < HS::GAMEPAD_MAP_MAX; ++ch) {
         HS::GamepadMapping &map = f.GamepadState.mapping[ch];
         if (map.function == GP_LEARN) {
             map.gamepad_input = button;
+            map.function = GP_GATE;
         }
         if (map.gamepad_input != button) continue;
         switch (map.function) {
@@ -468,6 +485,7 @@ void ConvertButtonData(int button, int mask) {
     }
 }
 
+FLASHMEM
 void UpdateButtons(JoystickController &device, uint32_t &buttons) {
     HS::IOFrame &f = HS::frame;
 
@@ -481,25 +499,35 @@ void UpdateButtons(JoystickController &device, uint32_t &buttons) {
     f.GamepadState.button_mask = buttons;
 }
 
+FLASHMEM
 void ProcessGamepad(JoystickController &device) {
     thisUSB.Task();
 
-    HS::IOFrame &f = HS::frame;
+    // is it even connected?
+    if (!device) {
+#ifdef GAMEPAD_DEBUG
+      if (HS::frame.GamepadState.connected)
+        Serial.println("Gamepad disconnected!");
+#endif
+      HS::frame.GamepadState.connected = false;
+      return;
+    }
 
+    HS::IOFrame &f = HS::frame;
     f.GamepadState.gamepad_type = device.joystickType();
     f.GamepadState.vid = device.idVendor();
     f.GamepadState.pid = device.idProduct();
 
-    if (f.GamepadState.prev_gamepad_type != f.GamepadState.gamepad_type) {
+    if (!f.GamepadState.connected) {
         ConnectGamepad(device);
-        f.GamepadState.prev_gamepad_type = f.GamepadState.gamepad_type;
+        f.GamepadState.connected = true;
     }
 
     // if (f.GamepadState.gamepad_type == JoystickController::PS3 && !f.GamepadState.ps3_paired)
     //     f.GamepadState.ps3_paired = device.PS3Pair(ps3_address);
 
+    // change event
     if (device.available()) {
-
         uint64_t axis_changed_mask = device.axisChangedMask();
         uint32_t buttons = device.getButtons();
 
