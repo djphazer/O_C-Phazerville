@@ -83,8 +83,10 @@ public:
       case TYPE_MIDI:
         return frame.MIDIState.mapping[index()].ViewOut();
 
-      case TYPE_HID:  // #ifdef USB_GAMEPAD
+#ifdef USB_GAMEPAD
+      case TYPE_HID:
         return frame.GamepadState.mapping[index()].output;
+#endif
 
       case TYPE_INTERNAL:
         // noise source
@@ -372,8 +374,10 @@ public:
         return frame.ViewOut(index()) > GATE_THRESHOLD;
       case TYPE_MIDI_MAP:
         return frame.MIDIState.mapping[index()].ViewOut() > GATE_THRESHOLD;
+#ifdef USB_GAMEPAD
       case TYPE_HID_MAP:
         return frame.GamepadState.mapping[index()].output > GATE_THRESHOLD;
+#endif
       case TYPE_NONE:
       default:
         return false;

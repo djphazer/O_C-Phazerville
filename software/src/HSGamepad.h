@@ -145,13 +145,13 @@
 
     extern JoystickController joystick;
 
-    enum GamepadFunctions {
-        GP_NOOP = 0,
-        GP_CV,
-        GP_GATE,
-        GP_TRIG,
-        GP_LEARN,
-        GP_FUNC_LAST = GP_LEARN
+    enum GamepadFunctions : uint8_t {
+      GP_NOOP = 0,
+      GP_CV,
+      GP_GATE,
+      GP_TRIG,
+      GP_LEARN,
+      GP_FUNC_LAST = GP_LEARN
     };
 
     struct GamePad {
@@ -172,36 +172,36 @@
         const int* dpad_shift_map;
     };
 
-    extern GamePad UNKNOWN;
+    extern const GamePad UNKNOWN;
 #ifdef ENABLE_PS3
-    extern GamePad PS3;
+    extern const GamePad PS3;
 #endif
 #ifdef ENABLE_PS3_MOTION
-    extern GamePad PS3_MOTION;
+    extern const GamePad PS3_MOTION;
 #endif
 #ifdef ENABLE_PS4
-    extern GamePad PS4;
+    extern const GamePad PS4;
 #endif
 #ifdef ENABLE_XBOX
-    extern GamePad XBOX;
+    extern const GamePad XBOX;
 #endif
 #ifdef ENABLE_XBOX360
-    extern GamePad XBOX360;
+    extern const GamePad XBOX360;
 #endif
 #ifdef ENABLE_XBOXONE
-    extern GamePad XBOXONE;
+    extern const GamePad XBOXONE;
 #endif
 #ifdef ENABLE_SpaceNav
-    extern GamePad SpaceNav;
+    extern const GamePad SpaceNav;
 #endif
 #ifdef ENABLE_SWITCH
-    extern GamePad SWITCH;
+    extern const GamePad SWITCH;
 #endif
 #ifdef ENABLE_SNES
-    extern GamePad SNES;
+    extern const GamePad SNES;
 #endif
 #ifdef ENABLE_N64
-    extern GamePad N64;
+    extern const GamePad N64;
 #endif
 
     void ProcessGamepad(JoystickController &device);
