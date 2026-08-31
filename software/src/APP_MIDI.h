@@ -98,11 +98,11 @@ const char* const midi_out_functions[MIDI_OUT_FUNCTION_COUNT] = {
     "--", "Note", "Leg.", "Veloc", "Mod", "Aft", "Bend", "Expr", "Pan", "Hold", "Brth", "yAxis"
 };
 
-const char* const midi2cv_label[] = {
+constexpr const char* const midi2cv_label[] = {
   "MIDI > A", "MIDI > B", "MIDI > C", "MIDI > D",
   "MIDI > E", "MIDI > F", "MIDI > G", "MIDI > H",
 };
-const char* const cv2midi_label[] = {
+constexpr const char* const cv2midi_label[] = {
   "1 > MIDI", "2 > MIDI", "3 > MIDI", "4 > MIDI",
   "5 > MIDI", "6 > MIDI", "7 > MIDI", "8 > MIDI",
 };
