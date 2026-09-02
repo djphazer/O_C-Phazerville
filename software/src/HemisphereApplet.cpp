@@ -232,11 +232,11 @@ void HemisphereApplet::gfxPrint(float num, int digits) const {
     }
 }
 
-void HemisphereApplet::gfxPrint(DigitalInputMap &map) const {
+void HemisphereApplet::gfxPrint(const DigitalInputMap &map) const {
   gfxPrintIcon(map.Icon());
   if (map.Gate()) gfxInvert(gfxGetPrintPosX()-8, gfxGetPrintPosY(), 8, 8);
 }
-void HemisphereApplet::gfxPrint(CVInputMap &map) const {
+void HemisphereApplet::gfxPrint(const CVInputMap &map) const {
   gfxPrintIcon(map.Icon());
   const int xpos = gfxGetPrintPosX() - 1;
   const int ypos = gfxGetPrintPosY() + 4;
@@ -282,7 +282,7 @@ void HemisphereApplet::gfxEndCursor(bool selected, bool spicy, const char *str, 
   SetAux(spicy);
   if (str) {
     const int w = strlen(str) * 6 + 2;
-    const int x = constrain(gfxGetPrintPosX() - w, 0, 63 - w);
+    const int x = constrain(gfxGetPrintPosX() - w, 2, 63 - w);
     gfxClear(x - 2, cursor_start_y - 1, w + 3, 12);
     gfxFrame(x - 1, cursor_start_y - 1, w + 1, 11, spicy);
     gfxPrint(x, cursor_start_y + 1, str);
