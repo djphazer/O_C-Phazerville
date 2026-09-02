@@ -30,9 +30,11 @@ public:
     static constexpr int SLIDEOUT_TIME = HS::MENU_ANIMATION_TIME;
 
     enum ClockSetupCursor {
+        PLAY_TRIG,
         PLAY_STOP,
         TEMPO,
         SHUFFLE,
+        SYNC_TRIG,
         EXT_PPQN,
         MULT1,
         MULT2,
@@ -89,9 +91,20 @@ public:
     // The ClockSetup controller handles MIDI Clock and Transport Start/Stop
     void Controller() {
         bool midi_sync = false;
-        bool clock_sync = HS::frame.synctrig;
+        //bool clock_sync = HS::frame.synctrig;
+        bool clock_sync = sync_trig.Clock();
 
         hemisphere = HS::CLOCK_CURSOR;
+
+        // simple Play<->Stop for the trigger mapping
+        if (play_trig.Clock()) {
+          if (HS::clock_m.IsRunning()) {
+            HS::clock_m.Stop();
+          } else {
+            HS::clock_m.Start();
+          }
+          PokePopup(CLOCK_POPUP);
+        }
 
         // MIDI Clock is filtered to 2 PPQN
         if (frame.MIDIState.clock_q) {
@@ -220,8 +233,14 @@ public:
         }
 
         switch ((ClockSetupCursor)cursor) {
+        case PLAY_TRIG:
+            play_trig.ChangeSource(direction);
+            break;
         case PLAY_STOP:
             PlayStop();
+            break;
+        case SYNC_TRIG:
+            sync_trig.ChangeSource(direction);
             break;
 
         case TRIG1:
@@ -337,6 +356,8 @@ public:
         //Pack(data, PackLocation { 17, 3 }, HS::screensaver_mode); // old spot
         Pack(data, PackLocation { 20, 4 }, HS::screensaver_mode);
         // 45 bits free
+        Pack(data, PackLocation { 32, 16 }, play_trig.Pack());
+        Pack(data, PackLocation { 48, 16 }, sync_trig.Pack());
         return data;
     }
     void SetGlobals(const uint64_t &data) {
@@ -349,6 +370,9 @@ public:
           HS::clock_m.Start(true);
         HS::screensaver_mode = Unpack(data, PackLocation { 17, 3 }) // backward compat
                              + Unpack(data, PackLocation { 20, 4 });
+
+        play_trig.Unpack(Unpack(data, PackLocation{32, 16}));
+        sync_trig.Unpack(Unpack(data, PackLocation{48, 16}));
     }
 
 protected:
@@ -366,6 +390,10 @@ private:
     int taps = 0; // tap tempo
     uint32_t tap_time[NR_OF_TAPS]; // buffer of past tap tempo measurements
     uint32_t last_tap_tick = 0;
+
+    // TODO: these should live in the ClockManager; doesn't matter while there's only one clock...
+    DigitalInputMap play_trig;
+    DigitalInputMap sync_trig;
 
     void PlayStop() {
         if (HS::clock_m.IsRunning()) {
@@ -425,14 +453,23 @@ private:
       }
 
       if (cursor <= EXT_PPQN) {
-        int y = 1;
-        // Clock State
-        if (clock_m.IsRunning()) {
-            gfxIcon(1, y, clock_m.cycle ? METRO_R_ICON : METRO_L_ICON );
-            gfxIcon(12, y, PLAY_ICON);
+        const int y = 1;
+        if (PLAY_TRIG == cursor) {
+          gfxStartCursor(2, y);
+          gfxPrint(play_trig);
+          gfxEndCursor(cursor == PLAY_TRIG, true, play_trig.InputName());
         } else {
-            gfxIcon(1, y, CLOCK_ICON);
-            gfxIcon(12, y, clock_m.IsPaused()? PAUSE_ICON : STOP_ICON);
+          // Clock State
+          if (clock_m.IsRunning()) {
+              gfxIcon(1, y, clock_m.cycle ? METRO_R_ICON : METRO_L_ICON );
+              gfxIcon(12, y, PLAY_ICON);
+          } else {
+              gfxIcon(1, y, CLOCK_ICON);
+              gfxIcon(12, y, clock_m.IsPaused()? PAUSE_ICON : STOP_ICON);
+          }
+          if (play_trig.Gate()) {
+            gfxInvert(0, y-1, 10, 10);
+          }
         }
 
         // Tempo
@@ -446,8 +483,19 @@ private:
             gfxPrint("%");
         }
 
+        // Sync trigger input
+        if (cursor == SYNC_TRIG) {
+          const int w = strlen(sync_trig.InputName()) * 6 + 2;
+          const int x = 79;
+          gfxFrame(x, y - 1, w + 1, 11, true);
+          gfxPrint(x + 1, y, sync_trig.InputName());
+          if (EditMode()) gfxInvert(x, y - 1, w + 1, 11);
+        } else {
+          gfxPos(92, y);
+          gfxPrint(sync_trig);
+        }
         // Input PPQN
-        gfxPrint(79, y, "Sync=");
+        gfxPrint(103, y, "/");
         gfxPrint(clock_m.GetClockPPQN());
       } else if (cursor <= MULT8) {
         int y = 1;

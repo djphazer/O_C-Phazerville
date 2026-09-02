@@ -256,8 +256,8 @@ public:
     void gfxPrint(int num) const;
     void gfxPrint(int x, int y, float num, int digits) const;
     void gfxPrint(float num, int digits) const;
-    void gfxPrint(CVInputMap &map) const;
-    void gfxPrint(DigitalInputMap &map) const;
+    void gfxPrint(const CVInputMap &map) const;
+    void gfxPrint(const DigitalInputMap &map) const;
     void gfxPrint(int x, int y, HS::QuantEngine &q_eng, bool overlay = true) const;
     void gfxPrint(int x_adv, int num) const; // Print number with character padding
 
