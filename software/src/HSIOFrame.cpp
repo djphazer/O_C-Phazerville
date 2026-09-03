@@ -3,6 +3,32 @@
 #include "HSUtils.h"
 #include "HSIOFrame.h"
 
+#ifdef ARDUINO_TEENSY41
+void MidiLog::Push(bool out, uint8_t message, uint8_t channel, uint8_t d1, uint8_t d2) {
+  uint16_t s = (uint16_t)(seq + 1);
+  if (s == 0) s = 1;             // skip 0 on wrap (0 marks empty slots)
+  seq = s;
+  Ev &e = ring[s % kEvents];
+  e.message = message;
+  e.dirchan = (uint8_t)((out ? 0x80 : 0) | (channel & 0x7F));
+  e.d1 = d1;
+  e.d2 = d2;
+  e.seq = s;                     // seq written last: slot valid once visible
+}
+void MidiLog::PrintLog() {
+  uint8_t packed[MidiLog::kEvents * 6];
+  LogPack(packed);
+  Serial.print("N:");
+  for (size_t i = 0; i < sizeof(packed); i++) {
+    Serial.printf("%02X", packed[i]);
+  }
+  Serial.println();
+  Serial.flush();
+}
+DMAMEM MidiLog::Ev MidiLog::ring[kEvents];
+volatile uint16_t MidiLog::seq = 0;
+#endif
+
 const int HS::MIDIMapping::ViewOut() const {
   if (IsPitch()) return output + (transpose * 128) + Proportion(pitch_bend, 8192, frame.MIDIState.bend_range << 7);
   return output;

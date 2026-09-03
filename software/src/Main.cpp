@@ -527,6 +527,10 @@ void SerialHandler() {
 
 #if defined(__IMXRT1062__)
 #if defined(ARDUINO_TEENSY41)
+        case 'N':
+          // MIDI monitor: dump the in/out event ring as one "N:..." line.
+          MidiLog::PrintLog();
+          break;
         case 'i':
           ScanI2C();
           break;

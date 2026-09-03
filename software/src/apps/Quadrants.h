@@ -549,6 +549,12 @@ public:
 
     void SendMIDIThru(const MIDIMessage &msg, uint8_t exclude_mask) {
       exclude_mask |= midi_thru_disable;
+
+      // MIDI monitor: log thru traffic as OUT (only if some port will send it)
+      if (msg.message != midi::Clock &&
+          (~exclude_mask & (mMaskUSBDev | mMaskUSBHost | mMaskUSBHost2 | mMaskSerial)))
+        MidiLog::Push(true, msg.message, msg.channel, msg.data1, msg.data2);
+
       if (~exclude_mask & mMaskUSBDev) {
         usbMIDI.send(msg.message, msg.data1, msg.data2, msg.channel, 0);
       }
@@ -586,6 +592,12 @@ public:
             device.getData1(),
             device.getData2()
           };
+
+          // MIDI monitor: log everything received except the floods (Clock,
+          // Active Sensing) and SysEx (reserved for the display transport).
+          if (msg.message != midi::Clock && msg.message != midi::ActiveSensing
+              && msg.message != midi::SystemExclusive)
+            MidiLog::Push(false, msg.message, msg.channel, msg.data1, msg.data2);
 
           switch (msg.message) {
             case midi::SystemExclusive:

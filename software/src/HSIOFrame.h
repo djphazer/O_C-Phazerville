@@ -27,6 +27,37 @@
 #include "HSGamepad.h"
 #endif
 
+namespace MidiLog {
+
+static constexpr size_t kEvents = 32;
+
+struct Ev {
+  uint16_t seq;       // rolling counter, 0 = empty
+  uint8_t message;    // raw MIDI status (0x80/0x90/0xB0/0xC0/0xD0/0xE0/0xFx)
+  uint8_t dirchan;    // bit7 = out, low 7 = channel 1..16 (0 for system msgs)
+  uint8_t d1, d2;
+};
+
+extern Ev ring[kEvents];
+extern volatile uint16_t seq;
+
+void Push(bool out, uint8_t message, uint8_t channel, uint8_t d1, uint8_t d2);
+
+inline void LogPack(uint8_t *dst) {
+  for (size_t i = 0; i < MidiLog::kEvents; i++) {
+    const MidiLog::Ev &e = MidiLog::ring[i];
+    *dst++ = (uint8_t)(e.seq >> 8);
+    *dst++ = (uint8_t)(e.seq & 0xFF);
+    *dst++ = e.message;
+    *dst++ = e.dirchan;
+    *dst++ = e.d1;
+    *dst++ = e.d2;
+  }
+}
+void PrintLog();
+
+} // namespace MidiLog
+
 namespace HS {
 
 static constexpr int GATE_THRESHOLD = 15 << 7; // 1.25 volts
@@ -735,6 +766,7 @@ struct alignas(32) MIDIFrame {
 
     void SendAfterTouch(const uint8_t midi_ch, uint8_t val) {
 #ifdef ARDUINO_TEENSY41
+      MidiLog::Push(true, 0xD0, midi_ch + 1, val, 0);
       if (~midi_msgtx_disable & mMaskUSBDev)   usbMIDI.sendAfterTouch(val, midi_ch + 1);
       if (~midi_msgtx_disable & mMaskUSBHost)  usbHostMIDI[0].sendAfterTouch(val, midi_ch + 1);
       if (~midi_msgtx_disable & mMaskUSBHost2) usbHostMIDI[1].sendAfterTouch(val, midi_ch + 1);
@@ -745,6 +777,7 @@ struct alignas(32) MIDIFrame {
     }
     void SendPitchBend(const uint8_t midi_ch, uint16_t bend) {
 #ifdef ARDUINO_TEENSY41
+      MidiLog::Push(true, 0xE0, midi_ch + 1, bend & 0x7F, (bend >> 7) & 0x7F);
       if (~midi_msgtx_disable & mMaskUSBDev)   usbMIDI.sendPitchBend(bend, midi_ch + 1);
       if (~midi_msgtx_disable & mMaskUSBHost)  usbHostMIDI[0].sendPitchBend(bend, midi_ch + 1);
       if (~midi_msgtx_disable & mMaskUSBHost2) usbHostMIDI[1].sendPitchBend(bend, midi_ch + 1);
@@ -756,6 +789,7 @@ struct alignas(32) MIDIFrame {
 
     void SendCC(const uint8_t midi_ch, uint8_t ccnum, uint8_t val) {
 #ifdef ARDUINO_TEENSY41
+      MidiLog::Push(true, 0xB0, midi_ch + 1, ccnum, val);
       if (~midi_msgtx_disable & mMaskUSBDev)   usbMIDI.sendControlChange(ccnum, val, midi_ch + 1);
       if (~midi_msgtx_disable & mMaskUSBHost)  usbHostMIDI[0].sendControlChange(ccnum, val, midi_ch + 1);
       if (~midi_msgtx_disable & mMaskUSBHost2) usbHostMIDI[1].sendControlChange(ccnum, val, midi_ch + 1);
@@ -765,10 +799,10 @@ struct alignas(32) MIDIFrame {
 #endif
     }
     void SendNoteOn(const uint8_t midi_ch, uint8_t note = 255, uint8_t vel = 100) {
-        if (note > 127) note = current_note[midi_ch];
-        else current_note[midi_ch] = note;
-
+      if (note > 127) note = current_note[midi_ch];
+      else current_note[midi_ch] = note;
 #ifdef ARDUINO_TEENSY41
+      MidiLog::Push(true, 0x90, midi_ch + 1, note, vel);
       if (~midi_msgtx_disable & mMaskUSBDev)   usbMIDI.sendNoteOn(note, vel, midi_ch + 1);
       if (~midi_msgtx_disable & mMaskUSBHost)  usbHostMIDI[0].sendNoteOn(note, vel, midi_ch + 1);
       if (~midi_msgtx_disable & mMaskUSBHost2) usbHostMIDI[1].sendNoteOn(note, vel, midi_ch + 1);
@@ -778,8 +812,9 @@ struct alignas(32) MIDIFrame {
 #endif
     }
     void SendNoteOff(const uint8_t midi_ch, uint8_t note = 255, uint8_t vel = 0) {
-        if (note > 127) note = current_note[midi_ch];
+      if (note > 127) note = current_note[midi_ch];
 #ifdef ARDUINO_TEENSY41
+      MidiLog::Push(true, 0x80, midi_ch + 1, note, vel);
       if (~midi_msgtx_disable & mMaskUSBDev)   usbMIDI.sendNoteOff(note, vel, midi_ch + 1);
       if (~midi_msgtx_disable & mMaskUSBHost)  usbHostMIDI[0].sendNoteOff(note, vel, midi_ch + 1);
       if (~midi_msgtx_disable & mMaskUSBHost2) usbHostMIDI[1].sendNoteOff(note, vel, midi_ch + 1);
