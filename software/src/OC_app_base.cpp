@@ -137,6 +137,8 @@ UiMode AppBase::DispatchEvent(const UI::Event &event)
 
       case UI::EVENT_BUTTON_LONG_PRESS:
         if (event.control == CONTROL_BUTTON_Z) z_button_hold = true;
+      case UI::EVENT_MISC:
+        // for now, MISC events are lumped in with buttons
       default:
         HandleButtonEvent(event);
         break;

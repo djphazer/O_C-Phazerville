@@ -568,6 +568,22 @@ void SerialHandler() {
           break;
         }
 
+        case 'p': // preset load
+        case 'P': // Preset Save
+        {
+          // next byte = slot + 33.
+          uint32_t t0 = millis();
+          while (!Serial.available() && (millis() - t0) < 5) { /* await slot */ }
+          if (Serial.available())
+            OC::ui.Inject(
+              UI::EVENT_MISC,
+              c == 'p' ? UI::MISC_PRESET_LOAD : UI::MISC_PRESET_SAVE,
+              Serial.read() - 33,
+              0
+            );
+
+          break;
+        }
         default:
           capreq = true;
           break;

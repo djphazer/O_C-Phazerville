@@ -1921,6 +1921,11 @@ void AppQuadrants::HandleButtonEvent(const UI::Event &event) {
     }
 
     switch (event.type) {
+    case UI::EVENT_MISC:
+        if (event.control == UI::MISC_PRESET_LOAD) QueuePresetLoad(event.value);
+        if (event.control == UI::MISC_PRESET_SAVE) StoreToPreset(event.value);
+        break;
+
     case UI::EVENT_BUTTON_DOWN:
 
       // Quantizer popup editor intercepts everything on-press
@@ -2061,5 +2066,6 @@ void AppQuadrants::StoreToPreset(int id) {
 }
 FLASHMEM
 void AppQuadrants::LoadFromPreset(int id) {
+  if (id < 0 || id >= QUAD_PRESET_COUNT) return;
   load_from_preset(id);
 }

@@ -40,6 +40,16 @@ enum EventType : uint16_t {
   EVENT_BUTTON_PRESS = EVENT_BUTTON_RELEASE, // compatibility alias
 };
 
+enum MiscControl : uint16_t {
+  MISC_PRESET_LOAD,
+  MISC_PRESET_SAVE,
+  MISC_CHANGE_APPLET,
+  MISC_CLOCK_START,
+  MISC_CLOCK_STOP,
+  MISC_CLOCK_CONTINUE, // aka reset
+  MISC_CLOCK_TICK, // 24ppqn, with a timestamp
+};
+
 // UI event struct
 // Yes, looks similar to stmlib::Event but hey, they're UI events.
 struct Event {
