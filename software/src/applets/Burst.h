@@ -63,7 +63,7 @@ public:
         if (Clock(0)) {
             if (clocked) {
                 // Get a tempo, if this is the second tick or later since the last clock
-                spacing = (ticks_since_clock / number) / 17;
+                spacing = ClockCycleTicks(0) / number / 17;
                 ticks_since_clock = 0;
             } else clocked = 1;
 
@@ -227,7 +227,7 @@ private:
     // Settings
     int div; // Divide or multiply the clock tempo
     uint8_t number; // How many bursts fire at each trigger
-    uint8_t spacing; // How many ms pass between each burst
+    uint16_t spacing; // How many ms pass between each burst
     int8_t accel; // Accelleration or deceleration
     uint8_t jitter; // Randomness
     uint8_t passthru; // regular clock pulses come out, too
