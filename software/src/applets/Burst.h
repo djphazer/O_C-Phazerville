@@ -43,7 +43,9 @@ public:
         cursor = 0;
         number = 4;
         div = 1;
+        effective_div = 1;
         spacing = 50;
+        display_spacing = 50;
         accel = 0;
         jitter = 0;
         bursts_to_go = 0;
@@ -58,7 +60,15 @@ public:
             last_number_cv_tick = OC::CORE::ticks;
         }
         int spacing_mod = clocked ? 0 : Proportion(DetentedIn(1), HEMISPHERE_MAX_INPUT_CV, 500);
-
+        if (!clocked) display_spacing = constrain(spacing + spacing_mod, HEM_BURST_SPACING_MIN, HEM_BURST_SPACING_MAX);
+        if (clocked) {
+            static const int div_states[] = {-8, -7, -6, -5, -4, -3, -2, 1, 2, 3, 4, 5, 6, 7, 8};
+            int base_pos = 0;
+            for (int i = 0; i < 15; ++i) if (div_states[i] == div) base_pos = i;
+            int cv_steps = Proportion(DetentedIn(1), HEMISPHERE_MAX_INPUT_CV, 7);
+            int effective_pos = constrain(base_pos + cv_steps, 0, 14);
+            effective_div = div_states[effective_pos];
+        }
         // Get timing information
         if (Clock(0)) {
             if (clocked) {
@@ -226,8 +236,10 @@ private:
 
     // Settings
     int div; // Divide or multiply the clock tempo
+    int effective_div; // CV2-modulated division/multiplication for clocked operation
     uint8_t number; // How many bursts fire at each trigger
     uint16_t spacing; // How many ms pass between each burst
+    int display_spacing; // CV2-modified spacing shown on the display
     int8_t accel; // Accelleration or deceleration
     uint8_t jitter; // Randomness
     uint8_t passthru; // regular clock pulses come out, too
@@ -254,7 +266,7 @@ private:
         y += 9;
 
         // Spacing
-        gfxPrint(1, y, clocked ? get_effective_spacing() : spacing);
+        gfxPrint(1, y, clocked ? get_effective_spacing() : display_spacing);
         gfxPrint(28, y, "ms");
 
         y += 9;
@@ -272,9 +284,9 @@ private:
         // Div
         if (clocked) {
             gfxBitmap(1, y, 8, CLOCK_ICON);
-            gfxPrint(11, y, div < 0 ? "x" : "/");
-            gfxPrint(div < 0 ? -div : div);
-            gfxPrint(div < 0 ? " Mult" : " Div");
+            gfxPrint(11, y, effective_div < 0 ? "x" : "/");
+            gfxPrint(effective_div < 0 ? -effective_div : effective_div);
+            gfxPrint(effective_div < 0 ? " Mult" : " Div");
         }
 
         // Cursor
@@ -315,8 +327,8 @@ private:
     int get_effective_spacing() {
         int effective_spacing = spacing;
         if (clocked) {
-            if (div > 1) effective_spacing *= div;
-            if (div < 0) effective_spacing /= -div;
+            if (effective_div > 1) effective_spacing *= effective_div;
+            if (effective_div < 0) effective_spacing /= -effective_div;
         }
         return effective_spacing;
     }
