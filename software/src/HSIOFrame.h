@@ -18,6 +18,13 @@
 #include "OC_ADC.h"
 #include "OC_digital_inputs.h"
 #include "icons.h"
+
+#ifdef QUAD_CAPTURE
+// External-viewer MIDI monitor (defined in quad_midilog.h, single TU via
+// Quadrants.h): the Send* wrappers below log outgoing traffic through this.
+void QuadMidiLog_Push(bool out, uint8_t message, uint8_t channel,
+                      uint8_t d1, uint8_t d2);
+#endif
 #include "HSClockManager.h"
 #include "util/util_macros.h"
 #include "util/clkdivmult.h"
@@ -734,6 +741,9 @@ struct alignas(32) MIDIFrame {
     void Send(const SlewedValue *outvals);
 
     void SendAfterTouch(const uint8_t midi_ch, uint8_t val) {
+#ifdef QUAD_CAPTURE
+      QuadMidiLog_Push(true, 0xD0, midi_ch + 1, val, 0);
+#endif
 #ifdef ARDUINO_TEENSY41
       if (~midi_msgtx_disable & mMaskUSBDev)   usbMIDI.sendAfterTouch(val, midi_ch + 1);
       if (~midi_msgtx_disable & mMaskUSBHost)  usbHostMIDI[0].sendAfterTouch(val, midi_ch + 1);
@@ -744,6 +754,9 @@ struct alignas(32) MIDIFrame {
 #endif
     }
     void SendPitchBend(const uint8_t midi_ch, uint16_t bend) {
+#ifdef QUAD_CAPTURE
+      QuadMidiLog_Push(true, 0xE0, midi_ch + 1, bend & 0x7F, (bend >> 7) & 0x7F);
+#endif
 #ifdef ARDUINO_TEENSY41
       if (~midi_msgtx_disable & mMaskUSBDev)   usbMIDI.sendPitchBend(bend, midi_ch + 1);
       if (~midi_msgtx_disable & mMaskUSBHost)  usbHostMIDI[0].sendPitchBend(bend, midi_ch + 1);
@@ -755,6 +768,9 @@ struct alignas(32) MIDIFrame {
     }
 
     void SendCC(const uint8_t midi_ch, uint8_t ccnum, uint8_t val) {
+#ifdef QUAD_CAPTURE
+      QuadMidiLog_Push(true, 0xB0, midi_ch + 1, ccnum, val);
+#endif
 #ifdef ARDUINO_TEENSY41
       if (~midi_msgtx_disable & mMaskUSBDev)   usbMIDI.sendControlChange(ccnum, val, midi_ch + 1);
       if (~midi_msgtx_disable & mMaskUSBHost)  usbHostMIDI[0].sendControlChange(ccnum, val, midi_ch + 1);
@@ -767,7 +783,9 @@ struct alignas(32) MIDIFrame {
     void SendNoteOn(const uint8_t midi_ch, uint8_t note = 255, uint8_t vel = 100) {
         if (note > 127) note = current_note[midi_ch];
         else current_note[midi_ch] = note;
-
+#ifdef QUAD_CAPTURE
+        QuadMidiLog_Push(true, 0x90, midi_ch + 1, note, vel);
+#endif
 #ifdef ARDUINO_TEENSY41
       if (~midi_msgtx_disable & mMaskUSBDev)   usbMIDI.sendNoteOn(note, vel, midi_ch + 1);
       if (~midi_msgtx_disable & mMaskUSBHost)  usbHostMIDI[0].sendNoteOn(note, vel, midi_ch + 1);
@@ -779,6 +797,9 @@ struct alignas(32) MIDIFrame {
     }
     void SendNoteOff(const uint8_t midi_ch, uint8_t note = 255, uint8_t vel = 0) {
         if (note > 127) note = current_note[midi_ch];
+#ifdef QUAD_CAPTURE
+        QuadMidiLog_Push(true, 0x80, midi_ch + 1, note, vel);
+#endif
 #ifdef ARDUINO_TEENSY41
       if (~midi_msgtx_disable & mMaskUSBDev)   usbMIDI.sendNoteOff(note, vel, midi_ch + 1);
       if (~midi_msgtx_disable & mMaskUSBHost)  usbHostMIDI[0].sendNoteOff(note, vel, midi_ch + 1);
