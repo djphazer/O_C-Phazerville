@@ -755,7 +755,8 @@ void SerialHandler() {
       if (n < 16) Serial.print("0");
       Serial.print(n, HEX);
 
-      if (++cap_idx >= display::frame_buffer.kFrameSize) {
+      // 128x256 - 4 screens stacked vertically, 4096 bytes
+      if (++cap_idx >= display::frame_buffer.kFrameSize * display::frame_buffer.kNumScreens) {
         // we're done sending this one
         Serial.println();
         Serial.flush();

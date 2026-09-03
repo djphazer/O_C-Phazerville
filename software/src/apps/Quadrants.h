@@ -763,85 +763,99 @@ public:
       }
     }
 
+    void RenderAll() const {
+      // Screen 0 - northern CV applets, or full-screen or Overview
+      graphics.setScreen(0);
+      if (view_state == APPLET_FULLSCREEN) {
+        DrawFullScreen();
+      } else if (view_state == OVERVIEW) {
+        DrawOverview();
+      } else {
+        active_applet[0]->BaseView();
+        active_applet[1]->BaseView();
+        graphics.drawLine(63, 0, 63, 63, 2); // vertical separator
+      }
+
+      // Screen 1 - southern CV applets
+      graphics.setScreen(1);
+      active_applet[2]->BaseView();
+      active_applet[3]->BaseView();
+      graphics.drawLine(63, 0, 63, 63, 2); // vertical separator
+      gfxInvert(0, 0, 127, 10); // inverted titles
+
+      // Screen 2 - Audio view
+      graphics.setScreen(2);
+      audio_app.View();
+
+      // Screen 3 - Config menus
+      graphics.setScreen(3);
+      DrawConfig();
+    }
+
+    void DrawConfig() const {
+      if (preset_cursor) {
+        DrawPresetSelector();
+        return;
+      }
+
+      switch (config_page) {
+        default:
+          DrawOverview();
+          break;
+
+        case LOADSAVE_POPUP:
+          PokePopup(MENU_POPUP);
+          break;
+
+        case CONFIG_SETTINGS:
+          DrawConfigMenu();
+          break;
+
+        case INPUT_SETTINGS:
+          DrawInputMappings();
+          break;
+
+        case QUANTIZER_SETTINGS:
+          DrawQuantizerConfig();
+          break;
+
+        case MIDI_MAPS_PAGE:
+          DrawMidiMaps(config_cursor - MIDIMAP1);
+          break;
+
+        case MIDI_ROUTING_PAGE:
+          DrawMidiRouting(config_cursor - MIDI_THRU_SERIAL);
+          break;
+
+        case SHOWHIDE_APPLETS:
+          DrawAppletList();
+          break;
+      }
+    }
+
     void View() const {
-        bool draw_applets = true;
+        RenderAll();
 
-        if (preset_cursor) {
-          DrawPresetSelector();
-          draw_applets = false;
+        int screen = 0;
+        if (preset_cursor || config_page > LOADSAVE_POPUP || view_state == OVERVIEW) {
+          screen = 3;
+        } else if (view_state == AUDIO_SETUP) {
+          screen = 2;
+        } else if (view_state == APPLET_FULLSCREEN) {
+          screen = 0;
+        } else {
+          screen = view_slot[0];
         }
-        else if (config_page > HIDE_CONFIG) {
-          switch(config_page) {
-          default:
-          case LOADSAVE_POPUP:
-            PokePopup(MENU_POPUP);
-            // but still draw the applets
-            break;
+        display::frame_buffer.set_screen_view(screen);
+        graphics.setScreen(screen);
 
-          case CONFIG_SETTINGS:
-            DrawConfigMenu();
-            draw_applets = false;
-            break;
-
-          case INPUT_SETTINGS:
-            DrawInputMappings();
-            draw_applets = false;
-            break;
-
-          case QUANTIZER_SETTINGS:
-            DrawQuantizerConfig();
-            draw_applets = false;
-            break;
-
-          case MIDI_MAPS_PAGE:
-            DrawMidiMaps(config_cursor - MIDIMAP1);
-            draw_applets = false;
-            break;
-
-          case MIDI_ROUTING_PAGE:
-            DrawMidiRouting(config_cursor - MIDI_THRU_SERIAL);
-            draw_applets = false;
-            break;
-
-          case SHOWHIDE_APPLETS:
-            DrawAppletList();
-            draw_applets = false;
-            break;
-          }
-        }
         if (HS::q_edit)
           PokePopup(QUANTIZER_POPUP);
         else if (HS::midi_edit)
           PokePopup(MIDI_POPUP);
 
-        if (draw_applets) {
-          if (view_state == AUDIO_SETUP) {
-            audio_app.View();
-
-            draw_applets = false;
-          }
-        }
-
-        if (draw_applets) {
-          if (view_state == APPLET_FULLSCREEN) {
-            DrawFullScreen();
-          } else if (view_state == OVERVIEW) {
-            DrawOverview();
-          } else {
-            // only two applets visible at a time
-            for (int h = 0; h < 2; h++)
-            {
-                HEM_SIDE slot = HEM_SIDE(h + view_slot[h]*2);
-                active_applet[slot]->BaseView();
-
-                // Applets 3 and 4 get inverted titles
-                if (slot > 1) gfxInvert(0 + h*64, 0, 63, 10);
-            }
-
-            // vertical separator
-            graphics.drawLine(63, 0, 63, 63, 2);
-          }
-        }
+        // --- Popups & Overlays
+        // draws on whatever screen we ended up on
 
         // Clock setup is an overlay
         if (clock_overlay) {
@@ -851,6 +865,7 @@ public:
         }
 
         // Overlay popup Load/Save menu last
+        // TODO: this is kinda cool but not that important or useful
         if (HS::popup_type == HS::MENU_POPUP &&
             HS::get_tick() - HS::popup_tick < HS::popup_duration) {
           HS::DrawMenuPopup(config_cursor);
@@ -1102,7 +1117,9 @@ public:
       // h should be 0 or 1 (left or right)
       //h %= 2;
 
-      view_slot[h] = 1 - view_slot[h];
+      view_slot[0] = 1 - view_slot[0];
+      view_slot[1] = view_slot[0];
+
       // also switch fullscreen to corresponding side/slot
       zoom_slot = HEM_SIDE(view_slot[h]*2 + h);
     }
@@ -1115,7 +1132,8 @@ public:
     }
     // this brings a specific applet into view on the appropriate side
     void SwitchToSlot(HEM_SIDE h) {
-      view_slot[h % 2] = h / 2;
+      view_slot[0] = h / 2;
+      view_slot[1] = h / 2;
       zoom_slot = h;
     }
 
@@ -1781,7 +1799,6 @@ void AppQuadrants::Loop() {
     audio_app.mainloop();
 }
 
-FLASHMEM
 FLASHMEM void AppQuadrants::DrawMenu() const {
     View();
 }

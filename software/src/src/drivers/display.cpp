@@ -27,7 +27,7 @@ weegfx::Graphics graphics;
 
 namespace display {
 
-FrameBuffer<SH1106_128x64_Driver::kFrameSize, 2> frame_buffer;
+DMAMEM FrameBuffer<SH1106_128x64_Driver::kFrameSize, 2> frame_buffer;
 PagedDisplayDriver<SH1106_128x64_Driver> driver;
 
 void Init() {
