@@ -162,7 +162,7 @@ inline void blit(uint8_t *dst, coord_t y, coord_t w, coord_t h, const uint8_t *s
 void Graphics::Begin(uint8_t *frame, CLEAR_FRAME clear_frame)
 {
   frame_ = frame;
-  if (clear_frame) memset(frame_, 0, kFrameSize);
+  if (clear_frame) memset(frame_, 0, kFrameSize * kNumScreens);
 
   setPrintPos(0, 0);
 }

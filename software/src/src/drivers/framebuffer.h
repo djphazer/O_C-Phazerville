@@ -18,7 +18,8 @@ template <size_t frame_size, size_t frames>
 class FrameBuffer {
 public:
 
-  static const size_t kFrameSize = frame_size;
+  static constexpr size_t kFrameSize = frame_size;
+  static constexpr size_t kNumScreens = 4; // pow2
 
   FrameBuffer() { }
 
@@ -40,7 +41,7 @@ public:
 
   // @return readable frame (assumes one exists)
   const uint8_t *readable_frame() const {
-    return frame_memory_[read_ptr_ % frames];
+    return frame_memory_[read_ptr_ % frames] + screen_ * kFrameSize;
   }
 
   // @return next writeable frame (assumes one exists)
@@ -55,7 +56,7 @@ public:
   void written() {
     if (capture_on_next_write) {
       capture_on_next_write = false;
-      memcpy(capture_memory_, frame_memory_[write_ptr_ % frames], kFrameSize);
+      memcpy(capture_memory_, frame_memory_[write_ptr_ % frames], kFrameSize * kNumScreens);
       capture_is_valid = true;
     }
     ++write_ptr_;
@@ -71,12 +72,19 @@ public:
     capture_is_valid = false;
   }
 
+  // select viewport offset within framebuffer
+  // XXX: it's possible to do half-screen vertical offsets...
+  void set_screen_view(size_t s) {
+    screen_ = s & (kNumScreens - 1);
+  }
+
 private:
-  uint8_t frame_memory_[frames][kFrameSize]  __attribute__ ((aligned (4)));
-  uint8_t capture_memory_[kFrameSize] __attribute__ ((aligned (4)));
+  uint8_t frame_memory_[frames][kFrameSize * kNumScreens]  __attribute__ ((aligned (4)));
+  uint8_t capture_memory_[kFrameSize * kNumScreens] __attribute__ ((aligned (4)));
 
   volatile size_t write_ptr_;
   volatile size_t read_ptr_;
+  volatile size_t screen_;
   volatile bool capture_on_next_write;
   volatile bool capture_is_valid;
 

@@ -56,6 +56,7 @@ public:
   static constexpr uint8_t kWidth = 128;
   static constexpr uint8_t kHeight = 64;
   static constexpr size_t kFrameSize = kWidth * kHeight / 8;
+  static constexpr size_t kNumScreens = 4;
 
   void Begin(uint8_t *frame, CLEAR_FRAME clear_frame);
   void End();
@@ -80,6 +81,7 @@ public:
   // Beware: No clipping
   void drawCircle(coord_t center_x, coord_t center_y, coord_t r);
 
+  void setScreen(size_t s);
   void setPrintPos(coord_t x, coord_t y);
   void movePrintPos(coord_t dx, coord_t dy);
   coord_t getPrintPosX();
@@ -121,6 +123,7 @@ public:
 private:
   uint8_t *frame_ = nullptr;
 
+  size_t screen_ = 0;
   coord_t text_x_ = 0;
   coord_t text_y_ = 0;
 
@@ -154,6 +157,10 @@ inline void Graphics::movePrintPos(coord_t dx, coord_t dy)
   text_y_ += dy;
 }
 
+inline void Graphics::setScreen(size_t s) {
+  screen_ = s & (kNumScreens - 1);
+}
+
 inline coord_t Graphics::getPrintPosX()
 {
   return text_x_;
@@ -167,7 +174,7 @@ inline coord_t Graphics::getPrintPosY()
 inline uint8_t *Graphics::get_frame_ptr(const coord_t x, const coord_t y)
 {
   // assumes kWidth and kHeight are pow2
-  return frame_ + (((y & (kHeight - 1)) >> 3) * kWidth) + (x & (kWidth - 1));
+  return frame_ + (screen_ * kFrameSize) + (((y & (kHeight - 1)) >> 3) * kWidth) + (x & (kWidth - 1));
 }
 
 }  // namespace weegfx
