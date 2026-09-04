@@ -29,7 +29,7 @@ void HemisphereApplet::BaseStart(const HEM_SIDE hemisphere_) {
         }
     }
 }
-void HemisphereApplet::BaseView(bool full_screen, bool parked) const {
+FLASHMEM void HemisphereApplet::BaseView(bool full_screen, bool parked) const {
     //if (HS::select_mode == hemisphere)
     gfxHeader(applet_name(), (HS::ALWAYS_SHOW_ICONS || full_screen) ? applet_icon() : nullptr);
     // If active, draw the full screen view instead of the application screen
@@ -42,7 +42,7 @@ void HemisphereApplet::BaseView(bool full_screen, bool parked) const {
     else this->View();
 }
 
-void HemisphereApplet::DrawConfigHelp() const {
+FLASHMEM void HemisphereApplet::DrawConfigHelp() const {
     for (int i=0; i<HELP_LABEL_COUNT; ++i) help[i] = "";
     SetHelp();
     const bool clockrun = HS::clock_m.IsRunning();
@@ -150,7 +150,7 @@ void HemisphereApplet::GateOut(int ch, bool high) const {
     // -------------------------------
     // --- Offset graphics methods ---
     // -------------------------------
-void HemisphereApplet::gfxCursor(int x, int y, int w, int h, const char *str, const char *extra_str) const {
+FLASHMEM void HemisphereApplet::gfxCursor(int x, int y, int w, int h, const char *str, const char *extra_str) const {
   SetLabel(str);
   SetAux(false);
   // assumes standard text height for highlighting
@@ -171,7 +171,7 @@ void HemisphereApplet::gfxCursor(int x, int y, int w, int h, const char *str, co
     gfxPixel(x + w - 1, y - 1);
   }
 }
-void HemisphereApplet::gfxSpicyCursor(int x, int y, int w, int h, const char *str, const char *extra_str) const {
+FLASHMEM void HemisphereApplet::gfxSpicyCursor(int x, int y, int w, int h, const char *str, const char *extra_str) const {
   SetLabel(str);
   SetAux(true);
   if (EditMode()) {
@@ -232,18 +232,18 @@ void HemisphereApplet::gfxPrint(float num, int digits) const {
     }
 }
 
-void HemisphereApplet::gfxPrint(DigitalInputMap &map) const {
+FLASHMEM void HemisphereApplet::gfxPrint(DigitalInputMap &map) const {
   gfxPrintIcon(map.Icon());
   if (map.Gate()) gfxInvert(gfxGetPrintPosX()-8, gfxGetPrintPosY(), 8, 8);
 }
-void HemisphereApplet::gfxPrint(CVInputMap &map) const {
+FLASHMEM void HemisphereApplet::gfxPrint(CVInputMap &map) const {
   gfxPrintIcon(map.Icon());
   const int xpos = gfxGetPrintPosX() - 1;
   const int ypos = gfxGetPrintPosY() + 4;
   const int height = map.InRescaled(24);
   gfxLine(xpos, ypos, xpos, ypos - height);
 }
-void HemisphereApplet::gfxPrint(int x, int y, HS::QuantEngine &q_eng, bool overlay) const {
+FLASHMEM void HemisphereApplet::gfxPrint(int x, int y, HS::QuantEngine &q_eng, bool overlay) const {
   if (overlay) {
     gfxClear(x - 2, y - 2, 29, 22);
     gfxFrame(x - 1, y - 2, 27, 21, true);
@@ -275,7 +275,7 @@ void HemisphereApplet::gfxStartCursor() {
     cursor_start_y = gfxGetPrintPosY();
 }
 
-void HemisphereApplet::gfxEndCursor(bool selected, bool spicy, const char *str, const char *extra_str) const {
+FLASHMEM void HemisphereApplet::gfxEndCursor(bool selected, bool spicy, const char *str, const char *extra_str) const {
   if (!selected) return;
 
   SetLabel(extra_str);
@@ -299,7 +299,7 @@ void HemisphereApplet::gfxEndCursor(bool selected, bool spicy, const char *str, 
 void HemisphereApplet::gfxPixel(int x, int y) const {
     graphics.setPixel(x + gfx_offset, y);
 }
-void HemisphereApplet::gfxFrame(int x, int y, int w, int h, bool dotted) const {
+FLASHMEM void HemisphereApplet::gfxFrame(int x, int y, int w, int h, bool dotted) const {
   if (dotted) {
     gfxLine(x, y, x + w - 1, y, 2); // top
     gfxLine(x, y + 1, x, y + h - 1, 2); // vert left
@@ -345,7 +345,7 @@ void HemisphereApplet::gfxPrintIcon(const uint8_t *data, int16_t w) const {
 }
 
 /* Show channel-grouped bi-lateral display */
-void HemisphereApplet::gfxSkyline() const {
+FLASHMEM void HemisphereApplet::gfxSkyline() const {
     ForEachChannel(ch)
     {
         int height = ProportionCV(In(ch), 32);
@@ -356,10 +356,10 @@ void HemisphereApplet::gfxSkyline() const {
     }
 }
 
-void HemisphereApplet::gfxHeader(int y) const {
+FLASHMEM void HemisphereApplet::gfxHeader(int y) const {
   gfxHeader(applet_name(), applet_icon(), y, false);
 }
-void HemisphereApplet::gfxHeader(const char *str, const uint8_t *icon, int y, bool underline) const {
+FLASHMEM void HemisphereApplet::gfxHeader(const char *str, const uint8_t *icon, int y, bool underline) const {
   if (IsEditingInputMap()) return;
   if (EditMode()) {
     gfxParamHeader();
@@ -378,7 +378,7 @@ void HemisphereApplet::gfxHeader(const char *str, const uint8_t *icon, int y, bo
     gfxDottedLine(0, y + 8, 62, y + 8);
 }
 
-void HemisphereApplet::gfxParamHeader() const {
+FLASHMEM void HemisphereApplet::gfxParamHeader() const {
   gfxIcon( 4, 6, DOWN_BTN_ICON);
   gfxIcon(20, 6, DOWN_BTN_ICON);
   gfxIcon(36, 6, DOWN_BTN_ICON);
@@ -393,7 +393,7 @@ void HemisphereApplet::gfxParamHeader() const {
   }
 }
 
-void HemisphereApplet::DrawSlider(uint8_t x, uint8_t y, uint8_t len, uint8_t value, uint8_t max_val, bool is_cursor) const {
+FLASHMEM void HemisphereApplet::DrawSlider(uint8_t x, uint8_t y, uint8_t len, uint8_t value, uint8_t max_val, bool is_cursor) const {
     uint8_t p = is_cursor ? 1 : 3;
     uint8_t w = Proportion(value, max_val, len-1);
     gfxDottedLine(x, y + 4, x + len, y + 4, p);

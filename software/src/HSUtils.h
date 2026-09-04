@@ -130,7 +130,7 @@ namespace HS {
     mMaskUSBHost2 = (1 << 3),
     mMaskUSBHost3 = (1 << 4),
 
-    mMaskReserved0 = (1 << 5),
+    mMaskBus = (1 << 5),   // Buchla 200e preset bus (PRESET_BUS builds)
     mMaskReserved1 = (1 << 6),
     mMaskReserved2 = (1 << 7),
   };

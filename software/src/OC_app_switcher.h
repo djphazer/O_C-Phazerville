@@ -51,7 +51,8 @@ public:
   AppSwitcher() { }
   ~AppSwitcher() { }
 
-  void Init(bool reset_settings);
+  // returns true if stored settings were restored (false = firstrun/defaults)
+  bool Init(bool reset_settings);
 
   void set_current_app(size_t index);
   inline AppBase *current_app() const { return static_cast<AppBase *>(current_app_.instance); }
