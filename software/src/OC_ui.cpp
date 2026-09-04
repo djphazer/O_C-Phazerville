@@ -152,7 +152,15 @@ UiMode Ui::DispatchEvents(const RuntimeSlot &appslot) {
     MENU_REDRAW = 1;
 
     // 200e preset-bus overlay: it owns all input while open, and holding
-    // BOTH encoder buttons opens it (unused gesture; menu is A/Z + R)
+    // BOTH encoder buttons opens it (unused gesture; menu is A/Z + R).
+    //
+    // Compile-gated to the targets that can actually have the bus. VOR
+    // hardware binds the same L+R chord to VBiasManager::AdvanceBias()
+    // (OC_app_base.cpp, EVENT_BUTTON_DOWN), and DispatchEvents runs before
+    // the app's handler. The PresetBusUI stubs are inert off-target, but
+    // SetButtonIgnoreMask() and the `continue` are not -- ungated, this
+    // block swallows the chord on every build and VBias cycling dies.
+#if defined(ARDUINO_TEENSY41) && defined(PRESET_BUS)
     if (OC::PresetBusUI::Active()) {
       if (OC::PresetBusUI::HandleEvent(event)) continue;
     }
@@ -164,6 +172,7 @@ UiMode Ui::DispatchEvents(const RuntimeSlot &appslot) {
       SetButtonIgnoreMask();  // swallow the releases
       continue;
     }
+#endif
 
     const bool z_hold = (event.mask & CONTROL_BUTTON_Z);
     const bool a_hold = (event.mask & CONTROL_BUTTON_A);
