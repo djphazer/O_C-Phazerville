@@ -37,7 +37,7 @@ struct Ev {
   uint8_t d1, d2;
 };
 
-static Ev ring[kEvents];
+static DMAMEM Ev ring[kEvents];
 static volatile uint16_t seq = 0;
 
 } // namespace QuadMidiLog

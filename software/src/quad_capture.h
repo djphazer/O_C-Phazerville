@@ -42,7 +42,7 @@ namespace QuadCapture {
 
 static constexpr size_t kMaxFrame = 128 * 128 / 8; // 2048 (largest we send)
 
-static uint8_t buffer[kMaxFrame] __attribute__((aligned(4)));
+static DMAMEM uint8_t buffer[kMaxFrame] __attribute__((aligned(4)));
 static bool    sending    = false;
 static size_t  idx        = 0;
 static size_t  frame_len  = 0;   // bytes to stream for the current frame

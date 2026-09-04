@@ -151,7 +151,7 @@ struct Chan {
   }
 };
 
-static Chan chans[2];
+static DMAMEM Chan chans[2];
 
 static inline void Sample(OC::IOFrame *ioframe) {
   chans[0].Sample(ioframe);

@@ -35,8 +35,8 @@ static constexpr uint8_t SUB = 0x7A;   // our "quad capture" sub-id
 
 static volatile char pending = 0;                 // request cmd awaiting service
 static volatile uint8_t args[3] = { 0, 0, 0 };    // request args ('O' slot/src/win, '~' sel)
-static uint8_t frame[2048] __attribute__((aligned(4)));   // render scratch
-static uint8_t out[4 + 4096 + 1];                 // header + max nibbles + F7
+static DMAMEM uint8_t frame[2048] __attribute__((aligned(4)));   // render scratch
+static DMAMEM uint8_t out[4 + 4096 + 1];                 // header + max nibbles + F7
 
 // SysEx handler — keep it tiny; just latch the request.
 inline void onSysEx(uint8_t *data, unsigned size) {
