@@ -42,6 +42,7 @@ public:
     void Start() {
         cursor = 0;
         number = 4;
+        number_mod = 4;
         div = 1;
         effective_div = 1;
         spacing = 50;
@@ -55,25 +56,23 @@ public:
 
     void Controller() {
         // Settings and modulation over CV
-        if (DetentedIn(0) > 0) {
-            number = constrain(Proportion(In(0), HEMISPHERE_MAX_INPUT_CV, HEM_BURST_NUMBER_MAX), 1, HEM_BURST_NUMBER_MAX);
+        if (DetentedIn(0) != 0) {
             last_number_cv_tick = OC::CORE::ticks;
         }
+        number_mod = constrain(number + Proportion(DetentedIn(0), HEMISPHERE_MAX_INPUT_CV, HEM_BURST_NUMBER_MAX - 1), 1, HEM_BURST_NUMBER_MAX);
         int spacing_mod = clocked ? 0 : Proportion(DetentedIn(1), HEMISPHERE_MAX_INPUT_CV, 500);
         if (!clocked) display_spacing = constrain(spacing + spacing_mod, HEM_BURST_SPACING_MIN, HEM_BURST_SPACING_MAX);
         if (clocked) {
             static const int div_states[] = {-8, -7, -6, -5, -4, -3, -2, 1, 2, 3, 4, 5, 6, 7, 8};
             int base_pos = 0;
-            for (int i = 0; i < 15; ++i) if (div_states[i] == div) base_pos = i;
-            int cv_steps = Proportion(DetentedIn(1), HEMISPHERE_MAX_INPUT_CV, 7);
-            int effective_pos = constrain(base_pos + cv_steps, 0, 14);
-            effective_div = div_states[effective_pos];
+            while (base_pos < 14 && div_states[base_pos] != div) ++base_pos;
+            effective_div = div_states[constrain(base_pos + Proportion(DetentedIn(1) - HEMISPHERE_CENTER_INPUT_CV, HEMISPHERE_MAX_INPUT_CV / 2, 7), 0, 14)];
         }
         // Get timing information
         if (Clock(0)) {
             if (clocked) {
                 // Get a tempo, if this is the second tick or later since the last clock
-                spacing = ClockCycleTicks(0) / number / 17;
+                spacing = ClockCycleTicks(0) / number_mod / HEMISPHERE_CLOCK_TICKS;
                 ticks_since_clock = 0;
             } else clocked = 1;
 
@@ -110,7 +109,7 @@ public:
                 modded_spacing = constrain(modded_spacing, HEM_BURST_SPACING_MIN, HEM_BURST_SPACING_MAX);
                 ClockOut(0);
                 burst_count++;
-                if (--bursts_to_go > 0) burst_countdown = modded_spacing * 17; // Reset for next burst
+                if (--bursts_to_go > 0) burst_countdown = modded_spacing * HEMISPHERE_CLOCK_TICKS; // Reset for next burst
                 else GateOut(1, 0); // Turn off the gate
             }
         }
@@ -131,8 +130,8 @@ public:
         if (EndOfADCLag() || (btrig && !number_is_changing)) {
             ClockOut(0);
             GateOut(1, 1);
-            bursts_to_go = number - 1;
-            burst_countdown = effective_spacing * 17;
+            bursts_to_go = number_mod - 1;
+            burst_countdown = effective_spacing * HEMISPHERE_CLOCK_TICKS;
             burst_count = 1;
         }
     }
@@ -238,6 +237,7 @@ private:
     int div; // Divide or multiply the clock tempo
     int effective_div; // CV2-modulated division/multiplication for clocked operation
     uint8_t number; // How many bursts fire at each trigger
+    int number_mod; // CV1-modulated burst amount for operation and display
     uint16_t spacing; // How many ms pass between each burst
     int display_spacing; // CV2-modified spacing shown on the display
     int8_t accel; // Accelleration or deceleration
@@ -260,7 +260,7 @@ private:
         y += 9;
 
         // Number
-        gfxPrint(1, y, number);
+        gfxPrint(1, y, number_mod);
         gfxPrint(27, y, "bursts");
 
         y += 9;
