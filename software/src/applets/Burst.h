@@ -131,6 +131,7 @@ public:
             ClockOut(0);
             GateOut(1, 1);
             bursts_to_go = number_mod - 1;
+            if (bursts_to_go == 0) GateOut(1, 0);
             burst_countdown = effective_spacing * HEMISPHERE_CLOCK_TICKS;
             burst_count = 1;
         }
