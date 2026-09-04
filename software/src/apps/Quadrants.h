@@ -696,93 +696,7 @@ public:
       }
     }
 
-    void View() const {
-        bool draw_applets = true;
-
-        if (preset_cursor) {
-          DrawPresetSelector();
-          draw_applets = false;
-        }
-        else if (config_page > HIDE_CONFIG) {
-          switch(config_page) {
-          default:
-          case LOADSAVE_POPUP:
-            PokePopup(MENU_POPUP);
-            // but still draw the applets
-            break;
-
-          case MIDI_MAPS_PAGE:
-            DrawMidiMaps(config_cursor - MIDIMAP1);
-            draw_applets = false;
-            break;
-
-          case INPUT_SETTINGS:
-            DrawInputMappings();
-            draw_applets = false;
-            break;
-
-          case QUANTIZER_SETTINGS:
-            DrawQuantizerConfig();
-            draw_applets = false;
-            break;
-
-          case CONFIG_SETTINGS:
-            DrawConfigMenu();
-            draw_applets = false;
-            break;
-
-          case SHOWHIDE_APPLETS:
-            DrawAppletList();
-            draw_applets = false;
-            break;
-          }
-        }
-        if (HS::q_edit)
-          PokePopup(QUANTIZER_POPUP);
-        else if (HS::midi_edit)
-          PokePopup(MIDI_POPUP);
-
-        if (draw_applets) {
-          if (view_state == AUDIO_SETUP) {
-            audio_app.View();
-
-            draw_applets = false;
-          }
-        }
-
-        if (draw_applets) {
-          if (view_state == APPLET_FULLSCREEN) {
-            DrawFullScreen();
-          } else if (view_state == OVERVIEW) {
-            DrawOverview();
-          } else {
-            // only two applets visible at a time
-            for (int h = 0; h < 2; h++)
-            {
-                HEM_SIDE slot = HEM_SIDE(h + view_slot[h]*2);
-                active_applet[slot]->BaseView();
-
-                // Applets 3 and 4 get inverted titles
-                if (slot > 1) gfxInvert(0 + h*64, 0, 63, 10);
-            }
-
-            // vertical separator
-            graphics.drawLine(63, 0, 63, 63, 2);
-          }
-        }
-
-        // Clock setup is an overlay
-        if (clock_overlay) {
-          ClockSetup_instance.View();
-        } else {
-          ClockSetup_instance.DrawIndicator(view_state == OVERVIEW);
-        }
-
-        // Overlay popup window last
-        if (OC::CORE::ticks - HS::popup_tick < HEMISPHERE_CURSOR_TICKS * 4) {
-          HS::DrawPopup(config_cursor, preset_id, CursorBlink());
-        }
-    }
+    void View() const;
 
     // always act-on-press for encoder
     void DelegateEncoderPush(const UI::Event &event) {
@@ -1792,6 +1706,96 @@ void AppQuadrants::Loop() {
 FLASHMEM
 void AppQuadrants::DrawMenu() const {
     View();
+}
+
+// Out-of-class so FLASHMEM survives LTO: in-class (implicitly inline)
+// definitions lose the section attribute and land in ITCM.
+FLASHMEM void AppQuadrants::View() const {
+    bool draw_applets = true;
+
+    if (preset_cursor) {
+      DrawPresetSelector();
+      draw_applets = false;
+    }
+    else if (config_page > HIDE_CONFIG) {
+      switch(config_page) {
+      default:
+      case LOADSAVE_POPUP:
+        PokePopup(MENU_POPUP);
+        // but still draw the applets
+        break;
+
+      case MIDI_MAPS_PAGE:
+        DrawMidiMaps(config_cursor - MIDIMAP1);
+        draw_applets = false;
+        break;
+
+      case INPUT_SETTINGS:
+        DrawInputMappings();
+        draw_applets = false;
+        break;
+
+      case QUANTIZER_SETTINGS:
+        DrawQuantizerConfig();
+        draw_applets = false;
+        break;
+
+      case CONFIG_SETTINGS:
+        DrawConfigMenu();
+        draw_applets = false;
+        break;
+
+      case SHOWHIDE_APPLETS:
+        DrawAppletList();
+        draw_applets = false;
+        break;
+      }
+    }
+    if (HS::q_edit)
+      PokePopup(QUANTIZER_POPUP);
+    else if (HS::midi_edit)
+      PokePopup(MIDI_POPUP);
+
+    if (draw_applets) {
+      if (view_state == AUDIO_SETUP) {
+        audio_app.View();
+
+        draw_applets = false;
+      }
+    }
+
+    if (draw_applets) {
+      if (view_state == APPLET_FULLSCREEN) {
+        DrawFullScreen();
+      } else if (view_state == OVERVIEW) {
+        DrawOverview();
+      } else {
+        // only two applets visible at a time
+        for (int h = 0; h < 2; h++)
+        {
+            HEM_SIDE slot = HEM_SIDE(h + view_slot[h]*2);
+            active_applet[slot]->BaseView();
+
+            // Applets 3 and 4 get inverted titles
+            if (slot > 1) gfxInvert(0 + h*64, 0, 63, 10);
+        }
+
+        // vertical separator
+        graphics.drawLine(63, 0, 63, 63, 2);
+      }
+    }
+
+    // Clock setup is an overlay
+    if (clock_overlay) {
+      ClockSetup_instance.View();
+    } else {
+      ClockSetup_instance.DrawIndicator(view_state == OVERVIEW);
+    }
+
+    // Overlay popup window last
+    if (OC::CORE::ticks - HS::popup_tick < HEMISPHERE_CURSOR_TICKS * 4) {
+      HS::DrawPopup(config_cursor, preset_id, CursorBlink());
+    }
 }
 
 void AppQuadrants::DrawScreensaver() const {

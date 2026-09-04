@@ -799,4 +799,23 @@ void start_calibration() {
   OC::app_switcher.set_current_app(0);
 }
 
+// Remote bench control (console 'a'): activate an app by index with the
+// same suspend/switch/resume choreography the app menu uses. Loop context
+// only.
+FLASHMEM void SwitchToApp(size_t index) {
+  app_switcher.current_app()->DispatchAppEvent(APP_EVENT_SUSPEND);
+  CORE::app_isr_enabled = false;
+  delay(1);
+  FreqMeasure.end();
+  DigitalInputs::reInit();
+  app_switcher.set_current_app(index);
+  app_switcher.current_app()->DispatchAppEvent(APP_EVENT_RESUME);
+  CORE::app_isr_enabled = true;
+  CORE::app_loop_enabled = true;
+  ::MENU_REDRAW = 1;
+  Serial.printf("app: %s\n", app_switcher.current_app()->name());
+}
+
+FLASHMEM void SwitchToDefaultApp() { SwitchToApp(DEFAULT_APP_INDEX); }
+
 }; // namespace OC

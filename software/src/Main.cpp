@@ -51,6 +51,10 @@
 #if defined(ARDUINO_TEENSY41)
 USBHost thisUSB;
 USBHub hub1(thisUSB);
+// These MUST stay in DTCM: their member arrays are the EHCI DMA buffers,
+// and USBHost_t36's midi/ehci paths do NO cache maintenance - DTCM is
+// non-cacheable (EHCI reaches it via the CM7 AHBS backdoor), while RAM2 is
+// write-back cached and silently corrupts host MIDI both directions.
 MIDIDevice_BigBuffer usbHostMIDI[2] {
   MIDIDevice_BigBuffer(thisUSB),
   MIDIDevice_BigBuffer(thisUSB)
@@ -92,6 +96,7 @@ void ScanI2C() {
 #endif // ARDUINO_TEENSY41
 
 uint_fast8_t MENU_REDRAW = true;
+volatile uint32_t loop_counter = 0;   // main-loop rate, read by SelfTest
 static OC::UiMode ui_mode = OC::UI_MODE_MENU;
 static OC::IOFrame io_frame;
 
@@ -153,7 +158,8 @@ extern "C" {
   }
 }
 
-void BootMenu() {
+// boot-time only; noinline so FLASHMEM sticks (free-function LTO rule)
+FLASHMEM __attribute__((noinline)) void BootMenu() {
   bool save = false;
   int choice = -1;
 
@@ -218,13 +224,93 @@ void BootMenu() {
 }
 #endif
 
+// ---------------------------------------------------------------------------
+// Crash forensics + hardware watchdog (T4.x)
+// ---------------------------------------------------------------------------
+#if defined(__IMXRT1062__)
+// The core never zeroes .bss.dma (DMAMEM is documented as uninitialized), so
+// C++ objects placed there boot with garbage in any member their constructor
+// doesn't touch - USBHost_t36 state machines rely on bss-zero and lock up.
+// Zero the section here: ResetHandler calls this hook after the DTCM bss
+// clear and BEFORE __libc_init_array (C++ ctors). .bss.dma is the first
+// section in RAM2 (origin 0x20200000) and ends at _heap_start per the .ld.
+extern unsigned long _heap_start;
+extern "C" FLASHMEM void startup_middle_hook(void) {
+  memset((void *)0x20200000, 0, (uint32_t)&_heap_start - 0x20200000u);
+}
+
+// Capture CrashReport text at boot so it can be appended to CRASH.LOG once
+// LittleFS is mounted (the Serial print is gone if nobody was watching).
+// buffer lives in RAM2 (DMAMEM) - DTCM stack headroom is precious
+static DMAMEM char crash_buf[1024];
+class BufferPrint : public Print {
+public:
+  char *buf = crash_buf;
+  size_t len = 0;
+  size_t write(uint8_t c) override {
+    if (len < sizeof(crash_buf) - 1) { buf[len++] = c; buf[len] = 0; return 1; }
+    return 0;
+  }
+};
+static BufferPrint crash_capture;
+
+// Reset cause, captured then cleared at boot: SRSR bits are sticky w1c and
+// would otherwise show every cause since the last power-on, forever.
+static uint32_t boot_srsr = 0;
+
+// WDOG1: 128s timeout, fed only from loop(). Long enough that the slowest
+// legitimate blocking op (a full LittleFS format) rarely trips it; a hard
+// loop() hang reboots instead of bricking the module until power-cycle.
+// Armed at the END of setup() so interactive boot flows (BootMenu,
+// ConfirmReset) can block indefinitely.
+static bool watchdog_armed = false;
+FLASHMEM static void watchdog_arm() {
+  // the core never ungates WDOG1's clock ("WDOG1 requires CCM_CCGR3_WDOG1"
+  // per imxrt.h) - touching its registers without this bus-faults
+  CCM_CCGR3 |= CCM_CCGR3_WDOG1(CCM_CCGR_ON);
+  asm volatile("dsb");
+  // PDE (set at reset) is a one-shot 16s power-down counter that asserts
+  // reset unless cleared - with the clock just ungated it would fire ~16s
+  // after arming and masquerade as a watchdog timeout
+  WDOG1_WMCR = 0;
+  WDOG1_WCR = (uint16_t)(255u << 8)  // WT: (255+1)*0.5s = 128s
+            | WDOG_WCR_WDE | WDOG_WCR_SRS | WDOG_WCR_WDA
+            | WDOG_WCR_WDBG | WDOG_WCR_WDZST;
+  watchdog_armed = true;
+}
+static inline void watchdog_feed() {
+  WDOG1_WSR = 0x5555;
+  WDOG1_WSR = 0xAAAA;
+}
+
+// A full LittleFS format can exceed 128s worst-case (flash sector erase is
+// 400ms MAX) - the one legitimate loop-blocking op longer than the
+// watchdog. Feed from a timer for its duration only.
+static IntervalTimer wdog_format_feeder;
+static void watchdog_feed_isr() { watchdog_feed(); }  // ISR: stays in ITCM
+FLASHMEM static void watchdog_feed_during(void (*op)()) {
+  wdog_format_feeder.begin(watchdog_feed_isr, 1000000);  // 1s
+  op();
+  wdog_format_feeder.end();
+}
+#endif
+
 void setup() {
   delay(50);
+#if defined(__IMXRT1062__)
+  boot_srsr = SRC_SRSR;
+  SRC_SRSR = boot_srsr;  // w1c: next boot reports only its own cause
+#endif
   Serial.begin(9600);
 
   if (CrashReport) {
     while (!Serial && millis() < 3000) ; // wait
     Serial.println(CrashReport);
+#if defined(__IMXRT1062__)
+    // stash the report so it can be appended to CRASH.LOG once the
+    // filesystem is up (console prints vanish when nobody is watching)
+    crash_capture.print(CrashReport);
+#endif
     delay(1500);
   }
 
@@ -367,6 +453,37 @@ void setup() {
 
   // use default global config file in LFS
   bool firstrun = !PhzConfig::load_config();
+#ifdef __IMXRT1062__
+  if (firstrun) {
+    // GLOBALS.CFG missing/corrupt: try the boot-time backup before the
+    // ConfirmReset flow gets a chance to threaten a factory wipe.
+    if (PhzConfig::load_config(PhzConfig::BACKUP_FILENAME)) {
+      Serial.println("CONFIG: GLOBALS.CFG bad; restored from GLOBALS.BAK");
+      PhzConfig::save_config();  // re-materialize the primary from memory
+      firstrun = false;
+    }
+  } else {
+    PhzConfig::backup_config();  // known-good primary: refresh the backup
+  }
+
+  // append any captured crash report to CRASH.LOG (rotate at 8KB)
+  if (crash_capture.len) {
+    File cl = PhzConfig::myfs.open("CRASH.LOG", FILE_READ);
+    const bool rotate = cl && cl.size() > 8192;
+    if (cl) cl.close();
+    if (rotate) {  // keep one generation of history instead of deleting
+      PhzConfig::myfs.remove("CRASH.OLD");
+      PhzConfig::myfs.rename("CRASH.LOG", "CRASH.OLD");
+    }
+    cl = PhzConfig::myfs.open("CRASH.LOG", FILE_WRITE);  // append
+    if (cl) {
+      cl.printf("--- boot @ %lu ms ---\n", millis());
+      cl.write((const uint8_t *)crash_capture.buf, crash_capture.len);
+      cl.close();
+      Serial.println("CrashReport appended to CRASH.LOG");
+    }
+  }
+#endif
 
   // initialize apps
   OC::app_switcher.Init(reset_settings || firstrun);
@@ -379,12 +496,88 @@ void setup() {
 
   OC::app_switcher.current_app()->DispatchAppEvent(OC::APP_EVENT_RESUME);
 
+#if defined(__IMXRT1062__)
+  // last: everything interactive that can legitimately block forever is
+  // behind us, and loop() takes over feeding from here
+  watchdog_arm();
+  SERIAL_PRINTLN("* WDOG1 armed (128s, fed from loop)");
+#endif
+
   SERIAL_PRINTLN("[End of setup()]");
 }
 
 /*  ---------    main loop  --------  */
 
-void FASTRUN loop() {
+#if defined(__IMXRT1062__)
+// console 't': one-shot system health report
+extern char _heap_end[], *__brkval;
+FLASHMEM __attribute__((noinline)) static void SelfTest() {
+  Serial.println("=== selftest ===");
+  // bit 4 = wdog_rst_b (bit 5 is JTAG). Captured+cleared at boot.
+  Serial.printf("uptime=%lus  reset_cause(SRC_SRSR@boot)=%08lX%s\n",
+                millis() / 1000, boot_srsr,
+                (boot_srsr & (1 << 4)) ? " [WDOG]" : "");
+  Serial.printf("watchdog: %s (128s, fed from loop)\n",
+                watchdog_armed ? "armed" : "OFF");
+  {
+    static uint32_t last_lc = 0, last_ms = 0;
+    const uint32_t lc = loop_counter, ms = millis();
+    if (last_ms && ms != last_ms)
+      Serial.printf("loop rate ~%lu Hz\n", (lc - last_lc) * 1000 / (ms - last_ms));
+    last_lc = lc; last_ms = ms;
+    const uint32_t t0 = OC::CORE::ticks;
+    delay(5);
+    Serial.printf("core delta5ms=%lu (expect ~83)\n", OC::CORE::ticks - t0);
+  }
+  Serial.printf("heap free: %lu bytes (RAM2)\n",
+                (unsigned long)(_heap_end - __brkval));
+#if defined(ARDUINO_TEENSY41)
+  // integer tenths: %f would drag the float-printf tables into DTCM
+  Serial.printf("audio pool: %u now / %u max   cpu: %lu.%lu%% now / %lu.%lu%% max\n",
+                AudioMemoryUsage(), AudioMemoryUsageMax(),
+                (unsigned long)(AudioProcessorUsage() * 10) / 10,
+                (unsigned long)(AudioProcessorUsage() * 10) % 10,
+                (unsigned long)(AudioProcessorUsageMax() * 10) / 10,
+                (unsigned long)(AudioProcessorUsageMax() * 10) % 10);
+#endif
+  {
+    // %llu is unsupported by Print::printf (prints literal "lu")
+    Serial.printf("littlefs: %luKB/%luKB used\n",
+                  (unsigned long)(PhzConfig::myfs.usedSize() >> 10),
+                  (unsigned long)(PhzConfig::myfs.totalSize() >> 10));
+    // write-verify: the failure mode where writes "succeed" as 0-byte files
+    const char *tf = "SELFTST.TMP";
+    uint8_t pat[64], chk[64];
+    for (unsigned i = 0; i < sizeof(pat); ++i) pat[i] = (uint8_t)(i * 37 + 5);
+    PhzConfig::myfs.remove(tf);
+    File f = PhzConfig::myfs.open(tf, FILE_WRITE_BEGIN);
+    bool ok = f && f.write(pat, sizeof(pat)) == sizeof(pat);
+    if (f) f.close();
+    if (ok) {
+      f = PhzConfig::myfs.open(tf, FILE_READ);
+      ok = f && f.read(chk, sizeof(chk)) == sizeof(chk)
+             && memcmp(pat, chk, sizeof(pat)) == 0;
+      if (f) f.close();
+    }
+    PhzConfig::myfs.remove(tf);
+    Serial.printf("fs write-verify: %s\n", ok ? "PASS" : "FAIL");
+    f = PhzConfig::myfs.open("CRASH.LOG", FILE_READ);
+    if (f) {
+      Serial.printf("CRASH.LOG present: %lu bytes (crashes recorded)\n",
+                    (unsigned long)f.size());
+      f.close();
+    } else {
+      Serial.println("CRASH.LOG: none (no crashes recorded)");
+    }
+  }
+  Serial.println("=== selftest done ===");
+}
+#endif
+
+// FLASHMEM, not FASTRUN: under LTO a FASTRUN loop() gets inlined into
+// main() wholesale, dragging several KB of cold menu/console code into
+// ITCM. noinline keeps an out-of-line body for the section attribute.
+FLASHMEM __attribute__((noinline)) void loop() {
   using namespace OC;
   CORE::app_isr_enabled = true;
   CORE::display_update_enabled = true;
@@ -393,6 +586,10 @@ void FASTRUN loop() {
   uint32_t last_redraw_time = 0;
 
   while (true) {
+    ++loop_counter;
+#if defined(__IMXRT1062__)
+    watchdog_feed();  // a wedged loop() now reboots instead of bricking
+#endif
 #if defined(ARDUINO_TEENSY41)
     thisUSB.Task();
 #endif
@@ -466,25 +663,46 @@ void FASTRUN loop() {
     // check for request from PC to capture the screen
     if (Serial && Serial.available() > 0) {
       bool capreq = false;
+      // Console lock: hosts like Linux ModemManager AT/MBIM-probe every new
+      // CDC port, and that byte soup lands on real commands ('D' turns the
+      // display off, 'C'/'F' reset or erase the config filesystem). Ignore
+      // all input until the literal sequence "pew!" arrives once per boot.
+      static bool console_unlocked = false;
+      static uint32_t unlock_shift = 0;
+      static uint32_t destructive_arm_ms = 0;  // C/F double-press confirm
+      static char destructive_arm_key = 0;
       do {
         int cmd = Serial.read();
+        if (!console_unlocked) {
+          unlock_shift = (unlock_shift << 8) | (uint8_t)cmd;
+          if (unlock_shift == 0x70657721) {  // "pew!"
+            console_unlocked = true;
+            Serial.println("-=[ console unlocked ]=-");
+          }
+          continue;
+        }
         switch (cmd) {
 #ifdef PRINT_DEBUG
           case 'z':
             Serial.println("-=[ PEW PEW NERDS! ]=-");
-            Serial.println("Secret Menu Options:");
-            Serial.printf("'I' = Toggle App ISR [%s]\n", OC::CORE::app_isr_enabled ? "ON" : "OFF");
-            Serial.printf("'D' = Toggle Display Redraw [%s]\n", OC::CORE::display_update_enabled ? "ON" : "OFF");
-            Serial.printf("'L' = Toggle App Loop [%s]\n", OC::CORE::app_loop_enabled ? "ON" : "OFF");
+            Serial.println("-- system --");
+#if defined(__IMXRT1062__)
+            Serial.println("t selftest   a activate default app");
+#endif
+            Serial.printf("I app ISR [%s]   D display [%s]   L app loop [%s]\n",
+                          OC::CORE::app_isr_enabled ? "on" : "OFF",
+                          OC::CORE::display_update_enabled ? "on" : "OFF",
+                          OC::CORE::app_loop_enabled ? "on" : "OFF");
 #if defined(__IMXRT1062__)
 #if defined(ARDUINO_TEENSY41)
-            Serial.println("'i' = scan all i2c addresses");
+            Serial.println("i i2c scan");
 #endif
-            Serial.println("'l' = list all files in flash (LittleFS)");
-            Serial.println("'s' = list all files on SD card");
-            Serial.println("'C' = clear/reset default Config file");
-            Serial.println("'F' = format/erase all LittleFS files");
+            Serial.println("-- files --");
+            Serial.println("l list LittleFS   s list SD");
+            Serial.println("-- DANGER --");
+            Serial.println("C RESET config file   F ERASE ALL LittleFS files");
 #endif
+            Serial.println("(any other key = screen capture)");
             break;
 
           case 'I':
@@ -506,10 +724,22 @@ void FASTRUN loop() {
             ScanI2C();
             break;
 #endif
+          // destructive keys need a second press within 3s ('pew!' stops
+          // robots typing garbage; this stops human typos)
           case 'C':
-            Serial.println("Resetting Config File!!");
-            PhzConfig::clear_config();
-            PhzConfig::save_config();
+            if (millis() - destructive_arm_ms < 3000 && destructive_arm_key == 'C') {
+              destructive_arm_ms = 0;
+              Serial.println("Resetting Config File!!");
+              PhzConfig::clear_config();
+              PhzConfig::save_config();
+            } else {
+              destructive_arm_ms = millis();
+              destructive_arm_key = 'C';
+              Serial.println("'C' RESETS the config - press 'C' again within 3s");
+            }
+            break;
+          case 't': SelfTest(); break;  // one-shot system health report
+          case 'a': OC::SwitchToDefaultApp(); break;  // remote: default app
           case 'l':
             Serial.println(" -=- LittleFS -=- ");
             PhzConfig::listFiles();
@@ -519,8 +749,16 @@ void FASTRUN loop() {
             PhzConfig::listFiles(SD);
             break;
           case 'F':
+            if (millis() - destructive_arm_ms >= 3000 || destructive_arm_key != 'F') {
+              destructive_arm_ms = millis();
+              destructive_arm_key = 'F';
+              Serial.println("'F' ERASES ALL LittleFS files - press 'F' again within 3s");
+              break;
+            }
+            destructive_arm_ms = 0;
             Serial.println("!! ERASING ALL FILES on LittleFS !!");
-            PhzConfig::eraseFiles();
+            // worst-case format outlives the 128s watchdog: timer-fed
+            watchdog_feed_during([] { PhzConfig::eraseFiles(); });
             break;
 #endif
 

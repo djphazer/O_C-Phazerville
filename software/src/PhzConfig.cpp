@@ -286,6 +286,26 @@ bool load_config(const char* filename, FS &fs)
 }
 
 FLASHMEM
+bool backup_config()
+{
+  File src = myfs.open(CONFIG_FILENAME, FILE_READ);
+  if (!src) return false;
+  myfs.remove(BACKUP_FILENAME);
+  File dst = myfs.open(BACKUP_FILENAME, FILE_WRITE_BEGIN);
+  if (!dst) { src.close(); return false; }
+  uint8_t buf[256];
+  int n;
+  bool ok = true;
+  while ((n = src.read(buf, sizeof(buf))) > 0) {
+    if (dst.write(buf, n) != (size_t)n) { ok = false; break; }
+  }
+  src.close();
+  dst.close();
+  if (!ok) myfs.remove(BACKUP_FILENAME);  // no partial backups
+  return ok;
+}
+
+FLASHMEM
 void listFiles(FS &fs)
 {
   Serial.print("\n     Space Used = ");
