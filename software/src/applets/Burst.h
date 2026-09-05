@@ -59,14 +59,17 @@ public:
         if (DetentedIn(0) != 0) {
             last_number_cv_tick = OC::CORE::ticks;
         }
-        number_mod = constrain(number + Proportion(DetentedIn(0), HEMISPHERE_MAX_INPUT_CV, HEM_BURST_NUMBER_MAX - 1), 1, HEM_BURST_NUMBER_MAX);
+        number_mod = number;
+        int cv = SemitoneIn(0) / 5;
+        number_mod = constrain(number_mod + cv, 1, HEM_BURST_NUMBER_MAX);
         int spacing_mod = clocked ? 0 : Proportion(DetentedIn(1), HEMISPHERE_MAX_INPUT_CV, 500);
         if (!clocked) display_spacing = constrain(spacing + spacing_mod, HEM_BURST_SPACING_MIN, HEM_BURST_SPACING_MAX);
         if (clocked) {
-            static const int div_states[] = {-8, -7, -6, -5, -4, -3, -2, 1, 2, 3, 4, 5, 6, 7, 8};
-            int base_pos = 0;
-            while (base_pos < 14 && div_states[base_pos] != div) ++base_pos;
-            effective_div = div_states[constrain(base_pos + Proportion(DetentedIn(1) - HEMISPHERE_CENTER_INPUT_CV, HEMISPHERE_MAX_INPUT_CV / 2, 7), 0, 14)];
+            int div_index = (div < 0) ? div + 8 : div + 6;
+            int div_mod = div_index * 2;
+            Modulate(div_mod, 1, 0, 28);
+            int mod_index = div_mod / 2;
+            effective_div = (mod_index < 7) ? mod_index - 8 : mod_index - 6;
         }
         // Get timing information
         if (Clock(0)) {
@@ -177,7 +180,7 @@ public:
 
           case DIVISION:
             div += direction;
-            div_constrain(direction);
+            div_constrain(div, direction);
             break;
         }
     }
@@ -198,7 +201,7 @@ public:
     void OnDataReceive(uint64_t data) {
         number = constrain(Unpack(data, PackLocation {0,8}), 1, HEM_BURST_NUMBER_MAX);
         spacing = constrain(Unpack(data, PackLocation {8,8}), HEM_BURST_SPACING_MIN, HEM_BURST_SPACING_MAX);
-        div = Unpack(data, PackLocation {16,8}) - 8; div_constrain(); // special constrain for div
+        div = Unpack(data, PackLocation {16,8}) - 8; div_constrain(div); // special constrain for div
         jitter = constrain(Unpack(data, PackLocation {24,8}), 0, HEM_BURST_JITTER_MAX);
         accel = Unpack(data, PackLocation {32,8});
         CONSTRAIN(accel, -HEM_BURST_ACCEL_MAX, HEM_BURST_ACCEL_MAX);
@@ -334,10 +337,10 @@ private:
         return effective_spacing;
     }
 
-    void div_constrain(int dir = 1) { // moved special contrain procedure to function for reuse when constraining unpack.
-        if (div > HEM_BURST_CLOCKDIV_MAX) div = HEM_BURST_CLOCKDIV_MAX;
-        if (div < -HEM_BURST_CLOCKDIV_MAX) div = -HEM_BURST_CLOCKDIV_MAX;
-        if (div == 0) div = dir > 0 ? 1 : -2; // No such thing as 1/1 Multiple
-        if (div == -1) div = 1; // Must be moving up to hit -1 (see previous line)
+    void div_constrain(int &value, int dir = 1) { // special constrain procedure for div.
+        if (value > HEM_BURST_CLOCKDIV_MAX) value = HEM_BURST_CLOCKDIV_MAX;
+        if (value < -HEM_BURST_CLOCKDIV_MAX) value = -HEM_BURST_CLOCKDIV_MAX;
+        if (value == 0) value = dir > 0 ? 1 : -2; // No such thing as 1/1 Multiple
+        if (value == -1) value = 1; // Must be moving up to hit -1
     }
 };
