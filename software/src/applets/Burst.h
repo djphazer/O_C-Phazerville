@@ -74,13 +74,11 @@ public:
             if (clocked) {
                 // Get a tempo, if this is the second tick or later since the last clock
                 spacing = ClockCycleTicks(0) / number_mod / HEMISPHERE_CLOCK_TICKS;
-                ticks_since_clock = 0;
             } else clocked = 1;
 
             if (passthru & 1)
               ClockOut(0);
         }
-        ticks_since_clock++;
 
         // Get spacing with clock division or multiplication calculated
         int effective_spacing = get_effective_spacing();
@@ -230,7 +228,6 @@ private:
                   // spacing of a new burst is number/clock length.
 
     // state
-    int ticks_since_clock; // When clocked, this is the time since the last clock.
     int last_number_cv_tick; // The last time the number was changed via CV. This is used to
                              // decide whether the ADC delay should be used when clocks come in.
 
