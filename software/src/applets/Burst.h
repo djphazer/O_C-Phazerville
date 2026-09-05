@@ -42,45 +42,48 @@ public:
     void Start() {
         cursor = 0;
         number = 4;
+        number_mod = 4;
         div = 1;
+        effective_div = 1;
         spacing = 50;
+        display_spacing = 50;
         accel = 0;
         jitter = 0;
         bursts_to_go = 0;
         clocked = 0;
-        last_number_cv_tick = 0;
     }
 
     void Controller() {
         // Settings and modulation over CV
-        if (DetentedIn(0) > 0) {
-            number = constrain(Proportion(In(0), HEMISPHERE_MAX_INPUT_CV, HEM_BURST_NUMBER_MAX), 1, HEM_BURST_NUMBER_MAX);
-            last_number_cv_tick = OC::CORE::ticks;
+        number_mod = number;
+        int cv = SemitoneIn(0) / 5;
+        number_mod = constrain(number_mod + cv, 1, HEM_BURST_NUMBER_MAX);
+        if (clocked) {
+            int div_index = (div < 0) ? div + 8 : div + 6;
+            int div_mod = div_index * 2;
+            Modulate(div_mod, 1, 0, 28);
+            int mod_index = div_mod / 2;
+            effective_div = (mod_index < 7) ? mod_index - 8 : mod_index - 6;
         }
-        int spacing_mod = clocked ? 0 : Proportion(DetentedIn(1), HEMISPHERE_MAX_INPUT_CV, 500);
-
         // Get timing information
         if (Clock(0)) {
             if (clocked) {
                 // Get a tempo, if this is the second tick or later since the last clock
-                spacing = (ticks_since_clock / number) / 17;
-                ticks_since_clock = 0;
+                spacing = ClockCycleTicks(0) / number_mod / HEMISPHERE_CLOCK_TICKS;
             } else clocked = 1;
 
             if (passthru & 1)
               ClockOut(0);
         }
-        ticks_since_clock++;
 
         // Get spacing with clock division or multiplication calculated
         int effective_spacing = get_effective_spacing();
-
+        if (!clocked) Modulate(effective_spacing, 1, HEM_BURST_SPACING_MIN, HEM_BURST_SPACING_MAX);
+        if (!clocked) display_spacing = effective_spacing;
         // Handle a burst set in progress
         if (bursts_to_go > 0) {
             if (--burst_countdown <= 0) {
-                int modded_spacing = effective_spacing + spacing_mod;
-                // if (modded_spacing < HEM_BURST_SPACING_MIN) modded_spacing = HEM_BURST_SPACING_MIN;
-                // if (modded_spacing > HEM_BURST_SPACING_MAX) modded_spacing = HEM_BURST_SPACING_MAX;
+                int modded_spacing = effective_spacing;
                 modded_spacing = constrain(modded_spacing, HEM_BURST_SPACING_MIN, HEM_BURST_SPACING_MAX);
                 if (accel > 0) {
                     int amount_from_min = modded_spacing - HEM_BURST_SPACING_MIN;
@@ -100,29 +103,22 @@ public:
                 modded_spacing = constrain(modded_spacing, HEM_BURST_SPACING_MIN, HEM_BURST_SPACING_MAX);
                 ClockOut(0);
                 burst_count++;
-                if (--bursts_to_go > 0) burst_countdown = modded_spacing * 17; // Reset for next burst
+                if (--bursts_to_go > 0) burst_countdown = modded_spacing * HEMISPHERE_CLOCK_TICKS; // Reset for next burst
                 else GateOut(1, 0); // Turn off the gate
             }
         }
 
         // Handle the triggering of a new burst set.
         //
-        // number_is_changing: If Number is being changed via CV, employ the ADC Lag mechanism
-        // so that Number can be set and gated with a sequencer (or something). Otherwise, if
-        // Number is not being changed via CV, fire the set of bursts right away. This is done so that
-        // the applet can adapt to contexts that involve (1) the need to accurately interpret rapidly-
-        // changing CV values or (2) the need for tight timing when Number is static-ish.
-        bool number_is_changing = (OC::CORE::ticks - last_number_cv_tick < 80000);
         bool btrig = Clock(1) && (random(100) >= prob);
-        if (btrig && number_is_changing) StartADCLag();
-
         if ((passthru & 0x2) && Clock(1)) ClockOut(0);
 
-        if (EndOfADCLag() || (btrig && !number_is_changing)) {
+        if (btrig) {
             ClockOut(0);
             GateOut(1, 1);
-            bursts_to_go = number - 1;
-            burst_countdown = effective_spacing * 17;
+            bursts_to_go = number_mod - 1;
+            if (bursts_to_go == 0) GateOut(1, 0);
+            burst_countdown = effective_spacing * HEMISPHERE_CLOCK_TICKS;
             burst_count = 1;
         }
     }
@@ -167,7 +163,7 @@ public:
 
           case DIVISION:
             div += direction;
-            div_constrain(direction);
+            div_constrain(div, direction);
             break;
         }
     }
@@ -188,7 +184,7 @@ public:
     void OnDataReceive(uint64_t data) {
         number = constrain(Unpack(data, PackLocation {0,8}), 1, HEM_BURST_NUMBER_MAX);
         spacing = constrain(Unpack(data, PackLocation {8,8}), HEM_BURST_SPACING_MIN, HEM_BURST_SPACING_MAX);
-        div = Unpack(data, PackLocation {16,8}) - 8; div_constrain(); // special constrain for div
+        div = Unpack(data, PackLocation {16,8}) - 8; div_constrain(div); // special constrain for div
         jitter = constrain(Unpack(data, PackLocation {24,8}), 0, HEM_BURST_JITTER_MAX);
         accel = Unpack(data, PackLocation {32,8});
         CONSTRAIN(accel, -HEM_BURST_ACCEL_MAX, HEM_BURST_ACCEL_MAX);
@@ -220,14 +216,15 @@ private:
                   // spacing of a new burst is number/clock length.
 
     // state
-    int ticks_since_clock; // When clocked, this is the time since the last clock.
-    int last_number_cv_tick; // The last time the number was changed via CV. This is used to
                              // decide whether the ADC delay should be used when clocks come in.
 
     // Settings
     int div; // Divide or multiply the clock tempo
+    int effective_div; // CV2-modulated division/multiplication for clocked operation
     uint8_t number; // How many bursts fire at each trigger
-    uint8_t spacing; // How many ms pass between each burst
+    int number_mod; // CV1-modulated burst amount for operation and display
+    uint16_t spacing; // How many ms pass between each burst
+    int display_spacing; // CV2-modified spacing shown on the display
     int8_t accel; // Accelleration or deceleration
     uint8_t jitter; // Randomness
     uint8_t passthru; // regular clock pulses come out, too
@@ -248,13 +245,13 @@ private:
         y += 9;
 
         // Number
-        gfxPrint(1, y, number);
+        gfxPrint(1, y, number_mod);
         gfxPrint(27, y, "bursts");
 
         y += 9;
 
         // Spacing
-        gfxPrint(1, y, clocked ? get_effective_spacing() : spacing);
+        gfxPrint(1, y, clocked ? get_effective_spacing() : display_spacing);
         gfxPrint(28, y, "ms");
 
         y += 9;
@@ -272,9 +269,9 @@ private:
         // Div
         if (clocked) {
             gfxBitmap(1, y, 8, CLOCK_ICON);
-            gfxPrint(11, y, div < 0 ? "x" : "/");
-            gfxPrint(div < 0 ? -div : div);
-            gfxPrint(div < 0 ? " Mult" : " Div");
+            gfxPrint(11, y, effective_div < 0 ? "x" : "/");
+            gfxPrint(effective_div < 0 ? -effective_div : effective_div);
+            gfxPrint(effective_div < 0 ? " Mult" : " Div");
         }
 
         // Cursor
@@ -315,16 +312,16 @@ private:
     int get_effective_spacing() {
         int effective_spacing = spacing;
         if (clocked) {
-            if (div > 1) effective_spacing *= div;
-            if (div < 0) effective_spacing /= -div;
+            if (effective_div > 1) effective_spacing *= effective_div;
+            if (effective_div < 0) effective_spacing /= -effective_div;
         }
         return effective_spacing;
     }
 
-    void div_constrain(int dir = 1) { // moved special contrain procedure to function for reuse when constraining unpack.
-        if (div > HEM_BURST_CLOCKDIV_MAX) div = HEM_BURST_CLOCKDIV_MAX;
-        if (div < -HEM_BURST_CLOCKDIV_MAX) div = -HEM_BURST_CLOCKDIV_MAX;
-        if (div == 0) div = dir > 0 ? 1 : -2; // No such thing as 1/1 Multiple
-        if (div == -1) div = 1; // Must be moving up to hit -1 (see previous line)
+    void div_constrain(int &value, int dir = 1) { // special constrain procedure for div.
+        if (value > HEM_BURST_CLOCKDIV_MAX) value = HEM_BURST_CLOCKDIV_MAX;
+        if (value < -HEM_BURST_CLOCKDIV_MAX) value = -HEM_BURST_CLOCKDIV_MAX;
+        if (value == 0) value = dir > 0 ? 1 : -2; // No such thing as 1/1 Multiple
+        if (value == -1) value = 1; // Must be moving up to hit -1
     }
 };
