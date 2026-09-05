@@ -252,15 +252,84 @@ extern unsigned long _heap_start;
 extern "C" FLASHMEM void startup_middle_hook(void) {
   memset((void *)0x20200000, 0, (uint32_t)&_heap_start - 0x20200000u);
 }
+
+
+// ---------------------------------------------------------------------------
+// Crash forensics + hardware watchdog (T4.x)
+// ---------------------------------------------------------------------------
+
+// Capture CrashReport text at boot so it can be appended to CRASH.LOG once
+// LittleFS is mounted (the Serial print is gone if nobody was watching).
+// buffer lives in RAM2 (DMAMEM) - DTCM stack headroom is precious
+static DMAMEM char crash_buf[1024];
+class BufferPrint : public Print {
+public:
+  char *buf = crash_buf;
+  size_t len = 0;
+  size_t write(uint8_t c) override {
+    if (len < sizeof(crash_buf) - 1) { buf[len++] = c; buf[len] = 0; return 1; }
+    return 0;
+  }
+};
+static BufferPrint crash_capture;
+
+// Reset cause, captured then cleared at boot: SRSR bits are sticky w1c and
+// would otherwise show every cause since the last power-on, forever.
+static uint32_t boot_srsr = 0;
+
+// WDOG1: 128s timeout, fed only from loop(). Long enough that the slowest
+// legitimate blocking op (a full LittleFS format) rarely trips it; a hard
+// loop() hang reboots instead of bricking the module until power-cycle.
+// Armed at the END of setup() so interactive boot flows (BootMenu,
+// ConfirmReset) can block indefinitely.
+static bool watchdog_armed = false;
+FLASHMEM static void watchdog_arm() {
+  // the core never ungates WDOG1's clock ("WDOG1 requires CCM_CCGR3_WDOG1"
+  // per imxrt.h) - touching its registers without this bus-faults
+  CCM_CCGR3 |= CCM_CCGR3_WDOG1(CCM_CCGR_ON);
+  asm volatile("dsb");
+  // PDE (set at reset) is a one-shot 16s power-down counter that asserts
+  // reset unless cleared - with the clock just ungated it would fire ~16s
+  // after arming and masquerade as a watchdog timeout
+  WDOG1_WMCR = 0;
+  WDOG1_WCR = (uint16_t)(255u << 8)  // WT: (255+1)*0.5s = 128s
+            | WDOG_WCR_WDE | WDOG_WCR_SRS | WDOG_WCR_WDA
+            | WDOG_WCR_WDBG | WDOG_WCR_WDZST;
+  watchdog_armed = true;
+}
+static inline void watchdog_feed() {
+  WDOG1_WSR = 0x5555;
+  WDOG1_WSR = 0xAAAA;
+}
+
+// A full LittleFS format can exceed 128s worst-case (flash sector erase is
+// 400ms MAX) - the one legitimate loop-blocking op longer than the
+// watchdog. Feed from a timer for its duration only.
+static IntervalTimer wdog_format_feeder;
+static void watchdog_feed_isr() { watchdog_feed(); }  // ISR: stays in ITCM
+FLASHMEM static void watchdog_feed_during(void (*op)()) {
+  wdog_format_feeder.begin(watchdog_feed_isr, 1000000);  // 1s
+  op();
+  wdog_format_feeder.end();
+}
 #endif
 
 FLASHMEM void setup() {
   delay(50);
+#if defined(__IMXRT1062__)
+  boot_srsr = SRC_SRSR;
+  SRC_SRSR = boot_srsr;  // w1c: next boot reports only its own cause
+#endif
   Serial.begin(9600);
 
   if (CrashReport) {
     while (!Serial && millis() < 3000) ; // wait
     Serial.println(CrashReport);
+#if defined(__IMXRT1062__)
+    // stash the report so it can be appended to CRASH.LOG once the
+    // filesystem is up (console prints vanish when nobody is watching)
+    crash_capture.print(CrashReport);
+#endif
     delay(1500);
   }
 
@@ -366,6 +435,26 @@ FLASHMEM void setup() {
   // initialize LittleFS for config files
   PhzConfig::Init();
 
+#if defined(__IMXRT1062__)
+  // append any captured crash report to CRASH.LOG (rotate at 8KB)
+  if (crash_capture.len) {
+    File cl = PhzConfig::myfs.open("CRASH.LOG", FILE_READ);
+    const bool rotate = cl && cl.size() > 8192;
+    if (cl) cl.close();
+    if (rotate) {  // keep one generation of history instead of deleting
+      PhzConfig::myfs.remove("CRASH.OLD");
+      PhzConfig::myfs.rename("CRASH.LOG", "CRASH.OLD");
+    }
+    cl = PhzConfig::myfs.open("CRASH.LOG", FILE_WRITE);  // append
+    if (cl) {
+      cl.printf("--- boot @ %lu ms ---\n", millis());
+      cl.write((const uint8_t *)crash_capture.buf, crash_capture.len);
+      cl.close();
+      Serial.println("CrashReport appended to CRASH.LOG");
+    }
+  }
+#endif
+
   // Display loading splash screen and optional calibration
   bool reset_settings = false;
   ui_mode = OC::ui.Splashscreen(reset_settings, 0);
@@ -384,6 +473,19 @@ FLASHMEM void setup() {
 
   // use default global config file in LFS
   bool firstrun = !PhzConfig::load_config();
+#ifdef __IMXRT1062__
+  if (firstrun) {
+    // GLOBALS.CFG missing/corrupt: try the boot-time backup before the
+    // ConfirmReset flow gets a chance to threaten a factory wipe.
+    if (PhzConfig::load_config(PhzConfig::BACKUP_FILENAME)) {
+      Serial.println("CONFIG: GLOBALS.CFG bad; restored from GLOBALS.BAK");
+      PhzConfig::save_config();  // re-materialize the primary from memory
+      firstrun = false;
+    }
+  } else {
+    PhzConfig::backup_config();  // known-good primary: refresh the backup
+  }
+#endif
 
   // initialize apps
   OC::app_switcher.Init(reset_settings || firstrun);
@@ -395,6 +497,12 @@ FLASHMEM void setup() {
     OC::start_calibration();
 
   OC::app_switcher.current_app()->DispatchAppEvent(OC::APP_EVENT_RESUME);
+
+#if defined(__IMXRT1062__)
+  // loop takes over feeding from here
+  watchdog_arm();
+  SERIAL_PRINTLN("* WDOG1 armed (128s, fed from loop)");
+#endif
 
   SERIAL_PRINTLN("[End of setup()]");
 }
@@ -463,7 +571,9 @@ void SerialHandler() {
           break;
         case 'F':
           Serial.println("!! ERASING ALL FILES on LittleFS !!");
-          PhzConfig::eraseFiles();
+          // a worst-case format can outlive the 128s watchdog, so feed it
+          // from a timer for the duration
+          watchdog_feed_during([] { PhzConfig::eraseFiles(); });
           break;
 #endif
 
@@ -556,6 +666,9 @@ FLASHMEM __attribute__((noinline)) void loop() {
   uint32_t last_redraw_time = 0;
 
   while (true) {
+#if defined(__IMXRT1062__)
+    watchdog_feed();
+#endif
 #if defined(ARDUINO_TEENSY41)
     thisUSB.Task();
 #endif
