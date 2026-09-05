@@ -62,8 +62,6 @@ public:
         number_mod = number;
         int cv = SemitoneIn(0) / 5;
         number_mod = constrain(number_mod + cv, 1, HEM_BURST_NUMBER_MAX);
-        int spacing_mod = clocked ? 0 : Proportion(DetentedIn(1), HEMISPHERE_MAX_INPUT_CV, 500);
-        if (!clocked) display_spacing = constrain(spacing + spacing_mod, HEM_BURST_SPACING_MIN, HEM_BURST_SPACING_MAX);
         if (clocked) {
             int div_index = (div < 0) ? div + 8 : div + 6;
             int div_mod = div_index * 2;
@@ -86,13 +84,12 @@ public:
 
         // Get spacing with clock division or multiplication calculated
         int effective_spacing = get_effective_spacing();
-
+        if (!clocked) Modulate(effective_spacing, 1, HEM_BURST_SPACING_MIN, HEM_BURST_SPACING_MAX);
+        if (!clocked) display_spacing = effective_spacing;
         // Handle a burst set in progress
         if (bursts_to_go > 0) {
             if (--burst_countdown <= 0) {
-                int modded_spacing = effective_spacing + spacing_mod;
-                // if (modded_spacing < HEM_BURST_SPACING_MIN) modded_spacing = HEM_BURST_SPACING_MIN;
-                // if (modded_spacing > HEM_BURST_SPACING_MAX) modded_spacing = HEM_BURST_SPACING_MAX;
+                int modded_spacing = effective_spacing;
                 modded_spacing = constrain(modded_spacing, HEM_BURST_SPACING_MIN, HEM_BURST_SPACING_MAX);
                 if (accel > 0) {
                     int amount_from_min = modded_spacing - HEM_BURST_SPACING_MIN;
