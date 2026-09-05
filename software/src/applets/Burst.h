@@ -51,14 +51,10 @@ public:
         jitter = 0;
         bursts_to_go = 0;
         clocked = 0;
-        last_number_cv_tick = 0;
     }
 
     void Controller() {
         // Settings and modulation over CV
-        if (DetentedIn(0) != 0) {
-            last_number_cv_tick = OC::CORE::ticks;
-        }
         number_mod = number;
         int cv = SemitoneIn(0) / 5;
         number_mod = constrain(number_mod + cv, 1, HEM_BURST_NUMBER_MAX);
@@ -114,18 +110,10 @@ public:
 
         // Handle the triggering of a new burst set.
         //
-        // number_is_changing: If Number is being changed via CV, employ the ADC Lag mechanism
-        // so that Number can be set and gated with a sequencer (or something). Otherwise, if
-        // Number is not being changed via CV, fire the set of bursts right away. This is done so that
-        // the applet can adapt to contexts that involve (1) the need to accurately interpret rapidly-
-        // changing CV values or (2) the need for tight timing when Number is static-ish.
-        bool number_is_changing = (OC::CORE::ticks - last_number_cv_tick < 80000);
         bool btrig = Clock(1) && (random(100) >= prob);
-        if (btrig && number_is_changing) StartADCLag();
-
         if ((passthru & 0x2) && Clock(1)) ClockOut(0);
 
-        if (EndOfADCLag() || (btrig && !number_is_changing)) {
+        if (btrig) {
             ClockOut(0);
             GateOut(1, 1);
             bursts_to_go = number_mod - 1;
@@ -228,7 +216,6 @@ private:
                   // spacing of a new burst is number/clock length.
 
     // state
-    int last_number_cv_tick; // The last time the number was changed via CV. This is used to
                              // decide whether the ADC delay should be used when clocks come in.
 
     // Settings
