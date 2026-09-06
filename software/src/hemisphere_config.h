@@ -150,7 +150,7 @@ AppletRegistry reg{
 
 #ifdef PEWPEWPEW
     // Phazer's choice
-    DeclareApplet<BugCrack>{51, 0x80},
+    // DeclareApplet<BugCrack>{51, 0x80},
     DeclareApplet<DrLoFi>{16, 0x80},
 
     DeclareApplet<Burst>{31, 0x04},
