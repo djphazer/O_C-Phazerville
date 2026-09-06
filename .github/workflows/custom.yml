@@ -13,7 +13,7 @@ jobs:
     steps:
     - uses: actions/checkout@v6
       with:
-        ref: T32
+        ref: patch-1
 
     - name: Setup env
       env:
