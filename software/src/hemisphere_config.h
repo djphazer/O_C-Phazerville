@@ -183,7 +183,9 @@ AppletRegistry reg{
     DeclareApplet<Stairs>{61, 0x01},
     DeclareApplet<VectorEG>{52, 0x01},
     DeclareApplet<VectorLFO>{49, 0x01},
+    DeclareApplet<VectorMod>{53, 0x01},
     DeclareApplet<VectorMorph>{54, 0x01},
+    DeclareApplet<RunglBook>{44, 0x01},
 
     DeclareApplet<AttenuateOffset>{56, 0x10},
     DeclareApplet<Brancher>{4, 0x14},
@@ -197,6 +199,7 @@ AppletRegistry reg{
     DeclareApplet<Slew>{19, 0x01},
     DeclareApplet<Voltage>{43, 0x10},
     DeclareApplet<Xfader>{33, 0x10},
+    
 #else
 #ifdef APPLETS_SEQUENCING
     DeclareApplet<ASR>{47, 0x09},
@@ -257,7 +260,7 @@ AppletRegistry reg{
     DeclareApplet<Stairs>{61, 0x01},
     DeclareApplet<VectorEG>{52, 0x01},
     DeclareApplet<VectorLFO>{49, 0x01},
-    //DeclareApplet<VectorMod>{53, 0x01}, // awkward middle child
+    DeclareApplet<VectorMod>{53, 0x01},
     DeclareApplet<VectorMorph>{54, 0x01},
 #endif
 #ifdef APPLETS_LOGIC_UTILITY
