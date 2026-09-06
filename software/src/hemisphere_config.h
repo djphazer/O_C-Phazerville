@@ -183,6 +183,7 @@ AppletRegistry reg{
     DeclareApplet<Stairs>{61, 0x01},
     DeclareApplet<VectorEG>{52, 0x01},
     DeclareApplet<VectorLFO>{49, 0x01},
+    DeclareApplet<VectorMod>{53, 0x01},
     DeclareApplet<VectorMorph>{54, 0x01},
 
     DeclareApplet<AttenuateOffset>{56, 0x10},
