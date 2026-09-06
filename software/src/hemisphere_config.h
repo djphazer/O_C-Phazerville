@@ -150,7 +150,7 @@ AppletRegistry reg{
 
 #ifdef PEWPEWPEW
     // Phazer's choice
-    // DeclareApplet<BugCrack>{51, 0x80},
+    DeclareApplet<BugCrack>{51, 0x80},
     DeclareApplet<DrLoFi>{16, 0x80},
 
     DeclareApplet<Burst>{31, 0x04},
@@ -185,6 +185,7 @@ AppletRegistry reg{
     DeclareApplet<VectorLFO>{49, 0x01},
     DeclareApplet<VectorMod>{53, 0x01},
     DeclareApplet<VectorMorph>{54, 0x01},
+    DeclareApplet<RunglBook>{44, 0x01},
 
     DeclareApplet<AttenuateOffset>{56, 0x10},
     DeclareApplet<Brancher>{4, 0x14},
