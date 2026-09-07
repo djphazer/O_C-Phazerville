@@ -131,6 +131,12 @@ class LorenzGenerator {
   uint16_t dac_code_[kNumChannels];
  
   uint8_t index_;
+
+  static void Lorenz(int32_t &x, int32_t &y, int32_t &z, int64_t rho, int64_t sigma, int64_t beta, int64_t dt);
+  static void Rossler(int32_t &x, int32_t &y, int32_t &z, int64_t c, int64_t a, int64_t b, int64_t dt);
+  static void ScaleLorenz(int32_t x, int32_t y, int32_t z, int32_t &x_scaled, int32_t &y_scaled, int32_t &z_scaled);
+  static void ScaleRossler(int32_t x, int32_t y, int32_t z, int32_t &x_scaled, int32_t &y_scaled, int32_t &z_scaled);
+  void DetermineActiveGenerators(bool &lorenz1, bool &rossler1, bool &lorenz2, bool &rossler2) const;
   
   DISALLOW_COPY_AND_ASSIGN(LorenzGenerator);
 };
