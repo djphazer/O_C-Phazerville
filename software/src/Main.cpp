@@ -162,11 +162,11 @@ extern "C" {
 }
 
 // boot-time only; noinline so FLASHMEM sticks (free-function LTO rule)
-FLASHMEM __attribute__((noinline)) void BootMenu() {
+FLASHMEM __attribute__((noinline)) void BootMenu(const bool show) {
   bool save = false;
   int choice = -1;
 
-  while (true) {
+  while (show) {
     const bool z_held = OC::ui.read_immediate(OC::CONTROL_BUTTON_Z);
     const bool a_held = OC::ui.read_immediate(OC::CONTROL_BUTTON_A);
     const bool b_held = OC::ui.read_immediate(OC::CONTROL_BUTTON_B);
@@ -223,6 +223,24 @@ FLASHMEM __attribute__((noinline)) void BootMenu() {
 
   if (save) {
     OC::calibration_save();
+  }
+
+  // check choice and jump
+  if (OC::calibration_data.bootchoice() == 3) {
+    for (int i = 0; i < DAC_CHANNEL_COUNT; ++i) {
+      // -3V to +4V
+      OC::DAC::set_octave(DAC_CHANNEL(i), i-3);
+    }
+    OC::ui.DebugStats();
+  } else if (OC::calibration_data.bootchoice() != MULTIBOOT) {
+    GRAPHICS_BEGIN_FRAME(true);
+    graphics.setPrintPos(1, 28);
+    graphics.print("Switching to alt mode!");
+    GRAPHICS_END_FRAME();
+    AudioNoInterrupts();
+    delay(10);
+    disableCache();
+    jump_to_alt(OC::calibration_data.bootchoice());
   }
 }
 #endif
@@ -334,28 +352,9 @@ FLASHMEM void setup() {
   thisUSB.begin();
 #endif
 
-#ifdef MULTIBOOT
+#if defined(MULTIBOOT) && (MULTIBOOT == 0)
   delay(100);
-  if (OC::ui.read_immediate(OC::CONTROL_BUTTON_Z)) {
-    BootMenu();
-  }
-
-  if (OC::calibration_data.bootchoice() == 3) {
-    for (int i = 0; i < DAC_CHANNEL_COUNT; ++i) {
-      // -3V to +4V
-      OC::DAC::set_octave(DAC_CHANNEL(i), i-3);
-    }
-    OC::ui.DebugStats();
-  } else if (OC::calibration_data.bootchoice()) {
-    GRAPHICS_BEGIN_FRAME(true);
-    graphics.setPrintPos(1, 28);
-    graphics.print("Switching to alt mode!");
-    GRAPHICS_END_FRAME();
-    AudioNoInterrupts();
-    delay(10);
-    disableCache();
-    jump_to_alt(OC::calibration_data.bootchoice());
-  }
+  BootMenu(OC::ui.read_immediate(OC::CONTROL_BUTTON_Z));
 #endif
 
   // --- more hardware init
