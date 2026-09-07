@@ -70,6 +70,7 @@ public:
     bool midi_out_enabled = 1;
 
     bool tickno = 0;
+    bool auto_stop = true;
     bool extsync = false; // locked into an external clock; will stop after timeout
     uint32_t clock_tick[2] = {0,0}; // previous ticks when a physical clock was received on DIGITAL 1
     uint32_t beat_tick = 0; // The tick to count from
@@ -282,11 +283,13 @@ public:
         if (clocked) {
             tickno = 1 - tickno;
             clock_tick[tickno] = now;
-        }
-        else if (extsync && ppqn && now - clock_tick[tickno] > ticks_per_beat * 2 / ppqn) {
-          // auto-stop
-          Stop();
-          Start(true); // re-arm
+        } else if (auto_stop) {
+          if (extsync && ppqn
+              && now - clock_tick[tickno] > ticks_per_beat * 2 / ppqn) {
+            // auto-stop
+            Stop();
+            Start(true); // re-arm
+          }
         }
     }
 

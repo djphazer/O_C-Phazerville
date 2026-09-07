@@ -369,6 +369,7 @@ void AppSwitcher::Init(bool reset_settings) {
     APPS_SERIAL_PRINTLN("> %s", app->name());
     app.InitDefaults(app.instance);
   });
+  ClockSetup_instance.BaseStart(HS::CLOCK_CURSOR);
 
   current_app_ = app_container[DEFAULT_APP_INDEX];
 
