@@ -74,8 +74,9 @@ class Ponglet : public HemisphereApplet {
         Boop(); --boop_ticker;
       }
 
-      // throttling to 1/32 cycle for ball update
-      if (++ticker & 0x1f) return;
+      // throttling for ball update, modulated by CV1
+      const uint32_t mask = 0xff >> abs(3 + In(0) / ONE_OCTAVE);
+      if (++ticker & mask) return;
 
       ball_x += vel_x;
       ball_y += vel_y;
@@ -135,10 +136,10 @@ class Ponglet : public HemisphereApplet {
       //                    "-------" <-- Label size guide
       help[HELP_DIGITAL1] = "";
       help[HELP_DIGITAL2] = "";
-      help[HELP_CV1]      = "";
+      help[HELP_CV1]      = "Speed";
       help[HELP_CV2]      = "";
       help[HELP_OUT1]     = "Audio";
-      help[HELP_OUT2]     = "";
+      help[HELP_OUT2]     = "Trig";
       help[HELP_EXTRA1] = "Beeps and Boops";
       help[HELP_EXTRA2] = "(paddle coming soon)";
       //                  "---------------------" <-- Extra text size guide
