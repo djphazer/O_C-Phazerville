@@ -38,6 +38,17 @@ bool DAC_is_inverted = false;
 float OC::GetIDVoltage() {
   return OC::ADC::Read_ID_Voltage();
 }
+int OC::GetIDIndex() {
+  if (id_voltage < 0.05f) return 1; // O_C
+  if (id_voltage < 0.11f) return 2; // O_C T4.1 Rev3 prototypes
+  if (id_voltage < 0.25f) return 3; // O.R.N.8 with 20Vpp DAC
+  if (id_voltage < 0.35f) return 4; // Calsynth XLOC2
+  if (id_voltage < 0.45f) return 5; // NLM Xenomorpher Serge format
+  if (id_voltage < 0.55f) return 6; // NLM Xenomorpher Buchla format
+
+  // invalid/unsupported HW ID voltage
+  return 0;
+}
 
 FLASHMEM
 void OC::SetFlipMode(bool flip_180) {

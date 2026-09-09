@@ -221,7 +221,11 @@ UiMode Ui::Splashscreen(bool &reset_settings, uint8_t phase) {
       GRAPHICS_BEGIN_FRAME(true);
 
       menu::DefaultTitleBar::Draw();
-      graphics.print( DAC_is_inverted? OC::Strings::NAME_NLM : OC::Strings::NAME);
+#if defined(ARDUINO_TEENSY41)
+      graphics.print(Strings::NAMES_VENDOR[GetIDIndex()]);
+#else
+      graphics.print(Strings::NAME);
+#endif
       weegfx::coord_t y = menu::CalcLineY(0);
 
       graphics.setPrintPos(menu::kIndentDx, y + menu::kTextDy);
