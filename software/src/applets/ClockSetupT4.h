@@ -365,7 +365,7 @@ public:
         Pack(data, PackLocation { 20, 4 }, HS::screensaver_mode);
         // -- 8 bits free --
         Pack(data, PackLocation { 32, 16 }, play_trig.Pack());
-        Pack(data, PackLocation { 48, 16 }, sync_trig.Pack());
+        Pack(data, PackLocation { 48, 16 }, sync_trig.Pack()-1);
         return data;
     }
     void SetGlobals(const uint64_t &data) {
@@ -381,7 +381,9 @@ public:
                              + Unpack(data, PackLocation { 20, 4 });
 
         play_trig.Unpack(Unpack(data, PackLocation{32, 16}));
-        sync_trig.Unpack(Unpack(data, PackLocation{48, 16}));
+        sync_trig.Unpack(Unpack(data, PackLocation{48, 16})+1);
+        // oh no! help! default is no sync trig, what do?
+        // fixed with a +1/-1 trick, hope it works
     }
 
 protected:
