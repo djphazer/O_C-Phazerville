@@ -148,7 +148,11 @@ static void debug_menu_version()
   static int hwid = int(GetIDVoltage() * 1000);
 
   graphics.setPrintPos(2, 12);
-  graphics.print(DAC_is_inverted ? Strings::NAME_NLM : Strings::NAME);
+#if defined(ARDUINO_TEENSY41)
+  graphics.print(Strings::NAMES_VENDOR[GetIDIndex()]);
+#else
+  graphics.print(Strings::NAME);
+#endif
   graphics.setPrintPos(2, 22);
   graphics.print(Strings::VERSION);
   graphics.setPrintPos(2, 32);

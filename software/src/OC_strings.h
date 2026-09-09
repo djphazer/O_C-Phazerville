@@ -12,9 +12,7 @@ namespace OC {
   namespace Strings {
     extern const char * const RELEASE_NAME;
     extern const char * const NAME;
-    extern const char * const SHORT_NAME;
-    extern const char * const NAME_NLM;
-    extern const char * const SHORT_NAME_NLM;
+    extern const char * const NAMES_VENDOR[];
     extern const char * const VERSION;
     extern const char * const BUILD_TAG;
 

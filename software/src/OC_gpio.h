@@ -56,7 +56,7 @@ namespace OC {
   void Pinout_Detect();
   void SetFlipMode(bool flip_180);
   float GetIDVoltage();
-
+  int GetIDIndex();
 }
 
 #endif // OC_GPIO_H_
