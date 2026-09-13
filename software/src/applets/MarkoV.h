@@ -357,7 +357,7 @@ protected:
     }
 
 private:
-    uint8_t  cursor;
+    int  cursor;
     uint8_t  profile;
     uint8_t  qselect;      // absolute quantizer channel
     uint8_t  chaos_base;   // encoder-set baseline chaos 0-100
