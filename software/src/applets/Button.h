@@ -76,18 +76,14 @@ public:
             toggle_st[channel] = 0; // reset Gate to off
         }
     }
-        
-    /* No state data for this applet
-     */
+
     uint64_t OnDataRequest() {
-        uint64_t data = 0;
-        return data;
+      return uint64_t(gate_mode[0]?1:0) | uint64_t(gate_mode[1]?1:0) << 1;
     }
 
-    /* No state data for this applet
-     */
     void OnDataReceive(uint64_t data) {
-        return;
+      gate_mode[0] = data & 1;
+      gate_mode[1] = (data >> 1) & 1;
     }
 
 protected:
