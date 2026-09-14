@@ -21,8 +21,10 @@
 class Combin8 : public HemisphereApplet {
 public:
   enum Combin8Cursor {
+    CH1_OUT,
     CH1_AUX1,
     CH1_AUX2,
+    CH2_OUT,
     CH2_AUX1,
     CH2_AUX2,
 
@@ -40,17 +42,29 @@ public:
 
   void Controller() {
     ForEachChannel(ch) {
-      int signal = In(ch) + sources[ch][0].In() + sources[ch][1].In();
-      // probably not necessary to constrain here, but doesn't hurt
+      int main_cv = In(ch);
+      int aux1 = sources[ch][0].In();
+      int aux2 = sources[ch][1].In();
+      int signal;
+
+      // SUM mode: sample and hold the complete summed input on the clock.
+      if (output_mode[ch] == MODE_SUM) {
+        signal = main_cv + aux1 + aux2;
+        if (Clock(ch)) StartADCLag(ch);
+        if (EndOfADCLag(ch)) held_cv[ch] = signal;
+        signal = held_cv[ch];
+      // IN mode: sample and hold the main input while aux inputs remain live.
+      } else if (output_mode[ch] == MODE_IN) {
+        if (Clock(ch)) StartADCLag(ch);
+        if (EndOfADCLag(ch)) held_cv[ch] = main_cv;
+        signal = held_cv[ch] + aux1 + aux2;
+      } else {
+        signal = main_cv + aux1 + aux2;
+      }
+
       CONSTRAIN(signal, HEMISPHERE_MIN_CV, HEMISPHERE_MAX_CV);
-
-      // TODO: gate inputs for mutes? S&H?
-      // Mute:
-      //if (Gate(ch)) Out(ch, 0); else Out(ch, signal);
-      // S&H:
-      //if (Clock(ch)) StartADCLag(ch);
-      //if (EndOfADCLag(ch)) Out(ch, signal);
-
+      signal = HS::GetQuantEngine(io_offset + ch).Process(signal, 0, 0);
+      CONSTRAIN(signal, HEMISPHERE_MIN_CV, HEMISPHERE_MAX_CV);
       Out(ch, signal);
     }
   }
@@ -69,7 +83,18 @@ public:
           IndexedInput(CH2_AUX2, sources[1][1])
         ))
       return;
+
     CursorToggle();
+  }
+
+  void AuxButton() {
+    if (IsOutput()) {
+      SetAux(false);
+      HS::QuantizerEdit(io_offset + Channel());
+      CancelEdit();
+      return;
+    }
+    CancelEdit();
   }
 
   void OnEncoderMove(int direction) {
@@ -79,73 +104,220 @@ public:
     }
     if (EditSelectedInputMap(direction)) return;
 
-    sources[cursor/2][cursor%2].ChangeSource(direction);
+    int ch = Channel();
+    if (IsOutput()) {
+      if (direction > 0) {
+        output_mode[ch] = static_cast<OutputMode>(
+          (output_mode[ch] + 1) % 3
+        );
+      } else if (direction < 0) {
+        output_mode[ch] = static_cast<OutputMode>(
+          (output_mode[ch] + 2) % 3
+        );
+      }
+      return;
+    }
+
+    sources[ch][cursor % 3 - 1].ChangeSource(direction);
   }
 
   uint64_t OnDataRequest() {
-    return PackPackables(
-      sources[0][0], sources[0][1], sources[1][0], sources[1][1]
+    uint64_t data = PackPackables(
+      sources[0][0],
+      sources[0][1],
+      sources[1][0],
+      sources[1][1]
     );
+
+    // Persist both channel output modes using the applet's existing data storage.
+    uint64_t mode_data = 0;
+    Pack(mode_data, PackLocation {0, 2}, output_mode[0]);
+    Pack(mode_data, PackLocation {2, 2}, output_mode[1]);
+    SetData(0, mode_data);
+
+    return data;
   }
 
   void OnDataReceive(uint64_t data) {
     UnpackPackables(
-      data, sources[0][0], sources[0][1], sources[1][0], sources[1][1]
+      data,
+      sources[0][0],
+      sources[0][1],
+      sources[1][0],
+      sources[1][1]
     );
-  }
 
+    // Restore saved output modes; default to NRM if no valid data is available.
+    uint64_t mode_data = 0;
+    if (GetData(0, mode_data)) {
+      uint8_t mode0 = Unpack(mode_data, PackLocation {0, 2});
+      uint8_t mode1 = Unpack(mode_data, PackLocation {2, 2});
+
+      if (mode0 > MODE_IN) mode0 = MODE_NRM;
+      if (mode1 > MODE_IN) mode1 = MODE_NRM;
+
+      output_mode[0] = static_cast<OutputMode>(mode0);
+      output_mode[1] = static_cast<OutputMode>(mode1);
+    } else {
+      output_mode[0] = MODE_NRM;
+      output_mode[1] = MODE_NRM;
+    }
+  }
 protected:
   void SetHelp() {
-    //                    "-------" <-- Label size guide
-    help[HELP_DIGITAL1] = "";
-    help[HELP_DIGITAL2] = "";
+    help[HELP_DIGITAL1] = "HoldCV1";
+    help[HELP_DIGITAL2] = "HoldCV2";
     help[HELP_CV1]      = "CV Ch1";
     help[HELP_CV2]      = "CV Ch2";
     help[HELP_OUT1]     = "Out1";
     help[HELP_OUT2]     = "Out2";
     help[HELP_EXTRA1] = "3 inputs per chan";
     help[HELP_EXTRA2] = "";
-    //                  "---------------------" <-- Extra text size guide
   }
 
 private:
   int cursor;
 
-  // two extra sources per channel
+  int Channel() const {
+    return cursor / 3;
+  }
+
+  bool IsOutput() const {
+    return cursor % 3 == 0;
+  }
+
+  // Additional sources.
   CVInputMap sources[2][2];
-  // XXX: offset?
+
+  // Output modes: normal sum, clocked sum/hold, or clocked main input with live aux inputs.
+  enum OutputMode {
+    MODE_NRM,
+    MODE_SUM,
+    MODE_IN,
+  };
+
+  OutputMode output_mode[2] = {MODE_NRM, MODE_NRM};
+  int held_cv[2] = {0, 0};
 
   void DrawInterface() {
     ForEachChannel(ch) {
-      int ypos = 13 + 26*ch;
-      gfxPrint(2, ypos, OutputLabel(ch));
+
+      int ypos = 13 + 26 * ch;
+
+      const int out_x = 2;
+      if (output_mode[ch] == MODE_SUM) {
+        gfxPos(out_x, ypos);
+        gfxPrintIcon(CLOCK_ICON);
+      } else {
+        gfxPrint(out_x, ypos, OutputLabel(ch));
+      }
+
+      // Output mode.
+      gfxPos(10, ypos);
       gfxPrint("=");
+      int fixed_input_x = gfxGetPrintPosX();
+      if (output_mode[ch] == MODE_IN) {
+        gfxPos(fixed_input_x, ypos);
+        gfxPrintIcon(CLOCK_ICON);
+      } else {
+        gfxPos(fixed_input_x, ypos);
+        gfxPrint(cvmap[ch + io_offset]);
+      }
 
-      gfxPrint(cvmap[ch + io_offset]);
-
+      // Input spacing.
+      gfxPos(gfxGetPrintPosX() - 4, ypos);
       gfxPrint(" +");
-      gfxStartCursor();
+      int aux1_x = gfxGetPrintPosX();
       gfxPrint(sources[ch][0]);
-      gfxEndCursor(cursor == ch*2 + 0, false, sources[ch][0].InputName());
-
+      gfxPos(gfxGetPrintPosX() - 4, ypos);
       gfxPrint(" +");
-      gfxStartCursor();
+      int aux2_x = gfxGetPrintPosX();
       gfxPrint(sources[ch][1]);
-      gfxEndCursor(cursor == ch*2 + 1, false, sources[ch][1].InputName());
 
-      // meters
+      int base_cursor = ch * 3;
+      int out_cursor = base_cursor;
+      int aux1_cursor = base_cursor + 1;
+      int aux2_cursor = base_cursor + 2;
+
+      // Cursor.
+      if (!EditMode() && CursorBlink()) {
+        if (cursor == out_cursor) {
+          gfxRect(out_x, ypos + 9, fixed_input_x + 8 - out_x, 1);
+        } else if (cursor == aux1_cursor) {
+          gfxRect(aux1_x, ypos + 9, 8, 1);
+        } else if (cursor == aux2_cursor) {
+          gfxRect(aux2_x, ypos + 9, 8, 1);
+        }
+      }
+
+      // Edit popup.
+      if (EditMode()) {
+        const char *popup = nullptr;
+        int popup_x = 0;
+
+        if (cursor == out_cursor) {
+          if (output_mode[ch] == MODE_NRM) { popup = "NRM"; } else if (output_mode[ch] == MODE_SUM) { popup = "SUM"; } else { popup = "IN"; }
+          popup_x = 1;
+        } else if (cursor == aux1_cursor) {
+          popup = sources[ch][0].InputName();
+          popup_x = 31;
+        } else if (cursor == aux2_cursor) {
+          popup = sources[ch][1].InputName();
+          popup_x = 62;
+        }
+
+        if (popup) {
+          int text_w = strlen(popup) * 6;
+          int box_w = text_w + 4;
+
+          if (cursor == out_cursor) {
+            popup_x = 1;
+          } else if (cursor == aux1_cursor) {
+            popup_x -= box_w / 2;
+          } else {
+            popup_x -= box_w - 1;
+          }
+
+          popup_x = constrain(popup_x, 1, 63 - box_w);
+
+          gfxClear(popup_x - 1, ypos - 1, box_w + 2, 12);
+          gfxFrame(popup_x, ypos - 1, box_w, 11);
+          gfxPrint(popup_x + 2, ypos + 1, popup);
+          gfxInvert(popup_x, ypos - 1, box_w, 11);
+        }
+      }
+
       DrawMeter(In(ch), ypos + 11, 1);
       DrawMeter(sources[ch][0].In(), ypos + 13, 1);
       DrawMeter(sources[ch][1].In(), ypos + 15, 1);
-
       DrawMeter(ViewOut(ch), ypos + 17, 3);
+    }
+
+    if (cursor == CH1_OUT) {
+      SetLabel("A OUT");
+      SetAux(true);
+    } else if (cursor == CH1_AUX1) {
+      SetLabel("A AUX IN 1");
+      SetAux(false);
+    } else if (cursor == CH1_AUX2) {
+      SetLabel("A AUX IN 2");
+      SetAux(false);
+    } else if (cursor == CH2_OUT) {
+      SetLabel("B OUT");
+      SetAux(true);
+    } else if (cursor == CH2_AUX1) {
+      SetLabel("B AUX IN 1");
+      SetAux(false);
+    } else if (cursor == CH2_AUX2) {
+      SetLabel("B AUX IN 2");
+      SetAux(false);
     }
   }
 
   void DrawMeter(int cv, int ypos, int height = 1) {
-      // positve values extend bars from left side of screen to the right
-      // negative values go from right side to left
-      int max_length = 60;//px
+
+
+      const int max_length = 60;
       int length = ProportionCV(abs(cv), max_length);
       if (cv < 0)
           gfxRect(max_length - length, ypos, length, height);
