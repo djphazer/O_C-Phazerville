@@ -49,16 +49,23 @@ public:
 
       // SUM mode: sample and hold the complete summed input on the clock.
       if (output_mode[ch] == MODE_SUM) {
+        signal = main_cv;
+        if (!aux_muted[ch][0]) signal += aux1;
+        if (!aux_muted[ch][1]) signal += aux2;
         if (Clock(ch)) StartADCLag(ch);
-        if (EndOfADCLag(ch)) held_cv[ch] = main_cv + aux1 + aux2;
+        if (EndOfADCLag(ch)) held_cv[ch] = signal;
         signal = held_cv[ch];
       // IN mode: sample and hold the main input while aux inputs remain live.
       } else if (output_mode[ch] == MODE_IN) {
         if (Clock(ch)) StartADCLag(ch);
         if (EndOfADCLag(ch)) held_cv[ch] = main_cv;
-        signal = held_cv[ch] + aux1 + aux2;
+        signal = held_cv[ch];
+        if (!aux_muted[ch][0]) signal += aux1;
+        if (!aux_muted[ch][1]) signal += aux2;
       } else {
-        signal = main_cv + aux1 + aux2;
+        signal = main_cv;
+        if (!aux_muted[ch][0]) signal += aux1;
+        if (!aux_muted[ch][1]) signal += aux2;
       }
 
       CONSTRAIN(signal, HEMISPHERE_MIN_CV, HEMISPHERE_MAX_CV);
@@ -86,9 +93,22 @@ public:
   }
 
   void AuxButton() {
+    const int ch = Channel();
+
     if (IsOutput()) {
-      QEdit(Channel());
+      QEdit(ch);
     }
+
+    if (IsAux1()) {
+      aux_muted[ch][0] = !aux_muted[ch][0];
+      return;
+    }
+
+    if (IsAux2()) {
+      aux_muted[ch][1] = !aux_muted[ch][1];
+      return;
+    }
+
     CancelEdit();
   }
 
@@ -160,12 +180,14 @@ public:
   }
 protected:
   void SetHelp() {
+    //                    "-------" <-- Label size guide
     help[HELP_DIGITAL1] = "HoldCV1";
     help[HELP_DIGITAL2] = "HoldCV2";
     help[HELP_CV1]      = "CV Ch1";
     help[HELP_CV2]      = "CV Ch2";
     help[HELP_OUT1]     = "Out1";
     help[HELP_OUT2]     = "Out2";
+    //                  "---------------------" <-- Extra text size guide
     help[HELP_EXTRA1] = "3 inputs per chan";
     help[HELP_EXTRA2] = "";
   }
@@ -179,6 +201,14 @@ private:
 
   bool IsOutput() const {
     return cursor % 3 == 0;
+  }
+
+  bool IsAux1() const {
+    return cursor % 3 == 1;
+  }
+
+  bool IsAux2() const {
+    return cursor % 3 == 2;
   }
 
   // Additional sources.
@@ -195,22 +225,22 @@ private:
 
   OutputMode output_mode[2] = {MODE_NRM, MODE_NRM};
   int held_cv[2] = {0, 0};
+  bool aux_muted[2][2] = {{false, false}, {false, false}};
 
   void DrawInterface() {
     ForEachChannel(ch) {
+      const int ypos = 13 + 26 * ch;
+      const int base_cursor = ch * 3;
 
-      int ypos = 13 + 26 * ch;
-
-      const int out_x = 2;
+      // Output = main input.
+      gfxPos(2, ypos);
+      gfxStartCursor();
       if (output_mode[ch] == MODE_SUM) {
-        gfxPos(out_x, ypos);
         gfxPrintIcon(CLOCK_ICON);
       } else {
-        gfxPrint(out_x, ypos, OutputLabel(ch));
+        gfxPrint(OutputLabel(ch));
+        gfxPos(gfxGetPrintPosX() + 2, gfxGetPrintPosY());
       }
-
-      // Output mode.
-      gfxPos(10, ypos);
       gfxPrint("=");
       int fixed_input_x = gfxGetPrintPosX();
       if (output_mode[ch] == MODE_IN) {
@@ -221,68 +251,43 @@ private:
         gfxPrint(cvmap[ch + io_offset]);
       }
 
-      // Input spacing.
-      gfxPos(gfxGetPrintPosX() - 4, ypos);
-      gfxPrint(" +");
-      int aux1_x = gfxGetPrintPosX();
-      gfxPrint(sources[ch][0]);
-      gfxPos(gfxGetPrintPosX() - 4, ypos);
-      gfxPrint(" +");
-      int aux2_x = gfxGetPrintPosX();
-      gfxPrint(sources[ch][1]);
-
-      int base_cursor = ch * 3;
-      int out_cursor = base_cursor;
-      int aux1_cursor = base_cursor + 1;
-      int aux2_cursor = base_cursor + 2;
-
-      // Cursor.
-      if (!EditMode() && CursorBlink()) {
-        if (cursor == out_cursor) {
-          gfxRect(out_x, ypos + 9, fixed_input_x + 8 - out_x, 1);
-        } else if (cursor == aux1_cursor) {
-          gfxRect(aux1_x, ypos + 9, 8, 1);
-        } else if (cursor == aux2_cursor) {
-          gfxRect(aux2_x, ypos + 9, 8, 1);
-        }
+      // Main input.
+      if (output_mode[ch] == MODE_IN) {
+        gfxPrintIcon(CLOCK_ICON);
+      } else {
+        gfxPrint(cvmap[ch + io_offset]);
       }
 
-      // Edit popup.
-      if (EditMode()) {
-        const char *popup = nullptr;
-        int popup_x = 0;
+      // Highlight the OUT cursor when selected.
+      gfxEndCursor(cursor == base_cursor, false, nullptr);
 
-        if (cursor == out_cursor) {
-          if (output_mode[ch] == MODE_NRM) { popup = "NRM"; } else if (output_mode[ch] == MODE_SUM) { popup = "SUM"; } else { popup = "IN"; }
-          popup_x = 1;
-        } else if (cursor == aux1_cursor) {
-          popup = sources[ch][0].InputName();
-          popup_x = 31;
-        } else if (cursor == aux2_cursor) {
-          popup = sources[ch][1].InputName();
-          popup_x = 62;
-        }
+      // Tighten spacing after the fixed input.
+      gfxPos(gfxGetPrintPosX() - 2, gfxGetPrintPosY());
 
-        if (popup) {
-          int text_w = strlen(popup) * 6;
-          int box_w = text_w + 4;
-
-          if (cursor == out_cursor) {
-            popup_x = 1;
-          } else if (cursor == aux1_cursor) {
-            popup_x -= box_w / 2;
-          } else {
-            popup_x -= box_w - 1;
-          }
-
-          popup_x = constrain(popup_x, 1, 63 - box_w);
-
-          gfxClear(popup_x - 1, ypos - 1, box_w + 2, 12);
-          gfxFrame(popup_x, ypos - 1, box_w, 11);
-          gfxPrint(popup_x + 2, ypos + 1, popup);
-          gfxInvert(popup_x, ypos - 1, box_w, 11);
-        }
+      // AUX input 1.
+      gfxPrint(" +");
+      gfxStartCursor();
+      if (aux_muted[ch][0]) {
+        gfxPrint("X");
+        gfxPos(gfxGetPrintPosX() + 2, gfxGetPrintPosY());
+      } else {
+        gfxPrint(sources[ch][0]);
       }
+      gfxEndCursor(cursor == base_cursor + 1, false,
+                   EditMode() ? sources[ch][0].InputName() : nullptr);
+
+      // AUX input 2.
+      gfxPos(gfxGetPrintPosX() - 2, gfxGetPrintPosY());
+      gfxPrint(" +");
+      gfxStartCursor();
+      if (aux_muted[ch][1]) {
+        gfxPrint("X");
+        gfxPos(gfxGetPrintPosX() + 2, gfxGetPrintPosY());
+      } else {
+        gfxPrint(sources[ch][1]);
+      }
+      gfxEndCursor(cursor == base_cursor + 2, false,
+                   EditMode() ? sources[ch][1].InputName() : nullptr);
 
       DrawMeter(In(ch), ypos + 11, 1);
       DrawMeter(sources[ch][0].In(), ypos + 13, 1);
@@ -291,32 +296,34 @@ private:
     }
 
     if (cursor == CH1_OUT) {
-      SetLabel("A OUT");
+      SetLabel("OUT A");
       SetAux(true);
     } else if (cursor == CH1_AUX1) {
-      SetLabel("A AUX IN 1");
-      SetAux(false);
+      SetLabel(aux_muted[0][0] ? "MUTED " : "AUX A1");
+      SetAux(true);
     } else if (cursor == CH1_AUX2) {
-      SetLabel("A AUX IN 2");
-      SetAux(false);
+      SetLabel(aux_muted[0][1] ? "MUTED " : "AUX A2");
+      SetAux(true);
     } else if (cursor == CH2_OUT) {
-      SetLabel("B OUT");
+      SetLabel("OUT B");
       SetAux(true);
     } else if (cursor == CH2_AUX1) {
-      SetLabel("B AUX IN 1");
-      SetAux(false);
+      SetLabel(aux_muted[1][0] ? "MUTED " : "AUX B1");
+      SetAux(true);
     } else if (cursor == CH2_AUX2) {
-      SetLabel("B AUX IN 2");
-      SetAux(false);
+      SetLabel(aux_muted[1][1] ? "MUTED " : "AUX B2");
+      SetAux(true);
     }
   }
 
   void DrawMeter(int cv, int ypos, int height = 1) {
-      const int max_length = 60;
-      int length = ProportionCV(abs(cv), max_length);
-      if (cv < 0)
-          gfxRect(max_length - length, ypos, length, height);
-      else
-          gfxRect(1, ypos, length, height);
+    // Positive values extend bars from left side of screen to the right.
+    // Negative values go from right side to left.
+    const int max_length = 60;
+    int length = ProportionCV(abs(cv), max_length);
+    if (cv < 0)
+      gfxRect(max_length - length, ypos, length, height);
+    else
+      gfxRect(1, ypos, length, height);
   }
 };
