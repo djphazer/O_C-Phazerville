@@ -68,7 +68,7 @@ public:
       case TYPE_HID:  // #ifdef USB_GAMEPAD
         return GAMEPAD_MAP_MAX;
       case TYPE_INTERNAL:
-        return 1;
+        return 2;
     }
   }
 
@@ -92,6 +92,9 @@ public:
         // noise source
         if (index() == 0)
           return int(random(ONE_OCTAVE * HS::octave_max * 2)) - ONE_OCTAVE * HS::octave_max;
+        // constant +5V source
+        if (index() == 1)
+          return 5 * ONE_OCTAVE;
         // TODO: LFOs and other basic stuff
         // else, fall through to default
       default:
@@ -193,9 +196,16 @@ public:
         in_label[2] = char('0' + idx % 10);
         break;
 
+      case TYPE_INTERNAL:
       default:
-        in_label[1] = '*';
-        in_label[2] = ' ';
+        if (idx == 1) {  // constant source
+          in_label[0] = '+';
+          in_label[1] = '5';
+          in_label[2] = 'v';
+        } else {
+          in_label[1] = '*';
+          in_label[2] = ' ';
+        }
         break;
     }
     return in_label;
