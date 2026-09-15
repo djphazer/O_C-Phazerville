@@ -497,11 +497,6 @@ public:
         } else {
             ClockSetup_instance.DrawIndicator();
         }
-
-        // Overlay popup window last
-        if (OC::CORE::ticks - HS::popup_tick < HEMISPHERE_CURSOR_TICKS) {
-          HS::DrawPopup();
-        }
     }
 
     /////////////////////////////////////////////////////////////////
