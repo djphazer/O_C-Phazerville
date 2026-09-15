@@ -70,7 +70,7 @@ enum UiMode {
 
 class Ui {
 public:
-  static const size_t kEventQueueDepth = 16;
+  static const size_t kEventQueueDepth = 128;
   static const uint32_t kLongPressTicks = 500;
 
   Ui() { }
