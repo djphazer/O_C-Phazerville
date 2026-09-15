@@ -42,16 +42,15 @@ public:
 
   void Controller() {
     ForEachChannel(ch) {
-      int main_cv = In(ch);
-      int aux1 = sources[ch][0].In();
-      int aux2 = sources[ch][1].In();
+      const int main_cv = In(ch);
+      const int aux1 = sources[ch][0].In();
+      const int aux2 = sources[ch][1].In();
       int signal;
 
       // SUM mode: sample and hold the complete summed input on the clock.
       if (output_mode[ch] == MODE_SUM) {
-        signal = main_cv + aux1 + aux2;
         if (Clock(ch)) StartADCLag(ch);
-        if (EndOfADCLag(ch)) held_cv[ch] = signal;
+        if (EndOfADCLag(ch)) held_cv[ch] = main_cv + aux1 + aux2;
         signal = held_cv[ch];
       // IN mode: sample and hold the main input while aux inputs remain live.
       } else if (output_mode[ch] == MODE_IN) {
@@ -63,8 +62,7 @@ public:
       }
 
       CONSTRAIN(signal, HEMISPHERE_MIN_CV, HEMISPHERE_MAX_CV);
-      signal = HS::GetQuantEngine(io_offset + ch).Process(signal, 0, 0);
-      CONSTRAIN(signal, HEMISPHERE_MIN_CV, HEMISPHERE_MAX_CV);
+      signal = Quantize(ch, signal);
       Out(ch, signal);
     }
   }
@@ -89,10 +87,7 @@ public:
 
   void AuxButton() {
     if (IsOutput()) {
-      SetAux(false);
-      HS::QuantizerEdit(io_offset + Channel());
-      CancelEdit();
-      return;
+      QEdit(Channel());
     }
     CancelEdit();
   }
@@ -106,15 +101,17 @@ public:
 
     int ch = Channel();
     if (IsOutput()) {
-      if (direction > 0) {
-        output_mode[ch] = static_cast<OutputMode>(
-          (output_mode[ch] + 1) % 3
-        );
-      } else if (direction < 0) {
-        output_mode[ch] = static_cast<OutputMode>(
-          (output_mode[ch] + 2) % 3
-        );
-      }
+      // mode values loop around, I guess
+      output_mode[ch] = static_cast<OutputMode>(
+        (output_mode[ch] + MODE_COUNT + direction) % MODE_COUNT
+      );
+
+      // i usually bookend them, which requires a signed int type
+      // output_mode[ch] = static_cast<OutputMode>(
+      //   constrain(output_mode[ch] + direction, 0, MODE_COUNT - 1)
+      // );
+      // It's also less clutter to use int instead of the OutputMode enum type
+      // for the output_mode[] variables - no need to static_cast.
       return;
     }
 
@@ -122,20 +119,18 @@ public:
   }
 
   uint64_t OnDataRequest() {
-    uint64_t data = PackPackables(
-      sources[0][0],
-      sources[0][1],
-      sources[1][0],
-      sources[1][1]
-    );
-
     // Persist both channel output modes using the applet's existing data storage.
     uint64_t mode_data = 0;
     Pack(mode_data, PackLocation {0, 2}, output_mode[0]);
     Pack(mode_data, PackLocation {2, 2}, output_mode[1]);
     SetData(0, mode_data);
 
-    return data;
+    return PackPackables(
+      sources[0][0],
+      sources[0][1],
+      sources[1][0],
+      sources[1][1]
+    );
   }
 
   void OnDataReceive(uint64_t data) {
@@ -194,6 +189,8 @@ private:
     MODE_NRM,
     MODE_SUM,
     MODE_IN,
+
+    MODE_COUNT,
   };
 
   OutputMode output_mode[2] = {MODE_NRM, MODE_NRM};
