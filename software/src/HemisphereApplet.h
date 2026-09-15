@@ -430,6 +430,9 @@ protected:
     }
 
     // --- Quantizer helpers
+    void QEdit(int ch) {
+      HS::QuantizerEdit(ch + io_offset);
+    }
     int GetLatestNoteNumber(int ch) {
       return HS::GetLatestNoteNumber(ch);
     }
