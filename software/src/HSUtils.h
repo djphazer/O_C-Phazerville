@@ -87,15 +87,9 @@ namespace HS {
     QUANTIZER_POPUP,
     MIDI_POPUP,
     MESSAGE_POPUP,
+    ERROR_POPUP,
 
     POPUP_TYPE_COUNT
-  };
-
-  enum ErrMsgIndex {
-    NO_ERROR,
-    LFS_WRITE_ERROR,
-    PRESET_SAVED,
-    MYSTERIOUS_ERROR,
   };
 
   enum QUANT_CHANNEL {
@@ -204,11 +198,13 @@ namespace HS {
 
   extern uint32_t popup_tick; // for button feedback
   extern PopupType popup_type;
+  extern uint32_t popup_duration;
+  extern const char* error_text;
+
   extern uint8_t qview; // which quantizer's setting is shown in popup
   extern int q_edit;
   extern int midi_edit;
   extern uint8_t mview;
-  extern ErrMsgIndex msg_idx;
 
   extern peaks::MultistageEnvelope env_[DAC_CHANNEL_COUNT];
   extern util::TuringShiftRegister* turing_machine_[ADC_CHANNEL_COUNT];
@@ -264,10 +260,10 @@ namespace HS {
   void MEditEncoderMove(bool rightenc, int dir);
   void DrawMidiMaps(int curpos);
   void DrawConfigRow(int row, int y, bool cur, bool editing);
-  void DrawPopup(const int config_cursor = 0, const int preset_id = 0, const bool blink = 0);
+  void DrawMenuPopup(const int config_cursor = 0);
+  void DrawPopup();
   void ToggleClockRun();
-  void PokePopup(PopupType pop, ErrMsgIndex err = NO_ERROR);
-  void PokePopup(PopupType pop, const char* msg);
+  void PokePopup(PopupType pop, const char* msg = nullptr);
 
   peaks::MultistageEnvelope& GetEnvelope(int index);
   util::TuringShiftRegister& GetTM(int index);

@@ -467,12 +467,6 @@ void FASTRUN loop() {
         OC_DEBUG_PROFILE_SCOPE(DEBUG::MENU_draw_cycles);
         app_switcher.current_app()->Draw(ui_mode);
         ++menu_draw_count;
-#ifdef VOR
-        // TODO: move this into AppBase
-        // only if not screensaver
-        VBiasManager *vbias_m = vbias_m->get();
-        vbias_m->DrawPopupPerhaps();
-#endif
       }
 
       MENU_REDRAW = 0;

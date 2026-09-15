@@ -331,7 +331,7 @@ public:
           success = PhzConfig::save_config(bank_filename);
 
         if (success)
-          PokePopup(HS::MESSAGE_POPUP, HS::PRESET_SAVED);
+          PokePopup(HS::MESSAGE_POPUP, "PRESET SAVED!");
     }
 
     void LoadFromPreset(int id);
@@ -420,7 +420,7 @@ public:
         //LoadGlobals();
 
         audio_app.LoadPreset(id);
-        PokePopup(PRESET_POPUP);
+        PokePopup(PRESET_POPUP, OC::Strings::capital_letters[id]);
     }
     void LoadGlobals() {
         // applet filtering
@@ -898,9 +898,10 @@ public:
           ClockSetup_instance.DrawIndicator(view_state == OVERVIEW);
         }
 
-        // Overlay popup window last
-        if (OC::CORE::ticks - HS::popup_tick < HEMISPHERE_CURSOR_TICKS * 4) {
-          HS::DrawPopup(config_cursor, preset_id, CursorBlink());
+        // Overlay popup Load/Save menu last
+        if (HS::popup_type == HS::MENU_POPUP &&
+            OC::CORE::ticks - HS::popup_tick < HS::popup_duration) {
+          HS::DrawMenuPopup(config_cursor);
         }
     }
 
@@ -2200,7 +2201,9 @@ void AppQuadrants::DrawScreensaver() const {
     }
 }
 void AppQuadrants::DrawDebugInfo() const {
-  // TODO:
+  if (HS::error_text) {
+    gfxPrint(0, 10, HS::error_text);
+  }
 }
 
 FLASHMEM

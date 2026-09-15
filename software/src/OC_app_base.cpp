@@ -64,6 +64,11 @@ void AppBase::Draw(UiMode ui_mode) const
       DrawMenu();
     else
       io_settings_menu.Draw();
+
+#ifdef VOR
+    VBiasManager *vbias_m = vbias_m->get();
+    vbias_m->DrawPopupPerhaps();
+#endif
   } else {
     DrawScreensaver();
   }
@@ -87,6 +92,11 @@ void AppBase::Draw(UiMode ui_mode) const
     else
       gfxPrint("???");
     gfxPrint(1, 56, "L:I/O Cfg  R:App Menu");
+  }
+
+  // Overlay popup window last
+  if (OC::CORE::ticks - HS::popup_tick < HS::popup_duration) {
+    HS::DrawPopup();
   }
 }
 
