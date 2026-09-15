@@ -326,7 +326,7 @@ public:
           //OC::draw_save_message(64);
           OC::CORE::app_isr_enabled = true;
 
-          PokePopup(HS::MESSAGE_POPUP, HS::PRESET_SAVED);
+          PokePopup(HS::MESSAGE_POPUP, "PRESET SAVED!");
         }
     }
 #endif
@@ -472,7 +472,7 @@ public:
         }
 
         if (PhzConfig::save_config(PRESET_FILENAME))
-          PokePopup(HS::MESSAGE_POPUP, HS::PRESET_SAVED);
+          PokePopup(HS::MESSAGE_POPUP, "PRESET SAVED!");
 #else
         StoreToPreset( (HemispherePreset*)(hem_presets + id), skip_eeprom );
 #endif
@@ -574,7 +574,7 @@ public:
             }
         }
 #endif
-        PokePopup(PRESET_POPUP);
+        PokePopup(PRESET_POPUP, OC::Strings::capital_letters[id]);
     }
 
     void LoadGlobals() {
@@ -882,9 +882,10 @@ public:
           }
         }
 
-        // Overlay popup window last
-        if (OC::CORE::ticks - HS::popup_tick < HEMISPHERE_CURSOR_TICKS * 4) {
-          HS::DrawPopup(config_cursor, preset_id, CursorBlink());
+        // Overlay popup Load/Save menu last
+        if (HS::popup_type == HS::MENU_POPUP &&
+            OC::CORE::ticks - HS::popup_tick < HS::popup_duration) {
+          HS::DrawMenuPopup(config_cursor);
         }
     }
 
