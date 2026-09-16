@@ -472,6 +472,17 @@ void FASTRUN loop() {
       MENU_REDRAW = 0;
       last_redraw_time = ui.ticks();
       GRAPHICS_END_FRAME();
+
+      static elapsedMillis bug_checker = 0;
+      if (bug_checker > 1000) {
+        bug_checker = 0;
+        if (display::frame_buffer.check_for_bugs(true)) {
+          HS::PokePopup(HS::ERROR_POPUP, "GFX overflow! (pre)");
+        }
+        if (display::frame_buffer.check_for_bugs(false)) {
+          HS::PokePopup(HS::ERROR_POPUP, "GFX overflow! (post)");
+        }
+      }
     }
 
     // Run current app

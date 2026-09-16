@@ -198,6 +198,15 @@ static void debug_menu_gfx() {
                   debug::cycles_to_us(DEBUG::MENU_draw_cycles.min_value()),
                   debug::cycles_to_us(DEBUG::MENU_draw_cycles.value()),
                   debug::cycles_to_us(DEBUG::MENU_draw_cycles.max_value()));
+
+  if (display::frame_buffer.check_for_bugs(true)) {
+    graphics.setPrintPos(2, 42);
+    graphics.print("Pre-Leak detect!");
+  }
+  if (display::frame_buffer.check_for_bugs(false)) {
+    graphics.setPrintPos(2, 52);
+    graphics.print("Post-Leak detect!");
+  }
 }
 
 FLASHMEM
