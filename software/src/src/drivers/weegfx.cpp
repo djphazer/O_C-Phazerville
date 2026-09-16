@@ -300,8 +300,9 @@ void Graphics::drawBitmap8(coord_t x, coord_t y, coord_t w, const uint8_t *data)
 {
   if (x + w > kWidth) w = kWidth - x;
   if (x < 0) {
-    data += x;
+    data -= x;
     w += x;
+    x = 0;
   }
   if (w <= 0) return;
 
@@ -315,8 +316,9 @@ void Graphics::writeBitmap8(coord_t x, coord_t y, coord_t w, const uint8_t *data
 {
   if (x + w > kWidth) w = kWidth - x;
   if (x < 0) {
-    data += x;
+    data -= x;
     w += x;
+    x = 0;
   }
   if (w <= 0) return;
 
