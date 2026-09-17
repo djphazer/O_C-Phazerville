@@ -22,7 +22,7 @@
 
 #include "../OC_sequence_edit.h"
 
-static constexpr uint8_t NUM_CHANNELS = 2;
+static constexpr uint8_t NUM_CHANNELS = DAC_CHANNEL_COUNT / 2;
 static constexpr uint8_t MULT_MAX = 26;    // max multiplier
 static constexpr uint8_t MULT_BY_ONE = 19; // default multiplication
 static constexpr uint8_t PULSEW_MAX = 255; // max pulse width [ms]
@@ -2130,15 +2130,13 @@ void AppDualSequencer::Process(IOFrame *ioframe) {
     ticks_src2 = 0x0;
   }
 
-  // update sequencer channels 1, 2:
-  seq_channel_[0].Update(ioframe);
-  seq_channel_[1].Update(ioframe);
-  // update DAC channels A, B:
-  seq_channel_[0].update_main_channel(0, ioframe);
-  seq_channel_[1].update_main_channel(1, ioframe);
-  // update DAC channels C, D:
-  seq_channel_[0].update_aux_channel(2, ioframe);
-  seq_channel_[1].update_aux_channel(3, ioframe);
+  for (int i = 0; i < NUM_CHANNELS; ++i) {
+    seq_channel_[i].Update(ioframe);
+    // update DAC channels (A/B, or A, B, C, D):
+    seq_channel_[i].update_main_channel(i, ioframe);
+    // update DAC channels (C/D, or E, F, G, H):
+    seq_channel_[i].update_aux_channel(i + NUM_CHANNELS, ioframe);
+  }
 }
 
 void AppDualSequencer::GetIOConfig(IOConfig &ioconfig) const
@@ -2415,13 +2413,14 @@ void AppDualSequencer::HandleDownButtonLong() {
 
 FLASHMEM
 void AppDualSequencer::DrawMenu() const {
+  using TitleBar = menu::TitleBar<menu::kDefaultMenuStartX, NUM_CHANNELS, 2>;
 
-  menu::DualTitleBar::Draw();
+  TitleBar::Draw();
 
-  for (int i = 0, x = 0; i < NUM_CHANNELS; ++i, x += 21) {
+  for (int i = 0; i < NUM_CHANNELS; ++i) {
 
     const SEQ_Channel &channel = seq_channel_[i];
-    menu::DualTitleBar::SetColumn(i);
+    TitleBar::SetColumn(i);
 
     // draw gate/step indicator
     uint8_t gate = 1;
@@ -2429,24 +2428,22 @@ void AppDualSequencer::DrawMenu() const {
       gate += 14;
     else if (channel.get_step_state() == ON)
       gate += 10;
-    menu::DualTitleBar::DrawGateIndicator(i, gate);
+    TitleBar::DrawGateIndicator(i, gate);
 
-    graphics.movePrintPos(5, 0);
+    graphics.movePrintPos(3, 0);
     // channel id:
-    graphics.print("#");
     graphics.print((char)('A' + i));
     // sequence id:
     graphics.print("/");
     graphics.print(1 + channel.get_display_num_sequence());
     // octave:
-    graphics.movePrintPos(22, 0);
     if (channel.poke_octave_toggle())
       graphics.print("+");
   }
 
   const SEQ_Channel &channel = seq_channel_[selected_channel_];
 
-  menu::DualTitleBar::Selected(selected_channel_);
+  TitleBar::Selected(selected_channel_);
 
   menu::SettingsList<menu::kScreenLines, 0, menu::kDefaultValueX> settings_list(cursor_);
 
