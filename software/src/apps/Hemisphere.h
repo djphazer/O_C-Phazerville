@@ -1031,12 +1031,7 @@ public:
 
     void DelegateEncoderMovement(const UI::Event &event) {
         HEM_SIDE h = (event.control == OC::CONTROL_ENCODER_L) ? LEFT_HEMISPHERE : RIGHT_HEMISPHERE;
-        int increment = event.value;
-        if (event.mask & (OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_R)) {
-          // push-and-turn for coarse adjustments
-          OC::ui.SetButtonIgnoreMask();
-          increment *= 10;
-        }
+        const int increment = event.value;
 
         if (HS::q_edit) {
           HS::QEditEncoderMove(h, increment);
