@@ -31,10 +31,13 @@ namespace UI {
 enum EventType : uint16_t {
   EVENT_NONE,
   EVENT_BUTTON_DOWN,
-  EVENT_BUTTON_PRESS,
+  EVENT_BUTTON_RELEASE,
   EVENT_BUTTON_LONG_PRESS,
   EVENT_BUTTON_LONG_RELEASE,
-  EVENT_ENCODER
+  EVENT_ENCODER,
+  EVENT_MISC,
+
+  EVENT_BUTTON_PRESS = EVENT_BUTTON_RELEASE, // compatibility alias
 };
 
 // UI event struct
@@ -56,7 +59,7 @@ struct Event {
 
   const bool IsEncoder() const { return type == EVENT_ENCODER; }
   const bool IsPress() const { return type == EVENT_BUTTON_DOWN; }
-  const bool IsRelease() const { return type == EVENT_BUTTON_PRESS; }
+  const bool IsRelease() const { return type == EVENT_BUTTON_RELEASE; }
   const bool IsLongPress() const { return type == EVENT_BUTTON_LONG_PRESS; }
   const bool IsLongRelease() const { return type == EVENT_BUTTON_LONG_RELEASE; }
 };

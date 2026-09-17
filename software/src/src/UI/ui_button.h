@@ -46,16 +46,20 @@ public:
     return !(state & 0x01);
   }
 
-  inline bool pressed() const {
+  inline bool held() const {
     return state_ == 0x00;
   }
 
-  inline bool just_pressed() const {
+  inline bool rising() const {
     return state_ == 0x80;
   }
 
-  inline bool released() const {
+  inline bool falling() const {
     return state_ == 0x7f;
+  }
+
+  inline bool off() const {
+    return state_ == 0xff;
   }
 
   bool read_immediate() const {
