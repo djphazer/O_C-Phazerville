@@ -419,7 +419,7 @@ void HS::IOFrame::Load(OC::IOFrame *ioframe) {
         const int input = ioframe->cv.pitch_values[i];
 
         // calculate gates/clocks for all ADC inputs as well
-        gate_high[OC::DIGITAL_INPUT_LAST + i] = input > GATE_THRESHOLD;
+        gate_high[DIGITAL_INPUT_COUNT + i] = input > GATE_THRESHOLD;
 
         // some calculations for change detection
         if (abs(input - last_cv[i]) > HEMISPHERE_CHANGE_THRESHOLD) {
@@ -483,14 +483,7 @@ void HS::IOFrame::Load(OC::IOFrame *ioframe) {
 }
 
 void HS::IOFrame::Send(OC::IOFrame *ioframe) {
-    const DAC_CHANNEL chan[DAC_CHANNEL_COUNT] = {
-      DAC_CHANNEL_A, DAC_CHANNEL_B, DAC_CHANNEL_C, DAC_CHANNEL_D,
-#ifdef ARDUINO_TEENSY41
-      DAC_CHANNEL_E, DAC_CHANNEL_F, DAC_CHANNEL_G, DAC_CHANNEL_H,
-#endif
-    };
     for (int i = 0; i < IO_CHANNEL_COUNT; ++i) {
-
       /*
        * envelope output!
       if (output_slew[i] < 0) {
@@ -510,7 +503,7 @@ void HS::IOFrame::Send(OC::IOFrame *ioframe) {
           gate_state |= peaks::CONTROL_GATE_FALLING;
 
         const int value = GetEnvelope(i).ProcessSingleSample(gate_state); // 0 to 32767
-        ioframe->outputs.set_pitch_value(chan[i], Proportion(value, 32767, HEMISPHERE_MAX_CV));
+        ioframe->outputs.set_pitch_value(i, Proportion(value, 32767, HEMISPHERE_MAX_CV));
 
         continue;
       }
@@ -518,7 +511,7 @@ void HS::IOFrame::Send(OC::IOFrame *ioframe) {
 
       outputs[i].push(output_slew[i]);
       if (i < DAC_CHANNEL_COUNT)
-        ioframe->outputs.set_pitch_value(chan[i], outputs[i].get(output_atten[i]));
+        ioframe->outputs.set_pitch_value(i, outputs[i].get(output_atten[i]));
     }
 
     if (autoMIDIOut) MIDIState.Send(outputs);
