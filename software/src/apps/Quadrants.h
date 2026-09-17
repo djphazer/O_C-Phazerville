@@ -1041,13 +1041,7 @@ public:
     }
 
     void DelegateEncoderMovement(const UI::Event &event) {
-        int increment = event.value;
-        if (event.mask & (OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_R)) {
-          // push-and-turn for coarse adjustments
-          // XXX: hopefully nothing breaks if event.value is larger than 1 or -1...
-          OC::ui.SetButtonIgnoreMask();
-          increment *= 10;
-        }
+        const int increment = event.value;
         int h = (event.control == OC::CONTROL_ENCODER_L) ? LEFT_HEMISPHERE : RIGHT_HEMISPHERE;
         HEM_SIDE slot = HEM_SIDE(view_slot[h]*2 + h);
         if (HS::q_edit) {
