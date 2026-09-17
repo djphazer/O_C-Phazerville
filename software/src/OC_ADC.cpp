@@ -598,14 +598,14 @@ void ADC::Read(IOFrame *ioframe)
       Serial.println();
       #endif
       const int mult = 2;
-      update<ADC_CHANNEL_5>(sum[0] * mult / count);
-      update<ADC_CHANNEL_6>(sum[1] * mult / count);
-      update<ADC_CHANNEL_7>(sum[2] * mult / count);
-      update<ADC_CHANNEL_8>(sum[3] * mult / count);
-      update<ADC_CHANNEL_1>(sum[4] * mult / count);
-      update<ADC_CHANNEL_2>(sum[5] * mult / count);
-      update<ADC_CHANNEL_3>(sum[6] * mult / count);
-      update<ADC_CHANNEL_4>(sum[7] * mult / count);
+      update(0, sum[0] * mult / count);
+      update(1, sum[1] * mult / count);
+      update(2, sum[2] * mult / count);
+      update(3, sum[3] * mult / count);
+      update(4, sum[4] * mult / count);
+      update(5, sum[5] * mult / count);
+      update(6, sum[6] * mult / count);
+      update(7, sum[7] * mult / count);
       old_poffset = (old_poffset + count * sizeof(adc33131_frame_t)) % sizeof(adc_buffer);
     }
     return;
@@ -625,15 +625,15 @@ void ADC::Read(IOFrame *ioframe)
       sum[3] += data->adc[3];
     }
     const int mult = 16;
-    update<ADC_CHANNEL_1>(sum[0] * mult / count);
-    update<ADC_CHANNEL_2>(sum[1] * mult / count);
-    update<ADC_CHANNEL_3>(sum[2] * mult / count);
-    update<ADC_CHANNEL_4>(sum[3] * mult / count);
+    update(0, sum[0] * mult / count);
+    update(1, sum[1] * mult / count);
+    update(2, sum[2] * mult / count);
+    update(3, sum[3] * mult / count);
 #if defined(ARDUINO_TEENSY41)
-    update<ADC_CHANNEL_5>(sum[0] * mult / count);
-    update<ADC_CHANNEL_6>(sum[1] * mult / count);
-    update<ADC_CHANNEL_7>(sum[2] * mult / count);
-    update<ADC_CHANNEL_8>(sum[3] * mult / count);
+    update(4, sum[0] * mult / count);
+    update(5, sum[1] * mult / count);
+    update(6, sum[2] * mult / count);
+    update(7, sum[3] * mult / count);
 #endif
 
     old_idx = idx;
