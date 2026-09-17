@@ -42,9 +42,9 @@ public:
 
   void Controller() {
     ForEachChannel(ch) {
-      int main_cv = In(ch);
-      int aux1 = sources[ch][0].In();
-      int aux2 = sources[ch][1].In();
+      const int main_cv = In(ch);
+      const int aux1 = sources[ch][0].In();
+      const int aux2 = sources[ch][1].In();
       int signal;
 
       // SUM: Sample and hold the sum of the main input and unmuted AUX inputs.
@@ -63,8 +63,7 @@ public:
       }
 
       CONSTRAIN(signal, HEMISPHERE_MIN_CV, HEMISPHERE_MAX_CV);
-      signal = HS::GetQuantEngine(io_offset + ch).Process(signal, 0, 0);
-      CONSTRAIN(signal, HEMISPHERE_MIN_CV, HEMISPHERE_MAX_CV);
+      signal = Quantize(ch, signal);
       Out(ch, signal);
     }
   }
@@ -88,13 +87,10 @@ public:
   }
 
   void AuxButton() {
-    int ch = Channel();
+    const int ch = Channel();
 
     if (IsOutput()) {
-      SetAux(false);
-      HS::QuantizerEdit(io_offset + ch);
-      CancelEdit();
-      return;
+      QEdit(ch);
     }
 
     if (IsAux1()) {
@@ -131,20 +127,18 @@ public:
   }
 
   uint64_t OnDataRequest() {
-    uint64_t data = PackPackables(
-      sources[0][0],
-      sources[0][1],
-      sources[1][0],
-      sources[1][1]
-    );
-
     // Persist both channel output modes using the applet's existing data storage.
     uint64_t mode_data = 0;
     Pack(mode_data, PackLocation {0, 2}, output_mode[0]);
     Pack(mode_data, PackLocation {2, 2}, output_mode[1]);
     SetData(0, mode_data);
 
-    return data;
+    return PackPackables(
+      sources[0][0],
+      sources[0][1],
+      sources[1][0],
+      sources[1][1]
+    );
   }
 
   void OnDataReceive(uint64_t data) {
@@ -222,6 +216,8 @@ private:
     MODE_NRM,
     MODE_SUM,
     MODE_IN,
+
+    MODE_COUNT,
   };
 
   OutputMode output_mode[2] = {MODE_NRM, MODE_NRM};
