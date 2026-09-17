@@ -223,17 +223,7 @@ void OC::Pinout_Detect() {
     but_mid  = 15; // 'Z'
     // TODO: flip_mode?
 
-    // Input index
-    ADC_CHANNEL_1 = 4;
-    ADC_CHANNEL_2 = 5;
-    ADC_CHANNEL_3 = 6;
-    ADC_CHANNEL_4 = 7;
-    ADC_CHANNEL_5 = 0;
-    ADC_CHANNEL_6 = 1;
-    ADC_CHANNEL_7 = 2;
-    ADC_CHANNEL_8 = 3;
-
-    // Output index
+    // output rows are inverted
     DAC_CHANNEL_A = 4;
     DAC_CHANNEL_B = 5;
     DAC_CHANNEL_C = 6;
@@ -242,6 +232,16 @@ void OC::Pinout_Detect() {
     DAC_CHANNEL_F = 1;
     DAC_CHANNEL_G = 2;
     DAC_CHANNEL_H = 3;
+
+    // input rows are inverted
+    ADC_CHANNEL_1 = 4;
+    ADC_CHANNEL_2 = 5;
+    ADC_CHANNEL_3 = 6;
+    ADC_CHANNEL_4 = 7;
+    ADC_CHANNEL_5 = 0;
+    ADC_CHANNEL_6 = 1;
+    ADC_CHANNEL_7 = 2;
+    ADC_CHANNEL_8 = 3;
   }
 
   if (DAC_20Vpp) {
