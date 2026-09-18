@@ -186,6 +186,64 @@ static void test_tx_prefetch_rewind() {
   BusCardStop();
 }
 
+// A real 251e BACKUP is 30 slots x 2104 = 63120 bytes in one pointer-write
+// plus a long data burst. At the old 32768-byte size that wrapped at stream
+// byte 32768 and silently ate its own first 30352 bytes; the image must now
+// hold the whole bank with every byte distinct and in order.
+static void test_full_251e_bank_does_not_wrap() {
+  static const uint32_t kBank = 30u * 2104u;  // 63120
+  CHECK(kBank <= BUSCARD_SIZE);               // the point of the resize
+  CHECK(kBank > 32768u);                      // ...and it used to wrap
+
+  BusCardInit(img, BUSCARD_SIZE);
+  memset(img, 0xFF, sizeof(img));
+
+  // one transaction, pointer 0, then the whole bank streamed in
+  BusCardStart(0);
+  BusCardRxByte(0);
+  BusCardRxByte(0);
+  for (uint32_t i = 0; i < kBank; ++i)
+    BusCardRxByte((uint8_t)(i * 31u + (i >> 8)));  // position-dependent
+  BusCardStop();
+
+  CHECK(BusCardPointer() == kBank);             // never wrapped to 0
+  CHECK(BusCardGetStats()->bytes_written == kBank);
+  uint32_t bad = 0;
+  for (uint32_t i = 0; i < kBank; ++i)
+    if (img[i] != (uint8_t)(i * 31u + (i >> 8))) bad++;
+  CHECK(bad == 0);
+  // the tail beyond the bank is still erased -- nothing overran
+  CHECK(img[kBank] == 0xFF && img[BUSCARD_SIZE - 1] == 0xFF);
+
+  // and it reads back as one continuous run, which is what DumpCard prints
+  uint8_t r[8];
+  m_read_at((uint16_t)(kBank - 4), r, 4);
+  for (uint32_t i = 0; i < 4; ++i) {
+    const uint32_t p = kBank - 4 + i;
+    CHECK(r[i] == (uint8_t)(p * 31u + (p >> 8)));
+  }
+}
+
+// The card pointer is 2 bytes on the wire, so 0x0000..0xFFFF is the entire
+// space a master can name. Sizing the image to exactly that means no address
+// a master can utter aliases onto another -- the wrap is now unreachable
+// except by running off the very top.
+static void test_pointer_space_is_fully_addressable() {
+  CHECK(BUSCARD_SIZE == 0x10000u);
+  BusCardInit(img, BUSCARD_SIZE);
+  memset(img, 0, sizeof(img));
+
+  const uint8_t hi[1] = { 0x80 };
+  m_write(hi, 1);
+  CHECK(BusCardPointer() == 0x8000);   // above the old size, not folded to 0
+
+  const uint8_t d[1] = { 0x5C };
+  m_write_at(0xFFFF, d, 1);            // last addressable byte
+  CHECK(img[0xFFFF] == 0x5C);
+  CHECK(img[0x7FFF] == 0);             // did NOT alias into the old top
+  CHECK(BusCardPointer() == 0);        // ...and only there does it wrap
+}
+
 static void test_detached() {
   BusCardInit(NULL, 0);
   BusCardStart(1);
@@ -209,6 +267,8 @@ int main() {
   test_short_writes();
   test_lost_stop_recovery();
   test_tx_prefetch_rewind();
+  test_full_251e_bank_does_not_wrap();
+  test_pointer_space_is_fully_addressable();
   test_detached();
   printf("test_buscard: %d checks, %d failures\n", checks, fails);
   return fails ? 1 : 0;

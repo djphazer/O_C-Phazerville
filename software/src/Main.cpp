@@ -280,7 +280,11 @@ FLASHMEM static void watchdog_arm() {
             | WDOG_WCR_WDBG | WDOG_WCR_WDZST;
   watchdog_armed = true;
 }
-static inline void watchdog_feed() {
+// External linkage on purpose: PresetEngine.cpp feeds the watchdog across the
+// long flash writes of a preset save (`extern void watchdog_feed();`). As a
+// static inline it had internal linkage, and the call from another TU became
+// an LTO relocation the linker could not encode.
+void watchdog_feed() {
   WDOG1_WSR = 0x5555;
   WDOG1_WSR = 0xAAAA;
 }

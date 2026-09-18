@@ -27,7 +27,12 @@
 // the address in hardware) while a real preset manager owns 0x50.
 // ---------------------------------------------------------------------------
 
-#define BUSCARD_SIZE 32768u  // 24LC256 / WPM FRAM window
+// 64K = the ENTIRE address space a 2-byte card pointer can name, so the wrap
+// below can never silently eat a transfer: whatever a master writes, it lands
+// somewhere distinct. Sized up from 32768 (24LC256) after a real 251e BACKUP
+// -- 30 slots x 2104 = 63120 bytes -- wrapped at 32K and overwrote its own
+// first 30352 bytes with its tail. 24LC512-shaped; still one flat malloc.
+#define BUSCARD_SIZE 65536u  // 24LC512 / full 16-bit pointer span
 
 typedef struct {
   uint32_t txns_write;   // write transactions (incl. pointer-only)
