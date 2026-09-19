@@ -651,17 +651,13 @@ public:
   }
 
   int32_t get_pitch_at_step(uint8_t seq, uint8_t step) const {
-
-    uint8_t _channel_offset = !channel_id_ ? 0x0 : OC::Patterns::NUM_PATTERNS_PER_CHAN;
-
+    const uint8_t _channel_offset = channel_id_ * OC::Patterns::NUM_PATTERNS_PER_CHAN;
     OC::Pattern *read_pattern_ = &OC::user_patterns[seq + _channel_offset];
     return read_pattern_->notes[step];
   }
 
   void set_pitch_at_step(uint8_t seq, uint8_t step, int32_t pitch) {
-
-    uint8_t _channel_offset = !channel_id_ ? 0x0 : OC::Patterns::NUM_PATTERNS_PER_CHAN;
-
+    const uint8_t _channel_offset = channel_id_ * OC::Patterns::NUM_PATTERNS_PER_CHAN;
     OC::Pattern *write_pattern_ = &OC::user_patterns[seq + _channel_offset];
     write_pattern_->notes[step] = pitch;
   }
@@ -671,15 +667,14 @@ public:
   }
 
   void clear_user_pattern(uint8_t seq) {
-
-    uint8_t _channel_offset = !channel_id_ ? 0x0 : OC::Patterns::NUM_PATTERNS_PER_CHAN;
+    const uint8_t _channel_offset = channel_id_ * OC::Patterns::NUM_PATTERNS_PER_CHAN;
     memcpy(&OC::user_patterns[seq + _channel_offset], &OC::patterns[0], sizeof(OC::Pattern));
   }
 
   void copy_seq(uint8_t seq, uint8_t len, uint16_t mask) {
 
     // which sequence ?
-    copy_sequence = seq + (!channel_id_ ? 0x0 : OC::Patterns::NUM_PATTERNS_PER_CHAN);
+    copy_sequence = seq + channel_id_ * OC::Patterns::NUM_PATTERNS_PER_CHAN;
     copy_length = len;
     copy_mask = mask;
     copy_timeout = 0;
@@ -690,7 +685,7 @@ public:
     if (copy_timeout < COPYTIMEOUT) {
 
        // which sequence to copy to ?
-       uint8_t sequence = seq + (!channel_id_ ? 0x0 : OC::Patterns::NUM_PATTERNS_PER_CHAN);
+       uint8_t sequence = seq + channel_id_ * OC::Patterns::NUM_PATTERNS_PER_CHAN;
        // copy length:
        set_sequence_length(copy_length, seq);
        // copy mask:
@@ -819,7 +814,6 @@ public:
     display_mask_ = get_mask(display_num_sequence_);
     active_sequence_ = display_num_sequence_;
     sequence_manual_ = display_num_sequence_;
-    sequence_advance_state_ = false;
     pendulum_fwd_ = true;
     clock_display_.Init();
     arpeggiator_.Init();
@@ -900,8 +894,8 @@ public:
      // TR1 or TR3?
      if (SEQ_CHANNEL_TRIGGER_NONE != _clock_source) {
       _triggered = _clock_source
-          ? ioframe->digital_inputs.triggered<OC::DIGITAL_INPUT_3>()
-          : ioframe->digital_inputs.triggered<OC::DIGITAL_INPUT_1>();
+          ? ioframe->digital_inputs.triggered(OC::DIGITAL_INPUT_3)
+          : ioframe->digital_inputs.triggered(OC::DIGITAL_INPUT_1);
      } else {
       _triggered = false;
      }
@@ -970,8 +964,8 @@ public:
          if (_reset_source < SEQ_CHANNEL_TRIGGER_NONE && !reset_pending_) {
             // TR1, TR3 are main clock sources
             uint8_t reset_state_ = !_reset_source
-              ? ioframe->digital_inputs.raised<OC::DIGITAL_INPUT_2>()
-              : ioframe->digital_inputs.raised<OC::DIGITAL_INPUT_4>();
+              ? ioframe->digital_inputs.raised(OC::DIGITAL_INPUT_2)
+              : ioframe->digital_inputs.raised(OC::DIGITAL_INPUT_4);
 
             // ?
             if (reset_state_ < prev_reset_state_) {
@@ -1052,16 +1046,16 @@ public:
              case SEQ_CHANNEL_TRIGGER_NONE:
              break;
              case SEQ_CHANNEL_TRIGGER_FREEZE_HI2:
-              mute = !digitalReadFast(TR2);
+              mute = ioframe->digital_inputs.raised(OC::DIGITAL_INPUT_2);
              break;
              case SEQ_CHANNEL_TRIGGER_FREEZE_LO2:
-              mute = digitalReadFast(TR2);
+              mute = !ioframe->digital_inputs.raised(OC::DIGITAL_INPUT_2);
              break;
              case SEQ_CHANNEL_TRIGGER_FREEZE_HI4:
-              mute = !digitalReadFast(TR4);
+              mute = ioframe->digital_inputs.raised(OC::DIGITAL_INPUT_4);
              break;
              case SEQ_CHANNEL_TRIGGER_FREEZE_LO4:
-              mute = digitalReadFast(TR4);
+              mute = !ioframe->digital_inputs.raised(OC::DIGITAL_INPUT_4);
              break;
              default:
              break;
@@ -1275,12 +1269,8 @@ public:
          }
          else {
             // we simply echo the pulsewidth:
-            bool _state = (_clock_source == SEQ_CHANNEL_TRIGGER_TR1) ? !digitalReadFast(TR1) : !digitalReadFast(TR3);
-
-            if (_state)
-              gate_state_ = ON;
-            else
-              gate_state_ = OFF;
+            const bool _state = ioframe->digital_inputs.raised((_clock_source == SEQ_CHANNEL_TRIGGER_TR1) ? OC::DIGITAL_INPUT_1 : OC::DIGITAL_INPUT_3);
+            gate_state_ = _state ? ON : OFF;
          }
      }
   } // end update
@@ -1386,10 +1376,8 @@ public:
           sequence_max = _playmode - PM_SEQ3;
           prev_playmode_ = _playmode;
           // trigger?
-          uint8_t _advance_trig = (channel_id_ == 0) ? digitalReadFast(TR2) : digitalReadFast(TR4);
-
-          if (_advance_trig < sequence_advance_state_) {
-
+          const bool _advance_trig = ioframe->digital_inputs.triggered((channel_id_ & 1) ? OC::DIGITAL_INPUT_4 : OC::DIGITAL_INPUT_2);
+          if (_advance_trig) {
             // increment sequence #
             sequence_cnt_++;
             // reset sequence #
@@ -1406,7 +1394,6 @@ public:
               active_sequence_ += num_sequence_cv;
               CONSTRAIN(active_sequence_, 0, OC::Patterns::NUM_PATTERNS_PER_CHAN - 1);
           }
-          sequence_advance_state_ = _advance_trig;
           sequence_max = 0x0;
         }
         break;
@@ -1894,7 +1881,7 @@ public:
 
 private:
 
-  bool channel_id_;
+  uint8_t channel_id_;
   bool octave_toggle_;
   bool wait_for_EoS_;
   bool note_repeat_;
@@ -1929,7 +1916,6 @@ private:
   int8_t sequence_manual_;
   int8_t active_sequence_length_;
   int32_t sequence_cnt_;
-  int8_t sequence_advance_state_;
   int8_t sequence_change_pending_;
   int8_t pendulum_fwd_;
   int last_scale_;
