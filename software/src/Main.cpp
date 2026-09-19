@@ -399,6 +399,128 @@ FLASHMEM void setup() {
   SERIAL_PRINTLN("[End of setup()]");
 }
 
+FLASHMEM __attribute__((noinline))
+void SerialHandler() {
+  static size_t cap_idx = 0;
+  static elapsedMicros cap_send_time = 0;
+
+  if (Serial && Serial.available() > 0) {
+    bool capreq = false;
+    do {
+      int cmd = Serial.read();
+      switch (cmd) {
+#ifdef PRINT_DEBUG
+        case 'z':
+          Serial.println("-=[ PEW PEW NERDS! ]=-");
+          Serial.println("Secret Menu Options:");
+          Serial.printf("'I' = Toggle App ISR [%s]\n", OC::CORE::app_isr_enabled ? "ON" : "OFF");
+          Serial.printf("'D' = Toggle Display Redraw [%s]\n", OC::CORE::display_update_enabled ? "ON" : "OFF");
+          Serial.printf("'L' = Toggle App Loop [%s]\n", OC::CORE::app_loop_enabled ? "ON" : "OFF");
+#if defined(__IMXRT1062__)
+#if defined(ARDUINO_TEENSY41)
+          Serial.println("'i' = scan all i2c addresses");
+#endif
+          Serial.println("'l' = list all files in flash (LittleFS)");
+          Serial.println("'s' = list all files on SD card");
+          Serial.println("'C' = clear/reset default Config file");
+          Serial.println("'F' = format/erase all LittleFS files");
+#endif
+          break;
+
+        case 'I':
+          OC::CORE::app_isr_enabled = !OC::CORE::app_isr_enabled;
+          Serial.printf("App ISR = %s\n", OC::CORE::app_isr_enabled ? "ON" : "OFF");
+          break;
+        case 'D':
+          OC::CORE::display_update_enabled = !OC::CORE::display_update_enabled;
+          Serial.printf("Display Redraw = %s\n", OC::CORE::display_update_enabled ? "ON" : "OFF");
+          break;
+        case 'L':
+          OC::CORE::app_loop_enabled = !OC::CORE::app_loop_enabled;
+          Serial.printf("App Loop = %s\n", OC::CORE::app_loop_enabled ? "ON" : "OFF");
+          break;
+
+#if defined(__IMXRT1062__)
+#if defined(ARDUINO_TEENSY41)
+        case 'i':
+          ScanI2C();
+          break;
+#endif
+        case 'C':
+          Serial.println("Resetting Config File!!");
+          PhzConfig::clear_config();
+          PhzConfig::save_config();
+        case 'l':
+          Serial.println(" -=- LittleFS -=- ");
+          PhzConfig::listFiles();
+          break;
+        case 's':
+          Serial.println(" -=- SD Card -=- ");
+          PhzConfig::listFiles(SD);
+          break;
+        case 'F':
+          Serial.println("!! ERASING ALL FILES on LittleFS !!");
+          PhzConfig::eraseFiles();
+          break;
+#endif
+
+#endif
+        default:
+          capreq = true;
+          break;
+      }
+    } while (Serial.available() > 0); // todo: yield after a limit
+    if (capreq) {
+      display::frame_buffer.capture_request();
+      cap_idx = 0;
+    }
+  }
+
+  // check for frame buffer to have capture data ready
+  const uint8_t *capture_data = display::frame_buffer.captured();
+  if (capture_data && cap_send_time > 950) {
+    cap_send_time = 0;
+    capture_data += cap_idx; // start where we left off
+
+    // limit to n bytes every 950 micros
+    const size_t chunk_size = 32;
+    for (size_t i=0; i < chunk_size; i++) {
+      uint8_t n = *capture_data++;
+      if (n < 16) Serial.print("0");
+      Serial.print(n, HEX);
+
+      if (++cap_idx >= display::frame_buffer.kFrameSize) {
+        // we're done sending this one
+        Serial.println();
+        Serial.flush();
+        cap_idx = 0;
+        display::frame_buffer.capture_retire();
+        break;
+      }
+    }
+  }
+
+} // SerialHandler
+
+void Redraw() {
+  using namespace OC;
+  static uint32_t menu_draw_count = 0;
+
+  GRAPHICS_BEGIN_FRAME(false); // Don't busy wait
+  if (UI_MODE_APP_SETTINGS == ui_mode) {
+    // Only draw the App menu here...
+    // Handle events and process state changes elsewhere.
+    ui.AppSettings(true);
+
+  } else { // if (UI_MODE_MENU == ui_mode) {
+    OC_DEBUG_RESET_CYCLES(menu_draw_count, 512, DEBUG::MENU_draw_cycles);
+    OC_DEBUG_PROFILE_SCOPE(DEBUG::MENU_draw_cycles);
+    app_switcher.current_app()->Draw(ui_mode);
+    ++menu_draw_count;
+  }
+  GRAPHICS_END_FRAME();
+}
+
 /*  ---------    main loop  --------  */
 
 void FASTRUN loop() {
@@ -416,23 +538,9 @@ void FASTRUN loop() {
 
     // Refresh display
     if (MENU_REDRAW && CORE::display_update_enabled) {
-      GRAPHICS_BEGIN_FRAME(false); // Don't busy wait
-
-      if (UI_MODE_APP_SETTINGS == ui_mode) {
-        // Only draw the App menu here...
-        // Handle events and process state changes elsewhere.
-        ui.AppSettings(true);
-
-      } else { // if (UI_MODE_MENU == ui_mode) {
-        OC_DEBUG_RESET_CYCLES(menu_draw_count, 512, DEBUG::MENU_draw_cycles);
-        OC_DEBUG_PROFILE_SCOPE(DEBUG::MENU_draw_cycles);
-        app_switcher.current_app()->Draw(ui_mode);
-        ++menu_draw_count;
-      }
-
+      Redraw();
       MENU_REDRAW = 0;
       last_redraw_time = ui.ticks();
-      GRAPHICS_END_FRAME();
     }
 
     // Run current app
@@ -472,123 +580,7 @@ void FASTRUN loop() {
     MTP.loop();
 #endif
 
-    static size_t cap_idx = 0;
-    static elapsedMicros cap_send_time = 0;
-    // check for request from PC to capture the screen
-    if (Serial && Serial.available() > 0) {
-      bool capreq = false;
-      do {
-        int cmd = Serial.read();
-        switch (cmd) {
-#ifdef PRINT_DEBUG
-          case 'z':
-            Serial.println("-=[ PEW PEW NERDS! ]=-");
-            Serial.println("Secret Menu Options:");
-            Serial.printf("'I' = Toggle App ISR [%s]\n", OC::CORE::app_isr_enabled ? "ON" : "OFF");
-            Serial.printf("'D' = Toggle Display Redraw [%s]\n", OC::CORE::display_update_enabled ? "ON" : "OFF");
-            Serial.printf("'L' = Toggle App Loop [%s]\n", OC::CORE::app_loop_enabled ? "ON" : "OFF");
-#if defined(__IMXRT1062__)
-#if defined(ARDUINO_TEENSY41)
-            Serial.println("'i' = scan all i2c addresses");
-#endif
-            Serial.println("'l' = list all files in flash (LittleFS)");
-            Serial.println("'s' = list all files on SD card");
-            Serial.println("'C' = clear/reset default Config file");
-            Serial.println("'F' = format/erase all LittleFS files");
-#endif
-            break;
+    if (Serial) SerialHandler();
 
-          case 'I':
-            OC::CORE::app_isr_enabled = !OC::CORE::app_isr_enabled;
-            Serial.printf("App ISR = %s\n", OC::CORE::app_isr_enabled ? "ON" : "OFF");
-            break;
-          case 'D':
-            OC::CORE::display_update_enabled = !OC::CORE::display_update_enabled;
-            Serial.printf("Display Redraw = %s\n", OC::CORE::display_update_enabled ? "ON" : "OFF");
-            break;
-          case 'L':
-            OC::CORE::app_loop_enabled = !OC::CORE::app_loop_enabled;
-            Serial.printf("App Loop = %s\n", OC::CORE::app_loop_enabled ? "ON" : "OFF");
-            break;
-
-#if defined(__IMXRT1062__)
-#if defined(ARDUINO_TEENSY41)
-          case 'i':
-            ScanI2C();
-            break;
-#endif
-          case 'C':
-            Serial.println("Resetting Config File!!");
-            PhzConfig::clear_config();
-            PhzConfig::save_config();
-          case 'l':
-            Serial.println(" -=- LittleFS -=- ");
-            PhzConfig::listFiles();
-            break;
-          case 's':
-            Serial.println(" -=- SD Card -=- ");
-            PhzConfig::listFiles(SD);
-            break;
-          case 'F':
-            Serial.println("!! ERASING ALL FILES on LittleFS !!");
-            PhzConfig::eraseFiles();
-            break;
-#endif
-
-            // TODO:
-          case '+':
-          case '-':
-            // simulate UP and DOWN buttons
-            break;
-          case '[':
-          case ']':
-            // simulate Encoder button press
-            break;
-          case ',':
-          case '.':
-            // simulate Left Encoder turn
-            break;
-          case '<':
-          case '>':
-            // simulate Right Encoder turn
-            break;
-#endif
-          default:
-            capreq = true;
-            break;
-        }
-      } while (Serial.available() > 0);
-      if (capreq) {
-        display::frame_buffer.capture_request();
-        cap_idx = 0;
-      }
-    }
-
-    // check for frame buffer to have capture data ready
-    const uint8_t *capture_data = display::frame_buffer.captured();
-    if (capture_data && cap_send_time > 950) {
-      cap_send_time = 0;
-      capture_data += cap_idx; // start where we left off
-
-      // limit to n bytes every 950 micros
-      const size_t chunk_size = 32;
-      for (size_t i=0; i < chunk_size; i++) {
-        uint8_t n = *capture_data++;
-        if (n < 16) Serial.print("0");
-        Serial.print(n, HEX);
-
-        if (++cap_idx >= display::frame_buffer.kFrameSize) {
-          // we're done sending this one
-          Serial.println();
-          Serial.flush();
-          cap_idx = 0;
-          display::frame_buffer.capture_retire();
-          break;
-        }
-      }
-    }
-
-  }
+  } // while true
 }
-
-
