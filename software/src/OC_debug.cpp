@@ -59,11 +59,14 @@ namespace OC {
 namespace DEBUG {
   debug::AveragedCycles LOOP_cycles;
   debug::AveragedCycles ISR_cycles;
+  debug::AveragedCycles APP_cycles;
   debug::AveragedCycles UI_cycles;
   debug::AveragedCycles MENU_draw_cycles;
   uint32_t UI_event_count;
   uint32_t UI_max_queue_depth;
   uint32_t UI_queue_overflow;
+  size_t UI_queue_max = 0;
+  uint32_t core_queue_overflow;
 
   void Init() {
     debug::CycleMeasurement::Init();
@@ -123,15 +126,24 @@ static void debug_menu_core() {
 
   y += 10;
   graphics.setPrintPos(2, y);
+  graphics.printf("APP %3lu/%3lu/%3lu",
+                  debug::cycles_to_us(DEBUG::APP_cycles.min_value()),
+                  debug::cycles_to_us(DEBUG::APP_cycles.value()),
+                  debug::cycles_to_us(DEBUG::APP_cycles.max_value()));
+
+#if 0
+  y += 10;
+  graphics.setPrintPos(2, y);
   graphics.printf("POLL%3lu/%3lu/%3lu",
                   debug::cycles_to_us(DEBUG::UI_cycles.min_value()),
                   debug::cycles_to_us(DEBUG::UI_cycles.value()),
                   debug::cycles_to_us(DEBUG::UI_cycles.max_value()));
+#endif
 
 #ifdef OC_DEBUG_UI
   y += 10;
   graphics.setPrintPos(2, y);
-  graphics.printf("UI   !%lu #%lu", DEBUG::UI_queue_overflow, DEBUG::UI_event_count);
+  graphics.printf("UI   !%lu #%lu  <%u", DEBUG::UI_queue_overflow, DEBUG::UI_event_count, DEBUG::UI_queue_max);
 #endif
 
   y += 10;
@@ -140,6 +152,11 @@ static void debug_menu_core() {
                   debug::cycles_to_us(DEBUG::LOOP_cycles.min_value()),
                   debug::cycles_to_us(DEBUG::LOOP_cycles.value()),
                   debug::cycles_to_us(DEBUG::LOOP_cycles.max_value()));
+
+  y += 10;
+  graphics.setPrintPos(2, y);
+  const size_t qsize = CORE::get_queue_size();
+  graphics.printf("TaskQ !%lu %3u / %u", DEBUG::core_queue_overflow, qsize, CORE::queue_max);
 }
 
 FLASHMEM
@@ -454,9 +471,6 @@ void Ui::DebugStats() {
       midi_monitor();
     }
 
-    thisUSB.Task();
-    CORE::FlushTasks();
-
     const auto &current_menu = debug_menus[current_menu_index];
 
     GRAPHICS_BEGIN_FRAME(false);
@@ -465,6 +479,9 @@ void Ui::DebugStats() {
       graphics.print(current_menu.title);
       current_menu.display_fn();
     GRAPHICS_END_FRAME();
+
+    thisUSB.Task();
+    CORE::FlushTasks();
 
     while (event_queue_.available()) {
       UI::Event event = event_queue_.PullEvent();

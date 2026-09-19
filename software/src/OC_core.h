@@ -9,10 +9,13 @@
 #include "OC_menus.h"
 #include "util/util_debugpins.h"
 #include "src/drivers/display.h"
-#include <functional>
-#include <queue>
 
-using Task = std::function<void()>;
+enum Task : uint16_t {
+  PROCESS_IOFRAME,
+};
+
+// power-of-two only
+static constexpr size_t IO_BUFFER_SIZE = 128;
 
 namespace OC {
   namespace CORE {
@@ -20,12 +23,15 @@ namespace OC {
     extern volatile bool app_isr_enabled;
     extern volatile bool display_update_enabled;
     extern volatile bool app_loop_enabled;
+    extern size_t queue_max;
 
     static constexpr int RAM2_HEADROOM = 10240;
 
-    void DeferTask(Task func);
+    void DeferTask(Task t);
     void FlushTasks();
     int FreeRam();
+    void Process(const uint16_t tick);
+    size_t get_queue_size();
   }; // namespace CORE
 
   struct TickCount {
