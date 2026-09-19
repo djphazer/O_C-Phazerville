@@ -584,14 +584,14 @@ FLASHMEM void ShiftArp::OnButtonPress() {
     }
 
     // Outside modal: double-click clears buffer (works on every cursor field).
-    if (OC::CORE::ticks - click_tick < HS::HEMISPHERE_DOUBLE_CLICK_TIME) {
+    if (HS::get_tick() - click_tick < HS::HEMISPHERE_DOUBLE_CLICK_TIME) {
         buf_count = 0;
         step = 0;
         cur_idx = 0;
         click_tick = 0;
         return;
     }
-    click_tick = OC::CORE::ticks;
+    click_tick = HS::get_tick();
 
     if (cursor == EDT)   { OpenEditor(); return; }
     if (cursor == SCALE) { OpenScaleEditor(); return; }

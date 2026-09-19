@@ -280,7 +280,7 @@ public:
       return;
     }
 
-    if (CORE::ticks % 3200 == 0) {
+    if (HS::get_tick() % 3200 == 0) {
       pick_left = random(8);
       pick_right = random(8);
     }

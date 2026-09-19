@@ -55,12 +55,12 @@ class Ponglet : public HemisphereApplet {
     };
 
     void Beep() {
-      const bool high = (OC::CORE::ticks % BEEP_TICKS) < (BEEP_TICKS / 2);
+      const bool high = (HS::get_tick() % BEEP_TICKS) < (BEEP_TICKS / 2);
       const int amp = beep_ticker * ONE_OCTAVE * 3 / BEEP_LEN * (high?1:-1);
       Out(0, amp);
     }
     void Boop() {
-      const bool high = (OC::CORE::ticks % BOOP_TICKS) < (BOOP_TICKS / 2);
+      const bool high = (HS::get_tick() % BOOP_TICKS) < (BOOP_TICKS / 2);
       const int amp = boop_ticker * ONE_OCTAVE * 3 / BOOP_LEN * (high?1:-1);
       Out(0, amp);
     }

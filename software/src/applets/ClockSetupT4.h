@@ -212,7 +212,7 @@ public:
         if (cursor == TEMPO) {
             // Tap Tempo detection
             if (last_tap_tick) {
-                tap_time[taps] = OC::CORE::ticks - last_tap_tick;
+                tap_time[taps] = HS::get_tick() - last_tap_tick;
 
                 if (tap_time[taps] > CLOCK_TICKS_MAX) {
                     taps = 0;
@@ -223,7 +223,7 @@ public:
 
                 taps %= NR_OF_TAPS;
             }
-            last_tap_tick = OC::CORE::ticks;
+            last_tap_tick = HS::get_tick();
         }
     }
 
