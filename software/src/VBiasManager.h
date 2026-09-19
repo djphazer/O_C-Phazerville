@@ -73,15 +73,15 @@ public:
     void AdvanceBias() {
         // Only advance the bias if it's been less than a second since the last button press.
         // This is so that the first button press shows the popup without changing anything.
-        if (OC::CORE::ticks - last_advance_tick < BIAS_EDITOR_TIMEOUT) {
+        if (HS::get_tick() - last_advance_tick < BIAS_EDITOR_TIMEOUT) {
             if (++bias_state > 2) bias_state = 0;
             instance->SetState(VBiasManager::VState(bias_state));
         }
-        last_advance_tick = OC::CORE::ticks;
+        last_advance_tick = HS::get_tick();
     }
 
     int IsEditing() {
-        return (OC::CORE::ticks - last_advance_tick < BIAS_EDITOR_TIMEOUT);
+        return (HS::get_tick() - last_advance_tick < BIAS_EDITOR_TIMEOUT);
     }
 
     /*
@@ -150,7 +150,7 @@ public:
      * If the last state advance (with the button) was less than a second ago, draw the popup indicator
      */
     void DrawPopupPerhaps() {
-        if (OC::CORE::ticks - last_advance_tick < BIAS_EDITOR_TIMEOUT) {
+        if (HS::get_tick() - last_advance_tick < BIAS_EDITOR_TIMEOUT) {
             graphics.clearRect(17, 7, 82, 43);
             graphics.drawFrame(18, 8, 80, 42);
 

@@ -44,14 +44,14 @@ public:
   }
 
   void Register(int hemisphere) {
-    registered[hemisphere & 1] = OC::CORE::ticks;
+    registered[hemisphere & 1] = HS::get_tick();
   }
   void Unload(int hemisphere) {
     registered[hemisphere & 1] = 0;
   }
 
   bool IsLinked() {
-    uint32_t t = OC::CORE::ticks;
+    uint32_t t = HS::get_tick();
     return (
       (t - registered[LEFT_HEMISPHERE] < 160)
       && (t - registered[RIGHT_HEMISPHERE] < 160)

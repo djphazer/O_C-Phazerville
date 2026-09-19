@@ -134,7 +134,7 @@ void HemisphereApplet::Out(int ch, int value) const {
 }
 
 void HemisphereApplet::SmoothedOut(int ch, int value, int kSmoothing) const {
-    if (OC::CORE::ticks % kSmoothing == 0) {
+    if (HS::get_tick() % kSmoothing == 0) {
       DAC_CHANNEL channel = (DAC_CHANNEL)(ch + io_offset);
       value = (frame.outputs[channel].get_target() * (kSmoothing - 1) + value) / kSmoothing;
       frame.outputs[channel].set(value);

@@ -62,7 +62,7 @@ public:
     if (current_app_.instance) {
       IO::Read(ioframe, &current_app_.io_settings());
       // actual processing is deferred after loading the IOFrame
-      // TODO: refactor everything that references CORE::ticks - tick number is carried in the IOFrame
+      // XXX: this could be triggered by a UI Event instead...
       CORE::DeferTask([ioframe, this]() {
         current_app_.Process(current_app_.instance, ioframe);
         IO::Write(ioframe, &current_app_.io_settings());

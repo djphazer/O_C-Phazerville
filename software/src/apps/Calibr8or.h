@@ -571,7 +571,7 @@ public:
               click_tick = 0;
             } else {
               first_click = hemisphere;
-              click_tick = OC::CORE::ticks;
+              click_tick = HS::get_tick();
             }
             break;
           case OC::CONTROL_BUTTON_L:

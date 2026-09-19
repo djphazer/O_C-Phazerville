@@ -57,7 +57,7 @@ public:
     }
 
     void Controller() {
-        if (CLKPASSTHRU == cursor && passthru && OC::CORE::ticks - passthru_popup_tick >= HEMISPHERE_CURSOR_TICKS * 4) enc_edit[hemisphere].isEditing = false;
+        if (CLKPASSTHRU == cursor && passthru && HS::get_tick() - passthru_popup_tick >= HEMISPHERE_CURSOR_TICKS * 4) enc_edit[hemisphere].isEditing = false;
         number_mod = constrain(number + SemitoneIn(0) / 5, 1, HEM_BURST_NUMBER_MAX);
         if (clocked) {
             static const int div_states[] = {-8, -7, -6, -5, -4, -3, -2, 1, 2, 3, 4, 5, 6, 7, 8};
@@ -118,7 +118,7 @@ public:
         //
         bool trigger = Clock(1);
         bool btrig = trigger && (random(100) >= prob);
-        if (trigger) { zap_active = btrig; if (!btrig) skip_tick = OC::CORE::ticks; }
+        if (trigger) { zap_active = btrig; if (!btrig) skip_tick = HS::get_tick(); }
         if ((passthru & 0x2) && trigger) ClockOut(0);
 
         if (btrig) {
@@ -141,7 +141,7 @@ public:
     void OnButtonPress() {
       if (CLKPASSTHRU == cursor) {
         ++passthru %= 3;
-        passthru_popup_tick = OC::CORE::ticks;
+        passthru_popup_tick = HS::get_tick();
         enc_edit[hemisphere].isEditing = passthru != 0;
         ResetCursor();
       } else
@@ -250,7 +250,7 @@ private:
         gfxIcon(1, y, CLOCK_ICON);
         gfxIcon(10, y, icons[display_passthru]);
 
-        if (skip_tick && OC::CORE::ticks - skip_tick < HEMISPHERE_CURSOR_TICKS) gfxPrint(33, y, "*");
+        if (skip_tick && HS::get_tick() - skip_tick < HEMISPHERE_CURSOR_TICKS) gfxPrint(33, y, "*");
         gfxPrint(40, y, prob);
         gfxPrint("%");
 

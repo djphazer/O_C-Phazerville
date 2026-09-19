@@ -29,7 +29,7 @@ struct ClkDivMult {
   bool Tick(bool clocked = 0) {
     if (steps == 0) return false;
     bool trigout = 0;
-    const uint32_t this_tick = OC::CORE::ticks;
+    const uint32_t this_tick = HS::get_tick();
 
     if (clocked) {
       cycle_time = this_tick - last_clock;
@@ -96,7 +96,7 @@ struct DivSequence {
       if (clocked) {
           step_index = 0;
           divmult[step_index].last_clock = last_clock;
-          last_clock = OC::CORE::ticks;
+          last_clock = HS::get_tick();
           return divmult[step_index].Tick(true) && StepActive(step_index);
       }
       return false; // reset and not ready
@@ -124,7 +124,7 @@ struct DivSequence {
         }
       }
 
-      last_clock = OC::CORE::ticks;
+      last_clock = HS::get_tick();
     }
 
 

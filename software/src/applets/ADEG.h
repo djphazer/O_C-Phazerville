@@ -134,7 +134,7 @@ public:
             decay = constrain(decay + direction, 0, HEM_ADEG_MAX_VALUE);
             last_ticks_val = ScaleStageToTicks(decay);
         }
-        last_change_ticks = OC::CORE::ticks;
+        last_change_ticks = HS::get_tick();
     }
 
     uint64_t OnDataRequest() {
@@ -192,7 +192,7 @@ private:
         gfxRect(1, 15, ProportionCV(ViewOut(0), 62), 6);
 
         // Change indicator, if necessary
-        if (OC::CORE::ticks - last_change_ticks < 20000) {
+        if (HS::get_tick() - last_change_ticks < 20000) {
             const int ms_value = last_ticks_val * 10 / 17;
             gfxPrint(ms_value / 10);
             gfxPrint(".");

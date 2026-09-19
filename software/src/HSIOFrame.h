@@ -731,7 +731,7 @@ struct alignas(32) MIDIFrame {
             }
             log_index--;
         }
-        last_msg_tick = OC::CORE::ticks;
+        last_msg_tick = HS::get_tick();
     }
     void UpdateLog(uint8_t message, uint8_t data1, uint8_t data2) {
         UpdateLog({0, message, data1, data2});
@@ -892,6 +892,7 @@ struct GamepadFrame {
 };
 #endif
 
+static OC::IOFrame dummy_frame; // just to avoid a null pointer...
 
 // shared IO Frame, updated every tick
 // this will allow chaining applets together, multiple stages of processing
@@ -939,6 +940,7 @@ struct IOFrame {
         clockinskip[i] = 0;
         clockoutskip[i] = 0;
       }
+      current_ioframe = &dummy_frame;
     }
 
     const int ViewOut(DAC_CHANNEL ch) const { return outputs[ch].get(output_atten[ch]); }
