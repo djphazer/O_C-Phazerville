@@ -101,7 +101,7 @@ void ScanI2C() {
 
 uint_fast8_t MENU_REDRAW = true;
 static OC::UiMode ui_mode = OC::UI_MODE_MENU;
-static OC::IOFrame io_frame;
+static OC::IOFrame io_frames[16];
 
 /*  ------------------------ UI timer ISR ---------------------------   */
 
@@ -143,7 +143,7 @@ void FASTRUN CORE_timer_ISR() {
 
   ++CORE::ticks;
   if (CORE::app_isr_enabled) {
-    OC::app_switcher.Process(&io_frame);
+    OC::app_switcher.Process(&io_frames[CORE::ticks & 0x0f]);
   }
 
   OC_DEBUG_RESET_CYCLES(OC::CORE::ticks, 16384, OC::DEBUG::ISR_cycles);
@@ -321,7 +321,7 @@ FLASHMEM void setup() {
   OC::ui.configure_encoders(OC::calibration_data.encoder_config());
 
   SERIAL_PRINTLN("* CORE ISR @%luus", OC_CORE_TIMER_RATE);
-  io_frame.Reset();
+  for (auto &io_frame : io_frames) io_frame.Reset();
   CORE_timer.begin(CORE_timer_ISR, OC_CORE_TIMER_RATE);
   CORE_timer.priority(OC_CORE_TIMER_PRIO);
 

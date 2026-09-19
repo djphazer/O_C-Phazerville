@@ -84,6 +84,7 @@ void InputDesc::set_printf(const char *fmt, ...)
       ioframe->cv.pitch_values[i] = CVUtils::Attenuate(ADC::value_to_pitch(value), gain);
     }
   }
+  ioframe->tick = OC::CORE::ticks;
 }
 
 /*static*/ void IO::Write(IOFrame *ioframe, const IOSettings *io_settings) 
