@@ -201,91 +201,56 @@ private:
 
   void DrawInterface() {
     ForEachChannel(ch) {
+      const int ypos = 13 + 26 * ch;
+      const int base_cursor = ch * 3;
 
-      int ypos = 13 + 26 * ch;
+      // Fixed horizontal layout.
+      // gfxEndCursor() clears from x - 2, so x=2 keeps the clear region inside the framebuffer.
+      const int out_x   = 2;
+      const int eq_x    = 10;
+      const int fixed_x = 16;
+      const int plus1_x = 28;
+      const int aux1_x  = 35;
+      const int plus2_x = 46;
+      const int aux2_x  = 53;
 
-      const int out_x = 2;
-      if (output_mode[ch] == MODE_SUM) {
-        gfxPos(out_x, ypos);
+      // Output = Fixed.
+      gfxStartCursor(out_x, ypos);
+
+      if (output_mode[ch] == MODE_SUM)
         gfxPrintIcon(CLOCK_ICON);
-      } else {
-        gfxPrint(out_x, ypos, OutputLabel(ch));
-      }
+      else
+        gfxPrint(OutputLabel(ch));
 
-      // Output mode.
-      gfxPos(10, ypos);
+      gfxPos(eq_x, ypos);
       gfxPrint("=");
-      int fixed_input_x = gfxGetPrintPosX();
-      if (output_mode[ch] == MODE_IN) {
-        gfxPos(fixed_input_x, ypos);
+
+      gfxPos(fixed_x, ypos);
+      if (output_mode[ch] == MODE_IN)
         gfxPrintIcon(CLOCK_ICON);
-      } else {
-        gfxPos(fixed_input_x, ypos);
+      else
         gfxPrint(cvmap[ch + io_offset]);
-      }
 
-      // Input spacing.
-      gfxPos(gfxGetPrintPosX() - 4, ypos);
-      gfxPrint(" +");
-      int aux1_x = gfxGetPrintPosX();
+      // Same cursor mechanism as the AUX inputs.
+      gfxEndCursor(cursor == base_cursor, false, nullptr);
+
+      // AUX input 1.
+      gfxPos(plus1_x, ypos);
+      gfxPrint("+");
+
+      gfxStartCursor(aux1_x, ypos);
       gfxPrint(sources[ch][0]);
-      gfxPos(gfxGetPrintPosX() - 4, ypos);
-      gfxPrint(" +");
-      int aux2_x = gfxGetPrintPosX();
+      gfxEndCursor(cursor == base_cursor + 1, false,
+                   EditMode() ? sources[ch][0].InputName() : nullptr);
+
+      // AUX input 2.
+      gfxPos(plus2_x, ypos);
+      gfxPrint("+");
+
+      gfxStartCursor(aux2_x, ypos);
       gfxPrint(sources[ch][1]);
-
-      int base_cursor = ch * 3;
-      int out_cursor = base_cursor;
-      int aux1_cursor = base_cursor + 1;
-      int aux2_cursor = base_cursor + 2;
-
-      // Cursor.
-      if (!EditMode() && CursorBlink()) {
-        if (cursor == out_cursor) {
-          gfxRect(out_x, ypos + 9, fixed_input_x + 8 - out_x, 1);
-        } else if (cursor == aux1_cursor) {
-          gfxRect(aux1_x, ypos + 9, 8, 1);
-        } else if (cursor == aux2_cursor) {
-          gfxRect(aux2_x, ypos + 9, 8, 1);
-        }
-      }
-
-      // Edit popup.
-      if (EditMode()) {
-        const char *popup = nullptr;
-        int popup_x = 0;
-
-        if (cursor == out_cursor) {
-          if (output_mode[ch] == MODE_NRM) { popup = "NRM"; } else if (output_mode[ch] == MODE_SUM) { popup = "SUM"; } else { popup = "IN"; }
-          popup_x = 1;
-        } else if (cursor == aux1_cursor) {
-          popup = sources[ch][0].InputName();
-          popup_x = 31;
-        } else if (cursor == aux2_cursor) {
-          popup = sources[ch][1].InputName();
-          popup_x = 62;
-        }
-
-        if (popup) {
-          int text_w = strlen(popup) * 6;
-          int box_w = text_w + 4;
-
-          if (cursor == out_cursor) {
-            popup_x = 1;
-          } else if (cursor == aux1_cursor) {
-            popup_x -= box_w / 2;
-          } else {
-            popup_x -= box_w - 1;
-          }
-
-          popup_x = constrain(popup_x, 1, 63 - box_w);
-
-          gfxClear(popup_x - 1, ypos - 1, box_w + 2, 12);
-          gfxFrame(popup_x, ypos - 1, box_w, 11);
-          gfxPrint(popup_x + 2, ypos + 1, popup);
-          gfxInvert(popup_x, ypos - 1, box_w, 11);
-        }
-      }
+      gfxEndCursor(cursor == base_cursor + 2, false,
+                   EditMode() ? sources[ch][1].InputName() : nullptr);
 
       DrawMeter(In(ch), ypos + 11, 1);
       DrawMeter(sources[ch][0].In(), ypos + 13, 1);
