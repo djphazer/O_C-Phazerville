@@ -224,15 +224,15 @@ private:
     int last_icon_ticks[2];
 
     void DrawMonitor() {
-        if ((OC::CORE::ticks - frame.MIDIState.last_msg_tick) < 100) {
+        if ((HS::get_tick() - frame.MIDIState.last_msg_tick) < 100) {
             // reset icon display timers
             if (frame.MIDIState.mapping[map_index[0]].get_channel() == frame.MIDIState.last_midi_channel)
-                last_icon_ticks[0] = OC::CORE::ticks;
+                last_icon_ticks[0] = HS::get_tick();
             if (frame.MIDIState.mapping[map_index[1]].get_channel() == frame.MIDIState.last_midi_channel)
-                last_icon_ticks[1] = OC::CORE::ticks;
+                last_icon_ticks[1] = HS::get_tick();
         }
 
-        if (OC::CORE::ticks - last_icon_ticks[io_page] < 4000) // Ch midi activity
+        if (HS::get_tick() - last_icon_ticks[io_page] < 4000) // Ch midi activity
             gfxIcon(54, 13, MIDI_ICON);
     }
 

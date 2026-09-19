@@ -167,7 +167,7 @@ public:
     // Reset - Resync multipliers, optionally skipping the first tock
     void Reset(bool count_skip = 0) {
       ++beat_count;
-      beat_tick = OC::CORE::ticks;
+      beat_tick = HS::get_tick();
       if (!count_skip) {
         beat_count = 0;
         clock_tick[0] = 0;
@@ -192,7 +192,7 @@ public:
 
     // call this on every tick when clock is running, before all Controllers
     void SyncTrig(bool clocked, bool midi_sync = false) {
-        const uint32_t now = OC::CORE::ticks;
+        const uint32_t now = HS::get_tick();
         if (midi_sync) DisableMIDIOut();
         const int ppqn = (midi_sync || !midi_out_enabled) ? MIDI_CLOCK_PPQN : clock_ppqn;
 
@@ -372,7 +372,7 @@ public:
     }
 
     bool EndOfBeat(int ch = 0) const {
-      return BeatTick() == OC::CORE::ticks;
+      return BeatTick() == HS::get_tick();
     }
 
     bool Cycle(int ch = 0) {return cycle;}

@@ -115,10 +115,10 @@ public:
       switch (cursor) {
         case CHAN1_RANGE:
         case CHAN2_RANGE:
-          if (OC::CORE::ticks - click_tick < HS::HEMISPHERE_DOUBLE_CLICK_TIME)
+          if (HS::get_tick() - click_tick < HS::HEMISPHERE_DOUBLE_CLICK_TIME)
             Shred(cursor, true);
           else
-            click_tick = OC::CORE::ticks;
+            click_tick = HS::get_tick();
         default:
           CursorToggle();
           break;
