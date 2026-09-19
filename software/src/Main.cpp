@@ -97,7 +97,7 @@ void ScanI2C() {
 
 uint_fast8_t MENU_REDRAW = true;
 static OC::UiMode ui_mode = OC::UI_MODE_MENU;
-static OC::IOFrame io_frame;
+static DMAMEM OC::IOFrame io_frames[IO_BUFFER_SIZE];
 
 /*  ------------------------ UI timer ISR ---------------------------   */
 
@@ -106,6 +106,10 @@ IntervalTimer UI_timer;
 void FASTRUN UI_timer_ISR() {
   OC_DEBUG_PROFILE_SCOPE(OC::DEBUG::UI_cycles);
   OC::ui.Poll();
+
+  const size_t evq = OC::ui.get_queue_size();
+  OC::DEBUG::UI_queue_max = max(OC::DEBUG::UI_queue_max, evq);
+
   OC_DEBUG_RESET_CYCLES(OC::ui.ticks(), 2048, OC::DEBUG::UI_cycles);
 }
 
@@ -133,16 +137,45 @@ void FASTRUN CORE_timer_ISR() {
   // see OC_ADC.h for details; empirically (with current parameters), Scan_DMA() picks up new samples @ 5.55kHz
   OC::ADC::Scan_DMA();
 
-  // Pin changes are tracked in separate ISRs, so depending on prio it might
-  // need extra precautions. Note: This call is required to clear flags
-  DigitalInputs::Scan();
+#ifdef AudioNoInterrupts
+  // suppress Audio when the core queue needs it more
+  if (CORE::get_queue_size() > IO_BUFFER_SIZE / 4)
+    AudioNoInterrupts();
+  else
+    AudioInterrupts();
+#endif
+  // cap it at half (64 ticks, 3.6ms)
+  if (CORE::get_queue_size() <= IO_BUFFER_SIZE / 2) {
+    // Pin changes are tracked in separate ISRs, so depending on prio it might
+    // need extra precautions. Note: This call is required to clear flags
+    DigitalInputs::Scan();
 
-  ++CORE::ticks;
-  if (CORE::app_isr_enabled) {
-    OC::app_switcher.Process(&io_frame);
-  }
+    ++CORE::ticks;
+    if (CORE::app_isr_enabled) {
+      // -- load the current frame
+      OC::app_switcher.LoadFrame(&io_frames[CORE::ticks & (IO_BUFFER_SIZE-1)]);
+
+      const size_t qsize = CORE::get_queue_size();
+      CORE::queue_max = max(CORE::queue_max, qsize);
+      CONSTRAIN(CORE::queue_max, 1, IO_BUFFER_SIZE-2);
+
+      // -- send the latest frame that has been processed
+      // Dynamic latency based on measured "high water mark" of the CORE event queue
+      // This is normally very low unless/until the Audio ISR takes more time.
+      // With audio block size = 128 samples, at 48kHz, this should max out at ~2.7ms
+      // or 45 CORE ticks before things fall apart.
+      OC::app_switcher.SendFrame(&io_frames[(CORE::ticks - CORE::queue_max - 1) & (IO_BUFFER_SIZE-1)]);
+    }
+  } else // queue is full
+    ++DEBUG::core_queue_overflow;
 
   OC_DEBUG_RESET_CYCLES(OC::CORE::ticks, 16384, OC::DEBUG::ISR_cycles);
+}
+
+void OC::CORE::Process(const uint16_t tick) {
+  if (app_isr_enabled) {
+    OC::app_switcher.Process(&io_frames[tick & (IO_BUFFER_SIZE-1)]);
+  }
 }
 
 /*       ---------------------------------------------------------         */
@@ -214,7 +247,9 @@ FLASHMEM __attribute__((noinline)) void BootMenu(const bool show) {
     graphics.print("(hold Z to set)");
     GRAPHICS_END_FRAME();
 
-    delay(10);
+    OC::CORE::FlushTasks();
+
+    delay(1);
   }
 
   if (save) {
@@ -368,7 +403,7 @@ FLASHMEM void setup() {
   OC::ui.configure_encoders(OC::calibration_data.encoder_config());
 
   SERIAL_PRINTLN("* CORE ISR @%luus", OC_CORE_TIMER_RATE);
-  io_frame.Reset();
+  for (auto &io_frame : io_frames) io_frame.Reset();
   CORE_timer.begin(CORE_timer_ISR, OC_CORE_TIMER_RATE);
   CORE_timer.priority(OC_CORE_TIMER_PRIO);
 
@@ -745,10 +780,12 @@ void Redraw() {
 /*  ---------    main loop  --------  */
 FLASHMEM __attribute__((noinline)) void loop() {
   using namespace OC;
+
+  CORE::FlushTasks();
+  CORE::queue_max = 0;
   CORE::app_isr_enabled = true;
   CORE::display_update_enabled = true;
   CORE::app_loop_enabled = true;
-  uint32_t menu_draw_count = 0;
   uint32_t last_redraw_time = 0;
 
   while (true) {
@@ -759,6 +796,9 @@ FLASHMEM __attribute__((noinline)) void loop() {
     thisUSB.Task();
 #endif
 
+    // Take care of queued tasks from ISR - frequently!
+    OC::CORE::FlushTasks();
+
     // Refresh display
     if (MENU_REDRAW && CORE::display_update_enabled) {
       Redraw();
@@ -766,11 +806,12 @@ FLASHMEM __attribute__((noinline)) void loop() {
       last_redraw_time = ui.ticks();
     }
 
+    OC::CORE::FlushTasks();
+
     // Run current app
     if (CORE::app_loop_enabled)
       app_switcher.current_app()->DispatchLoop();
 
-    // Take care of queued tasks
     OC::CORE::FlushTasks();
 
     // UI events
