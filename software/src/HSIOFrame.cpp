@@ -474,8 +474,8 @@ void HS::IOFrame::Load(OC::IOFrame *ioframe) {
       result = result || (clock_m.Beep(virt_chan) && CheckSkip(virt_chan));
 
       if (result) {
-          cycle_ticks[ch] = OC::CORE::ticks - last_clock[ch];
-          last_clock[ch] = OC::CORE::ticks;
+          cycle_ticks[ch] = HS::get_tick() - last_clock[ch];
+          last_clock[ch] = HS::get_tick();
       }
 
       clocked[ch] = result;

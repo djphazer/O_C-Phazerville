@@ -111,6 +111,8 @@ namespace HS {
 
     ResetMappings();
   }
+  uint32_t get_tick() { return frame.current_ioframe->tick; }
+
   FLASHMEM
   void ResetMappings() {
     for (int i = 0; i < APPLET_SLOTS * 2; ++i) {
@@ -134,7 +136,7 @@ namespace HS {
         error_text = msg;
     }
     popup_type = pop;
-    popup_tick = OC::CORE::ticks;
+    popup_tick = get_tick();
     popup_duration = HEMISPHERE_CURSOR_TICKS * (4 + (pop == ERROR_POPUP) * 25);
   }
 

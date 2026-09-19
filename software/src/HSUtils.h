@@ -241,6 +241,7 @@ namespace HS {
   void Init();
   void ResetMappings();
   void DrawAppletList(bool blink = false);
+  uint32_t get_tick();
 
   // --- Quantizer helpers
   QuantEngine& GetQuantEngine(int ch);

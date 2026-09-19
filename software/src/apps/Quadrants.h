@@ -816,7 +816,7 @@ public:
 
         // Overlay popup Load/Save menu last
         if (HS::popup_type == HS::MENU_POPUP &&
-            OC::CORE::ticks - HS::popup_tick < HS::popup_duration) {
+            HS::get_tick() - HS::popup_tick < HS::popup_duration) {
           HS::DrawMenuPopup(config_cursor);
         }
     }
@@ -1952,7 +1952,7 @@ void AppQuadrants::HandleButtonEvent(const UI::Event &event) {
             OC::ui.SetButtonIgnoreMask(); // ignore release and long-press
           } else {
             HEM_SIDE slot = ButtonToSlot(event);
-            if (OC::CORE::ticks - click_tick < HEMISPHERE_DOUBLE_CLICK_TIME
+            if (HS::get_tick() - click_tick < HEMISPHERE_DOUBLE_CLICK_TIME
                 && (slot == first_click))
             {
                 // This is a double-click on one button.
@@ -1975,7 +1975,7 @@ void AppQuadrants::HandleButtonEvent(const UI::Event &event) {
             }
 
             // mark this single click
-            click_tick = OC::CORE::ticks;
+            click_tick = HS::get_tick();
             first_click = slot;
           }
       }

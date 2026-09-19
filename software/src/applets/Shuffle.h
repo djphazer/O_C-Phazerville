@@ -42,12 +42,12 @@ public:
 
     void Reset() {
         which = 0; // Reset (next trigger will be even clock)
-        last_tick = OC::CORE::ticks;
+        last_tick = HS::get_tick();
         triplet_which = 0;  // Triplets reset to down beat
     }
 
     void Controller() {
-        const uint32_t tick = OC::CORE::ticks;
+        const uint32_t tick = HS::get_tick();
         if (Clock(1)) Reset();
 
         // continuously update CV modulated delay values, for display
@@ -184,7 +184,7 @@ private:
             gfxBitmap(x, 48 - (which == n ? 3 : 0), 8, which == n ? NOTE_ICON : X_NOTE_ICON);
         }
 
-        int lx = Proportion(OC::CORE::ticks - last_tick, tempo, 20) + (which * 20) + 4;
+        int lx = Proportion(HS::get_tick() - last_tick, tempo, 20) + (which * 20) + 4;
         lx = constrain(lx, 1, 54);
         gfxDottedLine(lx, 42, lx, 60, 2);
     }
