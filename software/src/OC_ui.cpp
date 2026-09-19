@@ -48,9 +48,11 @@ void Ui::Init() {
   for (size_t i = 0; i < count; ++i) {
     buttons_[i].Init(button_pins[i], OC_GPIO_BUTTON_PINMODE);
   }
-  std::fill(button_press_time_, button_press_time_ + 4, 0);
+  std::fill(button_press_time_, button_press_time_ + CONTROL_BUTTON_LAST, 0);
   button_state_ = 0;
-  button_ignore_mask_ = 0;
+  button_down_ = 0;
+  chord_hold_ = 0;
+  chord_release_ = 0;
   screensaver_ = false;
   preempt_screensaver_ = false;
   jump_to_menu_ = false;
@@ -93,7 +95,6 @@ void FASTRUN Ui::Poll() {
 
   uint32_t now = ++ticks_;
   uint16_t button_state = 0; // immediate readings
-  uint16_t button_held = 0; // debounced mask
 
 #if defined(ARDUINO_TEENSY41)
   const size_t count = (but_mid == 0xFF)? 4 : CONTROL_BUTTON_LAST;
@@ -103,25 +104,29 @@ void FASTRUN Ui::Poll() {
   for (size_t i = 0; i < count; ++i) {
     if (buttons_[i].Poll())
       button_state |= control_mask(i);
-    // there's a key distinction between held() and !off()
-    if (!buttons_[i].off())
-      button_held |= control_mask(i);
   }
 
   for (size_t i = 0; i < count; ++i) {
     auto &button = buttons_[i];
+    const uint16_t control = control_mask(i);
     if (button.rising()) {
+      button_down_ |= control;
       button_press_time_[i] = now;
-      PushEvent(UI::EVENT_BUTTON_DOWN, control_mask(i), 0, button_held);
+      PushEvent(UI::EVENT_BUTTON_DOWN, control, 0, button_down_);
     } else if (button.falling()) {
+      button_down_ &= ~control;
+      if (chord_hold_ & control) {
+        chord_hold_ &= ~control;
+        chord_release_ |= control;
+      }
       if (now - button_press_time_[i] < kLongPressTicks)
-        PushEvent(UI::EVENT_BUTTON_PRESS, control_mask(i), 0, button_held);
+        PushEvent(UI::EVENT_BUTTON_PRESS, control, 0, button_down_);
       else
-        PushEvent(UI::EVENT_BUTTON_LONG_RELEASE, control_mask(i), 0, button_held);
+        PushEvent(UI::EVENT_BUTTON_LONG_RELEASE, control, 0, button_down_);
 
       button_press_time_[i] = 0;
     } else if (button.held() && (now - button_press_time_[i] == kLongPressTicks)) {
-      PushEvent(UI::EVENT_BUTTON_LONG_PRESS, control_mask(i), 0, button_held);
+      PushEvent(UI::EVENT_BUTTON_LONG_PRESS, control, 0, button_down_);
     }
   }
 
@@ -131,21 +136,30 @@ void FASTRUN Ui::Poll() {
   int32_t increment;
   increment = encoder_right_.Read();
   if (increment) {
-    if (button_held & (OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_R)) {
+    if (button_down_ & (OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_R)) {
       // hold encoder and turn for coarse adjustments
       SetButtonIgnoreMask(); // prevents oopsies
       increment *= 10;
     }
-    PushEvent(UI::EVENT_ENCODER, CONTROL_ENCODER_R, increment, button_held);
+    PushEvent(UI::EVENT_ENCODER, CONTROL_ENCODER_R, increment, button_down_);
   }
 
   increment = encoder_left_.Read();
   if (increment)
-    PushEvent(UI::EVENT_ENCODER, CONTROL_ENCODER_L, increment, button_held);
+    PushEvent(UI::EVENT_ENCODER, CONTROL_ENCODER_L, increment, button_down_);
 
   button_state_ = button_state;
 }
 
+FLASHMEM void Ui::Inject(UI::EventType type, uint16_t control, int16_t value, uint16_t held) {
+  // BUTTON_DOWN events include the button in the mask; `held` adds modifier buttons to the mask
+  const uint16_t mask = ((type == UI::EVENT_BUTTON_DOWN) ? control : 0) | held;
+  noInterrupts();
+  PushEvent(type, control, value, mask);
+  interrupts();
+}
+
+FLASHMEM __attribute__((noinline))
 UiMode Ui::DispatchEvents(const RuntimeSlot &appslot) {
   AppBase* app = static_cast<AppBase*>(appslot.instance);
   if (!app) return UiMode::UI_MODE_APP_SETTINGS;
