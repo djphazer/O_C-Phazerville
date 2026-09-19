@@ -14,12 +14,15 @@ namespace DEBUG {
 
   extern debug::AveragedCycles LOOP_cycles;
   extern debug::AveragedCycles ISR_cycles;
+  extern debug::AveragedCycles APP_cycles;
   extern debug::AveragedCycles UI_cycles;
   extern debug::AveragedCycles MENU_draw_cycles;
 
   extern uint32_t UI_event_count;
   extern uint32_t UI_max_queue_depth;
   extern uint32_t UI_queue_overflow;
+  extern size_t UI_queue_max;
+  extern uint32_t core_queue_overflow;
 };
 
 class DebugPins {

@@ -28,6 +28,7 @@
 #include <array>
 #include <tuple>
 #include "OC_apps.h"
+#include "OC_core.h"
 #include "OC_io.h"
 #include "OC_storage.h"
 #include "util/util_templates.h"
@@ -57,10 +58,23 @@ public:
   inline AppBase *current_app() const { return static_cast<AppBase *>(current_app_.instance); }
   inline const RuntimeSlot &current_slot() const { return current_app_; }
 
-  inline void Process(IOFrame *ioframe) __attribute__((always_inline)) {
+  inline void LoadFrame(IOFrame *ioframe) __attribute__((always_inline)) {
     if (current_app_.instance) {
       IO::Read(ioframe, &current_app_.io_settings());
+      CORE::DeferTask(PROCESS_IOFRAME);
+    }
+  }
+
+  inline void Process(IOFrame *ioframe) __attribute__((always_inline)) {
+    if (current_app_.instance) {
+      OC_DEBUG_PROFILE_SCOPE(DEBUG::APP_cycles);
       current_app_.Process(current_app_.instance, ioframe);
+      OC_DEBUG_RESET_CYCLES(ioframe->tick, 16384, OC::DEBUG::APP_cycles);
+    }
+  }
+
+  inline void SendFrame(IOFrame *ioframe) __attribute__((always_inline)) {
+    if (current_app_.instance) {
       IO::Write(ioframe, &current_app_.io_settings());
     }
   }
