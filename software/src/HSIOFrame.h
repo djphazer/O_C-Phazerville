@@ -18,10 +18,21 @@
 #include "OC_ADC.h"
 #include "OC_digital_inputs.h"
 #include "icons.h"
+
+#ifdef QUAD_CAPTURE
+// External-viewer MIDI monitor (defined in quad_midilog.h, single TU via
+// Quadrants.h): the Send* wrappers below log outgoing traffic through this.
+void QuadMidiLog_Push(bool out, uint8_t message, uint8_t channel,
+                      uint8_t d1, uint8_t d2);
+#endif
 #include "HSClockManager.h"
 #include "util/util_macros.h"
 #include "util/clkdivmult.h"
 #include "src/extern/bjorklund.h"
+
+#ifdef USB_GAMEPAD
+#include "HSGamepad.h"
+#endif
 
 namespace HS {
 
@@ -33,6 +44,7 @@ static constexpr int IO_CHANNEL_COUNT = 32; // virtual inputs and outputs
 static constexpr int MIDIMAP_MAX = 8;
 static constexpr int IO_CHANNEL_COUNT = 32;
 #endif
+static constexpr int GAMEPAD_MAP_MAX = 32;
 
 struct MIDIFrame;
 struct IOFrame;
@@ -719,7 +731,7 @@ struct alignas(32) MIDIFrame {
             }
             log_index--;
         }
-        last_msg_tick = OC::CORE::ticks;
+        last_msg_tick = HS::get_tick();
     }
     void UpdateLog(uint8_t message, uint8_t data1, uint8_t data2) {
         UpdateLog({0, message, data1, data2});
@@ -729,6 +741,9 @@ struct alignas(32) MIDIFrame {
     void Send(const SlewedValue *outvals);
 
     void SendAfterTouch(const uint8_t midi_ch, uint8_t val) {
+#ifdef QUAD_CAPTURE
+      QuadMidiLog_Push(true, 0xD0, midi_ch + 1, val, 0);
+#endif
 #ifdef ARDUINO_TEENSY41
       if (~midi_msgtx_disable & mMaskUSBDev)   usbMIDI.sendAfterTouch(val, midi_ch + 1);
       if (~midi_msgtx_disable & mMaskUSBHost)  usbHostMIDI[0].sendAfterTouch(val, midi_ch + 1);
@@ -739,6 +754,9 @@ struct alignas(32) MIDIFrame {
 #endif
     }
     void SendPitchBend(const uint8_t midi_ch, uint16_t bend) {
+#ifdef QUAD_CAPTURE
+      QuadMidiLog_Push(true, 0xE0, midi_ch + 1, bend & 0x7F, (bend >> 7) & 0x7F);
+#endif
 #ifdef ARDUINO_TEENSY41
       if (~midi_msgtx_disable & mMaskUSBDev)   usbMIDI.sendPitchBend(bend, midi_ch + 1);
       if (~midi_msgtx_disable & mMaskUSBHost)  usbHostMIDI[0].sendPitchBend(bend, midi_ch + 1);
@@ -750,6 +768,9 @@ struct alignas(32) MIDIFrame {
     }
 
     void SendCC(const uint8_t midi_ch, uint8_t ccnum, uint8_t val) {
+#ifdef QUAD_CAPTURE
+      QuadMidiLog_Push(true, 0xB0, midi_ch + 1, ccnum, val);
+#endif
 #ifdef ARDUINO_TEENSY41
       if (~midi_msgtx_disable & mMaskUSBDev)   usbMIDI.sendControlChange(ccnum, val, midi_ch + 1);
       if (~midi_msgtx_disable & mMaskUSBHost)  usbHostMIDI[0].sendControlChange(ccnum, val, midi_ch + 1);
@@ -762,7 +783,9 @@ struct alignas(32) MIDIFrame {
     void SendNoteOn(const uint8_t midi_ch, uint8_t note = 255, uint8_t vel = 100) {
         if (note > 127) note = current_note[midi_ch];
         else current_note[midi_ch] = note;
-
+#ifdef QUAD_CAPTURE
+        QuadMidiLog_Push(true, 0x90, midi_ch + 1, note, vel);
+#endif
 #ifdef ARDUINO_TEENSY41
       if (~midi_msgtx_disable & mMaskUSBDev)   usbMIDI.sendNoteOn(note, vel, midi_ch + 1);
       if (~midi_msgtx_disable & mMaskUSBHost)  usbHostMIDI[0].sendNoteOn(note, vel, midi_ch + 1);
@@ -774,6 +797,9 @@ struct alignas(32) MIDIFrame {
     }
     void SendNoteOff(const uint8_t midi_ch, uint8_t note = 255, uint8_t vel = 0) {
         if (note > 127) note = current_note[midi_ch];
+#ifdef QUAD_CAPTURE
+        QuadMidiLog_Push(true, 0x80, midi_ch + 1, note, vel);
+#endif
 #ifdef ARDUINO_TEENSY41
       if (~midi_msgtx_disable & mMaskUSBDev)   usbMIDI.sendNoteOff(note, vel, midi_ch + 1);
       if (~midi_msgtx_disable & mMaskUSBHost)  usbHostMIDI[0].sendNoteOff(note, vel, midi_ch + 1);
@@ -784,6 +810,89 @@ struct alignas(32) MIDIFrame {
 #endif
     }
 };
+
+
+#ifdef USB_GAMEPAD
+struct GamepadMapSettings {
+  uint8_t function;
+  uint8_t gamepad_input;
+};
+struct GamepadMapping : public GamepadMapSettings {
+  GamepadMapping() {}
+  ~GamepadMapping() {}
+
+  static constexpr size_t Size = 16; // Make this compatible with Packable
+
+  int16_t trigout_countdown;
+  int output;
+
+  void CVOut(int value) {
+    output = value;
+  }
+
+  void ClockOut() {
+    trigout_countdown = HEMISPHERE_CLOCK_TICKS * HS::trig_length;
+    output = HEMISPHERE_MAX_CV;
+  }
+
+  void GateOut(bool high) {
+    output = (high ? PULSE_VOLTAGE * (12 << 7) : 0);
+  }
+
+  uint16_t Pack() const {
+    return PackPackables(function, gamepad_input);
+  }
+
+  void Unpack(uint16_t data) {
+    UnpackPackables(data, function, gamepad_input);
+    // validation for safety
+    if (function > GP_FUNC_LAST) function = GP_NOOP;
+  }
+
+  DISALLOW_COPY_AND_ASSIGN(GamepadMapping);
+};
+
+constexpr GamepadMapping& pack(GamepadMapping& input) {
+    return input;
+};
+
+struct GamepadFrame {
+    GamepadMapping mapping[GAMEPAD_MAP_MAX];
+
+    const GamePad *gamepad = &UNKNOWN;
+
+    uint16_t vid = 0x0;
+    uint16_t pid = 0x0;
+
+    int gamepad_type = 0; // UNKNOWN = 0, PS3, PS3_MOTION, PS4, XBOX, XBOX360W, XBOX360USB, XBOXONE, SpaceNav, SWITCH, SNES, N64
+    bool connected = false;
+
+    uint32_t button_mask = 0;
+    int16_t axis[16];
+
+    uint32_t last_changed = 0; // used for param learning in JoyStyx
+
+    bool set_rumble = false;
+    bool set_leds = false;
+
+    bool ps3_paired = false;
+
+    void Init() {
+        for (int i = 0; i < GAMEPAD_MAP_MAX; ++i) {
+            if (i > gamepad->button_count + gamepad->axis_count - 1) {
+                mapping[i].gamepad_input = 0;
+                mapping[i].function = GP_NOOP;
+            } else {
+                mapping[i].gamepad_input = i;
+                mapping[i].function = (i < gamepad->button_count) ? GP_GATE : GP_CV;
+            }
+            mapping[i].output = 0;
+        }
+    }
+};
+#endif
+
+static OC::IOFrame dummy_frame; // just to avoid a null pointer...
 
 // shared IO Frame, updated every tick
 // this will allow chaining applets together, multiple stages of processing
@@ -819,6 +928,10 @@ struct IOFrame {
       return current_ioframe;
     }
 
+#ifdef USB_GAMEPAD
+    GamepadFrame GamepadState;
+#endif
+
     void Init() {
       MIDIState.Init();
       for (int i = 0; i < IO_CHANNEL_COUNT; ++i) {
@@ -827,6 +940,7 @@ struct IOFrame {
         clockinskip[i] = 0;
         clockoutskip[i] = 0;
       }
+      current_ioframe = &dummy_frame;
     }
 
     const int ViewOut(DAC_CHANNEL ch) const { return outputs[ch].get(output_atten[ch]); }

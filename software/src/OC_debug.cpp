@@ -148,7 +148,11 @@ static void debug_menu_version()
   static int hwid = int(GetIDVoltage() * 1000);
 
   graphics.setPrintPos(2, 12);
-  graphics.print(DAC_is_inverted ? Strings::NAME_NLM : Strings::NAME);
+#if defined(ARDUINO_TEENSY41)
+  graphics.print(Strings::NAMES_VENDOR[GetIDIndex()]);
+#else
+  graphics.print(Strings::NAME);
+#endif
   graphics.setPrintPos(2, 22);
   graphics.print(Strings::VERSION);
   graphics.setPrintPos(2, 32);
@@ -194,6 +198,15 @@ static void debug_menu_gfx() {
                   debug::cycles_to_us(DEBUG::MENU_draw_cycles.min_value()),
                   debug::cycles_to_us(DEBUG::MENU_draw_cycles.value()),
                   debug::cycles_to_us(DEBUG::MENU_draw_cycles.max_value()));
+
+  if (display::frame_buffer.check_for_bugs(true)) {
+    graphics.setPrintPos(2, 42);
+    graphics.print("Pre-Leak detect!");
+  }
+  if (display::frame_buffer.check_for_bugs(false)) {
+    graphics.setPrintPos(2, 52);
+    graphics.print("Post-Leak detect!");
+  }
 }
 
 FLASHMEM

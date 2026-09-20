@@ -53,6 +53,13 @@ void InputDesc::set_printf(const char *fmt, ...)
 
 /*static*/ void IO::Read(IOFrame *ioframe, const IOSettings *io_settings)
 {
+  const ADC_CHANNEL chan[ADC_CHANNEL_COUNT] = {
+    ADC_CHANNEL_1, ADC_CHANNEL_2, ADC_CHANNEL_3, ADC_CHANNEL_4,
+#ifdef ARDUINO_TEENSY41
+    ADC_CHANNEL_5, ADC_CHANNEL_6, ADC_CHANNEL_7, ADC_CHANNEL_8,
+#endif
+  };
+
   {
     DEBUG_PIN_SCOPE(OC_GPIO_DEBUG_PIN1);
     ioframe->digital_inputs.rising_edges = DigitalInputs::rising_edges();
@@ -60,38 +67,24 @@ void InputDesc::set_printf(const char *fmt, ...)
   }
   {
     DEBUG_PIN_SCOPE(OC_GPIO_DEBUG_PIN1);
-    for (int channel = 0; channel < ADC_CHANNEL_COUNT; ++channel) {
-      int32_t value = io_settings->adc_filter_enabled(channel)
-        ? ADC::value(static_cast<ADC_CHANNEL>(channel))
-        : ADC::unsmoothed_value(static_cast<ADC_CHANNEL>(channel));
+    for (int i = 0; i < ADC_CHANNEL_COUNT; ++i) {
+      // TODO: why not just sample every variant of the signal?
 
-      // TODO[PLD] Does it make sense to only attenuate on demand?
-      // Or only provide one "normalized" value? This would have to be the pitch
-      // value but this makes the scaling somewhat awkward ()
+      int32_t value = io_settings->adc_filter_enabled(i)
+        ? ADC::value(chan[i])
+        : ADC::unsmoothed_value(chan[i]);
+
+      // TODO: attenuation is redundant with HSIOFrame, but not all apps use it...
+      // ioframe->cv.values[i] = value;
+      // ioframe->cv.pitch_values[i] = ADC::value_to_pitch(value);
 
       // Attenuating before pitch scaling loses some resolution
-      auto gain = io_settings->input_gain(channel);
-      ioframe->cv.values[channel] = CVUtils::Attenuate(value, gain);
-      ioframe->cv.pitch_values[channel] = CVUtils::Attenuate(ADC::value_to_pitch(value), gain);
+      auto gain = io_settings->input_gain(i);
+      ioframe->cv.values[i] = CVUtils::Attenuate(value, gain);
+      ioframe->cv.pitch_values[i] = CVUtils::Attenuate(ADC::value_to_pitch(value), gain);
     }
   }
-}
-
-static void IOFrameToChannel(DAC_CHANNEL channel, const IOFrame *ioframe, const IOSettings *io_settings) 
-{
-  DEBUG_PIN_SCOPE(OC_GPIO_DEBUG_PIN1);
-  auto value = ioframe->outputs.values[channel];
-  switch(ioframe->outputs.modes[channel]) {
-    case OUTPUT_MODE_PITCH:
-      value = DAC::PitchToScaledDAC(channel,
-                  value, io_settings->get_output_scaling(channel),
-                  io_settings->autotune_data_enabled(channel));
-    break;
-    case OUTPUT_MODE_GATE:  value = DAC::GateToDAC(channel, value); break;
-    case OUTPUT_MODE_UNI:   value += DAC::get_zero_offset(channel); break;
-    case OUTPUT_MODE_RAW:   break;
-  }
-  DAC::set(channel, value);
+  ioframe->tick = OC::CORE::ticks;
 }
 
 /*static*/ void IO::Write(IOFrame *ioframe, const IOSettings *io_settings) 
@@ -104,7 +97,20 @@ static void IOFrameToChannel(DAC_CHANNEL channel, const IOFrame *ioframe, const 
   };
 
   for (int i = 0; i < DAC_CHANNEL_COUNT; ++i) {
-    IOFrameToChannel(chan[i], ioframe, io_settings);
+    DEBUG_PIN_SCOPE(OC_GPIO_DEBUG_PIN1);
+    auto value = ioframe->outputs.values[i];
+    switch(ioframe->outputs.modes[i]) {
+      case OUTPUT_MODE_PITCH:
+        value = DAC::PitchToScaledDAC(chan[i],
+                    value, io_settings->get_output_scaling(i),
+                    io_settings->autotune_data_enabled(i));
+      break;
+      case OUTPUT_MODE_GATE:  value = DAC::GateToDAC(chan[i], value); break;
+      case OUTPUT_MODE_UNI:   value += DAC::get_zero_offset(chan[i]); break;
+      case OUTPUT_MODE_RAW:   break;
+    }
+
+    DAC::set(chan[i], value);
   }
 }
 

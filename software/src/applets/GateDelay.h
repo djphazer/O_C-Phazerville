@@ -47,7 +47,7 @@ public:
                 mod_time = constrain(mod_time, 0, 2000);
 
                 bool p = play(ch, mod_time);
-                if (p) last_gate[ch] = OC::CORE::ticks;
+                if (p) last_gate[ch] = HS::get_tick();
                 GateOut(ch, p);
 
                 if (++location[ch] > 2047) location[ch] = 0;
@@ -116,7 +116,7 @@ private:
             gfxPrint(1, y, time[ch]);
             gfxPrint("ms");
 
-            if (OC::CORE::ticks - last_gate[ch] < 1667) gfxBitmap(54, y, 8, CLOCK_ICON);
+            if (HS::get_tick() - last_gate[ch] < 1667) gfxBitmap(54, y, 8, CLOCK_ICON);
         }
         gfxCursor(0, 23 + (cursor * 25), 63);
     }

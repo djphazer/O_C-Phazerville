@@ -28,7 +28,7 @@
 
 namespace UI {
 
-enum EventType : uint8_t {
+enum EventType : uint16_t {
   EVENT_NONE,
   EVENT_BUTTON_DOWN,
   EVENT_BUTTON_PRESS,

@@ -28,6 +28,7 @@
 #include <array>
 #include <tuple>
 #include "OC_apps.h"
+#include "OC_core.h"
 #include "OC_io.h"
 #include "OC_storage.h"
 #include "util/util_templates.h"
@@ -60,8 +61,12 @@ public:
   inline void Process(IOFrame *ioframe) __attribute__((always_inline)) {
     if (current_app_.instance) {
       IO::Read(ioframe, &current_app_.io_settings());
-      current_app_.Process(current_app_.instance, ioframe);
-      IO::Write(ioframe, &current_app_.io_settings());
+      // actual processing is deferred after loading the IOFrame
+      // XXX: this could be triggered by a UI Event instead...
+      CORE::DeferTask([ioframe, this]() {
+        current_app_.Process(current_app_.instance, ioframe);
+        IO::Write(ioframe, &current_app_.io_settings());
+      });
     }
   }
 

@@ -22,8 +22,9 @@ namespace HS {
 
   uint32_t popup_tick; // for button feedback
   PopupType popup_type = MENU_POPUP;
+  uint32_t popup_duration;
   const char* popup_msg;
-  ErrMsgIndex msg_idx;
+  const char* error_text = nullptr;
 
   int preset_id = -1;
 
@@ -110,6 +111,8 @@ namespace HS {
 
     ResetMappings();
   }
+  uint32_t get_tick() { return frame.current_ioframe->tick; }
+
   FLASHMEM
   void ResetMappings() {
     for (int i = 0; i < APPLET_SLOTS * 2; ++i) {
@@ -127,14 +130,14 @@ namespace HS {
   }
 
   void PokePopup(PopupType pop, const char* msg) {
-    popup_msg = msg;
+    if (msg) {
+      popup_msg = msg;
+      if (ERROR_POPUP == pop)
+        error_text = msg;
+    }
     popup_type = pop;
-    popup_tick = OC::CORE::ticks;
-  }
-  void PokePopup(PopupType pop, ErrMsgIndex err) {
-    popup_msg = OC::Strings::err_msg[err];
-    popup_type = pop;
-    popup_tick = OC::CORE::ticks;
+    popup_tick = get_tick();
+    popup_duration = HEMISPHERE_CURSOR_TICKS * (4 + (pop == ERROR_POPUP) * 25);
   }
 
   void ProcessBeatSync() {
@@ -248,6 +251,7 @@ namespace HS {
     MODE,
     VOICE,
     RANGELOW, RANGEHIGH,
+    TRANSPOSE,
 
     MEDITCURSOR_COUNT
   };
@@ -277,6 +281,9 @@ namespace HS {
           break;
         case 5: // high
           map.AdjustRangeHigh(dir);
+          break;
+        case 6: // transpose
+          map.AdjustTranspose(dir);
           break;
       }
     }
@@ -437,36 +444,59 @@ namespace HS {
       if (editing) gfxInvert(82, y - 1, 45, 10);
     }
   }
-  void DrawPopup(const int config_cursor, const int preset_id, const bool blink) {
-
+  void DrawMenuPopup(const int config_cursor) {
     enum ConfigCursor {
         DELETE_PRESET,
         LOAD_PRESET, SAVE_PRESET,
         AUTO_SAVE,
         CONFIG_DUMMY, // past this point goes full screen
     };
+    int px = 73, py = 25, pw = 54, ph = 38;
+    graphics.clearRect(px, py, pw, ph);
+    graphics.drawFrame(px+1, py+1, pw-2, ph-2);
+    graphics.setPrintPos(px+5, py+5);
 
+    gfxPrint(78, 30, "Load");
+    gfxPrint(78, 40, config_cursor == AUTO_SAVE ? "(auto)" : "Save");
+    gfxIcon(78, 50, PhzIcons::snowflakeA);
+    gfxIcon(86, 50, ZAP_ICON);
+    gfxIcon(94, 50, PhzIcons::snowflakeB);
+    //gfxPrint(78, 50, "????");
+
+    switch (config_cursor) {
+      case LOAD_PRESET:
+      case SAVE_PRESET:
+        gfxIcon(104, 30 + (config_cursor-LOAD_PRESET)*10, LEFT_ICON);
+        break;
+      case AUTO_SAVE:
+        if (auto_save_enabled)
+          gfxInvert(78, 40, 37, 8);
+        gfxIcon(116, 40, LEFT_ICON);
+        break;
+      case CONFIG_DUMMY:
+        gfxIcon(104, 50, LEFT_ICON);
+        break;
+      default: break;
+    }
+  }
+  void DrawPopup() {
     int px, py, pw, ph;
 
-    /*
-    MENU_POPUP,
-    CLOCK_POPUP,
-    PRESET_POPUP,
-    QUANTIZER_POPUP,
-    MIDI_POPUP,
-    MESSAGE_POPUP,
-    */
     switch (popup_type) {
       case MENU_POPUP:
-        px = 73; py = 25;
-        pw = 54; ph = 38;
-        break;
+        // handled in DrawMenuPopup instead
+        return;
+
       case MIDI_POPUP:
+        px = 14; py = 14;
+        pw = 100; ph = 38;
+        break;
       case QUANTIZER_POPUP:
         px = 14; py = 23;
         pw = 100; ph = 28;
         break;
       case MESSAGE_POPUP:
+      case ERROR_POPUP:
         pw = 6 * strlen(popup_msg) + 10;
         pw = min(pw, 124);
         ph = 18;
@@ -489,29 +519,6 @@ namespace HS {
         gfxPrint(popup_msg);
         break;
       case MENU_POPUP:
-        gfxPrint(78, 30, "Load");
-        gfxPrint(78, 40, config_cursor == AUTO_SAVE ? "(auto)" : "Save");
-        gfxIcon(78, 50, PhzIcons::snowflakeA);
-        gfxIcon(86, 50, ZAP_ICON);
-        gfxIcon(94, 50, PhzIcons::snowflakeB);
-        //gfxPrint(78, 50, "????");
-
-        switch (config_cursor) {
-          case LOAD_PRESET:
-          case SAVE_PRESET:
-            gfxIcon(104, 30 + (config_cursor-LOAD_PRESET)*10, LEFT_ICON);
-            break;
-          case AUTO_SAVE:
-            if (auto_save_enabled)
-              gfxInvert(78, 40, 37, 8);
-            gfxIcon(116, 40, LEFT_ICON);
-            break;
-          case CONFIG_DUMMY:
-            gfxIcon(104, 50, LEFT_ICON);
-            break;
-          default: break;
-        }
-
         break;
       case CLOCK_POPUP:
         graphics.print("Clock ");
@@ -523,7 +530,7 @@ namespace HS {
 
       case PRESET_POPUP:
         graphics.print("> Preset ");
-        graphics.print(OC::Strings::capital_letters[preset_id]);
+        graphics.print(popup_msg);
         break;
       case QUANTIZER_POPUP:
       {
@@ -578,17 +585,25 @@ namespace HS {
 
         graphics.setPrintPos(px + 5, py + 15);
         graphics.printf(
-          "V:%d<%s:%s>",
+          "V:%d <%s:%s>",
           map.get_voice() + 1,
           midi_note_numbers[map.get_low()],
           midi_note_numbers[map.get_high()]
         );
 
+        graphics.setPrintPos(px + 5, py + 25);
+        graphics.printf(
+          "T:%d",
+          map.get_transpose()
+        );
+
         if (midi_edit) {
           if (midi_edit < 3) // chan or mode
-            gfxIcon(px + 5 + 24 * midi_edit, 35, UP_BTN_ICON);
-          else // voice, range low, range high
-            gfxIcon(px + 17 + 20 * (midi_edit - 3), 45, UP_BTN_ICON);
+            gfxIcon(px + 5 + 24 * midi_edit, 25, UP_BTN_ICON);
+          else if (midi_edit < 6) // voice, range low, range high
+            gfxIcon(px + 17 + 20 * (midi_edit - 3), 35, UP_BTN_ICON);
+          else  // transpose
+            gfxIcon(px + 17 + 20 * (midi_edit - 6), 45, UP_BTN_ICON);
 
           // context clues at top/bottom of screen
           gfxFooter("L:cursor     R:adjust");

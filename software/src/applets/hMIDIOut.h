@@ -94,7 +94,7 @@ public:
                 hMIDI.SendNoteOn(channel, midi_note, velocity);
                 last_note = midi_note;
                 last_channel = channel;
-                last_tick = OC::CORE::ticks;
+                last_tick = HS::get_tick();
                 if (legato) legato_on = 1;
 
                 UpdateLog(HEM_MIDI_NOTE_ON, midi_note, velocity);
@@ -107,14 +107,14 @@ public:
             hMIDI.SendCC(channel, functionA - CC_CONTROL, value);
             last_cc[0] = value;
             UpdateLog(HEM_MIDI_CC, functionA - CC_CONTROL, value);
-            last_tick = OC::CORE::ticks;
+            last_tick = HS::get_tick();
           }
         }
 
         if (!read_gate && gated) { // A note off message should be sent
             hMIDI.SendNoteOff(last_channel, last_note, 0);
             UpdateLog(HEM_MIDI_NOTE_OFF, last_note, 0);
-            last_tick = OC::CORE::ticks;
+            last_tick = HS::get_tick();
         }
 
         gated = read_gate;
@@ -129,7 +129,7 @@ public:
                     hMIDI.SendCC(channel, functionB - CC_CONTROL, value);
                     last_cc[1] = value;
                     UpdateLog(HEM_MIDI_CC, functionB - CC_CONTROL, value);
-                    last_tick = OC::CORE::ticks;
+                    last_tick = HS::get_tick();
                 }
             }
 
@@ -140,7 +140,7 @@ public:
                     hMIDI.SendAfterTouch(channel, value);
                     last_at = value;
                     UpdateLog(HEM_MIDI_AFTERTOUCH_CHANNEL, value, 0);
-                    last_tick = OC::CORE::ticks;
+                    last_tick = HS::get_tick();
                 }
             }
 
@@ -152,7 +152,7 @@ public:
                     hMIDI.SendPitchBend(channel, bend);
                     last_bend = bend;
                     UpdateLog(HEM_MIDI_PITCHBEND, bend - 8192, 0);
-                    last_tick = OC::CORE::ticks;
+                    last_tick = HS::get_tick();
                 }
             }
         }
@@ -340,7 +340,7 @@ private:
     }
 
     void DrawMonitor() {
-        if (OC::CORE::ticks - last_tick < 4000) {
+        if (HS::get_tick() - last_tick < 4000) {
             if (hemisphere & 1)
                 gfxIcon( 9, 1, MIDI_ICON);
             else

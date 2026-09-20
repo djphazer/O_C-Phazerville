@@ -64,6 +64,11 @@ void AppBase::Draw(UiMode ui_mode) const
       DrawMenu();
     else
       io_settings_menu.Draw();
+
+#ifdef VOR
+    VBiasManager *vbias_m = vbias_m->get();
+    vbias_m->DrawPopupPerhaps();
+#endif
   } else {
     DrawScreensaver();
   }
@@ -88,6 +93,11 @@ void AppBase::Draw(UiMode ui_mode) const
       gfxPrint("???");
     gfxPrint(1, 56, "L:I/O Cfg  R:App Menu");
   }
+
+  // Overlay popup window last
+  if (HS::get_tick() - HS::popup_tick < HS::popup_duration) {
+    HS::DrawPopup();
+  }
 }
 
 UiMode AppBase::DispatchEvent(const UI::Event &event)
@@ -99,7 +109,8 @@ UiMode AppBase::DispatchEvent(const UI::Event &event)
         HandleEncoderEvent(event);
         break;
 
-      case UI::EVENT_BUTTON_PRESS:
+      case UI::EVENT_BUTTON_PRESS: // aka release or falling edge
+      case UI::EVENT_BUTTON_LONG_RELEASE: // same thing, but after a longer hold time
 #ifdef VOR
         if (OC::CONTROL_BUTTON_M == event.control) {
             VBiasManager *vbias_m = vbias_m->get();
@@ -107,10 +118,10 @@ UiMode AppBase::DispatchEvent(const UI::Event &event)
         } else
 #endif
         HandleButtonEvent(event);
-        z_button_hold = event.mask & CONTROL_BUTTON_Z;
+        if (event.control == CONTROL_BUTTON_Z) z_button_hold = false;
         break;
 
-      case UI::EVENT_BUTTON_DOWN:
+      case UI::EVENT_BUTTON_DOWN: // aka just-pressed or rising edge
 #ifdef VOR
         // dual encoder press
         if ( ((OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_R) == event.mask) )
@@ -125,9 +136,9 @@ UiMode AppBase::DispatchEvent(const UI::Event &event)
         break;
 
       case UI::EVENT_BUTTON_LONG_PRESS:
+        if (event.control == CONTROL_BUTTON_Z) z_button_hold = true;
       default:
         HandleButtonEvent(event);
-        z_button_hold = event.mask & CONTROL_BUTTON_Z;
         break;
     }
   } else {

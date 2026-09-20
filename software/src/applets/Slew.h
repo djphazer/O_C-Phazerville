@@ -82,7 +82,7 @@ public:
             fall = constrain(fall + direction, 0, HEM_SLEW_MAX_VALUE);
             last_ms_value = Proportion(fall, HEM_SLEW_MAX_VALUE, HEM_SLEW_MAX_TICKS) / 17;
         }
-        last_change_ticks = OC::CORE::ticks;
+        last_change_ticks = HS::get_tick();
     }
         
     uint64_t OnDataRequest() {
@@ -139,7 +139,7 @@ private:
         }
 
         // Change indicator, if necessary
-        if (OC::CORE::ticks - last_change_ticks < 20000) {
+        if (HS::get_tick() - last_change_ticks < 20000) {
             gfxPrint(15, 43, last_ms_value);
             gfxPrint("ms");
         }

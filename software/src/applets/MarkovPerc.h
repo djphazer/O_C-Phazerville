@@ -414,7 +414,7 @@ private:
         uint8_t accent; // kept for schedule compatibility (not used for Out B)
     };
 
-    uint8_t   cursor;
+    int   cursor;
     uint8_t   profile;
     uint8_t   chaos_base;    // encoder-set baseline chaos 0-100
     int       chaos_pct;     // live chaos for display

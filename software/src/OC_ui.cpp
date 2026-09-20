@@ -92,7 +92,8 @@ void Ui::preempt_screensaver(bool v) {
 void FASTRUN Ui::Poll() {
 
   uint32_t now = ++ticks_;
-  uint16_t button_state = 0;
+  uint16_t button_state = 0; // immediate readings
+  uint16_t button_held = 0; // debounced mask
 
 #if defined(ARDUINO_TEENSY41)
   const size_t count = (but_mid == 0xFF)? 4 : CONTROL_BUTTON_LAST;
@@ -102,22 +103,25 @@ void FASTRUN Ui::Poll() {
   for (size_t i = 0; i < count; ++i) {
     if (buttons_[i].Poll())
       button_state |= control_mask(i);
+    // there's a key distinction between held() and !off()
+    if (!buttons_[i].off())
+      button_held |= control_mask(i);
   }
 
   for (size_t i = 0; i < count; ++i) {
     auto &button = buttons_[i];
-    if (button.just_pressed()) {
+    if (button.rising()) {
       button_press_time_[i] = now;
-      PushEvent(UI::EVENT_BUTTON_DOWN, control_mask(i), 0, button_state);
-    } else if (button.released()) {
+      PushEvent(UI::EVENT_BUTTON_DOWN, control_mask(i), 0, button_held);
+    } else if (button.falling()) {
       if (now - button_press_time_[i] < kLongPressTicks)
-        PushEvent(UI::EVENT_BUTTON_PRESS, control_mask(i), 0, button_state);
+        PushEvent(UI::EVENT_BUTTON_PRESS, control_mask(i), 0, button_held);
       else
-        PushEvent(UI::EVENT_BUTTON_LONG_RELEASE, control_mask(i), 0, button_state);
+        PushEvent(UI::EVENT_BUTTON_LONG_RELEASE, control_mask(i), 0, button_held);
 
       button_press_time_[i] = 0;
-    } else if (button.pressed() && (now - button_press_time_[i] == kLongPressTicks)) {
-      PushEvent(UI::EVENT_BUTTON_LONG_PRESS, control_mask(i), 0, button_state);
+    } else if (button.held() && (now - button_press_time_[i] == kLongPressTicks)) {
+      PushEvent(UI::EVENT_BUTTON_LONG_PRESS, control_mask(i), 0, button_held);
     }
   }
 
@@ -126,12 +130,18 @@ void FASTRUN Ui::Poll() {
 
   int32_t increment;
   increment = encoder_right_.Read();
-  if (increment)
-    PushEvent(UI::EVENT_ENCODER, CONTROL_ENCODER_R, increment, button_state);
+  if (increment) {
+    if (button_held & (OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_R)) {
+      // hold encoder and turn for coarse adjustments
+      SetButtonIgnoreMask(); // prevents oopsies
+      increment *= 10;
+    }
+    PushEvent(UI::EVENT_ENCODER, CONTROL_ENCODER_R, increment, button_held);
+  }
 
   increment = encoder_left_.Read();
   if (increment)
-    PushEvent(UI::EVENT_ENCODER, CONTROL_ENCODER_L, increment, button_state);
+    PushEvent(UI::EVENT_ENCODER, CONTROL_ENCODER_L, increment, button_held);
 
   button_state_ = button_state;
 }
@@ -221,7 +231,11 @@ UiMode Ui::Splashscreen(bool &reset_settings, uint8_t phase) {
       GRAPHICS_BEGIN_FRAME(true);
 
       menu::DefaultTitleBar::Draw();
-      graphics.print( DAC_is_inverted? OC::Strings::NAME_NLM : OC::Strings::NAME);
+#if defined(ARDUINO_TEENSY41)
+      graphics.print(Strings::NAMES_VENDOR[GetIDIndex()]);
+#else
+      graphics.print(Strings::NAME);
+#endif
       weegfx::coord_t y = menu::CalcLineY(0);
 
       graphics.setPrintPos(menu::kIndentDx, y + menu::kTextDy);

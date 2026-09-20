@@ -25,6 +25,7 @@
 #endif
 
 extern "C" void _reboot_Teensyduino_();
+void BootMenu(const bool show);
 using namespace OC;
 
 OC_APP_CLASS(AppSettings, TWOCCS("SE"), "Setup/About", "Settings"),
@@ -33,6 +34,7 @@ public:
   OC_APP_INTERFACE_DECLARE(AppSettings, 0);
 
   bool reflash = false;
+  bool boot_menu = false;
   bool calibration_mode = false;
   bool calibration_complete = true;
   bool cal_save_q = false;
@@ -278,7 +280,7 @@ public:
       return;
     }
 
-    if (CORE::ticks % 3200 == 0) {
+    if (HS::get_tick() % 3200 == 0) {
       pick_left = random(8);
       pick_right = random(8);
     }
@@ -325,7 +327,12 @@ public:
       gfxPrint(10, 35, OC::Strings::BUILD_TAG);
       gfxIcon(0, 45, PhzIcons::frontBack);
       gfxPrint(10, 45, "github.com/djphazer");
+#ifdef MULTIBOOT
+      gfxPrint(0, 55, reflash ? "[Reflash]  [BootMenu]"
+                              : "[CALIBRATE]   [RESET]");
+#else
       gfxPrint(0, 55, reflash ? "[Reflash]" : "[CALIBRATE]   [RESET]");
+#endif
   }
 
   void DrawCalibration() const {
@@ -461,7 +468,14 @@ public:
           else
             StartCalibration();
         }
-        if (event.control == OC::CONTROL_BUTTON_R && event.type == UI::EVENT_BUTTON_PRESS) FactoryReset();
+        if (event.control == OC::CONTROL_BUTTON_R && event.type == UI::EVENT_BUTTON_PRESS) {
+#ifdef MULTIBOOT
+          if (reflash)
+            BootMenu(true);
+          else
+#endif
+            FactoryReset();
+        }
 
         // dual-press UP+DOWN / A+B to flip screen
         if ( event.type == UI::EVENT_BUTTON_DOWN &&

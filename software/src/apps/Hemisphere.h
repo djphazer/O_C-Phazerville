@@ -326,7 +326,7 @@ public:
           //OC::draw_save_message(64);
           OC::CORE::app_isr_enabled = true;
 
-          PokePopup(HS::MESSAGE_POPUP, HS::PRESET_SAVED);
+          PokePopup(HS::MESSAGE_POPUP, "PRESET SAVED!");
         }
     }
 #endif
@@ -472,7 +472,7 @@ public:
         }
 
         if (PhzConfig::save_config(PRESET_FILENAME))
-          PokePopup(HS::MESSAGE_POPUP, HS::PRESET_SAVED);
+          PokePopup(HS::MESSAGE_POPUP, "PRESET SAVED!");
 #else
         StoreToPreset( (HemispherePreset*)(hem_presets + id), skip_eeprom );
 #endif
@@ -574,7 +574,7 @@ public:
             }
         }
 #endif
-        PokePopup(PRESET_POPUP);
+        PokePopup(PRESET_POPUP, OC::Strings::capital_letters[id]);
     }
 
     void LoadGlobals() {
@@ -882,9 +882,10 @@ public:
           }
         }
 
-        // Overlay popup window last
-        if (OC::CORE::ticks - HS::popup_tick < HEMISPHERE_CURSOR_TICKS * 4) {
-          HS::DrawPopup(config_cursor, preset_id, CursorBlink());
+        // Overlay popup Load/Save menu last
+        if (HS::popup_type == HS::MENU_POPUP &&
+            HS::get_tick() - HS::popup_tick < HS::popup_duration) {
+          HS::DrawMenuPopup(config_cursor);
         }
     }
 
@@ -986,7 +987,7 @@ public:
                 return;
             }
 
-            if (OC::CORE::ticks - click_tick < HEMISPHERE_DOUBLE_CLICK_TIME) {
+            if (HS::get_tick() - click_tick < HEMISPHERE_DOUBLE_CLICK_TIME) {
                 // This is a double-click on one button. Activate corresponding help screen and deactivate select mode.
                 if (hemisphere == first_click)
                     SetFullScreen(hemisphere);
@@ -1007,7 +1008,7 @@ public:
             }
 
             // mark this single click
-            click_tick = OC::CORE::ticks;
+            click_tick = HS::get_tick();
             first_click = hemisphere;
             return;
         }
@@ -1030,12 +1031,7 @@ public:
 
     void DelegateEncoderMovement(const UI::Event &event) {
         HEM_SIDE h = (event.control == OC::CONTROL_ENCODER_L) ? LEFT_HEMISPHERE : RIGHT_HEMISPHERE;
-        int increment = event.value;
-        if (event.mask & (OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_R)) {
-          // push-and-turn for coarse adjustments
-          OC::ui.SetButtonIgnoreMask();
-          increment *= 10;
-        }
+        const int increment = event.value;
 
         if (HS::q_edit) {
           HS::QEditEncoderMove(h, increment);

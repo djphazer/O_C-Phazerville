@@ -4,7 +4,7 @@
 #include "HSIOFrame.h"
 
 const int HS::MIDIMapping::ViewOut() const {
-  if (IsPitch()) return output + Proportion(pitch_bend, 8192, frame.MIDIState.bend_range << 7);
+  if (IsPitch()) return output + (transpose * 128) + Proportion(pitch_bend, 8192, frame.MIDIState.bend_range << 7);
   return output;
 }
 
@@ -419,7 +419,7 @@ void HS::IOFrame::Load(OC::IOFrame *ioframe) {
         const int input = ioframe->cv.pitch_values[i];
 
         // calculate gates/clocks for all ADC inputs as well
-        gate_high[OC::DIGITAL_INPUT_LAST + i] = input > GATE_THRESHOLD;
+        gate_high[DIGITAL_INPUT_COUNT + i] = input > GATE_THRESHOLD;
 
         // some calculations for change detection
         if (abs(input - last_cv[i]) > HEMISPHERE_CHANGE_THRESHOLD) {
@@ -447,6 +447,14 @@ void HS::IOFrame::Load(OC::IOFrame *ioframe) {
             }
         }
     }
+#ifdef USB_GAMEPAD
+    for (int i = 0; i < GAMEPAD_MAP_MAX; ++i) {
+      GamepadMapping& g = GamepadState.mapping[i];
+      if (g.trigout_countdown > 0) {
+        if (--g.trigout_countdown == 0) g.output = 0;
+      }
+    }
+#endif
 
     // pre-calculate clock triggers
     for (int ch = 0; ch < APPLET_SLOTS * 2; ++ch) {
@@ -466,8 +474,8 @@ void HS::IOFrame::Load(OC::IOFrame *ioframe) {
       result = result || (clock_m.Beep(virt_chan) && CheckSkip(virt_chan));
 
       if (result) {
-          cycle_ticks[ch] = OC::CORE::ticks - last_clock[ch];
-          last_clock[ch] = OC::CORE::ticks;
+          cycle_ticks[ch] = HS::get_tick() - last_clock[ch];
+          last_clock[ch] = HS::get_tick();
       }
 
       clocked[ch] = result;
@@ -475,14 +483,7 @@ void HS::IOFrame::Load(OC::IOFrame *ioframe) {
 }
 
 void HS::IOFrame::Send(OC::IOFrame *ioframe) {
-    const DAC_CHANNEL chan[DAC_CHANNEL_COUNT] = {
-      DAC_CHANNEL_A, DAC_CHANNEL_B, DAC_CHANNEL_C, DAC_CHANNEL_D,
-#ifdef ARDUINO_TEENSY41
-      DAC_CHANNEL_E, DAC_CHANNEL_F, DAC_CHANNEL_G, DAC_CHANNEL_H,
-#endif
-    };
     for (int i = 0; i < IO_CHANNEL_COUNT; ++i) {
-
       /*
        * envelope output!
       if (output_slew[i] < 0) {
@@ -502,7 +503,7 @@ void HS::IOFrame::Send(OC::IOFrame *ioframe) {
           gate_state |= peaks::CONTROL_GATE_FALLING;
 
         const int value = GetEnvelope(i).ProcessSingleSample(gate_state); // 0 to 32767
-        ioframe->outputs.set_pitch_value(chan[i], Proportion(value, 32767, HEMISPHERE_MAX_CV));
+        ioframe->outputs.set_pitch_value(i, Proportion(value, 32767, HEMISPHERE_MAX_CV));
 
         continue;
       }
@@ -510,7 +511,7 @@ void HS::IOFrame::Send(OC::IOFrame *ioframe) {
 
       outputs[i].push(output_slew[i]);
       if (i < DAC_CHANNEL_COUNT)
-        ioframe->outputs.set_pitch_value(chan[i], outputs[i].get(output_atten[i]));
+        ioframe->outputs.set_pitch_value(i, outputs[i].get(output_atten[i]));
     }
 
     if (autoMIDIOut) MIDIState.Send(outputs);

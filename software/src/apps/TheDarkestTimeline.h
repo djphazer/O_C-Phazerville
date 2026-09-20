@@ -106,8 +106,8 @@ public:
         // Step forward with Digital 1
         int gate_ticks = HEMISPHERE_CLOCK_TICKS;
         if (Clock(0)) {
-            last_tempo = OC::CORE::ticks - last_clock_event;
-            last_clock_event = OC::CORE::ticks;
+            last_tempo = HS::get_tick() - last_clock_event;
+            last_clock_event = HS::get_tick();
             if (gate_time() > 0) {
                 gate_ticks = Proportion(gate_time(), 100, last_tempo);
             }
@@ -119,8 +119,8 @@ public:
 
         // Reset sequencer with Digital 3
         if (Clock(2)) {
-            last_tempo = OC::CORE::ticks - last_clock_event;
-            last_clock_event = OC::CORE::ticks;
+            last_tempo = HS::get_tick() - last_clock_event;
+            last_clock_event = HS::get_tick();
             cursor = 0;
             clocked = 1;
         }
@@ -199,8 +199,8 @@ public:
                         last_midi_note[0] = MIDIQuantizer::NoteNumber(get_data_at(idx, DT_CV_TIMELINE), transpose);
                         vel = Proportion(cv, HSAPPLICATION_5V, 127);
                         usbMIDI.sendNoteOn(last_midi_note[0], vel, last_midi_channel[0]);
-                        last_length[0] = OC::CORE::ticks - last_clock[0];
-                        last_clock[0] = OC::CORE::ticks;
+                        last_length[0] = HS::get_tick() - last_clock[0];
+                        last_clock[0] = HS::get_tick();
                     }
                 }
 
@@ -217,8 +217,8 @@ public:
                         last_midi_note[1] = MIDIQuantizer::NoteNumber(get_data_at(alt_idx, DT_CV_TIMELINE));
                         vel = Proportion(get_data_at(alt_idx, DT_PROBABILITY_TIMELINE), HSAPPLICATION_5V, 127);
                         usbMIDI.sendNoteOn(last_midi_note[1], vel, last_midi_channel[1]);
-                        last_length[1] = OC::CORE::ticks - last_clock[1];
-                        last_clock[1] = OC::CORE::ticks;
+                        last_length[1] = HS::get_tick() - last_clock[1];
+                        last_clock[1] = HS::get_tick();
                     }
                 }
             } // Thus ends the processing of the Probability Timeline
@@ -227,7 +227,7 @@ public:
         // Turn off notes that have been on for too long
         for (uint8_t ch = 0; ch < 2; ch++)
         {
-            if (last_midi_note[ch] > -1 && (OC::CORE::ticks - last_clock[ch]) > (last_length[ch]) * 2) {
+            if (last_midi_note[ch] > -1 && (HS::get_tick() - last_clock[ch]) > (last_length[ch]) * 2) {
                 usbMIDI.sendNoteOff(last_midi_note[ch], 0, last_midi_channel[ch]);
                 last_midi_note[ch] = -1;
             }
@@ -376,7 +376,7 @@ public:
 
         // If a clock pulse seems to be ongoing, don't interfere with that pulse. Otherwise,
         // set the clocked flag to force a Probability Timeline calculation
-        if (OC::CORE::ticks - last_clock_event > last_tempo) clocked = 1;
+        if (HS::get_tick() - last_clock_event > last_tempo) clocked = 1;
     }
 
 private:

@@ -169,6 +169,7 @@ struct IOFrame {
 
   } outputs;
 
+  uint32_t tick;
 };
 
 } // namespace OC
