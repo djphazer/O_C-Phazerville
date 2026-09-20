@@ -218,7 +218,9 @@ FLASHMEM __attribute__((noinline)) void BootMenu(const bool show) {
     graphics.print("(hold Z to set)");
     GRAPHICS_END_FRAME();
 
-    delay(10);
+    OC::CORE::FlushTasks();
+
+    delay(1);
   }
 
   if (save) {

@@ -470,9 +470,11 @@ public:
         }
         if (event.control == OC::CONTROL_BUTTON_R && event.type == UI::EVENT_BUTTON_PRESS) {
 #ifdef MULTIBOOT
-          if (reflash)
+          if (reflash) {
+            OC::CORE::app_isr_enabled = false;
             BootMenu(true);
-          else
+            OC::CORE::app_isr_enabled = true; // in case it comes back...
+          } else
 #endif
             FactoryReset();
         }
