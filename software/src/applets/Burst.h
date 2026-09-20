@@ -157,6 +157,7 @@ public:
 
         switch (cursor) {
           case CLKPASSTHRU:
+            SetLabel(passthru == 1 ? "ClockPass" : passthru == 2 ? "BurstPass" : "Burst");
             break;
           case PROB:
             prob = constrain(prob + direction, 0, 100);
@@ -253,12 +254,14 @@ private:
         if (skip_tick && HS::get_tick() - skip_tick < HEMISPHERE_CURSOR_TICKS) gfxPrint(33, y, "*");
         gfxPrint(40, y, prob);
         gfxPrint("%");
+        const int prob_w = gfxGetPrintPosX() - 40;
 
         y += 9;
 
         // Steps
         gfxPrint(1, y, number_mod);
         gfxPrint(18, y, "Steps");
+        const int number_w = gfxGetPrintPosX() - 1;
         if (number_mod != number) { gfxIcon(50, y, CV_ICON); gfxBitmap(59, y, 3, SUP_ONE); }
 
         y += 9;
@@ -266,6 +269,7 @@ private:
         // Spacing
         gfxPrint(1, y, clocked ? get_effective_spacing() : display_spacing);
         gfxPrint(28, y, "ms");
+        const int spacing_w = gfxGetPrintPosX() - 1;
         if (!clocked && display_spacing != spacing) { gfxIcon(43, y, CV_ICON); gfxBitmap(51, y, 3, SUB_TWO); }
 
         y += 9;
@@ -273,10 +277,12 @@ private:
         // Acceleration
         gfxIcon(1, y-1, GAUGE_ICON);
         gfxPrint(10, y, accel);
+        const int accel_w = gfxGetPrintPosX() - 1;
 
         // Jitter
         gfxIcon(32, y - 1, RANDOM_ICON);
         gfxPrint(40, y, jitter);
+        const int jitter_w = gfxGetPrintPosX() - 32;
 
         y += 9;
 
@@ -284,9 +290,9 @@ private:
         if (clocked) {
             bool multiplying = effective_div < 0;
             gfxBitmap(1, y, 8, CLOCK_ICON);
-            gfxPrint(6, y, multiplying ? "x" : "/");
+            gfxPrint(10, y, multiplying ? "x" : "/");
             gfxPrint(multiplying ? -effective_div : effective_div);
-            gfxPrint(multiplying ? " Mult" : " Div");
+            gfxPrint(multiplying ? " Mlt" : " Div");
             if (effective_div != div) { gfxIcon(49, y, CV_ICON); gfxBitmap(57, y, 3, SUB_TWO); }
         }
 
@@ -294,25 +300,25 @@ private:
         switch (cursor) {
           case CLKPASSTHRU:
             gfxIcon(19, 13, LEFT_ICON);
-            gfxCursor(19, 22, 12, 9, passthru == 1 ? "ClockPass" : passthru == 2 ? "BurstPass" : "Burst");
+            SetLabel(passthru == 1 ? "ClockPass" : passthru == 2 ? "BurstPass" : "Burst");
             break;
           case PROB:
-            gfxCursor(40, 21, 18, 9, "Skip %");
+            gfxCursor(40, 21, prob_w, 9, "Skip %");
             break;
           case NUMBER:
-            gfxCursor( 1, 30, 13, 9, "Count");
+            gfxCursor(1, 30, number_w, 9, "Count");
             break;
           case SPACING:
-            gfxCursor( 1, 39, 19, 9, "Spacing");
+            gfxCursor(1, 39, spacing_w, 9, "Spacing");
             break;
           case ACCEL:
-            gfxCursor(10, 48, 13, 9, "Accel");
+            gfxCursor(1, 48, accel_w, 9, "Accel");
             break;
           case JITTER:
-            gfxCursor(40, 48, 13, 9, "Jitter");
+            gfxCursor(32, 48, jitter_w, 9, "Jitter");
             break;
           case DIVISION:
-            gfxCursor(1, 57, 43, 9, "ClkDiv");
+            gfxCursor(1, 57, 47, 9, "ClkDiv");
             break;
         }
     }
