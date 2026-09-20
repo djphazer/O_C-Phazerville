@@ -195,16 +195,6 @@ void OC::Pinout_Detect() {
     I2S2_Audio_DAC = true;        // pins 2=DATA, 3=LRCLK, 4=BCLK, 33=MCLK
     I2C_Expansion = true;         // pins 18=SDA, 19=SCL
     MIDI_Uses_Serial8 = true;     // pins 34=IN, 35=OUT
-
-    // most Rev3-based T41 hardware have the input rows inverted
-    ADC_CHANNEL_1 = 4;
-    ADC_CHANNEL_2 = 5;
-    ADC_CHANNEL_3 = 6;
-    ADC_CHANNEL_4 = 7;
-    ADC_CHANNEL_5 = 0;
-    ADC_CHANNEL_6 = 1;
-    ADC_CHANNEL_7 = 2;
-    ADC_CHANNEL_8 = 3;
   }
 
   // any HW_ID significantly higher than the reference design will use +/-10V at the outputs
@@ -243,15 +233,15 @@ void OC::Pinout_Detect() {
     DAC_CHANNEL_G = 2;
     DAC_CHANNEL_H = 3;
 
-    // inputs are actually in normal order
-    ADC_CHANNEL_1 = 0;
-    ADC_CHANNEL_2 = 1;
-    ADC_CHANNEL_3 = 2;
-    ADC_CHANNEL_4 = 3;
-    ADC_CHANNEL_5 = 4;
-    ADC_CHANNEL_6 = 5;
-    ADC_CHANNEL_7 = 6;
-    ADC_CHANNEL_8 = 7;
+    // input rows are inverted
+    ADC_CHANNEL_1 = 4;
+    ADC_CHANNEL_2 = 5;
+    ADC_CHANNEL_3 = 6;
+    ADC_CHANNEL_4 = 7;
+    ADC_CHANNEL_5 = 0;
+    ADC_CHANNEL_6 = 1;
+    ADC_CHANNEL_7 = 2;
+    ADC_CHANNEL_8 = 3;
   }
 
   if (DAC_20Vpp) {

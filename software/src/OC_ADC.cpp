@@ -598,14 +598,15 @@ void ADC::Read(IOFrame *ioframe)
       Serial.println();
       #endif
       const int mult = 2;
-      update(0, sum[0] * mult / count);
-      update(1, sum[1] * mult / count);
-      update(2, sum[2] * mult / count);
-      update(3, sum[3] * mult / count);
-      update(4, sum[4] * mult / count);
-      update(5, sum[5] * mult / count);
-      update(6, sum[6] * mult / count);
-      update(7, sum[7] * mult / count);
+      // rows are inverted because of reasons, and now it hurts to change it
+      update(4, sum[0] * mult / count);
+      update(5, sum[1] * mult / count);
+      update(6, sum[2] * mult / count);
+      update(7, sum[3] * mult / count);
+      update(0, sum[4] * mult / count);
+      update(1, sum[5] * mult / count);
+      update(2, sum[6] * mult / count);
+      update(3, sum[7] * mult / count);
       old_poffset = (old_poffset + count * sizeof(adc33131_frame_t)) % sizeof(adc_buffer);
     }
     return;
