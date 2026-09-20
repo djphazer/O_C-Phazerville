@@ -20,6 +20,9 @@ void OC::CORE::FlushTasks() {
     }
   }
 }
+size_t OC::CORE::get_queue_size() {
+  return task_queue.available();
+}
 
 int OC::CORE::FreeRam() {
 #ifdef __IMXRT1062__

@@ -110,6 +110,10 @@ IntervalTimer UI_timer;
 void FASTRUN UI_timer_ISR() {
   OC_DEBUG_PROFILE_SCOPE(OC::DEBUG::UI_cycles);
   OC::ui.Poll();
+
+  const size_t evq = OC::ui.get_queue_size();
+  OC::DEBUG::UI_queue_max = max(OC::DEBUG::UI_queue_max, evq);
+
   OC_DEBUG_RESET_CYCLES(OC::ui.ticks(), 2048, OC::DEBUG::UI_cycles);
 }
 

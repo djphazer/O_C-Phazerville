@@ -20,6 +20,7 @@ namespace DEBUG {
   extern uint32_t UI_event_count;
   extern uint32_t UI_max_queue_depth;
   extern uint32_t UI_queue_overflow;
+  extern size_t UI_queue_max;
 };
 
 class DebugPins {

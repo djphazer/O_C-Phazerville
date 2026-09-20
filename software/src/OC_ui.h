@@ -118,6 +118,10 @@ public:
     return ticks_;
   }
 
+  inline size_t get_queue_size() const {
+    return event_queue_.available();
+  }
+
   inline void SetButtonIgnoreMask() {
     button_ignore_mask_ = button_state_;
   }

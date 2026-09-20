@@ -49,7 +49,7 @@ public:
     events_.Flush();
   }
 
-  inline bool available() const {
+  inline size_t available() const {
     __DMB();
     return events_.readable();
   }

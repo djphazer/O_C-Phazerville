@@ -27,6 +27,7 @@ namespace OC {
     void FlushTasks();
     int FreeRam();
     void Process(const uint16_t tick);
+    size_t get_queue_size();
   }; // namespace CORE
 
   struct TickCount {
