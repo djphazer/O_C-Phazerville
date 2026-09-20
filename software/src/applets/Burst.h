@@ -157,6 +157,7 @@ public:
 
         switch (cursor) {
           case CLKPASSTHRU:
+            SetLabel(passthru == 1 ? "ClockPass" : passthru == 2 ? "BurstPass" : "Burst");
             break;
           case PROB:
             prob = constrain(prob + direction, 0, 100);
@@ -294,7 +295,7 @@ private:
         switch (cursor) {
           case CLKPASSTHRU:
             gfxIcon(19, 13, LEFT_ICON);
-            gfxCursor(19, 22, 12, 9, passthru == 1 ? "ClockPass" : passthru == 2 ? "BurstPass" : "Burst");
+            SetLabel(passthru == 1 ? "ClockPass" : passthru == 2 ? "BurstPass" : "Burst");
             break;
           case PROB:
             gfxCursor(40, 21, 18, 9, "Skip %");
@@ -312,7 +313,7 @@ private:
             gfxCursor(40, 48, 13, 9, "Jitter");
             break;
           case DIVISION:
-            gfxCursor(1, 57, 43, 9, "ClkDiv");
+            gfxCursor(1, 57, 47, 9, "ClkDiv");
             break;
         }
     }
