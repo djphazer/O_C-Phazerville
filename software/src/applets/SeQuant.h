@@ -18,9 +18,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <string>
-#include <map>
-
 /**
  * This applet is a quantizer sequencer: a set of roots and scales can be selected and stepped through. They then configure a quantizer.
  * 
@@ -82,98 +79,92 @@ public:
         uint32_t previousPitch = currentPitch;
         if (continuous[LEFT_CH] || EndOfADCLag(LEFT_CH)) {
             int32_t pitch = In(LEFT_CH);
-            currentPitch = Quantize(quantizerId, pitch);
+            currentPitch = HS::Quantize(quantizerId, pitch);
             Out(LEFT_CH, currentPitch);
         }
 
         // Scale sequencing
         int previousScaleId = currentScaleId;
-        if (continuous[RIGHT_CH]){
-            int32_t scale_cv = In(RIGHT_CH);
+        if (continuous[RIGHT_CH]) {
+          // divide by 3 spreads 4 values over 1 octave
+          // SemitoneIn also provides hysteresis to kill jitter
+          currentScaleId = constrain(SemitoneIn(RIGHT_CH) / 3, 0, nbScales - 1);
 
-            // Is there a better way to do this ?
-            // I have just printed the values on the screen to find out
-            CONSTRAIN(scale_cv, 0, HEMISPHERE_MAX_INPUT_CV - 1);
-            currentScaleId = (scale_cv * nbScales) / HEMISPHERE_MAX_INPUT_CV;
-
-            SetRootNote(quantizerId, rootNote[currentScaleId]);
-            SetScale(quantizerId, scale[currentScaleId]);
-        }else if(EndOfADCLag(RIGHT_CH)){
-            switch (tr2Modes[currentTr2ModeId]){
-            case TR2Mode::STEP_FOWARDS:{
-                currentScaleId = (currentScaleId + 1) % nbScales;
-                break;
+          HS::SetRootNote(quantizerId, rootNote[currentScaleId]);
+          HS::QuantizerConfigure(quantizerId, scale[currentScaleId]);
+        } else if (EndOfADCLag(RIGHT_CH)) {
+          switch (currentTr2ModeId) {
+            case TR2Mode::STEP_FOWARDS: {
+              currentScaleId = (currentScaleId + 1) % nbScales;
+              break;
             }
 
-            case TR2Mode::STEP_BACKWARDS:{
-                currentScaleId = (currentScaleId + nbScales - 1) % nbScales;
-                break;
+            case TR2Mode::STEP_BACKWARDS: {
+              currentScaleId = (currentScaleId + nbScales - 1) % nbScales;
+              break;
             }
 
-            case TR2Mode::STEP_BACK_AND_FORTH:{
-                if(step_direction){ // forwards
-                    if(currentScaleId == nbScales - 1){
-                        currentScaleId = nbScales - 2;
-                        step_direction = false;
-                    }else{
-                        currentScaleId = currentScaleId + 1;
-                    }
-                }else{ // backwards
-                    if(currentScaleId == 0){
-                        currentScaleId = 1;
-                        step_direction = true;
-                    }else{
-                        currentScaleId = (currentScaleId + nbScales - 1) % nbScales;
-                    }
+            case TR2Mode::STEP_BACK_AND_FORTH: {
+              if (step_direction) { // forwards
+                if (currentScaleId == nbScales - 1) {
+                  currentScaleId = nbScales - 2;
+                  step_direction = false;
+                } else {
+                  currentScaleId = currentScaleId + 1;
                 }
-                break;
-            }
-            
-            case TR2Mode::STEP_RANDOM:{
-                srand((unsigned)time(0)); 
-                currentScaleId = rand() % nbScales;
-                break;
-            }
-
-            case TR2Mode::STEP_RANDOM_NO_REPEAT:{
-                srand((unsigned)time(0));
-                int new_scaleId = -1;
-                while(new_scaleId == -1 || new_scaleId == currentScaleId){
-                    new_scaleId = rand() % nbScales;
+              } else { // backwards
+                if (currentScaleId == 0) {
+                  currentScaleId = 1;
+                  step_direction = true;
+                } else {
+                  currentScaleId = (currentScaleId + nbScales - 1) % nbScales;
                 }
-                currentScaleId = new_scaleId;
-                break;
+              }
+              break;
             }
 
-            case TR2Mode::CV_SELECT_SCALE:{
-                int32_t cv = In(RIGHT_CH);
-
-                // Is there a better way to do this ?
-                // I have just printed the values on the screen to find out
-                CONSTRAIN(cv, 0, HEMISPHERE_MAX_INPUT_CV - 1);
-                currentScaleId = (cv * nbScales) / HEMISPHERE_MAX_INPUT_CV;
-                break;
+            case TR2Mode::STEP_RANDOM: {
+              currentScaleId = random(nbScales);
+              break;
             }
-            
+
+            case TR2Mode::STEP_RANDOM_NO_REPEAT: {
+              int new_scaleId = -1;
+              while (new_scaleId == -1 || new_scaleId == currentScaleId) {
+                new_scaleId = random(nbScales);
+              }
+              currentScaleId = new_scaleId;
+              break;
+            }
+
+            case TR2Mode::CV_SELECT_SCALE:
+              currentScaleId
+                = constrain(SemitoneIn(RIGHT_CH) / 3, 0, nbScales - 1);
+              break;
+
             default:
-                break;
-            }
+              break;
+          }
 
-            SetRootNote(quantizerId, rootNote[currentScaleId]);
-            SetScale(quantizerId, scale[currentScaleId]);
+          HS::SetRootNote(quantizerId, rootNote[currentScaleId]);
+          HS::QuantizerConfigure(quantizerId, scale[currentScaleId]);
         }
 
-
         // OUT2
-        if(out2Modes[currentOut2ModeId] == Out2Mode::NOTE_TRIGGER){
+        switch (currentOut2ModeId) {
+          case Out2Mode::NOTE_TRIGGER:
             GateOut(RIGHT_CH, currentPitch != previousPitch);
-        }else if (out2Modes[currentOut2ModeId] == Out2Mode::SCALE_TRIGGER){
+            break;
+          case Out2Mode::SCALE_TRIGGER:
             GateOut(RIGHT_CH, currentScaleId != previousScaleId);
-        }else if (out2Modes[currentOut2ModeId] == Out2Mode::PROGRESSION_LOOPBACK_TRIGGER){
+            break;
+          default:
+          case Out2Mode::PROGRESSION_LOOPBACK_TRIGGER:
             GateOut(RIGHT_CH, previousScaleId != 0 && currentScaleId == 0);
-        }else if (out2Modes[currentOut2ModeId] == Out2Mode::ROOT){
-            int32_t quantized_root = QuantizerLookup(quantizerId, 64);
-            Out(RIGHT_CH, quantized_root);
+            break;
+          case Out2Mode::ROOT:
+            Out(RIGHT_CH, HS::QuantizerLookup(quantizerId, 64));
+            break;
         }
 
         previousPitch = currentPitch;
@@ -250,14 +241,14 @@ public:
                 scale[scaleSlotId] = NudgeScaleLocal(scale[scaleSlotId], direction);
             }
         }else if (cursor == 1 + (nbScales * 2) + 2){
-            quantizerId = quantizerId + direction;
-            CONSTRAIN(quantizerId, 1, QUANT_CHANNEL_COUNT);
+          quantizerId
+            = constrain(quantizerId + direction, 0, QUANT_CHANNEL_COUNT - 1);
         }else if (cursor == 1 + (nbScales * 2) + 3){
-            currentOut2ModeId = currentOut2ModeId + direction;
-            CONSTRAIN(currentOut2ModeId, 0, NB_OUT2_MODES - 1);
+          currentOut2ModeId
+            = constrain(currentOut2ModeId + direction, 0, NB_OUT2_MODES - 1);
         }else if (cursor == 1 + (nbScales * 2) + 4){
-            currentTr2ModeId = currentTr2ModeId + direction;
-            CONSTRAIN(currentTr2ModeId, 0, tr2Modes.size() - 1);
+          currentTr2ModeId
+            = constrain(currentTr2ModeId + direction, 0, NB_TR2_MODES - 1);
         }
     }
 
@@ -323,17 +314,17 @@ public:
             continuous[RIGHT_CH] = Unpack(data, PackLocation {49, 1});
             
             currentOut2ModeId = Unpack(data, PackLocation {50, 4});
-            CONSTRAIN(currentOut2ModeId, 0, NB_OUT2_MODES);
+            CONSTRAIN(currentOut2ModeId, 0, NB_OUT2_MODES - 1);
 
             currentTr2ModeId = Unpack(data, PackLocation {54, 3});
-            CONSTRAIN(currentTr2ModeId, 0, NB_TR2_MODES);
+            CONSTRAIN(currentTr2ModeId, 0, NB_TR2_MODES - 1);
 
              // nbScales is 1-4, encoded as 0-3
             nbScales = Unpack(data, PackLocation {57, 2}) + 1;
             CONSTRAIN(nbScales, MIN_NB_SCALES, MAX_NB_SCALES);
 
             quantizerId = Unpack(data, PackLocation {59, 3});
-            CONSTRAIN(quantizerId, 0 ,QUANT_CHANNEL_COUNT);
+            CONSTRAIN(quantizerId, 0, QUANT_CHANNEL_COUNT - 1);
         }
     }
 
@@ -374,10 +365,9 @@ private:
     static const int LEFT_CH = 0;
     static const int RIGHT_CH = 1;
 
-    int quantizerId = 1;
+    int quantizerId = io_offset;
 
-    static const uint8_t NB_OUT2_MODES = 4;
-    enum class Out2Mode : uint8_t {
+    enum Out2Mode : uint8_t {
         // If no note trigger is used, outputs a trigger when the note changes
         // If a note trigger is used, otuputs a copy of the trigger
         NOTE_TRIGGER,
@@ -388,28 +378,20 @@ private:
         PROGRESSION_LOOPBACK_TRIGGER,
         // Outputs the root note of the current scale (this doubles as a 
         // classic sequencer for the bass for example)
-        ROOT
-    };
-    // an array makes cycling through easier
-    const Out2Mode out2Modes[NB_OUT2_MODES] = {
-        Out2Mode::NOTE_TRIGGER, 
-        Out2Mode::SCALE_TRIGGER, 
-        Out2Mode::PROGRESSION_LOOPBACK_TRIGGER, 
-        Out2Mode::ROOT
-    };
-    const std::map<Out2Mode, const std::string> out2ModeLabel = {
-        {Out2Mode::NOTE_TRIGGER, "nt_tg"}, 
-        {Out2Mode::SCALE_TRIGGER, "sc_tg"}, 
-        {Out2Mode::PROGRESSION_LOOPBACK_TRIGGER, "oo_tg"}, 
-        {Out2Mode::ROOT, "root"}
-    };
+        ROOT,
 
+        NB_OUT2_MODES
+    };
+    const char* const out2ModeLabel[Out2Mode::NB_OUT2_MODES] = {
+      "nt_tg",
+      "sc_tg",
+      "oo_tg",
+      "root",
+    };
     int currentOut2ModeId = 2;
 
-
     // Behaviour of the app when receiving a trigger on the second channel
-    static const uint8_t NB_TR2_MODES = 6;
-    enum class TR2Mode : uint8_t {
+    enum TR2Mode : uint8_t {
         // Go one step forward in the scale sequence
         STEP_FOWARDS,
         // Same but in the other direction
@@ -421,33 +403,23 @@ private:
         // Jump to a random scale different than the current one
         STEP_RANDOM_NO_REPEAT,
         // Select scale via CVIN2 now.
-        CV_SELECT_SCALE
-    };
+        CV_SELECT_SCALE,
 
-    const std::array<TR2Mode, NB_TR2_MODES> tr2Modes = {
-        TR2Mode::STEP_FOWARDS,
-        TR2Mode::STEP_BACKWARDS,
-        TR2Mode::STEP_BACK_AND_FORTH,
-        TR2Mode::STEP_RANDOM,
-        TR2Mode::STEP_RANDOM_NO_REPEAT,
-        TR2Mode::CV_SELECT_SCALE
+        NB_TR2_MODES
     };
-
-    const std::map<TR2Mode, const std::string> tr2ModeLabel = {
-        {TR2Mode::STEP_FOWARDS, "step>"},
-        {TR2Mode::STEP_BACKWARDS, "step<"},
-        {TR2Mode::STEP_BACK_AND_FORTH, "step<>"},
-        {TR2Mode::STEP_RANDOM, "step?"},
-        {TR2Mode::STEP_RANDOM_NO_REPEAT, "step?!"},
-        {TR2Mode::CV_SELECT_SCALE, "cv"}
+    const char* const tr2ModeLabel[NB_TR2_MODES] = {
+      "step>",
+      "step<",
+      "step<>",
+      "step?",
+      "step?!",
+      "cv",
     };
+    int currentTr2ModeId = 0;
 
     // true is forwards (used when in forwards/backwards mode)
     bool step_direction = true;
 
-    // an array makes cycling through easier
-    int currentTr2ModeId = 0;
-    
     // The number of scales in the progression
     int nbScales = 4;
 
@@ -558,16 +530,16 @@ private:
         gfxBitmap(48, 15, 8, continuous[RIGHT_CH]?CHECK_OFF_ICON:CHECK_ON_ICON);
 
         gfxPrint(0, 25, "Q:");
-        gfxPrint(16, 25, quantizerId);
+        gfxPrint(16, 25, quantizerId + 1);
         
         // B: output options
         gfxPrint(0, 35, OutputLabel(1));
         gfxPrint(":");
-        gfxPrint(12, 35, out2ModeLabel.at(out2Modes[currentOut2ModeId]).c_str());
+        gfxPrint(12, 35, out2ModeLabel[currentOut2ModeId]);
 
         // TR2 output options
         gfxPrint(0, 45, "TR2:");
-        gfxPrint(8 * 3, 45, tr2ModeLabel.at(tr2Modes[currentTr2ModeId]).c_str());
+        gfxPrint(8 * 3, 45, tr2ModeLabel[currentTr2ModeId]);
 
         // Draw cursor
         if(pageCursor == 0){
