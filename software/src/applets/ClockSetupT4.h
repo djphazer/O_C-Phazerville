@@ -141,16 +141,14 @@ public:
 
         // ------------ //
         if (HS::clock_m.IsRunning() && HS::clock_m.MIDITock()) {
-          OC::CORE::DeferTask([](){
-            if (~midi_clktx_disable & mMaskUSBDev)
-              usbMIDI.sendRealTime(usbMIDI.Clock);
-            if (~midi_clktx_disable & mMaskUSBHost)
-              usbHostMIDI[0].sendRealTime(usbMIDI.Clock);
-            if (~midi_clktx_disable & mMaskUSBHost2)
-              usbHostMIDI[1].sendRealTime(usbMIDI.Clock);
-            if (~midi_clktx_disable & mMaskSerial)
-              MIDI1.sendRealTime(midi::MidiType(usbMIDI.Clock));
-          });
+          if (~midi_clktx_disable & mMaskUSBDev)
+            usbMIDI.sendRealTime(usbMIDI.Clock);
+          if (~midi_clktx_disable & mMaskUSBHost)
+            usbHostMIDI[0].sendRealTime(usbMIDI.Clock);
+          if (~midi_clktx_disable & mMaskUSBHost2)
+            usbHostMIDI[1].sendRealTime(usbMIDI.Clock);
+          if (~midi_clktx_disable & mMaskSerial)
+            MIDI1.sendRealTime(midi::MidiType(usbMIDI.Clock));
         }
 
         // 8 internal clock flashers

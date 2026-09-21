@@ -58,15 +58,17 @@ public:
   inline AppBase *current_app() const { return static_cast<AppBase *>(current_app_.instance); }
   inline const RuntimeSlot &current_slot() const { return current_app_; }
 
-  inline void Process(IOFrame *ioframe) __attribute__((always_inline)) {
+  inline void LoadFrame(IOFrame *ioframe) __attribute__((always_inline)) {
     if (current_app_.instance) {
       IO::Read(ioframe, &current_app_.io_settings());
-      // actual processing is deferred after loading the IOFrame
-      // XXX: this could be triggered by a UI Event instead...
-      CORE::DeferTask([ioframe, this]() {
-        current_app_.Process(current_app_.instance, ioframe);
-        IO::Write(ioframe, &current_app_.io_settings());
-      });
+      CORE::DeferTask(PROCESS_IOFRAME);
+    }
+  }
+
+  inline void Process(IOFrame *ioframe) __attribute__((always_inline)) {
+    if (current_app_.instance) {
+      current_app_.Process(current_app_.instance, ioframe);
+      IO::Write(ioframe, &current_app_.io_settings());
     }
   }
 

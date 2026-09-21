@@ -30,7 +30,7 @@
 #include "HSMIDI.h"
 #include "HSUtils.h"
 #include <functional>
-#include <vector>
+#include <queue>
 
 namespace HS {
 
@@ -43,6 +43,8 @@ constexpr int MIDI_CLOCK_PPQN = 2;
 constexpr int MIDI_OUT_PPQN = 24;
 constexpr int CLOCK_MAX_MULTIPLE = 24;
 constexpr int CLOCK_MIN_MULTIPLE = -31; // becomes /32
+
+using Task = std::function<void()>;
 
 class ClockManager {
 public:
@@ -299,7 +301,6 @@ public:
         paused = p;
         auto_reset = !p;
         if (!p && midi_out_enabled) {
-            // TODO: DeferTask?
 #ifdef ARDUINO_TEENSY41
             if (~midi_clktx_disable & mMaskUSBDev)
               usbMIDI.sendRealTime(usbMIDI.Start);
@@ -321,7 +322,6 @@ public:
         extsync = false;
         if (midi_out_enabled) {
 #ifdef ARDUINO_TEENSY41
-            // TODO: DeferTask?
             if (~midi_clktx_disable & mMaskUSBDev)
               usbMIDI.sendRealTime(usbMIDI.Stop);
             if (~midi_clktx_disable & mMaskUSBHost)

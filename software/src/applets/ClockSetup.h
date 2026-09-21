@@ -102,9 +102,7 @@ public:
 
         // ------------ //
         if (clock_m.IsRunning() && clock_m.MIDITock()) {
-          OC::CORE::DeferTask([](){
-            usbMIDI.sendRealTime(usbMIDI.Clock);
-          });
+          usbMIDI.sendRealTime(usbMIDI.Clock);
         }
 
         // 4 internal clock flashers

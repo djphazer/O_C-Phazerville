@@ -1,27 +1,24 @@
 #include "OC_core.h"
+#include "src/UI/ui_event_queue.h"
 #include <malloc.h>
 
 extern "C" char _heap_end[], *__brkval;
 
-/*volatile*/ std::queue<Task> fn_queue;
-//volatile bool fn_queue_lock = false;
+UI::EventQueue<64> task_queue;
 
-void OC::CORE::DeferTask(Task func) {
-  // This simply ignores Tasks from the ISR while flushing...
-  // Hopefully that's more like debouncing or frame drops and not missed clocks...
-  //if (!fn_queue_lock) // oh no!
-  fn_queue.emplace(func);
+void OC::CORE::DeferTask(Task t) {
+  task_queue.PushEvent(UI::EVENT_MISC, t, ticks & 0xffff, 0);
 }
 void OC::CORE::FlushTasks() {
-  if (fn_queue.empty()) return;
-  //noInterrupts();
-  //fn_queue_lock = true;
-  while (!fn_queue.empty()) {
-    fn_queue.front()();
-    fn_queue.pop();
+  while (task_queue.available()) {
+    auto event = task_queue.PullEvent();
+    switch (event.control) {
+      case PROCESS_IOFRAME:
+        Process(event.value);
+        break;
+      default: break;
+    }
   }
-  //interrupts();
-  //fn_queue_lock = false;
 }
 
 int OC::CORE::FreeRam() {

@@ -9,10 +9,10 @@
 #include "OC_menus.h"
 #include "util/util_debugpins.h"
 #include "src/drivers/display.h"
-#include <functional>
-#include <queue>
 
-using Task = std::function<void()>;
+enum Task : uint16_t {
+  PROCESS_IOFRAME,
+};
 
 namespace OC {
   namespace CORE {
@@ -23,9 +23,10 @@ namespace OC {
 
     static constexpr int RAM2_HEADROOM = 10240;
 
-    void DeferTask(Task func);
+    void DeferTask(Task t);
     void FlushTasks();
     int FreeRam();
+    void Process(const uint16_t tick);
   }; // namespace CORE
 
   struct TickCount {
