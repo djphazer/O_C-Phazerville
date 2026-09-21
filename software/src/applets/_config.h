@@ -138,7 +138,7 @@ using namespace HS;
 
 #include "../AppletRegistry.h"
 
-constexpr Registry reg = Registry<HemisphereApplet, HS::APPLET_SLOTS  // unused ID's: 1, 2, 86, 87, 98 (update this list if you use one)
+constexpr Registry reg = Registry<HemisphereApplet, HS::APPLET_SLOTS  // unused ID's: 1, 2, 87, 98 (update this list if you use one)
     , DeclareApplet<ADSREG, 8, CAT_MODULATOR>
     , DeclareApplet<ADEG, 34, CAT_MODULATOR>
     , DeclareApplet<MiniASR, 47, CAT_MODULATOR | CAT_QUANTIZER>
@@ -220,7 +220,7 @@ constexpr Registry reg = Registry<HemisphereApplet, HS::APPLET_SLOTS  // unused 
     , DeclareApplet<Scope, 23, CAT_OTHER>
     , DeclareApplet<Seq32, 75, CAT_SEQUENCER>
     , DeclareApplet<SeqPlay7, 76, CAT_SEQUENCER>
-    , DeclareApplet<SeQuant, 66, CAT_QUANTIZER>
+    , DeclareApplet<SeQuant, 86, CAT_QUANTIZER>
     , DeclareApplet<SequenceX, 14, CAT_SEQUENCER>
     // , DeclareApplet<ShiftArp, 96, CAT_SEQUENCER>
     , DeclareApplet<ShiftGate, 48, CAT_LOGIC | CAT_MODULATOR | CAT_CLOCKING>
