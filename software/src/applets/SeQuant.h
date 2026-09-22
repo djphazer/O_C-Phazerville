@@ -64,6 +64,11 @@ public:
         std::fill_n(scale, MAX_NB_SCALES, OC::Scales::SCALE_SEMI);
     }
 
+    void Reset() {
+      currentScaleId = 0;
+      reset = true;
+    }
+
     void Controller() {
         if (Clock(LEFT_CH)) {
             continuous[LEFT_CH] = 0; // Turn off continuous mode if there's a clock
@@ -74,7 +79,7 @@ public:
             continuous[RIGHT_CH] = 0; // Turn off continuous mode if there's a clock
             StartADCLag(RIGHT_CH);
         }
-        
+
         // Melody quantization
         uint32_t previousPitch = currentPitch;
         if (continuous[LEFT_CH] || EndOfADCLag(LEFT_CH)) {
@@ -95,17 +100,25 @@ public:
         } else if (EndOfADCLag(RIGHT_CH)) {
           switch (currentTr2ModeId) {
             case TR2Mode::STEP_FOWARDS: {
-              currentScaleId = (currentScaleId + 1) % nbScales;
+              if (reset) {
+                reset = false;
+              } else
+                currentScaleId = (currentScaleId + 1) % nbScales;
               break;
             }
 
             case TR2Mode::STEP_BACKWARDS: {
-              currentScaleId = (currentScaleId + nbScales - 1) % nbScales;
+              if (reset) {
+                reset = false;
+              } else
+                currentScaleId = (currentScaleId + nbScales - 1) % nbScales;
               break;
             }
 
             case TR2Mode::STEP_BACK_AND_FORTH: {
-              if (step_direction) { // forwards
+              if (reset) {
+                reset = false;
+              } else if (step_direction) { // forwards
                 if (currentScaleId == nbScales - 1) {
                   currentScaleId = nbScales - 2;
                   step_direction = false;
@@ -129,8 +142,8 @@ public:
             }
 
             case TR2Mode::STEP_RANDOM_NO_REPEAT: {
-              int new_scaleId = -1;
-              while (new_scaleId == -1 || new_scaleId == currentScaleId) {
+              int new_scaleId = currentScaleId;
+              while (new_scaleId == currentScaleId) {
                 new_scaleId = random(nbScales);
               }
               currentScaleId = new_scaleId;
@@ -349,6 +362,7 @@ private:
     // Each channel starts as continuous and becomes clocked when a clock is
     // received
     bool continuous[2];
+    bool reset = false;
     int8_t cursor;
 
     // The minimal/maximal number of scales in the progression
