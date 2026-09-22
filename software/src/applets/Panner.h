@@ -71,7 +71,6 @@ FLASHMEM void Panner::Start() {
 
 void Panner::Controller() {
     int signal = In(0);
-    int cv2 = In(1);
 
     bool left_gate = Gate(0);
     bool right_gate = Gate(1);
@@ -82,10 +81,9 @@ void Panner::Controller() {
         if (left_gate && right_gate) pos = (PANNER_MAX_VALUE + 1) / 2;
         else pos = left_gate ? 0 : PANNER_MAX_VALUE;
     } else {
-        int offset = Proportion(constrain(cv2, 0, PANNER_CV_RANGE),
-                                PANNER_CV_RANGE, PANNER_MAX_VALUE);  // 0..5V -> rightward
-
-        pos = constrain((int)base_position + offset, 0, PANNER_MAX_VALUE);
+        pos = base_position;
+        // modify pos with CV2 using standard method
+        Modulate(pos, 1, 0, PANNER_MAX_VALUE);
     }
 
     Out(0, Proportion(PANNER_MAX_VALUE - pos, PANNER_MAX_VALUE, signal));  // OUT1 = left
