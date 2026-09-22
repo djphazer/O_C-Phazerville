@@ -450,6 +450,245 @@ static void RemoteControl(int sel) {
 }
 #endif // QUAD_CAPTURE
 
+void SerialHandler() {
+  static size_t cap_idx = 0;
+  static elapsedMicros cap_send_time = 0;
+  // check for request from PC to capture the screen
+  if (Serial && Serial.available() > 0) {
+    bool capreq = false;
+    do {
+      int cmd = Serial.read();
+      switch (cmd) {
+#ifdef PRINT_DEBUG
+        case 'z':
+          Serial.println("-=[ PEW PEW NERDS! ]=-");
+          Serial.println("Secret Menu Options:");
+          Serial.printf("'I' = Toggle App ISR [%s]\n", OC::CORE::app_isr_enabled ? "ON" : "OFF");
+          Serial.printf("'D' = Toggle Display Redraw [%s]\n", OC::CORE::display_update_enabled ? "ON" : "OFF");
+          Serial.printf("'L' = Toggle App Loop [%s]\n", OC::CORE::app_loop_enabled ? "ON" : "OFF");
+#if defined(__IMXRT1062__)
+#if defined(ARDUINO_TEENSY41)
+          Serial.println("'i' = scan all i2c addresses");
+#endif
+          Serial.println("'l' = list all files in flash (LittleFS)");
+          Serial.println("'s' = list all files on SD card");
+          Serial.println("'C' = clear/reset default Config file");
+          Serial.println("'F' = format/erase all LittleFS files");
+#endif
+          break;
+
+        case 'I':
+          OC::CORE::app_isr_enabled = !OC::CORE::app_isr_enabled;
+          Serial.printf("App ISR = %s\n", OC::CORE::app_isr_enabled ? "ON" : "OFF");
+          break;
+        case 'D':
+          OC::CORE::display_update_enabled = !OC::CORE::display_update_enabled;
+          Serial.printf("Display Redraw = %s\n", OC::CORE::display_update_enabled ? "ON" : "OFF");
+          break;
+        case 'L':
+          OC::CORE::app_loop_enabled = !OC::CORE::app_loop_enabled;
+          Serial.printf("App Loop = %s\n", OC::CORE::app_loop_enabled ? "ON" : "OFF");
+          break;
+
+#if defined(__IMXRT1062__)
+#if defined(ARDUINO_TEENSY41)
+        case 'i':
+          ScanI2C();
+          break;
+#endif
+        case 'C':
+          Serial.println("Resetting Config File!!");
+          PhzConfig::clear_config();
+          PhzConfig::save_config();
+        case 'l':
+          Serial.println(" -=- LittleFS -=- ");
+          PhzConfig::listFiles();
+          break;
+        case 's':
+          Serial.println(" -=- SD Card -=- ");
+          PhzConfig::listFiles(SD);
+          break;
+        case 'F':
+          Serial.println("!! ERASING ALL FILES on LittleFS !!");
+          PhzConfig::eraseFiles();
+          break;
+#endif
+
+          // TODO:
+        case '+':
+        case '-':
+          // simulate UP and DOWN buttons
+          break;
+        case '[':
+        case ']':
+          // simulate Encoder button press
+          break;
+        case ',':
+        case '.':
+          // simulate Left Encoder turn
+          break;
+        case '<':
+        case '>':
+          // simulate Right Encoder turn
+          break;
+#endif
+#ifdef QUAD_CAPTURE
+        case 'Q':
+          // 4-up Quadrants capture: render all four applets into a 128x128
+          // frame and stream it below. Falls through to nothing if Quadrants
+          // isn't the active app. Stock single-frame capture is unaffected.
+          QuadCapture::request();
+          break;
+        case 'A':
+          // Audio DSP stack view (128x64) for the external viewer.
+          QuadCapture::requestAudio();
+          break;
+        case 'M':
+          // MIDI map page (128x64) for the external viewer.
+          QuadCapture::requestMidi();
+          break;
+        case 'N':
+          // MIDI monitor: dump the in/out event ring as one "N:..." line.
+          QuadCapture_MidiLog();
+          break;
+        case 'O': {
+          // Oscilloscope: 'O' <slot 'A'|'B'> <src> <win '0'-'3'>. src:
+          // '1'-'8' CV out, 'a'-'h' CV in, 't'-'w' trig in, 'L'/'R' audio out.
+          // Streams a 512-byte snapshot (256 big-endian int16 samples) of
+          // that slot's ring via the chunked hex sender below.
+          char b[3];
+          int n = 0;
+          uint32_t t0 = millis();
+          while (n < 3 && (millis() - t0) < 8) {
+            if (Serial.available()) b[n++] = Serial.read();
+          }
+          if (n == 3) {
+            if (b[1] == '?') {
+              // diagnostic state line (protocol version, crash flag, live values)
+              QuadCapture_ScopeDebug();
+            } else if (b[1] == '!') {
+              // dump + clear the CrashReport from the last hard fault, if any
+              if (CrashReport) Serial.print(CrashReport);
+              else Serial.println("NOCRASH");
+              Serial.println("ENDCRASH");
+              Serial.flush();
+            } else {
+              QuadCapture::requestScope(b[0], b[1], b[2]);
+            }
+          }
+          break;
+        }
+        case '~': {
+          // Remote control: the next byte selects a button/encoder to inject.
+          uint32_t t0 = millis();
+          while (!Serial.available() && (millis() - t0) < 5) { /* await selector */ }
+          if (Serial.available()) RemoteControl(Serial.read());
+          break;
+        }
+        case 'T': {
+          // Control state: reply "left,right,full,preset\n".
+          int l = 0, r = 0, f = -1, pre = -1;
+          if (QuadCapture_ControlState(l, r, f, pre)) {
+            Serial.print(l);   Serial.print(',');
+            Serial.print(r);   Serial.print(',');
+            Serial.print(f);   Serial.print(',');
+            Serial.println(pre);
+            Serial.flush();
+          }
+          break;
+        }
+        case 'W': {
+          // Save current state to a preset slot: next byte = slot + 33.
+          uint32_t t0 = millis();
+          while (!Serial.available() && (millis() - t0) < 5) { /* await slot */ }
+          if (Serial.available()) QuadCapture_SavePreset(Serial.read() - 33);
+          break;
+        }
+        case 'B':
+          // Backup: stream the whole bank file to the host.
+          QuadCapture_BackupBank();
+          break;
+        case 'V': {
+          // Audio levels: reply "inL,inR,outL,outR\n" (peaks 0..1). Hosts
+          // that only know the old two-value form can ignore the extras.
+          float il = 0.f, ir = 0.f, ol = 0.f, orr = 0.f;
+          if (QuadCapture_InputLevels(il, ir)) {
+            QuadCapture_OutputLevels(ol, orr);
+            Serial.print(il, 4); Serial.print(',');
+            Serial.print(ir, 4); Serial.print(',');
+            Serial.print(ol, 4); Serial.print(',');
+            Serial.println(orr, 4);
+            Serial.flush();
+          }
+          break;
+        }
+#endif // QUAD_CAPTURE
+        default:
+          capreq = true;
+          break;
+      }
+    } while (Serial.available() > 0);
+    if (capreq) {
+      display::frame_buffer.capture_request();
+      cap_idx = 0;
+    }
+  }
+
+  // check for frame buffer to have capture data ready
+  const uint8_t *capture_data = display::frame_buffer.captured();
+  if (capture_data && cap_send_time > 950) {
+    cap_send_time = 0;
+    capture_data += cap_idx; // start where we left off
+
+    // limit to n bytes every 950 micros
+    const size_t chunk_size = 32;
+    for (size_t i=0; i < chunk_size; i++) {
+      uint8_t n = *capture_data++;
+      if (n < 16) Serial.print("0");
+      Serial.print(n, HEX);
+
+      if (++cap_idx >= display::frame_buffer.kFrameSize) {
+        // we're done sending this one
+        Serial.println();
+        Serial.flush();
+        cap_idx = 0;
+        display::frame_buffer.capture_retire();
+        break;
+      }
+    }
+  }
+
+} // SerialHandler
+
+void Redraw() {
+  using namespace OC;
+  static uint32_t menu_draw_count = 0;
+
+  GRAPHICS_BEGIN_FRAME(false); // Don't busy wait
+  if (UI_MODE_APP_SETTINGS == ui_mode) {
+    // Only draw the App menu here...
+    // Handle events and process state changes elsewhere.
+    ui.AppSettings(true);
+
+  } else { // if (UI_MODE_MENU == ui_mode) {
+    OC_DEBUG_RESET_CYCLES(menu_draw_count, 512, DEBUG::MENU_draw_cycles);
+    OC_DEBUG_PROFILE_SCOPE(DEBUG::MENU_draw_cycles);
+    app_switcher.current_app()->Draw(ui_mode);
+    ++menu_draw_count;
+  }
+  GRAPHICS_END_FRAME();
+
+  static elapsedMillis bug_checker = 0;
+  if (bug_checker > 1000) {
+    bug_checker = 0;
+    if (display::frame_buffer.check_for_bugs(true)) {
+      HS::PokePopup(HS::ERROR_POPUP, "GFX overflow! (pre)");
+    }
+    if (display::frame_buffer.check_for_bugs(false)) {
+      HS::PokePopup(HS::ERROR_POPUP, "GFX overflow! (post)");
+    }
+  }
+}
 /*  ---------    main loop  --------  */
 
 void FASTRUN loop() {
@@ -457,7 +696,6 @@ void FASTRUN loop() {
   CORE::app_isr_enabled = true;
   CORE::display_update_enabled = true;
   CORE::app_loop_enabled = true;
-  uint32_t menu_draw_count = 0;
   uint32_t last_redraw_time = 0;
 
   while (true) {
@@ -465,44 +703,23 @@ void FASTRUN loop() {
     thisUSB.Task();
 #endif
 
-    // Take care of queued tasks from ISR
+    // Take care of queued tasks from ISR - frequently!
     OC::CORE::FlushTasks();
 
     // Refresh display
     if (MENU_REDRAW && CORE::display_update_enabled) {
-      GRAPHICS_BEGIN_FRAME(false); // Don't busy wait
-
-      if (UI_MODE_APP_SETTINGS == ui_mode) {
-        // Only draw the App menu here...
-        // Handle events and process state changes elsewhere.
-        ui.AppSettings(true);
-
-      } else { // if (UI_MODE_MENU == ui_mode) {
-        OC_DEBUG_RESET_CYCLES(menu_draw_count, 512, DEBUG::MENU_draw_cycles);
-        OC_DEBUG_PROFILE_SCOPE(DEBUG::MENU_draw_cycles);
-        app_switcher.current_app()->Draw(ui_mode);
-        ++menu_draw_count;
-      }
-
+      Redraw();
       MENU_REDRAW = 0;
       last_redraw_time = ui.ticks();
-      GRAPHICS_END_FRAME();
-
-      static elapsedMillis bug_checker = 0;
-      if (bug_checker > 1000) {
-        bug_checker = 0;
-        if (display::frame_buffer.check_for_bugs(true)) {
-          HS::PokePopup(HS::ERROR_POPUP, "GFX overflow! (pre)");
-        }
-        if (display::frame_buffer.check_for_bugs(false)) {
-          HS::PokePopup(HS::ERROR_POPUP, "GFX overflow! (post)");
-        }
-      }
     }
+
+    OC::CORE::FlushTasks();
 
     // Run current app
     if (CORE::app_loop_enabled)
       app_switcher.current_app()->DispatchLoop();
+
+    OC::CORE::FlushTasks();
 
     // UI events
     if (UI_MODE_APP_SETTINGS == ui_mode) {
@@ -534,188 +751,7 @@ void FASTRUN loop() {
     MTP.loop();
 #endif
 
-    static size_t cap_idx = 0;
-    static elapsedMicros cap_send_time = 0;
-    // check for request from PC to capture the screen
-    if (Serial && Serial.available() > 0) {
-      bool capreq = false;
-      do {
-        int cmd = Serial.read();
-        switch (cmd) {
-#ifdef PRINT_DEBUG
-          case 'z':
-            Serial.println("-=[ PEW PEW NERDS! ]=-");
-            Serial.println("Secret Menu Options:");
-            Serial.printf("'I' = Toggle App ISR [%s]\n", OC::CORE::app_isr_enabled ? "ON" : "OFF");
-            Serial.printf("'D' = Toggle Display Redraw [%s]\n", OC::CORE::display_update_enabled ? "ON" : "OFF");
-            Serial.printf("'L' = Toggle App Loop [%s]\n", OC::CORE::app_loop_enabled ? "ON" : "OFF");
-#if defined(__IMXRT1062__)
-#if defined(ARDUINO_TEENSY41)
-            Serial.println("'i' = scan all i2c addresses");
-#endif
-            Serial.println("'l' = list all files in flash (LittleFS)");
-            Serial.println("'s' = list all files on SD card");
-            Serial.println("'C' = clear/reset default Config file");
-            Serial.println("'F' = format/erase all LittleFS files");
-#endif
-            break;
-
-          case 'I':
-            OC::CORE::app_isr_enabled = !OC::CORE::app_isr_enabled;
-            Serial.printf("App ISR = %s\n", OC::CORE::app_isr_enabled ? "ON" : "OFF");
-            break;
-          case 'D':
-            OC::CORE::display_update_enabled = !OC::CORE::display_update_enabled;
-            Serial.printf("Display Redraw = %s\n", OC::CORE::display_update_enabled ? "ON" : "OFF");
-            break;
-          case 'L':
-            OC::CORE::app_loop_enabled = !OC::CORE::app_loop_enabled;
-            Serial.printf("App Loop = %s\n", OC::CORE::app_loop_enabled ? "ON" : "OFF");
-            break;
-
-#if defined(__IMXRT1062__)
-#if defined(ARDUINO_TEENSY41)
-          case 'i':
-            ScanI2C();
-            break;
-#endif
-          case 'C':
-            Serial.println("Resetting Config File!!");
-            PhzConfig::clear_config();
-            PhzConfig::save_config();
-          case 'l':
-            Serial.println(" -=- LittleFS -=- ");
-            PhzConfig::listFiles();
-            break;
-          case 's':
-            Serial.println(" -=- SD Card -=- ");
-            PhzConfig::listFiles(SD);
-            break;
-          case 'F':
-            Serial.println("!! ERASING ALL FILES on LittleFS !!");
-            PhzConfig::eraseFiles();
-            break;
-#endif
-
-            // TODO:
-          case '+':
-          case '-':
-            // simulate UP and DOWN buttons
-            break;
-          case '[':
-          case ']':
-            // simulate Encoder button press
-            break;
-          case ',':
-          case '.':
-            // simulate Left Encoder turn
-            break;
-          case '<':
-          case '>':
-            // simulate Right Encoder turn
-            break;
-#endif
-#ifdef QUAD_CAPTURE
-          case 'Q':
-            // 4-up Quadrants capture: render all four applets into a 128x128
-            // frame and stream it below. Falls through to nothing if Quadrants
-            // isn't the active app. Stock single-frame capture is unaffected.
-            QuadCapture::request();
-            break;
-          case 'A':
-            // Audio DSP stack view (128x64) for the external viewer.
-            QuadCapture::requestAudio();
-            break;
-          case 'M':
-            // MIDI map page (128x64) for the external viewer.
-            QuadCapture::requestMidi();
-            break;
-          case 'N':
-            // MIDI monitor: dump the in/out event ring as one "N:..." line.
-            QuadCapture_MidiLog();
-            break;
-          case 'O': {
-            // Oscilloscope: 'O' <slot 'A'|'B'> <src> <win '0'-'3'>. src:
-            // '1'-'8' CV out, 'a'-'h' CV in, 't'-'w' trig in, 'L'/'R' audio out.
-            // Streams a 512-byte snapshot (256 big-endian int16 samples) of
-            // that slot's ring via the chunked hex sender below.
-            char b[3];
-            int n = 0;
-            uint32_t t0 = millis();
-            while (n < 3 && (millis() - t0) < 8) {
-              if (Serial.available()) b[n++] = Serial.read();
-            }
-            if (n == 3) {
-              if (b[1] == '?') {
-                // diagnostic state line (protocol version, crash flag, live values)
-                QuadCapture_ScopeDebug();
-              } else if (b[1] == '!') {
-                // dump + clear the CrashReport from the last hard fault, if any
-                if (CrashReport) Serial.print(CrashReport);
-                else Serial.println("NOCRASH");
-                Serial.println("ENDCRASH");
-                Serial.flush();
-              } else {
-                QuadCapture::requestScope(b[0], b[1], b[2]);
-              }
-            }
-            break;
-          }
-          case '~': {
-            // Remote control: the next byte selects a button/encoder to inject.
-            uint32_t t0 = millis();
-            while (!Serial.available() && (millis() - t0) < 5) { /* await selector */ }
-            if (Serial.available()) RemoteControl(Serial.read());
-            break;
-          }
-          case 'T': {
-            // Control state: reply "left,right,full,preset\n".
-            int l = 0, r = 0, f = -1, pre = -1;
-            if (QuadCapture_ControlState(l, r, f, pre)) {
-              Serial.print(l);   Serial.print(',');
-              Serial.print(r);   Serial.print(',');
-              Serial.print(f);   Serial.print(',');
-              Serial.println(pre);
-              Serial.flush();
-            }
-            break;
-          }
-          case 'W': {
-            // Save current state to a preset slot: next byte = slot + 33.
-            uint32_t t0 = millis();
-            while (!Serial.available() && (millis() - t0) < 5) { /* await slot */ }
-            if (Serial.available()) QuadCapture_SavePreset(Serial.read() - 33);
-            break;
-          }
-          case 'B':
-            // Backup: stream the whole bank file to the host.
-            QuadCapture_BackupBank();
-            break;
-          case 'V': {
-            // Audio levels: reply "inL,inR,outL,outR\n" (peaks 0..1). Hosts
-            // that only know the old two-value form can ignore the extras.
-            float il = 0.f, ir = 0.f, ol = 0.f, orr = 0.f;
-            if (QuadCapture_InputLevels(il, ir)) {
-              QuadCapture_OutputLevels(ol, orr);
-              Serial.print(il, 4); Serial.print(',');
-              Serial.print(ir, 4); Serial.print(',');
-              Serial.print(ol, 4); Serial.print(',');
-              Serial.println(orr, 4);
-              Serial.flush();
-            }
-            break;
-          }
-#endif // QUAD_CAPTURE
-          default:
-            capreq = true;
-            break;
-        }
-      } while (Serial.available() > 0);
-      if (capreq) {
-        display::frame_buffer.capture_request();
-        cap_idx = 0;
-      }
-    }
+    SerialHandler();
 
 #ifdef QUAD_CAPTURE
     // stream an armed quad/audio frame quickly (its own faster pacing than the
@@ -731,31 +767,7 @@ void FASTRUN loop() {
     QuadMidi::service(RemoteControl);
 #endif // QUAD_CAPTURE
 
-    // check for frame buffer to have capture data ready
-    const uint8_t *capture_data = display::frame_buffer.captured();
-    if (capture_data && cap_send_time > 950) {
-      cap_send_time = 0;
-      capture_data += cap_idx; // start where we left off
-
-      // limit to n bytes every 950 micros
-      const size_t chunk_size = 32;
-      for (size_t i=0; i < chunk_size; i++) {
-        uint8_t n = *capture_data++;
-        if (n < 16) Serial.print("0");
-        Serial.print(n, HEX);
-
-        if (++cap_idx >= display::frame_buffer.kFrameSize) {
-          // we're done sending this one
-          Serial.println();
-          Serial.flush();
-          cap_idx = 0;
-          display::frame_buffer.capture_retire();
-          break;
-        }
-      }
-    }
-
-  }
+  } // while true
 }
 
 
