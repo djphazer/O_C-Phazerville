@@ -437,15 +437,19 @@ protected:
       return HS::GetLatestNoteNumber(ch);
     }
     int Quantize(int ch, int cv, int root = 0, int transpose = 0) {
+      HS_ASSERT(ch >= 0 && ch <= 1, "channel out of range!");
       return HS::Quantize(ch + io_offset, cv, root, transpose);
     }
     int QuantizerLookup(int ch, int note) {
+      HS_ASSERT(ch >= 0 && ch <= 1, "channel out of range!");
       return HS::QuantizerLookup(ch + io_offset, note);
     }
     void QuantizerConfigure(int ch, int scale, uint16_t mask = 0xffff) {
+      HS_ASSERT(ch >= 0 && ch <= 1, "channel out of range!");
       q_engine[io_offset + ch].Configure(scale, mask);
     }
     void SetScale(int ch, int scale) {
+      HS_ASSERT(ch >= 0 && ch <= 1, "channel out of range!");
       QuantizerConfigure(ch, scale);
     }
     int GetScale(int ch) {
