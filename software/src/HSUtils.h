@@ -37,6 +37,16 @@
   static_cast<int>(x), \
   static_cast<int>((mul) * ((x) - static_cast<int32_t>(x)))
 
+#if 1
+#define HS_ASSERT(condition, msg) \
+  if (!(condition)) { \
+    PokePopup(ERROR_POPUP, msg); \
+    return; \
+  } do {} while(0)
+#else
+#define HS_ASSERT(cond, msg)
+#endif
+
 namespace HS {
 
   enum HEM_SIDE : uint8_t {
