@@ -71,7 +71,7 @@ public:
         }
         if (Clock(0)) {
             if (clocked) {
-                spacing = ClockCycleTicks(0) / number_mod / HEMISPHERE_CLOCK_TICKS;
+                spacing = max(1u, ClockCycleTicks(0) / number_mod / HEMISPHERE_CLOCK_TICKS);
             } else clocked = 1;
 
             if (passthru & 1)
@@ -86,15 +86,21 @@ public:
         // Handle a burst set in progress
         if (bursts_to_go > 0) {
             if (--burst_countdown <= 0) {
-                int modded_spacing = constrain(effective_spacing, HEM_BURST_SPACING_MIN, HEM_BURST_SPACING_MAX);
+                int modded_spacing = effective_spacing;
                 int accel_span = burst_count + bursts_to_go - 1;
                 if (accel > 0) {
-                    int amount_from_min = modded_spacing - HEM_BURST_SPACING_MIN;
+                    int accel_min = effective_spacing < HEM_BURST_SPACING_MIN
+                        ? 1
+                        : HEM_BURST_SPACING_MIN;
+                    int amount_from_min = modded_spacing - accel_min;
                     int spacing_accel = amount_from_min * burst_count / accel_span * accel / HEM_BURST_ACCEL_MAX;
                     modded_spacing -= spacing_accel;
                 }
                 if (accel < 0) {
-                    int amount_from_max = HEM_BURST_SPACING_MAX - modded_spacing;
+                    int accel_max = effective_spacing > HEM_BURST_SPACING_MAX
+                        ? HEM_BURST_SPACING_MAX * HEM_BURST_CLOCKDIV_MAX
+                        : HEM_BURST_SPACING_MAX;
+                    int amount_from_max = accel_max - modded_spacing;
                     int spacing_accel = amount_from_max * burst_count / accel_span * abs(accel) / HEM_BURST_ACCEL_MAX;
                     modded_spacing += spacing_accel;
                 }
@@ -103,7 +109,7 @@ public:
                     int jitter_offset = Proportion(rand, (HEM_BURST_JITTER_MAX * 10), modded_spacing);
                     modded_spacing += jitter_offset;
                 }
-                modded_spacing = constrain(modded_spacing, HEM_BURST_SPACING_MIN, HEM_BURST_SPACING_MAX);
+                modded_spacing = max(1, modded_spacing);
                 ClockOut(0);
                 zap_active = true;
                 burst_count++;
@@ -337,6 +343,7 @@ private:
         if (clocked) {
             if (effective_div > 1) effective_spacing *= effective_div;
             if (effective_div < 0) effective_spacing /= -effective_div;
+            effective_spacing = max(1, effective_spacing);
         }
         return effective_spacing;
     }
