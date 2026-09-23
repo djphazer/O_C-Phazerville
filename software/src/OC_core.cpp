@@ -10,8 +10,9 @@ void OC::CORE::DeferTask(Task t) {
   task_queue.PushEvent(UI::EVENT_MISC, t, ticks & 0xffff, 0);
 }
 void OC::CORE::FlushTasks() {
-  while (task_queue.available()) {
-    auto event = task_queue.PullEvent();
+  int i = 0; // yield after a certain number to prevent UI and gfx freeze
+  while (task_queue.available() && i++ < 16000) {
+    const UI::Event event = task_queue.PullEvent();
     switch (event.control) {
       case PROCESS_IOFRAME:
         Process(event.value);
