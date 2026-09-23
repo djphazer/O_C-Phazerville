@@ -4,7 +4,7 @@
 
 extern "C" char _heap_end[], *__brkval;
 
-UI::EventQueue<64> task_queue;
+UI::EventQueue<32> task_queue;
 
 void OC::CORE::DeferTask(Task t) {
   task_queue.PushEvent(UI::EVENT_MISC, t, ticks & 0xffff, 0);

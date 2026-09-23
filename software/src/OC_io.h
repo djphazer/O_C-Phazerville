@@ -97,15 +97,15 @@ struct IOFrame {
   void Reset();
 
   struct {
-    uint32_t rising_edges; // Rising edge detected since last frame
-    uint32_t raised_mask;   // Last read state
+    uint8_t rising_edges; // Rising edge detected since last frame
+    uint8_t raised_mask;   // Last read state
 
-    inline uint32_t triggered() const { return rising_edges; }
+    inline uint8_t triggered() const { return rising_edges; }
 
     template <DigitalInput input>
-    inline uint32_t triggered() const { return rising_edges & DIGITAL_INPUT_MASK(input); }
+    inline uint8_t triggered() const { return rising_edges & DIGITAL_INPUT_MASK(input); }
 
-    inline uint32_t triggered(DigitalInput input) const { return rising_edges & DIGITAL_INPUT_MASK(input); }
+    inline uint8_t triggered(DigitalInput input) const { return rising_edges & DIGITAL_INPUT_MASK(input); }
 
     template <DigitalInput input>
     inline bool raised() const { return raised_mask & DIGITAL_INPUT_MASK(input); }
@@ -115,8 +115,8 @@ struct IOFrame {
   } digital_inputs;
 
   struct {
-    std::array<int32_t, ADC_CHANNEL_COUNT> values;       // 10V = 2^12
-    std::array<int32_t, ADC_CHANNEL_COUNT> pitch_values; // 1V = 12 << 7 = 1536
+    std::array<int16_t, ADC_CHANNEL_COUNT> values;       // 10V = 2^12
+    std::array<int16_t, ADC_CHANNEL_COUNT> pitch_values; // 1V = 12 << 7 = 1536
 
     // Get CV value mapped for a given number of steps across the range
     // Round up/offset to move window and avoid "busy" toggling around 0
