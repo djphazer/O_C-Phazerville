@@ -18,7 +18,7 @@ Roll your own! Generate a [custom O_C firmware](https://github.com/djphazer/O_C-
 
 Teensy 4.0 releases for O_C hardware include almost all of the available Apps.
 
-Teensy 4.1 releases for ORN8 hardware currently exclude most legacy Apps to prioritize [**Quadrants**](Quadrants) and the new Audio DSP subsystem. All legacy Apps can still run, but you'll have to modify the build config flags and compile it yourself. (Check the README for tips)
+Teensy 4.1 releases for ORN8 hardware have a multi-boot system, with [**Quadrants**](Quadrants) and the new Audio DSP subsystem in the primary slots. All legacy Apps are still available in a secondary boot slot. Hold 'Z' on startup for the Boot Menu.
 
 ### VOR
 
