@@ -302,6 +302,7 @@ public:
 
   // state
   bool last_gate_state = false; // for detecting clocks
+  bool flipflop = false;
   uint32_t clkcount = 0;
 
   bool ChangeSourceType(int dir) {
@@ -360,6 +361,7 @@ public:
     if (hard) div_mult.steps = 1;
     div_mult.Reset();
     last_gate_state = false;
+    flipflop = false;
     clkcount = 0;
   }
   void Clear() {
@@ -414,6 +416,16 @@ public:
     }
 
     return tock;
+  }
+
+  /**
+   * Toggles between true/false for each rising edge.
+   * Since this calls Clock(), it consumes the edge,
+   * so call Clock() first if you need that trigger.
+   **/
+  bool FlipFlop() {
+    if (Clock()) flipflop = !flipflop;
+    return flipflop;
   }
 
   uint8_t const* Icon() const {
