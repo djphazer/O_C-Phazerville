@@ -18,7 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-/* original 8-step mod by Logarhythm, adapted by djphazer
+/*
+    original 8-step mod by Logarhythm, adapted by djphazer, h4x by beau-seidon
  */
 
 class SequenceX : public HemisphereApplet {
@@ -29,7 +30,7 @@ public:
     static constexpr int SEQX_MIN_VALUE = -30;
     static constexpr int SEQX_MAX_VALUE = 30;
 
-    const char* applet_name() { // Maximum 10 characters
+    const char* applet_name() {  // Maximum 10 characters
         return "Seq8";
     }
     const uint8_t* applet_icon() { return PhzIcons::sequenceX; }
@@ -44,14 +45,14 @@ public:
     }
 
     void Randomize(bool unipolar = false) {
-      const int minval = unipolar? 0 : -SEQX_MIN_VALUE;
-      for (int s = 0; s < SEQX_STEPS; s++) {
-        note[s] = random(SEQX_MAX_VALUE + minval) - minval;
-      }
+        const int minval = unipolar? 0 : -SEQX_MIN_VALUE;
+        for (int s = 0; s < SEQX_STEPS; s++) {
+            if (!note_cv[s].enabled()) note[s] = random(SEQX_MAX_VALUE + minval) - minval;
+        }
     }
 
     void Controller() {
-        if (abs(In(1)) > (24 << 7) ) // 24 semitones == 2V
+        if (abs(In(1)) > (24 << 7))  // 24 semitones == 2V
         {
             // new random sequence if CV2 goes high
             if (!cv2_gate) {
@@ -61,10 +62,10 @@ public:
         }
         else cv2_gate = 0;
 
-        if (Clock(1)) { // reset
+        if (Clock(1)) {  // reset
             Reset();
         }
-        if (Clock(0)) { // clock
+        if (Clock(0)) {  // clock
 
             if (!reset) Advance(step);
             reset = false;
@@ -72,38 +73,57 @@ public:
             if (step == 0) ClockOut(1);
         }
 
+        for (int s = 0; s < SEQX_STEPS; s++) {  // works for positive cv input, rework scaling for full input range?
+            if (note_cv[s].enabled())
+                note[s] = constrain(note_cv[s].InRescaled(2*SEQX_MAX_VALUE) + SEQX_MIN_VALUE, SEQX_MIN_VALUE, SEQX_MAX_VALUE);
+        }
+
         // continuously compute the note
-        int transpose = DetentedIn(0) / 128; // 128 ADC steps per semitone
+        int transpose = DetentedIn(0) / 128;  // 128 ADC steps per semitone
         int play_note = note[step] + (OC::DAC::kOctaveZero * 12) - (OC::DAC::kOctaveZero == 0)*SEQX_MIN_VALUE + transpose;
         play_note = constrain(play_note, 0, 127);
         // set CV output
         Out(0, MIDIQuantizer::CV(play_note));
-
     }
 
     void View() {
         DrawPanel();
     }
 
-    void OnButtonPress() {
-        if (cursor >= SEQX_STEPS && !EditMode()) // toggle mute
+    void OnButtonPress() override {
+        if (CheckEditInputMapPress(cursor,
+            IndexedInput(2*SEQX_STEPS+0, note_cv[0]),
+            IndexedInput(2*SEQX_STEPS+1, note_cv[1]),
+            IndexedInput(2*SEQX_STEPS+2, note_cv[2]),
+            IndexedInput(2*SEQX_STEPS+3, note_cv[3]),
+            IndexedInput(2*SEQX_STEPS+4, note_cv[4]),
+            IndexedInput(2*SEQX_STEPS+5, note_cv[5]),
+            IndexedInput(2*SEQX_STEPS+6, note_cv[6]),
+            IndexedInput(2*SEQX_STEPS+7, note_cv[7])
+        )) return;
+
+        if (cursor < 2*SEQX_STEPS && cursor >= SEQX_STEPS && !EditMode())  // toggle mute
             muted ^= (0x01 << (cursor - SEQX_STEPS));
         else
             CursorToggle();
     }
+
     void AuxButton() {
-      const int s = cursor % SEQX_STEPS;
-      muted ^= (0x01 << s);
-      CancelEdit();
+        const int s = cursor % SEQX_STEPS;
+        muted ^= (0x01 << s);
+        CancelEdit();
     }
 
     void OnEncoderMove(int direction) {
         if (!EditMode()) {
-            MoveCursor(cursor, direction, SEQX_STEPS*2-1);
+            MoveCursor(cursor, direction, 3*SEQX_STEPS-1);
             return;
         }
+        if (EditSelectedInputMap(direction)) return;
 
-        if (cursor >= SEQX_STEPS) // toggle mute
+        if (cursor >= 2*SEQX_STEPS) // cv input map
+            note_cv[cursor - 2*SEQX_STEPS].ChangeSource(direction);
+        else if (cursor >= SEQX_STEPS)  // toggle mute
             muted ^= (0x01 << (cursor - SEQX_STEPS));
         else {
             note[cursor] = constrain(note[cursor] + direction, SEQX_MIN_VALUE, SEQX_MAX_VALUE);
@@ -113,22 +133,36 @@ public:
 
     uint64_t OnDataRequest() {
         uint64_t data = 0;
-        const int b = 6; // bits per step
-        for (size_t s = 0; s < SEQX_STEPS; s++)
-        {
+        const int b = 6;  // bits per step
+        for (size_t s = 0; s < SEQX_STEPS; s++) {
             Pack(data, PackLocation {s * b, b}, note[s] - SEQX_MIN_VALUE);
         }
         Pack(data, PackLocation{SEQX_STEPS * b, SEQX_STEPS}, muted);
+
+        uint64_t d;
+        const size_t blobs = SEQX_STEPS / 4;
+        for (size_t i = 0; i < blobs; ++i) {
+            d = PackPackables(note_cv[0 + 4*i], note_cv[1 + 4*i], note_cv[2 + 4*i], note_cv[3 + 4*i]);
+            SetData(i, d);
+        }
+
         return data;
     }
 
     void OnDataReceive(uint64_t data) {
-        const int b = 6; // bits per step
-        for (size_t s = 0; s < SEQX_STEPS; s++)
-        {
+        const int b = 6;  // bits per step
+        for (size_t s = 0; s < SEQX_STEPS; s++) {
             note[s] = Unpack(data, PackLocation {s * b, b}) + SEQX_MIN_VALUE;
         }
         muted = Unpack(data, PackLocation {SEQX_STEPS * b, SEQX_STEPS});
+
+        uint64_t d;
+        const size_t blobs = SEQX_STEPS / 4;
+        for (size_t i = 0; i < blobs; ++i) {
+            if (!GetData(i, d)) break;
+            UnpackPackables(d, note_cv[0 + 4*i], note_cv[1 + 4*i], note_cv[2 + 4*i], note_cv[3 + 4*i]);
+        }
+
         Reset();
     }
 
@@ -141,16 +175,17 @@ protected:
         help[HELP_CV2]      = "Rndmize";
         help[HELP_OUT1]     = "CV";
         help[HELP_OUT2]     = "Step 1";
-        help[HELP_EXTRA1] = "";
-        help[HELP_EXTRA2] = "AuxButton: Mute step";
-       //                   "---------------------" <-- Extra text size guide
+        help[HELP_EXTRA1]   = "";
+        help[HELP_EXTRA2]   = "AuxButton: Mute step";
+       //                     "---------------------" <-- Extra text size guide
     }
 
 private:
     int cursor = 0;
-    uint8_t muted = 0xF0; // Bitfield for muted steps; ((muted >> step) & 1) means muted
-    int8_t note[SEQX_STEPS]; // Sequence value (-30 to 30)
-    int step = 0; // Current sequencer step
+    uint8_t muted = 0xF0;  // Bitfield for muted steps; ((muted >> step) & 1) means muted
+    int8_t note[SEQX_STEPS];  // Sequence value (-30 to 30)
+    CVInputMap note_cv[SEQX_STEPS];  // Internal mapping overrides encoder-set value
+    int step = 0;  // Current sequencer step
     bool reset = true;
     bool cv2_gate = false;
 
@@ -168,12 +203,11 @@ private:
         gfxDottedLine(0, zero_pos, 63, zero_pos, 3);
 
         // Sliders
-        for (int s = 0; s < SEQX_STEPS; s++)
-        {
+        for (int s = 0; s < SEQX_STEPS; s++) {
             const int x = 3 + (8 * s);
 
             if (!step_is_muted(s)) {
-                gfxLine(x, y, x, 60, (s != cursor) ); // dotted line for unselected steps
+                gfxLine(x, y, x, 60, (s != cursor) );  // dotted line for unselected steps
 
                 // scaled pixel position on slider
                 const int pos = (note[s] + 30) * (h-2) / 60;
@@ -194,8 +228,15 @@ private:
                     gfxLine(x, y, x, 60);
             }
 
+            if (s == cursor - 2*SEQX_STEPS) {
+                gfxStartCursor(x - 5, y - 8);
+                gfxPrint(note_cv[s]);
+                gfxEndCursor(cursor == s, false, note_cv[s].InputName());
+            }
+
             if (s == cursor - SEQX_STEPS)
-              gfxIcon(x - 3, y - 8, step_is_muted(s) ? CHECK_OFF_ICON : CHECK_ON_ICON);
+                gfxIcon(x - 3, y - 8, step_is_muted(s) ? CHECK_OFF_ICON : CHECK_ON_ICON);
+
             if (s == cursor && EditMode()) {
                 gfxInvert(x - 2, y, 5, h + 1);
                 int8_t noteval = note[s] + 30*(OC::DAC::kOctaveZero == 0);
@@ -206,6 +247,8 @@ private:
                 gfxPrint(x_, y - 8, noteval);
             }
         }
+
+        gfxDisplayInputMapEditor();
     }
 
     bool step_is_muted(int step) {
