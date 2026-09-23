@@ -3,25 +3,30 @@ title: Saving State
 nav_order: 5
 ---
 
-# Saving State
+# State Data Storage
 
-Your App / applet state will not be remembered between power cycles unless you:
+There are generally three types of data stored in the module:
+1. Calibration Data
+2. Global Settings
+3. [Presets](Hemisphere-Presets)
 
-* (A) Manually save to EEPROM _(Long-press RIGHT encoder to escape to main menu, long-press RIGHT again to save)_
-* (B) Store the current state of Hemisphere to a [preset](Hemisphere-Presets)
-* (C) Turn on [Auto Save](Hemisphere-Presets#auto-save)
+Calibration Data is kept in a reserved part of EEPROM where it's rarely modified.
 
-To Save/Load presets or toggle Auto Saving in Hemisphere, long-press the DOWN button to open the config menu, and (if necessary) rotate the LEFT encoder to paginate to the floating preset menu.
+Global Settings include things like the default App to run on startup, custom user scales, and custom vector waveforms. It also includes app data for all legacy Apps that don't otherwise use Preset files.
 
-When storing a Preset, it immediately triggers an EEPROM Save (with a potential 2ms interruption, fyi) so there is no need to also long-press-save on the main menu.
+Presets include all Applet settings in Hemisphere/Quadrants, I/O mappings, Q-engines, etc. - everything you really care about.
 
-## EEPROM Save
+On newer Teensy 4.x modules, Global Settings and Presets are stored in portable binary files, either in a partition of flash called LittleFS, or on a microSD card.
 
-All of the Apps included in your firmware build have Config Settings that can change at runtime. You can make them persist after a power cycle with the built-in Ornament and Crime storage system:
-* Return to the main menu by long-pressing the right encoder.
-* Then, long-press the right encoder again.
+For older Teensy 3.2 modules, all of it is crammed into the 2KB EEPROM space in flash.
 
-This will save the state of all applications in the module, as well as the active App and various Global Settings (user scales, waveforms, sequence patterns, turing machines, etc).
+## How To Save
+
+To manually save Global Settings to EEPROM: _Long-press RIGHT encoder to escape to main menu, long-press RIGHT again to save_
+
+This does not necessarily store the current [Preset](Hemisphere-Presets), unless you've enabled [Auto-Save](Hemisphere-Presets#auto-save).
+
+To Save/Load presets or toggle Auto-Saving in Hemisphere/Quadrants, long-press the DOWN (or B) button to open the config menu. If necessary, scroll all the way to the LEFT to the floating preset menu. In Quadrants, the A + X key combo is a great shortcut for Load, with Save accessible by rotating L-Enc in the menu.
 
 ## Teensy 4.0 & 4.1
 
