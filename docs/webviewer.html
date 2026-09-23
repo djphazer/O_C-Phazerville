@@ -1,87 +1,141 @@
 <!DOCTYPE html>
 <!--
   Phazerville Quad Viewer  —  zero-install WebSerial display
-  ==========================================================
-  External monitor for a CalSynth XLOC2 / ORN8 / Teensy 4.1 running Phazerville
-  Suite with the quad_capture firmware patch.
+  ===========================================================
+  The screen is a 2x2 grid and EACH quadrant selects what it shows:
 
-  Left column : Quadrants 4-up (all four CV applets)          command 'Q' (2048B)
-  Right column: audio DSP stack                               command 'A' (1024B)
-                + two real-time L/R audio input-level graphs  command 'V' ("l,r")
-                + MIDI monitor, in & out                      command 'N' ("N:...")
-  Bottom row  : two independent oscilloscopes, each with      command 'O'+slot+
-                source (CV out 1-8 / audio out L/R), vertical  src+win (512B)
-                scale, time base, and freeze
+    Quadrants 4-up ('Q'+'T')  ·  Live screen ('S', works in any app/config
+    page)  ·  Audio stack + in/out meters ('A'+'V')  ·  MIDI maps ('M')
+    Scope A / Scope B ('O')   ·  MIDI monitor ('N')   ·  Off
 
-  Capture is USB *Serial* (CDC), not HID. Needs Chrome / Edge / Arc. Open this
-  file, click Connect, pick the module's serial port.
+  The CLASSIC toolbar toggle swaps the whole page for a single big live
+  mirror of the module's OLED — the original screen-capture-app experience.
+
+  Everything scrolls as one document (sticky toolbar), so controls never
+  pop in and out while scrolling. Layout persists in localStorage.
+
+  Needs Chrome / Edge / Arc. Open this file, click Connect, pick the module's
+  serial port. Wire protocol: PROTOCOL.md in calsynth/phzdev.
 -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <title>Phazerville Quad Viewer</title>
 <style>
-  html,body { margin:0; height:100%; background:#000; color:#ccc;
+  html,body { margin:0; min-height:100%; background:#000; color:#ccc;
               font-family: ui-monospace, Menlo, Consolas, monospace; }
-  #bar { display:flex; gap:8px; align-items:center; padding:8px 12px;
-         background:#0c0c0e; border-bottom:1px solid #222; flex-wrap:wrap; }
+  #bar { position:sticky; top:0; z-index:5; display:flex; gap:8px; align-items:center;
+         padding:8px 12px; background:#0c0c0e; border-bottom:1px solid #222; flex-wrap:wrap; }
   button { background:#1b1b20; color:#ddd; border:1px solid #333; border-radius:6px;
            padding:6px 12px; cursor:pointer; font:inherit; }
   button:hover { background:#26262d; }
   button:disabled { opacity:.4; cursor:default; }
   button.on { background:#2b3b2b; border-color:#4a7a4a; color:#dfe; }
-  #status { color:#888; margin-left:auto; font-size:13px; }
+  select { background:#141418; color:#ddd; border:1px solid #333; border-radius:6px;
+           padding:5px; font:inherit; font-size:12px; }
+  #status { color:#fff; margin-left:auto; font-size:16px; font-weight:600; }
   #tag { padding:2px 8px; border:1px solid #444; border-radius:10px; font-size:12px; color:#aaa; }
+  #mode { font-size:12px; color:#9c9; border:1px solid #2a3a2a; border-radius:10px; padding:2px 8px; }
+  #mode.audio { color:#fe6; border-color:#5a4a1a; }
+  #preset { color:#bbb; }
+  #preset.dirty { color:#fe6; }
   .sep { width:1px; align-self:stretch; background:#282830; margin:0 2px; }
-  #panels { display:flex; flex-direction:column; align-items:center;
-            gap:20px; padding:16px; height:calc(100% - 49px); box-sizing:border-box; overflow:auto; }
-  #toprow, #scoperow { display:flex; flex-direction:row; align-items:stretch;
-                       justify-content:center; gap:20px; }
-  /* right column stretches to the quad column's height; the MIDI monitor
-     absorbs the remainder so both columns share the same bottom edge */
-  #col-right { justify-content:flex-start; }
-  #panel-midi { flex:1; min-height:0; align-self:stretch; }
-  /* flex-basis 0 + min-height 0: the log NEVER drives the column height —
-     it fills leftover space and scrolls internally */
-  #panel-midi { flex:1 1 0; min-height:0; overflow:hidden; }
-  #midilog { flex:1 1 0; min-height:48px; background:#000; overflow-y:auto; box-sizing:border-box;
-             padding:3px 7px; font-size:11.5px; line-height:15px; color:#aaa; }
-  #midilog .mrow { white-space:pre; }
-  #midilog .min  { color:#7ed07e; }
-  #midilog .mout { color:#e8b34a; }
-  #panel-midi { display:flex; flex-direction:column; gap:4px; }
-  .col { display:flex; flex-direction:column; align-items:center; gap:10px; }
-  .panel { display:flex; flex-direction:column; align-items:center; gap:4px; }
-  .plabel { font-size:12px; color:#777; letter-spacing:.05em; text-transform:uppercase; }
-  canvas { image-rendering: pixelated; display:block; }
-  #panel-quad canvas { cursor: pointer; }
-  :fullscreen #bar { display:none; }
-  :fullscreen #panels { height:100%; }
+
+  [hidden] { display:none !important; }   /* hidden must beat display:flex/grid */
+  #classic { display:flex; flex-direction:column; align-items:center; gap:10px; padding:20px; }
+  #grid { display:grid; grid-template-columns:repeat(2, max-content); gap:18px;
+          justify-content:center; padding:16px; }
+  .cell { display:flex; flex-direction:column; gap:6px; background:#0a0a0c;
+          border:1px solid #1d1d24; border-radius:10px; padding:10px; }
+  .chead { display:flex; gap:8px; align-items:center; }
+  .cmax { margin-left:auto; padding:4px 9px; font-size:13px; }
+  .cmax.on { background:#2b3b2b; border-color:#4a7a4a; color:#dfe; }
+  .cname { font-size:11px; color:#666; letter-spacing:.08em; width:24px; }
+  .cbody { display:flex; flex-direction:column; gap:6px; align-items:center;
+           justify-content:flex-start; }
+  canvas { image-rendering:pixelated; display:block; }
+  .quadcv { cursor:pointer; }
+
+  .qrow, .srow { display:flex; gap:5px; align-items:center; justify-content:center; }
+  .srow { flex-wrap:nowrap; }
+  .cbtn { min-width:36px; height:34px; font-size:14px; padding:4px 8px; }
+  .slbl { font-size:10px; color:#777; letter-spacing:.06em; text-transform:uppercase;
+          width:34px; text-align:right; }
+  .s-src { width:112px; } .s-vs { width:86px; } .s-win { width:76px; }
+  .s-odn,.s-oup { width:40px; padding:6px 0; } .s-oz { width:44px; padding:6px 0; }
+  .s-freeze { width:70px; padding:6px 0; margin-left:12px; }
+  .s-freeze.on, .m-pause.on { background:#3b2b2b; border-color:#7a4a4a; color:#fdd; }
+
+  .midilog { background:#000; overflow-y:auto; box-sizing:border-box; width:100%;
+             padding:3px 7px; font-size:12px; line-height:16px; color:#aaa; }
+  .midilog .mrow { white-space:pre; }
+  .midilog .min  { color:#7ed07e; }
+  .midilog .mout { color:#e8b34a; }
+  .mctl { display:flex; gap:6px; align-items:center; justify-content:center; flex-wrap:wrap; }
+  .mctl button { padding:5px 10px; font-size:12px; }
+  .m-chan { width:70px; }
+
   #control { display:flex; flex-wrap:wrap; gap:18px; align-items:center; justify-content:center;
              padding:12px; background:#0c0c0e; border-top:1px solid #222; }
   .cgroup { display:flex; align-items:center; gap:6px; padding:6px 10px;
             background:#141418; border:1px solid #262630; border-radius:10px; }
   .clbl { font-size:11px; color:#888; letter-spacing:.05em; margin-right:2px; }
-  .cbtn { min-width:38px; height:38px; font-size:15px; }
   .jog { width:150px; accent-color:#4a7a4a; }
-  #quadctl { display:flex; flex-direction:column; gap:5px; justify-content:center; margin-top:8px; box-sizing:border-box; }
-  #mode { font-size:12px; color:#9c9; border:1px solid #2a3a2a; border-radius:10px; padding:2px 8px; }
-  #mode.audio { color:#fe6; border-color:#5a4a1a; }
-  #preset { font-size:inherit; color:#bbb; }
-  #preset.dirty { color:#fe6; }
-  #saveslot { width:52px; background:#141418; color:#ddd; border:1px solid #333; border-radius:6px; padding:5px; font:inherit; }
-  #panel-audio.audio-active { outline:3px solid rgba(255,225,80,.95); outline-offset:3px; border-radius:4px; }
-  .sctl { display:flex; flex-direction:column; gap:5px; align-items:center; margin-top:2px; }
-  /* fixed geometry: no wrapping, fixed control widths — the layout must not
-     shift when a selected value's text length changes */
-  .srow { display:flex; flex-wrap:nowrap; gap:6px; align-items:center; justify-content:center; }
-  .qrow { display:flex; flex-wrap:wrap; gap:5px; align-items:center; justify-content:center; }
-  .sctl select { background:#141418; color:#ddd; border:1px solid #333; border-radius:6px; padding:5px 2px; font:inherit; font-size:12px; }
-  .s-src { width:112px; } .s-vs { width:86px; } .s-win { width:76px; }
-  .s-odn, .s-oup { width:40px; padding:6px 0; } .s-oz { width:44px; padding:6px 0; }
-  .s-freeze { width:70px; padding:6px 0; margin-left:14px; }
-  .slbl { font-size:10px; color:#777; letter-spacing:.06em; text-transform:uppercase; width:34px; text-align:right; }
-  .s-freeze.on { background:#3b2b2b; border-color:#7a4a4a; color:#fdd; }
+  .hint { font-size:11px; color:#555; }
+  #keys { position:fixed; inset:0; z-index:20; background:rgba(0,0,0,.75);
+          display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  #keyscard { background:#101014; border:1px solid #2a2a34; border-radius:12px;
+              padding:18px 26px; max-width:520px; }
+  #keyscard h3 { margin:0 0 10px; font-size:14px; color:#dfe; letter-spacing:.05em; }
+  #keyscard table { border-collapse:collapse; font-size:13px; }
+  #keyscard td { padding:3px 8px; vertical-align:top; }
+  #keyscard td:first-child { color:#8fd08f; white-space:nowrap; text-align:right; }
+  #keyscard th { padding:10px 8px 3px; text-align:left; color:#e8b34a; font-size:12px;
+                 letter-spacing:.06em; font-weight:normal; }
+  .kdim { color:#666; font-size:11px; margin-top:8px; text-align:center; }
+  /* fullscreen = recording mode: canvases only, no chrome at all */
+  body.fs #bar, body.fs .chead, body.fs .qrow, body.fs .srow, body.fs .mctl, body.fs .hint { display:none; }
+  body.fs .cell { border:none; background:transparent; padding:4px; }
+  body.fs #grid { gap:8px; }
+
+  /* ---- Slots panel (loadable-slots loader) ---- */
+  #slotspanel { position:fixed; inset:48px 0 0 0; z-index:8; overflow-y:auto;
+                background:rgba(0,0,0,.92); backdrop-filter:blur(2px); }
+  #slotspanel .inner { max-width:760px; margin:0 auto; padding:18px;
+                       display:flex; flex-direction:column; gap:12px; }
+  #slotspanel .bank { background:#0a0a0c; border:1px solid #1d1d24; border-radius:10px; padding:12px; }
+  #slotspanel .bhead { display:flex; gap:10px; align-items:baseline; margin-bottom:8px; }
+  #slotspanel .bname { color:#9c9; font-size:13px; letter-spacing:.06em; }
+  #slotspanel .binfo { color:#666; font-size:11px; }
+  #slotspanel table { border-collapse:collapse; width:100%; font-size:13px; }
+  #slotspanel th { text-align:left; color:#666; font-size:11px; letter-spacing:.06em;
+                   text-transform:uppercase; padding:4px 8px; border-bottom:1px solid #1d1d24; }
+  #slotspanel td { padding:5px 8px; border-bottom:1px solid #141418; }
+  #slotspanel tr:last-child td { border-bottom:none; }
+  #slotspanel .st { padding:1px 7px; border-radius:9px; font-size:11px; border:1px solid #333; }
+  #slotspanel .st.ok  { color:#9e9; border-color:#3a5a3a; }
+  #slotspanel .st.bad { color:#e99; border-color:#5a3a3a; }
+  #slotspanel .num { color:#888; }
+  #slotspanel .erasebtn { padding:3px 9px; font-size:12px;
+                          background:#3b2b2b; border-color:#7a4a4a; color:#fdd; }
+  #slotsdrop { border:2px dashed #2a2a33; border-radius:10px; padding:22px; text-align:center;
+               color:#777; font-size:14px; }
+  #slotsdrop.armed { border-color:#4a7a4a; color:#9e9; }
+  #slotsdrop input { display:none; }
+  #slotsconfirm { background:#0e1410; border:1px solid #2a3a2a; border-radius:10px; padding:12px;
+                  display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+  #slotsconfirm.mismatch { background:#141010; border-color:#3a2a2a; }
+  #slotsconfirm .meta { display:flex; flex-direction:column; gap:2px; font-size:13px; }
+  #slotsconfirm .meta .warn { color:#e99; }
+  #slotsconfirm .meta .dim { color:#777; font-size:12px; }
+  #slotsprogress { height:8px; background:#141418; border-radius:5px; overflow:hidden; }
+  #slotsprogress div { height:100%; width:0%; background:#4a7a4a; transition:width .1s; }
+  #slotsmsg { color:#8a8; font-size:12px; min-height:16px; white-space:pre-wrap; }
+  #slotsmsg.err { color:#e88; }
+  /* version tag — bottom-right, out of the way, hidden in recording mode */
+  #ver { text-align:center; color:#555; font-size:11px; padding:22px 0 14px;
+         user-select:none; }
+  body.fs #ver { display:none; }
 </style>
 </head>
 <body>
@@ -89,89 +143,21 @@
     <button id="connect">Connect</button>
     <button id="disconnect" disabled>Disconnect</button>
     <span id="tag">–</span>
-    <span class="sep"></span>
-    <button id="t-quad"   class="on" disabled>Quadrants</button>
-    <button id="t-audio"  class="on" disabled>Audio</button>
-    <button id="t-graphs" class="on" disabled>Graphs</button>
-    <button id="t-midi" class="on" disabled>MIDI</button>
-    <button id="t-scope" class="on" disabled>Scope</button>
-    <button id="t-control" disabled>Control</button>
-    <span id="mode" title="Space toggles Quadrants / Audio">MODE: QUADRANTS</span>
+    <span id="mode" title="click to switch the module between Quadrants and Audio Setup" style="cursor:pointer">MODE: QUADRANTS</span>
     <span class="sep"></span>
     <span id="preset" title="current preset (● = unsaved remote changes)">Preset: –</span>
     <select id="saveslot" title="slot to save into"></select>
     <button id="savebtn" disabled>Save</button>
-    <button id="backupbtn" disabled>Backup</button>
+    <button id="backupbtn" disabled hidden>Backup</button><!-- hidden: firmware bank backup reads LFS but saves go to SD; re-show after Quadrants.h StreamBankBackup fix -->
+    <button id="slotsbtn" disabled title="load/erase apps in the module's flash slots">Slots</button>
     <span class="sep"></span>
+    <button id="t-classic" title="single big live mirror of the module screen">Classic</button>
+    <button id="t-control" disabled>Control</button>
     <button id="color">Color</button>
     <button id="save" disabled>Save PNG</button>
     <button id="full">Fullscreen</button>
+    <button id="t-keys" title="keyboard shortcuts">Keys</button>
     <span id="status">Web Serial: click Connect and pick the module's serial port.</span>
-  </div>
-
-  <div id="panels">
-   <div id="toprow">
-    <div class="col" id="col-left">
-      <div class="panel" id="panel-quad"><div class="plabel">Quadrants — 4-up</div><canvas></canvas></div>
-      <div id="quadctl">
-        <div class="qrow">
-          <button class="cbtn" data-q="cursorPrev" title="cursor up (W / ↑)">▲</button>
-          <button class="cbtn" data-q="cursorNext" title="cursor down (S / ↓)">▼</button>
-          <button class="cbtn" data-q="edit" title="select param (X)">edit</button>
-          <button class="cbtn" data-q="valDn" title="value − (C)">val −</button>
-          <button class="cbtn" data-q="valUp" title="value + (Z)">val +</button>
-        </div>
-        <div class="qrow">
-          <button class="cbtn" data-q="prevApp" title="previous applet (Q)">◀ app</button>
-          <button class="cbtn" data-q="nextApp" title="next applet (E)">app ▶</button>
-          <button class="cbtn" data-q="prevPre" title="previous preset (O)">◀ preset</button>
-          <button class="cbtn" data-q="nextPre" title="next preset (P)">preset ▶</button>
-        </div>
-      </div>
-    </div>
-    <div class="col" id="col-right">
-      <div class="panel" id="panel-audio"><div class="plabel">Audio stack</div><canvas></canvas></div>
-      <div class="panel" id="graph-l"><canvas></canvas></div>
-      <div class="panel" id="graph-r"><canvas></canvas></div>
-      <div class="panel" id="panel-midi"><div class="plabel">MIDI monitor</div><div id="midilog"></div></div>
-    </div>
-   </div>
-   <div id="scoperow">
-      <div class="panel scopepanel" id="scope-0">
-        <canvas></canvas>
-        <div class="sctl">
-          <div class="srow">
-            <span class="slbl">src</span><select class="s-src" title="scope A source"></select>
-            <span class="slbl">scale</span><select class="s-vs" title="vertical scale"></select>
-            <span class="slbl">time</span><select class="s-win" title="time base (window length)"></select>
-          </div>
-          <div class="srow">
-            <span class="slbl">ofs</span>
-            <button class="s-odn" title="move trace down">▼</button>
-            <button class="s-oup" title="move trace up">▲</button>
-            <button class="s-oz" title="reset offset to 0">rst</button>
-            <button class="s-freeze" title="freeze / resume the trace">Freeze</button>
-          </div>
-        </div>
-      </div>
-      <div class="panel scopepanel" id="scope-1">
-        <canvas></canvas>
-        <div class="sctl">
-          <div class="srow">
-            <span class="slbl">src</span><select class="s-src" title="scope B source"></select>
-            <span class="slbl">scale</span><select class="s-vs" title="vertical scale"></select>
-            <span class="slbl">time</span><select class="s-win" title="time base (window length)"></select>
-          </div>
-          <div class="srow">
-            <span class="slbl">ofs</span>
-            <button class="s-odn" title="move trace down">▼</button>
-            <button class="s-oup" title="move trace up">▲</button>
-            <button class="s-oz" title="reset offset to 0">rst</button>
-            <button class="s-freeze" title="freeze / resume the trace">Freeze</button>
-          </div>
-        </div>
-      </div>
-   </div>
   </div>
 
   <div id="control" hidden>
@@ -199,7 +185,70 @@
     </div>
   </div>
 
+  <div id="classic" hidden>
+    <canvas></canvas>
+    <div class="hint">live OLED — follows every screen, any app · Classic again to return to the grid</div>
+  </div>
+
+  <div id="grid">
+    <div class="cell" data-cell="0"><div class="chead"><span class="cname">NW</span><select class="ctype"></select><button class="cmax" title="fill the screen with this panel">⛶</button></div><div class="cbody"></div></div>
+    <div class="cell" data-cell="1"><div class="chead"><span class="cname">NE</span><select class="ctype"></select><button class="cmax" title="fill the screen with this panel">⛶</button></div><div class="cbody"></div></div>
+    <div class="cell" data-cell="2"><div class="chead"><span class="cname">SW</span><select class="ctype"></select><button class="cmax" title="fill the screen with this panel">⛶</button></div><div class="cbody"></div></div>
+    <div class="cell" data-cell="3"><div class="chead"><span class="cname">SE</span><select class="ctype"></select><button class="cmax" title="fill the screen with this panel">⛶</button></div><div class="cbody"></div></div>
+  </div>
+
+
+<div id="keys" hidden>
+  <div id="keyscard">
+    <h3>Keyboard shortcuts</h3>
+    <table>
+      <tr><td>f</td><td>fullscreen on / off (recording mode)</td></tr>
+      <tr><td>Space</td><td>grid ⇄ classic live view</td></tr>
+      <tr><td>Esc</td><td>leave fullscreen / close this panel</td></tr>
+      <tr><th colspan="2">Quadrants mode</th></tr>
+      <tr><td>↑↓←→ / WASD</td><td>focus a quadrant</td></tr>
+      <tr><td>X</td><td>edit — select parameter</td></tr>
+      <tr><td>Z / C</td><td>value + / value −</td></tr>
+      <tr><td>Q / E</td><td>previous / next applet</td></tr>
+      <tr><td>O / P</td><td>previous / next preset</td></tr>
+      <tr><th colspan="2">Audio mode <span class="kdim">(click MODE in the toolbar)</span></th></tr>
+      <tr><td>↑↓ / W S</td><td>move cursor</td></tr>
+      <tr><td>Shift / Enter</td><td>select slot · advance / back</td></tr>
+      <tr><td>X · Z / C · A / D</td><td>select · value + / −</td></tr>
+    </table>
+    <div class="kdim">click anywhere to close</div>
+  </div>
+</div>
+
+<div id="slotspanel" hidden>
+  <div class="inner">
+    <div style="display:flex; gap:8px; align-items:center;">
+      <span style="color:#9c9;">FLASH SLOTS</span>
+      <span id="slotstag" style="color:#666; font-size:12px;"></span>
+      <span style="margin-left:auto;"></span>
+      <button id="slotsrefresh">Refresh</button>
+      <button id="slotsreboot">Reboot unit</button>
+      <button id="slotsclose">Close</button>
+    </div>
+    <label id="slotsdrop">
+      Drop a <b>.pzslot</b> file here, or click to choose one.
+      <input type="file" id="slotsfile" accept=".pzslot">
+    </label>
+    <div id="slotsconfirm" hidden>
+      <div class="meta" id="slotsmeta"></div>
+      <button id="slotsload" class="on">Load</button>
+      <button id="slotscancel">Cancel</button>
+    </div>
+    <div id="slotsprogress" hidden><div></div></div>
+    <div id="slotsmsg"></div>
+    <div id="slotsbanks"></div>
+  </div>
+</div>
+
+<div id="ver">Quad Viewer v2026-09-01b (dev)</div>
+
 <script>
+"use strict";
 const OLED_W = 128;
 const BG = [8, 8, 10];
 const PHOSPHORS = [
@@ -209,112 +258,341 @@ const PHOSPHORS = [
   { name:"blue",  rgb:[90,180,255] },
 ];
 
-// framebuffer panels
-const PANELS = {
-  quad:  { cmd:"Q", on:true, el:"panel-quad",  btn:"t-quad",  native:null, grid:true  },
-  audio: { cmd:"A", on:true, el:"panel-audio", btn:"t-audio", native:null, grid:false },
+// ---- cell types ---------------------------------------------------------------
+const TYPES = {
+  off:    "Off",
+  quad:   "Quadrants 4-up",
+  live:   "Live screen",
+  audio:  "Audio + levels",
+  maps:   "MIDI maps",
+  scopeA: "Scope A",
+  scopeB: "Scope B",
+  midi:   "MIDI monitor",
 };
-const GRAPHS = { on:true, btn:"t-graphs" };
-// Oscilloscopes: two independent slots (A/B). src "1".."8" = CV outs A..H
-// (mV), "L"/"R" = audio outs (PCM), "" = off. win 0..3 = firmware time base
-// (decimation x1/2/4/8). vs = vertical-scale index. misses: consecutive
-// no-replies; at 3 we stop polling that slot (old firmware treats our bytes
-// as stock-capture requests, which freezes the module's display).
-const SCOPE = { on:true };
+let CELLS = ["quad", "audio", "scopeA", "scopeB"];   // NW NE SW SE defaults (Scope B = audio out L)
+let VIEW = "grid";                                 // "grid" | "classic"
+let MAXED = -1;                                    // cell index filling the screen, or -1
+
+// ---- shared state ---------------------------------------------------------------
+let colorIdx = 0;
+let activeSlots = { left:0, right:1, full:-1 };
+let focusedSlot = 0;
+let mode = "quad", audioLevel = 0;
+let presetId = -1, presetDirty = false;
+let ioBusy = false;
+let levels = [0,0,0,0], peaks = [0,0,0,0], levelsSeen = false;   // inL inR outL outR
+const natives = { quad:null, live:null, audio:null, maps:null }; // last decoded frames
+
 const SCOPES = [
-  { src:"1", vs:0, win:0, off:0, frozen:false, data:null, misses:0 },
+  { src:"i", vs:0, win:0, off:0, frozen:false, data:null, misses:0 },   // default: audio in L
   { src:"L", vs:0, win:0, off:0, frozen:false, data:null, misses:0 },
 ];
-const SCOPE_CV_RATE = 16666.6/16, SCOPE_AUDIO_RATE = 44100/2;   // win-0 rates, per PROTOCOL.md
-// MIDI monitor ('N'): lastSeq = highest event seq rendered (16-bit, wrap-aware)
-const MIDI = { on:true, lastSeq:null, misses:0 };
-// vertical-scale tables: [label, vMin, vMax]
-const CV_VS = [["±10 V",-10,10],["-3…+6 V",-3,6],["±3 V",-3,3],["±1 V",-1,1],["±0.5 V",-0.5,0.5]];
-const AU_VS = [["±1.0",-1,1],["±0.5",-0.5,0.5],["±0.25",-0.25,0.25],["±0.1",-0.1,0.1]];
+const SCOPE_CV_RATE = 16666.6/16, SCOPE_AUDIO_RATE = 44100/2;
+const CV_VS = [["±10 V",-10,10],["±5 V",-5,5],["±3 V",-3,3],["±1 V",-1,1],["±0.5 V",-0.5,0.5]];
+const AU_VS = [["0 dBFS",-1,1],["-6 dBFS",-0.5,0.5],["-12 dBFS",-0.25,0.25],["-20 dBFS",-0.1,0.1]];
 const isAudioSrc = src => src === "L" || src === "R" || src === "i" || src === "j";
 
-let curL = 0, curR = 0, peakL = 0, peakR = 0, levelsSeen = false;
-let activeSlots = { left: 0, right: 1, full: -1 };   // which quadrants are being driven
-let focusedSlot = 0;                                 // quadrant targeted for control/params
-let mode = "quad";                                   // "quad" or "audio"
-let audioLevel = 0;                                  // 0 stack, 1 slot-selected, 2 in-applet
-let presetId = -1, presetDirty = false;              // current preset + unsaved-remote-changes flag
-let ioBusy = false;                                  // pause frame polling during backup
-const SLOT_NAMES = ["NW","NE","SW","SE"];
-const clamp01 = v => Math.min(1, Math.max(0, v||0));
+// MIDI monitor: full event history + filters
+const MIDI = { lastSeq:null, misses:0, paused:false, showIn:true, showOut:true,
+               chan:0 /* 0 = all */, events:[] };
 
 let port=null, reader=null, writer=null, running=false;
-let colorIdx=0, lastFrameFetch=0;
-
 const $ = id => document.getElementById(id);
 const enc = new TextEncoder();
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
 const setStatus = t => $("status").textContent = t;
 const setTag = t => $("tag").textContent = t;
+const clamp01 = v => Math.min(1, Math.max(0, v||0));
+const cellEls = [...document.querySelectorAll("#grid .cell")];
+const cellVisible = i => MAXED < 0 || MAXED === i;
+const cellsOf = t => cellEls.filter((el,i)=>CELLS[i]===t && cellVisible(i));
+const hasType = t => CELLS.some((c,i)=>c===t && cellVisible(i));
 
-// --- persisted prefs (local file, not a sandboxed artifact -> storage is fine)
+// ---- prefs ---------------------------------------------------------------------
 try {
-  const s = JSON.parse(localStorage.getItem("phaz_prefs2")||"{}");
+  const s = JSON.parse(localStorage.getItem("phaz_grid4")||"{}");
   if (typeof s.colorIdx==="number") colorIdx = s.colorIdx;
-  if (typeof s.quad==="boolean")   PANELS.quad.on = s.quad;
-  if (typeof s.audio==="boolean")  PANELS.audio.on = s.audio;
-  if (typeof s.graphs==="boolean") GRAPHS.on = s.graphs;
-  if (typeof s.scope==="boolean")  SCOPE.on = s.scope;
-  if (typeof s.midi==="boolean")   MIDI.on = s.midi;
+  if (Array.isArray(s.cells)) s.cells.forEach((t,i)=>{ if (TYPES[t] && i<4) CELLS[i]=t; });
   if (Array.isArray(s.scopes)) s.scopes.forEach((p,i)=>{
     if (!SCOPES[i] || !p) return;
     if (typeof p.src==="string") SCOPES[i].src = p.src;
-    if (typeof p.vs==="number")  SCOPES[i].vs  = Math.min(4, Math.max(0, p.vs));
+    // CV scale list has changed shape twice; migrate saved indices forward.
+    //   vsv 2: "±5 V" inserted at index 1  -> pre-vsv indices >= 1 shift up by one
+    //   vsv 3: legacy "-3…+6 V" removed from index 2 (stock O_C range; XLOC2 is ±10 V)
+    //          -> vsv-2 index 2 lands on ±5 V, indices > 2 shift down by one
+    if (typeof p.vs==="number"){
+      let vs = p.vs;
+      if (s.vsv !== 2 && s.vsv !== 3 && vs >= 1) vs += 1;   // -> vsv 2 numbering
+      if (s.vsv !== 3) vs = vs === 2 ? 1 : (vs > 2 ? vs - 1 : vs);
+      SCOPES[i].vs = Math.min(CV_VS.length-1, Math.max(0, vs));
+    }
     if (typeof p.win==="number") SCOPES[i].win = Math.min(3, Math.max(0, p.win));
     if (typeof p.off==="number") SCOPES[i].off = Math.min(20, Math.max(-20, p.off));
   });
 } catch(e){}
 function savePrefs(){
-  try { localStorage.setItem("phaz_prefs2", JSON.stringify(
-    { colorIdx, quad:PANELS.quad.on, audio:PANELS.audio.on, graphs:GRAPHS.on,
-      scope:SCOPE.on, midi:MIDI.on,
-      scopes:SCOPES.map(sc=>({src:sc.src, vs:sc.vs, win:sc.win, off:sc.off})) })); } catch(e){}
+  try { localStorage.setItem("phaz_grid4", JSON.stringify({ colorIdx, cells:CELLS, vsv:3,
+    scopes:SCOPES.map(sc=>({src:sc.src, vs:sc.vs, win:sc.win, off:sc.off})) })); } catch(e){}
 }
 
-function syncUI(){
-  $("t-quad").classList.toggle("on", PANELS.quad.on);
-  $("t-audio").classList.toggle("on", PANELS.audio.on);
-  $("t-graphs").classList.toggle("on", GRAPHS.on);
-  $("t-scope").classList.toggle("on", SCOPE.on);
-  $("t-midi").classList.toggle("on", MIDI.on);
-  $("panel-quad").hidden  = !PANELS.quad.on;
-  $("panel-audio").hidden = !PANELS.audio.on;
-  $("graph-l").hidden = !GRAPHS.on;
-  $("graph-r").hidden = !GRAPHS.on;
-  $("panel-midi").hidden = !MIDI.on;
-  $("scoperow").hidden = !SCOPE.on;
-  $("col-left").hidden  = !PANELS.quad.on;
-  $("col-right").hidden = !(PANELS.audio.on || GRAPHS.on || MIDI.on);
+// ---- scale ----------------------------------------------------------------------
+function scaleFor(){
+  if (MAXED >= 0) {
+    // one panel fills the screen
+    return Math.max(1, Math.min(10, Math.floor(Math.min(
+      (window.innerWidth - 120) / 165, (window.innerHeight - 240) / 165))));
+  }
+  if (document.fullscreenElement) {
+    // recording mode: per-panel chrome is hidden, so nearly the whole
+    // viewport is canvas — just toolbar + slim padding remain
+    const byW = Math.floor((window.innerWidth - 80) / 2 / 148);
+    const byH = Math.floor((window.innerHeight - 70) / 260);
+    return Math.max(1, Math.min(9, byW, byH));
+  }
+  // normal view: size by width only — a little vertical scrolling is fine,
+  // fullscreen (above) is the fit-everything mode
+  const w = Math.min(window.innerWidth, 1900);
+  return Math.max(1, Math.min(5, Math.floor((w - 120) / 2 / 140)));
 }
-$("t-quad").onclick   = ()=>{ PANELS.quad.on  = !PANELS.quad.on;  syncUI(); savePrefs(); };
-$("t-audio").onclick  = ()=>{ PANELS.audio.on = !PANELS.audio.on; syncUI(); savePrefs(); };
-$("t-graphs").onclick = ()=>{ GRAPHS.on = !GRAPHS.on; syncUI(); savePrefs(); };
-$("t-scope").onclick  = ()=>{ SCOPE.on = !SCOPE.on; syncUI(); savePrefs(); };
-$("t-midi").onclick   = ()=>{ MIDI.on = !MIDI.on; syncUI(); savePrefs(); };
-syncUI();
 
-// --- oscilloscope controls ----------------------------------------------------
-// Each scope panel has: source, vertical scale, time base, freeze. The scale
-// and time labels depend on the source type (CV vs audio), so they're rebuilt
-// on source change (indices are preserved).
-function scopeEl(i, cls){ return $("scope-"+i).querySelector(cls); }
+// ================================================================================
+// Cell content builders
+// ================================================================================
+function buildCell(i){
+  const cell = cellEls[i], body = cell.querySelector(".cbody"), t = CELLS[i];
+  body.innerHTML = "";
+  if (t === "quad") {
+    body.innerHTML = `
+      <canvas class="quadcv"></canvas>
+      <div class="qrow">
+        <button class="cbtn" data-q="cursorPrev" title="cursor up">▲</button>
+        <button class="cbtn" data-q="cursorNext" title="cursor down">▼</button>
+        <button class="cbtn" data-q="edit" title="select param">edit</button>
+        <button class="cbtn" data-q="valDn" title="value −">val −</button>
+        <button class="cbtn" data-q="valUp" title="value +">val +</button>
+      </div>
+      <div class="qrow">
+        <button class="cbtn" data-q="prevApp" title="previous applet">◀ app</button>
+        <button class="cbtn" data-q="nextApp" title="next applet">app ▶</button>
+        <button class="cbtn" data-q="prevPre" title="previous preset">◀ preset</button>
+        <button class="cbtn" data-q="nextPre" title="next preset">preset ▶</button>
+      </div>`;
+    body.querySelectorAll("[data-q]").forEach(b=> b.addEventListener("click", ()=>quadAction(b.dataset.q)));
+    body.querySelector("canvas").addEventListener("click", (e)=>{
+      const r = e.currentTarget.getBoundingClientRect();
+      if (!r.width || !r.height) return;
+      const x = (e.clientX-r.left)/r.width, y = (e.clientY-r.top)/r.height;
+      setFocus((y<0.5?0:1)*2 + (x<0.5?0:1));
+    });
+  } else if (t === "live" || t === "maps") {
+    body.innerHTML = `<canvas></canvas>
+      <div class="hint">${t==="live" ? "live OLED — follows every screen, any app" : "MIDI map page (Quadrants)"}</div>`;
+  } else if (t === "audio") {
+    body.innerHTML = `<canvas class="acv"></canvas>
+      <canvas class="m0"></canvas><canvas class="m1"></canvas>
+      <canvas class="m2"></canvas><canvas class="m3"></canvas>`;
+  } else if (t === "scopeA" || t === "scopeB") {
+    const si = t === "scopeB" ? 1 : 0;
+    body.innerHTML = `
+      <canvas></canvas>
+      <div class="srow">
+        <span class="slbl">src</span><select class="s-src"></select>
+        <span class="slbl">scale</span><select class="s-vs"></select>
+        <span class="slbl">time</span><select class="s-win"></select>
+      </div>
+      <div class="srow">
+        <span class="slbl">ofs</span>
+        <button class="s-odn" title="move trace down">▼</button>
+        <button class="s-oup" title="move trace up">▲</button>
+        <button class="s-oz" title="reset offset">rst</button>
+        <button class="s-freeze" title="freeze / resume">Freeze</button>
+      </div>`;
+    wireScopeControls(body, si);
+  } else if (t === "midi") {
+    body.innerHTML = `
+      <div class="mctl">
+        <button class="m-pause" title="pause the display (events still collect)">Pause</button>
+        <button class="m-clear" title="clear history">Clear</button>
+        <button class="m-in on"  title="show incoming">In</button>
+        <button class="m-out on" title="show outgoing">Out</button>
+        <span class="slbl">ch</span>
+        <select class="m-chan"><option value="0">All</option>${
+          Array.from({length:16},(_,n)=>`<option value="${n+1}">${n+1}</option>`).join("")}</select>
+      </div>
+      <div class="midilog"></div>`;
+    wireMidiControls(body);
+  }
+  sizeCells();
+  redrawAll();
+}
 
+function typeSelects(){
+  cellEls.forEach((cell, i)=>{
+    const sel = cell.querySelector(".ctype");
+    sel.innerHTML = Object.entries(TYPES).map(([v,l])=>`<option value="${v}">${l}</option>`).join("");
+    sel.value = CELLS[i];
+    sel.onchange = ()=>{ CELLS[i] = sel.value; buildCell(i); savePrefs(); };
+    cell.querySelector(".cmax").onclick = ()=> setMaxed(MAXED === i ? -1 : i);
+  });
+}
+
+function setMaxed(i){
+  MAXED = i;
+  cellEls.forEach((cell, k)=>{
+    cell.style.display = cellVisible(k) ? "" : "none";
+    const b = cell.querySelector(".cmax");
+    b.classList.toggle("on", MAXED === k);
+    b.title = MAXED === k ? "back to the 2×2 grid" : "fill the screen with this panel";
+  });
+  $("grid").style.gridTemplateColumns = MAXED >= 0 ? "max-content" : "repeat(2, max-content)";
+  redrawAll();
+}
+
+function sizeCells(){
+  const s = scaleFor(), w = OLED_W * s;
+  // consistent frame footprint across all panel types
+  const fs = !!document.fullscreenElement;
+  const minH = fs ? (128*s + 32) : (128*s + 32 + 96);   // canvas + control rows
+  const minW = fs ? (128*s + 32) : Math.max(128*s + 32, 384);
+  cellEls.forEach(cell=>{
+    const b = cell.querySelector(".cbody");
+    b.style.minHeight = minH + "px";
+    b.style.minWidth = minW + "px";
+  });
+  cellEls.forEach((cell, i)=>{
+    const t = CELLS[i], body = cell.querySelector(".cbody");
+    if (t === "quad") {
+      // sized by drawQuadComposite
+    } else if (t === "live" || t === "maps") {
+      const cv = body.querySelector("canvas");
+      if (cv && (cv.width!==w || cv.height!==64*s)) { cv.width=w; cv.height=64*s; }
+    } else if (t === "audio") {
+      const acv = body.querySelector(".acv");
+      if (acv && (acv.width!==w || acv.height!==64*s)) { acv.width=w; acv.height=64*s; }
+      const mh = Math.max(24, Math.floor((64*s - 18) / 4));
+      for (let m=0; m<4; m++){
+        const cv = body.querySelector(".m"+m);
+        if (cv && (cv.width!==w || cv.height!==mh)) { cv.width=w; cv.height=mh; }
+      }
+    } else if (t === "scopeA" || t === "scopeB") {
+      const size = 128*s + 2*QPAD + QGUT;   // match the quad footprint
+      const cv = body.querySelector("canvas");
+      if (cv && (cv.width!==size || cv.height!==size)) { cv.width=size; cv.height=size; }
+    } else if (t === "midi") {
+      const log = body.querySelector(".midilog");
+      if (log) { log.style.width = (128*s + 2*QPAD + QGUT) + "px";
+                 log.style.height = (128*s + QGUT - 20) + "px"; }
+    }
+  });
+}
+
+// ================================================================================
+// Rendering (ported from phazerville_quad.html)
+// ================================================================================
+function buildNative(frame){
+  const { data, w, h } = frame, fg = PHOSPHORS[colorIdx].rgb;
+  const nat = document.createElement("canvas"); nat.width=w; nat.height=h;
+  const ctx = nat.getContext("2d");
+  const img = ctx.createImageData(w,h);
+  for (let y=0;y<h;y++){
+    const page=(y>>3)*w, bit=1<<(y&7);
+    for (let x=0;x<w;x++){
+      const on = data[page+x] & bit, k=(y*w+x)*4;
+      img.data[k]=on?fg[0]:BG[0]; img.data[k+1]=on?fg[1]:BG[1]; img.data[k+2]=on?fg[2]:BG[2]; img.data[k+3]=255;
+    }
+  }
+  ctx.putImageData(img,0,0);
+  return nat;
+}
+
+const QPAD = 8, QGUT = 16;
+function drawQuadComposite(cv, native, s){
+  const qs = 64*s, size = 128*s + 2*QPAD + QGUT;
+  cv.width = size; cv.height = size;
+  const ctx = cv.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = "#000"; ctx.fillRect(0,0,size,size);
+  const org = c => QPAD + c*(qs + QGUT);
+  for (let q=0;q<4;q++){
+    const col=q&1, row=(q>>1)&1;
+    ctx.fillStyle = `rgb(${BG.join(",")})`;
+    ctx.fillRect(org(col), org(row), qs, qs);
+    ctx.drawImage(native, col*64, row*64, 64, 64, org(col), org(row), qs, qs);
+  }
+  const ring = (q, gap) => {
+    if (q<0 || q>3) return;
+    const col=q&1, row=(q>>1)&1;
+    ctx.strokeRect(org(col)-gap+.5, org(row)-gap+.5, qs+2*gap-1, qs+2*gap-1);
+  };
+  const slots = activeSlots.full >= 0 ? [activeSlots.full] : [activeSlots.left, activeSlots.right];
+  ctx.strokeStyle = "rgba(120,220,255,.9)"; ctx.lineWidth = 2;
+  for (const q of slots) ring(q, 3);
+  ctx.strokeStyle = "rgba(255,225,80,.95)"; ctx.lineWidth = 2;
+  ring(focusedSlot, 6);
+}
+
+function drawSimple(cv, native){
+  if (!cv || !native) return;
+  const ctx = cv.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = `rgb(${BG.join(",")})`; ctx.fillRect(0,0,cv.width,cv.height);
+  ctx.drawImage(native, 0, 0, cv.width, cv.height);
+}
+
+function zoneColor(frac){
+  return frac > 0.85 ? [235,45,35] : frac > 0.60 ? [238,208,30] : [70,220,55];
+}
+function drawMeter(cv, level, peak, label){
+  if (!cv) return;
+  const w=cv.width, h=cv.height, ctx=cv.getContext("2d");
+  ctx.fillStyle="#000"; ctx.fillRect(0,0,w,h);
+  const top = 14, barH = h - top - 3;
+  const N = Math.min(46, Math.max(20, Math.round(w/12)));
+  const gap = Math.max(1, Math.round(w/(N*7)));
+  const segW = (w - gap*(N+1)) / N;
+  const lit = Math.round(clamp01(level)*N);
+  const peakIdx = Math.ceil(clamp01(peak)*N) - 1;
+  ctx.save();
+  for (let i=0;i<N;i++){
+    const on = (i < lit) || (i === peakIdx && peakIdx >= 0);
+    if (!on) continue;
+    const c = zoneColor((i+1)/N);
+    const x = gap + i*(segW+gap);
+    ctx.shadowColor = `rgb(${c.join(",")})`;
+    ctx.shadowBlur = Math.max(3, segW*0.6);
+    ctx.fillStyle = `rgb(${c.join(",")})`;
+    ctx.fillRect(x, top, segW, barH);
+  }
+  ctx.restore();
+  ctx.fillStyle="rgba(230,230,235,.8)"; ctx.font="11px ui-monospace, monospace"; ctx.textBaseline="top";
+  ctx.fillText(label, 4, 1);
+  const right = levelsSeen ? (Math.round(clamp01(level)*100)+"%") : "no data";
+  ctx.textAlign="right"; ctx.fillText(right, w-4, 1); ctx.textAlign="left";
+}
+
+// ---- scopes --------------------------------------------------------------------
 function scopeWinLabel(i, w){
   const sc = SCOPES[i];
   const rate = (isAudioSrc(sc.src) ? SCOPE_AUDIO_RATE : SCOPE_CV_RATE) / (1 << w);
-  const shown = isAudioSrc(sc.src) ? 128 : 256;    // audio draws half (trigger hunt)
+  const shown = isAudioSrc(sc.src) ? 128 : 256;
   const ms = shown / rate * 1000;
-  return ms >= 1000 ? (ms/1000).toFixed(ms >= 2000 ? 0 : 1) + " s" : Math.round(ms) + " ms";
+  // Display-only tidy-up: the real windows are awkward numbers (246 / 492 / 983 / 1966 ms),
+  // so anything that rounds to 250 ms or more is shown rounded to the nearest 250 ms.
+  // Short audio windows (a few ms) keep 1 ms resolution — 250 ms rounding would erase them.
+  if (ms >= 125){
+    const r = Math.round(ms/250)*250;
+    return r >= 1000 ? (r/1000).toFixed(2).replace(/\.?0+$/,"") + " s" : r + " ms";
+  }
+  return Math.round(ms) + " ms";
 }
-
-function rebuildScopeSelects(i){
+function scopeOffStep(i){
   const sc = SCOPES[i];
-  const src = scopeEl(i, ".s-src");
+  const t = isAudioSrc(sc.src) ? AU_VS : CV_VS;
+  const vs = t[Math.min(sc.vs, t.length-1)];
+  return (vs[2]-vs[1]) / 8;
+}
+function rebuildScopeSelects(body, i){
+  const sc = SCOPES[i], src = body.querySelector(".s-src");
   if (!src.options.length) {
     let h = '<option value="">Off</option>';
     for (let n=1; n<=8; n++) h += `<option value="${n}">CV out ${n}</option>`;
@@ -326,132 +604,534 @@ function rebuildScopeSelects(i){
   }
   src.value = sc.src;
   const vsTable = isAudioSrc(sc.src) ? AU_VS : CV_VS;
-  scopeEl(i, ".s-vs").innerHTML =
-    vsTable.map((v,ix)=>`<option value="${ix}">${v[0]}</option>`).join("");
-  scopeEl(i, ".s-vs").value = String(sc.vs);
-  scopeEl(i, ".s-win").innerHTML =
-    [0,1,2,3].map(w=>`<option value="${w}">${scopeWinLabel(i,w)}</option>`).join("");
-  scopeEl(i, ".s-win").value = String(sc.win);
+  body.querySelector(".s-vs").innerHTML = vsTable.map((v,ix)=>`<option value="${ix}">${v[0]}</option>`).join("");
+  body.querySelector(".s-vs").value = String(Math.min(sc.vs, vsTable.length-1));
+  body.querySelector(".s-win").innerHTML = [0,1,2,3].map(w=>`<option value="${w}">${scopeWinLabel(i,w)}</option>`).join("");
+  body.querySelector(".s-win").value = String(sc.win);
   const dis = !sc.src;
-  for (const c of [".s-vs",".s-win",".s-freeze",".s-odn",".s-oz",".s-oup"]) scopeEl(i, c).disabled = dis;
+  for (const c of [".s-vs",".s-win",".s-freeze",".s-odn",".s-oz",".s-oup"]) body.querySelector(c).disabled = dis;
 }
-
-// vertical-offset step: one grid division of the current range
-function scopeOffStep(i){
-  const sc = SCOPES[i];
-  const t = isAudioSrc(sc.src) ? AU_VS : CV_VS;
-  const vs = t[Math.min(sc.vs, t.length-1)];
-  return (vs[2] - vs[1]) / 8;
-}
-
-for (let i=0; i<2; i++){
-  rebuildScopeSelects(i);
-  scopeEl(i, ".s-src").onchange = ()=>{
+function wireScopeControls(body, i){
+  rebuildScopeSelects(body, i);
+  body.querySelector(".s-src").onchange = ()=>{
     const sc = SCOPES[i];
-    sc.src = scopeEl(i, ".s-src").value;
-    sc.data = null;             // stale waveform from the old source
-    sc.misses = 0;              // give the firmware another chance
-    sc.off = 0;                 // offset is range-relative; reset on source change
-    rebuildScopeSelects(i);     // scale/time labels follow the source type
-    drawScope(i); savePrefs();
+    sc.src = body.querySelector(".s-src").value;
+    sc.data = null; sc.misses = 0; sc.off = 0;
+    rebuildScopeSelects(body, i);
+    drawScopes(); savePrefs();
   };
-  scopeEl(i, ".s-oup").onclick = ()=>{
+  body.querySelector(".s-vs").onchange = ()=>{ SCOPES[i].vs = +body.querySelector(".s-vs").value; drawScopes(); savePrefs(); };
+  body.querySelector(".s-win").onchange = ()=>{
     const sc = SCOPES[i];
-    sc.off = Math.max(-20, sc.off - scopeOffStep(i));   // view up = window down
-    drawScope(i); savePrefs();
+    sc.win = +body.querySelector(".s-win").value;
+    sc.data = null; sc.misses = 0;
+    drawScopes(); savePrefs();
   };
-  scopeEl(i, ".s-odn").onclick = ()=>{
-    const sc = SCOPES[i];
-    sc.off = Math.min(20, sc.off + scopeOffStep(i));    // view down = window up
-    drawScope(i); savePrefs();
-  };
-  scopeEl(i, ".s-oz").onclick = ()=>{
-    SCOPES[i].off = 0;
-    drawScope(i); savePrefs();
-  };
-  scopeEl(i, ".s-vs").onchange = ()=>{
-    SCOPES[i].vs = +scopeEl(i, ".s-vs").value;
-    drawScope(i); savePrefs();
-  };
-  scopeEl(i, ".s-win").onchange = ()=>{
-    const sc = SCOPES[i];
-    sc.win = +scopeEl(i, ".s-win").value;
-    sc.data = null;             // firmware clears its ring on window change
-    sc.misses = 0;
-    drawScope(i); savePrefs();
-  };
-  scopeEl(i, ".s-freeze").onclick = ()=>{
-    const sc = SCOPES[i], b = scopeEl(i, ".s-freeze");
+  body.querySelector(".s-oup").onclick = ()=>{ SCOPES[i].off = Math.max(-20, SCOPES[i].off - scopeOffStep(i)); drawScopes(); savePrefs(); };
+  body.querySelector(".s-odn").onclick = ()=>{ SCOPES[i].off = Math.min(20, SCOPES[i].off + scopeOffStep(i)); drawScopes(); savePrefs(); };
+  body.querySelector(".s-oz").onclick  = ()=>{ SCOPES[i].off = 0; drawScopes(); savePrefs(); };
+  body.querySelector(".s-freeze").onclick = ()=>{
+    const sc = SCOPES[i], b = body.querySelector(".s-freeze");
     sc.frozen = !sc.frozen;
     b.classList.toggle("on", sc.frozen);
     b.textContent = sc.frozen ? "Run" : "Freeze";
-    drawScope(i);
+    drawScopes();
   };
 }
 
-// --- remote control (buttons / encoders) ------------------------------------
-let showControl = false;
-$("t-control").onclick = ()=>{
-  showControl = !showControl;
-  $("t-control").classList.toggle("on", showControl);
-  $("control").hidden = !showControl;
-};
-// Send a control command: "~" + selector. Selectors: A B X Y Z (buttons),
-// l r (encoder push), ( ) (L enc -/+), [ ] (R enc -/+).
+function drawScopeInto(cv, i){
+  if (!cv) return;                 // cell not built yet
+  const sc = SCOPES[i];
+  const w=cv.width, h=cv.height, ctx=cv.getContext("2d");
+  const isAudio = isAudioSrc(sc.src);
+  ctx.fillStyle="#000"; ctx.fillRect(0,0,w,h);
+  if (!sc.src){
+    ctx.fillStyle="rgba(160,160,175,.6)"; ctx.font="11px ui-monospace, monospace"; ctx.textBaseline="top";
+    ctx.fillText("SCOPE " + (i?"B":"A") + " — off", 4, 2);
+    return;
+  }
+  const top=15, bot=4, plotH=h-top-bot;
+  const vsTable = isAudio ? AU_VS : CV_VS;
+  const vs = vsTable[Math.min(sc.vs, vsTable.length-1)];
+  const vMin = vs[1] + sc.off, vMax = vs[2] + sc.off;
+  const yOf = v => top + (vMax - v)/(vMax - vMin)*plotH;
+  ctx.strokeStyle="rgba(85,85,100,.35)"; ctx.lineWidth=1;
+  for (let g=0; g<=8; g++){
+    const y = Math.round(top + g*plotH/8)+.5;
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke();
+  }
+  for (let g=1; g<10; g++){
+    const x = Math.round(g*w/10)+.5;
+    ctx.beginPath(); ctx.moveTo(x,top); ctx.lineTo(x,h-bot); ctx.stroke();
+  }
+  if (vMin < 0 && vMax > 0){
+    ctx.strokeStyle="rgba(160,160,180,.7)";
+    ctx.beginPath(); ctx.moveTo(0, yOf(0)+.5); ctx.lineTo(w, yOf(0)+.5); ctx.stroke();
+  }
+  const d = sc.data;
+  if (d && d.length){
+    let start = 0, count = d.length;
+    if (isAudio){
+      count = d.length >> 1;
+      for (let k=1; k<=d.length-count; k++)
+        if (d[k-1] > 0 && d[k] <= 0){ start = k; break; }   // rising edge post-inversion
+    }
+    const fg = PHOSPHORS[colorIdx].rgb;
+    ctx.strokeStyle = `rgb(${fg.join(",")})`;
+    ctx.lineWidth = 2; ctx.lineJoin = "round";
+    ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = 4;
+    ctx.beginPath();
+    for (let k=0; k<count; k++){
+      // audio: PCM -> ±1, negated (output stage inverts vs the jack); CV: mV -> V
+      const v = isAudio ? -d[start+k]/32768 : d[start+k]/1000;
+      const x = k/(count-1)*w;
+      const y = Math.max(top, Math.min(h-bot, yOf(v)));
+      k ? ctx.lineTo(x,y) : ctx.moveTo(x,y);
+    }
+    ctx.stroke(); ctx.shadowBlur = 0;
+  }
+  ctx.fillStyle="rgba(230,230,235,.8)"; ctx.font="11px ui-monospace, monospace"; ctx.textBaseline="top";
+  const name = sc.src === "i" || sc.src === "j" ? ("AUDIO IN " + (sc.src==="i"?"L":"R"))
+             : isAudio                          ? ("AUDIO OUT " + sc.src)
+             : sc.src >= "a" && sc.src <= "h"   ? ("CV IN " + ("abcdefgh".indexOf(sc.src)+1))
+             : sc.src >= "t" && sc.src <= "w"   ? ("TRIG IN " + ("tuvw".indexOf(sc.src)+1))
+             :                                    ("CV OUT " + sc.src);
+  ctx.fillText("SCOPE " + (i?"B":"A") + " — " + name, 4, 2);
+  ctx.textAlign="right";
+  const offTxt = sc.off ? ("OFS " + (sc.off>0?"+":"") +
+    (Math.abs(sc.off)<1 ? sc.off.toFixed(2) : +sc.off.toFixed(2)) + (isAudio?"":"V") + "  ") : "";
+  ctx.fillText(offTxt + (sc.frozen ? "FROZEN" : d ? scopeWinLabel(i, sc.win)
+             : sc.misses >= 3 ? "no fw support" : "no data"), w-4, 2);
+  ctx.textAlign="left";
+  ctx.fillStyle="rgba(180,180,195,.55)"; ctx.font="18px ui-monospace, monospace";
+  const unit = isAudio ? "" : "V";
+  // audio is digital, so the axis is labelled in dBFS (a magnitude — both peaks read the same,
+  // centre is silence); CV knows its own volts and keeps them
+  const fmt = isAudio
+    ? v => { const a = Math.abs(v); return a < 1e-6 ? "-\u221E dB" : Math.round(20*Math.log10(a)) + " dB"; }
+    : v => (v>0?"+":"") + (Math.abs(v)<1 ? v.toFixed(2).replace("0.",".") : +v.toFixed(2)) + unit;
+  ctx.fillText(fmt(vMax), 2, top+5);
+  if (vMin < 0 && vMax > 0){
+    // punch a gap in the zero gridline so it doesn't strike through the label
+    const zt = "0"+unit, zy = yOf(0)-9, zw = ctx.measureText(zt).width;
+    const zfs = ctx.fillStyle;
+    ctx.fillStyle = "#000"; ctx.fillRect(0, zy-1, zw+6, 20);
+    ctx.fillStyle = zfs; ctx.fillText(zt, 2, zy);
+  }
+  ctx.fillText(fmt(vMin), 2, h-bot-18);
+}
+
+// ---- redraw dispatch --------------------------------------------------------------
+function drawType(t){
+  const s = scaleFor();
+  for (const cell of cellsOf(t)){
+    const body = cell.querySelector(".cbody");
+    if (t === "quad" && natives.quad){
+      const cv = body.querySelector("canvas");
+      if (cv) drawQuadComposite(cv, natives.quad, s);
+    }
+    if (t === "live")                   drawSimple(body.querySelector("canvas"), natives.live);
+    if (t === "maps")                   drawSimple(body.querySelector("canvas"), natives.maps);
+    if (t === "audio"){
+      drawSimple(body.querySelector(".acv"), natives.audio);
+      const names = ["IN L","IN R","OUT L","OUT R"];
+      for (let m=0;m<4;m++) drawMeter(body.querySelector(".m"+m), levels[m], peaks[m], names[m]);
+    }
+  }
+}
+function drawScopes(){
+  const s = scaleFor();
+  for (const i of [0,1]){
+    const t = i ? "scopeB" : "scopeA";
+    for (const cell of cellsOf(t)) drawScopeInto(cell.querySelector(".cbody canvas"), i);
+  }
+}
+function drawClassic(){
+  const cv = document.querySelector("#classic canvas");
+  const sc = Math.max(1, Math.min(9,
+    Math.floor(Math.min((window.innerWidth - 80) / 128, (window.innerHeight - 180) / 64))));
+  if (cv.width !== 128*sc || cv.height !== 64*sc) { cv.width = 128*sc; cv.height = 64*sc; }
+  if (natives.live) drawSimple(cv, natives.live);
+}
+function syncView(){
+  $("classic").hidden = VIEW !== "classic";
+  $("grid").hidden = VIEW !== "grid";
+  $("t-classic").classList.toggle("on", VIEW === "classic");
+}
+function redrawAll(){
+  sizeCells();
+  for (const t of ["quad","live","maps","audio"]) drawType(t);
+  drawScopes();
+  renderMidiLog();
+  drawClassic();
+  applyFsZoom();
+}
+// In fullscreen the canvases use the largest INTEGER pixel scale that fits;
+// a fractional CSS zoom then expands the whole grid to consume the leftover
+// band (image-rendering:pixelated keeps it crisp).
+function applyFsZoom(){
+  const g = $("grid");
+  g.style.zoom = "";
+  if (!document.fullscreenElement || VIEW !== "grid") return;
+  const h = g.offsetHeight, w = g.offsetWidth;
+  if (!h || !w) return;
+  const k = Math.min((window.innerHeight - 6) / h, (window.innerWidth - 6) / w);
+  if (k > 1.02) g.style.zoom = String(Math.min(k, 1.8));
+}
+
+// ================================================================================
+// MIDI monitor
+// ================================================================================
+const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const noteName = n => NOTE_NAMES[n%12] + (Math.floor(n/12)-1);
+function fmtMidiEv(e){
+  const dir = e.out ? "OUT" : "IN ";
+  const ch = e.chan ? String(e.chan).padStart(2,"0") : "--";
+  let body;
+  switch (e.message & 0xF0) {
+    case 0x90: body = e.d2 ? "Note On  " + noteName(e.d1).padEnd(4) + " vel " + e.d2
+                           : "Note Off " + noteName(e.d1).padEnd(4) + " (vel 0)"; break;
+    case 0x80: body = "Note Off " + noteName(e.d1).padEnd(4) + " vel " + e.d2; break;
+    case 0xB0: body = "CC " + String(e.d1).padStart(3) + " = " + e.d2; break;
+    case 0xE0: { const v = ((e.d2<<7)|e.d1) - 8192; body = "Bend " + (v>0?"+":"") + v; break; }
+    case 0xC0: body = "Program " + e.d1; break;
+    case 0xD0: body = "AfterTouch " + e.d1; break;
+    case 0xA0: body = "PolyAT " + noteName(e.d1) + " " + e.d2; break;
+    default:   body = ({0xFA:"Start",0xFB:"Continue",0xFC:"Stop",0xF2:"SongPos",0xF1:"MTC",0xF6:"TuneReq"})[e.message]
+                      || ("Status 0x" + e.message.toString(16).toUpperCase()); break;
+  }
+  return dir + " ch" + ch + "  " + body;
+}
+function midiVisible(e){
+  if (e.out ? !MIDI.showOut : !MIDI.showIn) return false;
+  if (MIDI.chan && e.chan !== MIDI.chan) return false;
+  return true;
+}
+function renderMidiLog(){
+  for (const cell of cellsOf("midi")){
+    const log = cell.querySelector(".midilog");
+    if (!log) continue;
+    const rows = MIDI.events.filter(midiVisible).slice(-250);
+    log.innerHTML = rows.map(e =>
+      `<div class="mrow ${e.out?"mout":"min"}">${fmtMidiEv(e)}</div>`).join("");
+    log.scrollTop = log.scrollHeight;
+  }
+}
+function midiIngest(evs){
+  let fresh;
+  if (MIDI.lastSeq === null) {
+    fresh = evs.slice().sort((a,b)=>a.seq-b.seq).slice(-12);
+  } else {
+    const age = e => (e.seq - MIDI.lastSeq) & 0xFFFF;
+    fresh = evs.filter(e => age(e) > 0 && age(e) <= 0x7FFF).sort((a,b)=>age(a)-age(b));
+  }
+  if (!fresh.length) return;
+  MIDI.lastSeq = fresh[fresh.length-1].seq;
+  MIDI.events.push(...fresh);
+  if (MIDI.events.length > 500) MIDI.events.splice(0, MIDI.events.length - 500);
+  if (!MIDI.paused) renderMidiLog();
+}
+function wireMidiControls(body){
+  const p = body.querySelector(".m-pause");
+  p.onclick = ()=>{ MIDI.paused = !MIDI.paused; p.classList.toggle("on", MIDI.paused);
+                    p.textContent = MIDI.paused ? "Resume" : "Pause";
+                    if (!MIDI.paused) renderMidiLog(); };
+  body.querySelector(".m-clear").onclick = ()=>{ MIDI.events = []; renderMidiLog(); };
+  const tIn = body.querySelector(".m-in"), tOut = body.querySelector(".m-out");
+  tIn.onclick  = ()=>{ MIDI.showIn  = !MIDI.showIn;  tIn.classList.toggle("on", MIDI.showIn);  renderMidiLog(); };
+  tOut.onclick = ()=>{ MIDI.showOut = !MIDI.showOut; tOut.classList.toggle("on", MIDI.showOut); renderMidiLog(); };
+  body.querySelector(".m-chan").onchange = e => { MIDI.chan = +e.target.value; renderMidiLog(); };
+}
+
+// ================================================================================
+// Serial core (ported from phazerville_quad.html)
+// ================================================================================
+let rxBuf = "";
+const inbox = [];
+async function pump(){
+  const dec = new TextDecoder();
+  while (running && reader) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    if (slotsBinMode) {          // slot-loader session: raw bytes, not lines
+      for (let i = 0; i < value.length; i++) slotsRx.push(value[i]);
+      if (slotsRxWaiter) { const w = slotsRxWaiter; slotsRxWaiter = null; w(); }
+      continue;
+    }
+    rxBuf += dec.decode(value, { stream:true });
+    let nl;
+    while ((nl = rxBuf.indexOf("\n")) >= 0) {
+      const line = rxBuf.slice(0,nl).trim();
+      rxBuf = rxBuf.slice(nl+1);
+      if (line) inbox.push(line);
+    }
+  }
+}
+function flushInput(){ inbox.length = 0; rxBuf = ""; }
+
+async function transact(cmd, expectBytes, timeoutMs=600){
+  flushInput();
+  await writer.write(enc.encode(cmd));
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() < deadline) {
+    while (inbox.length) {
+      const line = inbox.shift();
+      if (line.length % 2 === 0 && line.length/2 === expectBytes) return decodeFrame(line);
+    }
+    await sleep(1);
+  }
+  return null;
+}
+function decodeFrame(hexline){
+  const n = hexline.length/2;
+  if ((n!==1024 && n!==2048) || hexline.length % 2) return null;
+  const data = new Uint8Array(n);
+  for (let i=0;i<n;i++){ const b=parseInt(hexline.substr(i*2,2),16); if (Number.isNaN(b)) return null; data[i]=b; }
+  return { data, w:OLED_W, h:n/16 };
+}
+async function transactLevels(timeoutMs=250){
+  flushInput();
+  await writer.write(enc.encode("V"));
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() < deadline) {
+    while (inbox.length) {
+      const p = inbox.shift().split(",");
+      if (p.length >= 2) {
+        const v = p.map(parseFloat);
+        if (!v.some(isNaN)) return [v[0]||0, v[1]||0, v[2]||0, v[3]||0];
+      }
+    }
+    await sleep(1);
+  }
+  return null;
+}
+async function transactState(timeoutMs=200){
+  flushInput();
+  await writer.write(enc.encode("T"));
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() < deadline) {
+    while (inbox.length) {
+      const p = inbox.shift().split(",");
+      if (p.length === 4) {
+        const l=parseInt(p[0]), r=parseInt(p[1]), f=parseInt(p[2]), pre=parseInt(p[3]);
+        if (![l,r,f,pre].some(isNaN)) return { left:l, right:r, full:f, preset:pre };
+      }
+    }
+    await sleep(1);
+  }
+  return null;
+}
+async function transactScope(i, timeoutMs=400){
+  const sc = SCOPES[i];
+  flushInput();
+  await writer.write(enc.encode("O" + (i ? "B" : "A") + sc.src + sc.win));
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() < deadline) {
+    while (inbox.length) {
+      const line = inbox.shift();
+      if (line.length === 1024) {
+        const s = new Int16Array(256);
+        let ok = true;
+        for (let k=0;k<256;k++){
+          const v = parseInt(line.substr(k*4,4),16);
+          if (Number.isNaN(v)) { ok=false; break; }
+          s[k] = v > 32767 ? v-65536 : v;
+        }
+        if (ok) return s;
+      }
+    }
+    await sleep(1);
+  }
+  return null;
+}
+async function transactMidiLog(timeoutMs=250){
+  flushInput();
+  await writer.write(enc.encode("N"));
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() < deadline) {
+    while (inbox.length) {
+      const line = inbox.shift();
+      if (line.startsWith("N:") && line.length === 2 + 32*12) {
+        const evs = [];
+        for (let k=0;k<32;k++){
+          const o = 2 + k*12;
+          const seq = parseInt(line.substr(o,4),16);
+          if (!seq) continue;
+          const dc = parseInt(line.substr(o+6,2),16);
+          evs.push({ seq, message:parseInt(line.substr(o+4,2),16),
+                     out:!!(dc&0x80), chan:dc&0x7F,
+                     d1:parseInt(line.substr(o+8,2),16), d2:parseInt(line.substr(o+10,2),16) });
+        }
+        return evs;
+      }
+    }
+    await sleep(1);
+  }
+  return null;
+}
+
+// firmware probe + crash report (same as the main viewer)
+async function probeFirmware(context){
+  if (!writer) return;
+  flushInput();
+  try { await writer.write(enc.encode("OA?0")); } catch(e){ return; }
+  let dbg = null;
+  const deadline = performance.now() + 400;
+  while (performance.now() < deadline && !dbg) {
+    while (inbox.length) { const l = inbox.shift(); if (l.startsWith("DBG ")) { dbg = l; break; } }
+    await sleep(2);
+  }
+  if (!dbg) { console.warn("[phaz] " + context + ": no DBG reply — old firmware?"); return; }
+  console.log("[phaz] " + context + ": " + dbg);
+  if (!/crash=1/.test(dbg)) return;
+  flushInput();
+  try { await writer.write(enc.encode("OA!0")); } catch(e){ return; }
+  const rpt = [];
+  let end = performance.now() + 800, done = false;
+  while (performance.now() < end && !done) {
+    while (inbox.length) {
+      const l = inbox.shift();
+      if (l === "ENDCRASH") { done = true; break; }
+      rpt.push(l);
+    }
+    await sleep(2);
+  }
+  console.warn("[phaz] MODULE CRASH REPORT:\n" + rpt.join("\n"));
+  setStatus("Module crashed & rebooted — crash report in the console (Cmd-Opt-J).");
+}
+
+// ---- connection + recovery -----------------------------------------------------
+const OPEN_OPTS = { baudRate:115200, bufferSize:262144 };
+async function connect(){
+  if (!("serial" in navigator)) { setStatus("Web Serial not supported. Use Chrome / Edge / Arc."); return; }
+  try {
+    port = await navigator.serial.requestPort({ filters:[{ usbVendorId:0x16C0 }] });
+    await port.open(OPEN_OPTS);
+  } catch(e){ setStatus("Connect cancelled/failed: "+e.message); return; }
+  writer = port.writable.getWriter();
+  reader = port.readable.getReader();
+  running = true;
+  for (const sc of SCOPES) sc.misses = 0;
+  MIDI.misses = 0; MIDI.lastSeq = null;
+  $("connect").disabled = true;
+  $("disconnect").disabled = false;
+  $("save").disabled = false;
+  for (const id of ["t-control","savebtn","backupbtn","slotsbtn"]) $(id).disabled = false;
+  setStatus("Connected.");
+  pump().catch(()=>{ if (running) recover(); });
+  probeFirmware("connect").then(loop);
+}
+async function teardown(){
+  try { if (reader) await reader.cancel(); } catch(e){}
+  try { if (reader) reader.releaseLock(); } catch(e){}
+  try { if (writer) await writer.abort(); } catch(e){}
+  try { if (writer) writer.releaseLock(); } catch(e){}
+  try { if (port) await port.close(); } catch(e){}
+  reader = writer = null;
+  flushInput();
+}
+function uiDisconnected(){
+  $("connect").disabled=false; $("disconnect").disabled=true; $("save").disabled=true;
+  for (const id of ["t-control","savebtn","backupbtn","slotsbtn"]) $(id).disabled = true;
+  slotsClose();
+  setTag("–");
+}
+async function disconnect(){
+  running = false;
+  await teardown();
+  port = null;
+  uiDisconnected(); setStatus("Disconnected.");
+}
+let recoverPromise = null;
+function recover(){
+  if (!recoverPromise) recoverPromise = _recover().finally(()=>{ recoverPromise = null; });
+  return recoverPromise;
+}
+async function _recover(){
+  setStatus("Link lost — reconnecting…");
+  await teardown();
+  for (let i = 0; i < 20 && running && port; i++){
+    await sleep(500);
+    try {
+      await port.open(OPEN_OPTS);
+      writer = port.writable.getWriter();
+      reader = port.readable.getReader();
+      for (const sc of SCOPES) sc.misses = 0;
+      MIDI.misses = 0; MIDI.lastSeq = null;
+      setStatus("Reconnected.");
+      pump().catch(()=>{ if (running) recover(); });
+      await probeFirmware("reconnect");
+      return;
+    } catch(e){ setStatus("Link lost — reconnecting… (" + (i+1) + "/20)"); }
+  }
+  running = false;
+  port = null;
+  uiDisconnected();
+  setStatus("Link lost — check the USB cable, then press Connect.");
+}
+
+// ---- remote control --------------------------------------------------------------
 async function sendControl(sel){
   if (!writer) return;
   try { await writer.write(enc.encode("~" + sel)); } catch(e){}
 }
-function wireControl(){
-  document.querySelectorAll("#control [data-ctl]").forEach(b=>{
-    b.addEventListener("click", ()=> sendControl(b.dataset.ctl));
-  });
-  document.querySelectorAll("#control [data-hold]").forEach(b=>{     // auto-repeat while held
-    let iv = null;
-    const start = (e)=>{ e.preventDefault(); sendControl(b.dataset.hold); iv = setInterval(()=>sendControl(b.dataset.hold), 110); };
-    const stop  = ()=>{ if (iv){ clearInterval(iv); iv = null; } };
-    b.addEventListener("pointerdown", start);
-    for (const ev of ["pointerup","pointerleave","pointercancel"]) b.addEventListener(ev, stop);
-  });
-  document.querySelectorAll("#control .jog").forEach(s=>{            // scrub = relative detents
-    let last = 0;
-    s.addEventListener("input", ()=>{
-      const v = +s.value; const d = v - last; last = v;
-      if (!d) return;
-      const sel = d > 0 ? s.dataset.cw : s.dataset.ccw;
-      const n = Math.min(Math.abs(d), 4);   // cap per event (16-deep device queue)
-      for (let i=0;i<n;i++) sendControl(sel);
-    });
-    const reset = ()=>{ last = 0; s.value = 0; };   // recenter without sending
-    for (const ev of ["pointerup","pointercancel","change"]) s.addEventListener(ev, reset);
-  });
-}
-wireControl();
-
-// --- quad control bar (under the quad) --------------------------------------
-// Buttons act on the focused quadrant's side encoder / applet / preset.
-document.querySelectorAll("#quadctl [data-q]").forEach(b=>{
-  b.addEventListener("click", ()=> quadAction(b.dataset.q));
-});
+async function sendRaw(str){ if (!writer) return; try { await writer.write(enc.encode(str)); } catch(e){} }
 function quadAction(a){
-  const side = focusedSlot & 1;                 // 0 = left encoder, 1 = right encoder
+  const side = focusedSlot & 1;
   const turnDn = side ? "[" : "(", turnUp = side ? "]" : ")", push = side ? "r" : "l";
   switch (a) {
-    case "cursorPrev": sendControl(turnDn); break;   // move applet cursor
+    case "cursorPrev": sendControl(turnDn); break;
     case "cursorNext": sendControl(turnUp); break;
-    case "edit":       sendControl(push);   break;   // select/edit param
-    case "valDn":      sendControl(turnDn); break;   // value − (when editing)
-    case "valUp":      sendControl(turnUp); break;   // value +
+    case "edit":       sendControl(push);   break;
+    case "valDn":      sendControl(turnDn); break;
+    case "valUp":      sendControl(turnUp); break;
     case "prevApp":    sendControl(String(focusedSlot)); sendControl("<"); break;
     case "nextApp":    sendControl(String(focusedSlot)); sendControl(">"); break;
     case "prevPre":    sendControl("o"); break;
     case "nextPre":    sendControl("p"); break;
   }
-  if (a==="edit" || a==="valDn" || a==="valUp" || a==="prevApp" || a==="nextApp") markDirty();
+  if (["edit","valDn","valUp","prevApp","nextApp"].includes(a)) markDirty();
+}
+function setFocus(slot){
+  focusedSlot = ((slot % 4) + 4) % 4;
+  sendControl(String(focusedSlot));
+}
+function setMode(m){
+  mode = m;
+  audioLevel = 0;
+  const audio = (m === "audio");
+  $("mode").textContent = "MODE: " + (audio ? "AUDIO" : "QUADRANTS");
+  $("mode").classList.toggle("audio", audio);
+  sendControl(audio ? "S" : "Q");
+}
+function wireControl(){
+  document.querySelectorAll("#control [data-ctl]").forEach(b=>{
+    b.addEventListener("click", ()=> sendControl(b.dataset.ctl));
+  });
+  document.querySelectorAll("#control [data-hold]").forEach(b=>{
+    let iv = null, tm = null;
+    const start = (e)=>{ e.preventDefault(); sendControl(b.dataset.hold);
+      // one detent per tap; auto-repeat only after a real hold (stops cursor skips)
+      tm = setTimeout(()=>{ iv = setInterval(()=>sendControl(b.dataset.hold), 110); }, 400); };
+    const stop  = ()=>{ if (tm){ clearTimeout(tm); tm = null; } if (iv){ clearInterval(iv); iv = null; } };
+    b.addEventListener("pointerdown", start);
+    for (const ev of ["pointerup","pointerleave","pointercancel"]) b.addEventListener(ev, stop);
+  });
+  document.querySelectorAll("#control .jog").forEach(s=>{
+    let last = 0;
+    s.addEventListener("input", ()=>{
+      const v = +s.value; const d = v - last; last = v;
+      if (!d) return;
+      const sel = d > 0 ? s.dataset.cw : s.dataset.ccw;
+      const n = Math.min(Math.abs(d), 4);
+      for (let i=0;i<n;i++) sendControl(sel);
+    });
+    const reset = ()=>{ last = 0; s.value = 0; };
+    for (const ev of ["pointerup","pointercancel","change"]) s.addEventListener(ev, reset);
+  });
 }
 
-// --- presets ----------------------------------------------------------------
-// The module labels its 32 preset slots A-Z then a-f; mirror that here.
+// ---- presets + backup ------------------------------------------------------------
 const presetLabel = n => n < 0 ? "–"
   : n < 26 ? String.fromCharCode(65 + n) : String.fromCharCode(97 + n - 26);
 $("saveslot").innerHTML = Array.from({length:32}, (_,n) =>
@@ -462,20 +1142,16 @@ function updatePresetUI(){
   el.classList.toggle("dirty", presetDirty);
 }
 function markDirty(){ if (!presetDirty){ presetDirty = true; updatePresetUI(); } }
-
-async function sendRaw(str){ if (!writer) return; try { await writer.write(enc.encode(str)); } catch(e){} }
-
 function savePreset(){
   const slot = Math.max(0, Math.min(31, parseInt($("saveslot").value) || 0));
-  sendRaw("W" + String.fromCharCode(33 + slot));   // 'W' + (slot+33)
+  sendRaw("W" + String.fromCharCode(33 + slot));
   presetId = slot; presetDirty = false; updatePresetUI();
   setStatus("Saved preset " + presetLabel(slot));
 }
-
 async function backupBank(){
   if (!writer) return;
   setStatus("Backing up bank…");
-  ioBusy = true; await sleep(25);                 // pause the poll loop
+  ioBusy = true; await sleep(25);
   const res = await transactBackup();
   ioBusy = false;
   if (!res) { setStatus("Backup failed (no bank file yet? save a preset first)"); return; }
@@ -510,30 +1186,24 @@ async function transactBackup(timeoutMs=6000){
   }
   return null;
 }
-$("savebtn").onclick = savePreset;
-$("backupbtn").onclick = backupBank;
 
-// --- mode switch (Space) ----------------------------------------------------
-function setMode(m){
-  mode = m;
-  audioLevel = 0;
-  const audio = (m === "audio");
-  $("mode").textContent = "MODE: " + (audio ? "AUDIO" : "QUADRANTS");
-  $("mode").classList.toggle("audio", audio);
-  $("panel-audio").classList.toggle("audio-active", audio);
-  if (!PANELS.audio.on && audio) { PANELS.audio.on = true; syncUI(); savePrefs(); }  // ensure audio visible
-  sendControl(audio ? "S" : "Q");   // enter / leave the device's Audio Setup view
-}
-
-// --- keyboard ---------------------------------------------------------------
+// ---- keyboard --------------------------------------------------------------------
 window.addEventListener("keydown", (e)=>{
+  const tt = e.target;
+  const typing = tt && (tt.tagName === "INPUT" || tt.tagName === "TEXTAREA" || tt.tagName === "SELECT");
+  if (e.key === "Escape" && !$("keys").hidden) { $("keys").hidden = true; return; }
+  if ((e.key === "f" || e.key === "F") && !typing) {
+    document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+    e.preventDefault(); return;
+  }
   if (!running) return;
   const t = e.target;
-  if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;   // let sliders work
-
-  // Space toggles mode in any context.
-  if (e.key === " " || e.code === "Space") { setMode(mode === "quad" ? "audio" : "quad"); e.preventDefault(); return; }
-
+  if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT")) return;
+  if (e.key === " " || e.code === "Space") {
+    VIEW = VIEW === "classic" ? "grid" : "classic";
+    syncView(); redrawAll();
+    e.preventDefault(); return;
+  }
   let done = true;
   if (mode === "quad") {
     const col = focusedSlot & 1, row = (focusedSlot >> 1) & 1;
@@ -542,28 +1212,28 @@ window.addEventListener("keydown", (e)=>{
       case "ArrowDown": case "s": case "S":  setFocus(1*2 + col); break;
       case "ArrowLeft": case "a": case "A":  setFocus(row*2 + 0); break;
       case "ArrowRight": case "d": case "D": setFocus(row*2 + 1); break;
-      case "x": case "X": quadAction("edit"); break;      // select param
-      case "z": case "Z": quadAction("valUp"); break;     // increase value
-      case "c": case "C": quadAction("valDn"); break;     // decrease value
+      case "x": case "X": quadAction("edit"); break;
+      case "z": case "Z": quadAction("valUp"); break;
+      case "c": case "C": quadAction("valDn"); break;
       case "q": case "Q": quadAction("prevApp"); break;
       case "e": case "E": quadAction("nextApp"); break;
       case "o": case "O": quadAction("prevPre"); break;
       case "p": case "P": quadAction("nextPre"); break;
       default: done = false;
     }
-  } else {  // audio mode — events route to the audio stack (device is in Audio Setup)
+  } else {
     switch (e.key) {
-      case "ArrowUp": case "w": case "W":    sendControl("("); break;  // up: cursor / scroll / edit-
-      case "ArrowDown": case "s": case "S":  sendControl(")"); break;  // down
-      case "Shift":                          sendControl("l"); audioLevel = Math.min(audioLevel + 1, 2); break; // select slot (push)
+      case "ArrowUp": case "w": case "W":    sendControl("("); break;
+      case "ArrowDown": case "s": case "S":  sendControl(")"); break;
+      case "Shift":                          sendControl("l"); audioLevel = Math.min(audioLevel + 1, 2); break;
       case "Enter":
-        if (audioLevel >= 2) { sendControl("A"); audioLevel = 0; }     // in applet -> back up to the stack
-        else { sendControl("l"); audioLevel++; }                       // advance (select slot / enter params)
+        if (audioLevel >= 2) { sendControl("A"); audioLevel = 0; }
+        else { sendControl("l"); audioLevel++; }
         break;
-      case "x": case "X": sendControl("l"); break;   // applet select/push (in applet)
-      case "z": case "Z": sendControl(")"); break;   // value + (in applet)
-      case "c": case "C": sendControl("("); break;   // value −
-      case "a": case "A": sendControl("("); break;   // (wasd like quadrants inside applet)
+      case "x": case "X": sendControl("l"); break;
+      case "z": case "Z": sendControl(")"); break;
+      case "c": case "C": sendControl("("); break;
+      case "a": case "A": sendControl("("); break;
       case "d": case "D": sendControl(")"); break;
       default: done = false;
     }
@@ -572,664 +1242,494 @@ window.addEventListener("keydown", (e)=>{
   if (done) e.preventDefault();
 });
 
-// Click a quadrant in the 4-up view to focus/activate it (encoder-driven).
-$("panel-quad").querySelector("canvas").addEventListener("click", (e) => {
-  const r = e.currentTarget.getBoundingClientRect();
-  if (!r.width || !r.height) return;
-  // canvas has QPAD margins + QGUT gutter; the midline splits the quadrants
-  const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
-  const slot = (y < 0.5 ? 0 : 1) * 2 + (x < 0.5 ? 0 : 1);
-  setFocus(slot);
-});
-
-$("connect").onclick = connect;
-$("disconnect").onclick = disconnect;
-$("color").onclick = ()=>{ colorIdx=(colorIdx+1)%PHOSPHORS.length; savePrefs(); setStatus("color: "+PHOSPHORS[colorIdx].name); };
-$("save").onclick = savePng;
-$("full").onclick = ()=>{ document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); };
-
-// Big receive buffer: the default (255 B) overruns easily against our 4 KB hex
-// lines, which kills the read stream and used to wedge the whole port.
-const OPEN_OPTS = { baudRate:115200, bufferSize:262144 };
-
-async function connect(){
-  if (!("serial" in navigator)) { setStatus("Web Serial not supported. Use Chrome / Edge / Arc."); return; }
-  try {
-    port = await navigator.serial.requestPort({ filters:[{ usbVendorId:0x16C0 }] });
-    await port.open(OPEN_OPTS);
-  } catch(e){ setStatus("Connect cancelled/failed: "+e.message); return; }
-  writer = port.writable.getWriter();
-  reader = port.readable.getReader();
-  running = true;
-  for (const sc of SCOPES) sc.misses = 0;
-  MIDI.misses = 0; MIDI.lastSeq = null;
-  $("connect").disabled = true;
-  $("disconnect").disabled = false;
-  $("save").disabled = false;
-  for (const id of ["t-quad","t-audio","t-graphs","t-midi","t-scope","t-control","savebtn","backupbtn"]) $(id).disabled = false;
-  setStatus("Connected.");
-  pump().catch(()=>{ if (running) recover(); });
-  probeFirmware("connect").then(loop);
-}
-
-// Release everything in an order that works even after a stream error:
-// abort the writer first (discards pending writes that would otherwise hold
-// the lock and make port.close() hang forever — the "must reload the page"
-// failure), then close. Keeps `port` so recover() can reopen it.
-async function teardown(){
-  try { if (reader) await reader.cancel(); } catch(e){}
-  try { if (reader) reader.releaseLock(); } catch(e){}
-  try { if (writer) await writer.abort(); } catch(e){}
-  try { if (writer) writer.releaseLock(); } catch(e){}
-  try { if (port) await port.close(); } catch(e){}
-  reader = writer = null;
-  flushInput();
-}
-
-function uiDisconnected(){
-  $("connect").disabled=false; $("disconnect").disabled=true; $("save").disabled=true;
-  for (const id of ["t-quad","t-audio","t-graphs","t-midi","t-scope","t-control","savebtn","backupbtn"]) $(id).disabled = true;
-  setTag("–");
-}
-
-async function disconnect(){
-  running = false;
-  await teardown();
-  port = null;
-  uiDisconnected(); setStatus("Disconnected.");
-}
-
-// Auto-recovery: reopen the SAME port (no permission prompt needed) after the
-// link dies — USB hiccup, buffer overrun, module reset. Shared promise so the
-// read pump and the poll loop can't both start a recovery.
-let recoverPromise = null;
-function recover(){
-  if (!recoverPromise) recoverPromise = _recover().finally(()=>{ recoverPromise = null; });
-  return recoverPromise;
-}
-async function _recover(){
-  setStatus("Link lost — reconnecting…");
-  await teardown();
-  for (let i = 0; i < 20 && running && port; i++){
-    await sleep(500);
-    try {
-      await port.open(OPEN_OPTS);
-      writer = port.writable.getWriter();
-      reader = port.readable.getReader();
-      for (const sc of SCOPES) sc.misses = 0;
-      MIDI.misses = 0; MIDI.lastSeq = null;   // module may have rebooted (seq restart)
-      setStatus("Reconnected.");
-      pump().catch(()=>{ if (running) recover(); });
-      await probeFirmware("reconnect");   // did the module crash-reboot, or just a link blip?
-      return;
-    } catch(e){ setStatus("Link lost — reconnecting… (" + (i+1) + "/20)"); }
-  }
-  running = false;
-  port = null;
-  uiDisconnected();
-  setStatus("Link lost — check the USB cable, then press Connect.");
-}
-
-// --- serial line reader -----------------------------------------------------
-let rxBuf = "";
-const inbox = [];
-async function pump(){
-  const dec = new TextDecoder();
-  while (running && reader) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    rxBuf += dec.decode(value, { stream:true });
-    let nl;
-    while ((nl = rxBuf.indexOf("\n")) >= 0) {
-      const line = rxBuf.slice(0,nl).trim();
-      rxBuf = rxBuf.slice(nl+1);
-      if (line) inbox.push(line);
-    }
-  }
-}
-function flushInput(){ inbox.length = 0; rxBuf = ""; }
-
-// framebuffer transaction: only accept a reply of the expected byte-size.
-async function transact(cmd, expectBytes, timeoutMs=600){
-  flushInput();
-  await writer.write(enc.encode(cmd));
-  const deadline = performance.now() + timeoutMs;
-  while (performance.now() < deadline) {
-    while (inbox.length) {
-      const line = inbox.shift();
-      if (line.length % 2 === 0 && line.length/2 === expectBytes) return decodeFrame(line);
-    }
-    await sleep(1);
-  }
-  return null;
-}
-// level transaction: expect a short "l,r" text line.
-async function transactLevels(timeoutMs=250){
-  flushInput();
-  await writer.write(enc.encode("V"));
-  const deadline = performance.now() + timeoutMs;
-  while (performance.now() < deadline) {
-    while (inbox.length) {
-      const p = inbox.shift().split(",");
-      if (p.length === 2) { const l=parseFloat(p[0]), r=parseFloat(p[1]); if (!isNaN(l)&&!isNaN(r)) return [l,r]; }
-    }
-    await sleep(1);
-  }
-  return null;
-}
-// Firmware diagnostic probe ("OA?0" -> "DBG v3 crash=... pv=[...] ..."), run at
-// connect and after every auto-reconnect. Logs the firmware's live state to
-// the console, and if the module hard-faulted and rebooted (crash=1), pulls
-// the full CrashReport ("OA!0") into the console so it can be copied.
-async function probeFirmware(context){
-  if (!writer) return;
-  flushInput();
-  try { await writer.write(enc.encode("OA?0")); } catch(e){ return; }
-  let dbg = null;
-  const deadline = performance.now() + 400;
-  while (performance.now() < deadline && !dbg) {
-    while (inbox.length) { const l = inbox.shift(); if (l.startsWith("DBG ")) { dbg = l; break; } }
-    await sleep(2);
-  }
-  if (!dbg) { console.warn("[phaz] " + context + ": no DBG reply — firmware predates scope protocol v3"); return; }
-  console.log("[phaz] " + context + ": " + dbg);
-  if (!/crash=1/.test(dbg)) return;
-  // the module crashed and auto-rebooted since we last looked — fetch the report
-  flushInput();
-  try { await writer.write(enc.encode("OA!0")); } catch(e){ return; }
-  const rpt = [];
-  let end = performance.now() + 800, done = false;
-  while (performance.now() < end && !done) {
-    while (inbox.length) {
-      const l = inbox.shift();
-      if (l === "ENDCRASH") { done = true; break; }
-      rpt.push(l);
-    }
-    await sleep(2);
-  }
-  console.warn("[phaz] MODULE CRASH REPORT:\n" + rpt.join("\n"));
-  setStatus("Module crashed & rebooted — crash report in the console (Cmd-Opt-J), please copy it.");
-}
-
-// --- MIDI monitor ('N') --------------------------------------------------------
-// Reply: "N:" + 32 events x 12 hex chars (seq4 message2 dirchan2 d1 d2).
-// seq is a rolling 16-bit counter, 0 = empty slot; we render only events newer
-// than the highest seq seen (wraparound-aware).
-async function transactMidiLog(timeoutMs=250){
-  flushInput();
-  await writer.write(enc.encode("N"));
-  const deadline = performance.now() + timeoutMs;
-  while (performance.now() < deadline) {
-    while (inbox.length) {
-      const line = inbox.shift();
-      if (line.startsWith("N:") && line.length === 2 + 32*12) {
-        const evs = [];
-        for (let i = 0; i < 32; i++) {
-          const o = 2 + i*12;
-          const seq = parseInt(line.substr(o, 4), 16);
-          if (!seq) continue;
-          const dc = parseInt(line.substr(o+6, 2), 16);
-          evs.push({ seq,
-            message: parseInt(line.substr(o+4, 2), 16),
-            out: !!(dc & 0x80), chan: dc & 0x7F,
-            d1: parseInt(line.substr(o+8, 2), 16),
-            d2: parseInt(line.substr(o+10, 2), 16) });
-        }
-        return evs;
-      }
-    }
-    await sleep(1);
-  }
-  return null;
-}
-
-const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
-const noteName = n => NOTE_NAMES[n%12] + (Math.floor(n/12) - 1);
-function fmtMidiEv(e){
-  const dir = e.out ? "OUT" : "IN ";
-  const ch = e.chan ? String(e.chan).padStart(2, "0") : "--";
-  let body;
-  switch (e.message & 0xF0) {
-    case 0x90: body = e.d2 ? "Note On  " + noteName(e.d1).padEnd(4) + " vel " + e.d2
-                           : "Note Off " + noteName(e.d1).padEnd(4) + " (vel 0)"; break;
-    case 0x80: body = "Note Off " + noteName(e.d1).padEnd(4) + " vel " + e.d2; break;
-    case 0xB0: body = "CC " + String(e.d1).padStart(3) + " = " + e.d2; break;
-    case 0xE0: { const v = ((e.d2 << 7) | e.d1) - 8192;
-                 body = "Bend " + (v > 0 ? "+" : "") + v; break; }
-    case 0xC0: body = "Program " + e.d1; break;
-    case 0xD0: body = "AfterTouch " + e.d1; break;
-    case 0xA0: body = "PolyAT " + noteName(e.d1) + " " + e.d2; break;
-    default:   body = ({ 0xFA:"Start", 0xFB:"Continue", 0xFC:"Stop",
-                         0xF2:"SongPos", 0xF1:"MTC", 0xF6:"TuneReq" })[e.message]
-                      || ("Status 0x" + e.message.toString(16).toUpperCase()); break;
-  }
-  return dir + " ch" + ch + "  " + body;
-}
-
-function midiAppend(evs){
-  let fresh;
-  if (MIDI.lastSeq === null) {
-    fresh = evs.slice().sort((a,b)=>a.seq-b.seq).slice(-12);   // seed with recent
-  } else {
-    const age = e => (e.seq - MIDI.lastSeq) & 0xFFFF;
-    fresh = evs.filter(e => age(e) > 0 && age(e) <= 0x7FFF)
-               .sort((a,b) => age(a) - age(b));
-  }
-  if (!fresh.length) return;
-  MIDI.lastSeq = fresh[fresh.length-1].seq;
-  const log = $("midilog");
-  for (const e of fresh) {
-    const row = document.createElement("div");
-    row.className = "mrow " + (e.out ? "mout" : "min");
-    row.textContent = fmtMidiEv(e);
-    log.appendChild(row);
-  }
-  while (log.children.length > 200) log.removeChild(log.firstChild);
-  log.scrollTop = log.scrollHeight;   // keep the newest events in view
-}
-
-// scope transaction: "O"+slot+src+win -> 512 bytes = 256 big-endian int16
-// samples, oldest first (1024 hex chars; unique length, frames are 1024/2048 B).
-async function transactScope(i, timeoutMs=400){
-  const sc = SCOPES[i];
-  flushInput();
-  await writer.write(enc.encode("O" + (i ? "B" : "A") + sc.src + sc.win));
-  const deadline = performance.now() + timeoutMs;
-  while (performance.now() < deadline) {
-    while (inbox.length) {
-      const line = inbox.shift();
-      if (line.length === 1024) {
-        const s = new Int16Array(256);
-        let ok = true;
-        for (let i = 0; i < 256; i++) {
-          const v = parseInt(line.substr(i*4, 4), 16);
-          if (Number.isNaN(v)) { ok = false; break; }
-          s[i] = v > 32767 ? v - 65536 : v;
-        }
-        if (ok) return s;
-      }
-    }
-    await sleep(1);
-  }
-  return null;
-}
-// control-state transaction: expect "left,right,full" (which quadrants are active).
-async function transactState(timeoutMs=200){
-  flushInput();
-  await writer.write(enc.encode("T"));
-  const deadline = performance.now() + timeoutMs;
-  while (performance.now() < deadline) {
-    while (inbox.length) {
-      const p = inbox.shift().split(",");
-      if (p.length === 4) {
-        const l=parseInt(p[0]), r=parseInt(p[1]), f=parseInt(p[2]), pre=parseInt(p[3]);
-        if (![l,r,f,pre].some(isNaN)) return { left:l, right:r, full:f, preset:pre };
-      }
-    }
-    await sleep(1);
-  }
-  return null;
-}
-function decodeFrame(hexline){
-  const n = hexline.length/2;
-  if ((n!==1024 && n!==2048) || hexline.length % 2) return null;
-  const data = new Uint8Array(n);
-  for (let i=0;i<n;i++){ const b=parseInt(hexline.substr(i*2,2),16); if (Number.isNaN(b)) return null; data[i]=b; }
-  return { data, w:OLED_W, h:n/16 };
-}
-
-// --- polling loop -----------------------------------------------------------
+// ---- polling loop ------------------------------------------------------------------
+let loopErrs = 0;   // consecutive loop exceptions; only repeated ones mean the link died
 async function loop(){
   while (running) {
     try {
-      if (ioBusy) { await sleep(15); continue; }   // paused during backup
-      // Background tabs get their timers throttled hard by the browser, which
-      // makes every transaction time out and desyncs the link — pause instead.
+      if (ioBusy) { await sleep(15); continue; }
       if (document.hidden) { await sleep(250); continue; }
-      let cycleOK = false;   // did ANY transaction succeed this cycle?
-      // levels first (fast), then the framebuffers — all as fast as the link allows
-      if (GRAPHS.on) {
-        const lv = await transactLevels();
-        if (lv) { pushLevel(lv[0], lv[1]); levelsSeen = true; cycleOK = true; }
-        drawGraphs();
+      let cycleOK = false;
+
+      if (VIEW === "classic") {
+        const f = await transact("S", 1024, 600);
+        if (f) { natives.live = buildNative(f); drawClassic(); setTag("LIVE"); cycleOK = true; }
+        if (!cycleOK) { await sleep(80); flushInput(); }
+        await sleep(2);
+        continue;
       }
-      if (PANELS.quad.on) {
+
+      if (hasType("quad")) {
         const st = await transactState();
         if (st) {
           cycleOK = true;
           activeSlots = st;
-          if (st.preset !== presetId) { presetId = st.preset; presetDirty = false; }  // device loaded a preset
+          if (st.preset !== presetId) { presetId = st.preset; presetDirty = false; }
           updatePresetUI();
         }
-        let f = await transact("Q", 2048, 500);
-        if (f) { drawPanel("quad", f); setTag("QUAD"); cycleOK = true; }
-        else { f = await transact("S", 1024, 500); if (f) { drawPanel("quad", f); setTag("two-up"); cycleOK = true; } }
+        const f = await transact("Q", 2048, 500);
+        if (f) { natives.quad = buildNative(f); drawType("quad"); setTag("QUAD"); cycleOK = true; }
       }
-      if (PANELS.audio.on) { const f = await transact("A", 1024, 500); if (f) { drawPanel("audio", f); cycleOK = true; } }
-      if (MIDI.on && MIDI.misses < 3) {
-        const evs = await transactMidiLog();
-        if (evs) { midiAppend(evs); MIDI.misses = 0; cycleOK = true; }
-        else if (++MIDI.misses >= 3)
-          setStatus("MIDI monitor: no reply — flash firmware with the 'N' command.");
+      if (hasType("live")) {
+        const f = await transact("S", 1024, 500);
+        if (f) { natives.live = buildNative(f); drawType("live"); cycleOK = true; }
       }
-      if (SCOPE.on) for (let i=0; i<2; i++) {
+      if (hasType("audio")) {
+        const f = await transact("A", 1024, 500);
+        if (f) { natives.audio = buildNative(f); cycleOK = true; }
+        const lv = await transactLevels();
+        if (lv) {
+          levels = lv; levelsSeen = true; cycleOK = true;
+          for (let m=0;m<4;m++) peaks[m] = (lv[m] >= peaks[m]) ? lv[m] : Math.max(lv[m], peaks[m]-0.012);
+        }
+        drawType("audio");
+      }
+      if (hasType("maps")) {
+        const f = await transact("M", 1024, 500);
+        if (f) { natives.maps = buildNative(f); drawType("maps"); cycleOK = true; }
+      }
+      for (const i of [0,1]) {
+        if (!hasType(i ? "scopeB" : "scopeA")) continue;
         const sc = SCOPES[i];
         if (!sc.src || sc.frozen || sc.misses >= 3) continue;
         const s = await transactScope(i);
         if (s) { sc.data = s; sc.misses = 0; cycleOK = true; }
         else if (++sc.misses >= 3)
-          setStatus("Scope " + (i?"B":"A") + ": no reply — flash firmware with the 4-byte 'O' command, then reconnect.");
-        drawScope(i);
+          setStatus("Scope " + (i?"B":"A") + ": no reply — firmware needs the 4-byte 'O' command.");
+        drawScopes();
       }
-      // Resync: nothing answered — let any in-flight/garbled reply finish and
-      // drain it before hammering the link again, so one glitch can't spiral.
-      if (!cycleOK && (GRAPHS.on || PANELS.quad.on || PANELS.audio.on)) {
-        await sleep(80);
-        flushInput();
+      if (hasType("midi") && MIDI.misses < 3) {
+        const evs = await transactMidiLog();
+        if (evs) { midiIngest(evs); MIDI.misses = 0; cycleOK = true; }
+        else if (++MIDI.misses >= 3)
+          setStatus("MIDI monitor: no reply — firmware needs the 'N' command.");
       }
+      if (!cycleOK) { await sleep(80); flushInput(); }
+      else loopErrs = 0;
       await sleep(2);
     } catch(e){
       if (!running) break;
-      await recover();            // link died mid-transaction — try to reopen
-      if (!writer) break;         // recovery gave up; loop ends cleanly
+      // A one-off exception here is usually a viewer bug, not a dead link —
+      // log it and keep going. Only repeated failures trigger reconnection.
+      console.error("[phaz] loop exception:", e);
+      if (++loopErrs < 3) {
+        setStatus("viewer hiccup: " + e.message + " (details in console)");
+        await sleep(100);
+        continue;
+      }
+      loopErrs = 0;
+      await recover();
+      if (!writer) break;
     }
   }
 }
 
-function pushLevel(l, r){
-  curL=l; curR=r;
-  peakL = (l>=peakL) ? l : Math.max(l, peakL-0.012);   // peak-hold with slow decay
-  peakR = (r>=peakR) ? r : Math.max(r, peakR-0.012);
-}
-
-// --- layout / rendering -----------------------------------------------------
-function scaleFor(){
-  const box = $("panels");
-  const cols = Math.max((PANELS.quad.on ? 1 : 0) + ((PANELS.audio.on||GRAPHS.on) ? 1 : 0),
-                        SCOPE.on ? 2 : 0) || 1;
-  const availW = (box.clientWidth - 32 - 20*(cols-1)) / cols;
-  // Two rows when the scopes are on: 128 (top) + 128 (scope) native px, plus
-  // the row gap and the scope-controls strip (fixed px, not scaled).
-  const availH = box.clientHeight - 40 - (SCOPE.on ? 64 : 0);
-  const rowsNative = SCOPE.on ? 256 : 128;
-  return Math.max(1, Math.floor(Math.min(availW/OLED_W, availH/rowsNative)));
-}
-
-function buildNative(frame){
-  const { data, w, h } = frame, fg = PHOSPHORS[colorIdx].rgb;
-  const nat = document.createElement("canvas"); nat.width=w; nat.height=h;
-  const ctx = nat.getContext("2d");
-  const img = ctx.createImageData(w,h);
-  for (let y=0;y<h;y++){
-    const page=(y>>3)*w, bit=1<<(y&7);
-    for (let x=0;x<w;x++){
-      const on = data[page+x] & bit, i=(y*w+x)*4;
-      img.data[i]=on?fg[0]:BG[0]; img.data[i+1]=on?fg[1]:BG[1]; img.data[i+2]=on?fg[2]:BG[2]; img.data[i+3]=255;
-    }
-  }
-  ctx.putImageData(img,0,0);
-  return nat;
-}
-
-
-// Quad composite: draw the four applet views with a margin (QPAD) and gutter
-// (QGUT) so the cyan/yellow highlight rings sit fully OUTSIDE the displays.
-const QPAD = 8, QGUT = 16;
-function quadCanvasSize(s){ return 128*s + 2*QPAD + QGUT; }
-function drawQuadComposite(cv, native, s){
-  const qs = 64*s;                       // one quadrant, scaled
-  const size = quadCanvasSize(s);
-  cv.width = size; cv.height = size;
-  const ctx = cv.getContext("2d");
-  ctx.imageSmoothingEnabled = false;
-  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, size, size);
-  const org = (c) => QPAD + c * (qs + QGUT);   // quadrant origin (col/row 0|1)
-  for (let q = 0; q < 4; q++){
-    const col = q & 1, row = (q >> 1) & 1;
-    ctx.fillStyle = `rgb(${BG.join(",")})`;
-    ctx.fillRect(org(col), org(row), qs, qs);
-    ctx.drawImage(native, col*64, row*64, 64, 64, org(col), org(row), qs, qs);
-  }
-  const ring = (q, gap) => {
-    if (q < 0 || q > 3) return;
-    const col = q & 1, row = (q >> 1) & 1;
-    ctx.strokeRect(org(col) - gap + .5, org(row) - gap + .5, qs + 2*gap - 1, qs + 2*gap - 1);
-  };
-  // cyan = slots the encoders are driving; yellow = focused quadrant —
-  // both drawn in the margin/gutter, never over display pixels
-  const slots = activeSlots.full >= 0 ? [activeSlots.full] : [activeSlots.left, activeSlots.right];
-  ctx.strokeStyle = "rgba(120,220,255,.9)"; ctx.lineWidth = 2;
-  for (const q of slots) ring(q, 3);
-  ctx.strokeStyle = "rgba(255,225,80,.95)"; ctx.lineWidth = 2;
-  ring(focusedSlot, 6);
-}
-
-function drawPanel(key, frame){
-  const p = PANELS[key];
-  p.native = buildNative(frame);
-  const cv = $(p.el).querySelector("canvas");
-  const s = scaleFor();
-  if (p.grid && frame.h === 128) {
-    drawQuadComposite(cv, p.native, s);
-  } else {
-    cv.width = frame.w*s; cv.height = frame.h*s;
-    const ctx = cv.getContext("2d");
-    ctx.imageSmoothingEnabled = false;
-    ctx.fillStyle = `rgb(${BG.join(",")})`; ctx.fillRect(0,0,cv.width,cv.height);
-    ctx.drawImage(p.native, 0,0, cv.width, cv.height);
-  }
-  if (key === "quad") $("quadctl").style.width = cv.width + "px";   // match control bar to quad width
-  // keep graph widths matched to the framebuffer panels
-  sizeGraphs(); drawGraphs();
-}
-
-function sizeGraphs(){
-  if (!GRAPHS.on && !SCOPE.on) return;
-  const s = scaleFor();
-  const w = OLED_W * s;
-  // Right column should visually balance the quad panel height when present.
-  const quadH = PANELS.quad.on ? 128*s : 0;
-  const audioH = PANELS.audio.on ? 64*s : 0;
-  let gH = PANELS.quad.on ? Math.floor((quadH - audioH - 30) / 2) : Math.round(46*s/2);
-  gH = Math.max(38, Math.min(gH, 150));
-  for (const id of ["graph-l","graph-r"]) {
-    const cv = $(id).querySelector("canvas");
-    if (cv.width!==w || cv.height!==gH){ cv.width=w; cv.height=gH; }
-  }
-  // Scopes: one per column, square — same footprint/ratio as the displays above.
-  for (let i=0; i<2; i++){
-    const cv = $("scope-"+i).querySelector("canvas");
-    if (cv.width!==w || cv.height!==w){ cv.width=w; cv.height=w; }
-    // (scope control strips have fixed geometry — see .srow CSS — so no width sync)
-  }
-  // MIDI monitor matches the column width; its height flexes to bottom-align
-  // the right column with the quad column (see #panel-midi CSS).
-  $("midilog").style.width = w + "px";
-}
-
-function drawGraphs(){
-  sizeGraphs();
-  if (GRAPHS.on) {
-    drawMeter($("graph-l").querySelector("canvas"), curL, peakL, "L IN");
-    drawMeter($("graph-r").querySelector("canvas"), curR, peakR, "R IN");
-  }
-  if (SCOPE.on){ drawScope(0); drawScope(1); }
-}
-
-// --- oscilloscopes ------------------------------------------------------------
-// CV sources plot in volts, audio in raw PCM (-1..+1), on the user-selected
-// vertical scale; audio uses a rising-edge trigger for a stable trace. The
-// time base (win) is applied firmware-side; freeze stops polling that slot.
-function drawScope(i){
-  if (!SCOPE.on) return;
-  const sc = SCOPES[i];
-  const cv = $("scope-"+i).querySelector("canvas");
-  if (!cv.width) sizeGraphs();
-  const w=cv.width, h=cv.height, ctx=cv.getContext("2d");
-  const isAudio = isAudioSrc(sc.src);
-  ctx.fillStyle="#000"; ctx.fillRect(0,0,w,h);
-  if (!sc.src){
-    ctx.fillStyle="rgba(160,160,175,.6)"; ctx.font="11px ui-monospace, monospace";
-    ctx.textBaseline="top";
-    ctx.fillText("SCOPE " + (i?"B":"A") + " — off", 4, 2);
-    return;
-  }
-  const top=15, bot=4, plotH=h-top-bot;
-  const vsTable = isAudio ? AU_VS : CV_VS;
-  const vs = vsTable[Math.min(sc.vs, vsTable.length-1)];
-  const vMin = vs[1] + sc.off, vMax = vs[2] + sc.off;   // window shifted by offset
-  const yOf = v => top + (vMax - v)/(vMax - vMin)*plotH;
-
-  // grid: 8 horizontal + 10 vertical divisions
-  ctx.strokeStyle="rgba(85,85,100,.35)"; ctx.lineWidth=1;
-  for (let g=0; g<=8; g++){
-    const y = Math.round(top + g*plotH/8)+.5;
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
-  }
-  for (let g=1; g<10; g++){
-    const x = Math.round(g*w/10)+.5;
-    ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, h-bot); ctx.stroke();
-  }
-  if (vMin < 0 && vMax > 0){                                    // 0 line, brighter
-    ctx.strokeStyle="rgba(160,160,180,.7)";
-    ctx.beginPath(); ctx.moveTo(0, yOf(0)+.5); ctx.lineTo(w, yOf(0)+.5); ctx.stroke();
-  }
-
-  // waveform
-  const d = sc.data;
-  if (d && d.length){
-    let start = 0, count = d.length;
-    if (isAudio){
-      // show half the buffer; hunt for a rising zero-cross in the other half
-      count = d.length >> 1;
-      for (let k=1; k<=d.length-count; k++)
-        if (d[k-1] > 0 && d[k] <= 0){ start = k; break; }   // rising edge post-inversion
-    }
-    const fg = PHOSPHORS[colorIdx].rgb;
-    ctx.strokeStyle = `rgb(${fg.join(",")})`;
-    ctx.lineWidth = 2; ctx.lineJoin = "round";
-    ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = 4;
-    ctx.beginPath();
-    for (let k=0; k<count; k++){
-      // audio: PCM -> ±1, NEGATED (the analog output stage inverts, so raw
-      // samples are upside-down relative to the jack); CV: mV -> V
-      const v = isAudio ? -d[start+k]/32768 : d[start+k]/1000;
-      const x = k/(count-1)*w;
-      const y = Math.max(top, Math.min(h-bot, yOf(v)));
-      k ? ctx.lineTo(x,y) : ctx.moveTo(x,y);
-    }
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-  }
-
-  // labels: name top-left; time window / status top-right; scale ticks left
-  ctx.fillStyle="rgba(230,230,235,.8)"; ctx.font="11px ui-monospace, monospace"; ctx.textBaseline="top";
-  const name = sc.src === "i" || sc.src === "j" ? ("AUDIO IN " + (sc.src === "i" ? "L" : "R"))
-             : isAudio                          ? ("AUDIO OUT " + sc.src)
-             : sc.src >= "a" && sc.src <= "h"   ? ("CV IN "   + ("abcdefgh".indexOf(sc.src)+1))
-             : sc.src >= "t" && sc.src <= "w"   ? ("TRIG IN " + ("tuvw".indexOf(sc.src)+1))
-             :                                    ("CV OUT "  + sc.src);
-  ctx.fillText("SCOPE " + (i?"B":"A") + " — " + name, 4, 2);
-  ctx.textAlign="right";
-  const offTxt = sc.off ? ("OFS " + (sc.off > 0 ? "+" : "") +
-    (Math.abs(sc.off) < 1 ? sc.off.toFixed(2) : +sc.off.toFixed(2)) + (isAudio ? "" : "V") + "  ") : "";
-  ctx.fillText(offTxt + (sc.frozen ? "FROZEN"
-             : d ? scopeWinLabel(i, sc.win)
-             : sc.misses >= 3 ? "no fw support" : "no data"), w-4, 2);
-  ctx.textAlign="left";
-  ctx.fillStyle="rgba(180,180,195,.55)"; ctx.font="9px ui-monospace, monospace";
-  const unit = isAudio ? "" : "V";
-  const fmt = v => (v > 0 ? "+" : "") + (Math.abs(v) < 1 ? v.toFixed(2).replace("0.",".") : v) + unit;
-  ctx.fillText(fmt(vMax), 2, top+1);
-  if (vMin < 0 && vMax > 0) ctx.fillText("0"+unit, 2, yOf(0)+1);
-  ctx.fillText(fmt(vMin), 2, h-bot-9);
-}
-
-// Segmented LED-style level meter: green -> yellow -> red, unlit = blank,
-// with a floating peak-hold segment.
-function zoneColor(frac){
-  return frac > 0.85 ? [235,45,35]     // red
-       : frac > 0.60 ? [238,208,30]    // yellow
-       :               [70,220,55];    // green
-}
-function drawMeter(cv, level, peak, label){
-  const w=cv.width, h=cv.height, ctx=cv.getContext("2d");
-  ctx.fillStyle="#000"; ctx.fillRect(0,0,w,h);
-  const top = 15, barH = h - top - 3;
-  const N = Math.min(46, Math.max(20, Math.round(w/12)));
-  const gap = Math.max(1, Math.round(w/(N*7)));
-  const segW = (w - gap*(N+1)) / N;
-  const lit = Math.round(clamp01(level)*N);
-  const peakIdx = Math.ceil(clamp01(peak)*N) - 1;
-  ctx.save();
-  for (let i=0;i<N;i++){
-    const on = (i < lit) || (i === peakIdx && peakIdx >= 0);
-    if (!on) continue;                       // blank if the level isn't reached
-    const c = zoneColor((i+1)/N);
-    const x = gap + i*(segW+gap);
-    ctx.shadowColor = `rgb(${c.join(",")})`;
-    ctx.shadowBlur = Math.max(3, segW*0.6);   // soft LED glow
-    ctx.fillStyle = `rgb(${c.join(",")})`;
-    ctx.fillRect(x, top, segW, barH);
-  }
-  ctx.restore();
-  ctx.fillStyle="rgba(230,230,235,.8)"; ctx.font="11px ui-monospace, monospace"; ctx.textBaseline="top";
-  ctx.fillText(label, 4, 2);
-  const right = levelsSeen ? (Math.round(clamp01(level)*100)+"%") : "no data";
-  ctx.textAlign="right"; ctx.fillText(right, w-4, 2); ctx.textAlign="left";
-}
-
-// redraw on window resize
-let rT; window.addEventListener("resize", ()=>{ clearTimeout(rT); rT=setTimeout(()=>{
-  for (const k of Object.keys(PANELS)) if (PANELS[k].native) redrawPanel(k);
-  drawGraphs();
-}, 120); });
-function redrawPanel(key){
-  const p = PANELS[key]; if (!p.native) return;
-  const cv = $(p.el).querySelector("canvas"); const s = scaleFor();
-  if (p.grid && p.native.height === 128) {
-    drawQuadComposite(cv, p.native, s);
-    return;
-  }
-  cv.width = p.native.width*s; cv.height = p.native.height*s;
-  const ctx = cv.getContext("2d"); ctx.imageSmoothingEnabled=false;
-  ctx.drawImage(p.native,0,0,cv.width,cv.height);
-}
-
-// Move focus to a quadrant (0..3): activate it on the module (drives its encoder).
-function setFocus(slot){
-  focusedSlot = ((slot % 4) + 4) % 4;
-  sendControl(String(focusedSlot));   // SwitchToSlot -> active + firmware focus
-}
-
+// ---- save PNG ---------------------------------------------------------------------
 function savePng(){
-  const cols=[];
-  if (PANELS.quad.on && PANELS.quad.native) cols.push([PANELS.quad.native]);
-  const right=[];
-  if (PANELS.audio.on && PANELS.audio.native) right.push(PANELS.audio.native);
-  if (GRAPHS.on){ right.push($("graph-l").querySelector("canvas"), $("graph-r").querySelector("canvas")); }
-  if (right.length) cols.push(right);
-  if (SCOPE.on){ cols.push([$("scope-0").querySelector("canvas")], [$("scope-1").querySelector("canvas")]); }
-  if (!cols.length) return;
-  const scale=6, gap=10;
-  const colImgs = cols.map(list=>{
-    const w = Math.max(...list.map(c=>c.width))*scale;
-    const h = list.reduce((s,c)=>s+c.height*scale+gap, gap);
-    const cc=document.createElement("canvas"); cc.width=w; cc.height=h;
-    const x=cc.getContext("2d"); x.imageSmoothingEnabled=false;
-    x.fillStyle=`rgb(${BG.join(",")})`; x.fillRect(0,0,w,h);
-    let y=gap; for (const c of list){ x.drawImage(c,0,y,c.width*scale,c.height*scale); y+=c.height*scale+gap; }
-    return cc;
+  const canvases = [];
+  cellEls.forEach((cell,i)=>{
+    if (CELLS[i] === "off" || CELLS[i] === "midi") return;
+    const cv = cell.querySelector(".cbody canvas");
+    if (cv && cv.width) canvases.push(cv);
   });
-  const W = colImgs.reduce((s,c)=>s+c.width+gap, gap);
-  const H = Math.max(...colImgs.map(c=>c.height))+2*gap;
-  const out=document.createElement("canvas"); out.width=W; out.height=H;
-  const c=out.getContext("2d"); c.fillStyle=`rgb(${BG.join(",")})`; c.fillRect(0,0,W,H);
-  let x=gap; for (const ci of colImgs){ c.drawImage(ci,x,gap); x+=ci.width+gap; }
-  const a=document.createElement("a");
-  a.download="phazerville_"+new Date().toISOString().replace(/[:.]/g,"-")+".png";
-  a.href=out.toDataURL("image/png"); a.click();
+  if (!canvases.length) return;
+  const gap = 12;
+  const w = Math.max(...canvases.map(c=>c.width));
+  const cols = Math.min(2, canvases.length);
+  const rows = Math.ceil(canvases.length / 2);
+  const rowH = Math.max(...canvases.map(c=>c.height));
+  const out = document.createElement("canvas");
+  out.width = cols*w + (cols+1)*gap;
+  out.height = rows*rowH + (rows+1)*gap;
+  const ctx = out.getContext("2d");
+  ctx.fillStyle = "#000"; ctx.fillRect(0,0,out.width,out.height);
+  canvases.forEach((c,k)=>{
+    ctx.drawImage(c, gap + (k%2)*(w+gap), gap + Math.floor(k/2)*(rowH+gap));
+  });
+  const a = document.createElement("a");
+  a.download = "phazerville_grid_" + new Date().toISOString().replace(/[:.]/g,"-") + ".png";
+  a.href = out.toDataURL("image/png"); a.click();
 }
+
+// ---- boot ------------------------------------------------------------------------
+$("connect").onclick = connect;
+$("disconnect").onclick = disconnect;
+$("color").onclick = ()=>{ colorIdx=(colorIdx+1)%PHOSPHORS.length; savePrefs(); redrawAll(); setStatus("color: "+PHOSPHORS[colorIdx].name); };
+$("save").onclick = savePng;
+$("full").onclick = ()=>{ document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); };
+$("t-keys").onclick = ()=>{ $("keys").hidden = !$("keys").hidden; };
+$("keys").onclick = ()=>{ $("keys").hidden = true; };
+$("mode").onclick = ()=>{ if (running) setMode(mode === "quad" ? "audio" : "quad"); };
+$("t-classic").onclick = ()=>{
+  VIEW = VIEW === "classic" ? "grid" : "classic";
+  syncView(); redrawAll(); savePrefs();
+};
+$("t-control").onclick = ()=>{
+  const show = $("control").hidden;
+  $("control").hidden = !show;
+  $("t-control").classList.toggle("on", show);
+};
+$("savebtn").onclick = savePreset;
+$("backupbtn").onclick = backupBank;
+let rT; window.addEventListener("resize", ()=>{ clearTimeout(rT); rT=setTimeout(redrawAll, 120); });
+document.addEventListener("fullscreenchange", ()=>{
+  document.body.classList.toggle("fs", !!document.fullscreenElement);
+  redrawAll();
+});
+
+wireControl();
+typeSelects();
+for (let i=0;i<4;i++) buildCell(i);
+setMaxed(-1);
+syncView();
+updatePresetUI();
+
+// ================================================================================
+// Slots panel — loadable-slots loader (protocol v1, SlotLoaderProtocol.md).
+// Shares the viewer's port: while a session runs, ioBusy pauses the capture
+// loop and pump() feeds raw bytes into slotsRx instead of the line inbox.
+// ================================================================================
+let slotsBinMode = false;
+let slotsRx = [];            // raw byte queue (head index avoids O(n^2) shifts)
+let slotsRxHead = 0;
+let slotsRxWaiter = null;
+let slotsUnit = null, slotsInv = [], slotsPending = null, slotsSessionBusy = false;
+
+const SL_SYNC=0xA5, SL_CHUNK=1024;
+const SL_CMD={HELLO:1,INVENTORY:2,BEGIN:3,DATA:4,END:5,ERASE:6,COMMIT:7,RESET:8,BYE:9};
+const SL_STATUS=["OK","BAD_FRAME","BAD_STATE","BAD_SLOT","BAD_SIZE","BAD_SEQ",
+                 "VERIFY_FAIL","HDR_INVALID","CORE_MISMATCH","FLASH_ERR","UNKNOWN_CMD"];
+const SL_FRIENDLY={
+  BAD_STATE:"the module refused: that app is the CURRENT app on the unit — switch apps on the module, then retry",
+  CORE_MISMATCH:"this .pzslot was built for a different firmware build — rebuild it against the running firmware",
+  VERIFY_FAIL:"transfer verification failed — try again",
+};
+const SL_STATE=["empty","ok","bad-crc","core-mismatch","invalid"];
+const SL_TYPE={1:"applet",2:"audio-mono",3:"audio-stereo",4:"app"};
+const SL_MAGIC=0x417A6850;
+
+const SL_CRC_T=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;
+  for(let k=0;k<8;k++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);t[n]=c>>>0;}return t;})();
+function slCrc32(b){let c=0xFFFFFFFF;for(let i=0;i<b.length;i++)c=SL_CRC_T[(c^b[i])&0xFF]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+
+function slAvail(){ return slotsRx.length - slotsRxHead; }
+function slTake(n){
+  const out = slotsRx.slice(slotsRxHead, slotsRxHead+n);
+  slotsRxHead += n;
+  if (slotsRxHead > 65536) { slotsRx = slotsRx.slice(slotsRxHead); slotsRxHead = 0; }
+  return out;
+}
+function slPeek(i){ return slotsRx[slotsRxHead+i]; }
+function slFlush(){ slotsRx = []; slotsRxHead = 0; }
+// Resolve only when MORE data than `have` is available (or reject on
+// timeout). Resolving on "any data present" spins forever on a partial
+// frame: the caller re-checks, is still short, and awaits an
+// already-resolved promise in an infinite microtask loop — page freeze.
+function slWaitMore(deadline, have){
+  return new Promise((res,rej)=>{
+    if (slAvail() > have) return res();
+    if (!running || !writer) return rej(new Error("link lost"));
+    const ms = deadline - performance.now();
+    if (ms <= 0) return rej(new Error("timeout — is the module still connected?"));
+    const to = setTimeout(()=>{ slotsRxWaiter=null; rej(new Error("timeout — is the module still connected?")); }, ms);
+    slotsRxWaiter = ()=>{ clearTimeout(to); res(); };
+  });
+}
+async function slRecv(timeoutMs){
+  const deadline = performance.now() + timeoutMs;
+  let skipped = 0;
+  for(;;){
+    // Yield to the event loop while skipping garbage: with a continuously
+    // streaming module this scan otherwise starves the main thread and
+    // freezes the page.
+    if (skipped > 0 && (skipped & 1023) === 0) await sleep(0);
+    if (skipped > 2_000_000)
+      throw new Error("no protocol frames in the stream — the module is talking, but not loader protocol (boot loop or capture stream?)");
+    if (performance.now() > deadline) throw new Error("timeout — is the module still connected?");
+    while (slAvail() < 1) await slWaitMore(deadline, slAvail());
+    if (slPeek(0) !== SL_SYNC) { slTake(1); skipped++; continue; }
+    while (slAvail() < 3) await slWaitMore(deadline, slAvail());
+    const len = slPeek(1) | (slPeek(2)<<8);
+    if (len === 0 || len > 8192) { slTake(1); skipped++; continue; }
+    while (slAvail() < 3+len+4) await slWaitMore(deadline, slAvail());
+    const fr = slTake(3+len+4);
+    const body = new Uint8Array(fr.slice(3, 3+len));
+    const crc = (fr[3+len] | (fr[4+len]<<8) | (fr[5+len]<<16) | (fr[6+len]<<24)) >>> 0;
+    if (slCrc32(body) !== crc) { skipped += fr.length; continue; }
+    return { cmd: body[0], payload: body.slice(1) };
+  }
+}
+async function slSend(cmd, payload=new Uint8Array(0)){
+  const body = new Uint8Array(1+payload.length);
+  body[0]=cmd; body.set(payload,1);
+  const f = new Uint8Array(3+body.length+4);
+  f[0]=SL_SYNC; f[1]=body.length&0xFF; f[2]=body.length>>8;
+  f.set(body,3);
+  const c = slCrc32(body);
+  f[3+body.length]=c&0xFF; f[4+body.length]=(c>>>8)&0xFF;
+  f[5+body.length]=(c>>>16)&0xFF; f[6+body.length]=(c>>>24)&0xFF;
+  await writer.write(f);
+}
+async function slRequest(cmd, payload, timeoutMs=3000){
+  await slSend(cmd, payload);
+  const r = await slRecv(timeoutMs);
+  if (r.cmd !== (cmd|0x80)) throw new Error("unexpected response 0x"+r.cmd.toString(16));
+  const st = r.payload[0];
+  if (st !== 0) {
+    const name = SL_STATUS[st] || ("status "+st);
+    throw new Error(SL_FRIENDLY[name] || ("device replied "+name));
+  }
+  return r.payload;
+}
+function slDv(b){ return new DataView(b.buffer, b.byteOffset, b.byteLength); }
+function slCstr(b,off,len){ let e=off; while(e<off+len && b[e]!==0) e++;
+  return new TextDecoder().decode(b.slice(off,e)); }
+
+async function slSession(fn){
+  // one loader conversation: pause capture loop, raw mode, PhZ!, ... , BYE
+  if (!writer) { slMsg("not connected — press Connect first", true); return; }
+  if (slotsSessionBusy) { slMsg("still finishing the previous operation — try again in a moment", true); return; }
+  if (!running) { slMsg("link is down — reconnect first", true); return; }
+  slotsSessionBusy = true;
+  ioBusy = true;
+  console.log("[slots] session start");
+  await sleep(650);                   // let any in-flight capture transact fully time out
+  slotsBinMode = true; slFlush();
+  try {
+    console.log("[slots] entering loader (PhZ!)");
+    await writer.write(enc.encode("PhZ!"));
+    await sleep(200);
+    await fn();
+    console.log("[slots] session ops done");
+    try { await slRequest(SL_CMD.BYE); } catch(e){}
+  } catch(e) {
+    console.warn("[slots] session error:", e);
+    slMsg("error: " + e.message, true);
+    try { await slRequest(SL_CMD.BYE); } catch(e2){}
+  } finally {
+    slotsBinMode = false; slFlush();
+    flushInput();
+    ioBusy = false;
+    slotsSessionBusy = false;
+    console.log("[slots] session end");
+  }
+}
+
+async function slHello(){
+  console.log("[slots] HELLO...");
+  const pl = await slRequest(SL_CMD.HELLO);
+  console.log("[slots] HELLO ok");
+  const v = slDv(pl);
+  const banks=[]; const n=pl[11]; let off=12;
+  for(let i=0;i<n;i++){ banks.push({first:v.getUint16(off,true),count:v.getUint16(off+2,true),
+    base:v.getUint32(off+4,true),size:v.getUint32(off+8,true),
+    tmin:v.getUint16(off+12,true),tmax:v.getUint16(off+14,true)}); off+=16; }
+  slotsUnit = { core:v.getUint32(1,true), proto:v.getUint32(5,true),
+                banks, name: slCstr(pl,off,16) };
+}
+async function slInventory(){
+  const pl = await slRequest(SL_CMD.INVENTORY);
+  const v = slDv(pl); const count=v.getUint16(1,true);
+  slotsInv=[]; let off=3;
+  for(let i=0;i<count;i++){
+    slotsInv.push({ slot:v.getUint16(off,true), state:pl[off+2], type:pl[off+3],
+      size:v.getUint32(off+12,true), name:slCstr(pl,off+20,16) });
+    off+=36;
+  }
+}
+async function slTransfer(bytes, slot, onP){
+  const v=new DataView(new ArrayBuffer(10));
+  v.setUint16(0,slot,true); v.setUint32(2,bytes.length,true); v.setUint32(6,slCrc32(bytes),true);
+  await slRequest(SL_CMD.BEGIN, new Uint8Array(v.buffer), 30000);
+  let seq=0;
+  for(let off=0; off<bytes.length; off+=SL_CHUNK){
+    const ch=bytes.slice(off,off+SL_CHUNK);
+    const p=new Uint8Array(2+ch.length); p[0]=seq&0xFF; p[1]=seq>>8; p.set(ch,2);
+    await slRequest(SL_CMD.DATA, p, 10000);
+    seq++; onP(Math.min(off+SL_CHUNK,bytes.length)/bytes.length);
+  }
+  const pl = await slRequest(SL_CMD.END, undefined, 10000);
+  return { state: pl[1], needsReboot: pl[2]===1 };
+}
+function slParsePzslot(bytes){
+  if (bytes.length <= 128) throw new Error("file too small to be a .pzslot");
+  const v = slDv(bytes);
+  if (v.getUint32(0,true) !== SL_MAGIC) throw new Error("not a .pzslot (bad magic)");
+  if (slCrc32(bytes.slice(0,124)) !== v.getUint32(124,true)) throw new Error("corrupt .pzslot (header CRC)");
+  return { type:v.getUint16(6,true), core:v.getUint32(8,true),
+           name:slCstr(bytes,20,16), factory:v.getUint32(48,true) };
+}
+function slSlotFor(addr){
+  if (!slotsUnit) return null;
+  for (const b of slotsUnit.banks)
+    if (addr >= b.base && addr < b.base + b.count*b.size)
+      return b.first + Math.floor((addr-b.base)/b.size);
+  return null;
+}
+function slBankLabel(b){
+  if (b.tmin===1 && b.tmax===1) return "quadrant applets";
+  if (b.tmin>=2 && b.tmax<=3) return "audio applets";
+  if (b.tmin===4) return "full-screen apps";
+  return "slots";
+}
+function slMsg(m, err){
+  const el = $("slotsmsg");
+  el.textContent = m || "";
+  el.classList.toggle("err", !!err);
+}
+function slRender(){
+  const root = $("slotsbanks"); root.innerHTML = "";
+  if (!slotsUnit) return;
+  $("slotstag").textContent =
+    slotsUnit.name + " · core " + slotsUnit.core.toString(16).toUpperCase().padStart(8,"0")
+    + " · " + slotsInv.length + " slot(s) in use";
+  for (const b of slotsUnit.banks){
+    const div = document.createElement("div");
+    div.className = "bank";
+    const occ = slotsInv.filter(r => r.slot >= b.first && r.slot < b.first + b.count);
+    div.innerHTML = '<div class="bhead"><span class="bname">' + slBankLabel(b) + '</span>'
+      + '<span class="binfo">slots ' + b.first + '–' + (b.first+b.count-1) + ' · '
+      + (b.size/1024) + ' KB each · ' + occ.length + '/' + b.count + ' used</span></div>';
+    if (occ.length){
+      const t=document.createElement("table");
+      t.innerHTML='<tr><th>slot</th><th>name</th><th>type</th><th>size</th><th>state</th><th></th></tr>';
+      for (const r of occ){
+        const tr=document.createElement("tr");
+        const ok = r.state===1;
+        tr.innerHTML = '<td class="num">'+r.slot+'</td><td>'+r.name+'</td>'
+          + '<td class="num">'+(SL_TYPE[r.type]||r.type)+'</td>'
+          + '<td class="num">'+r.size+' B</td>'
+          + '<td><span class="st '+(ok?"ok":"bad")+'">'+(SL_STATE[r.state]||r.state)+'</span></td><td></td>';
+        const btn=document.createElement("button");
+        btn.className="erasebtn"; btn.textContent="Erase";
+        btn.onclick=()=>slErase(r.slot, r.name);
+        tr.lastElementChild.appendChild(btn);
+        t.appendChild(tr);
+      }
+      div.appendChild(t);
+    }
+    root.appendChild(div);
+  }
+}
+
+function slotsRefresh(){
+  slMsg("reading unit…");
+  return slSession(async ()=>{
+    await slHello(); await slInventory();
+    slRender(); slMsg("");
+  });
+}
+function slErase(slot, name){
+  if (!window.confirm("Erase slot "+slot+" ("+name+")? Active uses fall back automatically.")) return;
+  slMsg("erasing slot "+slot+"…");
+  slSession(async ()=>{
+    const p=new Uint8Array(2); p[0]=slot&0xFF; p[1]=slot>>8;
+    await slRequest(SL_CMD.ERASE, p, 10000);
+    await slHello(); await slInventory();
+    slRender(); slMsg("slot "+slot+" erased");
+  });
+}
+function slotsReboot(){
+  slMsg("rebooting…");
+  slSession(async ()=>{ await slSend(SL_CMD.RESET); slMsg("reboot sent — the viewer will reconnect"); });
+}
+function slOfferFile(file){
+  file.arrayBuffer().then(buf=>{
+    const bytes=new Uint8Array(buf);
+    const info=slParsePzslot(bytes);
+    const slot=slSlotFor(info.factory);
+    slotsPending={bytes,info,slot};
+    const lines=[]; let blocked=false;
+    lines.push("<span><b>"+info.name+"</b> · "+(SL_TYPE[info.type]||info.type)+" · "+bytes.length+" B</span>");
+    if (!slotsUnit){ lines.push('<span class="warn">open the panel while connected first</span>'); blocked=true; }
+    else {
+      if (slot===null){ lines.push('<span class="warn">image address matches no bank on this unit</span>'); blocked=true; }
+      else {
+        const r = slotsInv.find(x=>x.slot===slot);
+        lines.push('<span class="dim">linked for slot '+slot+(r?(' — will replace “'+r.name+'”'):' (currently empty)')+'</span>');
+      }
+      if (info.core !== slotsUnit.core){
+        lines.push('<span class="warn">built for core '+info.core.toString(16).toUpperCase()
+          +' — unit runs '+slotsUnit.core.toString(16).toUpperCase()+' (will be rejected)</span>');
+        blocked=true;
+      }
+    }
+    $("slotsmeta").innerHTML=lines.join("");
+    $("slotsconfirm").classList.toggle("mismatch", blocked);
+    $("slotsload").disabled=blocked;
+    $("slotsconfirm").hidden=false;
+  }).catch(e=>slMsg("error: "+e.message, true));
+}
+function slotsDoLoad(){
+  if (!slotsPending || slotsPending.slot===null) return;
+  const {bytes,info,slot}=slotsPending;
+  $("slotsconfirm").hidden=true;
+  $("slotsprogress").hidden=false;
+  const bar=$("slotsprogress").firstElementChild;
+  slMsg("loading "+info.name+" → slot "+slot+"…");
+  slSession(async ()=>{
+    const res=await slTransfer(bytes, slot, f=>{ bar.style.width=(f*100).toFixed(1)+"%"; });
+    await slHello(); await slInventory();
+    slRender();
+    $("slotsprogress").hidden=true; bar.style.width="0%";
+    slMsg("loaded "+info.name+" into slot "+slot
+      +(res.needsReboot?" — replaced a running registration; reboot to pick up the new image":""));
+    slotsPending=null;
+  });
+}
+function slotsOpen(){
+  $("slotspanel").hidden=false;
+  $("slotsbtn").classList.add("on");
+  return slotsRefresh();
+}
+function slotsClose(){
+  const p=$("slotspanel");
+  if (p) p.hidden=true;
+  const b=$("slotsbtn");
+  if (b) b.classList.remove("on");
+}
+$("slotsbtn").onclick = ()=>{ $("slotspanel").hidden ? slotsOpen() : slotsClose(); };
+$("slotsclose").onclick = slotsClose;
+$("slotsrefresh").onclick = slotsRefresh;
+$("slotsreboot").onclick = slotsReboot;
+$("slotsload").onclick = slotsDoLoad;
+$("slotscancel").onclick = ()=>{ slotsPending=null; $("slotsconfirm").hidden=true; };
+{
+  const d=$("slotsdrop");
+  d.addEventListener("dragover", e=>{ e.preventDefault(); d.classList.add("armed"); });
+  d.addEventListener("dragleave", ()=>d.classList.remove("armed"));
+  d.addEventListener("drop", e=>{ e.preventDefault(); d.classList.remove("armed");
+    const f=e.dataTransfer.files[0]; if (f) slOfferFile(f); });
+  $("slotsfile").addEventListener("change", e=>{ if (e.target.files[0]) slOfferFile(e.target.files[0]); });
+}
+// A file dropped anywhere outside the drop zone would otherwise NAVIGATE the
+// tab to the file, killing the viewer mid-session ("the page crashed").
+// Catch drops window-wide: never navigate, and route .pzslot files to the
+// Slots panel no matter where they land.
+window.addEventListener("dragover", e => e.preventDefault());
+window.addEventListener("dragenter", e => e.preventDefault());
+window.addEventListener("drop", e => {
+  e.preventDefault();
+  const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if (!f) return;
+  if (!/\.pzslot$/i.test(f.name)) return;
+  if (!writer) { setStatus("Connect first, then drop the .pzslot again."); return; }
+  if ($("slotspanel").hidden) {
+    // open the panel, let its refresh finish so bank/core info exists,
+    // then offer the file
+    Promise.resolve(slotsOpen()).then(() => slOfferFile(f));
+  } else {
+    slOfferFile(f);
+  }
+}, true);
+
+window.addEventListener("unhandledrejection", e=>{
+  console.warn("[phaz] unhandled rejection:", e.reason);
+  if (!$("slotspanel").hidden) slMsg("error: "+(e.reason && e.reason.message || e.reason), true);
+});
+
 </script>
+
+
 </body>
 </html>
