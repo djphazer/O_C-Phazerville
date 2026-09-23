@@ -141,10 +141,10 @@ public:
       }
     }
     void View() {
-      if (HS::get_tick() - view_tick > 1000) {
+      if (view_timer > 500) {
         slide_anim = SLIDEOUT_TIME;
       }
-      view_tick = HS::get_tick();
+      view_timer = 0;
       if (cursor >= OUTSKIP1) DrawIndicator();
       DrawInterface();
     }
@@ -321,7 +321,7 @@ private:
     //int flash_ticker[4];
     int button_ticker;
     int slide_anim = 0;
-    uint32_t view_tick = 0;
+    elapsedMillis view_timer = 0;
 
     static const int NR_OF_TAPS = 3;
 
