@@ -43,11 +43,23 @@ void SaveAppData();
 
 static inline void save_app_data() { SaveAppData(); }
 
+#ifdef __IMXRT1062__
+struct AppData;
+void BuildAppData(AppData &data);
+void ApplyAppData(const AppData &data);
+bool BuildSingleAppData(uint16_t app_id, AppData &out);
+void BuildGlobalSettingsValues();
+void RestoreGlobalSettingsFromConfig(uint8_t scala_loaded_mask = 0);
+size_t ResolveAppIndexByID(uint16_t app_id);
+bool QuadrantsPresetLabel(uint8_t preset_id, char *out, size_t cap);
+#endif
+
 enum AppEvent {
   APP_EVENT_SUSPEND,
   APP_EVENT_RESUME,
   APP_EVENT_SCREENSAVER_ON,
-  APP_EVENT_SCREENSAVER_OFF
+  APP_EVENT_SCREENSAVER_OFF,
+  APP_EVENT_FLUSH
 };
 
 // The original "app" interface was built around structs filled with function
@@ -101,6 +113,8 @@ public:
   virtual void HandleEncoderEvent(const UI::Event &) = 0;
   virtual void GetIOConfig(IOConfig &) const = 0;
   virtual void DrawDebugInfo() const = 0;
+  virtual bool OwnsEncoderChord() const { return false; }
+  virtual bool PresetModified() const { return false; }
 
 private:
   const uint16_t id_;
@@ -125,6 +139,8 @@ protected:
 void draw_save_message(uint8_t c);
 void save_app_data();
 void start_calibration();
+void SwitchToApp(size_t index);
+void SwitchToDefaultApp();
 
 template <typename T, typename Traits> class AppBaseImpl : public AppBase {
 public:

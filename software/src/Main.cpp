@@ -47,6 +47,9 @@
 #include "HSMIDI.h"
 
 #include "PhzConfig.h"
+#include "PresetEngine.h"
+#include "PresetBus.h"
+#include "PresetBusUI.h"
 
 #if defined(ARDUINO_TEENSY41)
 USBHost thisUSB;
@@ -92,6 +95,7 @@ void ScanI2C() {
 #endif // ARDUINO_TEENSY41
 
 uint_fast8_t MENU_REDRAW = true;
+volatile uint32_t loop_counter = 0;
 static OC::UiMode ui_mode = OC::UI_MODE_MENU;
 static OC::IOFrame io_frame;
 
@@ -218,13 +222,64 @@ void BootMenu() {
 }
 #endif
 
-void setup() {
+#if defined(__IMXRT1062__)
+extern unsigned long _heap_start;
+extern "C" FLASHMEM void startup_middle_hook(void) {
+  memset((void *)0x20200000, 0, (uint32_t)&_heap_start - 0x20200000u);
+}
+
+static DMAMEM char crash_buf[1024];
+class BufferPrint : public Print {
+public:
+  char *buf = crash_buf;
+  size_t len = 0;
+  size_t write(uint8_t c) override {
+    if (len < sizeof(crash_buf) - 1) { buf[len++] = c; buf[len] = 0; return 1; }
+    return 0;
+  }
+};
+static BufferPrint crash_capture;
+
+static uint32_t boot_srsr = 0;
+
+static bool watchdog_armed = false;
+FLASHMEM static void watchdog_arm() {
+  CCM_CCGR3 |= CCM_CCGR3_WDOG1(CCM_CCGR_ON);
+  asm volatile("dsb");
+  WDOG1_WMCR = 0;
+  WDOG1_WCR = (uint16_t)(255u << 8)
+            | WDOG_WCR_WDE | WDOG_WCR_SRS | WDOG_WCR_WDA
+            | WDOG_WCR_WDBG | WDOG_WCR_WDZST;
+  watchdog_armed = true;
+}
+void watchdog_feed() {
+  WDOG1_WSR = 0x5555;
+  WDOG1_WSR = 0xAAAA;
+}
+
+static IntervalTimer wdog_format_feeder;
+static void watchdog_feed_isr() { watchdog_feed(); }
+FLASHMEM static void watchdog_feed_during(void (*op)()) {
+  wdog_format_feeder.begin(watchdog_feed_isr, 1000000);
+  op();
+  wdog_format_feeder.end();
+}
+#endif
+
+FLASHMEM void setup() {
   delay(50);
+#if defined(__IMXRT1062__)
+  boot_srsr = SRC_SRSR;
+  SRC_SRSR = boot_srsr;
+#endif
   Serial.begin(9600);
 
   if (CrashReport) {
     while (!Serial && millis() < 3000) ; // wait
     Serial.println(CrashReport);
+#if defined(__IMXRT1062__)
+    crash_capture.print(CrashReport);
+#endif
     delay(1500);
   }
 
@@ -349,6 +404,25 @@ void setup() {
   // initialize LittleFS for config files
   PhzConfig::Init();
 
+#if defined(__IMXRT1062__)
+  if (crash_capture.len) {
+    File cl = PhzConfig::myfs.open("CRASH.LOG", FILE_READ);
+    const bool rotate = cl && cl.size() > 8192;
+    if (cl) cl.close();
+    if (rotate) {
+      PhzConfig::myfs.remove("CRASH.OLD");
+      PhzConfig::myfs.rename("CRASH.LOG", "CRASH.OLD");
+    }
+    cl = PhzConfig::myfs.open("CRASH.LOG", FILE_WRITE);
+    if (cl) {
+      cl.printf("--- boot @ %lu ms ---\n", millis());
+      cl.write((const uint8_t *)crash_capture.buf, crash_capture.len);
+      cl.close();
+      Serial.println("CrashReport appended to CRASH.LOG");
+    }
+  }
+#endif
+
   // Display loading splash screen and optional calibration
   bool reset_settings = false;
   ui_mode = OC::ui.Splashscreen(reset_settings, 0);
@@ -365,11 +439,30 @@ void setup() {
   vbias_m->SetState(VBiasManager::BI);
 #endif
 
+  bool firstrun = false;
+#ifdef __IMXRT1062__
   // use default global config file in LFS
-  bool firstrun = !PhzConfig::load_config();
+  firstrun = !PhzConfig::load_config();
+  if (firstrun) {
+    if (PhzConfig::load_config(PhzConfig::BACKUP_FILENAME)) {
+      Serial.println("CONFIG: GLOBALS.CFG bad; restored from GLOBALS.BAK");
+      PhzConfig::save_config();
+      firstrun = false;
+    }
+  } else {
+    PhzConfig::backup_config();
+  }
+#endif
 
-  // initialize apps
-  OC::app_switcher.Init(reset_settings || firstrun);
+  firstrun |= !OC::app_switcher.Init(reset_settings || firstrun);
+#if defined(ARDUINO_TEENSY41) && defined(AUDIO_INTERFACE)
+  OC::AudioIO::OutputStream();
+#endif
+
+  OC::PresetEngine::Init();
+  OC::PresetBus::Init();
+  OC::PresetBusUI::Init();
+  OC::PresetEngine::BootRecall();
 
   // Welcome splash
   OC::ui.Splashscreen(firstrun, 1);
@@ -378,6 +471,11 @@ void setup() {
     OC::start_calibration();
 
   OC::app_switcher.current_app()->DispatchAppEvent(OC::APP_EVENT_RESUME);
+
+#if defined(__IMXRT1062__)
+  watchdog_arm();
+  SERIAL_PRINTLN("* WDOG1 armed (128s, fed from loop)");
+#endif
 
   SERIAL_PRINTLN("[End of setup()]");
 }
@@ -393,6 +491,10 @@ void FASTRUN loop() {
   uint32_t last_redraw_time = 0;
 
   while (true) {
+    ++loop_counter;
+#if defined(__IMXRT1062__)
+    watchdog_feed();
+#endif
 #if defined(ARDUINO_TEENSY41)
     thisUSB.Task();
 #endif
@@ -406,6 +508,8 @@ void FASTRUN loop() {
         // Handle events and process state changes elsewhere.
         ui.AppSettings(true);
 
+      } else if (OC::PresetBusUI::Active()) {
+        OC::PresetBusUI::Draw();
       } else { // if (UI_MODE_MENU == ui_mode) {
         OC_DEBUG_RESET_CYCLES(menu_draw_count, 512, DEBUG::MENU_draw_cycles);
         OC_DEBUG_PROFILE_SCOPE(DEBUG::MENU_draw_cycles);
@@ -430,6 +534,9 @@ void FASTRUN loop() {
 
     // Take care of queued tasks
     OC::CORE::FlushTasks();
+    OC::PresetEngine::Process();
+    OC::PresetBus::Task();
+    OC::PresetBusUI::Task();
 
     // UI events
     if (UI_MODE_APP_SETTINGS == ui_mode) {
@@ -520,7 +627,7 @@ void FASTRUN loop() {
             break;
           case 'F':
             Serial.println("!! ERASING ALL FILES on LittleFS !!");
-            PhzConfig::eraseFiles();
+            watchdog_feed_during([] { PhzConfig::eraseFiles(); });
             break;
 #endif
 
@@ -540,6 +647,28 @@ void FASTRUN loop() {
           case '<':
           case '>':
             // simulate Right Encoder turn
+            break;
+          case '(': OC::PresetEngine::RequestSave(0); break;
+          case ')': OC::PresetEngine::RequestRecall(0); break;
+          case '{': OC::PresetEngine::RequestSave(1); break;
+          case '}': OC::PresetEngine::RequestRecall(1); break;
+          case 'g':
+            Serial.println("Saving global settings + app data...");
+            OC::SaveAppData();
+            break;
+          case 'p':
+            if (OC::PresetBusUI::Active()) OC::PresetBusUI::Exit();
+            else OC::PresetBusUI::Enter();
+            Serial.printf("PresetBusUI %s\n",
+                          OC::PresetBusUI::Active() ? "open" : "closed");
+            break;
+          case 'b': OC::PresetBus::DebugDump(); break;
+          case 'k':
+            OC::PresetBus::CardServeEnable(!OC::PresetBus::CardServing());
+            break;
+          case 'B':
+            OC::PresetBus::SetVerbose(!OC::PresetBus::Verbose());
+            Serial.printf("PresetBus verbose = %d\n", OC::PresetBus::Verbose());
             break;
 #endif
           default:

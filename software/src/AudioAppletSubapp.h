@@ -492,6 +492,29 @@ public:
     }
   }
 
+  template <typename Put>
+  void ForEachPresetValue(Put &&put) {
+    put((uint64_t)stereo);
+    for (size_t slot = 0; slot < Slots; ++slot) {
+      auto& stereo_applet = get_selected_stereo_applet(slot);
+      put((uint64_t)stereo_applet.applet_id());
+      ForEachAppletValue(stereo_applet, slot, put);
+      ForEachSide(ch) {
+        auto& mono_applet = get_selected_mono_applet(ch, slot);
+        put((uint64_t)mono_applet.applet_id());
+        ForEachAppletValue(mono_applet, slot, put);
+      }
+    }
+  }
+
+  template <typename Put>
+  void ForEachAppletValue(HemisphereAudioApplet& applet, size_t slot, Put &&put) {
+    array<uint64_t, APPLET_CONFIG_SIZE> data = {0};
+    applet.SetSlot(slot);
+    applet.OnDataRequest(data);
+    for (uint_fast8_t i = 0; i < APPLET_CONFIG_SIZE; ++i) put(data[i]);
+  }
+
   void LoadAppletData(uint16_t key, HemisphereAudioApplet& applet, size_t slot) {
     array<uint64_t, APPLET_CONFIG_SIZE> data;
     for (uint_fast8_t i = 0; i < APPLET_CONFIG_SIZE; ++i) {

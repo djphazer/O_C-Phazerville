@@ -16,6 +16,8 @@
 #include "src/drivers/display.h"
 #include "HSUtils.h"
 
+#include "PresetBusUI.h"
+
 #ifdef VOR
 #include "VBiasManager.h"
 VBiasManager *VBiasManager::instance = 0;
@@ -48,9 +50,11 @@ void Ui::Init() {
   for (size_t i = 0; i < count; ++i) {
     buttons_[i].Init(button_pins[i], OC_GPIO_BUTTON_PINMODE);
   }
-  std::fill(button_press_time_, button_press_time_ + 4, 0);
+  std::fill(button_press_time_, button_press_time_ + CONTROL_BUTTON_LAST, 0);
   button_state_ = 0;
-  button_ignore_mask_ = 0;
+  button_down_ = 0;
+  chord_hold_ = 0;
+  chord_release_ = 0;
   screensaver_ = false;
   preempt_screensaver_ = false;
   jump_to_menu_ = false;
@@ -106,10 +110,17 @@ void FASTRUN Ui::Poll() {
 
   for (size_t i = 0; i < count; ++i) {
     auto &button = buttons_[i];
+    const uint16_t control = control_mask(i);
     if (button.just_pressed()) {
+      button_down_ |= control;
       button_press_time_[i] = now;
       PushEvent(UI::EVENT_BUTTON_DOWN, control_mask(i), 0, button_state);
     } else if (button.released()) {
+      button_down_ &= ~control;
+      if (chord_hold_ & control) {
+        chord_hold_ &= ~control;
+        chord_release_ |= control;
+      }
       if (now - button_press_time_[i] < kLongPressTicks)
         PushEvent(UI::EVENT_BUTTON_PRESS, control_mask(i), 0, button_state);
       else
@@ -136,6 +147,15 @@ void FASTRUN Ui::Poll() {
   button_state_ = button_state;
 }
 
+FLASHMEM void Ui::Inject(UI::EventType type, uint16_t control, int16_t value,
+                         uint16_t held) {
+  const uint16_t mask = ((type == UI::EVENT_BUTTON_DOWN) ? control : 0) | held;
+  noInterrupts();
+  PushEvent(type, control, value, mask);
+  interrupts();
+}
+
+FLASHMEM __attribute__((noinline))
 UiMode Ui::DispatchEvents(const RuntimeSlot &appslot) {
   AppBase* app = static_cast<AppBase*>(appslot.instance);
   if (!app) return UiMode::UI_MODE_APP_SETTINGS;
@@ -148,6 +168,19 @@ UiMode Ui::DispatchEvents(const RuntimeSlot &appslot) {
       continue;
 
     MENU_REDRAW = 1;
+
+#if defined(ARDUINO_TEENSY41) && defined(PRESET_BUS)
+    if (OC::PresetBusUI::Active()) {
+      if (OC::PresetBusUI::HandleEvent(event)) continue;
+    } else if (UI::EVENT_BUTTON_DOWN == event.type &&
+               (CONTROL_BUTTON_L == event.control || CONTROL_BUTTON_R == event.control) &&
+               (event.mask & (CONTROL_BUTTON_L | CONTROL_BUTTON_R))
+                   == (CONTROL_BUTTON_L | CONTROL_BUTTON_R) &&
+               OC::Buchla200eHardware() && !app->OwnsEncoderChord()) {
+      OC::PresetBusUI::Enter();
+      continue;
+    }
+#endif
 
     const bool z_hold = (event.mask & CONTROL_BUTTON_Z);
     const bool a_hold = (event.mask & CONTROL_BUTTON_A);
@@ -184,10 +217,12 @@ UiMode Ui::DispatchEvents(const RuntimeSlot &appslot) {
   if (idle_time() > (screensaver_timeout() * 60) && !preempt_screensaver_)
     screensaver_ = true;
 
+  display_asleep_ = idle_time() > kDisplaySleepMs;
+
   if (screensaver_) {
     return UI_MODE_SCREENSAVER;
   } else if (jump_to_menu_) {
-    SetButtonIgnoreMask(); // ignore release
+    SetButtonIgnoreMask();
     jump_to_menu_ = false;
     return UI_MODE_APP_SETTINGS;
   } else {
@@ -221,7 +256,7 @@ UiMode Ui::Splashscreen(bool &reset_settings, uint8_t phase) {
       GRAPHICS_BEGIN_FRAME(true);
 
       menu::DefaultTitleBar::Draw();
-      graphics.print( DAC_is_inverted? OC::Strings::NAME_NLM : OC::Strings::NAME);
+      graphics.print(OC::Strings::HardwareName(OC::Buchla200eHardware(), DAC_is_inverted));
       weegfx::coord_t y = menu::CalcLineY(0);
 
       graphics.setPrintPos(menu::kIndentDx, y + menu::kTextDy);
@@ -246,26 +281,10 @@ UiMode Ui::Splashscreen(bool &reset_settings, uint8_t phase) {
       graphics.print(" ");
       graphics.print(OC::Strings::BUILD_TAG);
 
-      const uint8_t *iconroulette[] = {
-        PhzIcons::clockDivider, PhzIcons::clockSkip,
-        PhzIcons::clock_warp_A, PhzIcons::clock_warp_B,
-        PhzIcons::snowflakeB,
-        PhzIcons::snowflakeA
-      };
-
-      static int pick = 0;
-      if (timeout % 50 == 0) pick = random(6);
-      // pew pew?
-      for (int i = 0; i < 124; i+=8)
-        graphics.drawBitmap8(i, 56, 8, iconroulette[pick]);
-
-      // chargin mah lazerrrr
       weegfx::coord_t w = timeout * 128 / SPLASHSCREEN_DELAY_MS;
       w %= 256;
       if (w > 128) w = 256 - w;
       graphics.invertRect(0, 56, w, 8);
-
-      ZapScreensaver();
 
       /* fixes spurious button presses when booting ? */
       while (event_queue_.available())
@@ -280,16 +299,9 @@ UiMode Ui::Splashscreen(bool &reset_settings, uint8_t phase) {
   default:
     do {
       GRAPHICS_BEGIN_FRAME(true);
-      /*
-      const uint8_t *flake_icon[] = { PhzIcons::snowflakeA, PhzIcons::snowflakeB, ZAP_ICON };
-      for (int i=0; i<128; ++i) {
-        graphics.drawBitmap8(i*8%128 + random(2), i/16*8 + random(2), 8, flake_icon[random(3)]);
-      }
-      */
-      ZapScreensaver();
 
-      graphics.clearRect(27, 22, 74, 22);
       if (reset_settings) {
+        graphics.clearRect(27, 22, 74, 22);
         graphics.setPrintPos(28, 23);
         graphics.print("Time for a ");
         graphics.setPrintPos(28, 33);
@@ -300,7 +312,6 @@ UiMode Ui::Splashscreen(bool &reset_settings, uint8_t phase) {
         graphics.setPrintPos(28, 33);
         graphics.print("Phazerville!");
       }
-      //graphics.print(OC::Strings::RELEASE_NAME);
 
       while (event_queue_.available())
         (void)event_queue_.PullEvent();
