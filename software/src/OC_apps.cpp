@@ -95,6 +95,7 @@ enum GlobalSettingsDataKeys : uint16_t {
   TURING_MACHINES_KEY = 5 << 8,
   WAVEFORMS_KEY       = 6 << 8,
   AUTOCAL_KEY         = 7 << 8,
+  PRESETBUS_KEY       = 8 << 8,
 
   // lower 8 bits of key
   SCALE_METADATA = 0xff,
@@ -102,14 +103,9 @@ enum GlobalSettingsDataKeys : uint16_t {
 };
 #endif
 
-FLASHMEM
-static void SaveGlobalSettings() {
-  APPS_SERIAL_PRINTLN("Save global settings");
-
 #ifdef __IMXRT1062__
-  //PhzConfig::clear_config();
-  PhzConfig::load_config(); // use default config file
-
+FLASHMEM
+void BuildGlobalSettingsValues() {
   // Metadata
   uint64_t data = 0;
   // TODO:
@@ -120,7 +116,6 @@ static void SaveGlobalSettings() {
   PhzConfig::setValue(METADATA_KEY, data);
 
   // User Scales
-  char filename[] = "000.SCL";
   for (size_t i = 0; i < Scales::SCALE_USER_COUNT; ++i) {
     PhzConfig::setValue(USER_SCALES_KEY | (i << 4) | SCALE_METADATA, uint64_t(user_scales[i].span) << 16 | user_scales[i].num_notes);
     data = 0;
@@ -132,16 +127,6 @@ static void SaveGlobalSettings() {
         PhzConfig::setValue(USER_SCALES_KEY | (i << 4) | (SCALE_NOTEDATA + (nn >> 2)), data);
         data = 0;
       }
-    }
-
-    if (SDcard_Ready) {
-      filename[2] = char('0' + i);
-      SD.remove(filename);
-      File file = SD.open(filename, FILE_WRITE_BEGIN);
-      if (file) {
-        Scales::SaveToScala(user_scales[i], file);
-      }
-      file.close();
     }
   }
 
@@ -205,6 +190,31 @@ static void SaveGlobalSettings() {
     }
   }
   */
+}
+#endif
+
+FLASHMEM
+static void SaveGlobalSettings() {
+  APPS_SERIAL_PRINTLN("Save global settings");
+
+#ifdef __IMXRT1062__
+  //PhzConfig::clear_config();
+  PhzConfig::load_config(); // use default config file
+
+  BuildGlobalSettingsValues();
+
+  if (SDcard_Ready) {
+    char filename[] = "000.SCL";
+    for (size_t i = 0; i < Scales::SCALE_USER_COUNT; ++i) {
+      filename[2] = char('0' + i);
+      SD.remove(filename);
+      File file = SD.open(filename, FILE_WRITE_BEGIN);
+      if (file) {
+        Scales::SaveToScala(user_scales[i], file);
+      }
+      file.close();
+    }
+  }
 
   PhzConfig::save_config(); // save to default config file
 #else // --- Teensy 3.2
@@ -226,13 +236,7 @@ static void SaveGlobalSettings() {
     global_settings.q_engines[i].root_note = HS::q_engine[i].root_note;
   }
   for (int i = 0; i < MIDIMAP_MAX; ++i) {
-    global_settings.midi_maps[i].channel       = HS::frame.MIDIState.mapping[i].channel      ;
-    global_settings.midi_maps[i].dac_polyvoice = HS::frame.MIDIState.mapping[i].dac_polyvoice;
-    global_settings.midi_maps[i].function      = HS::frame.MIDIState.mapping[i].function     ;
-    global_settings.midi_maps[i].function_cc   = HS::frame.MIDIState.mapping[i].function_cc  ;
-    global_settings.midi_maps[i].transpose     = HS::frame.MIDIState.mapping[i].transpose    ;
-    global_settings.midi_maps[i].range_low     = HS::frame.MIDIState.mapping[i].range_low    ;
-    global_settings.midi_maps[i].range_high    = HS::frame.MIDIState.mapping[i].range_high   ;
+    global_settings.midi_maps[i] = HS::frame.MIDIState.mapping[i].settings();
   }
 
   global_settings_storage.Save(global_settings);
@@ -253,12 +257,11 @@ static constexpr size_t totalsize = total_storage_size();
 static_assert(totalsize < OC::AppData::kAppDataSize, "EEPROM Allocation Exceeded");
 */
 
-FLASHMEM void SaveAppData() {
-  SaveGlobalSettings(); // yeah, why not
-  APPS_SERIAL_PRINTLN("Save app data... (%u bytes available)", OC::AppData::kAppDataSize);
+FLASHMEM void BuildAppData(AppData &out) {
+  APPS_SERIAL_PRINTLN("Build app data... (%u bytes available)", OC::AppData::kAppDataSize);
 
-  app_data.used = 0;
-  uint8_t *data = app_data.data;
+  out.used = 0;
+  uint8_t *data = out.data;
   uint8_t *data_end = data + OC::AppData::kAppDataSize;
 
   size_t start_app = random(app_container.num_apps());
@@ -285,23 +288,51 @@ FLASHMEM void SaveAppData() {
       } else {
         APPS_SERIAL_PRINTLN("* %s (%02x) : Saved %u bytes... (%u)",
                             app->name(), app->id(), result, storage_size);
-        app_data.used += chunk->length;
+        out.used += chunk->length;
         data += chunk->length;
       }
       (void)result;
     }
   }
-  APPS_SERIAL_PRINTLN("App settings used: %u/%u", app_data.used, EEPROM_APPDATA_BINARY_SIZE);
+  APPS_SERIAL_PRINTLN("App settings used: %u/%u", out.used, EEPROM_APPDATA_BINARY_SIZE);
+}
+
+FLASHMEM bool BuildSingleAppData(uint16_t app_id, AppData &out) {
+  out.used = 0;
+  for (size_t i = 0; i < app_container.num_apps(); ++i) {
+    const AppBase *app = (AppBase *)app_container[i].instance;
+    if (!app || app->id() != app_id) continue;
+
+    size_t storage_size = app->storage_size() + sizeof(AppChunkHeader);
+    if (storage_size & 1) ++storage_size;
+    if (storage_size <= sizeof(AppChunkHeader) ||
+        storage_size > OC::AppData::kAppDataSize)
+      return false;
+
+    AppChunkHeader *chunk = reinterpret_cast<AppChunkHeader *>(out.data);
+    chunk->id = app->id();
+    chunk->length = (uint16_t)storage_size;
+    util::StreamBufferWriter stream_buffer{chunk + 1, chunk->length};
+    app->Save(stream_buffer);
+    if (stream_buffer.overflow()) return false;
+    out.used = chunk->length;
+    return true;
+  }
+  return false;
+}
+
+FLASHMEM void SaveAppData() {
+  SaveGlobalSettings(); // yeah, why not
+  BuildAppData(app_data);
   app_data_storage.Save(app_data);
   APPS_SERIAL_PRINTLN("Saved app settings in page_index %d", app_data_storage.page_index());
 }
 
-FLASHMEM
-static void RestoreAppData() {
-  APPS_SERIAL_PRINTLN("Restoring app data from page_index %d, used=%u", app_data_storage.page_index(), app_data.used);
+FLASHMEM void ApplyAppData(const AppData &in) {
+  APPS_SERIAL_PRINTLN("Restoring app data, used=%u", in.used);
 
-  const uint8_t *data = app_data.data;
-  const uint8_t *data_end = data + app_data.used;
+  const uint8_t *data = in.data;
+  const uint8_t *data_end = data + in.used;
   size_t restored_bytes = 0;
 
   while (data < data_end) {
@@ -347,8 +378,116 @@ static void RestoreAppData() {
     data += chunk->length;
   }
 
-  APPS_SERIAL_PRINTLN("App data restored: %u, expected %u", restored_bytes, app_data.used);
+  APPS_SERIAL_PRINTLN("App data restored: %u, expected %u", restored_bytes, in.used);
 }
+
+FLASHMEM
+static void RestoreAppData() {
+  APPS_SERIAL_PRINTLN("Restore from page_index %d", app_data_storage.page_index());
+  ApplyAppData(app_data);
+}
+
+#ifdef __IMXRT1062__
+FLASHMEM
+void RestoreGlobalSettingsFromConfig(uint8_t scala_loaded_mask) {
+  uint64_t data = 0;
+
+  // User Scales
+  for (size_t i = 0; i < Scales::SCALE_USER_COUNT; ++i) {
+    if ((scala_loaded_mask & (1 << i)) ||
+        !PhzConfig::getValue(USER_SCALES_KEY | (i << 4) | SCALE_METADATA, data))
+        continue;
+
+    user_scales[i].span = (data >> 16) & 0xffff;
+    user_scales[i].num_notes = data & 0x00ff;
+
+    for (size_t nn = 0; nn < user_scales[i].num_notes; ++nn) {
+      // the first of every 4 values needs a new config chunk
+      if ((nn & 0x3) == 0x0) {
+        data = 0;
+        if (!PhzConfig::getValue(USER_SCALES_KEY | (i << 4) | (SCALE_NOTEDATA + (nn >> 2)), data))
+          break;
+      }
+      user_scales[i].notes[nn] = Unpack(data, PackLocation{(nn & 0x3)*16, 16});
+    }
+  }
+
+  // User Patterns aka Sequences
+  for (size_t i = 0; i < Patterns::PATTERN_USER_COUNT; ++i) {
+    for (size_t step = 0; step < ARRAY_SIZE(Pattern::notes); ++step) {
+      if ((step & 0x3) == 0x0) {
+        data = 0;
+        if (!PhzConfig::getValue(SEQUENCES_KEY | (i << 3) | (step >> 2), data))
+          break;
+      }
+      user_patterns[i].notes[step] = Unpack(data, PackLocation{(step & 0x3)*16, 16});
+    }
+  }
+
+  // User Chords (progression sequences from Acid Curds)
+  for (size_t i = 0; i < Chords::CHORDS_USER_COUNT; ++i) {
+    data = 0;
+    if (!PhzConfig::getValue(CHORDS_KEY | i, data))
+      break;
+    user_chords[i].quality = Unpack(data, PackLocation{0, 8});
+    user_chords[i].inversion = Unpack(data, PackLocation{8, 8});
+    user_chords[i].voicing = Unpack(data, PackLocation{16,8});
+    user_chords[i].base_note = Unpack(data, PackLocation{24,8});
+    user_chords[i].octave = Unpack(data, PackLocation{32,8});
+  }
+
+  // -- User Turing Machines (for Enigma and friends)
+  for (size_t i = 0; i < HS::TURING_MACHINE_COUNT; ++i) {
+    data = 0;
+    if (!PhzConfig::getValue(TURING_MACHINES_KEY | i, data))
+      break;
+    HS::user_turing_machines[i].reg = Unpack(data, PackLocation{0, 16});
+    HS::user_turing_machines[i].len = Unpack(data, PackLocation{16, 8});
+    HS::user_turing_machines[i].favorite = Unpack(data, PackLocation{24, 1});
+  }
+
+#ifndef NO_HEMISPHERE
+  // -- User Waveform (custom VectorOsc shapes)
+  for (size_t i = 0; i < HS::VO_SEGMENT_COUNT; ++i) {
+    if ((i & 0x3) == 0x0) {
+      data = 0;
+      if (!PhzConfig::getValue(WAVEFORMS_KEY | (i >> 2), data))
+        break;
+    }
+    uint16_t wavedata = Unpack(data, PackLocation{(i & 0x3) * 16, 16});
+    HS::user_waveforms[i].level = (wavedata >> 8) & 0xff;
+    HS::user_waveforms[i].time = wavedata & 0xff;
+  }
+#endif
+}
+#endif
+
+#ifdef __IMXRT1062__
+FLASHMEM
+size_t ResolveAppIndexByID(uint16_t app_id) {
+  size_t idx = app_container.IndexOfAppByID(app_id);
+  if (idx >= app_container.num_apps())
+    idx = app_container.IndexOfAppByID(global_settings.current_app_id);
+  return idx;
+}
+
+FLASHMEM
+bool QuadrantsPresetLabel(uint8_t preset_id, char *out, size_t cap) {
+#ifdef NO_HEMISPHERE
+  (void)preset_id; (void)out; (void)cap;
+  return false;
+#else
+  if (preset_id >= 32 || !cap) return false;
+  uint64_t data = 0;
+  if (!PhzConfig::getValue((PhzConfig::KEY)((unsigned)preset_id << 11), data))
+    return false;
+  const int left  = HS::get_applet_index_by_id(Unpack(data, PackLocation{0, 8}));
+  const int right = HS::get_applet_index_by_id(Unpack(data, PackLocation{8, 8}));
+  snprintf(out, cap, "%s,%s", HS::get_applet_name(left), HS::get_applet_name(right));
+  return true;
+#endif
+}
+#endif
 
 FLASHMEM
 void AppSwitcher::set_current_app(size_t index)
@@ -362,11 +501,11 @@ void AppSwitcher::set_current_app(size_t index)
 }
 
 FLASHMEM
-void AppSwitcher::Init(bool reset_settings) {
+bool AppSwitcher::Init(bool reset_settings) {
 
   APPS_SERIAL_PRINTLN("Init");
   app_container.for_each([](RuntimeSlot app) {
-    APPS_SERIAL_PRINTLN("> %s", app->name());
+    APPS_SERIAL_PRINTLN("> %s", static_cast<AppBase *>(app.instance)->name());
     app.InitDefaults(app.instance);
   });
 
@@ -389,17 +528,30 @@ void AppSwitcher::Init(bool reset_settings) {
   global_settings.current_app_id = DEFAULT_APP_ID;
   memset(HS::user_turing_machines, 0, sizeof(HS::user_turing_machines));
 
+  bool gs_restored = false;
+#ifdef __IMXRT1062__
   uint64_t data = 0;
   // check metadata for validity
   if (PhzConfig::getValue(METADATA_KEY, data)) {
     global_settings.current_app_id = Unpack(data, PackLocation{0, 16});
     global_settings.encoders_enable_acceleration = Unpack(data, PackLocation{16, 1});
     global_settings.valid = Unpack(data, PackLocation{17, 1});
+    gs_restored = global_settings.valid;
     // 15 bits empty...
     // TODO:
     //global_settings.DAC_scaling = Unpack(data, PackLocation{32, 32});
     //OC::DAC::restore_scaling(global_settings.DAC_scaling);
   }
+#else
+  APPS_SERIAL_PRINTLN("Load global settings: size: %u, PAGESIZE=%u, PAGES=%u, LENGTH=%u",
+                sizeof(GlobalSettings),
+                GlobalSettingsStorage::PAGESIZE,
+                GlobalSettingsStorage::PAGES,
+                GlobalSettingsStorage::LENGTH);
+  gs_restored = global_settings_storage.Load(global_settings);
+  if (!gs_restored)
+    APPS_SERIAL_PRINTLN("Settings invalid, using defaults!");
+#endif
 
   if (reset_settings || !global_settings.valid) {
     if (ui.ConfirmReset()) {
@@ -418,6 +570,7 @@ void AppSwitcher::Init(bool reset_settings) {
       app_data_storage.Init();
       global_settings.valid = true;
       SaveGlobalSettings();
+      gs_restored = false;
     } else {
       reset_settings = false;
     }
@@ -427,118 +580,25 @@ void AppSwitcher::Init(bool reset_settings) {
 #ifdef __IMXRT1062__
     // User Scales
     char filename[] = "000.SCL";
-    bool scala_file_loaded[Scales::SCALE_USER_COUNT] = {false};
+    uint8_t scala_loaded_mask = 0;
     for (size_t i = 0; i < Scales::SCALE_USER_COUNT; ++i) {
       if (SDcard_Ready && SD.exists(filename)) {
         filename[2] = char('0' + i);
         File file = SD.open(filename);
         if (file) {
           Scales::LoadScala(user_scales[i], file);
-          scala_file_loaded[i] = true;
+          scala_loaded_mask |= (1 << i);
         }
         file.close();
       }
     }
 
-    // Metadata
     if (global_settings.valid) {
-      // User Scales
-      for (size_t i = 0; i < Scales::SCALE_USER_COUNT; ++i) {
-        if (scala_file_loaded[i] ||
-            !PhzConfig::getValue(USER_SCALES_KEY | (i << 4) | SCALE_METADATA, data))
-            continue;
-
-        user_scales[i].span = (data >> 16) & 0xffff;
-        user_scales[i].num_notes = data & 0x00ff;
-
-        for (size_t nn = 0; nn < user_scales[i].num_notes; ++nn) {
-          // the first of every 4 values needs a new config chunk
-          if ((nn & 0x3) == 0x0) {
-            data = 0;
-            if (!PhzConfig::getValue(USER_SCALES_KEY | (i << 4) | (SCALE_NOTEDATA + (nn >> 2)), data))
-              break;
-          }
-          user_scales[i].notes[nn] = Unpack(data, PackLocation{(nn & 0x3)*16, 16});
-        }
-      }
-
-      // User Patterns aka Sequences
-      for (size_t i = 0; i < Patterns::PATTERN_USER_COUNT; ++i) {
-        for (size_t step = 0; step < ARRAY_SIZE(Pattern::notes); ++step) {
-          if ((step & 0x3) == 0x0) {
-            data = 0;
-            if (!PhzConfig::getValue(SEQUENCES_KEY | (i << 3) | (step >> 2), data))
-              break;
-          }
-          user_patterns[i].notes[step] = Unpack(data, PackLocation{(step & 0x3)*16, 16});
-        }
-      }
-
-      // User Chords (progression sequences from Acid Curds)
-      for (size_t i = 0; i < Chords::CHORDS_USER_COUNT; ++i) {
-        data = 0;
-        if (!PhzConfig::getValue(CHORDS_KEY | i, data))
-          break;
-        user_chords[i].quality = Unpack(data, PackLocation{0, 8});
-        user_chords[i].inversion = Unpack(data, PackLocation{8, 8});
-        user_chords[i].voicing = Unpack(data, PackLocation{16,8});
-        user_chords[i].base_note = Unpack(data, PackLocation{24,8});
-        user_chords[i].octave = Unpack(data, PackLocation{32,8});
-      }
-
-      // -- User Turing Machines (for Enigma and friends)
-      for (size_t i = 0; i < HS::TURING_MACHINE_COUNT; ++i) {
-        data = 0;
-        if (!PhzConfig::getValue(TURING_MACHINES_KEY | i, data))
-          break;
-        HS::user_turing_machines[i].reg = Unpack(data, PackLocation{0, 16});
-        HS::user_turing_machines[i].len = Unpack(data, PackLocation{16, 8});
-        HS::user_turing_machines[i].favorite = Unpack(data, PackLocation{24, 1});
-      }
-
-#ifndef NO_HEMISPHERE
-      // -- User Waveform (custom VectorOsc shapes)
-      for (size_t i = 0; i < HS::VO_SEGMENT_COUNT; ++i) {
-        if ((i & 0x3) == 0x0) {
-          data = 0;
-          if (!PhzConfig::getValue(WAVEFORMS_KEY | (i >> 2), data))
-            break;
-        }
-        uint16_t wavedata = Unpack(data, PackLocation{(i & 0x3) * 16, 16});
-        HS::user_waveforms[i].level = (wavedata >> 8) & 0xff;
-        HS::user_waveforms[i].time = wavedata & 0xff;
-      }
-#endif
-
-      // -- Auto Calibration Data
-      /*
-      for (size_t i = 0; i < DAC_CHANNEL_COUNT; ++i) {
-        data = 0;
-        if (!PhzConfig::getValue(AUTOCAL_KEY | (0xff - i), data))
-          break;
-        auto_calibration_data[i].use_auto_calibration_ = data;
-        for (size_t oct = 0; oct < OCTAVES + 1; ++oct) {
-          if ((oct & 0x3) == 0x0) {
-            data = 0;
-            if (!PhzConfig::getValue(AUTOCAL_KEY | (i << 4) | (oct >> 2), data))
-              break;
-          }
-          auto_calibration_data[i].auto_calibrated_octaves[oct] = Unpack(data, PackLocation{(oct & 0x3) * 16, 16});
-        }
-      }
-      */
+      RestoreGlobalSettingsFromConfig(scala_loaded_mask);
     }
 
 #else // Teensy 3.2
-    APPS_SERIAL_PRINTLN("Load global settings: size: %u, PAGESIZE=%u, PAGES=%u, LENGTH=%u",
-                  sizeof(GlobalSettings),
-                  GlobalSettingsStorage::PAGESIZE,
-                  GlobalSettingsStorage::PAGES,
-                  GlobalSettingsStorage::LENGTH);
-
-    if (!global_settings_storage.Load(global_settings)) {
-      APPS_SERIAL_PRINTLN("Settings invalid, using defaults!");
-    } else {
+    if (gs_restored) {
       APPS_SERIAL_PRINTLN("Loaded settings from page_index %d, current_app_id is %02x",
                     global_settings_storage.page_index(),global_settings.current_app_id);
       memcpy(user_scales, global_settings.user_scales, sizeof(user_scales));
@@ -561,13 +621,7 @@ void AppSwitcher::Init(bool reset_settings) {
         HS::q_engine[i].Reconfig();
       }
       for (int i = 0; i < MIDIMAP_MAX; ++i) {
-        HS::frame.MIDIState.mapping[i].channel       = global_settings.midi_maps[i].channel      ;
-        HS::frame.MIDIState.mapping[i].dac_polyvoice = global_settings.midi_maps[i].dac_polyvoice;
-        HS::frame.MIDIState.mapping[i].function      = global_settings.midi_maps[i].function     ;
-        HS::frame.MIDIState.mapping[i].function_cc   = global_settings.midi_maps[i].function_cc  ;
-        HS::frame.MIDIState.mapping[i].transpose     = global_settings.midi_maps[i].transpose    ;
-        HS::frame.MIDIState.mapping[i].range_low     = global_settings.midi_maps[i].range_low    ;
-        HS::frame.MIDIState.mapping[i].range_high    = global_settings.midi_maps[i].range_high   ;
+        HS::frame.MIDIState.mapping[i].apply_settings(global_settings.midi_maps[i]);
       }
       HS::frame.MIDIState.UpdateMidiChannelFilter();
       HS::frame.MIDIState.UpdateMaxPolyphony();
@@ -610,6 +664,8 @@ void AppSwitcher::Init(bool reset_settings) {
   set_current_app(current_app_index);
 
   delay(100);
+
+  return gs_restored;
 }
 
 FLASHMEM
@@ -798,5 +854,21 @@ void start_calibration() {
   OC::calibration_data.set_calstart();
   OC::app_switcher.set_current_app(0);
 }
+
+FLASHMEM void SwitchToApp(size_t index) {
+  app_switcher.current_app()->DispatchAppEvent(APP_EVENT_SUSPEND);
+  CORE::app_isr_enabled = false;
+  delay(1);
+  FreqMeasure.end();
+  DigitalInputs::reInit();
+  app_switcher.set_current_app(index);
+  app_switcher.current_app()->DispatchAppEvent(APP_EVENT_RESUME);
+  CORE::app_isr_enabled = true;
+  CORE::app_loop_enabled = true;
+  ::MENU_REDRAW = 1;
+  Serial.printf("app: %s\n", app_switcher.current_app()->name());
+}
+
+FLASHMEM void SwitchToDefaultApp() { SwitchToApp(DEFAULT_APP_INDEX); }
 
 }; // namespace OC

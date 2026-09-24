@@ -83,12 +83,23 @@ public:
   bool AppSettings(bool drawmenu);
   UiMode DispatchEvents(const RuntimeSlot &appslot);
 
+  void Inject(UI::EventType type, uint16_t control, int16_t value,
+              uint16_t held = 0);
+
   void Poll();
   void Poke();
   void preempt_screensaver(bool v);
 
-  inline bool read_immediate(UiControl control) {
+  inline bool read_immediate(UiControl control) const {
     return button_state_ & control;
+  }
+
+  inline bool read_deliberate(UiControl control) const {
+    return (button_state_ & control) && !(chord_hold_ & control);
+  }
+
+  inline bool awaiting_release(UiControl control) const {
+    return chord_hold_ & control;
   }
 
   inline void encoders_enable_acceleration(bool enable) {
@@ -118,13 +129,22 @@ public:
     return ticks_;
   }
 
+  inline void IgnoreUntilRelease(uint16_t buttons) {
+    buttons &= kGuardableButtons;
+    const uint16_t down = button_down_ | button_state_;
+    chord_hold_    |= buttons &  down;
+    chord_release_ |= buttons & ~down;
+  }
+
   inline void SetButtonIgnoreMask() {
-    button_ignore_mask_ = button_state_;
+    IgnoreUntilRelease(button_down_ | button_state_);
   }
 
   inline void IgnoreButton(UiControl control) {
-    button_ignore_mask_ |= control;
+    IgnoreUntilRelease(control);
   }
+
+  bool display_asleep() const { return display_asleep_; }
 
   uint32_t screensaver_timeout() const {
     return screensaver_timeout_;
@@ -138,13 +158,20 @@ public:
 
 private:
 
+  static const uint16_t kGuardableButtons = 0x7f;
+
   uint32_t ticks_ = 0;
   uint32_t screensaver_timeout_ = 120;
+
+  static constexpr uint32_t kDisplaySleepMs = 10UL * 60UL * 1000UL;
+  bool display_asleep_ = false;
 
   UI::Button buttons_[CONTROL_BUTTON_LAST];
   uint32_t button_press_time_[CONTROL_BUTTON_LAST];
   uint16_t button_state_ = 0;
-  uint16_t button_ignore_mask_ = 0;
+  uint16_t button_down_ = 0;
+  uint16_t chord_hold_ = 0;
+  uint16_t chord_release_ = 0;
   bool screensaver_ = 0;
   bool preempt_screensaver_ = 0;
   bool jump_to_menu_ = 0;
@@ -172,17 +199,23 @@ private:
   }
 
   bool IgnoreEvent(const UI::Event &event) {
-    bool ignore = false;
-    if (button_ignore_mask_ & event.control) {
-      button_ignore_mask_ &= ~event.control;
-      ignore = true;
-    } else if (screensaver_) {
-      screensaver_ = false;
-      SetButtonIgnoreMask(); // ignore whatever button is about to be released
-      ignore = true;
+    if (chord_hold_ & event.control)
+      return true;
+
+    if (chord_release_ & event.control) {
+      chord_release_ &= ~event.control;
+      if (UI::EVENT_BUTTON_PRESS == event.type ||
+          UI::EVENT_BUTTON_LONG_RELEASE == event.type)
+        return true;
     }
 
-    return ignore;
+    if (screensaver_) {
+      screensaver_ = false;
+      SetButtonIgnoreMask();
+      return true;
+    }
+
+    return false;
   }
 
   DISALLOW_COPY_AND_ASSIGN(Ui);

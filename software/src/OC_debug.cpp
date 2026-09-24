@@ -148,7 +148,7 @@ static void debug_menu_version()
   static int hwid = int(GetIDVoltage() * 1000);
 
   graphics.setPrintPos(2, 12);
-  graphics.print(DAC_is_inverted ? Strings::NAME_NLM : Strings::NAME);
+  graphics.print(Strings::HardwareName(Buchla200eHardware(), DAC_is_inverted));
   graphics.setPrintPos(2, 22);
   graphics.print(Strings::VERSION);
   graphics.setPrintPos(2, 32);

@@ -49,6 +49,7 @@ namespace OC {
   const char * const NAME_NLM = "NLM Xenomorpher";
   const char * const SHORT_NAME_NLM = "XoC";
 #endif
+  const char * const NAME_NLM_200E = "NLM XENOMORPHER 2X0e";
 
   const char * const seq_playmodes[] = {" -", "SEQ+1", "SEQ+2", "SEQ+3", "TR+1", "TR+2", "TR+3", "ARP", "S+H#1", "S+H#2", "S+H#3", "S+H#4", "CV#1", "CV#2", "CV#3", "CV#4"};
 

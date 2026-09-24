@@ -40,6 +40,14 @@ public:
   static void Scan();
 
   // @return mask of all pins cloked since last call
+  static inline uint32_t take_latched_edges() {
+    noInterrupts();
+    const uint32_t m = latched_edges_;
+    latched_edges_ = 0;
+    interrupts();
+    return m;
+  }
+
   static inline uint32_t rising_edges() {
     return rising_edges_;
   }
@@ -75,6 +83,7 @@ private:
   }
 
   static uint32_t rising_edges_;
+  static uint32_t latched_edges_;
   static uint32_t raised_mask_;
   static volatile uint32_t captures_[DIGITAL_INPUT_LAST];
 
@@ -98,6 +107,14 @@ public:
   static void Scan();
 
   // @return mask of all pins cloked since last call
+  static inline uint32_t take_latched_edges() {
+    noInterrupts();
+    const uint32_t m = latched_edges_;
+    latched_edges_ = 0;
+    interrupts();
+    return m;
+  }
+
   static inline uint32_t rising_edges() {
     return rising_edges_;
   }
@@ -127,6 +144,7 @@ public:
   }
 private:
   static uint32_t rising_edges_;
+  static uint32_t latched_edges_;
   static uint32_t raised_mask_;
   static IMXRT_GPIO_t *port[DIGITAL_INPUT_LAST];
   static uint32_t bitmask[DIGITAL_INPUT_LAST];

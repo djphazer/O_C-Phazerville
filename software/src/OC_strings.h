@@ -15,6 +15,10 @@ namespace OC {
     extern const char * const SHORT_NAME;
     extern const char * const NAME_NLM;
     extern const char * const SHORT_NAME_NLM;
+    extern const char * const NAME_NLM_200E;
+    inline const char *HardwareName(bool buchla200e, bool nlm) {
+      return buchla200e ? NAME_NLM_200E : (nlm ? NAME_NLM : NAME);
+    }
     extern const char * const VERSION;
     extern const char * const BUILD_TAG;
 

@@ -217,13 +217,6 @@ public:
     }
 
     void Controller() {
-        // Process incoming MIDI traffic
-        process_midi_in(usbMIDI);
-#ifdef ARDUINO_TEENSY41
-        process_midi_in(usbHostMIDI[0]);
-        process_midi_in(usbHostMIDI[1]);
-        process_midi_in(MIDI1);
-#endif
 
         // Convert CV inputs to outgoing MIDI messages
         process_midi_out();
@@ -739,7 +732,7 @@ private:
     }
 
     template <typename T1>
-    void process_midi_in(T1 &device) {
+    bool process_midi_in(T1 &device) {
         if (device.read()) {
             uint8_t message = device.getType();
             uint8_t channel = device.getChannel();
@@ -751,7 +744,9 @@ private:
 
             HS::frame.MIDIState.ProcessMIDIMsg({channel, message, data1, data2});
             //old_process_midi_in(message, channel, data1, data2);
+            return true;
         }
+        return false;
     }
 
     [[ deprecated ]] // TODO: verify all this is handled in HS::MIDIState, MIDIMapping
@@ -978,9 +973,25 @@ void AppCaptainMIDI::HandleAppEvent(OC::AppEvent event) {
   if (event == OC::APP_EVENT_RESUME) {
     Resume();
   }
+  if (event == OC::APP_EVENT_FLUSH) {
+#ifdef __IMXRT1062__
+    StoreData();
+#endif
+  }
 }
 
-void AppCaptainMIDI::Loop() {} // Deprecated
+void AppCaptainMIDI::Loop() {
+  int budget = 8;
+  while (budget-- > 0 && process_midi_in(usbMIDI)) {}
+#ifdef ARDUINO_TEENSY41
+  budget = 8;
+  while (budget-- > 0 && process_midi_in(usbHostMIDI[0])) {}
+  budget = 8;
+  while (budget-- > 0 && process_midi_in(usbHostMIDI[1])) {}
+  budget = 8;
+  while (budget-- > 0 && process_midi_in(MIDI1)) {}
+#endif
+}
 
 FLASHMEM
 void AppCaptainMIDI::DrawMenu() const { BaseView(); }

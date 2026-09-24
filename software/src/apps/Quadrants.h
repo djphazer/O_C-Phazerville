@@ -21,6 +21,8 @@
 
 #pragma once
 
+#include "PresetEngine.h"
+
 // per bank file
 static constexpr int QUAD_PRESET_COUNT = 32;
 static constexpr int PRESET_FILE_REVISION = 1;
@@ -33,6 +35,9 @@ OC_APP_CLASS(AppQuadrants, TWOCCS("QS"), "Quadrants", "4x Applets"),
   public HSApplication {
 public:
   OC_APP_INTERFACE_DECLARE(AppQuadrants, 0);
+
+    bool OwnsEncoderChord() const override { return view_state == AUDIO_SETUP; }
+    bool PresetModified() const override { return preset_modified; }
 
     void Start() {
         audio_app.Init();
@@ -65,6 +70,12 @@ public:
     }
 
     void Resume() {
+        const int hint = OC::PresetEngine::ConsumeQuadrantsRecallHint();
+        if (hint >= 0) {
+            bank_num = (uint8_t)hint;
+            preset_id = -1;
+            queued_preset = -1;
+        }
         SetBank(bank_num);
 
         if (preset_id < 0)
@@ -181,137 +192,12 @@ public:
     }
 
     void StoreToPreset(int id);
-    void store_to_preset(int id) {
-        preset_id = id;
-        // preset id is upper 5 bits - 32 presets per bank
-        uint16_t preset_key = id << 11;
-
-        // clock data
-        clock_data = ClockSetup_instance.OnDataRequest();
-        PhzConfig::setValue(preset_key | CLOCK_DATA_KEY, clock_data);
-
-        // vague globals
-        global_data = ClockSetup_instance.GetGlobals();
-        PhzConfig::setValue(preset_key | GLOBALS_KEY, global_data);
-
-        uint64_t data = 0;
-        // Input Mappings
-        for (size_t i = 0; i < ADC_CHANNEL_COUNT/4; ++i) {
-          data = PackPackables(HS::trigmap[i*4], HS::trigmap[i*4+1]);
-          PhzConfig::setValue(preset_key | (TRIGMAP_KEY + i*2), data);
-          data = PackPackables(HS::trigmap[i*4+2], HS::trigmap[i*4+3]);
-          PhzConfig::setValue(preset_key | (TRIGMAP_KEY + i*2 + 1), data);
-
-          data = PackPackables(HS::cvmap[i*4], HS::cvmap[i*4+1], HS::cvmap[i*4+2], HS::cvmap[i*4+3]);
-          PhzConfig::setValue(preset_key | (CVMAP_KEY + i), data);
-        }
-        PhzConfig::deleteKey(preset_key | OLD_TRIGMAP_KEY);
-        PhzConfig::deleteKey(preset_key | (OLD_TRIGMAP_KEY + 1));
-
-        data = 0;
-        for (size_t i = 0; i < 8; ++i) {
-          Pack(data, PackLocation{i*8, 8}, HS::frame.clockinskip[i]);
-        }
-        PhzConfig::setValue(preset_key | INSKIP_KEY, data);
-        data = 0;
-        for (size_t i = 0; i < 8; ++i) {
-          Pack(data, PackLocation{i*8, 8}, HS::frame.clockoutskip[i]);
-        }
-        PhzConfig::setValue(preset_key | OUTSKIP_KEY, data);
-        data = 0;
-        for (size_t i = 0; i < 8; ++i) {
-          Pack(data, PackLocation{i*8, 8}, HS::frame.output_slew[i]);
-        }
-        PhzConfig::setValue(preset_key | OUTSLEW_KEY, data);
-        data = 0;
-        for (size_t i = 0; i < 8; ++i) {
-          Pack(data, PackLocation{i*8, 8}, static_cast<uint8_t>(HS::frame.output_atten[i]));
-        }
-        PhzConfig::setValue(preset_key | OUTATTEN_KEY, data);
-
-        data = 0;
-        for (size_t h = 0; h < APPLET_SLOTS; h++)
-        {
-            int index = active_applet_index[h];
-            Pack(data, PackLocation{h*8,8}, HS::appletIds[index]);
-
-            // applet data
-            applet_data[h] = HS::get_applet(index, HEM_SIDE(h))->OnDataRequest();
-            PhzConfig::setValue(preset_key | (APPLET_L1_DATA_KEY + h), applet_data[h]);
-        }
-
-        // applet ids, and maybe some other stuff?
-        PhzConfig::setValue(preset_key | APPLET_METADATA_KEY, data);
-
-        // applet filtering is actually just global
-        PhzConfig::setValue(FILTERMASK1_KEY, HS::hidden_applets[0]);
-        PhzConfig::setValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
-
-        data = PackPackables(
-          HS::frame.MIDIState.pc_channel,
-          HS::frame.MIDIState.bend_range,
-          midi_thru_disable,
-          midi_clkrx_disable,
-          midi_clktx_disable,
-          midi_msgrx_disable,
-          midi_msgtx_disable
-        );
-        PhzConfig::setValue(MIDI_GLOBALS_KEY, data);
-
-        data = PackPackables(jump_trig_);
-        PhzConfig::setValue(PRESET_JUMP_KEY, data);
-
-        // Global quantizer settings
-        for (size_t qslot = 0; qslot < QUANT_CHANNEL_COUNT; ++qslot) {
-          /*
-            // XXX: fine-tuning stuff from Calibr8or that should also be global
-            int8_t offset;
-            int16_t scale_factor; // precision of 0.01% as an offset from 100%
-            int8_t transpose; // in semitones
-          */
-          auto &q = q_engine[qslot];
-          data = PackPackables(
-              q.scale,
-              q.octave,
-              q.root_note,
-              q.mask
-              );
-          PhzConfig::setValue(Q_ENGINE_KEY + qslot, data);
-        }
-
-        // Global MIDI Maps
-        for (size_t midx = 0; midx < MIDIMAP_MAX; ++midx) {
-          data = PackPackables(frame.MIDIState.mapping[midx]);
-          PhzConfig::setValue(MIDI_MAPS_KEY + midx, data);
-        }
-
-        // User Patterns aka Sequences
-        for (size_t i = 0; i < OC::Patterns::PATTERN_USER_COUNT; ++i) {
-          data = 0;
-          for (size_t step = 0; step < ARRAY_SIZE(OC::Pattern::notes); ++step) {
-            Pack(data, PackLocation{(step & 0x3)*16, 16}, (uint16_t)OC::user_patterns[i].notes[step]);
-            if ((step & 0x3) == 0x3) {
-              PhzConfig::setValue(SEQUENCES_KEY + ((i << 2) | (step >> 2)), data);
-              data = 0;
-            }
-          }
-        }
-
-        audio_app.SavePreset(id);
-
-        bool success = false;
-        if (SDcard_Ready)
-          success = PhzConfig::save_config(bank_filename, SD);
-        else
-          success = PhzConfig::save_config(bank_filename);
-
-        if (success)
-          PokePopup(HS::MESSAGE_POPUP, HS::PRESET_SAVED);
-    }
+    void store_to_preset(int id);
 
     void LoadFromPreset(int id);
-    void load_from_preset(int id) {
+    FLASHMEM void load_from_preset(int id) {
         preset_id = id;
+        note_preset_synced();
 
         uint16_t preset_key = id << 11;
         uint64_t data;
@@ -509,6 +395,9 @@ public:
       if (~exclude_mask & mMaskSerial) {
         MIDI1.send((midi::MidiType)msg.message, msg.data1, msg.data2, msg.channel);
       }
+      if (~exclude_mask & mMaskBus) {
+        OC::PresetBus::QueueMidiTx(msg.message, msg.channel, msg.data1, msg.data2);
+      }
     }
 
     template <typename T1>
@@ -572,6 +461,31 @@ public:
         ProcessMIDI(usbHostMIDI[0]);
         ProcessMIDI(usbHostMIDI[1]);
         ProcessMIDI(MIDI1);
+        ProcessBusMIDI();
+    }
+
+    void ProcessBusMIDI() {
+        HS::IOFrame &f = HS::frame;
+        const bool clkrx = ~midi_clkrx_disable & mMaskBus;
+        const bool msgrx = ~midi_msgrx_disable & mMaskBus;
+
+        uint8_t status, d1, d2;
+        while (OC::PresetBus::ReadMidiRx(status, d1, d2)) {
+          const uint8_t type = (status >= 0xF8) ? status : (status & 0xF0);
+          const uint8_t buses = (status >= 0xF8) ? 0x8 : (status & 0x0F);
+          for (uint8_t bit = 0; bit < 4; ++bit) {
+            if (!(buses & (0x8 >> bit))) continue;
+            const MIDIMessage msg = { uint8_t(bit + 1), type,
+                                      uint8_t(d1 & 0x7F), uint8_t(d2 & 0x7F) };
+            if (type >= 0xF8) {
+              if (clkrx) f.MIDIState.ProcessMIDIMsg(msg);
+            } else if (msgrx) {
+              f.MIDIState.ProcessMIDIMsg(msg);
+            }
+            SendMIDIThru(msg, mMaskBus);
+            if (type >= 0xF8) break;
+          }
+        }
     }
     void Controller() {
         // Clock Setup applet handles internal clock duties
@@ -696,93 +610,7 @@ public:
       }
     }
 
-    void View() const {
-        bool draw_applets = true;
-
-        if (preset_cursor) {
-          DrawPresetSelector();
-          draw_applets = false;
-        }
-        else if (config_page > HIDE_CONFIG) {
-          switch(config_page) {
-          default:
-          case LOADSAVE_POPUP:
-            PokePopup(MENU_POPUP);
-            // but still draw the applets
-            break;
-
-          case MIDI_MAPS_PAGE:
-            DrawMidiMaps(config_cursor - MIDIMAP1);
-            draw_applets = false;
-            break;
-
-          case INPUT_SETTINGS:
-            DrawInputMappings();
-            draw_applets = false;
-            break;
-
-          case QUANTIZER_SETTINGS:
-            DrawQuantizerConfig();
-            draw_applets = false;
-            break;
-
-          case CONFIG_SETTINGS:
-            DrawConfigMenu();
-            draw_applets = false;
-            break;
-
-          case SHOWHIDE_APPLETS:
-            DrawAppletList();
-            draw_applets = false;
-            break;
-          }
-        }
-        if (HS::q_edit)
-          PokePopup(QUANTIZER_POPUP);
-        else if (HS::midi_edit)
-          PokePopup(MIDI_POPUP);
-
-        if (draw_applets) {
-          if (view_state == AUDIO_SETUP) {
-            audio_app.View();
-
-            draw_applets = false;
-          }
-        }
-
-        if (draw_applets) {
-          if (view_state == APPLET_FULLSCREEN) {
-            DrawFullScreen();
-          } else if (view_state == OVERVIEW) {
-            DrawOverview();
-          } else {
-            // only two applets visible at a time
-            for (int h = 0; h < 2; h++)
-            {
-                HEM_SIDE slot = HEM_SIDE(h + view_slot[h]*2);
-                active_applet[slot]->BaseView();
-
-                // Applets 3 and 4 get inverted titles
-                if (slot > 1) gfxInvert(0 + h*64, 0, 63, 10);
-            }
-
-            // vertical separator
-            graphics.drawLine(63, 0, 63, 63, 2);
-          }
-        }
-
-        // Clock setup is an overlay
-        if (clock_overlay) {
-          ClockSetup_instance.View();
-        } else {
-          ClockSetup_instance.DrawIndicator(view_state == OVERVIEW);
-        }
-
-        // Overlay popup window last
-        if (OC::CORE::ticks - HS::popup_tick < HEMISPHERE_CURSOR_TICKS * 4) {
-          HS::DrawPopup(config_cursor, preset_id, CursorBlink());
-        }
-    }
+    void View() const;
 
     // always act-on-press for encoder
     void DelegateEncoderPush(const UI::Event &event) {
@@ -1022,11 +850,21 @@ public:
         config_page = HIDE_CONFIG;
       } else {
         SetConfigPageFromCursor();
+        if (config_page == LOADSAVE_POPUP && bank_num != 0) {
+          bank_num = 0;
+          SetBank(0);
+        }
       }
     }
     void ShowPresetSelector() {
+      leave_scratch_bank();
       config_cursor = LOAD_PRESET;
       preset_cursor = preset_id + 1;
+    }
+    void leave_scratch_bank() {
+      if (bank_num < 100) return;
+      bank_num = 0;
+      SetBank(0);
     }
 
     // this toggles the view on a given side
@@ -1084,6 +922,110 @@ private:
                       // Right side: 1,3
     int next_applet_index[4]; // queued from UI thread, handled by Controller
     uint64_t clock_data, global_data, applet_data[4]; // cache of applet data
+
+    static constexpr uint32_t kFpSettleMs = 300;
+    static constexpr uint32_t kFpCheckMs = 250;
+    uint32_t fp_baseline = 0;
+    bool fp_valid = false;
+    bool preset_modified = false;
+    uint32_t fp_rebase_at = 1;
+    uint32_t fp_last_check = 0;
+    uint32_t fp_seen_ops = 0;
+
+    void note_preset_synced() {
+      fp_rebase_at = millis() + kFpSettleMs;
+      if (!fp_rebase_at) fp_rebase_at = 1;
+      preset_modified = false;
+    }
+    void track_modified();
+    uint32_t state_fingerprint();
+
+    template <typename Put>
+    void ForEachPresetValue(uint16_t preset_key, Put &&put) {
+      // clock data
+      put(preset_key | CLOCK_DATA_KEY, ClockSetup_instance.OnDataRequest());
+
+      // vague globals
+      put(preset_key | GLOBALS_KEY, ClockSetup_instance.GetGlobals());
+
+      uint64_t data = 0;
+      // Input Mappings
+      for (size_t i = 0; i < ADC_CHANNEL_COUNT/4; ++i) {
+        put(preset_key | (TRIGMAP_KEY + i*2), PackPackables(HS::trigmap[i*4], HS::trigmap[i*4+1]));
+        put(preset_key | (TRIGMAP_KEY + i*2 + 1), PackPackables(HS::trigmap[i*4+2], HS::trigmap[i*4+3]));
+        put(preset_key | (CVMAP_KEY + i),
+            PackPackables(HS::cvmap[i*4], HS::cvmap[i*4+1], HS::cvmap[i*4+2], HS::cvmap[i*4+3]));
+      }
+
+      data = 0;
+      for (size_t i = 0; i < 8; ++i) Pack(data, PackLocation{i*8, 8}, HS::frame.clockinskip[i]);
+      put(preset_key | INSKIP_KEY, data);
+      data = 0;
+      for (size_t i = 0; i < 8; ++i) Pack(data, PackLocation{i*8, 8}, HS::frame.clockoutskip[i]);
+      put(preset_key | OUTSKIP_KEY, data);
+      data = 0;
+      for (size_t i = 0; i < 8; ++i) Pack(data, PackLocation{i*8, 8}, HS::frame.output_slew[i]);
+      put(preset_key | OUTSLEW_KEY, data);
+      data = 0;
+      for (size_t i = 0; i < 8; ++i)
+        Pack(data, PackLocation{i*8, 8}, static_cast<uint8_t>(HS::frame.output_atten[i]));
+      put(preset_key | OUTATTEN_KEY, data);
+
+      data = 0;
+      for (size_t h = 0; h < APPLET_SLOTS; h++) {
+        const int index = active_applet_index[h];
+        Pack(data, PackLocation{h*8,8}, HS::appletIds[index]);
+
+        // applet data
+        put(preset_key | (APPLET_L1_DATA_KEY + h),
+            HS::get_applet(index, HEM_SIDE(h))->OnDataRequest());
+      }
+      // applet ids, and maybe some other stuff?
+      put(preset_key | APPLET_METADATA_KEY, data);
+
+      // applet filtering is actually just global
+      put(FILTERMASK1_KEY, HS::hidden_applets[0]);
+      put(FILTERMASK2_KEY, HS::hidden_applets[1]);
+
+      put(MIDI_GLOBALS_KEY, PackPackables(
+        HS::frame.MIDIState.pc_channel,
+        HS::frame.MIDIState.bend_range,
+        midi_thru_disable,
+        midi_clkrx_disable,
+        midi_clktx_disable,
+        midi_msgrx_disable,
+        midi_msgtx_disable
+      ));
+      put(PRESET_JUMP_KEY, PackPackables(jump_trig_));
+
+      // Global quantizer settings
+      for (size_t qslot = 0; qslot < QUANT_CHANNEL_COUNT; ++qslot) {
+        /*
+          // XXX: fine-tuning stuff from Calibr8or that should also be global
+          int8_t offset;
+          int16_t scale_factor; // precision of 0.01% as an offset from 100%
+          int8_t transpose; // in semitones
+        */
+        auto &q = q_engine[qslot];
+        put(Q_ENGINE_KEY + qslot, PackPackables(q.scale, q.octave, q.root_note, q.mask));
+      }
+
+      // Global MIDI Maps
+      for (size_t midx = 0; midx < MIDIMAP_MAX; ++midx)
+        put(MIDI_MAPS_KEY + midx, PackPackables(frame.MIDIState.mapping[midx]));
+
+      // User Patterns aka Sequences
+      for (size_t i = 0; i < OC::Patterns::PATTERN_USER_COUNT; ++i) {
+        data = 0;
+        for (size_t step = 0; step < ARRAY_SIZE(OC::Pattern::notes); ++step) {
+          Pack(data, PackLocation{(step & 0x3)*16, 16}, (uint16_t)OC::user_patterns[i].notes[step]);
+          if ((step & 0x3) == 0x3) {
+            put(SEQUENCES_KEY + ((i << 2) | (step >> 2)), data);
+            data = 0;
+          }
+        }
+      }
+    }
     bool view_slot[2] = {0, 0}; // Two applets on each side, only one visible at a time
     int config_cursor = LOAD_PRESET;
 
@@ -1163,6 +1105,11 @@ private:
         MIDI_MSGTX_USBDEV,
         MIDI_MSGTX_USBHOST1,
         MIDI_MSGTX_USBHOST2,
+        MIDI_THRU_BUS,
+        MIDI_CLKRX_BUS,
+        MIDI_CLKTX_BUS,
+        MIDI_MSGRX_BUS,
+        MIDI_MSGTX_BUS,
 
         // Input Remapping
         TRIGMAP1, TRIGMAP2, TRIGMAP3, TRIGMAP4,
@@ -1259,15 +1206,20 @@ private:
           if (h == 0) { // change pages
             config_page += dir;
             config_page = constrain(config_page, LOADSAVE_POPUP, LAST_PAGE);
+            if (config_page == LOADSAVE_POPUP) leave_scratch_bank();
 
             const int cursorpos[] = { 0, LOAD_PRESET, TRIG_LENGTH, TRIGMAP1, QUANT1, MIDIMAP1, SHOWHIDELIST };
             config_cursor = cursorpos[config_page];
           } else if (config_page == SHOWHIDE_APPLETS) {
             showhide_cursor.Scroll(dir);
           } else { // move cursor
-            config_cursor = constrain(config_cursor + dir, LOAD_PRESET, MAX_CURSOR);
+            int next = (config_cursor >= TRIG_LENGTH && config_cursor < TRIGMAP1)
+                           ? NextConfigRow(config_cursor, dir)
+                           : config_cursor + dir;
+            config_cursor = constrain(next, LOAD_PRESET, MAX_CURSOR);
 
             SetConfigPageFromCursor();
+            if (config_page == LOADSAVE_POPUP) leave_scratch_bank();
           }
           ResetCursor();
           if (config_cursor > RANDOMIZE_PRESET) HS::popup_tick = 0;
@@ -1541,6 +1493,22 @@ private:
             HS::midi_msgtx_disable ^= mMaskUSBHost2;
             break;
 
+          case MIDI_THRU_BUS:
+            HS::midi_thru_disable ^= mMaskBus;
+            break;
+          case MIDI_CLKRX_BUS:
+            HS::midi_clkrx_disable ^= mMaskBus;
+            break;
+          case MIDI_CLKTX_BUS:
+            HS::midi_clktx_disable ^= mMaskBus;
+            break;
+          case MIDI_MSGRX_BUS:
+            HS::midi_msgrx_disable ^= mMaskBus;
+            break;
+          case MIDI_MSGTX_BUS:
+            HS::midi_msgtx_disable ^= mMaskBus;
+            break;
+
           case SHOWHIDELIST:
             if (h == 0) // left encoder inverts selection
             {
@@ -1637,6 +1605,26 @@ private:
         }
     }
 
+    static constexpr uint8_t kCfgRowOrder[] = {
+        0, 1, 2, 3, 4, 5, 6, 7,
+        8, 9, 10, 11, 28,
+        12, 13, 14, 15, 29,
+        16, 17, 18, 19, 30,
+        20, 21, 22, 23, 31,
+        24, 25, 26, 27, 32,
+    };
+    static constexpr int kCfgRows = sizeof(kCfgRowOrder);
+
+    int NextConfigRow(int cursor, int dir) const {
+        int pos = 0;
+        for (int i = 0; i < kCfgRows; ++i)
+            if (kCfgRowOrder[i] == cursor - TRIG_LENGTH) { pos = i; break; }
+        pos += dir;
+        if (pos < 0) return TRIG_LENGTH - 1;
+        if (pos >= kCfgRows) return TRIGMAP1;
+        return TRIG_LENGTH + kCfgRowOrder[pos];
+    }
+
     void DrawConfigMenu() const {
         // --- Config Selection
         gfxHeader("< General Settings  >");
@@ -1644,12 +1632,16 @@ private:
         const int SHOW_ROWS = 6; // originally 5
         const int ROW_HEIGHT = 8; // originally 10
 
-        int scroll_top = config_cursor - TRIG_LENGTH - 2;
+        int cur_pos = 0;
+        for (int i = 0; i < kCfgRows; ++i)
+            if (kCfgRowOrder[i] == config_cursor - TRIG_LENGTH) { cur_pos = i; break; }
+
+        int scroll_top = cur_pos - 2;
         CONSTRAIN(scroll_top, 0, NUM_ROWS - SHOW_ROWS);
 
         // Draw 6 visible rows from scroll_top (scroll_top is a row index)
         for (int i = 0; i < SHOW_ROWS; ++i) {
-            int row = scroll_top + i;
+            int row = kCfgRowOrder[scroll_top + i];
             if (row >= NUM_ROWS) break;
             HS::DrawConfigRow(
               row,
@@ -1719,7 +1711,7 @@ private:
     }
 };
 
-void QuadrantSysExHandler() {
+FLASHMEM void QuadrantSysExHandler() {
   // TODO
 }
 
@@ -1769,7 +1761,7 @@ void AppQuadrants::GetIOConfig(OC::IOConfig &ioconfig) const
   ioconfig.outputs[7].set("Out H", OUTPUT_MODE_PITCH);
 }
 
-void AppQuadrants::HandleAppEvent(OC::AppEvent event) {
+FLASHMEM void AppQuadrants::HandleAppEvent(OC::AppEvent event) {
     switch (event) {
     case OC::APP_EVENT_RESUME:
         Resume();
@@ -1780,6 +1772,13 @@ void AppQuadrants::HandleAppEvent(OC::AppEvent event) {
         Suspend();
         break;
 
+    case OC::APP_EVENT_FLUSH:
+        if (preset_id >= 0) {
+            StoreToPreset(preset_id);
+            PhzConfig::setValue(253, (uint64_t)preset_id);
+        }
+        break;
+
     default: break;
     }
 }
@@ -1787,11 +1786,136 @@ void AppQuadrants::HandleAppEvent(OC::AppEvent event) {
 void AppQuadrants::Loop() {
     mainloop();
     audio_app.mainloop();
+    track_modified();
+}
+
+FLASHMEM __attribute__((noinline)) uint32_t AppQuadrants::state_fingerprint() {
+    uint32_t h = 2166136261u;
+    auto mix = [&h](uint64_t v) {
+      for (int i = 0; i < 8; ++i) { h ^= (uint8_t)(v >> (i * 8)); h *= 16777619u; }
+    };
+    ForEachPresetValue(0, [&mix](uint16_t key, uint64_t value) { mix(key); mix(value); });
+    audio_app.ForEachPresetValue(mix);
+    return h;
+}
+
+FLASHMEM __attribute__((noinline)) void AppQuadrants::track_modified() {
+    if (!OC::Buchla200eHardware()) return;
+    const uint32_t now = millis();
+
+    const uint32_t ops = OC::PresetEngine::OpCount();
+    if (ops != fp_seen_ops) {
+      fp_seen_ops = ops;
+      const bool ok = OC::PresetEngine::LastWasSave()
+                        ? OC::PresetEngine::LastSaveOk()
+                        : OC::PresetEngine::LastRecallError() == nullptr;
+      if (ok) note_preset_synced();
+    }
+
+    if (now - fp_last_check < kFpCheckMs) return;
+    fp_last_check = now;
+
+    const uint32_t fp = state_fingerprint();
+    if (fp_rebase_at && (int32_t)(now - fp_rebase_at) >= 0) {
+      fp_baseline = fp;
+      fp_valid = true;
+      fp_rebase_at = 0;
+    }
+    preset_modified = fp_valid && !fp_rebase_at && fp != fp_baseline;
 }
 
 FLASHMEM
-void AppQuadrants::DrawMenu() const {
+FLASHMEM void AppQuadrants::DrawMenu() const {
     View();
+}
+
+FLASHMEM void AppQuadrants::View() const {
+    bool draw_applets = true;
+
+    if (preset_cursor) {
+      DrawPresetSelector();
+      draw_applets = false;
+    }
+    else if (config_page > HIDE_CONFIG) {
+      switch(config_page) {
+      default:
+      case LOADSAVE_POPUP:
+        PokePopup(MENU_POPUP);
+        // but still draw the applets
+        break;
+
+      case MIDI_MAPS_PAGE:
+        DrawMidiMaps(config_cursor - MIDIMAP1);
+        draw_applets = false;
+        break;
+
+      case INPUT_SETTINGS:
+        DrawInputMappings();
+        draw_applets = false;
+        break;
+
+      case QUANTIZER_SETTINGS:
+        DrawQuantizerConfig();
+        draw_applets = false;
+        break;
+
+      case CONFIG_SETTINGS:
+        DrawConfigMenu();
+        draw_applets = false;
+        break;
+
+      case SHOWHIDE_APPLETS:
+        DrawAppletList();
+        draw_applets = false;
+        break;
+      }
+    }
+    if (HS::q_edit)
+      PokePopup(QUANTIZER_POPUP);
+    else if (HS::midi_edit)
+      PokePopup(MIDI_POPUP);
+
+    if (draw_applets) {
+      if (view_state == AUDIO_SETUP) {
+        audio_app.View();
+
+        draw_applets = false;
+      }
+    }
+
+    if (draw_applets) {
+      if (view_state == APPLET_FULLSCREEN) {
+        DrawFullScreen();
+      } else if (view_state == OVERVIEW) {
+        DrawOverview();
+      } else {
+        // only two applets visible at a time
+        for (int h = 0; h < 2; h++)
+        {
+            HEM_SIDE slot = HEM_SIDE(h + view_slot[h]*2);
+            active_applet[slot]->BaseView();
+
+            // Applets 3 and 4 get inverted titles
+            if (slot > 1) gfxInvert(0 + h*64, 0, 63, 10);
+        }
+
+        // vertical separator
+        if (preset_modified) graphics.drawVLine(63, 0, 64);
+        else graphics.drawLine(63, 0, 63, 63, 2);
+      }
+    }
+
+    // Clock setup is an overlay
+    if (clock_overlay) {
+      ClockSetup_instance.View();
+    } else {
+      ClockSetup_instance.DrawIndicator(view_state == OVERVIEW);
+    }
+
+    // Overlay popup window last
+    if (OC::CORE::ticks - HS::popup_tick < HEMISPHERE_CURSOR_TICKS * 4) {
+      HS::DrawPopup(config_cursor, preset_id, CursorBlink());
+    }
 }
 
 void AppQuadrants::DrawScreensaver() const {
@@ -1992,6 +2116,32 @@ void AppQuadrants::HandleButtonEvent(const UI::Event &event) {
 FLASHMEM
 void AppQuadrants::HandleEncoderEvent(const UI::Event &event) {
     DelegateEncoderMovement(event);
+}
+
+FLASHMEM void AppQuadrants::store_to_preset(int id) {
+    preset_id = id;
+    // preset id is upper 5 bits - 32 presets per bank
+    const uint16_t preset_key = id << 11;
+
+    ForEachPresetValue(preset_key, [](uint16_t key, uint64_t value) {
+      PhzConfig::setValue(key, value);
+    });
+    PhzConfig::deleteKey(preset_key | OLD_TRIGMAP_KEY);
+    PhzConfig::deleteKey(preset_key | (OLD_TRIGMAP_KEY + 1));
+
+    audio_app.SavePreset(id);
+
+    bool success = false;
+    if (SDcard_Ready)
+      success = PhzConfig::save_config(bank_filename, SD);
+    else
+      success = PhzConfig::save_config(bank_filename);
+
+    if (success) {
+      note_preset_synced();
+      PokePopup(HS::MESSAGE_POPUP, HS::PRESET_SAVED);
+      OC::PresetEngine::SyncPresetToSlot(bank_num, (uint8_t)id);
+    }
 }
 
 FLASHMEM
