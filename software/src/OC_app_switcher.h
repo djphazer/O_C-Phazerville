@@ -68,6 +68,11 @@ public:
   inline void Process(IOFrame *ioframe) __attribute__((always_inline)) {
     if (current_app_.instance) {
       current_app_.Process(current_app_.instance, ioframe);
+    }
+  }
+
+  inline void SendFrame(IOFrame *ioframe) __attribute__((always_inline)) {
+    if (current_app_.instance) {
       IO::Write(ioframe, &current_app_.io_settings());
     }
   }

@@ -147,9 +147,7 @@ static void debug_menu_core() {
   y += 10;
   graphics.setPrintPos(2, y);
   const size_t qsize = CORE::get_queue_size();
-  static size_t qmax = 0;
-  qmax = max(qmax, qsize);
-  graphics.printf("TaskQ %3u / %u", qsize, qmax);
+  graphics.printf("TaskQ %3u / %u", qsize, CORE::queue_max);
 }
 
 FLASHMEM

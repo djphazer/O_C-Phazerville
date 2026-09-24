@@ -300,6 +300,7 @@ public:
         running = 1;
         paused = p;
         auto_reset = !p;
+        OC::CORE::queue_max = 0;
         if (!p && midi_out_enabled) {
 #ifdef ARDUINO_TEENSY41
             if (~midi_clktx_disable & mMaskUSBDev)

@@ -4,14 +4,15 @@
 
 extern "C" char _heap_end[], *__brkval;
 
-UI::EventQueue<32> task_queue;
+UI::EventQueue<IO_BUFFER_SIZE> task_queue;
+size_t OC::CORE::queue_max = 0;
 
 void OC::CORE::DeferTask(Task t) {
   task_queue.PushEvent(UI::EVENT_MISC, t, ticks & 0xffff, 0);
 }
 void OC::CORE::FlushTasks() {
   int i = 0; // yield after a certain number to prevent UI and gfx freeze
-  while (task_queue.available() && i++ < 16000) {
+  while (task_queue.available() && i++ < 4000) {
     const UI::Event event = task_queue.PullEvent();
     switch (event.control) {
       case PROCESS_IOFRAME:
@@ -22,7 +23,8 @@ void OC::CORE::FlushTasks() {
   }
 }
 size_t OC::CORE::get_queue_size() {
-  return task_queue.available();
+  // always assume that one is still being processed
+  return task_queue.available() + 1;
 }
 
 int OC::CORE::FreeRam() {

@@ -101,7 +101,7 @@ void ScanI2C() {
 
 uint_fast8_t MENU_REDRAW = true;
 static OC::UiMode ui_mode = OC::UI_MODE_MENU;
-static OC::IOFrame io_frames[32];
+static DMAMEM OC::IOFrame io_frames[IO_BUFFER_SIZE];
 
 /*  ------------------------ UI timer ISR ---------------------------   */
 
@@ -141,21 +141,43 @@ void FASTRUN CORE_timer_ISR() {
   // see OC_ADC.h for details; empirically (with current parameters), Scan_DMA() picks up new samples @ 5.55kHz
   OC::ADC::Scan_DMA();
 
-  // Pin changes are tracked in separate ISRs, so depending on prio it might
-  // need extra precautions. Note: This call is required to clear flags
-  DigitalInputs::Scan();
+#ifdef AudioNoInterrupts
+  // suppress Audio when the core queue needs it more
+  if (CORE::get_queue_size() > IO_BUFFER_SIZE / 4)
+    AudioNoInterrupts();
+  else
+    AudioInterrupts();
+#endif
+  if (CORE::get_queue_size() < IO_BUFFER_SIZE - 5) {
+    // Pin changes are tracked in separate ISRs, so depending on prio it might
+    // need extra precautions. Note: This call is required to clear flags
+    DigitalInputs::Scan();
 
-  ++CORE::ticks;
-  if (CORE::app_isr_enabled) {
-    OC::app_switcher.LoadFrame(&io_frames[CORE::ticks & 0x1f]);
+    ++CORE::ticks;
+    if (CORE::app_isr_enabled) {
+      // -- load the current frame
+      OC::app_switcher.LoadFrame(&io_frames[CORE::ticks & (IO_BUFFER_SIZE-1)]);
+
+      const size_t qsize = CORE::get_queue_size();
+      CORE::queue_max = max(CORE::queue_max, qsize);
+      CONSTRAIN(CORE::queue_max, 1, IO_BUFFER_SIZE-2);
+
+      // -- send the latest frame that has been processed
+      // Dynamic latency based on measured "high water mark" of the CORE event queue
+      // This is normally very low unless/until the Audio ISR takes more time.
+      // With audio block size = 128 samples, at 48kHz, this should max out at ~2.7ms
+      // or 45 CORE ticks before things fall apart.
+      OC::app_switcher.SendFrame(&io_frames[(CORE::ticks - CORE::queue_max - 1) & (IO_BUFFER_SIZE-1)]);
+    }
   }
+  // else, queue is full, nothing to do but wait
 
   OC_DEBUG_RESET_CYCLES(OC::CORE::ticks, 16384, OC::DEBUG::ISR_cycles);
 }
 
 void OC::CORE::Process(const uint16_t tick) {
   if (app_isr_enabled) {
-    OC::app_switcher.Process(&io_frames[tick & 0x1f]);
+    OC::app_switcher.Process(&io_frames[tick & (IO_BUFFER_SIZE-1)]);
   }
 }
 
@@ -693,6 +715,9 @@ void Redraw() {
 
 void FASTRUN loop() {
   using namespace OC;
+
+  CORE::FlushTasks();
+  CORE::queue_max = 0;
   CORE::app_isr_enabled = true;
   CORE::display_update_enabled = true;
   CORE::app_loop_enabled = true;

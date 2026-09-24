@@ -14,12 +14,16 @@ enum Task : uint16_t {
   PROCESS_IOFRAME,
 };
 
+// power-of-two only
+static constexpr size_t IO_BUFFER_SIZE = 128;
+
 namespace OC {
   namespace CORE {
     extern volatile uint32_t ticks;
     extern volatile bool app_isr_enabled;
     extern volatile bool display_update_enabled;
     extern volatile bool app_loop_enabled;
+    extern size_t queue_max;
 
     static constexpr int RAM2_HEADROOM = 10240;
 
