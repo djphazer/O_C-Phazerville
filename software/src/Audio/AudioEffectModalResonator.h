@@ -61,7 +61,10 @@ public:
         strike_pending_ = false;
         strike_vel_     = 0.0f;
         strike_remain_  = 0;
-        noise_seed_     = 0xCAFEBABE;
+        excite_lp_      = 0.0f;
+        excite_bp_      = 0.0f;
+        excite_f_       = 0.0f;
+        excite_damp_    = 0.0f;
         dc_x1_ = dc_y1_ = 0.0f;
         updateCoeffs(261.63f, 0.5f, 0.7f, 0.5f, 0.25f);
     }
@@ -77,74 +80,53 @@ public:
     void updateCoeffs(float freq_hz, float structure, float brightness,
                       float damping, float position) {
 
-        // Q range calibrated for Chamberlin SVF at typical modal frequencies.
-        // For Chamberlin SVF: RT60 = 6.9 * Q / (pi * f_k)
-        // At f_k = C3 (261 Hz): RT60 = Q / 119
-        // Q_min=1.2 → RT60≈0.01s (click), Q_max=950 → RT60≈8s (long sustain).
-        // Log mapping over ~3 decades: Q = 1.2 * exp(damping * 6.67)
+        // --- Rings-Style Exciter Filter Calculation ---
+        // Cutoff tracks fundamental frequency and scales up with brightness
+        float exciter_hz = freq_hz * (1.0f + brightness * 6.0f); 
+        const float FREQ_CEIL = AUDIO_SAMPLE_RATE_EXACT * 0.40f;
+        if (exciter_hz > FREQ_CEIL) exciter_hz = FREQ_CEIL;
+        
+        excite_f_ = 2.0f * sinf(3.14159265f * exciter_hz / AUDIO_SAMPLE_RATE_EXACT);
+        // Rings internal exciter uses Q = 1.5. Chamberlin damp = fcoef / Q
+        excite_damp_ = excite_f_ / 1.5f; 
+
+        // --- Resonator Bank Calculation ---
         const float Q_MIN  = 1.2f;
-        const float Q_LOGR = 6.675f;  // log(950/1.2)
+        const float Q_LOGR = 6.675f; 
         float q_base = Q_MIN * expf(damping * Q_LOGR);
-
-        // Q-loss per mode: brightness=1 → q_loss≈1 (all modes ring equally).
-        // brightness=0 → q_loss≈0.15 (upper modes decay ~6× faster per step).
         float q_loss = brightness * (2.0f - brightness) * 0.85f + 0.15f;
-
-        // q_loss_rate: how fast q_loss changes per mode (Rings-style).
         float q_loss_rate = structure * (2.0f - structure) * 0.1f;
-
-        // Stiffness model (additive stretch, Rings-style).
-        // structure 0→1 maps to stiffness -0.05→+1.5.
         float stiffness = structure * 1.55f - 0.05f;
         float stretch   = 1.0f;
-
-        // Accumulate sum of position gains to normalise output level.
         float gain_sum = 0.0f;
 
         for (int k = 0; k < NUM_MODES; k++) {
-            // Modal frequency via additive stretch.
-            // Ceiling at 40% of Nyquist: fcoef = 2*sin(0.4*π) ≈ 1.90, giving a
-            // ~5% stability margin vs. the SVF limit of fcoef < 2.0.
-            // (20 kHz was only 0.7% margin — too close at extreme settings.)
-            const float FREQ_CEIL = AUDIO_SAMPLE_RATE_EXACT * 0.40f;
             float f_k = freq_hz * stretch;
             if (f_k > FREQ_CEIL) f_k = FREQ_CEIL;
             if (f_k <      20.0f) f_k =      20.0f;
 
-            // Chamberlin SVF frequency coefficient: 2*sin(π*f/fs)
             f_[k] = 2.0f * sinf(3.14159265f * f_k / AUDIO_SAMPLE_RATE_EXACT);
 
-            // Chamberlin damping: damp = fcoef / Q  (not 1/Q!)
-            // Chamberlin SVF is stable only for damp < 2.0; above that the
-            // filter explodes, producing NaN/Inf that kills the channel.
-            // q_base can collapse toward zero under aggressive q_loss (low
-            // brightness), making damp = fcoef/q_base → Inf.  Clamp both ends.
             float q_safe = q_base;
-            if (q_safe < 0.01f) q_safe = 0.01f;  // prevent divide-by-zero/Inf
+            if (q_safe < 0.01f) q_safe = 0.01f; 
             float damp_k = f_[k] / q_safe;
-            if (damp_k > 1.9f)  damp_k = 1.9f;   // hard stability ceiling
-            if (damp_k < 1e-4f) damp_k = 1e-4f;  // max sustain floor
+            if (damp_k > 1.9f)  damp_k = 1.9f;  
+            if (damp_k < 1e-4f) damp_k = 1e-4f; 
             damp_[k] = damp_k;
 
-            // Advance stiffness (self-limiting each step)
             stretch += stiffness;
             if (stiffness < 0.0f) stiffness *= 0.93f;
             else                  stiffness *= 0.98f;
 
-            // Q-loss compounds per mode
             q_loss += q_loss_rate * (1.0f - q_loss);
             q_base *= q_loss;
 
-            // Position comb: sin²(π · pos · (k+1))
             float pos_safe = position * 0.98f + 0.01f;
             float sg = sinf(3.14159265f * pos_safe * (float)(k + 1));
             mode_gain_[k] = sg * sg;
             gain_sum += mode_gain_[k];
         }
 
-        // Normalise mode gains so the sum is 1.0.
-        // This keeps output amplitude consistent regardless of position setting
-        // and prevents the 12 modes summing to >>1 and clipping.
         if (gain_sum > 0.0f) {
             float inv = 1.0f / gain_sum;
             for (int k = 0; k < NUM_MODES; k++) mode_gain_[k] *= inv;
@@ -205,8 +187,6 @@ public:
             fk[k] = f_[k];
             dk[k] = damp_[k];
             mg[k] = mode_gain_[k];
-            // Sanitise states: if a previous bad coefficient frame produced
-            // Inf/NaN, flush to zero so the channel recovers automatically.
             float lp_v = lp_[k];
             float bp_v = bp_[k];
             if (lp_v != lp_v || bp_v != bp_v ||
@@ -219,22 +199,23 @@ public:
         }
 
         for (int i = 0; i < AUDIO_BLOCK_SAMPLES; i++) {
-            // External audio input is scaled 0.125 (like Rings) to prevent
-            // SVF state saturation on loud signals.
-            // The manual strike noise burst is NOT scaled — it is already
-            // normalised to ±1 and needs full amplitude to excite the resonator.
             float x = src ? (float)src[i] * (0.125f / 32768.0f) : 0.0f;
 
             if (strike_remain_ > 0) {
+                const bool strike_sample = (strike_remain_ == AUDIO_BLOCK_SAMPLES);
                 --strike_remain_;
-                noise_seed_ ^= noise_seed_ << 13;
-                noise_seed_ ^= noise_seed_ >> 17;
-                noise_seed_ ^= noise_seed_ << 5;
-                // Unscaled: ±1 range, full amplitude strike
-                x += (float)(int32_t)noise_seed_ * (1.0f / 2147483648.0f) * vel;
+
+                // Send a single full-scale impulse into the exciter filter
+                float impulse = strike_sample ? vel : 0.0f;
+
+                float excite_notch = impulse - excite_damp_ * excite_bp_;
+                excite_lp_ += excite_f_ * excite_bp_;
+                excite_bp_ += excite_f_ * (excite_notch - excite_lp_);
+
+                // Feed the filtered impulse into the main modal bank
+                x += excite_lp_;
             }
 
-            // Track excitation peak — rescale external input back to ±1 range
             {
                 float ax = x < 0.0f ? -x : x;
                 uint32_t ax16 = (uint32_t)(ax * (8.0f * 32767.0f));
@@ -242,7 +223,6 @@ public:
                 if (ax16 > excite_peak_) excite_peak_ = (uint16_t)ax16;
             }
 
-            // Chamberlin SVF resonator bank — bandpass output
             float y = 0.0f;
             for (int k = 0; k < NUM_MODES; k++) {
                 float notch = x - dk[k] * bp[k];
@@ -251,22 +231,18 @@ public:
                 y           += mg[k] * bp[k];
             }
 
-            // DC blocker: y_out = y - x[n-1] + 0.995*y[n-1]
             float y_out = y - dc_x1_ + 0.995f * dc_y1_;
             dc_x1_ = y;
             dc_y1_ = y_out;
             int16_t s = Clip16(y_out * 32767.0f);
             dst[i] = s;
-            // Track output peak
+            
             {
                 uint16_t av = s < 0 ? (uint16_t)(-s) : (uint16_t)s;
                 if (av > output_peak_) output_peak_ = av;
             }
         }
 
-        // Clamp before write-back: steady-state SVF amplitude is ≤1.0;
-        // values beyond ±2.0 indicate transient blow-up in progress.
-        // This catches slow drift that the load-time sanitiser misses.
         for (int k = 0; k < NUM_MODES; k++) {
             if (lp[k] >  2.0f) lp[k] =  2.0f;
             if (lp[k] < -2.0f) lp[k] = -2.0f;
@@ -286,26 +262,26 @@ public:
 private:
     audio_block_t* input_queue_array_[1];
 
-    // Coefficients (written by updateCoeffs, read by update)
-    float f_[NUM_MODES];         // Chamberlin SVF frequency coeff: 2*sin(π*f/fs)
-    float damp_[NUM_MODES];      // SVF damping: 1/Q (per mode)
-    float mode_gain_[NUM_MODES]; // per-mode output weight (position × Q-normalised)
+    float f_[NUM_MODES];         
+    float damp_[NUM_MODES];      
+    float mode_gain_[NUM_MODES]; 
 
-    // Filter state (audio interrupt only)
-    float lp_[NUM_MODES];        // SVF lowpass state
-    float bp_[NUM_MODES];        // SVF bandpass state
+    float lp_[NUM_MODES];        
+    float bp_[NUM_MODES];        
 
-    // Manual strike
     volatile bool  strike_pending_ = false;
     volatile float strike_vel_     = 1.0f;
     int            strike_remain_  = 0;
-    uint32_t       noise_seed_     = 0xCAFEBABE;
 
-    // VU
+    // Rings-style internal excitation filter state
+    float excite_lp_   = 0.0f;
+    float excite_bp_   = 0.0f;
+    float excite_f_    = 0.0f;
+    float excite_damp_ = 0.0f;
+
     volatile uint16_t excite_peak_  = 0;
     volatile uint16_t output_peak_  = 0;
 
-    // DC blocker state (single-pole, pole at 0.995)
     float dc_x1_ = 0.0f;
     float dc_y1_ = 0.0f;
 };
