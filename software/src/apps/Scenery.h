@@ -679,6 +679,10 @@ void AppScenery::HandleAppEvent(OC::AppEvent event) {
         Suspend();
         break;
 
+    case OC::APP_EVENT_FLUSH:
+        SavePreset();  // preset-bus capture: persist file-backed state
+        break;
+
     default: break;
     }
 }

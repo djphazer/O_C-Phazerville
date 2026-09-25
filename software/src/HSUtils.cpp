@@ -429,6 +429,28 @@ namespace HS {
         gfxPrint(OC::Strings::off_on[!(midi_msgtx_disable & mMaskUSBHost2)]);
         break;
 
+      // 200e preset bus as a MIDI interface (live only on PRESET_BUS builds)
+      case 28:
+        gfxPrint(1, y, "Thru  Bus:    ");
+        gfxPrint(OC::Strings::off_on[!(midi_thru_disable & mMaskBus)]);
+        break;
+      case 29:
+        gfxPrint(1, y, "ClkRx Bus:    ");
+        gfxPrint(OC::Strings::off_on[!(midi_clkrx_disable & mMaskBus)]);
+        break;
+      case 30:
+        gfxPrint(1, y, "ClkTx Bus:    ");
+        gfxPrint(OC::Strings::off_on[!(midi_clktx_disable & mMaskBus)]);
+        break;
+      case 31:
+        gfxPrint(1, y, "MsgRx Bus:    ");
+        gfxPrint(OC::Strings::off_on[!(midi_msgrx_disable & mMaskBus)]);
+        break;
+      case 32:
+        gfxPrint(1, y, "MsgTx Bus:    ");
+        gfxPrint(OC::Strings::off_on[!(midi_msgtx_disable & mMaskBus)]);
+        break;
+
       default: break;
     }
 
@@ -437,7 +459,7 @@ namespace HS {
       if (editing) gfxInvert(82, y - 1, 45, 10);
     }
   }
-  void DrawPopup(const int config_cursor, const int preset_id, const bool blink) {
+  FLASHMEM void DrawPopup(const int config_cursor, const int preset_id, const bool blink) {
 
     enum ConfigCursor {
         DELETE_PRESET,

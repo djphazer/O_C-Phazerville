@@ -47,10 +47,17 @@
 #include "HSMIDI.h"
 
 #include "PhzConfig.h"
+#include "PresetEngine.h"
+#include "PresetBus.h"
+#include "PresetBusUI.h"
 
 #if defined(ARDUINO_TEENSY41)
 USBHost thisUSB;
 USBHub hub1(thisUSB);
+// These MUST stay in DTCM: their member arrays are the EHCI DMA buffers,
+// and USBHost_t36's midi/ehci paths do NO cache maintenance - DTCM is
+// non-cacheable (EHCI reaches it via the CM7 AHBS backdoor), while RAM2 is
+// write-back cached and silently corrupts host MIDI both directions.
 MIDIDevice_BigBuffer usbHostMIDI[2] {
   MIDIDevice_BigBuffer(thisUSB),
   MIDIDevice_BigBuffer(thisUSB)
@@ -92,6 +99,7 @@ void ScanI2C() {
 #endif // ARDUINO_TEENSY41
 
 uint_fast8_t MENU_REDRAW = true;
+volatile uint32_t loop_counter = 0;   // loop rate, read by PresetBus::DebugDump
 static OC::UiMode ui_mode = OC::UI_MODE_MENU;
 static OC::IOFrame io_frame;
 
@@ -218,13 +226,97 @@ void BootMenu() {
 }
 #endif
 
-void setup() {
+// ---------------------------------------------------------------------------
+// Crash forensics + hardware watchdog (T4.x)
+// ---------------------------------------------------------------------------
+#if defined(__IMXRT1062__)
+// The core never zeroes .bss.dma (DMAMEM is documented as uninitialized), so
+// C++ objects placed there boot with garbage in any member their constructor
+// doesn't touch - USBHost_t36 state machines rely on bss-zero and lock up.
+// Zero the section here: ResetHandler calls this hook after the DTCM bss
+// clear and BEFORE __libc_init_array (C++ ctors). .bss.dma is the first
+// section in RAM2 (origin 0x20200000) and ends at _heap_start per the .ld.
+extern unsigned long _heap_start;
+extern "C" FLASHMEM void startup_middle_hook(void) {
+  memset((void *)0x20200000, 0, (uint32_t)&_heap_start - 0x20200000u);
+}
+
+// Capture CrashReport text at boot so it can be appended to CRASH.LOG once
+// LittleFS is mounted (the Serial print is gone if nobody was watching).
+// buffer lives in RAM2 (DMAMEM) - DTCM stack headroom is precious
+static DMAMEM char crash_buf[1024];
+class BufferPrint : public Print {
+public:
+  char *buf = crash_buf;
+  size_t len = 0;
+  size_t write(uint8_t c) override {
+    if (len < sizeof(crash_buf) - 1) { buf[len++] = c; buf[len] = 0; return 1; }
+    return 0;
+  }
+};
+static BufferPrint crash_capture;
+
+// Reset cause, captured then cleared at boot: SRSR bits are sticky w1c and
+// would otherwise show every cause since the last power-on, forever.
+static uint32_t boot_srsr = 0;
+
+// WDOG1: 128s timeout, fed only from loop(). Long enough that the slowest
+// legitimate blocking op (a full LittleFS format) rarely trips it; a hard
+// loop() hang reboots instead of bricking the module until power-cycle.
+// Armed at the END of setup() so interactive boot flows (BootMenu,
+// ConfirmReset) can block indefinitely.
+static bool watchdog_armed = false;
+FLASHMEM static void watchdog_arm() {
+  // the core never ungates WDOG1's clock ("WDOG1 requires CCM_CCGR3_WDOG1"
+  // per imxrt.h) - touching its registers without this bus-faults
+  CCM_CCGR3 |= CCM_CCGR3_WDOG1(CCM_CCGR_ON);
+  asm volatile("dsb");
+  // PDE (set at reset) is a one-shot 16s power-down counter that asserts
+  // reset unless cleared - with the clock just ungated it would fire ~16s
+  // after arming and masquerade as a watchdog timeout
+  WDOG1_WMCR = 0;
+  WDOG1_WCR = (uint16_t)(255u << 8)  // WT: (255+1)*0.5s = 128s
+            | WDOG_WCR_WDE | WDOG_WCR_SRS | WDOG_WCR_WDA
+            | WDOG_WCR_WDBG | WDOG_WCR_WDZST;
+  watchdog_armed = true;
+}
+// External linkage on purpose: PresetEngine.cpp feeds the watchdog across the
+// long flash writes of a preset save (`extern void watchdog_feed();`). As a
+// static inline it had internal linkage, and the call from another TU became
+// an LTO relocation the linker could not encode.
+void watchdog_feed() {
+  WDOG1_WSR = 0x5555;
+  WDOG1_WSR = 0xAAAA;
+}
+
+// A full LittleFS format can exceed 128s worst-case (flash sector erase is
+// 400ms MAX) - the one legitimate loop-blocking op longer than the
+// watchdog. Feed from a timer for its duration only.
+static IntervalTimer wdog_format_feeder;
+static void watchdog_feed_isr() { watchdog_feed(); }  // ISR: stays in ITCM
+FLASHMEM static void watchdog_feed_during(void (*op)()) {
+  wdog_format_feeder.begin(watchdog_feed_isr, 1000000);  // 1s
+  op();
+  wdog_format_feeder.end();
+}
+#endif
+
+FLASHMEM void setup() {
   delay(50);
+#if defined(__IMXRT1062__)
+  boot_srsr = SRC_SRSR;
+  SRC_SRSR = boot_srsr;  // w1c: next boot reports only its own cause
+#endif
   Serial.begin(9600);
 
   if (CrashReport) {
     while (!Serial && millis() < 3000) ; // wait
     Serial.println(CrashReport);
+#if defined(__IMXRT1062__)
+    // stash the report so it can be appended to CRASH.LOG once the
+    // filesystem is up (console prints vanish when nobody is watching)
+    crash_capture.print(CrashReport);
+#endif
     delay(1500);
   }
 
@@ -349,6 +441,29 @@ void setup() {
   // initialize LittleFS for config files
   PhzConfig::Init();
 
+#if defined(__IMXRT1062__)
+  // Written here, straight after the mount: reading CrashReport at the top of
+  // setup() clears it, so anything that dies between there and the first write
+  // loses the report for good. This is the earliest point a file can exist.
+  // append any captured crash report to CRASH.LOG (rotate at 8KB)
+  if (crash_capture.len) {
+    File cl = PhzConfig::myfs.open("CRASH.LOG", FILE_READ);
+    const bool rotate = cl && cl.size() > 8192;
+    if (cl) cl.close();
+    if (rotate) {  // keep one generation of history instead of deleting
+      PhzConfig::myfs.remove("CRASH.OLD");
+      PhzConfig::myfs.rename("CRASH.LOG", "CRASH.OLD");
+    }
+    cl = PhzConfig::myfs.open("CRASH.LOG", FILE_WRITE);  // append
+    if (cl) {
+      cl.printf("--- boot @ %lu ms ---\n", millis());
+      cl.write((const uint8_t *)crash_capture.buf, crash_capture.len);
+      cl.close();
+      Serial.println("CrashReport appended to CRASH.LOG");
+    }
+  }
+#endif
+
   // Display loading splash screen and optional calibration
   bool reset_settings = false;
   ui_mode = OC::ui.Splashscreen(reset_settings, 0);
@@ -365,11 +480,40 @@ void setup() {
   vbias_m->SetState(VBiasManager::BI);
 #endif
 
+  bool firstrun = false;
+#ifdef __IMXRT1062__
   // use default global config file in LFS
-  bool firstrun = !PhzConfig::load_config();
+  firstrun = !PhzConfig::load_config();
+  if (firstrun) {
+    // GLOBALS.CFG missing/corrupt: try the boot-time backup before the
+    // ConfirmReset flow gets a chance to threaten a factory wipe.
+    if (PhzConfig::load_config(PhzConfig::BACKUP_FILENAME)) {
+      Serial.println("CONFIG: GLOBALS.CFG bad; restored from GLOBALS.BAK");
+      PhzConfig::save_config();  // re-materialize the primary from memory
+      firstrun = false;
+    }
+  } else {
+    PhzConfig::backup_config();  // known-good primary: refresh the backup
+  }
+#endif
 
-  // initialize apps
-  OC::app_switcher.Init(reset_settings || firstrun);
+  // initialize apps (on T3.x firstrun is detected by the EEPROM load inside)
+  firstrun |= !OC::app_switcher.Init(reset_settings || firstrun);
+#if defined(ARDUINO_TEENSY41) && defined(AUDIO_INTERFACE)
+  // Force the audio output path (I2S codec out + host-playback monitor mix)
+  // into existence. It is lazily built and was only ever constructed when an
+  // audio applet wired up the chain - an appletless boot had DEAD panel outs
+  // and no USB monitoring. Called here so it is created after every other
+  // stream (its documented ordering requirement).
+  OC::AudioIO::OutputStream();
+#endif
+
+  OC::PresetEngine::Init();
+  OC::PresetBus::Init();
+  OC::PresetBusUI::Init();
+  // restores the last bus preset on any T4.1 (bench units included);
+  // no bus traffic is emitted, so non-bus hardware is unaffected
+  OC::PresetEngine::BootRecall();  // gated on I2C_Expansion inside
 
   // Welcome splash
   OC::ui.Splashscreen(firstrun, 1);
@@ -378,6 +522,13 @@ void setup() {
     OC::start_calibration();
 
   OC::app_switcher.current_app()->DispatchAppEvent(OC::APP_EVENT_RESUME);
+
+#if defined(__IMXRT1062__)
+  // last: everything interactive that can legitimately block forever is
+  // behind us, and loop() takes over feeding from here
+  watchdog_arm();
+  SERIAL_PRINTLN("* WDOG1 armed (128s, fed from loop)");
+#endif
 
   SERIAL_PRINTLN("[End of setup()]");
 }
@@ -393,6 +544,10 @@ void FASTRUN loop() {
   uint32_t last_redraw_time = 0;
 
   while (true) {
+    ++loop_counter;
+#if defined(__IMXRT1062__)
+    watchdog_feed();  // a wedged loop() now reboots instead of bricking
+#endif
 #if defined(ARDUINO_TEENSY41)
     thisUSB.Task();
 #endif
@@ -406,6 +561,8 @@ void FASTRUN loop() {
         // Handle events and process state changes elsewhere.
         ui.AppSettings(true);
 
+      } else if (OC::PresetBusUI::Active()) {
+        OC::PresetBusUI::Draw();
       } else { // if (UI_MODE_MENU == ui_mode) {
         OC_DEBUG_RESET_CYCLES(menu_draw_count, 512, DEBUG::MENU_draw_cycles);
         OC_DEBUG_PROFILE_SCOPE(DEBUG::MENU_draw_cycles);
@@ -430,6 +587,9 @@ void FASTRUN loop() {
 
     // Take care of queued tasks
     OC::CORE::FlushTasks();
+    OC::PresetEngine::Process();
+    OC::PresetBus::Task();
+    OC::PresetBusUI::Task();
 
     // UI events
     if (UI_MODE_APP_SETTINGS == ui_mode) {
@@ -520,7 +680,9 @@ void FASTRUN loop() {
             break;
           case 'F':
             Serial.println("!! ERASING ALL FILES on LittleFS !!");
-            PhzConfig::eraseFiles();
+            // a worst-case format can outlive the 128s watchdog, so feed it
+            // from a timer for the duration
+            watchdog_feed_during([] { PhzConfig::eraseFiles(); });
             break;
 #endif
 
@@ -540,6 +702,30 @@ void FASTRUN loop() {
           case '<':
           case '>':
             // simulate Right Encoder turn
+            break;
+          // preset-engine bench triggers: [ = save, ] = recall (slot 0);
+          // { and } use slot 1
+          case '(': OC::PresetEngine::RequestSave(0); break;
+          case ')': OC::PresetEngine::RequestRecall(0); break;
+          case '{': OC::PresetEngine::RequestSave(1); break;
+          case '}': OC::PresetEngine::RequestRecall(1); break;
+          case 'g':
+            Serial.println("Saving global settings + app data...");
+            OC::SaveAppData();
+            break;
+          case 'p':  // toggle the preset-bus overlay (remote UI inspection)
+            if (OC::PresetBusUI::Active()) OC::PresetBusUI::Exit();
+            else OC::PresetBusUI::Enter();
+            Serial.printf("PresetBusUI %s\n",
+                          OC::PresetBusUI::Active() ? "open" : "closed");
+            break;
+          case 'b': OC::PresetBus::DebugDump(); break;
+          case 'k':  // toggle 0x50 card serving (WPM-less bus only; hard-gated)
+            OC::PresetBus::CardServeEnable(!OC::PresetBus::CardServing());
+            break;
+          case 'B':
+            OC::PresetBus::SetVerbose(!OC::PresetBus::Verbose());
+            Serial.printf("PresetBus verbose = %d\n", OC::PresetBus::Verbose());
             break;
 #endif
           default:
