@@ -16,6 +16,8 @@
 #include "src/drivers/display.h"
 #include "HSUtils.h"
 
+#include "PresetBusUI.h"
+
 #ifdef VOR
 #include "VBiasManager.h"
 VBiasManager *VBiasManager::instance = 0;
@@ -48,9 +50,14 @@ void Ui::Init() {
   for (size_t i = 0; i < count; ++i) {
     buttons_[i].Init(button_pins[i], OC_GPIO_BUTTON_PINMODE);
   }
-  std::fill(button_press_time_, button_press_time_ + 4, 0);
+  // ...+ CONTROL_BUTTON_LAST, not + 4: on T4.1 the array is seven long, and
+  // the three tail entries (Z/X/Y) were left uninitialised, so the first
+  // long-press decision for those buttons compared `now` against garbage.
+  std::fill(button_press_time_, button_press_time_ + CONTROL_BUTTON_LAST, 0);
   button_state_ = 0;
-  button_ignore_mask_ = 0;
+  button_down_ = 0;
+  chord_hold_ = 0;
+  chord_release_ = 0;
   screensaver_ = false;
   preempt_screensaver_ = false;
   jump_to_menu_ = false;
@@ -106,10 +113,30 @@ void FASTRUN Ui::Poll() {
 
   for (size_t i = 0; i < count; ++i) {
     auto &button = buttons_[i];
+    const uint16_t control = control_mask(i);
     if (button.just_pressed()) {
+      button_down_ |= control;
       button_press_time_[i] = now;
       PushEvent(UI::EVENT_BUTTON_DOWN, control_mask(i), 0, button_state);
     } else if (button.released()) {
+      button_down_ &= ~control;
+      // Release-first rule: the held half of the guard ends HERE, on the
+      // debounced release -- seven consecutive high reads -- and never on
+      // button_state, which is the raw pin. A switch that bounces reads high
+      // for a poll or two while the user is still holding, and clearing the
+      // guard on that would hand the screen the very press the guard exists to
+      // absorb. The release event being pushed on this same tick is still the
+      // chord's own, so it goes to the other half rather than out.
+      //
+      // This is also why the guard cannot stick and leave a button dead: it is
+      // only ever armed on a pin that is (or has just been) low, and every low
+      // excursion ends here. UI::Button::state_ reaches 0x7f seven high reads
+      // after ANY low read, whether or not the press was long enough to have
+      // reached 0x80 and reported a press in the first place.
+      if (chord_hold_ & control) {
+        chord_hold_ &= ~control;
+        chord_release_ |= control;
+      }
       if (now - button_press_time_[i] < kLongPressTicks)
         PushEvent(UI::EVENT_BUTTON_PRESS, control_mask(i), 0, button_state);
       else
@@ -136,6 +163,40 @@ void FASTRUN Ui::Poll() {
   button_state_ = button_state;
 }
 
+FLASHMEM void Ui::Inject(UI::EventType type, uint16_t control, int16_t value,
+                         uint16_t held) {
+  // Only the DOWN of a tap carries its button in the mask, as the raw pin
+  // would; by the PRESS the pin is high again.
+  //
+  // `held` adds modifier buttons to that mask, which is what lets a chord be
+  // injected at all -- every global gesture is recognised by testing
+  // event.mask for A or Z on another control's DOWN. Nothing is synthesized
+  // implicitly: a caller asking for a chord has to name the modifier.
+  //
+  // The screens these chords open arm IgnoreUntilRelease() on the whole chord.
+  // A modifier that was never physically down is simply "already up" to that
+  // guard, so it swallows one release that never arrives and costs nothing --
+  // the injected press that follows is delivered normally.
+  const uint16_t mask = ((type == UI::EVENT_BUTTON_DOWN) ? control : 0) | held;
+  noInterrupts();
+  PushEvent(type, control, value, mask);
+  interrupts();
+}
+
+// Loop context only, and only ever from Main.cpp's loop() -- which is itself
+// FLASHMEM. The ISR half of the UI is Ui::Poll() above (it fills the event
+// queue); this is the half that DRAINS it, so it does nothing at all unless a
+// human moved an encoder or pressed a button. Flash is the right home for it.
+//
+// FLASHMEM + noinline for the reason PresetBusUI.cpp's HandleEvent already
+// documents, seen from the other side: without an explicit placement here,
+// whether these ~1.5KB land in ITCM was decided by LTO's inlining mood. When
+// LTO folded it into FLASHMEM loop() the ITCM cost was zero; when unrelated
+// churn elsewhere in the image (a bigger Bus200e bridge, say) pushed it back
+// out of line, it reappeared as a 1544-byte ITCM function -- which on
+// T41_audio_dbg, sitting ~1KB under a 32KB ITCM bank boundary, cost a whole
+// extra bank and overflowed RAM1. Pinning it makes that deterministic.
+FLASHMEM __attribute__((noinline))
 UiMode Ui::DispatchEvents(const RuntimeSlot &appslot) {
   AppBase* app = static_cast<AppBase*>(appslot.instance);
   if (!app) return UiMode::UI_MODE_APP_SETTINGS;
@@ -148,6 +209,29 @@ UiMode Ui::DispatchEvents(const RuntimeSlot &appslot) {
       continue;
 
     MENU_REDRAW = 1;
+
+    // 200e preset-bus overlay: it owns all input while open, and holding
+    // BOTH encoder buttons opens it (unused gesture; menu is A/Z + R).
+    //
+    // Compile-gated to the targets that can actually have the bus. VOR
+    // hardware binds the same L+R chord to VBiasManager::AdvanceBias()
+    // (OC_app_base.cpp, EVENT_BUTTON_DOWN), and DispatchEvents runs before
+    // the app's handler. The PresetBusUI stubs are inert off-target, but
+    // SetButtonIgnoreMask() and the `continue` are not -- ungated, this
+    // block swallows the chord on every build and VBias cycling dies.
+#if defined(ARDUINO_TEENSY41) && defined(PRESET_BUS)
+    if (OC::PresetBusUI::Active()) {
+      if (OC::PresetBusUI::HandleEvent(event)) continue;
+    }
+    if (UI::EVENT_BUTTON_DOWN == event.type &&
+        (CONTROL_BUTTON_L == event.control || CONTROL_BUTTON_R == event.control) &&
+        (event.mask & (CONTROL_BUTTON_L | CONTROL_BUTTON_R))
+            == (CONTROL_BUTTON_L | CONTROL_BUTTON_R)) {
+      OC::PresetBusUI::Enter();
+      SetButtonIgnoreMask();  // swallow the releases
+      continue;
+    }
+#endif
 
     const bool z_hold = (event.mask & CONTROL_BUTTON_Z);
     const bool a_hold = (event.mask & CONTROL_BUTTON_A);
@@ -184,10 +268,40 @@ UiMode Ui::DispatchEvents(const RuntimeSlot &appslot) {
   if (idle_time() > (screensaver_timeout() * 60) && !preempt_screensaver_)
     screensaver_ = true;
 
+  // Panel sleep, evaluated from idle_time() every pass rather than latched on
+  // an edge: idle_time() is millis() - last_event_time_, so it is already reset
+  // by ANY event from ANY control (ui_event_queue.h). Deriving the state
+  // instead of hooking a wake-up path means there is no gesture that can leave
+  // the panel dark and no path back that can be missed -- if the module is
+  // being touched, the display is drawing, by construction.
+  //
+  // THIS DELIBERATELY DOES NOT SEND 0xAE, AND MUST NOT.
+  //
+  // The first version of this called display::SetDisplayOn(), which does an
+  // SPI.beginTransaction()/transfer()/endTransaction() from LOOP context. On
+  // Teensy 4.1 that LPSPI bus is SHARED WITH THE DAC: the page transfer is
+  // chained onto the DAC's completion interrupt (see spi_sendpage_isr and
+  // SendPage's `sendpage_state` guard), and the core ISR writes the DAC every
+  // 60us. Reconfiguring LPSPI4_TCR from loop, unsynchronised, races that ISR.
+  // It is a race rather than a certainty, which is the worst kind: it survived
+  // a bench pass, then hung a module hard enough to drop it off USB entirely,
+  // where it stayed until the program button was pressed. SetInverted() has
+  // the same shape and has simply been lucky, being rare and user-initiated.
+  //
+  // Blanking costs nothing and buys the same thing. OLED pixels age when they
+  // are LIT; an all-black frame lights none of them, so the burn-in this
+  // exists to prevent is prevented either way. True display-off would save a
+  // little power on top of that, and it is not worth touching a bus the audio
+  // ISR is using.
+  display_asleep_ = idle_time() > kDisplaySleepMs;
+
   if (screensaver_) {
     return UI_MODE_SCREENSAVER;
   } else if (jump_to_menu_) {
-    SetButtonIgnoreMask(); // ignore release
+    // The A/Z + encR chord already claimed itself above; this covers the OTHER
+    // way in, JumpToMenu() from an app (Hemisphere's encR), whose button is
+    // likewise still down. Re-arming for a chord already armed is a no-op.
+    SetButtonIgnoreMask();
     jump_to_menu_ = false;
     return UI_MODE_APP_SETTINGS;
   } else {
@@ -246,26 +360,14 @@ UiMode Ui::Splashscreen(bool &reset_settings, uint8_t phase) {
       graphics.print(" ");
       graphics.print(OC::Strings::BUILD_TAG);
 
-      const uint8_t *iconroulette[] = {
-        PhzIcons::clockDivider, PhzIcons::clockSkip,
-        PhzIcons::clock_warp_A, PhzIcons::clock_warp_B,
-        PhzIcons::snowflakeB,
-        PhzIcons::snowflakeA
-      };
-
-      static int pick = 0;
-      if (timeout % 50 == 0) pick = random(6);
-      // pew pew?
-      for (int i = 0; i < 124; i+=8)
-        graphics.drawBitmap8(i, 56, 8, iconroulette[pick]);
-
-      // chargin mah lazerrrr
+      // Plain progress bar -- was a cycling row of clock/snowflake icons
+      // ("chargin mah lazerrrr"); the character animation below is where
+      // this splash's personality lives now, so this stays a simple,
+      // silent "still booting" indicator instead of competing with it.
       weegfx::coord_t w = timeout * 128 / SPLASHSCREEN_DELAY_MS;
       w %= 256;
       if (w > 128) w = 256 - w;
       graphics.invertRect(0, 56, w, 8);
-
-      ZapScreensaver();
 
       /* fixes spurious button presses when booting ? */
       while (event_queue_.available())
@@ -280,16 +382,11 @@ UiMode Ui::Splashscreen(bool &reset_settings, uint8_t phase) {
   default:
     do {
       GRAPHICS_BEGIN_FRAME(true);
-      /*
-      const uint8_t *flake_icon[] = { PhzIcons::snowflakeA, PhzIcons::snowflakeB, ZAP_ICON };
-      for (int i=0; i<128; ++i) {
-        graphics.drawBitmap8(i*8%128 + random(2), i/16*8 + random(2), 8, flake_icon[random(3)]);
-      }
-      */
-      ZapScreensaver();
 
-      graphics.clearRect(27, 22, 74, 22);
       if (reset_settings) {
+        // Safety-relevant confirmation text -- unchanged, no animation
+        // competing with it.
+        graphics.clearRect(27, 22, 74, 22);
         graphics.setPrintPos(28, 23);
         graphics.print("Time for a ");
         graphics.setPrintPos(28, 33);
@@ -300,7 +397,6 @@ UiMode Ui::Splashscreen(bool &reset_settings, uint8_t phase) {
         graphics.setPrintPos(28, 33);
         graphics.print("Phazerville!");
       }
-      //graphics.print(OC::Strings::RELEASE_NAME);
 
       while (event_queue_.available())
         (void)event_queue_.PullEvent();

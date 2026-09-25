@@ -47,6 +47,9 @@
 #include "HSMIDI.h"
 
 #include "PhzConfig.h"
+#include "PresetEngine.h"
+#include "PresetBus.h"
+#include "PresetBusUI.h"
 
 #if defined(ARDUINO_TEENSY41)
 USBHost thisUSB;
@@ -96,6 +99,7 @@ void ScanI2C() {
 #endif // ARDUINO_TEENSY41
 
 uint_fast8_t MENU_REDRAW = true;
+volatile uint32_t loop_counter = 0;   // loop rate, read by PresetBus::DebugDump
 static OC::UiMode ui_mode = OC::UI_MODE_MENU;
 static OC::IOFrame io_frame;
 
@@ -276,7 +280,11 @@ FLASHMEM static void watchdog_arm() {
             | WDOG_WCR_WDBG | WDOG_WCR_WDZST;
   watchdog_armed = true;
 }
-static inline void watchdog_feed() {
+// External linkage on purpose: PresetEngine.cpp feeds the watchdog across the
+// long flash writes of a preset save (`extern void watchdog_feed();`). As a
+// static inline it had internal linkage, and the call from another TU became
+// an LTO relocation the linker could not encode.
+void watchdog_feed() {
   WDOG1_WSR = 0x5555;
   WDOG1_WSR = 0xAAAA;
 }
@@ -293,7 +301,7 @@ FLASHMEM static void watchdog_feed_during(void (*op)()) {
 }
 #endif
 
-void setup() {
+FLASHMEM void setup() {
   delay(50);
 #if defined(__IMXRT1062__)
   boot_srsr = SRC_SRSR;
@@ -472,9 +480,10 @@ void setup() {
   vbias_m->SetState(VBiasManager::BI);
 #endif
 
-  // use default global config file in LFS
-  bool firstrun = !PhzConfig::load_config();
+  bool firstrun = false;
 #ifdef __IMXRT1062__
+  // use default global config file in LFS
+  firstrun = !PhzConfig::load_config();
   if (firstrun) {
     // GLOBALS.CFG missing/corrupt: try the boot-time backup before the
     // ConfirmReset flow gets a chance to threaten a factory wipe.
@@ -488,8 +497,23 @@ void setup() {
   }
 #endif
 
-  // initialize apps
-  OC::app_switcher.Init(reset_settings || firstrun);
+  // initialize apps (on T3.x firstrun is detected by the EEPROM load inside)
+  firstrun |= !OC::app_switcher.Init(reset_settings || firstrun);
+#if defined(ARDUINO_TEENSY41) && defined(AUDIO_INTERFACE)
+  // Force the audio output path (I2S codec out + host-playback monitor mix)
+  // into existence. It is lazily built and was only ever constructed when an
+  // audio applet wired up the chain - an appletless boot had DEAD panel outs
+  // and no USB monitoring. Called here so it is created after every other
+  // stream (its documented ordering requirement).
+  OC::AudioIO::OutputStream();
+#endif
+
+  OC::PresetEngine::Init();
+  OC::PresetBus::Init();
+  OC::PresetBusUI::Init();
+  // restores the last bus preset on any T4.1 (bench units included);
+  // no bus traffic is emitted, so non-bus hardware is unaffected
+  OC::PresetEngine::BootRecall();  // gated on I2C_Expansion inside
 
   // Welcome splash
   OC::ui.Splashscreen(firstrun, 1);
@@ -520,6 +544,7 @@ void FASTRUN loop() {
   uint32_t last_redraw_time = 0;
 
   while (true) {
+    ++loop_counter;
 #if defined(__IMXRT1062__)
     watchdog_feed();  // a wedged loop() now reboots instead of bricking
 #endif
@@ -536,6 +561,8 @@ void FASTRUN loop() {
         // Handle events and process state changes elsewhere.
         ui.AppSettings(true);
 
+      } else if (OC::PresetBusUI::Active()) {
+        OC::PresetBusUI::Draw();
       } else { // if (UI_MODE_MENU == ui_mode) {
         OC_DEBUG_RESET_CYCLES(menu_draw_count, 512, DEBUG::MENU_draw_cycles);
         OC_DEBUG_PROFILE_SCOPE(DEBUG::MENU_draw_cycles);
@@ -560,6 +587,9 @@ void FASTRUN loop() {
 
     // Take care of queued tasks
     OC::CORE::FlushTasks();
+    OC::PresetEngine::Process();
+    OC::PresetBus::Task();
+    OC::PresetBusUI::Task();
 
     // UI events
     if (UI_MODE_APP_SETTINGS == ui_mode) {
@@ -672,6 +702,30 @@ void FASTRUN loop() {
           case '<':
           case '>':
             // simulate Right Encoder turn
+            break;
+          // preset-engine bench triggers: [ = save, ] = recall (slot 0);
+          // { and } use slot 1
+          case '(': OC::PresetEngine::RequestSave(0); break;
+          case ')': OC::PresetEngine::RequestRecall(0); break;
+          case '{': OC::PresetEngine::RequestSave(1); break;
+          case '}': OC::PresetEngine::RequestRecall(1); break;
+          case 'g':
+            Serial.println("Saving global settings + app data...");
+            OC::SaveAppData();
+            break;
+          case 'p':  // toggle the preset-bus overlay (remote UI inspection)
+            if (OC::PresetBusUI::Active()) OC::PresetBusUI::Exit();
+            else OC::PresetBusUI::Enter();
+            Serial.printf("PresetBusUI %s\n",
+                          OC::PresetBusUI::Active() ? "open" : "closed");
+            break;
+          case 'b': OC::PresetBus::DebugDump(); break;
+          case 'k':  // toggle 0x50 card serving (WPM-less bus only; hard-gated)
+            OC::PresetBus::CardServeEnable(!OC::PresetBus::CardServing());
+            break;
+          case 'B':
+            OC::PresetBus::SetVerbose(!OC::PresetBus::Verbose());
+            Serial.printf("PresetBus verbose = %d\n", OC::PresetBus::Verbose());
             break;
 #endif
           default:
