@@ -148,7 +148,6 @@ void FASTRUN CORE_timer_ISR() {
   ++CORE::ticks;
   if (CORE::app_isr_enabled) {
     OC::app_switcher.LoadFrame(&io_frames[CORE::ticks & 0x1f]);
-    OC::CORE::FlushTasks();
   }
 
   OC_DEBUG_RESET_CYCLES(OC::CORE::ticks, 16384, OC::DEBUG::ISR_cycles);
@@ -229,7 +228,7 @@ FLASHMEM __attribute__((noinline)) void BootMenu(const bool show) {
     graphics.print("(hold Z to set)");
     GRAPHICS_END_FRAME();
 
-    // OC::CORE::FlushTasks();
+    OC::CORE::FlushTasks();
 
     delay(1);
   }
@@ -705,7 +704,7 @@ void FASTRUN loop() {
 #endif
 
     // Take care of queued tasks from ISR - frequently!
-    // OC::CORE::FlushTasks();
+    OC::CORE::FlushTasks();
 
     // Refresh display
     if (MENU_REDRAW && CORE::display_update_enabled) {
@@ -714,13 +713,13 @@ void FASTRUN loop() {
       last_redraw_time = ui.ticks();
     }
 
-    // OC::CORE::FlushTasks();
+    OC::CORE::FlushTasks();
 
     // Run current app
     if (CORE::app_loop_enabled)
       app_switcher.current_app()->DispatchLoop();
 
-    // OC::CORE::FlushTasks();
+    OC::CORE::FlushTasks();
 
     // UI events
     if (UI_MODE_APP_SETTINGS == ui_mode) {
