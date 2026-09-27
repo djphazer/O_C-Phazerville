@@ -36,17 +36,17 @@
 extern USBHost thisUSB;
 
 void printBits(uint32_t value) {
-  for (int i = 31; i >= 0; i--) {
-    // Shift right by i and mask out the lowest bit
-    uint8_t bit = (value >> i) & 1;
-    Serial.print(bit);
+    for (int i = 31; i >= 0; i--) {
+        // Shift right by i and mask out the lowest bit
+        uint8_t bit = (value >> i) & 1;
+        Serial.print(bit);
 
-    // add a space every 8 bits for readability
-    if (i % 8 == 0 && i != 0) {
-      Serial.print(" ");
+        // add a space every 8 bits for readability
+        if (i % 8 == 0 && i != 0) {
+            Serial.print(" ");
+        }
     }
-  }
-  Serial.println();
+    Serial.println();
 }
 
 
@@ -75,7 +75,7 @@ GamePad UNKNOWN {
 
 #ifdef ENABLE_PS3
 PROGMEM const
-GamePad PS3 { // WIP
+GamePad PS3 {  // WIP
     .type_name = "PS3",
     .button_name = (const char*[]){
         "B1",  "B2",  "B3",  "B4",
@@ -100,7 +100,7 @@ GamePad PS3 { // WIP
 
 #ifdef ENABLE_PS3_MOTION
 PROGMEM const
-GamePad PS3_MOTION { // WIP
+GamePad PS3_MOTION {  // WIP
     .type_name = "PS Move",
     .button_name = (const char*[]){
         "SEL", "STRT", "PS",  "TRI",
@@ -134,11 +134,11 @@ GamePad PS4 {
         "LT", "RT",
         "LX", "LY",
         "RX", "RY",
-        "AcclX", "AcclY", "AcclZ",
-        "GyroX", "GyroY", "GyroZ",
-        // "T1_X", "T1_Y", "T2_X", "T2_Y"
+        // "AcclX", "AcclY", "AcclZ",
+        // "GyroX", "GyroY", "GyroZ",
+        // // "T1_X", "T1_Y", "T2_X", "T2_Y"
     },
-    .axis_count = 12,
+    .axis_count = 6,
     .axis_byte_map = (const int[]){  // 2 triggers, 4 joystick axes
         3,4,
         0,1,
@@ -200,7 +200,7 @@ GamePad XBOX360 {
         "RX", "RY"
     },
     .axis_count = 6,
-    .axis_byte_map = (const int[]){ // 2 triggers, 4 joystick axes
+    .axis_byte_map = (const int[]){  // 2 triggers, 4 joystick axes
         4,5,
         6,8,
         10,12
@@ -285,10 +285,10 @@ GamePad SNES {
         "D_X", "D_Y"
     },
     .axis_count = 2,
-    .axis_byte_map = (const int[]){ 0, 1 },  // D-Pad up/down are y/x axes
-    .axis_scaling = (const int[]){ 7, 7 },  // 8-bit "signed"
-    .axis_symmetry = (const int[]){ 1, 1 },  // -128 -> 127
-    .axis_inversion = (const int[]){ 0, 1},  // y inverted
+    .axis_byte_map =  (const int[]){ 0, 1 },  // D-Pad up/down are y/x axes
+    .axis_scaling =   (const int[]){ 7, 7 },  // 8-bit "signed"
+    .axis_symmetry =  (const int[]){ 1, 1 },  // -128 -> 127
+    .axis_inversion = (const int[]){ 0, 1 },  // y inverted
     .axis_center = 128
 };
 #endif
@@ -309,22 +309,43 @@ GamePad N64 {
         "J_X", "J_Y"
     },
     .axis_count = 2,
-    .axis_byte_map = (const int[]){ 0, 1 },  // D-Pad up/down are y/x axes
-    .axis_scaling = (const int[]){ 7, 7 },  // 8-bit "signed"
-    .axis_symmetry = (const int[]){ 1, 1 },  // -128 -> 127
-    .axis_inversion = (const int[]){ 0, 1},  // y inverted
+    .axis_byte_map =  (const int[]){ 0, 1 },  // D-Pad up/down are y/x axes
+    .axis_scaling =   (const int[]){ 7, 7 },  // 8-bit "signed"
+    .axis_symmetry =  (const int[]){ 1, 1 },  // -128 -> 127
+    .axis_inversion = (const int[]){ 0, 1 },  // y inverted
     .axis_center = 128,
     .dpad_byte = 9,
     .dpad_shift_map = (const int[]){ 13, 14, 15, 16 }  // up, right, down, left
 };
 #endif
 
+#ifdef ENABLE_ATARI
+PROGMEM const
+GamePad ATARI {
+    .type_name = "ATARI",
+    .button_name = (const char*[]){
+        "A",   "B",   "L",   "R",
+        "SEL", "STRT"
+    },
+    .button_count = 6,
+    .axis_name = (const char*[]){
+        "J_X", "J_Y"
+    },
+    .axis_count = 2,
+    .axis_byte_map =  (const int[]){ 0, 1 },  // joystick x/y buttons are x/y "axes"
+    .axis_scaling =   (const int[]){ 7, 7 },  // 8-bit "signed"
+    .axis_symmetry =  (const int[]){ 1, 1 },  // -128 -> 127
+    .axis_inversion = (const int[]){ 0, 1 },  // y inverted
+    .axis_center = 128
+};
+#endif
+
 // connect PS3 controller to a PC and use Sixaxis Pair Tool to set or determine this address
 // changing address will break association to your PS3
-uint8_t ps3_address[6] = {0x01, 0x01, 0x01, 0x3c, 0x2b, 0x1a}; // {0x1a, 0x2b, 0x3c, 0x01, 0x01, 0x01};
+uint8_t ps3_address[6] = {0x01, 0x01, 0x01, 0x3c, 0x2b, 0x1a};  // {0x1a, 0x2b, 0x3c, 0x01, 0x01, 0x01};
 
-static int data; // delete
-static int scaled_axis[16]; // delete
+static int data;  // delete
+static int scaled_axis[16];  // delete
 
 static const int axis_change_threshold = (-HEMISPHERE_MIN_CV) / 8;
 
@@ -369,6 +390,11 @@ void ConnectGamepad(JoystickController &device) {
             f.GamepadState.gamepad = &N64;
             break;
 #endif
+#ifdef ENABLE_ATARI
+        case (JoystickController::joytype_t::ATARI):
+            f.GamepadState.gamepad = &ATARI;
+            break;
+#endif
         default:
             f.GamepadState.gamepad = &UNKNOWN;
             break;
@@ -380,6 +406,7 @@ void ConnectGamepad(JoystickController &device) {
 FLASHMEM
 void ConvertAxisData(int axis, int value) {
     HS::IOFrame &f = HS::frame;
+
     for(int ch = 0; ch < HS::GAMEPAD_MAP_MAX; ++ch) {
         HS::GamepadMapping &map = f.GamepadState.mapping[ch];
         if (map.function == GP_LEARN) {
@@ -438,23 +465,23 @@ void UpdateDpad(JoystickController &device, const GamePad &gp_type, uint32_t &bu
     for (int d = 0; d < 4; ++d) {
         switch (d) {
             case 0:
-                dpad_state = (data == HatSwitch::LEFT_UP)
-                        || (data == HatSwitch::UP)
-                        || (data == HatSwitch::UP_RIGHT);
+                dpad_state = (data == HatSwitch::UP)
+                        || (data == HatSwitch::UP_RIGHT)
+                        || (data == HatSwitch::LEFT_UP);
                 break;
             case 1:
-                dpad_state = (data == HatSwitch::UP_RIGHT)
-                        || (data == HatSwitch::RIGHT)
+                dpad_state = (data == HatSwitch::RIGHT)
+                        || (data == HatSwitch::UP_RIGHT)
                         || (data == HatSwitch::RIGHT_DOWN);
                 break;
             case 2:
-                dpad_state = (data == HatSwitch::RIGHT_DOWN)
-                        || (data == HatSwitch::DOWN)
+                dpad_state = (data == HatSwitch::DOWN)
+                        || (data == HatSwitch::RIGHT_DOWN)
                         || (data == HatSwitch::DOWN_LEFT);
                 break;
             case 3:
-                dpad_state = (data == HatSwitch::DOWN_LEFT)
-                        || (data == HatSwitch::LEFT)
+                dpad_state = (data == HatSwitch::LEFT)
+                        || (data == HatSwitch::DOWN_LEFT)
                         || (data == HatSwitch::LEFT_UP);
                 break;
         }
@@ -465,6 +492,7 @@ void UpdateDpad(JoystickController &device, const GamePad &gp_type, uint32_t &bu
 FLASHMEM
 void ConvertButtonData(const uint8_t button, const uint32_t mask) {
     HS::IOFrame &f = HS::frame;
+
     for(int ch = 0; ch < HS::GAMEPAD_MAP_MAX; ++ch) {
         HS::GamepadMapping &map = f.GamepadState.mapping[ch];
         if (map.function == GP_LEARN) {
@@ -529,7 +557,7 @@ void ProcessGamepad(JoystickController &device) {
     // change event
     if (device.available()) {
         uint64_t axis_changed_mask = device.axisChangedMask();
-        uint32_t buttons = device.getButtons();
+        uint32_t buttons = device.getButtons();  // do stuff with button states at the very end, some "axes" are actually just buttons
 
         if (axis_changed_mask) {
 #ifdef GAMEPAD_DEBUG
@@ -828,13 +856,24 @@ void ProcessGamepad(JoystickController &device) {
                     break;
                 }
 #endif
+#ifdef ENABLE_ATARI
+                case JoystickController::ATARI: {
+                /* "axes" */
+                    for (int i = 0; i < ATARI.axis_count; ++i) {
+                        if (axis_changed_mask & (1 << ATARI.axis_byte_map[i])) {
+                            UpdateAxis(device, ATARI, i);
+                        }
+                    }
+                    break;
+                }
+#endif
                 case JoystickController::UNKNOWN:
                 default: {
                     for (int i = 0; i < 16; ++i)
                     {
                         if (axis_changed_mask & (1 << i)) {
                             data = device.getAxis(i);
-                            scaled_axis[i] = data;  // Proportion(data,  (data < 0) ? 0 : 255,  (data < 0) ? HEMISPHERE_MIN_CV : HEMISPHERE_MAX_CV);
+                            scaled_axis[i] = Proportion(data,  (data < 0) ? 0 : 255,  (data < 0) ? HEMISPHERE_MIN_CV : HEMISPHERE_MAX_CV);
                             if (scaled_axis[i] != f.GamepadState.axis[i]) {
                                 f.GamepadState.axis[i] = scaled_axis[i];
                                 f.GamepadState.last_changed = UNKNOWN.button_count + i;

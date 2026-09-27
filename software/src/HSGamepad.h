@@ -44,7 +44,8 @@
 // #define ENABLE_SpaceNav
 // #define ENABLE_SWITCH
 #define ENABLE_SNES
-// #define ENABLE_N64
+#define ENABLE_N64
+#define ENABLE_ATARI
 
 /*  this is how i had it kinda working previously but it sucked so its all the way different now,
     still useful as a reference, will purge it later
@@ -202,6 +203,9 @@
 #endif
 #ifdef ENABLE_N64
     extern const GamePad N64;
+#endif
+#ifdef ENABLE_ATARI
+    extern const GamePad ATARI;
 #endif
 
     void ProcessGamepad(JoystickController &device);
