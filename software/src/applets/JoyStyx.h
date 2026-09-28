@@ -20,14 +20,9 @@
 
 /*
     TODO:
-    - update UI to handle mode selection
+    - migrate mapping to global settings
     - selectable cv output meters or revert to raw counts
-    - selectable TR1 loopback for clock sync?
-    - new mode: raw (default, as is now)
-    - new mode: sample and hold (trig/clk clocked or button clocked?)
-    - new mode: slewed momentary modulation (2 input buttons drive output hi or low with adj slew rate. optional rtz upon release)
     - show icons for axis/button input type
-    - last cursor should display VID/PID
 */
 
 #ifdef USB_GAMEPAD
@@ -63,8 +58,13 @@ class JoyStyx : public HemisphereApplet {
         }
 
         void Controller() {
+            bool sample = Clock(0);
+            bool reset = Clock(1);
+            if (sample) sh_latch = true;
+            if (reset) sh_latch = false;
+
             ForEachChannel(ch) {
-                CONSTRAIN(param[ch], 0, gs.gamepad->button_count + gs.gamepad->axis_count-1); // in case a new controller is plugged in
+                CONSTRAIN(param[ch], 0, gs.gamepad->button_count + gs.gamepad->axis_count-1);  // in case a new controller is plugged in
             };
 
             if (learn > -1) {
@@ -76,11 +76,11 @@ class JoyStyx : public HemisphereApplet {
             } else {
                 ForEachChannel(ch) {
                     if (param[ch] > gs.gamepad->button_count-1) {
-                        cv[ch] = gs.axis[param[ch] - gs.gamepad->button_count];
-                        Out(ch, cv[ch]);
+                        if (!sh_latch || sample) cv[ch] = gs.axis[param[ch] - gs.gamepad->button_count];
+                        Out(ch, constrain(cv[ch] + In(ch), HEMISPHERE_MIN_CV, HEMISPHERE_MAX_CV));
                     } else {
-                        cv[ch] = (gs.button_mask & (1 << param[ch])) != 0;
-                        GateOut(ch, cv[ch]);
+                        if (!sh_latch || sample) cv[ch] = (gs.button_mask & (1 << param[ch])) != 0;
+                        GateOut(ch, (In(ch) > HEMISPHERE_3V_CV) || cv[ch]);
                     }
                 }
             }
@@ -101,17 +101,17 @@ class JoyStyx : public HemisphereApplet {
 
         void OnEncoderMove(int direction) {
             if (!EditMode()) {
-                MoveCursor(cursor, direction, CURSOR_LAST);
+                MoveCursor(cursor, direction, GP_INPUT);  // CURSOR_LAST);  // temp fix
                 return;
             }
 
             // param LUT
             const struct { uint8_t &p; int min, max; } params[] = {
-                { param[OUTPUT1], 0, gs.gamepad->button_count + gs.gamepad->axis_count - 1}, // pack local
-                { param[OUTPUT2], 0, gs.gamepad->button_count + gs.gamepad->axis_count - 1}, // pack local
+                { param[OUTPUT1], 0, gs.gamepad->button_count + gs.gamepad->axis_count - 1},  // pack local
+                { param[OUTPUT2], 0, gs.gamepad->button_count + gs.gamepad->axis_count - 1},  // pack local
                 { param[MAP_INDEX], 0, min(GAMEPAD_MAP_MAX - 1, gs.gamepad->button_count + gs.gamepad->axis_count - 1)},
-                { param[MAP_FUNCTION], 0, GamepadFunctions::GP_FUNC_LAST}, // pack in ioframe
-                { param[GP_INPUT], 0, gs.gamepad->button_count + gs.gamepad->axis_count - 1}, // pack in ioframe
+                { param[MAP_FUNCTION], 0, GamepadFunctions::GP_FUNC_LAST},  // pack in ioframe
+                { param[GP_INPUT], 0, gs.gamepad->button_count + gs.gamepad->axis_count - 1},  // pack in ioframe
                 { param[GAMEPAD_INFO], 0, 0}
             };
 
@@ -152,7 +152,35 @@ class JoyStyx : public HemisphereApplet {
 
     protected:
         void SetHelp() {
-          // TODO
+            //                    "-------" <-- Label size guide
+            help[HELP_DIGITAL1] = "S&H";
+            help[HELP_DIGITAL2] = "Release";
+            help[HELP_CV1]      = "+ Out1";
+            help[HELP_CV2]      = "+ Out2";
+            help[HELP_OUT1]     = getOutputLabel(0);
+            help[HELP_OUT2]     = getOutputLabel(1);
+            help[HELP_EXTRA1]   = helpExtraPrintHelper(0);
+            help[HELP_EXTRA2]   = helpExtraPrintHelper(1);
+            //                    "---------------------" <-- Extra text size guide
+        }
+
+        char help_extra[2][22];
+        const char* helpExtraPrintHelper(const int idx) {  // HAAAAAACKYSACK
+            if (!idx) {
+                snprintf(help_extra[idx], sizeof(help_extra[idx]),
+                    "%-10s B:%d X:%d",
+                    gs.gamepad->type_name,
+                    gs.gamepad->button_count,
+                    gs.gamepad->axis_count
+                );
+            } else {
+                snprintf(help_extra[idx], sizeof(help_extra[idx]),
+                    "VID:0x%04X PID:0x%04X",
+                    gs.vid,
+                    gs.pid
+                );
+            }
+            return help_extra[idx];
         }
 
     private:
@@ -161,11 +189,13 @@ class JoyStyx : public HemisphereApplet {
         uint8_t param[CURSOR_LAST+1];
         int learn = -1;
         uint32_t last_changed = 0;
+        bool sh_latch = false;
 
         void DrawInterface() {
             if (cursor <= OUTPUT2) DrawOutputs();
-            else if (cursor < GAMEPAD_INFO) DrawMappingConfig();
-            else DrawGamepadInfo();
+            // else if (cursor < GAMEPAD_INFO) DrawMappingConfig();
+            // else DrawGamepadInfo();
+            else DrawMappingConfig();
         }
 
         void DrawOutputs() {
@@ -174,11 +204,7 @@ class JoyStyx : public HemisphereApplet {
             ForEachChannel(ch) {
                 char out_label[] = {(char)('A' + io_offset + ch), '\0' };
                 gfxPrint(1, y, out_label); gfxPrint(": ");
-                gfxPrint((learn == ch) ? "Learn" :
-                    (param[ch] < gs.gamepad->button_count) ?
-                        gs.gamepad->button_name[param[ch]] :
-                        gs.gamepad->axis_name[param[ch] - gs.gamepad->button_count]
-                );
+                gfxPrint((learn == ch) ? "Learn" : getOutputLabel(ch));
                 y += ROW_HEIGHT;
             }
             gfxPrint(1, y, cv[0]); gfxPrint(32, y, cv[1]);
@@ -236,6 +262,11 @@ class JoyStyx : public HemisphereApplet {
                 gs.gamepad->axis_name[gp_in - gs.gamepad->button_count];
         }
 
+        const char* getOutputLabel(int_fast8_t ch) {  // whoops, redundant? combine these later?
+            return (param[ch] < gs.gamepad->button_count) ?
+                        gs.gamepad->button_name[param[ch]] :
+                        gs.gamepad->axis_name[param[ch] - gs.gamepad->button_count];
+        }
 };
 
 #endif

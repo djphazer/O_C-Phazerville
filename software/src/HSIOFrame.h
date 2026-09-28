@@ -843,7 +843,7 @@ struct GamepadFrame {
     uint16_t vid = 0x0;
     uint16_t pid = 0x0;
 
-    int gamepad_type = 0; // UNKNOWN = 0, PS3, PS3_MOTION, PS4, XBOX, XBOX360W, XBOX360USB, XBOXONE, SpaceNav, SWITCH, SNES, N64
+    int gamepad_type = 0; // UNKNOWN = 0, PS3, PS3_MOTION, PS4, XBOX, XBOX360W, XBOX360USB, XBOXONE, SpaceNav, SWITCH, SNES, N64, ATARI
     bool connected = false;
 
     uint32_t button_mask = 0;
