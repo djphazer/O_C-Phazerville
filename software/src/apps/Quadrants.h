@@ -72,8 +72,11 @@ public:
     void Resume() {
         SetBank(bank_num);
 
-        if (preset_id < 0)
-          LoadFromPreset(0);
+        if (preset_id < 0) {
+          LoadFromPreset(queued_preset < 0 ? 0 : queued_preset);
+          queued_preset = -1;
+        }
+
 
         for (auto& env : HS::env_) env.reset();
     }
@@ -152,6 +155,7 @@ public:
         // 100s = Globals
         FILTERMASK1_KEY = 100,
         FILTERMASK2_KEY = 101,
+        LAST_PRESET_KEY = 102,
 
         MIDI_GLOBALS_KEY  = 110,
         PRESET_JUMP_KEY = 111,
@@ -253,6 +257,7 @@ public:
         // applet filtering is actually just global
         PhzConfig::setValue(FILTERMASK1_KEY, HS::hidden_applets[0]);
         PhzConfig::setValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
+        PhzConfig::setValue(LAST_PRESET_KEY, HS::preset_id);
 
         data = PackPackables(
           HS::frame.MIDIState.pc_channel,
@@ -332,6 +337,7 @@ public:
     void LoadFromPreset(int id);
     void load_from_preset(int id) {
         preset_id = id;
+        queued_preset = -1;
 
         uint16_t preset_key = id << 11;
         uint64_t data;
@@ -421,8 +427,11 @@ public:
         // applet filtering
         PhzConfig::getValue(FILTERMASK1_KEY, HS::hidden_applets[0]);
         PhzConfig::getValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
-
         uint64_t data = 0;
+        if (PhzConfig::getValue(LAST_PRESET_KEY, data)) {
+          queued_preset = constrain(data, 0, QUAD_PRESET_COUNT - 1);
+        }
+
         if (PhzConfig::getValue(MIDI_GLOBALS_KEY, data)) {
           UnpackPackables(data,
               HS::frame.MIDIState.pc_channel,
@@ -490,7 +499,6 @@ public:
     void ProcessQueue() {
       if (queued_preset >= 0) {
         LoadFromPreset(queued_preset);
-        queued_preset = -1;
       }
     }
     void QueuePresetLoad(int id) {
