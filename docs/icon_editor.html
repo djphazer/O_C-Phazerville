@@ -1,0 +1,936 @@
+<!--
+    This file was generated using ChatGPT by @beau-seidon and modified to fix a few issues.
+    I'm not sure how AI code copyright works, so I'm using the MIT license and will fix
+    any problems or infringements as needed.
+-->
+
+<!--
+Copyright 2026 Beau Sterling
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+and associated documentation files (the “Software”), to deal in the Software without
+restriction, including without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or
+substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Phz Icon Editor</title>
+
+    <style>
+        :root {
+            /* Color palette */
+            --page-bg: #27262b;
+            --surface: #27262b;
+            --text: #ffffff;
+            --muted: #4d4b52;
+            --border: #44434d;
+            --border-dark: #212126;
+            --link: #00f;
+            --link-hover: #2b7ce9;
+            --control-bg: #302d36;
+            --control-hover: #212126;
+            --on: #ffffff;
+            --off: #000000;
+
+            /* Shared layout and grid settings */
+            --cell-size: 58px;
+            --gap: 1px;
+            --content-width: 900px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            font-size: 16px;
+        }
+
+        body {
+            margin: 0;
+            padding: 2rem 1rem 4rem;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                "Helvetica Neue", Arial, sans-serif;
+            font-size: 12px;
+            line-height: 1.5;
+            color: var(--text);
+            background: var(--page-bg);
+        }
+
+        main {
+            width: 100%;
+            max-width: var(--content-width);
+            margin: 0 auto;
+            padding: 2rem 2.5rem 2.5rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        }
+
+        h1 {
+            margin: 0 0 1.5rem;
+            font-size: 2rem;
+            font-weight: 400;
+            line-height: 1.25;
+            letter-spacing: -0.02em;
+            color: #ffffff;
+        }
+
+        h2 {
+            margin: 1.75rem 0 0.5rem;
+            padding-bottom: 0.35rem;
+            font-size: 1.25rem;
+            font-weight: 500;
+            line-height: 1.4;
+            color: #ffffff;
+            border-bottom: 1px solid var(--border);
+        }
+
+        label {
+            display: inline-block;
+            margin-bottom: 0.25rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text);
+        }
+
+        select,
+        button,
+        textarea,
+        input {
+            font: inherit;
+        }
+
+        select {
+            min-width: 0;
+            padding: 0.45rem 0.4rem;
+            border: 1px solid var(--border-dark);
+            border-radius: 3px;
+            color: var(--text);
+            background: var(--surface);
+        }
+
+        select:focus,
+        textarea:focus {
+            border-color: var(--link);
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background: #302d36;
+            border: 1px solid var(--border-dark);
+            border-radius: 3px;
+        }
+
+        .control-group {
+            min-width: 0;
+        }
+
+        .control-group select {
+            display: block;
+            width: 100%;
+        }
+
+        .buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(40px, 1fr));
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        button {
+            padding: 0.45rem 0.75rem;
+            border: 1px solid var(--border-dark);
+            border-radius: 3px;
+            color: var(--text);
+            background: var(--control-bg);
+            cursor: pointer;
+            transition: background 0.1s ease, border-color 0.1s ease, color 0.1s ease;
+        }
+
+        button:hover {
+            color: var(--link-hover);
+            background: var(--control-hover);
+            border-color: #212126;
+        }
+
+        button:active {
+            background: #302d36;
+        }
+
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        button:disabled:hover {
+            color: var(--text);
+            background: var(--control-bg);
+            border-color: var(--border-dark);
+        }
+
+        button:focus-visible,
+        select:focus-visible,
+        textarea:focus-visible {
+            outline: 2px solid var(--link);
+            outline-offset: 2px;
+        }
+
+        .grid-wrap {
+            display: flex;
+            justify-content: center;
+            max-width: 100%;
+            margin: 1.5rem 0;
+            padding: 1.25rem;
+            overflow: auto;
+            background: #27262b;
+        }
+
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(var(--columns, 8), var(--cell-size));
+            grid-template-rows: repeat(var(--rows, 8), var(--cell-size));
+            gap: var(--gap);
+            flex: 0 0 auto;
+            border: 2px solid var(--border-dark);
+            background: var(--border-dark);
+            user-select: none;
+        }
+
+        .cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            min-width: 0;
+            min-height: 0;
+            padding: 0;
+            border: 0;
+            border-radius: 0;
+            background: var(--off);
+            cursor: pointer;
+        }
+
+        .cell:hover {
+            opacity: 0.8;
+        }
+
+        .cell.on {
+            background: var(--on);
+        }
+
+        .cell:focus-visible {
+            outline: 3px solid #7253ed;
+            outline-offset: -3px;
+        }
+
+        .output {
+            width: 100%;
+            min-height: 92px;
+            padding: 0.75rem;
+            border: 1px solid var(--border-dark);
+            border-radius: 3px;
+            resize: vertical;
+            font-family: Consolas, "Cascadia Mono", "Courier New", monospace;
+            font-size: 0.9rem;
+            line-height: 1.45;
+            color: #ffffff;
+            background: #302d36;
+        }
+
+        .output:focus {
+            background: #212126;
+        }
+
+        .input {
+            background: #302d36;
+        }
+
+        .status {
+            min-height: 1.4em;
+            margin-top: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--muted);
+        }
+
+        .help {
+            margin-top: 1.5rem;
+            padding: 0.85rem 1rem;
+            color: var(--muted);
+            font-size: 0.9rem;
+            line-height: 1.5;
+            background: #27262b;
+        }
+
+        code {
+            font-family: Consolas, "Cascadia Mono", "Courier New", monospace;
+            font-size: 0.9em;
+        }
+
+        a {
+            color: var(--link);
+        }
+
+        a:hover {
+            color: var(--link-hover);
+        }
+
+        @media (max-width: 700px) {
+            body {
+                padding: 0;
+            }
+
+            main {
+                max-width: none;
+                padding: 1.25rem 1rem 2rem;
+                border: 0;
+                box-shadow: none;
+            }
+
+            h1 {
+                font-size: 1.75rem;
+            }
+
+            .controls {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            select {
+                width: 100%;
+            }
+
+            .grid-wrap {
+                padding: 0.5rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main>
+        <h1>Phz Icon Editor</h1>
+
+        <section class="controls" aria-label="Editor settings">
+            <div class="control-group">
+                <label for="columns">Grid columns</label>
+                <select id="columns"></select>
+            </div>
+
+            <div class="control-group">
+                <label for="rows">Grid rows</label>
+                <select id="rows"></select>
+            </div>
+
+            <div class="control-group">
+                <label for="major">Storage</label>
+                <select id="major">
+                    <option value="column">Column Major</option>
+                    <option value="row">Row Major</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="bitOrder">Bit orientation</label>
+                <select id="bitOrder">
+                    <option value="msb-bottom">MSB Bottom</option>
+                    <option value="msb-top">MSB Top</option>
+                    <option value="lsb-bottom">LSB Bottom</option>
+                    <option value="lsb-top">LSB Top</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="format">Output format</label>
+                <select id="format">
+                    <option value="c">C / C++</option>
+                    <option value="plain">Hex values only</option>
+                    <option value="hex">0xHH, 0xHH, ...</option>
+                </select>
+            </div>
+        </section>
+
+        <div class="buttons" aria-label="Bitmap operations">
+            <button id="clear" type="button">Clear</button>
+            <button id="invert" type="button">Invert</button>
+            <button id="rotateCW" type="button" title="Rotate clockwise (unavailable when the grid is wider than 64 pixels)">Rotate CW</button>
+            <button id="rotateCCW" type="button" title="Rotate counterclockwise (unavailable when the grid is wider than 64 pixels)">Rotate CCW</button>
+            <button id="shiftUp" type="button" title="Shift all pixels up; wrap the top row to the bottom" aria-label="Shift grid up">Shift ↑</button>
+            <button id="shiftDown" type="button" title="Shift all pixels down; wrap the bottom row to the top" aria-label="Shift grid down">Shift ↓</button>
+            <button id="shiftLeft" type="button" title="Shift all pixels left; wrap the left column to the right" aria-label="Shift grid left">Shift ←</button>
+            <button id="shiftRight" type="button" title="Shift all pixels right; wrap the right column to the left" aria-label="Shift grid right">Shift →</button>
+            <button id="flipH" type="button">Flip H</button>
+            <button id="flipV" type="button">Flip V</button>
+        </div>
+
+        <div class="grid-wrap">
+            <div id="grid" role="grid" aria-label="Bitmap editor"></div>
+        </div>
+
+        <h2>Output (uint8_t array)</h2>
+        <textarea id="output" class="output" spellcheck="false" readonly
+            aria-label="Generated output"></textarea>
+
+        <h2>Input</h2>
+        <textarea id="input" class="output input" spellcheck="false"
+            aria-label="Input byte array"
+            placeholder="Paste something like:
+{ 0x05, 0x05, 0x25, 0x12, 0x08, 0xe4, 0xa0, 0xe0 };
+or:
+const uint8_t ICON[8] = { 0x07, 0x08, ... };"></textarea>
+
+        <div class="buttons">
+            <button id="load" type="button">Load into grid</button>
+            <button id="copy" type="button">Copy output</button>
+        </div>
+
+        <div id="status" class="status" role="status" aria-live="polite"></div>
+
+        <p class="help">
+            Default orientation matches the old Bitca tool:
+            <b>Column Major, MSB Bottom</b>.
+            In that mode each byte stores eight vertical pixels from one column,
+            and bit 7 is the bottom pixel while bit 0 is the top pixel.
+            Larger grids are encoded in consecutive groups of eight pixels.
+            Changing orientation converts the displayed bitmap without changing the pixels.
+        </p>
+    </main>
+
+    <script>
+        "use strict";
+
+        // Grid limits and default dimensions.
+        const MIN_COLUMNS = 2;
+        const MAX_COLUMNS = 128;
+        const MIN_ROWS = 2;
+        const MAX_ROWS = 64;
+        const DEFAULT_COLUMNS = 8;
+        const DEFAULT_ROWS = 8;
+
+        // Shared references to the editor's controls and output elements.
+        const grid = document.getElementById("grid");
+        const gridWrap = document.querySelector(".grid-wrap");
+        const columnsSelect = document.getElementById("columns");
+        const rowsSelect = document.getElementById("rows");
+        const output = document.getElementById("output");
+        const input = document.getElementById("input");
+        const status = document.getElementById("status");
+        const major = document.getElementById("major");
+        const bitOrder = document.getElementById("bitOrder");
+        const format = document.getElementById("format");
+
+        let columnCount = DEFAULT_COLUMNS;
+        let rowCount = DEFAULT_ROWS;
+        let pixels = createPixels(rowCount, columnCount);
+        let cells = [];
+        let drawingPointerId = null;
+        let drawingState = true;
+        let visitedCells = new Set();
+
+        function createPixels(rows, columns, initialValue = false) {
+            return Array.from({ length: rows }, () => Array(columns).fill(initialValue));
+        }
+
+        function populateDimensionSelect(select, min, max, selectedValue) {
+            const fragment = document.createDocumentFragment();
+
+            for (let value = min; value <= max; value++) {
+                const option = document.createElement("option");
+                option.value = String(value);
+                option.textContent = String(value);
+                fragment.appendChild(option);
+            }
+
+            select.replaceChildren(fragment);
+            select.value = String(selectedValue);
+        }
+
+        function resizeGrid(newRows, newColumns) {
+            const resizedPixels = createPixels(newRows, newColumns);
+            const rowsToCopy = Math.min(rowCount, newRows);
+            const columnsToCopy = Math.min(columnCount, newColumns);
+
+            for (let y = 0; y < rowsToCopy; y++) {
+                for (let x = 0; x < columnsToCopy; x++) {
+                    resizedPixels[y][x] = pixels[y][x];
+                }
+            }
+
+            rowCount = newRows;
+            columnCount = newColumns;
+            pixels = resizedPixels;
+
+            grid.style.setProperty("--columns", columnCount);
+            grid.style.setProperty("--rows", rowCount);
+            buildGrid();
+            update();
+            scaleGrid();
+        }
+
+        function buildGrid() {
+            const fragment = document.createDocumentFragment();
+            cells = [];
+
+            for (let y = 0; y < rowCount; y++) {
+                for (let x = 0; x < columnCount; x++) {
+                    const cell = document.createElement("button");
+                    cell.className = "cell";
+                    cell.type = "button";
+                    cell.setAttribute("role", "gridcell");
+                    cell.setAttribute("aria-label", `row ${y + 1}, column ${x + 1}`);
+                    cell.setAttribute("aria-pressed", pixels[y][x] ? "true" : "false");
+
+                    cell.dataset.row = String(y);
+                    cell.dataset.column = String(x);
+
+                    fragment.appendChild(cell);
+                    cells.push(cell);
+                }
+            }
+
+            grid.replaceChildren(fragment);
+        }
+
+        function scaleGrid() {
+            const wrapStyles = getComputedStyle(gridWrap);
+            const gridStyles = getComputedStyle(grid);
+            const horizontalPadding =
+                parseFloat(wrapStyles.paddingLeft) + parseFloat(wrapStyles.paddingRight);
+            const gridBorders =
+                parseFloat(gridStyles.borderLeftWidth) + parseFloat(gridStyles.borderRightWidth);
+            const gap = parseFloat(gridStyles.columnGap) || 0;
+
+            // Reserve space for every gap and both borders before sizing cells.
+            // Otherwise the accumulated 1px gaps make wide grids overflow.
+            const availableWidth = Math.max(1, gridWrap.clientWidth - horizontalPadding);
+            const gapWidth = gap * Math.max(0, columnCount - 1);
+            const cellSize = Math.max(
+                1,
+                Math.min(58, (availableWidth - gapWidth - gridBorders) / columnCount)
+            );
+
+            grid.style.setProperty("--cell-size", `${cellSize}px`);
+        }
+
+        function updateRotationButtons() {
+            // Rotating swaps rows and columns. The rotated height must not exceed 64.
+            const rotationAllowed = columnCount <= MAX_ROWS;
+            document.getElementById("rotateCW").disabled = !rotationAllowed;
+            document.getElementById("rotateCCW").disabled = !rotationAllowed;
+        }
+
+        function setCellState(cell, state) {
+            const y = Number(cell.dataset.row);
+            const x = Number(cell.dataset.column);
+            const key = `${y},${x}`;
+
+            // Each cell is processed at most once per gesture, using the state
+            // chosen by the first pixel pressed (draw or erase).
+            if (visitedCells.has(key)) return;
+            visitedCells.add(key);
+            pixels[y][x] = state;
+            cell.classList.toggle("on", state);
+            cell.setAttribute("aria-pressed", state ? "true" : "false");
+        }
+
+        function cellAtPoint(x, y) {
+            const element = document.elementFromPoint(x, y);
+            return element && element.closest ? element.closest(".cell") : null;
+        }
+
+        function updateGrid() {
+            for (let i = 0; i < cells.length; i++) {
+                const y = Math.floor(i / columnCount);
+                const x = i % columnCount;
+                const isOn = pixels[y][x];
+
+                cells[i].classList.toggle("on", isOn);
+                cells[i].setAttribute("aria-pressed", isOn ? "true" : "false");
+            }
+        }
+
+        // Returns the bit position for a pixel within an eight-pixel group.
+        function bitIndexForPixel(position) {
+            const offset = position % 8;
+
+            if (bitOrder.value === "msb-bottom" || bitOrder.value === "lsb-top") {
+                return offset;
+            }
+
+            return 7 - offset;
+        }
+
+        // Encode as one byte-array per eight-pixel band. In column-major mode,
+        // each array contains one byte per column for an eight-row band. In
+        // row-major mode, each array contains one byte per row for an eight-column band.
+        function encodeGroups() {
+            const groups = [];
+
+            if (major.value === "column") {
+                const rowGroups = Math.ceil(rowCount / 8);
+                for (let group = 0; group < rowGroups; group++) {
+                    const bytes = [];
+                    for (let x = 0; x < columnCount; x++) {
+                        let value = 0;
+                        for (let bit = 0; bit < 8; bit++) {
+                            const y = group * 8 + bit;
+                            if (y < rowCount && pixels[y][x]) {
+                                value |= (1 << bitIndexForPixel(bit));
+                            }
+                        }
+                        bytes.push(value);
+                    }
+                    groups.push(bytes);
+                }
+            } else {
+                const columnGroups = Math.ceil(columnCount / 8);
+                for (let group = 0; group < columnGroups; group++) {
+                    const bytes = [];
+                    for (let y = 0; y < rowCount; y++) {
+                        let value = 0;
+                        for (let bit = 0; bit < 8; bit++) {
+                            const x = group * 8 + bit;
+                            if (x < columnCount && pixels[y][x]) {
+                                value |= (1 << bitIndexForPixel(bit));
+                            }
+                        }
+                        bytes.push(value);
+                    }
+                    groups.push(bytes);
+                }
+            }
+            return groups;
+        }
+
+        function formatBytes(groups) {
+            const formattedGroups = groups.map(bytes => bytes.map(
+                value => "0x" + value.toString(16).padStart(2, "0")
+            ));
+
+            if (format.value === "plain" || format.value === "hex") {
+                return formattedGroups.map(values => values.join(", ")).join("\n\n");
+            }
+
+            const totalBytes = groups.reduce((total, group) => total + group.length, 0);
+            const declarations = formattedGroups.map((values, index) =>
+                `const uint8_t ICON_${index}[${values.length}] = { ${values.join(", ")} };`
+            );
+            return `// Grid: ${rowCount} rows x ${columnCount} columns; ${totalBytes} bytes\n` +
+                declarations.join("\n");
+        }
+
+        function update() {
+            updateGrid();
+            output.value = formatBytes(encodeGroups());
+            updateRotationButtons();
+        }
+
+        function decode(groups, inferredRows, inferredColumns) {
+            rowCount = inferredRows;
+            columnCount = inferredColumns;
+            rowsSelect.value = String(rowCount);
+            columnsSelect.value = String(columnCount);
+            pixels = createPixels(rowCount, columnCount);
+
+            if (major.value === "column") {
+                for (let group = 0; group < groups.length; group++) {
+                    const bytes = groups[group];
+                    for (let x = 0; x < Math.min(columnCount, bytes.length); x++) {
+                        for (let bit = 0; bit < 8; bit++) {
+                            const y = group * 8 + bit;
+                            if (y < rowCount) {
+                                pixels[y][x] = Boolean(bytes[x] & (1 << bitIndexForPixel(bit)));
+                            }
+                        }
+                    }
+                }
+            } else {
+                for (let group = 0; group < groups.length; group++) {
+                    const bytes = groups[group];
+                    for (let y = 0; y < Math.min(rowCount, bytes.length); y++) {
+                        for (let bit = 0; bit < 8; bit++) {
+                            const x = group * 8 + bit;
+                            if (x < columnCount) {
+                                pixels[y][x] = Boolean(bytes[y] & (1 << bitIndexForPixel(bit)));
+                            }
+                        }
+                    }
+                }
+            }
+
+            grid.style.setProperty("--columns", columnCount);
+            grid.style.setProperty("--rows", rowCount);
+            buildGrid();
+            update();
+            scaleGrid();
+        }
+
+        function parseArray(text) {
+            // Read optional dimensions emitted by this editor, before removing comments.
+            const dimensions = text.match(/Grid:\s*(\d+)\s*rows?\s*x\s*(\d+)\s*columns?/i);
+            const declaredDimensions = text.match(/\b(?:ICON(?:_\d+)?|[A-Za-z_]\w*)\s*\[\s*(\d+)\s*\]\s*=\s*\{/);
+
+            text = text.replace(/\/\*[\s\S]*?\*\//g, "");
+            text = text.replace(/\/\/.*$/gm, "");
+
+            // Collect innermost brace groups, so both separate arrays and nested
+            // two-dimensional initializers are supported without duplicating bytes.
+            const groups = [];
+            const braceStarts = [];
+            for (let i = 0; i < text.length; i++) {
+                if (text[i] === "{") {
+                    braceStarts.push(i + 1);
+                } else if (text[i] === "}" && braceStarts.length) {
+                    const groupStart = braceStarts.pop();
+                    const contents = text.slice(groupStart, i);
+                    // Only parse leaf groups; an outer wrapper around nested arrays
+                    // is not itself a byte array.
+                    if (!contents.includes("{")) {
+                        const tokens = contents.match(/0x[0-9a-fA-F]+|\b\d+\b/g) || [];
+                        const values = tokens.map(token => token.toLowerCase().startsWith("0x")
+                            ? parseInt(token, 16) : parseInt(token, 10))
+                            .filter(value => value >= 0 && value <= 255);
+                        if (values.length) groups.push(values);
+                    }
+                }
+            }
+
+            if (groups.length === 0) {
+                // Plain hex output uses blank lines to separate eight-pixel bands.
+                const chunks = text.trim().split(/\n\s*\n/);
+                for (const chunk of chunks) {
+                    const tokens = chunk.match(/0x[0-9a-fA-F]+|\b\d+\b/g) || [];
+                    const values = tokens.map(token => token.toLowerCase().startsWith("0x")
+                        ? parseInt(token, 16) : parseInt(token, 10))
+                        .filter(value => value >= 0 && value <= 255);
+                    if (values.length) groups.push(values);
+                }
+            }
+
+            if (groups.length === 0) throw new Error("No byte values found in the input.");
+            if (groups.some(group => group.length !== groups[0].length)) {
+                throw new Error("All arrays must contain the same number of bytes.");
+            }
+
+            let rows;
+            let columns;
+            if (dimensions) {
+                rows = Number(dimensions[1]);
+                columns = Number(dimensions[2]);
+            } else if (major.value === "column") {
+                columns = groups[0].length;
+                rows = groups.length * 8;
+            } else {
+                rows = groups[0].length;
+                columns = groups.length * 8;
+            }
+
+            // A single legacy flat array represents one eight-pixel band.
+            if (groups.length === 1 && !dimensions) {
+                if (major.value === "column") {
+                    rows = 8;
+                    columns = groups[0].length;
+                } else {
+                    rows = groups[0].length;
+                    columns = 8;
+                }
+            }
+
+            if (rows < MIN_ROWS || rows > MAX_ROWS || columns < MIN_COLUMNS || columns > MAX_COLUMNS) {
+                throw new Error(`Input dimensions (${rows} rows x ${columns} columns) exceed the supported range (${MIN_ROWS}-${MAX_ROWS} rows, ${MIN_COLUMNS}-${MAX_COLUMNS} columns).`);
+            }
+
+            return { groups, rows, columns };
+        }
+
+        function setStatus(message, error = false) {
+            status.textContent = message;
+            status.style.color = error ? "#a00" : "var(--muted)";
+        }
+
+        function clear() {
+            pixels = createPixels(rowCount, columnCount);
+            update();
+        }
+
+        function invert() {
+            pixels = pixels.map(row => row.map(pixel => !pixel));
+            update();
+        }
+
+        function rotate(clockwise) {
+            const newRows = columnCount;
+            const newColumns = rowCount;
+            const rotated = createPixels(newRows, newColumns);
+
+            for (let y = 0; y < rowCount; y++) {
+                for (let x = 0; x < columnCount; x++) {
+                    if (clockwise) {
+                        rotated[x][rowCount - 1 - y] = pixels[y][x];
+                    } else {
+                        rotated[columnCount - 1 - x][y] = pixels[y][x];
+                    }
+                }
+            }
+
+            rowCount = newRows;
+            columnCount = newColumns;
+            pixels = rotated;
+            rowsSelect.value = String(rowCount);
+            columnsSelect.value = String(columnCount);
+            grid.style.setProperty("--columns", columnCount);
+            grid.style.setProperty("--rows", rowCount);
+            buildGrid();
+            update();
+            scaleGrid();
+        }
+
+        function shiftGrid(dx, dy) {
+            const shifted = createPixels(rowCount, columnCount);
+
+            for (let y = 0; y < rowCount; y++) {
+                for (let x = 0; x < columnCount; x++) {
+                    // Read from the opposite offset so the bitmap moves in the
+                    // requested direction, wrapping at each grid boundary.
+                    const sourceY = (y - dy + rowCount) % rowCount;
+                    const sourceX = (x - dx + columnCount) % columnCount;
+                    shifted[y][x] = pixels[sourceY][sourceX];
+                }
+            }
+
+            pixels = shifted;
+            update();
+        }
+
+        function flipH() {
+            pixels.forEach(row => row.reverse());
+            update();
+        }
+
+        function flipV() {
+            pixels.reverse();
+            update();
+        }
+
+        document.getElementById("load").addEventListener("click", () => {
+            try {
+                const parsed = parseArray(input.value);
+                decode(parsed.groups, parsed.rows, parsed.columns);
+                const byteCount = parsed.groups.reduce((total, group) => total + group.length, 0);
+                setStatus(`Loaded ${parsed.groups.length} array${parsed.groups.length === 1 ? "" : "s"} (${byteCount} bytes) into a ${parsed.rows} x ${parsed.columns} grid.`);
+            } catch (error) {
+                setStatus(error.message, true);
+            }
+        });
+
+        document.getElementById("copy").addEventListener("click", async () => {
+            try {
+                await navigator.clipboard.writeText(output.value);
+                setStatus("Copied output.");
+            } catch (error) {
+                output.select();
+                const copied = document.execCommand("copy");
+                setStatus(copied ? "Copied output." : "Copy failed; select and copy the output manually.", !copied);
+            }
+        });
+
+        // Pointer events support mouse, pen, and touch drawing. The first pixel
+        // determines the paint state; every newly crossed pixel gets that state.
+        grid.addEventListener("pointerdown", event => {
+            const cell = event.target.closest(".cell");
+            if (!cell || event.button !== 0 || drawingPointerId !== null) return;
+
+            event.preventDefault();
+            drawingPointerId = event.pointerId;
+            visitedCells = new Set();
+            const y = Number(cell.dataset.row);
+            const x = Number(cell.dataset.column);
+            drawingState = !pixels[y][x];
+            setCellState(cell, drawingState);
+            output.value = formatBytes(encodeGroups());
+        });
+
+        document.addEventListener("pointermove", event => {
+            if (event.pointerId !== drawingPointerId) return;
+
+            const cell = cellAtPoint(event.clientX, event.clientY);
+            if (!cell || !grid.contains(cell)) return;
+
+            setCellState(cell, drawingState);
+            output.value = formatBytes(encodeGroups());
+        });
+
+        function stopDrawing(event) {
+            if (event.pointerId !== drawingPointerId) return;
+            drawingPointerId = null;
+            visitedCells.clear();
+        }
+
+        document.addEventListener("pointerup", stopDrawing);
+        document.addEventListener("pointercancel", stopDrawing);
+        window.addEventListener("blur", () => {
+            drawingPointerId = null;
+            visitedCells.clear();
+        });
+
+        document.getElementById("clear").addEventListener("click", clear);
+        document.getElementById("invert").addEventListener("click", invert);
+        document.getElementById("rotateCW").addEventListener("click", () => rotate(true));
+        document.getElementById("rotateCCW").addEventListener("click", () => rotate(false));
+        document.getElementById("shiftUp").addEventListener("click", () => shiftGrid(0, -1));
+        document.getElementById("shiftDown").addEventListener("click", () => shiftGrid(0, 1));
+        document.getElementById("shiftLeft").addEventListener("click", () => shiftGrid(-1, 0));
+        document.getElementById("shiftRight").addEventListener("click", () => shiftGrid(1, 0));
+        document.getElementById("flipH").addEventListener("click", flipH);
+        document.getElementById("flipV").addEventListener("click", flipV);
+
+        columnsSelect.addEventListener("change", () => {
+            resizeGrid(rowCount, Number(columnsSelect.value));
+        });
+
+        rowsSelect.addEventListener("change", () => {
+            resizeGrid(Number(rowsSelect.value), columnCount);
+        });
+
+        major.addEventListener("change", update);
+        bitOrder.addEventListener("change", update);
+        format.addEventListener("change", update);
+
+        populateDimensionSelect(columnsSelect, MIN_COLUMNS, MAX_COLUMNS, DEFAULT_COLUMNS);
+        populateDimensionSelect(rowsSelect, MIN_ROWS, MAX_ROWS, DEFAULT_ROWS);
+        grid.style.setProperty("--columns", columnCount);
+        grid.style.setProperty("--rows", rowCount);
+        buildGrid();
+        scaleGrid();
+        update();
+
+        // Preserve the original tool's documented default orientation.
+        major.value = "column";
+        bitOrder.value = "msb-bottom";
+        update();
+
+        if ("ResizeObserver" in window) {
+            new ResizeObserver(scaleGrid).observe(gridWrap);
+        } else {
+            window.addEventListener("resize", scaleGrid);
+        }
+    </script>
+</body>
+</html>
