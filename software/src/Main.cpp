@@ -403,10 +403,12 @@ FLASHMEM __attribute__((noinline))
 void SerialHandler() {
   static size_t cap_idx = 0;
   static elapsedMicros cap_send_time = 0;
+  static bool unlocked = false;
 
   if (Serial && Serial.available() > 0) {
-    bool capreq = false;
-    do {
+    bool capreq = !unlocked;
+
+    if (unlocked) do {
       int cmd = Serial.read();
       switch (cmd) {
 #ifdef PRINT_DEBUG
@@ -470,6 +472,17 @@ void SerialHandler() {
           break;
       }
     } while (Serial.available() > 0); // todo: yield after a limit
+    /* not unlocked yet */
+    else {
+      static constexpr uint32_t PEW = FourCC<'P','e','w','!'>::value;
+      static uint32_t unlock_shift = 0;
+      unlock_shift = (unlock_shift << 8) | (uint8_t)Serial.read();
+      if (unlock_shift == PEW) {
+        unlocked = true;
+        Serial.println("Pew!");
+      }
+    };
+
     if (capreq) {
       display::frame_buffer.capture_request();
       cap_idx = 0;
