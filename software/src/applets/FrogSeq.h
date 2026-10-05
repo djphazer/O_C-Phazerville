@@ -37,16 +37,16 @@
 // SOFTWARE.
 
 
-static const uint8_t frog_bitmap[9][12] = {
-  {0,1,0,0,1,1,1,1,0,0,1,0},
-  {1,1,0,1,0,1,1,0,1,0,1,1},
-  {0,1,0,1,1,1,1,1,1,0,1,0},
-  {0,0,1,1,1,1,1,1,1,1,0,0},
-  {0,0,0,1,1,1,1,1,1,0,0,0},
-  {0,0,1,1,1,1,1,1,1,1,0,0},
-  {0,1,0,1,1,1,1,1,1,0,1,0},
-  {1,1,0,1,1,1,1,1,1,0,1,1},
-  {0,1,0,0,1,1,1,1,0,0,1,0}
+static const uint16_t FROG_BITMAP[9] = {
+  0x4F2,
+  0xD6B,
+  0x5FA,
+  0x3FC,
+  0x1F8,
+  0x3FC,
+  0x5FA,
+  0xDFB,
+  0x4F2
 };
 
 class FrogSeq : public HemisphereApplet {
@@ -114,7 +114,7 @@ private:
   bool frog_horizontal = false;
 
   // Frog positions: Safe Zone, Lane 1, Lane 2, Lane 3.
-  static constexpr int FROG_Y[4] = {13, 28, 41, 53};
+  static constexpr int FROG_Y[4] = {13, 27, 40, 53};
   int frog_lane = 0;
   int frog_y_reference = 0;
 
@@ -150,8 +150,7 @@ private:
   static constexpr int TRAFFIC_OBJECTS = 3;
   static constexpr int TRAFFIC_WIDTH = 10;
   static constexpr int TRAFFIC_MOVE_PIXELS = 4;
-  static constexpr int TRAFFIC_MIN_SPAWN_GAP =
-    TRAFFIC_MOVE_PIXELS * 4;
+  static constexpr int TRAFFIC_MIN_SPAWN_GAP = 8;
   static constexpr int TRAFFIC_LEFT_BOUNDARY = -TRAFFIC_WIDTH;
   static constexpr int TRAFFIC_RIGHT_BOUNDARY = 64;
 
@@ -250,10 +249,12 @@ private:
   bool modifier_gate = false;
   const uint8_t *modifier_icon = nullptr;
   bool collision_ratchet_armed = false;
+  int collision_ratchet_note = 0;  // Ratchet captures the queued step's note, even if muted.
   uint8_t collision_ratchets_to_go = 0;       // Actual Ratchets remaining
   uint8_t collision_ratchets_display = 0;
   uint8_t collision_ratchet_count = 0;
-  uint32_t collision_ratchet_countdown = 0;
+  uint32_t collision_ratchet_next_tick = 0;
+
   bool collision_ratchet_zap = false;
   uint32_t collision_ratchet_spacing = 0;
 
@@ -276,10 +277,10 @@ private:
       return;
     }
 
-    for (int y = 0; y < 9; y++) {
-      for (int x = 0; x < 12; x++) {
+    for (int y = 0; y < 9; ++y) {
+      for (int x = 0; x < 12; ++x) {
 
-        if (frog_bitmap[y][x])
+        if (FROG_BITMAP[y] & (1 << (11 - x)))
           gfxPixel(frog_x + x, frog_y + y);
 
       }
@@ -302,18 +303,22 @@ private:
 
   void ApplyCollisionModifier(
     int lane,
-    TrafficModifier modifier
+    TrafficModifier modifier,
+    bool clocked
   ) {
-    modifier_step = step;
+    modifier_step = clocked ? step : step + 1;
+    if (modifier_step >= sequence_length)
+      modifier_step = 0;
 
     const bool can_ratchet =
+      lane_rate[lane] == TRAFFIC_DIV_2 ||
       lane_rate[lane] == TRAFFIC_X2 ||
       lane_rate[lane] == TRAFFIC_X3 ||
       lane_rate[lane] == TRAFFIC_X4;
 
     // The car already chose its modifier when it spawned.
-    // ×1 and ÷2: Note or Gate.
-    // ×2, ×3 and ×4: Ratchet, Note or Gate.
+    // ×1: Note or Gate.
+    // ÷2, ×2, ×3 and ×4: Ratchet, Note or Gate.
 
     if (modifier == MODIFIER_RATCHET && can_ratchet) {
       modifier_icon = nullptr;
@@ -322,28 +327,44 @@ private:
       if (!collision_ratchet_armed || collision_ratchet_count == 0) {
         collision_ratchet_armed = true;
         collision_ratchet_count = 0;
-        collision_ratchet_countdown = 0;
+        collision_ratchet_next_tick = 0;
+
+        // On the master clock, use the current step.
+        // Between clocks, queue the upcoming step.
+        // This can "see through" a mute: normal sequence playback still
+        // leaves current_note unchanged on a muted step.
+        collision_ratchet_note = GetFrogNote(modifier_step);
+
+        const uint32_t ratchet_clock_ticks = max(1u, traffic_clock_ticks);
 
         switch (lane_rate[lane]) {
+          case TRAFFIC_DIV_2:
+            // /2 ratchet plays the captured note on two consecutive master clocks.
+            collision_ratchets_to_go = 2;
+            collision_ratchets_display = 2;
+            collision_ratchet_spacing =
+              max(1u, traffic_clock_ticks);
+            break;
+
           case TRAFFIC_X2:
             collision_ratchets_to_go = 2;
             collision_ratchets_display = 2;
             collision_ratchet_spacing =
-              max(1u, ClockCycleTicks(0) / 2);
+              max(1u, ratchet_clock_ticks / 2);
             break;
 
           case TRAFFIC_X3:
             collision_ratchets_to_go = 3;
             collision_ratchets_display = 3;
             collision_ratchet_spacing =
-              max(1u, ClockCycleTicks(0) / 3);
+              max(1u, ratchet_clock_ticks / 3);
             break;
 
           case TRAFFIC_X4:
             collision_ratchets_to_go = 4;
             collision_ratchets_display = 4;
             collision_ratchet_spacing =
-              max(1u, ClockCycleTicks(0) / 4);
+              max(1u, ratchet_clock_ticks / 4);
             break;
 
           default:
@@ -363,26 +384,26 @@ private:
       if (random(2))
         modifier_value = -modifier_value;
       SetFrogNote(
-        GetFrogNote(step) + modifier_value,
-        step
+        GetFrogNote(modifier_step) + modifier_value,
+        modifier_step
       );
 
-      if (muted(step))
-        ToggleMute(step);
+      if (muted(modifier_step))
+        ToggleMute(modifier_step);
     }
     else {
       collision_ratchets_display = 0;
       collision_ratchet_zap = false;
-      ToggleMute(step);
+      ToggleMute(modifier_step);
       modifier_gate = true;
       modifier_icon = GATE_ICON;
-      modifier_value = muted(step) ? 0 : 1;
+      modifier_value = muted(modifier_step) ? 0 : 1;
     }
 
     modifier_display_tick = OC::CORE::ticks;
   }
 
-  void CheckTrafficCollisions() {
+  void CheckTrafficCollisions(bool clocked) {
 
     if (frog_lane == 0)
       return;
@@ -411,7 +432,11 @@ private:
           collision_display_until = now + COLLISION_DISPLAY_TICKS;
 
           // The car already chose its modifier when it spawned.
-          ApplyCollisionModifier(lane, traffic[lane][i].modifier);
+          ApplyCollisionModifier(
+            lane,
+            traffic[lane][i].modifier,
+            clocked
+          );
           return;
         }
       }
@@ -522,7 +547,7 @@ private:
       }
     }
 
-    CheckTrafficCollisions();
+    CheckTrafficCollisions(clocked);
   }
 
   static constexpr int FLOW_CHANCE[7] = {
@@ -642,7 +667,7 @@ private:
     if (cursor == FROG_SELECT) {
 
       if (!EditMode() && CursorBlink()) {
-        gfxLine(frog_x, frog_y + 9, frog_x + 11, frog_y + 9);
+        gfxLine(frog_x, frog_y + 10, frog_x + 11, frog_y + 10);
         gfxPixel(frog_x, frog_y + 8);
         gfxPixel(frog_x + 11, frog_y + 8);
       }
@@ -695,9 +720,10 @@ private:
     DrawFrog();
 
     // Runtime Ratchets display in the Safe Zone.
-    // Queued: Ratchets remaining.
-    // Running: ZAP plus Ratchets remaining.
-    if (collision_ratchets_display > 0) {
+    // Queued: squares for all Ratchets.
+    // Running: ZAP replaces the current hit; squares show hits remaining after it.
+    if (modifier_icon == nullptr &&
+        (collision_ratchets_display > 0 || collision_ratchet_zap)) {
       const int x = SafeZoneModifierX();
       const int y = SafeZoneModifierY();
 
@@ -706,7 +732,7 @@ private:
 
       if (collision_ratchet_zap) {
         gfxIcon(
-          max(0, x + 1 + ((display_ratchets - 1) * 5) - 2),
+          max(0, x + 1 + (display_ratchets * 5) - 2),
           y,
           ZAP_ICON
         );
@@ -1463,7 +1489,7 @@ void FLASHMEM FrogSeq::OnDataReceive(uint64_t data) {
     collision_ratchets_to_go = 0;
     collision_ratchets_display = 0;
     collision_ratchet_count = 0;
-    collision_ratchet_countdown = 0;
+    collision_ratchet_next_tick = 0;
     collision_ratchet_zap = false;
     collision_ratchet_spacing = 0;
 
@@ -1501,6 +1527,7 @@ void FLASHMEM FrogSeq::OnDataReceive(uint64_t data) {
 
 FrogSeq::TrafficModifier FLASHMEM FrogSeq::RandomTrafficModifier(int lane) {
     const bool can_ratchet =
+      lane_rate[lane] == TRAFFIC_DIV_2 ||
       lane_rate[lane] == TRAFFIC_X2 ||
       lane_rate[lane] == TRAFFIC_X3 ||
       lane_rate[lane] == TRAFFIC_X4;
@@ -1528,7 +1555,7 @@ void FLASHMEM FrogSeq::Start() {
     collision_ratchets_to_go = 0;
     collision_ratchets_display = 0;
     collision_ratchet_count = 0;
-    collision_ratchet_countdown = 0;
+    collision_ratchet_next_tick = 0;
     collision_ratchet_zap = false;
     collision_ratchet_spacing = 0;
 
@@ -1612,7 +1639,7 @@ bool FLASHMEM FrogSeq::RestoreSequence() {
     collision_ratchets_to_go = 0;
     collision_ratchets_display = 0;
     collision_ratchet_count = 0;
-    collision_ratchet_countdown = 0;
+    collision_ratchet_next_tick = 0;
     collision_ratchet_zap = false;
     collision_ratchet_spacing = 0;
 
@@ -1703,10 +1730,14 @@ void FrogSeq::Controller() {
 
     // Collision Ratchet.
     //
-    // The master clock is trigger #1. Remaining triggers are
-    // generated between master clocks using the countdown timer.
-    // The sequence step does not advance during the Ratchet.
+    // The captured note is retained for the entire Ratchet.
+    // /2 produces two hits on consecutive master-clock cycles.
+    // ×2, ×3 and ×4 use the countdown timer for additional hits
+    // between master clocks.
+    // The sequence continues advancing on each master clock.
     if (collision_ratchet_armed) {
+
+      const uint32_t now = OC::CORE::ticks;
 
       const uint32_t ratchet_spacing = collision_ratchet_spacing;
 
@@ -1717,7 +1748,9 @@ void FrogSeq::Controller() {
         collision_ratchet_count = 1;
         collision_ratchet_zap = true;
 
-        PlayCurrentNote();
+        int play_cv = MIDIQuantizer::CV(collision_ratchet_note + 36);
+        play_cv = HS::GetQuantEngine(qselect).Process(play_cv, 0, 0);
+        Out(0, play_cv);
         ClockOut(1);
 
         --collision_ratchets_to_go;
@@ -1725,21 +1758,20 @@ void FrogSeq::Controller() {
           --collision_ratchets_display;
 
         if (collision_ratchets_to_go > 0) {
-          collision_ratchet_countdown = ratchet_spacing;
+          collision_ratchet_next_tick = now + ratchet_spacing;
         }
         else {
           collision_ratchet_armed = false;
         }
       }
       else if (collision_ratchet_count > 0 &&
-               collision_ratchets_to_go > 0) {
+               collision_ratchets_to_go > 0 &&
+               static_cast<int32_t>(
+                 now - collision_ratchet_next_tick) >= 0) {
 
-        if (collision_ratchet_countdown > 0)
-          --collision_ratchet_countdown;
-
-        if (collision_ratchet_countdown == 0) {
-
-          PlayCurrentNote();
+          int play_cv = MIDIQuantizer::CV(collision_ratchet_note + 36);
+          play_cv = HS::GetQuantEngine(qselect).Process(play_cv, 0, 0);
+          Out(0, play_cv);
           ClockOut(1);
 
           ++collision_ratchet_count;
@@ -1748,12 +1780,11 @@ void FrogSeq::Controller() {
           --collision_ratchets_display;
 
           if (collision_ratchets_to_go > 0)
-            collision_ratchet_countdown = ratchet_spacing;
+            collision_ratchet_next_tick += ratchet_spacing;
           else
             collision_ratchet_armed = false;
         }
       }
-    }
 
     else if (clocked) {
 
