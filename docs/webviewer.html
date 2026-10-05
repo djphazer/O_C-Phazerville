@@ -1011,6 +1011,7 @@ async function connect(){
   writer = port.writable.getWriter();
   reader = port.readable.getReader();
   running = true;
+  await writer.write(enc.encode("Pew!")); // unlock phrase
   for (const sc of SCOPES) sc.misses = 0;
   MIDI.misses = 0; MIDI.lastSeq = null;
   $("connect").disabled = true;
