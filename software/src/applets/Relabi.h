@@ -33,17 +33,6 @@ class Relabi : public HemisphereApplet {
 public:
   static constexpr int PROCESS_TICKS = 4;
 
-  enum RelabiCursor {
-    LFO1_FREQ, LFO1_XMOD, LFO1_PHASE, LFO1_THRESH,
-    LFO2_FREQ, LFO2_XMOD, LFO2_PHASE, LFO2_THRESH,
-    LFO3_FREQ, LFO3_XMOD, LFO3_PHASE, LFO3_THRESH,
-
-    FREQ_MULT, FREQ_DIV,
-    OUTMODE_A, OUTMODE_B,
-
-    MAX_CURSOR = OUTMODE_B
-  };
-
   const char* applet_name() {
     return "Relabi";
   }
@@ -52,24 +41,23 @@ public:
     freqKnob[0] = 30; // 3 Hz
     freqKnob[1] = 34; // 5 Hz
     freqKnob[2] = 38; // 7 Hz
-    freqKnobMul = 1; //
-    freqKnobDiv = 0; //
 
     for (int i = 0; i < 3; i++) {
-      xmodKnob[i] = 1; // 20%
       phaseKnob[i] = 0; // 0%
-      threshKnob[i] = 3; // 0%
 
       // Set oscillator to sine wave
       osc[i] = WaveformManager::VectorOscillatorFromWaveform(35);
       osc[i].SetFrequency( DecodeFreq(freqKnob[i]) * 100 * PROCESS_TICKS );
       osc[i].SetScale(HEMISPHERE_3V_CV);
     }
+    for (int i = 0; i < 4; i++) {
+      threshKnob[i] = 15; // centered threshold
+    }
 
-    outputAssign[0] = 0; // Default outputs to LFOs 1..4
-    outputAssign[1] = 1;
-    outputAssign[2] = 2;
-    outputAssign[3] = 6; // Defaults final output to stepped CV derived from gates 0-2.
+    outputAssign[0] = 0; // Gate 1
+    outputAssign[1] = 1; // Gate 2
+    outputAssign[2] = 2; // Gate 3
+    outputAssign[3] = 4; // Relabi wave
 
     // This could simplify registration, but requires AllowRestart()
     // ...which means params would be reset to defaults every time you switch away and come back.
@@ -90,7 +78,7 @@ public:
         // Get the total number of segments in the waveform
         uint8_t totalSegments = osc[pcount].GetSegment(0).Segments(); // Use first segment's TOC
         // Calculate phase position based on phase percentage (0–100)
-        int setPhase = round((phase(pcount) / 100.0) * totalSegments);
+        int setPhase = round((phaseKnob[pcount] / 16.0) * totalSegments);
         // Reset the phase of the oscillator
         osc[pcount].Reset(setPhase);
       }
@@ -105,31 +93,19 @@ public:
         // Linked as Follower: Receive lfo values from RelabiManager to display on right
         manager.ReadValues(sample[0], sample[1], sample[2]);
         manager.ReadGates(gateState);
+        UpdateRelabiWave();
       } else {
-
-        // hmmmmmm
-        float normalizedCV = InF(0); // (cvIn / 3.0f); // -1..1 incoming fm amount
-        float normalizedCV2 = InF(1); // (cvIn2 / 3.0f); // -1..1 incoming xmod amount
-        normalizedCV = hmmmmmm(normalizedCV); // powf(10.0f, normalizedCV * 2); // 0.01..100
-        float fModCV = constrain(normalizedCV, 0.01f, 100.0f);
-        float xModCV = constrain(normalizedCV2, 0.0f, 1.0f);
-        // hmmmmmm
+        float normalizedCV = InF(0, HEMISPHERE_3V_CV);
+        float normalizedCV2 = InF(1, HEMISPHERE_3V_CV);
+        const float fModCV = constrain(
+          powf(10.0f, normalizedCV * 2.0f), 0.01f, 100.0f
+        );
+        const float xModCV = constrain(normalizedCV2, 0.0f, 1.0f);
 
         // frequency modulation:
         for (uint8_t lfo = 0; lfo < 3; lfo++) {
-          // Calculate gate outputs based on thresholds
-          if (sample[lfo] >= (thresh(lfo) * HEMISPHERE_MAX_CV) / 200) {
-            // Gate is high
-            gateState[lfo] = true;
-          } else if (sample[lfo] < (thresh(lfo) * HEMISPHERE_MAX_CV) / 200) {
-            // Signal is below or equal to the threshold, clear the gate
-            gateState[lfo] = false;
-          }
-
           // Incorporate CV2 with cross-modulation
-          float xmodCombo = xmod(lfo) + xModCV * 100; // 0..140 + -100..100 = -100..240
-          // Previously
-          // float xmodCombo = xmod(lfo) +  (cvIn2 / 100) - 50; //???!
+          float xmodCombo = 30.0f + xModCV * 100; // Fixed 30% plus 0..100% from CV2
 
           // Calculate cross-frequency modulation factor
           float crossFreqMod = (xmodCombo / 100.0)
@@ -138,9 +114,6 @@ public:
           // Combine base frequency, cross-modulation, and CV input
           float freq = DecodeFreq(freqKnob[lfo]);
           freq = fModCV * (freq + (freq * crossFreqMod));
-
-          // Scale frequency by global freqMul and freqDiv amounts.
-          freq = freq * freqMulMap[freqKnobMul] / freqDivMap[freqKnobDiv];
 
           // Ensure the frequency stays within valid bounds
           // freq = constrain(freq, 0.01, 15000.0);
@@ -154,6 +127,17 @@ public:
           sample[lfo] = osc[lfo].Next();
         }
 
+        UpdateRelabiWave();
+        for (uint8_t gate = 0; gate < 4; gate++) {
+          const int thresholdCV = (thresh(gate) * HEMISPHERE_3V_CV) / 100;
+          if (relabiWave >= thresholdCV) {
+            // Gate is high
+            gateState[gate] = true;
+          } else {
+            gateState[gate] = false;
+          }
+        }
+
         if (linked) {
           // we're inside the "else" clause of (link_follow) so this must be the leader
           // Leader is Linked: Send lfo values and gates to RelabiManager
@@ -161,23 +145,17 @@ public:
           manager.WriteGates(gateState);
         }
       }
+      if (++scopeSampleDivider >= SCOPE_SAMPLE_DECIMATION) {
+        scopeSampleDivider = 0;
+        RecordRelabiScopeSample();
+      }
     }
-
-    // A momentary trigger pulse when any gate changes state
-    bool trigout = GateStateChanged();
 
     // Set outputs based on assignments
     ForEachChannel(ch) {
-      int assign = outputAssign[ch + link_follow*2];
-      if (assign == 7) { // trigger out
-        if (trigout) ClockOut(ch);
-      } else
-        Out(ch, GetOutputValue(assign));
+      uint8_t assign = outputAssign[ch + link_follow*2];
+      Out(ch, GetOutputValue(assign));
     }
-  }
-
-  constexpr float hmmmmmm(float lin) {
-    return powf(10.0f, lin * 2); // 0.01..100
   }
 
   void View() {
@@ -189,6 +167,7 @@ public:
       DrawOutputOption(43, 55, outputAssign[3]); // OUT4
 
       DrawVUMetersRight();
+      DrawGateIndicators();
 
       // Highlight selected parameter
       switch (cursor) {
@@ -202,129 +181,151 @@ public:
       return;
     }
 
-    int currentPage = (cursor / 4);
-    if (currentPage < 3) {
-      // Page 1: Main parameters for non-linked or left hemisphere
-      gfxPrint(1, 13, "LFO");
-      gfxPrint(currentPage + 1);
+    if (cursor < 8) {
+      gfxPrint(1, 15, "FREQ");
+      gfxPrint(27, 15, "PHAS");
+      for (int lfo = 0; lfo < CHAN_COUNT; ++lfo) {
+        const int rowY = 25 + lfo * 10;
+        const int freqCursor = lfo * 2;
+        const int phaseCursor = freqCursor + 1;
 
-      gfxPrint(1, 26, "FREQ");
-      float fDisplay = DecodeFreq(freqKnob[currentPage]);
-      PrintScaledFloat(2, 35, fDisplay);
-
-      gfxPrint(31, 26, "XFM");
-      gfxPrint(32, 35, xmod(currentPage));
-
-      gfxPrint(1, 46, "PHAS");
-      gfxPrint(2, 55, phase(currentPage));
-
-      gfxPrint(31, 46, "THRS");
-      gfxPrint(32, 55, thresh(currentPage));
-
-      // Highlight selected parameter
-      switch (cursor) {
-        case LFO1_FREQ:
-        case LFO2_FREQ:
-        case LFO3_FREQ:
-          gfxCursor(2, 43, 28);
-          break;
-        case LFO1_XMOD:
-        case LFO2_XMOD:
-        case LFO3_XMOD:
-          gfxCursor(32, 43, 28);
-          break;
-        case LFO1_PHASE:
-        case LFO2_PHASE:
-        case LFO3_PHASE:
-          gfxCursor(2, 63, 28);
-          break;
-        case LFO1_THRESH:
-        case LFO2_THRESH:
-        case LFO3_THRESH:
-          gfxCursor(32, 63, 28);
-          break;
+        PrintScaledFloat(2, rowY, DecodeFreq(freqKnob[lfo]));
+        gfxPrint(28, rowY, phase(lfo));
+        if (cursor == freqCursor) gfxCursor(1, rowY + 8, 25);
+        if (cursor == phaseCursor) gfxCursor(26, rowY + 8, 18);
       }
-      gfxIcon(31 + 10*currentPage, 20, UP_BTN_ICON);
-    } else if (currentPage == 3) {
-      // Page 2: Clock mult, Polarity, and Output page
-      gfxPrint(1, 13, "ALL");
-      gfxPrint(2, 25, "FREQx ");
-      gfxPrint(1, 35, freqMulMap[freqKnobMul]);
 
-      gfxPrint(16, 35, "/");
-      gfxPrint(22, 35, freqDivMap[freqKnobDiv]);
+      DrawVUMetersLeft();
 
       gfxPrint(1, 55, "A:");
-      DrawOutputOption(13, 55, outputAssign[0]); // OUT1
-
+      DrawOutputOption(13, 55, outputAssign[0]);
       gfxPrint(31, 55, "B:");
-      DrawOutputOption(43, 55, outputAssign[1]); // OUT2
-
-      // Highlight selected parameter (use your original locations)
-      switch (cursor) {
-        case FREQ_MULT:
-          gfxCursor(1, 44, 14);
-          break;
-        case FREQ_DIV:
-          gfxCursor(22, 44, 14);
-          break;
-        case OUTMODE_A:
-          gfxCursor(2, 63, 30);
-          break;
-        case OUTMODE_B:
-          gfxCursor(32, 63, 30);
-          break;
+      DrawOutputOption(43, 55, outputAssign[1]);
+      if (cursor == 6) gfxCursor(1, 63, 30);
+      if (cursor == 7) gfxCursor(31, 63, 30);
+    } else {
+      const int threshold = cursor - 8;
+      const int thresholdValue = thresh(threshold);
+      gfxPos(1, 15);
+      graphics.printf("THR%d  >", threshold + 1);
+      gfxPrint(thresholdValue);
+      if (gateState[threshold]) {
+        gfxInvert(37, 15, thresholdValue < 0 ? 24 : 18, 8);
       }
-      gfxDottedLine(32, 24, 60, 24);
+      DrawRelabiScope(1, 23, 62, 40, thresh(threshold), true);
+      if (EditMode()) {
+        gfxInvert(1, 23, 62, 40);
+      }
     }
-    DrawVUMetersLeft();
   }
 
   void DrawOutputOption(int x, int y, uint8_t assign) {
-    if (assign < 3) {
-      // LFO output
-      gfxBitmap(x, y, 8, WAVEFORM_ICON);
-      gfxPrint(x + 9, y, assign + 1);
-    } else if (assign < 6) {
+    if (assign < 4) {
       // Gate output
       gfxBitmap(x, y, 8, GATE_ICON);
-      gfxPrint(x + 9, y, assign - 2);
-    } else if (assign == 6) {
-      // Gate Combo output
-      gfxBitmap(x, y, 8, STAIRS_ICON);
-    } else if (assign == 7) {
-      // All Gates to Triggers output
-      gfxBitmap(x, y, 8, CLOCK_ICON);
+      gfxPrint(x + 9, y, assign + 1);
+    } else {
+      // Relabi wave followed by "R", then the three individual LFOs.
+      gfxBitmap(x, y, 8, WAVEFORM_ICON);
+      if (assign == 4) gfxPrint(x + 9, y, "R");
+      else gfxPrint(x + 9, y, assign - 4);
     }
   }
 
+  void DrawRelabiScope(
+    int x, int y, int width, int height,
+    int thresholdPercent = 0, bool showThreshold = false
+  ) {
+    gfxFrame(x, y, width, height);
+
+    const int centerY = y + height / 2;
+    const int maxPixelAmplitude = (height - 4) / 2;
+    const int maxWaveAmplitude = HEMISPHERE_3V_CV;
+    const int thresholdCV = (thresholdPercent * maxWaveAmplitude) / 100;
+    int previousX = x + 1;
+    int previousY = centerY;
+    int previousWave = 0;
+
+    for (int i = 0; i < SCOPE_WIDTH; ++i) {
+      const int sampleIndex = (scopeWriteIndex + i) % SCOPE_WIDTH;
+      const int wave = constrain(
+        scopeHistory[sampleIndex],
+        -maxWaveAmplitude,
+        maxWaveAmplitude
+      );
+      const int currentX = x + 1 + i;
+      const int currentY = centerY - (wave * maxPixelAmplitude) / maxWaveAmplitude;
+      if (i > 0) {
+        gfxLine(previousX, previousY, currentX, currentY);
+        if (
+          showThreshold
+          && (previousWave >= thresholdCV || wave >= thresholdCV)
+        ) {
+          gfxLine(previousX, previousY - 1, currentX, currentY - 1);
+        }
+      }
+      previousX = currentX;
+      previousY = currentY;
+      previousWave = wave;
+    }
+    if (showThreshold) {
+      const int thresholdY = centerY
+        - (thresholdPercent * maxPixelAmplitude) / 100;
+      gfxLine(x + 1, thresholdY, x + width - 2, thresholdY);
+    }
+  }
+
+  void RecordRelabiScopeSample() {
+    scopeHistory[scopeWriteIndex] = relabiWave;
+    scopeWriteIndex = (scopeWriteIndex + 1) % SCOPE_WIDTH;
+  }
+
   void DrawVUMetersRight() {
-    int bar;
+    int bar[3];
     for (int i = 0; i < 3; ++i) {
       // Calculate bar height based on sample value (assuming bipolar -3V to +3V
       // range)
-      bar = 14.0 * (sample[i] + HEMISPHERE_3V_CV) / HEMISPHERE_3V_CV;
+      bar[i] = 14.0 * (sample[i] + HEMISPHERE_3V_CV) / HEMISPHERE_3V_CV;
 
       // Draw vertical bars (adjust x-position and width as needed)
-      gfxRect(2 + (20 * i), 42 - bar, 18, bar);
+      gfxRect(2 + (20 * i), 42 - bar[i], 18, bar[i]);
+    }
+  }
+
+  void DrawGateIndicators() {
+    constexpr int indicatorY = 49;
+    constexpr int indicatorX[4] = {8, 24, 40, 56};
+    for (int gate = 0; gate < 4; ++gate) {
+      const int x = indicatorX[gate];
+      gfxCircle(x, indicatorY, 3);
+      if (gateState[gate]) gfxRect(x - 1, indicatorY - 1, 3, 3);
     }
   }
 
   void DrawVUMetersLeft() {
-    int bar;
-    for (int i = 0; i < 3; ++i) {
-      // Calculate bar height based on sample value (assuming bipolar -3V to +3V
-      // range) Smaller bars for left hemisphere
-      bar = 5.0 * (sample[i] + HEMISPHERE_3V_CV) / HEMISPHERE_3V_CV;
-      gfxInvert(
-        31 + (10 * i), 22 - bar, 9, bar
-      ); // Adjusted for smaller size
+    constexpr int meterX = 45;
+    constexpr int meterWidth = 18;
+    for (int lfo = 0; lfo < CHAN_COUNT; ++lfo) {
+      const int y = 25 + lfo * 10;
+      const int centerX = meterX + meterWidth / 2;
+      const int halfWidth = (meterWidth - 4) / 2;
+      const int level = constrain(
+        (sample[lfo] * halfWidth) / HEMISPHERE_3V_CV,
+        -halfWidth,
+        halfWidth
+      );
+      gfxFrame(meterX, y, meterWidth, 8);
+      gfxLine(centerX, y + 1, centerX, y + 6);
+      if (level > 0) gfxRect(centerX + 1, y + 2, level, 4);
+      else if (level < 0) gfxRect(centerX + level, y + 2, -level, 4);
     }
   }
 
   void PrintScaledFloat(int x, int y, float value) {
     // Clamp value to 0..150
     CONSTRAIN(value, 0.0f, 150.0f);
+
+    char buf[12]; // enough for "150\0" or "99.9\0"
 
     gfxPos(x, y);
     if (value >= 100.0f) {
@@ -343,11 +344,9 @@ public:
   //void OnButtonPress() { }
 
   void OnEncoderMove(int direction) {
-    // Determine how many parameters we have based on linkage and hemisphere
-    // linked && RIGHT_HEMISPHERE: 2 parameters (0 and 1)
-    // otherwise: adjust for both pages (parameters 0–7)
+    // The linked right hemisphere exposes only output C and D.
     const bool link_follow = (linked && (hemisphere & 1));
-    int max_param = link_follow ? 1 : MAX_CURSOR;
+    const int max_param = link_follow ? 1 : 11;
 
     if (!EditMode()) {
       // Not editing: move the cursor through the available parameters
@@ -355,65 +354,33 @@ public:
       return;
     }
 
-    // Editing: adjust parameters based on the current page and cursor
-
     if (link_follow) {
-      // Linked and RIGHT side: Only two output modes
-      switch (cursor) {
-        case 0: // OUT3 assignment
-          outputAssign[2] = constrain(outputAssign[2] + direction, 0, 7);
-          break;
-        case 1: // OUT4 assignment
-          outputAssign[3] = constrain(outputAssign[3] + direction, 0, 7);
-          break;
-      }
+      outputAssign[cursor + 2] = constrain(
+        outputAssign[cursor + 2] + direction, 0, 7
+      );
       return;
     }
 
-    // Determine the current page based on cursor position
-    // Page 0, 1, 2: Main parameters for LFO1, LFO2, LFO3
-    // Page 3: THRES, OUT1, OUT2
-    int currentPage = (cursor / 4);
-
-    switch (cursor) {
-      // Page 0-2: Main parameters
-      case LFO1_FREQ:
-      case LFO2_FREQ:
-      case LFO3_FREQ:
-        freqKnob[currentPage] = constrain(freqKnob[currentPage] + direction, 0, 63);
-        break;
-
-      case LFO1_XMOD: // XMOD (0–100) scaling
-      case LFO2_XMOD:
-      case LFO3_XMOD:
-        xmodKnob[currentPage] = constrain(xmodKnob[currentPage] + direction, 0, 7);
-        break;
-
-      case LFO1_PHASE: // PHAS (0–100)
-      case LFO2_PHASE:
-      case LFO3_PHASE:
-        phaseKnob[currentPage] = constrain(phaseKnob[currentPage] + direction, 0, 7);
-        break;
-
-      case LFO1_THRESH:
-      case LFO2_THRESH:
-      case LFO3_THRESH:
-        threshKnob[currentPage] = constrain(threshKnob[currentPage] + direction, 0, 6);
-        break;
-
-      // Page 3: clock mult/div, OUT1, OUT2
-      case FREQ_MULT: // Global frequency multiplier
-        freqKnobMul = constrain(freqKnobMul + direction, 0, 7);
-        break;
-      case FREQ_DIV: // Global frequency divider
-        freqKnobDiv = constrain(freqKnobDiv + direction, 0, 7);
-        break;
-      case OUTMODE_A: // OUT1 assignment
-        outputAssign[0] = constrain(outputAssign[0] + direction, 0, 7);
-        break;
-      case OUTMODE_B: // OUT2 assignment
-        outputAssign[1] = constrain(outputAssign[1] + direction, 0, 7);
-        break;
+    if (cursor < 6) {
+      const int lfo = cursor / 2;
+      switch (cursor % 2) {
+        case 0: // FREQ
+          freqKnob[lfo] = constrain(freqKnob[lfo] + direction, 0, 63);
+          break;
+        case 1: // PHAS
+          phaseKnob[lfo] = constrain(phaseKnob[lfo] + direction, 0, 15);
+          break;
+      }
+    } else if (cursor < 8) {
+      const int output = cursor - 6;
+      outputAssign[output] = constrain(
+        outputAssign[output] + direction, 0, 7
+      );
+    } else {
+      const int threshold = cursor - 8;
+      threshKnob[threshold] = constrain(
+        threshKnob[threshold] + direction, 0, 31
+      );
     }
   }
 
@@ -422,37 +389,38 @@ public:
     for (size_t i = 0; i < 3; i++) {
       // 1) freqKnob[3], 6 bits each → 18 bits total
       Pack(data, PackLocation{0 + i*6, 6}, freqKnob[i]);
-      // 2) xmodKnob[3], 3 bits each → 9 bits total
-      Pack(data, PackLocation{18 + i*3, 3}, xmodKnob[i]);
-      // 3) phaseKnob[3], 3 bits each → 9 bits total
-      Pack(data, PackLocation{27 + i*3, 3}, phaseKnob[i]);
-      // 4) threshKnob[3], 3 bits each → 9 bits total
-      Pack(data, PackLocation{36 + i*3, 3}, threshKnob[i]);
+      // 2) phaseKnob[3], 4 bits each → 12 bits total
+      Pack(data, PackLocation{18 + i*4, 4}, phaseKnob[i]);
     }
-    // 5) freqKnobMul → 3 bits
-    Pack(data, PackLocation{45, 3}, freqKnobMul);
-    // 6) freqKnobDiv → 3 bits
-    Pack(data, PackLocation{48, 3}, freqKnobDiv);
-    // 7) outputAssign → 3 bits each → 12 bits
+    // threshKnob[4], 5 bits each → 20 bits total
     for (size_t i = 0; i < 4; i++) {
-      Pack(data, PackLocation{51 + i*3, 3}, outputAssign[i]);
+      Pack(data, PackLocation{30 + i*5, 5}, threshKnob[i]);
     }
+    // outputAssign → 3 bits each → 12 bits
+    for (size_t i = 0; i < 4; i++) {
+      Pack(data, PackLocation{50 + i*3, 3}, outputAssign[i]);
+    }
+    Pack(data, PackLocation{62, 2}, 1); // Mark the high-resolution phase layout.
     return data;
   }
 
   void OnDataReceive(uint64_t data) {
+    const bool hasHighResolutionPhase = Unpack(data, PackLocation{62, 2}) == 1;
     for (size_t i = 0; i < 3; i++) {
       freqKnob[i] = Unpack(data, PackLocation{0 + i*6, 6});
-      xmodKnob[i] = Unpack(data, PackLocation{18 + i*3, 3});
-      phaseKnob[i] = Unpack(data, PackLocation{27 + i*3, 3});
-      threshKnob[i] = Unpack(data, PackLocation{36 + i*3, 3});
+      if (hasHighResolutionPhase) {
+        phaseKnob[i] = Unpack(data, PackLocation{18 + i*4, 4});
+      } else {
+        phaseKnob[i] = Unpack(data, PackLocation{21 + i*3, 3}) * 2;
+      }
     }
 
-    freqKnobMul = Unpack(data, PackLocation{45, 3});
-    freqKnobDiv = Unpack(data, PackLocation{48, 3});
+    for (size_t i = 0; i < 4; i++) {
+      threshKnob[i] = Unpack(data, PackLocation{30 + i*5, 5});
+    }
 
     for (size_t i = 0; i < 4; i++) {
-      outputAssign[i] = Unpack(data, PackLocation{51 + i*3, 3});
+      outputAssign[i] = Unpack(data, PackLocation{50 + i*3, 3});
     }
   }
 
@@ -471,72 +439,68 @@ protected:
       help[HELP_CV2] = "AllXmod";
       help[HELP_OUT1] = GetOutputLabel(outputAssign[0]);
       help[HELP_OUT2] = GetOutputLabel(outputAssign[1]);
-      help[HELP_EXTRA1] = "Set: Frq/XFM/Phs/Thrs";
-      help[HELP_EXTRA2] = "P2: Mul/Div/OutA/OutB";
+      help[HELP_EXTRA1] = "P1: Frq/Phs/OutA/OutB";
+      help[HELP_EXTRA2] = "P2-5: Thresholds 1-4";
     }
   }
 
 private:
   constexpr static int CHAN_COUNT = 3;
+  constexpr static int SCOPE_WIDTH = 60;
+  constexpr static uint8_t SCOPE_SAMPLE_DECIMATION = 16;
   constexpr static int numParams = 5;
-  const int freqMulMap[8] = {0, 1, 2, 3, 4, 6, 8, 12};
-  const int freqDivMap[8] = {1, 2, 3, 4, 8, 12, 16, 32};
+  int relabiWave = 0;
 
   RelabiManager& manager = RelabiManager::get();
   VectorOscillator osc[3];
 
   // parameters to be saved and loaded
   uint8_t freqKnob[CHAN_COUNT]; // 18 bits (6 each) // Each 0..19.5
-  uint8_t xmodKnob[CHAN_COUNT]; // 9 bits (3 each) // Each 0..140%
-  int8_t phaseKnob[CHAN_COUNT]; // 9 bits (3 each) // Each 0..87%
-  int8_t threshKnob[CHAN_COUNT]; // 9 bits (3 each) // Thresholds for each LFO (-84%..84%)
-  uint8_t freqKnobMul; // 3 bits // All freqs x 0..14
-  uint8_t freqKnobDiv; // 3 bits // All freqs / 1, 2, 3, 4, 8, 16, 32, 64
-  //    uint8_t xmodoffset; // 3 bits // All xmod + 0..140%
-  uint8_t outputAssign[4]; // 12 bits (3 each) // Output assignments for A and B
-                           // (0-7 for LFO1-LFO4, GATE1-GATE4)
+  uint8_t phaseKnob[CHAN_COUNT]; // 12 bits total (4 each) // 0..93.75%
+  uint8_t threshKnob[4]; // 20 bits (5 each) // Thresholds for four gates (-95..95)
+  uint8_t outputAssign[4]; // 12 bits (3 each): gates 1-4, Relabi wave, LFOs 1-3
 
   int cursor = 0;
-  int sample[CHAN_COUNT];
+  int sample[CHAN_COUNT] = {0};
 
   uint8_t clkDiv = 0; // clkDiv allows us to calculate every other tick to save cycles
+  int scopeHistory[SCOPE_WIDTH] = {};
+  uint8_t scopeWriteIndex = 0;
+  uint8_t scopeSampleDivider = 0;
 
   bool linked;
   //    bool bipolar;
-  bool gateState[3] = {false, false, false};
-  bool previousGateState[3] = {false, false, false}; // Stores the previous state of the gates
+  bool gateState[4] = {false, false, false, false};
 
-  const uint8_t xmod(int idx) const { return xmodKnob[idx] * 20; }
-  const uint8_t phase(int idx) const { return phaseKnob[idx] * 12.5; }
-  const int8_t thresh(int idx) const { return (threshKnob[idx] * 28) - 84; }
-
-  int GetOutputValue(uint8_t assign) {
-    if (assign < 3) {
-      // LFO outputs
-      return sample[assign] + HEMISPHERE_3V_CV;
-    } else if (assign < 6) {
-      // Gate outputs
-      return gateState[assign - 3] ? HEMISPHERE_MAX_CV : 0;
-    } else if (assign == 6) {
-      // Stepped CV from gate states
-      uint8_t gateCombo = (gateState[0] ? 1 : 0) // Bit 0
-        | (gateState[1] ? 1 : 0) << 1 // Bit 1
-        | (gateState[2] ? 1 : 0) << 2; // Bit 2
-      const int scaleFactor = HEMISPHERE_MAX_CV / 7;
-      return gateCombo * scaleFactor;
-    }
-    return 0; // Default output
+  const uint8_t phase(int idx) const {
+    return static_cast<uint8_t>((phaseKnob[idx] * 100 + 8) / 16);
+  }
+  const int thresh(int idx) const {
+    const int value = constrain(static_cast<int>(threshKnob[idx]), 0, 31);
+    if (value <= 15) return (value * 95) / 15 - 95;
+    return ((value - 15) * 95) / 16;
   }
 
-  const bool GateStateChanged() {
-    bool gateChanged = false;
-    for (int i = 0; i < 3; i++) {
-      if (gateState[i] != previousGateState[i]) {
-        gateChanged = true;
-        previousGateState[i] = gateState[i]; // Update the previous state
-      }
+  void UpdateRelabiWave() {
+    relabiWave = constrain(
+      (sample[0] + sample[1] + sample[2]) / 3,
+      -HEMISPHERE_3V_CV,
+      HEMISPHERE_3V_CV
+    );
+  }
+
+  int GetOutputValue(uint8_t assign) {
+    if (assign < 4) {
+      // Gate outputs
+      return gateState[assign] ? HEMISPHERE_MAX_CV : 0;
+    } else if (assign == 4) {
+      // Offset the bipolar +/-3V wave for the DAC range.
+      return relabiWave + HEMISPHERE_3V_CV;
+    } else if (assign < 8) {
+      // LFO outputs
+      return sample[assign - 5] + HEMISPHERE_3V_CV;
     }
-    return gateChanged;
+    return 0; // Default output
   }
 
   constexpr float DecodeFreq(uint8_t index) {
@@ -559,21 +523,23 @@ private:
   const char* GetOutputLabel(uint8_t assign) {
     switch (assign) {
       case 0:
-        return "LFO1";
-      case 1:
-        return "LFO2";
-      case 2:
-        return "LFO3";
-      case 3:
         return "GAT1";
-      case 4:
+      case 1:
         return "GAT2";
-      case 5:
+      case 2:
         return "GAT3";
+      case 3:
+        return "GAT4";
+      case 4:
+        return "RELW";
+      case 5:
+        return "LFO1";
       case 6:
-        return "STEP";
+        return "LFO2";
+      case 7:
+        return "LFO3";
       default:
-        return "TRIG";
+        return "GAT1";
     }
   }
 };
