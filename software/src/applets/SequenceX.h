@@ -18,8 +18,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-/*
-    original 8-step mod by Logarhythm, adapted by djphazer, h4x by beau-seidon
+/* original 8-step mod by Logarhythm
+ * adapted by djphazer
+ * h4x by beau-seidon
  */
 
 class SequenceX : public HemisphereApplet {
@@ -36,7 +37,12 @@ public:
     const uint8_t* applet_icon() { return PhzIcons::sequenceX; }
 
     void Start() {
-        Randomize(true);
+      // Randomize(true);
+      for (int s = 0; s < SEQX_STEPS; ++s) {
+        note[s] = 0;
+        // note_cv[s].SetInput(s);
+        // ^ this makes it an 8-way sequential switch by default! (quantized to semitones)
+      }
     }
 
     void Reset() {
@@ -47,7 +53,7 @@ public:
     void Randomize(bool unipolar = false) {
         const int minval = unipolar? 0 : -SEQX_MIN_VALUE;
         for (int s = 0; s < SEQX_STEPS; s++) {
-            if (!note_cv[s].enabled()) note[s] = random(SEQX_MAX_VALUE + minval) - minval;
+            note[s] = random(SEQX_MAX_VALUE + minval) - minval;
         }
     }
 
@@ -73,21 +79,23 @@ public:
             if (step == 0) ClockOut(1);
         }
 
-        for (int s = 0; s < SEQX_STEPS; s++) {  // works for positive cv input, rework scaling for full input range?
-            if (note_cv[s].enabled())
-                note[s] = constrain(note_cv[s].InRescaled(2*SEQX_MAX_VALUE) + SEQX_MIN_VALUE, SEQX_MIN_VALUE, SEQX_MAX_VALUE);
+        for (int i = 0; i < SEQX_STEPS; ++i) {
+          note_active[i] = note[i] + note_cv[i].SemitoneIn();
+          CONSTRAIN(note_active[i], SEQX_MIN_VALUE, SEQX_MAX_VALUE);
         }
 
         // continuously compute the note
         int transpose = DetentedIn(0) / 128;  // 128 ADC steps per semitone
-        int play_note = note[step] + (OC::DAC::kOctaveZero * 12) - (OC::DAC::kOctaveZero == 0)*SEQX_MIN_VALUE + transpose;
-        play_note = constrain(play_note, 0, 127);
+        int play_note = note_active[step] + (OC::DAC::kOctaveZero * 12) - (OC::DAC::kOctaveZero == 0)*SEQX_MIN_VALUE + transpose;
+        // offset from CV input maps
+
+        CONSTRAIN(play_note, 0, 127);
         // set CV output
         Out(0, MIDIQuantizer::CV(play_note));
     }
 
     void View() {
-        DrawPanel();
+      DrawPanel();
     }
 
     void OnButtonPress() override {
@@ -184,6 +192,7 @@ private:
     int cursor = 0;
     uint8_t muted = 0xF0;  // Bitfield for muted steps; ((muted >> step) & 1) means muted
     int8_t note[SEQX_STEPS];  // Sequence value (-30 to 30)
+    int8_t note_active[SEQX_STEPS];  // after modulation, for display
     CVInputMap note_cv[SEQX_STEPS];  // Internal mapping overrides encoder-set value
     int step = 0;  // Current sequencer step
     bool reset = true;
@@ -210,7 +219,7 @@ private:
                 gfxLine(x, y, x, 60, (s != cursor) );  // dotted line for unselected steps
 
                 // scaled pixel position on slider
-                const int pos = (note[s] + 30) * (h-2) / 60;
+                const int pos = (note_active[s] + 30) * (h-2) / 60;
 
                 // When cursor, there's a solid slider
                 if (s == cursor) {
@@ -239,7 +248,7 @@ private:
 
             if (s == cursor && EditMode()) {
                 gfxInvert(x - 2, y, 5, h + 1);
-                int8_t noteval = note[s] + 30*(OC::DAC::kOctaveZero == 0);
+                int8_t noteval = note_active[s] + 30*(OC::DAC::kOctaveZero == 0);
                 int w_ = 18 - pad(100, noteval);
                 int x_ = constrain(x - 9 + pad(10, noteval), 0, 63 - w_);
 
@@ -252,6 +261,6 @@ private:
     }
 
     bool step_is_muted(int step) {
-        return (muted & (0x01 << step));
+      return (muted & (0x01 << step));
     }
 };
