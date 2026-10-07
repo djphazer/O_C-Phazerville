@@ -113,6 +113,14 @@ private:
 
   bool frog_horizontal = false;
 
+  bool full_screen_view = false;
+
+  static constexpr int FULLSCREEN_TRAFFIC_RIGHT = 128;
+
+  // Fullscreen Safe zone horizontal bounds.
+  static constexpr int FULLSCREEN_FROG_LEFT = 28;
+  static constexpr int FULLSCREEN_FROG_RIGHT = 94;
+
   // Frog positions: Safe Zone, Lane 1, Lane 2, Lane 3.
   static constexpr int FROG_Y[4] = {13, 27, 40, 53};
   int frog_lane = 0;
@@ -177,6 +185,12 @@ private:
 
   TrafficObject traffic[TRAFFIC_LANES][TRAFFIC_OBJECTS];
 
+  int TrafficRightBoundary() const {
+    return full_screen_view
+      ? FULLSCREEN_TRAFFIC_RIGHT
+      : TRAFFIC_RIGHT_BOUNDARY;
+  }
+
   TrafficModifier RandomTrafficModifier(int lane);
 
   bool lane_reverse[TRAFFIC_LANES] = {
@@ -227,12 +241,6 @@ private:
     sequence_mutes[step] = !sequence_mutes[step];
   }
 
-  void PlayCurrentNote() {
-    int play_cv = MIDIQuantizer::CV(current_note + 36);
-    play_cv = HS::GetQuantEngine(qselect).Process(play_cv, 0, 0);
-    Out(0, play_cv);
-  }
-
 
   int current_note = 0;
 
@@ -273,15 +281,24 @@ private:
 
     if (now < collision_display_until &&
         now >= collision_blink_until) {
-      gfxIcon(frog_x + 2, frog_y + 1, BURST_ICON);
+
+      if (full_screen_view)
+        graphics.drawBitmap8(frog_x + 2, frog_y + 1, 8, BURST_ICON);
+      else
+        gfxIcon(frog_x + 2, frog_y + 1, BURST_ICON);
+
       return;
     }
 
     for (int y = 0; y < 9; ++y) {
       for (int x = 0; x < 12; ++x) {
 
-        if (FROG_BITMAP[y] & (1 << (11 - x)))
-          gfxPixel(frog_x + x, frog_y + y);
+        if (FROG_BITMAP[y] & (1 << (11 - x))) {
+          if (full_screen_view)
+            graphics.setPixel(frog_x + x, frog_y + y);
+          else
+            gfxPixel(frog_x + x, frog_y + y);
+        }
 
       }
     }
@@ -500,13 +517,13 @@ private:
         }
         else {
           traffic[lane][i].x += TRAFFIC_MOVE_PIXELS;
-          if (traffic[lane][i].x >= TRAFFIC_RIGHT_BOUNDARY)
+          if (traffic[lane][i].x >= TrafficRightBoundary())
             traffic[lane][i].active = false;
         }
       }
 
       const int spawn_x = lane_reverse[lane]
-        ? TRAFFIC_RIGHT_BOUNDARY
+        ? TrafficRightBoundary()
         : TRAFFIC_LEFT_BOUNDARY;
 
       bool spawn_clear = true;
@@ -518,7 +535,7 @@ private:
         const int car_right = traffic[lane][i].x + TRAFFIC_WIDTH;
 
         if (lane_reverse[lane]) {
-          if (car_right > TRAFFIC_RIGHT_BOUNDARY - TRAFFIC_MIN_SPAWN_GAP) {
+          if (car_right > TrafficRightBoundary() - TRAFFIC_MIN_SPAWN_GAP) {
             spawn_clear = false;
             break;
           }
@@ -591,23 +608,36 @@ private:
   FLASHMEM void DrawTrafficObject(int lane, int x, int object) {
 
     const int y = FROG_Y[lane + 1] + 1;
+    const int right_boundary = TrafficRightBoundary();
 
     if (traffic[lane][object].modifier == MODIFIER_RATCHET) {
       const int draw_x = max(x, 0);
-      const int draw_right = min(x + TRAFFIC_WIDTH, 64);
+      const int draw_right = min(x + TRAFFIC_WIDTH, right_boundary);
       const int draw_width = draw_right - draw_x;
 
-      if (draw_width > 0)
-        gfxFrame(draw_x, y, draw_width, 5);
+      if (draw_width > 0) {
+        if (full_screen_view)
+          graphics.drawRect(draw_x, y, draw_width, 5);
+        else
+          gfxFrame(draw_x, y, draw_width, 5);
+      }
 
       const int wheel1_x = x + 2;
       const int wheel2_x = x + 8;
 
-      if (wheel1_x >= 0 && wheel1_x < 64)
-        gfxPixel(wheel1_x, y + 5);
+      if (wheel1_x >= 0 && wheel1_x < right_boundary) {
+        if (full_screen_view)
+          graphics.setPixel(wheel1_x, y + 5);
+        else
+          gfxPixel(wheel1_x, y + 5);
+      }
 
-      if (wheel2_x >= 0 && wheel2_x < 64)
-        gfxPixel(wheel2_x, y + 5);
+      if (wheel2_x >= 0 && wheel2_x < right_boundary) {
+        if (full_screen_view)
+          graphics.setPixel(wheel2_x, y + 5);
+        else
+          gfxPixel(wheel2_x, y + 5);
+      }
 
       return;
     }
@@ -617,7 +647,24 @@ private:
         ? (lane_reverse[lane] ? INVERT_CAR_ICON : INVERT_CAR_RIGHT_ICON)
         : (lane_reverse[lane] ? CAR_ICON : CAR_RIGHT_ICON);
 
-    DrawTrafficIcon(x, y, icon);
+    if (full_screen_view) {
+      const int icon_width = 8;
+
+      for (int col = 0; col < icon_width; ++col) {
+        const int px = x + col;
+
+        if (px < 0 || px >= right_boundary)
+          continue;
+
+        for (int row = 0; row < 8; ++row) {
+          if (icon[col] & (1 << row))
+            graphics.setPixel(px, y + row);
+        }
+      }
+    }
+    else {
+      DrawTrafficIcon(x, y, icon);
+    }
   }
 
   FLASHMEM void DrawStepCounter() {
@@ -667,9 +714,16 @@ private:
     if (cursor == FROG_SELECT) {
 
       if (!EditMode() && CursorBlink()) {
-        gfxLine(frog_x, frog_y + 10, frog_x + 11, frog_y + 10);
-        gfxPixel(frog_x, frog_y + 8);
-        gfxPixel(frog_x + 11, frog_y + 8);
+        if (full_screen_view) {
+          graphics.drawLine(frog_x, frog_y + 10, frog_x + 11, frog_y + 10);
+          graphics.setPixel(frog_x, frog_y + 8);
+          graphics.setPixel(frog_x + 11, frog_y + 8);
+        }
+        else {
+          gfxLine(frog_x, frog_y + 10, frog_x + 11, frog_y + 10);
+          gfxPixel(frog_x, frog_y + 8);
+          gfxPixel(frog_x + 11, frog_y + 8);
+        }
       }
 
     }
@@ -851,28 +905,6 @@ DrawStepCounter();
     }
   }
 
-  FLASHMEM void DrawSequenceMenu() {
-
-    const int px = 5;
-    const int py = 13;
-    const int pw = 54;
-    const int ph = 38;
-
-    gfxRect(px, py, pw, ph);
-    gfxFrame(px, py, pw, ph);
-
-    gfxPrint(px + 5, py + 5, "Load");
-    gfxPrint(px + 5, py + 15, "Move");
-    gfxPrint(px + 5, py + 25, "Reset");
-
-    if (sequence_menu_mode == SEQUENCE_LOAD)
-      gfxIcon(px + 38, py + 5, LEFT_ICON);
-    else if (sequence_menu_mode == SEQUENCE_MOVE)
-      gfxIcon(px + 38, py + 15, LEFT_ICON);
-    else
-      gfxIcon(px + 38, py + 25, LEFT_ICON);
-  }
-
   FLASHMEM void DrawNoteSequencerPage() {
   SetAux(cursor >= 0 && (cursor <= sequence_length || sequence_menu || sequence_slot_mode || sequence_reset_confirm));
 
@@ -967,33 +999,62 @@ DrawStepCounter();
     if (frog_horizontal) {
 
       if (frog_lane == 0) {
-        frog_x_reference = 29;
+
+        // Safe zone: fixed in normal view, movable in fullscreen.
+        if (full_screen_view) {
+          frog_x_reference = constrain(
+            frog_x_reference + direction,
+            FULLSCREEN_FROG_LEFT,
+            FULLSCREEN_FROG_RIGHT
+          );
+        }
+        else {
+          frog_x_reference = 29;
+        }
+
       }
       else {
+
+        // Traffic lanes use the full available width in fullscreen.
+        const int frog_x_max = full_screen_view ? 116 : 52;
+
         frog_x_reference = constrain(
           frog_x_reference + direction,
           0,
-          52
+          frog_x_max
         );
+
       }
 
     } else {
 
-      // Keep the reference position for CV modulation.
-      frog_y_reference = constrain(frog_y_reference + direction, 0, 3);
+      frog_y_reference = constrain(
+        frog_y_reference + direction,
+        0,
+        3
+      );
+
       frog_lane = frog_y_reference;
       frog_y = FROG_Y[frog_lane];
 
       if (frog_lane == 0) {
-        frog_x = 29;
-        frog_x_reference = 29;
-        modifier_icon = nullptr;
-        modifier_value = 0;
-        modifier_gate = false;
+
+        // Snap into the Safe zone.
+        if (full_screen_view) {
+          frog_x_reference = constrain(
+            frog_x_reference,
+            FULLSCREEN_FROG_LEFT,
+            FULLSCREEN_FROG_RIGHT
+          );
+          frog_x = frog_x_reference;
+        }
+        else {
+          frog_x = 29;
+          frog_x_reference = 29;
+        }
+
       }
-
     }
-
   }
 
   FLASHMEM void ToggleFrogAxis() {
@@ -1055,12 +1116,6 @@ DrawStepCounter();
 
   }
 
-  FLASHMEM void ToggleSequenceMute() {
-
-    ToggleMute(cursor);
-
-  }
-
 public:
 
 
@@ -1071,6 +1126,8 @@ public:
 
 
   FLASHMEM void View();
+  FLASHMEM void DrawFullScreen();
+  FLASHMEM void DrawFullScreenMainPage();
 
 
   void OnEncoderMove(int direction);
@@ -1089,6 +1146,8 @@ public:
   void UnpackSequenceSteps(uint64_t data, int first_step);
 
   void SaveRestoreSnapshot();
+
+  void ClearCollisionState();
 
   bool RestoreSequence();
 
@@ -1252,11 +1311,11 @@ void FLASHMEM FrogSeq::OnButtonPress() {
             sequence_mutes[s] = false;
           }
           sequence_length = FROGSEQ_STEPS;
+          ClearCollisionState();
           step = 0;
           reset = true;
           current_note = GetFrogNote(0);
           SaveSequenceMemory(current_sequence);
-          SaveRestoreSnapshot();
         }
 
         sequence_reset_confirm = false;
@@ -1286,6 +1345,13 @@ void FLASHMEM FrogSeq::OnButtonPress() {
         if (sequence_menu_mode == SEQUENCE_LOAD) {
           if (LoadSequenceMemory(selected_sequence)) {
             current_sequence = selected_sequence;
+
+            ClearCollisionState();
+
+            step = 0;
+            reset = true;
+            current_note = GetFrogNote(0);
+
             SaveRestoreSnapshot();
           }
         }
@@ -1437,14 +1503,9 @@ for (int lane = 0; lane < TRAFFIC_LANES; ++lane) {
     );
 
 
-    Pack(
-      data,
-      PackLocation{24, 4},
-      sequence_length - 1
-    );
+
 
     SaveSequenceMemory(current_sequence);
-    SaveRestoreSnapshot();
 
     return data;
   
@@ -1475,12 +1536,7 @@ void FLASHMEM FrogSeq::OnDataReceive(uint64_t data) {
       );
 
 
-    sequence_length =
-      constrain(
-        Unpack(data, PackLocation{24, 4}) + 1,
-        1,
-        FROGSEQ_STEPS
-      );
+
 
     LoadSequenceMemory(current_sequence);
     SaveRestoreSnapshot();
@@ -1595,25 +1651,59 @@ uint64_t FLASHMEM FrogSeq::PackSequenceSteps(int first_step) {
 
       Pack(
         data,
-        PackLocation{static_cast<size_t>((s - first_step) * 8), 8},
+        PackLocation{static_cast<size_t>((s - first_step) * 7), 7},
         packed
+      );
+    }
+
+    // Store sequence length in the unused upper bits of the first word.
+    if (first_step == 0) {
+      Pack(
+        data,
+        PackLocation{56, 4},
+        sequence_length - 1
       );
     }
 
     return data;
   }
-
 void FLASHMEM FrogSeq::UnpackSequenceSteps(uint64_t data, int first_step) {
     for (int s = first_step; s < first_step + 8; ++s) {
-      const size_t offset = (s - first_step) * 8;
+      const size_t offset = (s - first_step) * 7;
+
       const uint8_t packed =
-        Unpack(data, PackLocation{offset, 8});
+        Unpack(data, PackLocation{offset, 7});
 
       sequence_notes[s] =
         constrain((packed & 0x3f) - 24, -24, 35);
+
       sequence_mutes[s] =
         (packed & 0x40) != 0;
     }
+
+    if (first_step == 0) {
+      sequence_length =
+        constrain(
+          Unpack(data, PackLocation{56, 4}) + 1,
+          1,
+          FROGSEQ_STEPS
+        );
+    }
+  }
+void FLASHMEM FrogSeq::ClearCollisionState() {
+    collision_display_until = 0;
+    collision_blink_until = 0;
+    modifier_icon = nullptr;
+    modifier_value = 0;
+    modifier_gate = false;
+
+    collision_ratchet_armed = false;
+    collision_ratchets_to_go = 0;
+    collision_ratchets_display = 0;
+    collision_ratchet_count = 0;
+    collision_ratchet_next_tick = 0;
+    collision_ratchet_zap = false;
+    collision_ratchet_spacing = 0;
   }
 
 bool FLASHMEM FrogSeq::RestoreSequence() {
@@ -1629,19 +1719,7 @@ bool FLASHMEM FrogSeq::RestoreSequence() {
 
     UnpackSequenceSteps(data, 8);
 
-    collision_display_until = 0;
-    collision_blink_until = 0;
-    modifier_icon = nullptr;
-    modifier_value = 0;
-    modifier_gate = false;
-
-    collision_ratchet_armed = false;
-    collision_ratchets_to_go = 0;
-    collision_ratchets_display = 0;
-    collision_ratchet_count = 0;
-    collision_ratchet_next_tick = 0;
-    collision_ratchet_zap = false;
-    collision_ratchet_spacing = 0;
+    ClearCollisionState();
 
     step = 0;
     reset = true;
@@ -1693,15 +1771,6 @@ void FLASHMEM FrogSeq::SetHelp(){
   }
 
 void FrogSeq::Controller() {
-    if (frog_lane == 0) {
-      frog_x = 29;
-      frog_x_reference = 29;
-    }
-    else {
-      frog_x = frog_x_reference;
-      Modulate(frog_x, 0, 0, 52);
-      frog_x = constrain(frog_x, 0, 52);
-    }
 
     const int frog_y_mod = constrain(SemitoneIn(1) / 12, -3, 3);
 
@@ -1713,6 +1782,32 @@ void FrogSeq::Controller() {
 
     frog_y = FROG_Y[frog_y_position];
     frog_lane = frog_y_position;
+
+    const int frog_x_min =
+      frog_lane == 0
+        ? (full_screen_view ? FULLSCREEN_FROG_LEFT : 29)
+        : 0;
+
+    const int frog_x_max =
+      frog_lane == 0
+        ? (full_screen_view ? FULLSCREEN_FROG_RIGHT : 29)
+        : (full_screen_view ? 116 : 52);
+
+    if (frog_lane == 0 && !full_screen_view) {
+      frog_x = 29;
+      frog_x_reference = 29;
+    }
+    else {
+      frog_x = frog_x_reference;
+
+      Modulate(frog_x, 0);
+
+      frog_x = constrain(
+        frog_x,
+        frog_x_min,
+        frog_x_max
+      );
+    }
 
     if (Clock(1)) {
       RestoreSequence();
@@ -1806,7 +1901,164 @@ void FrogSeq::Controller() {
     }
   }
 
+
+FLASHMEM void FrogSeq::DrawFullScreenMainPage() {
+
+    if (q_select)
+      SetLabel("Q-engine");
+    else
+      SetLabel("");
+
+    if (cursor == FROG_SELECT && EditMode()) {
+      const int x_offset = hemisphere * 64;
+
+      if (frog_horizontal) {
+        graphics.drawBitmap8(25 + x_offset, 1, 8, LEFT_ICON);
+        graphics.drawBitmap8(35 + x_offset, 1, 8, RIGHT_ICON);
+      } else {
+        graphics.drawBitmap8(25 + x_offset, 1, 8, UP_ICON);
+        graphics.drawBitmap8(35 + x_offset, 1, 8, DOWN_ICON);
+      }
+    }
+
+    DrawFrog();
+
+    if (modifier_icon == nullptr &&
+        (collision_ratchets_display > 0 || collision_ratchet_zap)) {
+
+      const int x = SafeZoneModifierX();
+      const int y = SafeZoneModifierY();
+
+      const int display_ratchets =
+        constrain(collision_ratchets_display, 0, 4);
+
+      if (collision_ratchet_zap) {
+        graphics.drawBitmap8(
+          max(0, x + 1 + (display_ratchets * 5) - 2),
+          y,
+          8,
+          ZAP_ICON
+        );
+      }
+
+      for (int i = 0; i < display_ratchets; i++)
+        graphics.drawRect(x + 1 + (i * 5), y + 3, 3, 3);
+    }
+    else if (modifier_icon &&
+             OC::CORE::ticks - modifier_display_tick <
+               HEMISPHERE_CURSOR_TICKS * 6 &&
+             modifier_step >= 0) {
+
+      const int x = SafeZoneModifierX();
+      const int y = SafeZoneModifierY();
+
+      const int step_number = modifier_step + 1;
+      graphics.drawBitmap8(
+        x,
+        y,
+        8,
+        TEENS_8X8 + step_number * 8
+      );
+
+      const uint8_t *icon = modifier_icon;
+
+      for (int col = 0; col < 8; ++col) {
+        for (int row = 0; row < 8; ++row) {
+          if (icon[col] & (1 << row))
+            graphics.setPixel(x + 9 + col, y + row);
+        }
+      }
+
+      if (modifier_gate) {
+        graphics.drawBitmap8(
+          x + 18,
+          y,
+          8,
+          modifier_value ? CHECK_ON_ICON : CHECK_OFF_ICON
+        );
+      }
+      else {
+        const int amount = constrain(abs(modifier_value), 0, 19);
+
+        graphics.drawBitmap8(
+          x + 18,
+          y,
+          8,
+          TEENS_8X8 + amount * 8
+        );
+
+        if (modifier_value < 0)
+          graphics.invertRect(x + 18, y, 8, 8);
+      }
+    }
+
+    for (int lane = 0; lane < TRAFFIC_LANES; ++lane) {
+      for (int i = 0; i < TRAFFIC_OBJECTS; ++i) {
+        if (traffic[lane][i].active)
+          DrawTrafficObject(lane, traffic[lane][i].x, i);
+      }
+    }
+
+    // Same three Main Page controls and the same cursor style.
+    DrawCurrentNote();
+    gfxIcon(56, 13, RANDOM_ICON);
+
+    // Fullscreen: keep the normal left indentation and spread
+    // the 16-step counter across the full 128-pixel display.
+    const int step_x0 = 1;
+    const int step_y = 25;
+    const int step_gap = 8;
+
+    for (int i = 0; i < FROGSEQ_STEPS; ++i) {
+      if (i == step) {
+        graphics.drawRect(step_x0 + i * step_gap - 1, step_y - 2, 5, 5);
+      }
+      else if (!muted(i)) {
+        graphics.setPixel(step_x0 + i * step_gap, step_y);
+      }
+    }
+
+    DrawMainCursor();
+
+    // Restore Aux state after cursor drawing.
+    SetAux(
+      cursor == FROG_SELECT ||
+      q_select
+    );
+
+    // Fullscreen road separators use the full 128-pixel display.
+    for (int x = 0; x < 128; x += 8)
+      graphics.drawLine(x, 38, x + 3, 38);
+
+    for (int x = 0; x < 128; x += 8)
+      graphics.drawLine(x, 51, x + 3, 51);
+  }
+
+void FLASHMEM FrogSeq::DrawFullScreen() {
+
+    // Move a right-hemisphere frog into its fullscreen position.
+    if (!full_screen_view && hemisphere == 1) {
+      frog_x_reference = constrain(frog_x_reference + 64, 0, 116);
+      frog_x = frog_x_reference;
+    }
+
+    full_screen_view = true;
+
+    if (page == MAIN_PAGE)
+      DrawFullScreenMainPage();
+    else
+      DrawNoteSequencerPage();
+  }
+
 void FLASHMEM FrogSeq::View() {
+
+    // Return a right-hemisphere frog to local coordinates.
+    if (full_screen_view && hemisphere == 1) {
+      frog_x_reference = constrain(frog_x_reference - 64, 0, 52);
+      frog_x = frog_x_reference;
+    }
+
+    full_screen_view = false;
 
     DrawInterface();
   }
