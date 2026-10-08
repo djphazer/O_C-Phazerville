@@ -292,9 +292,6 @@ public:
     void Controller() {
         ProcessMIDI();
 
-        // ClockSetup applet handles internal clock duties
-        ClockSetup_instance.Controller();
-
         // -- core processing --
         for (int ch = 0; ch < DAC_CHANNEL_LAST; ++ch) {
             bool clocked = Clock(ch);

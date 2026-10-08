@@ -72,6 +72,9 @@ public:
     virtual void Resume() = 0;
 
     void BaseController() {
+        // process the clock first - very important!
+        HS::ProcessClock();
+
         // Load the IO frame from CV inputs
         HS::frame.Load();
 

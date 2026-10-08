@@ -432,9 +432,7 @@ public:
     }
 
     void Controller() {
-        // Clock Setup applet handles internal clock duties
-        ClockSetup_instance.Controller();
-        // ^ this will process the queue and load presets
+        // Clock duties are now called from BaseController, before frame Load
 
         // this might be triggered by the internal clock...
         if (jump_trig_.Clock() && !HS::clock_m.auto_reset) {
