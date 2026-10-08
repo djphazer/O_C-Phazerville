@@ -67,7 +67,7 @@ MIDI_CREATE_INSTANCE(HardwareSerial, Serial8, MIDI1);
 #include "util/cachedisable.h"
 #endif
 
-FLASHMEM
+FLASHMEM __attribute__((noinline)) 
 void ScanI2C() {
   noInterrupts();
 
@@ -411,7 +411,7 @@ void SerialHandler() {
     if (unlocked) do {
       int cmd = Serial.read();
       switch (cmd) {
-#ifdef PRINT_DEBUG
+//#ifdef PRINT_DEBUG
         case 'z':
           Serial.println("-=[ PEW PEW NERDS! ]=-");
           Serial.println("Secret Menu Options:");
@@ -426,6 +426,7 @@ void SerialHandler() {
           Serial.println("'s' = list all files on SD card");
           Serial.println("'C' = clear/reset default Config file");
           Serial.println("'F' = format/erase all LittleFS files");
+          Serial.println("'?' = print contents of CRASH.LOG");
 #endif
           break;
 
@@ -466,7 +467,18 @@ void SerialHandler() {
           break;
 #endif
 
-#endif
+//#endif
+        case '?': {
+          // dump the CrashReport log
+          File cl = PhzConfig::myfs.open("CRASH.LOG", FILE_READ);
+          if (cl) {
+            Serial.println("*** CRASH.LOG ***");
+            while(cl.available()) Serial.print(cl.read());
+            cl.close();
+          } else
+            Serial.println("*** no CRASH.LOG found ***");
+          break;
+        }
         default:
           capreq = true;
           break;
