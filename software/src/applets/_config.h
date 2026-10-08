@@ -4,12 +4,6 @@
 
 using namespace HS;
 
-#ifdef ARDUINO_TEENSY41
-#include "ClockSetupT4.h"
-#else
-#include "ClockSetup.h"
-#endif
-
 // hacks to effectively rewrite part of the applet boilerplate,
 // making names and icons static
 #define applet_name applet_name() const final { return applet_name_(); } \

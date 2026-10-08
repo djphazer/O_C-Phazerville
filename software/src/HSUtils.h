@@ -253,6 +253,8 @@ namespace HS {
   void DrawAppletList(bool blink = false);
   uint32_t get_tick();
 
+  void ProcessClock();
+
   // --- Quantizer helpers
   QuantEngine& GetQuantEngine(int ch);
   int GetLatestNoteNumber(int ch);

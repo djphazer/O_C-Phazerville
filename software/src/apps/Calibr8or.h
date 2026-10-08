@@ -25,12 +25,6 @@
 #pragma once
 #ifdef ENABLE_APP_CALIBR8OR
 
-#ifdef ARDUINO_TEENSY41
-#include "../applets/ClockSetupT4.h"
-#else
-#include "../applets/ClockSetup.h"
-#endif
-
 static constexpr int CAL8_MAX_TRANSPOSE = 60;
 static constexpr int CAL8OR_PRECISION = 10000;
 
@@ -419,9 +413,6 @@ public:
 
     void Controller() {
         ProcessMIDI();
-
-        // ClockSetup applet handles internal clock duties
-        ClockSetup_instance.Controller();
 
         // -- core processing --
         for (int ch = 0; ch < DAC_CHANNEL_COUNT; ++ch) {
