@@ -901,7 +901,6 @@ struct IOFrame {
 
     bool changed_cv[IO_CHANNEL_COUNT]; // Has the input changed by more than 1/8 semitone since the last read?
     bool autoMIDIOut = false;
-    bool synctrig = false;
 
     OC::IOFrame* GetLatestIOFrame() const {
       return current_ioframe;

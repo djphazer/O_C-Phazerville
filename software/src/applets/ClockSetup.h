@@ -69,7 +69,6 @@ public:
     // The ClockSetup controller handles MIDI Clock and Transport Start/Stop
     void Controller() {
         bool midi_sync = false;
-        // bool clock_sync = HS::frame.synctrig;
         bool clock_sync = sync_trig.Clock();
 
         hemisphere = HS::CLOCK_CURSOR;
@@ -562,5 +561,3 @@ private:
         }
     }
 };
-
-ClockSetup ClockSetup_instance;
