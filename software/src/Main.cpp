@@ -67,7 +67,7 @@ MIDI_CREATE_INSTANCE(HardwareSerial, Serial8, MIDI1);
 #include "util/cachedisable.h"
 #endif
 
-FLASHMEM
+FLASHMEM __attribute__((noinline)) 
 void ScanI2C() {
   noInterrupts();
 
@@ -399,6 +399,63 @@ FLASHMEM void setup() {
   SERIAL_PRINTLN("[End of setup()]");
 }
 
+// Virtual button click or encoder detent
+FLASHMEM __attribute__((noinline))
+static void RemoteControl(int sel) {
+  using namespace OC;
+  switch (sel) {
+    // short button press
+    case 'a': ui.InjectButton(CONTROL_BUTTON_A); break;
+    case 'b': ui.InjectButton(CONTROL_BUTTON_B); break;
+    case 'x': ui.InjectButton(CONTROL_BUTTON_X); break;
+    case 'y': ui.InjectButton(CONTROL_BUTTON_Y); break;
+    case 'z': ui.InjectButton(CONTROL_BUTTON_Z); break;
+    case 'l': ui.InjectButton(CONTROL_BUTTON_L); break;   // left encoder push
+    case 'r': ui.InjectButton(CONTROL_BUTTON_R); break;   // right encoder push
+
+    // COMBOS
+    case '^': // A + B to go UP one screen
+      ui.InjectButton(CONTROL_BUTTON_A, false, CONTROL_BUTTON_B);
+      break;
+    case 'v': // X + Y combo to go DOWN one screen
+      ui.InjectButton(CONTROL_BUTTON_X, false, CONTROL_BUTTON_Y);
+      break;
+    case '<': // A + X to go LEFT one screen
+      ui.InjectButton(CONTROL_BUTTON_A, false, CONTROL_BUTTON_X);
+      break;
+    case '>': // B + Y to go RIGHT one screen
+      ui.InjectButton(CONTROL_BUTTON_B, false, CONTROL_BUTTON_Y);
+      break;
+
+    // lol backslash won't be problematic at all, right?
+    case '\\': // A + Y diagonal
+    case '|': // as an alternative
+      ui.InjectButton(CONTROL_BUTTON_A, false, CONTROL_BUTTON_Y);
+      break;
+    case '/':  // B + X diagonal
+      ui.InjectButton(CONTROL_BUTTON_B, false, CONTROL_BUTTON_X);
+      break;
+    case '_': // both encoders
+      ui.InjectButton(CONTROL_BUTTON_L, false, CONTROL_BUTTON_R);
+      break;
+
+    // long-presses
+    case 'A': ui.InjectButton(CONTROL_BUTTON_A, true); break;
+    case 'B': ui.InjectButton(CONTROL_BUTTON_B, true); break;
+    case 'X': ui.InjectButton(CONTROL_BUTTON_X, true); break;
+    case 'Y': ui.InjectButton(CONTROL_BUTTON_Y, true); break;
+    case 'Z': ui.InjectButton(CONTROL_BUTTON_Z, true); break;
+    case 'L': ui.InjectButton(CONTROL_BUTTON_L, true); break;
+    case 'R': ui.InjectButton(CONTROL_BUTTON_R, true); break;
+    // encoder detent rotation
+    case '(': ui.InjectEncoder(CONTROL_ENCODER_L, -1); break;
+    case ')': ui.InjectEncoder(CONTROL_ENCODER_L,  1); break;
+    case '[': ui.InjectEncoder(CONTROL_ENCODER_R, -1); break;
+    case ']': ui.InjectEncoder(CONTROL_ENCODER_R,  1); break;
+    default: break;
+  }
+}
+
 FLASHMEM __attribute__((noinline))
 void SerialHandler() {
   static size_t cap_idx = 0;
@@ -409,9 +466,33 @@ void SerialHandler() {
     bool capreq = !unlocked;
 
     if (unlocked) do {
-      int cmd = Serial.read();
+      static uint32_t cmd = 0;
+      char c = Serial.read();
+      cmd = (cmd << 8) | c;
+
+      // static uint8_t *cmd_bytes = (uint8_t*)&cmd;
+      // handle the top byte of a 4-byte command
+      // switch (cmd_bytes[0]) {
+      //   case 'O': // scope request
+      //     break;
+      //   default: break;
+      // }
+
+      // handle full 4-byte commands
       switch (cmd) {
-#ifdef PRINT_DEBUG
+        case FOURCCS("hey."):
+          Serial.println("Hello, person. Welcome to this place.");
+          continue;
+        case FOURCCS("F*ck"):
+          Serial.println("!! ERASING ALL FILES on LittleFS !!");
+          PhzConfig::eraseFiles();
+          break;
+        default:
+          break;
+      }
+
+      // immediate one-character handlers
+      switch (c) {
         case 'z':
           Serial.println("-=[ PEW PEW NERDS! ]=-");
           Serial.println("Secret Menu Options:");
@@ -420,12 +501,14 @@ void SerialHandler() {
           Serial.printf("'L' = Toggle App Loop [%s]\n", OC::CORE::app_loop_enabled ? "ON" : "OFF");
 #if defined(__IMXRT1062__)
 #if defined(ARDUINO_TEENSY41)
+          Serial.println("'N' = print Midi Log");
           Serial.println("'i' = scan all i2c addresses");
 #endif
           Serial.println("'l' = list all files in flash (LittleFS)");
           Serial.println("'s' = list all files on SD card");
           Serial.println("'C' = clear/reset default Config file");
-          Serial.println("'F' = format/erase all LittleFS files");
+          Serial.println("'F*ck' = format/erase all LittleFS files");
+          Serial.println("'?' = print contents of CRASH.LOG");
 #endif
           break;
 
@@ -460,13 +543,27 @@ void SerialHandler() {
           Serial.println(" -=- SD Card -=- ");
           PhzConfig::listFiles(SD);
           break;
-        case 'F':
-          Serial.println("!! ERASING ALL FILES on LittleFS !!");
-          PhzConfig::eraseFiles();
+        case '?': {
+          // dump the CrashReport log
+          File cl = PhzConfig::myfs.open("CRASH.LOG", FILE_READ);
+          if (cl) {
+            Serial.println("*** CRASH.LOG ***");
+            while(cl.available()) Serial.print(cl.read());
+            cl.close();
+          } else
+            Serial.println("*** no CRASH.LOG found ***");
           break;
+        }
 #endif
 
-#endif
+        case '~': {
+          // Remote control: the next byte selects a button/encoder to inject.
+          uint32_t t0 = millis();
+          while (!Serial.available() && (millis() - t0) < 5) { /* await selector */ }
+          if (Serial.available()) RemoteControl(Serial.read());
+          break;
+        }
+
         default:
           capreq = true;
           break;
@@ -474,7 +571,7 @@ void SerialHandler() {
     } while (Serial.available() > 0); // todo: yield after a limit
     /* not unlocked yet */
     else {
-      static constexpr uint32_t PEW = FourCC<'P','e','w','!'>::value;
+      static constexpr uint32_t PEW = FOURCCS("Pew!");
       static uint32_t unlock_shift = 0;
       unlock_shift = (unlock_shift << 8) | (uint8_t)Serial.read();
       if (unlock_shift == PEW) {

@@ -509,13 +509,24 @@ public:
       else
         LoadFromPreset(id);
     }
-    void JumpToNextPreset() {
-      int next_id = preset_id + 1;
-      while (!isValidPreset(next_id) && next_id != preset_id) {
-        ++next_id %= QUAD_PRESET_COUNT;
+
+    void ChangePreset(int dir) {
+      if (dir == 0) return;
+      int id = (preset_id < 0) ? 0 : preset_id;
+      for (int i = 0; i < QUAD_PRESET_COUNT; i++) {
+        id = (id + dir + QUAD_PRESET_COUNT) % QUAD_PRESET_COUNT;
+        if (isValidPreset(id)) {
+          QueuePresetLoad(id);
+          return;
+        }
       }
-      if (next_id != preset_id)
-        QueuePresetLoad(next_id);
+    }
+    void JumpToNextPreset() {
+      ChangePreset(1);
+    }
+
+    void SetAudioSetup(bool on) {
+      view_state = on ? AUDIO_SETUP : APPLETS;
     }
 
     // does not modify the preset, only the current state
@@ -2033,6 +2044,7 @@ void AppQuadrants::HandleEncoderEvent(const UI::Event &event) {
 
 FLASHMEM
 void AppQuadrants::StoreToPreset(int id) {
+  if (id < 0 || id >= QUAD_PRESET_COUNT) return;
   store_to_preset(id);
 }
 FLASHMEM
