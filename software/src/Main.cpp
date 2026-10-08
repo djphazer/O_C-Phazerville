@@ -242,12 +242,7 @@ FLASHMEM __attribute__((noinline)) void BootMenu(const bool show) {
 #endif
 
 #if defined(__IMXRT1062__)
-// The core never zeroes .bss.dma (DMAMEM is documented as uninitialized), so
-// C++ objects placed there boot with garbage in any member their constructor
-// doesn't touch - USBHost_t36 state machines rely on bss-zero and lock up.
-// Zero the section here: ResetHandler calls this hook after the DTCM bss
-// clear and BEFORE __libc_init_array (C++ ctors). .bss.dma is the first
-// section in RAM2 (origin 0x20200000) and ends at _heap_start per the .ld.
+// fill DMAMEM with zeroes to be safe
 extern unsigned long _heap_start;
 extern "C" FLASHMEM void startup_middle_hook(void) {
   memset((void *)0x20200000, 0, (uint32_t)&_heap_start - 0x20200000u);
@@ -258,9 +253,7 @@ extern "C" FLASHMEM void startup_middle_hook(void) {
 // Crash forensics + hardware watchdog (T4.x)
 // ---------------------------------------------------------------------------
 
-// Capture CrashReport text at boot so it can be appended to CRASH.LOG once
-// LittleFS is mounted (the Serial print is gone if nobody was watching).
-// buffer lives in RAM2 (DMAMEM) - DTCM stack headroom is precious
+// temp buffer to capture CrashReport text at boot
 static DMAMEM char crash_buf[1024];
 class BufferPrint : public Print {
 public:
@@ -277,20 +270,12 @@ static BufferPrint crash_capture;
 // would otherwise show every cause since the last power-on, forever.
 static uint32_t boot_srsr = 0;
 
-// WDOG1: 128s timeout, fed only from loop(). Long enough that the slowest
-// legitimate blocking op (a full LittleFS format) rarely trips it; a hard
-// loop() hang reboots instead of bricking the module until power-cycle.
-// Armed at the END of setup() so interactive boot flows (BootMenu,
-// ConfirmReset) can block indefinitely.
+// WDOG1: 128s timeout, fed only from loop().
+// a hard loop() hang reboots instead of bricking the module until power-cycle.
 static bool watchdog_armed = false;
 FLASHMEM static void watchdog_arm() {
-  // the core never ungates WDOG1's clock ("WDOG1 requires CCM_CCGR3_WDOG1"
-  // per imxrt.h) - touching its registers without this bus-faults
   CCM_CCGR3 |= CCM_CCGR3_WDOG1(CCM_CCGR_ON);
   asm volatile("dsb");
-  // PDE (set at reset) is a one-shot 16s power-down counter that asserts
-  // reset unless cleared - with the clock just ungated it would fire ~16s
-  // after arming and masquerade as a watchdog timeout
   WDOG1_WMCR = 0;
   WDOG1_WCR = (uint16_t)(255u << 8)  // WT: (255+1)*0.5s = 128s
             | WDOG_WCR_WDE | WDOG_WCR_SRS | WDOG_WCR_WDA
@@ -323,13 +308,10 @@ FLASHMEM void setup() {
   Serial.begin(9600);
 
   if (CrashReport) {
-    while (!Serial && millis() < 3000) ; // wait
-    Serial.println(CrashReport);
-#if defined(__IMXRT1062__)
-    // stash the report so it can be appended to CRASH.LOG once the
-    // filesystem is up (console prints vanish when nobody is watching)
+    // stash the report so it can be appended to CRASH.LOG once the filesystem is up
     crash_capture.print(CrashReport);
-#endif
+    while (!Serial && millis() < 3000) ; // wait
+    Serial.println(crash_capture.buf);
     delay(1500);
   }
 
@@ -435,17 +417,16 @@ FLASHMEM void setup() {
   // initialize LittleFS for config files
   PhzConfig::Init();
 
-#if defined(__IMXRT1062__)
   // append any captured crash report to CRASH.LOG (rotate at 8KB)
-  if (crash_capture.len) {
-    File cl = PhzConfig::myfs.open("CRASH.LOG", FILE_READ);
+  if (crash_capture.len && SDcard_Ready) {
+    File cl = SD.open("CRASH.LOG", FILE_READ);
     const bool rotate = cl && cl.size() > 8192;
     if (cl) cl.close();
     if (rotate) {  // keep one generation of history instead of deleting
-      PhzConfig::myfs.remove("CRASH.OLD");
-      PhzConfig::myfs.rename("CRASH.LOG", "CRASH.OLD");
+      SD.remove("CRASH.OLD");
+      SD.rename("CRASH.LOG", "CRASH.OLD");
     }
-    cl = PhzConfig::myfs.open("CRASH.LOG", FILE_WRITE);  // append
+    cl = SD.open("CRASH.LOG", FILE_WRITE);  // append
     if (cl) {
       cl.printf("--- boot @ %lu ms ---\n", millis());
       cl.write((const uint8_t *)crash_capture.buf, crash_capture.len);
@@ -453,7 +434,6 @@ FLASHMEM void setup() {
       Serial.println("CrashReport appended to CRASH.LOG");
     }
   }
-#endif
 
   // Display loading splash screen and optional calibration
   bool reset_settings = false;
@@ -517,8 +497,8 @@ void SerialHandler() {
     bool capreq = !unlocked;
 
     if (unlocked) do {
-      int cmd = Serial.read();
-      switch (cmd) {
+      char c = Serial.read();
+      switch (c) {
 //#ifdef PRINT_DEBUG
         case 'z':
           Serial.println("-=[ PEW PEW NERDS! ]=-");
@@ -580,10 +560,13 @@ void SerialHandler() {
 //#endif
         case '?': {
           // dump the CrashReport log
-          File cl = PhzConfig::myfs.open("CRASH.LOG", FILE_READ);
+          File cl = SD.open("CRASH.LOG", FILE_READ);
           if (cl) {
             Serial.println("*** CRASH.LOG ***");
-            while(cl.available()) Serial.print(cl.read());
+            while(cl.available()) {
+              c = cl.read();
+              Serial.print(c);
+            }
             cl.close();
           } else
             Serial.println("*** no CRASH.LOG found ***");
