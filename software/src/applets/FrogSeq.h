@@ -684,11 +684,28 @@ private:
 
     }
   }
+  FLASHMEM void DrawFullScreenStepCounter() {
+    const int x0 = 1;
+    const int y = 25;
+    const int gap = 8;
+
+    for (int i = 0; i < FROGSEQ_STEPS; ++i) {
+      if (i == step) {
+        graphics.drawRect(x0 + i * gap - 1, y - 2, 5, 5);
+      }
+      else if (!muted(i)) {
+        graphics.setPixel(x0 + i * gap, y);
+      }
+    }
+  }
+
   FLASHMEM void DrawCurrentNote() {
+    const int x_offset = full_screen_view && hemisphere == 0 ? 64 : 0;
+
     if (q_select) {
       char q_label[] = "Q1";
       q_label[1] = '1' + qselect;
-      gfxPrint(42, 15, q_label);
+      gfxPrint(42 + x_offset, 15, q_label);
       return;
     }
 
@@ -697,19 +714,21 @@ private:
 
     const int octave = (notenum / 12) - 3;
 
-    gfxBitmap(42, 13, 8, NOTE_NAMES + semitone * 8);
+    gfxBitmap(42 + x_offset, 13, 8, NOTE_NAMES + semitone * 8);
 
     if (octave == -2)
-      gfxBitmap(51, 16, 3, SUB_TWO);   // C1-B1
+      gfxBitmap(51 + x_offset, 16, 3, SUB_TWO);   // C1-B1
     else if (octave == -1)
-      gfxBitmap(51, 19, 3, SUP_ONE);   // C2-B2
+      gfxBitmap(51 + x_offset, 19, 3, SUP_ONE);   // C2-B2
     else if (octave == 1)
-      gfxBitmap(51, 11, 3, SUP_ONE);   // C4-B4
+      gfxBitmap(51 + x_offset, 11, 3, SUP_ONE);   // C4-B4
     else if (octave == 2)
-      gfxBitmap(51, 8, 3, SUB_TWO);    // C5-B5
+      gfxBitmap(51 + x_offset, 8, 3, SUB_TWO);    // C5-B5
   }
 
   FLASHMEM void DrawMainCursor() {
+    const int x_offset = full_screen_view && hemisphere == 0 ? 64 : 0;
+
 
     if (cursor == FROG_SELECT) {
 
@@ -730,17 +749,16 @@ private:
     else if (cursor == SEMITONE_SELECT) {
 
       if (q_select) {
-        gfxSpicyCursor(42, 23, 12);
+        gfxSpicyCursor(42 + x_offset, 23, 12);
         SetLabel("Q-engine");
-        SetAux(true);
       } else {
-        gfxCursor(42, 23, 12);
+        gfxCursor(42 + x_offset, 23, 12);
       }
 
     }
     else if (cursor == RANDOM_SELECT) {
 
-      gfxCursor(54, 23, 10);
+      gfxCursor(54 + x_offset, 23, 10);
 
     }
 
@@ -762,13 +780,9 @@ private:
         gfxIcon(35, 1, DOWN_ICON);
       }
     }
-
     SetAux(
       cursor == FROG_SELECT ||
-      q_select ||
-      (page == NOTE_SEQ_PAGE &&
-       cursor >= 0 &&
-       cursor < FROGSEQ_STEPS)
+      q_select
     );
 
     DrawFrog();
@@ -1800,7 +1814,7 @@ void FrogSeq::Controller() {
     else {
       frog_x = frog_x_reference;
 
-      Modulate(frog_x, 0);
+      Modulate(frog_x, 0, frog_x_min, frog_x_max);
 
       frog_x = constrain(
         frog_x,
@@ -1910,14 +1924,12 @@ FLASHMEM void FrogSeq::DrawFullScreenMainPage() {
       SetLabel("");
 
     if (cursor == FROG_SELECT && EditMode()) {
-      const int x_offset = hemisphere * 64;
-
       if (frog_horizontal) {
-        graphics.drawBitmap8(25 + x_offset, 1, 8, LEFT_ICON);
-        graphics.drawBitmap8(35 + x_offset, 1, 8, RIGHT_ICON);
+        gfxIcon(25, 1, LEFT_ICON);
+        gfxIcon(35, 1, RIGHT_ICON);
       } else {
-        graphics.drawBitmap8(25 + x_offset, 1, 8, UP_ICON);
-        graphics.drawBitmap8(35 + x_offset, 1, 8, DOWN_ICON);
+        gfxIcon(25, 1, UP_ICON);
+        gfxIcon(35, 1, DOWN_ICON);
       }
     }
 
@@ -2001,30 +2013,12 @@ FLASHMEM void FrogSeq::DrawFullScreenMainPage() {
 
     // Same three Main Page controls and the same cursor style.
     DrawCurrentNote();
-    gfxIcon(56, 13, RANDOM_ICON);
+    gfxIcon(56 + (hemisphere == 0 ? 64 : 0), 13, RANDOM_ICON);
 
-    // Fullscreen: keep the normal left indentation and spread
-    // the 16-step counter across the full 128-pixel display.
-    const int step_x0 = 1;
-    const int step_y = 25;
-    const int step_gap = 8;
-
-    for (int i = 0; i < FROGSEQ_STEPS; ++i) {
-      if (i == step) {
-        graphics.drawRect(step_x0 + i * step_gap - 1, step_y - 2, 5, 5);
-      }
-      else if (!muted(i)) {
-        graphics.setPixel(step_x0 + i * step_gap, step_y);
-      }
-    }
+    // Fullscreen uses the same step counter with wider spacing.
+    DrawFullScreenStepCounter();
 
     DrawMainCursor();
-
-    // Restore Aux state after cursor drawing.
-    SetAux(
-      cursor == FROG_SELECT ||
-      q_select
-    );
 
     // Fullscreen road separators use the full 128-pixel display.
     for (int x = 0; x < 128; x += 8)
