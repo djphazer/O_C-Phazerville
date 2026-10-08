@@ -69,6 +69,18 @@
 #include "OC_scale_edit.h"
 #include "OC_visualfx.h"
 
+// --- Internal Clock ---
+#ifdef ARDUINO_TEENSY41
+#include "applets/ClockSetupT4.h"
+#else
+#include "applets/ClockSetup.h"
+#endif
+ClockSetup ClockSetup_instance;
+void HS::ProcessClock() {
+  ClockSetup_instance.Controller();
+}
+// ----------------------
+
 // actual apps are included and instantiated here
 #include "apps/_config.h"
 

@@ -403,11 +403,6 @@ void HS::MIDIFrame::Send(const SlewedValue *outvals) {
 void HS::IOFrame::Load(OC::IOFrame *ioframe) {
     current_ioframe = ioframe; // cache that ish
 
-    auto triggers = ioframe->digital_inputs.triggered();
-
-    // TODO: configurable clock sync input
-    synctrig = triggers & DIGITAL_INPUT_MASK(0);
-
     // hardcoded to the enum...
     gate_high[0] = ioframe->digital_inputs.raised(OC::DIGITAL_INPUT_1);
     gate_high[1] = ioframe->digital_inputs.raised(OC::DIGITAL_INPUT_2);
@@ -455,6 +450,8 @@ void HS::IOFrame::Load(OC::IOFrame *ioframe) {
       }
     }
 #endif
+
+    ProcessClock();
 
     // pre-calculate clock triggers
     for (int ch = 0; ch < APPLET_SLOTS * 2; ++ch) {
