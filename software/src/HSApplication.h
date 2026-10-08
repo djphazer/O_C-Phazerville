@@ -37,6 +37,7 @@ using simfloat = int32_t;
 #include "HSClockManager.h"
 #include "HemisphereApplet.h"
 #include "HSUtils.h"
+#include "applets/ClockSetup.h"
 
 #define HSAPPLICATION_CURSOR_TICKS 4000
 #define HSAPPLICATION_5V 7680
@@ -50,6 +51,8 @@ using simfloat = int32_t;
 #endif
 
 using namespace HS;
+
+extern ClockSetup ClockSetup_instance;
 
 class HSApplication {
 public:
@@ -73,7 +76,7 @@ public:
 
     void BaseController() {
         // process the clock first - very important!
-        HS::ProcessClock();
+        ClockSetup_instance.Controller();
 
         // Load the IO frame from CV inputs
         HS::frame.Load();

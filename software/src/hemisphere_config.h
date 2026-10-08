@@ -346,8 +346,4 @@ namespace HS {
 
     return index;
   }
-
-  void ProcessClock() {
-    ClockSetup_instance.Controller();
-  }
 }

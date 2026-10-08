@@ -220,8 +220,6 @@ namespace HS {
   void ResetMappings();
   void DrawAppletList(bool blink = false);
 
-  void ProcessClock();
-
   // --- Quantizer helpers
   QuantEngine& GetQuantEngine(int ch);
   int GetLatestNoteNumber(int ch);

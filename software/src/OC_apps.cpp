@@ -172,6 +172,8 @@ static constexpr OC::App available_apps[] = {
   DECLARE_APP('B','R', "Backup / Restore", Backup),
 };
 
+ClockSetup ClockSetup_instance;
+
 static constexpr int NUM_AVAILABLE_APPS = ARRAY_SIZE(available_apps);
 
 namespace OC {

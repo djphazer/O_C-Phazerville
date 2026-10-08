@@ -492,5 +492,3 @@ private:
         }
     }
 };
-
-ClockSetup ClockSetup_instance;
