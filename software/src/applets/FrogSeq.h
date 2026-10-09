@@ -700,7 +700,7 @@ private:
   }
 
   FLASHMEM void DrawCurrentNote() {
-    const int x_offset = full_screen_view && hemisphere == 0 ? 64 : 0;
+    const int x_offset = full_screen_view ? 64 - gfx_offset : 0;
 
     if (q_select) {
       char q_label[] = "Q1";
@@ -727,7 +727,7 @@ private:
   }
 
   FLASHMEM void DrawMainCursor() {
-    const int x_offset = full_screen_view && hemisphere == 0 ? 64 : 0;
+    const int x_offset = full_screen_view ? 64 - gfx_offset : 0;
 
 
     if (cursor == FROG_SELECT) {
@@ -2013,7 +2013,7 @@ FLASHMEM void FrogSeq::DrawFullScreenMainPage() {
 
     // Same three Main Page controls and the same cursor style.
     DrawCurrentNote();
-    gfxIcon(56 + (hemisphere == 0 ? 64 : 0), 13, RANDOM_ICON);
+    gfxIcon(56 + (64 - gfx_offset), 13, RANDOM_ICON);
 
     // Fullscreen uses the same step counter with wider spacing.
     DrawFullScreenStepCounter();
@@ -2030,9 +2030,9 @@ FLASHMEM void FrogSeq::DrawFullScreenMainPage() {
 
 void FLASHMEM FrogSeq::DrawFullScreen() {
 
-    // Move a right-hemisphere frog into its fullscreen position.
-    if (!full_screen_view && hemisphere == 1) {
-      frog_x_reference = constrain(frog_x_reference + 64, 0, 116);
+    // Move a right-side frog into fullscreen coordinates.
+    if (!full_screen_view && gfx_offset != 0) {
+      frog_x_reference = constrain(frog_x_reference + gfx_offset, 0, 116);
       frog_x = frog_x_reference;
     }
 
@@ -2046,9 +2046,9 @@ void FLASHMEM FrogSeq::DrawFullScreen() {
 
 void FLASHMEM FrogSeq::View() {
 
-    // Return a right-hemisphere frog to local coordinates.
-    if (full_screen_view && hemisphere == 1) {
-      frog_x_reference = constrain(frog_x_reference - 64, 0, 52);
+    // Return a right-side frog to local coordinates.
+    if (full_screen_view && gfx_offset != 0) {
+      frog_x_reference = constrain(frog_x_reference - gfx_offset, 0, 52);
       frog_x = frog_x_reference;
     }
 
