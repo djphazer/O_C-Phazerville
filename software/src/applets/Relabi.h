@@ -101,15 +101,14 @@ public:
           powf(10.0f, normalizedCV * 2.0f), 0.01f, 100.0f
         );
         const float xModCV = constrain(normalizedCV2, 0.0f, 1.0f);
+        const float crossModScale =
+          (30.0f + xModCV * 100.0f) / (100.0f * HEMISPHERE_3V_CV);
 
         // frequency modulation:
         for (uint8_t lfo = 0; lfo < 3; lfo++) {
-          // Incorporate CV2 with cross-modulation
-          float xmodCombo = 30.0f + xModCV * 100; // Fixed 30% plus 0..100% from CV2
-
           // Calculate cross-frequency modulation factor
-          float crossFreqMod = (xmodCombo / 100.0)
-            * (static_cast<float>(sample[(lfo + 2) % 3]) / HEMISPHERE_3V_CV);
+          float crossFreqMod =
+            crossModScale * static_cast<float>(sample[(lfo + 2) % 3]);
 
           // Combine base frequency, cross-modulation, and CV input
           float freq = DecodeFreq(freqKnob[lfo]);
