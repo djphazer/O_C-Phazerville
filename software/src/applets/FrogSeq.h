@@ -105,10 +105,10 @@ private:
   bool q_select = false;
   int qselect = 0;
 
-  int8_t frog_x = 26;
-  int8_t frog_y = 14;
+  int8_t frog_x = 29;
+  int8_t frog_y = 13;
 
-  int frog_x_reference = 26;
+  int frog_x_reference = 29;
   int frog_y_position = 0;
 
   bool frog_horizontal = false;
@@ -1629,7 +1629,8 @@ void FLASHMEM FrogSeq::Start() {
     collision_ratchet_zap = false;
     collision_ratchet_spacing = 0;
 
-    frog_x = 26;
+    frog_x = 29;
+    frog_x_reference = 29;
     frog_y = FROG_Y[0];
     ResetTraffic();
 
