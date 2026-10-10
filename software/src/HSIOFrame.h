@@ -512,33 +512,6 @@ struct alignas(32) MIDIFrame {
       clock_count = 0;
     }
 
-    // getters for access to mappings
-    uint8_t get_in_assign(int ch) {
-      return mapping[ch].get_type() | mapping[ch].get_subtype();
-    }
-    uint8_t get_in_channel(int ch) {
-      return mapping[ch].get_channel();
-    }
-    int8_t get_in_transpose(int ch) {
-      return mapping[ch].get_transpose();
-    }
-    bool in_in_range(int ch, uint8_t note) {
-      return mapping[ch].InRange(note);
-    }
-
-    uint8_t get_out_assign(int ch) {
-      return outmap[ch].get_type() | outmap[ch].get_subtype();
-    }
-    uint8_t get_out_channel(int ch) {
-      return outmap[ch].get_channel();
-    }
-    int8_t get_out_transpose(int ch) {
-      return outmap[ch].get_transpose();
-    }
-    bool in_out_range(int ch, int note) {
-      return outmap[ch].InRange(note);
-    }
-
     void UpdateMidiChannelFilter() {
         uint16_t filter = 0;
         bool omni = false;
