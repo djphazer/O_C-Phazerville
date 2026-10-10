@@ -1586,6 +1586,12 @@ void AppCaptainMIDI::HandleAppEvent(OC::AppEvent event) {
   if (event == OC::APP_EVENT_RESUME) {
     Resume();
   }
+  if (event == OC::APP_EVENT_FLUSH) {
+    PackSetup(active_setup);
+#ifdef __IMXRT1062__
+    StoreData();  // preset-bus capture: persist CAPTAIN.DAT
+#endif
+  }
 }
 
 FLASHMEM void AppCaptainMIDI::Loop() { DoLoop(); } // deferred (non-ISR) work
