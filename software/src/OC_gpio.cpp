@@ -36,7 +36,11 @@ bool DAC_is_inverted = false;
 #endif
 
 float OC::GetIDVoltage() {
+#ifdef __IMXRT1062__
   return OC::ADC::Read_ID_Voltage();
+#else
+  return 0.f; // no hardware-ID divider on Teensy 3.x boards
+#endif
 }
 int OC::GetIDIndex() {
   if (id_voltage < 0.05f) return 1; // O_C

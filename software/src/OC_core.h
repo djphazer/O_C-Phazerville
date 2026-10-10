@@ -65,9 +65,13 @@ struct Factory {
       if (mask & (1 << i)) continue;
 
       if (!pool[i]) {
+#ifdef __IMXRT1062__
         // use RAM2 first
         void *block = (OC::CORE::FreeRam() > OC::CORE::RAM2_HEADROOM) ? calloc(1, sizeof(T)) : nullptr;
         if (!block) block = extmem_calloc(1, sizeof(T)); // fallback to PSRAM
+#else
+        void *block = calloc(1, sizeof(T));
+#endif
         if (block) pool[i] = new (block) T(); // place new object
         // else cry about it
       }
