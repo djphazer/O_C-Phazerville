@@ -178,6 +178,45 @@ bool save_config(const char* filename, FS &fs)
     return success;
 }
 
+FLASHMEM bool save_filtered(const char* filename, FS &fs,
+                   bool (*pred)(KEY), KEY (*remap)(KEY))
+{
+    SERIAL_PRINTLN("\nSaving filtered config: %s\n", filename);
+
+    // Build filtered/remapped copies; the live map stays untouched.
+    ConfigMap cfg_out, data_out;
+    for (auto &kv : cfg_store) {
+      if (pred && !pred(kv.first)) continue;
+      cfg_out[remap ? remap(kv.first) : kv.first] = kv.second;
+    }
+    for (auto &kv : data_store) {
+      if (pred && !pred(kv.first)) continue;
+      data_out[remap ? remap(kv.first) : kv.first] = kv.second;
+    }
+
+    const char* const TEMPFILE = "PEWPEW.TMP";
+    bool success = true;
+
+    fs.remove(TEMPFILE);
+    dataFile = fs.open(TEMPFILE, FILE_WRITE_BEGIN);
+    if (dataFile) {
+      size_t sz  = save_chunk( 0, "PZ", cfg_out);
+      if (sz) sz = save_chunk(sz, "PX", data_out);
+      dataFile.close();
+      if (!sz) success = false;
+    } else {
+      SERIAL_PRINTLN("PhzConfig: Error opening %s\n", filename);
+      success = false;
+    }
+
+    if (success) {
+      fs.remove(filename);
+      success = fs.rename(TEMPFILE, filename);
+    }
+
+    return success;
+}
+
 bool load_chunk(uint8_t *buf, const char *sig, ConfigMap &store) {
   // quick signature check
   if (buf[0] != sig[0] || buf[1] != sig[1]) return false;

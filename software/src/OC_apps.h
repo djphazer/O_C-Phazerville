@@ -43,11 +43,20 @@ void SaveAppData();
 
 static inline void save_app_data() { SaveAppData(); }
 
+struct AppData;
+void BuildAppData(AppData &data);
+void ApplyAppData(const AppData &data);
+void BuildGlobalSettingsValues();
+void RestoreGlobalSettingsFromConfig(uint8_t scala_loaded_mask = 0);
+// app-container index for an app id; falls back to the current app
+size_t ResolveAppIndexByID(uint16_t app_id);
+
 enum AppEvent {
   APP_EVENT_SUSPEND,
   APP_EVENT_RESUME,
   APP_EVENT_SCREENSAVER_ON,
-  APP_EVENT_SCREENSAVER_OFF
+  APP_EVENT_SCREENSAVER_OFF,
+  APP_EVENT_FLUSH,
 };
 
 // The original "app" interface was built around structs filled with function
