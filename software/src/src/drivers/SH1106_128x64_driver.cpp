@@ -82,8 +82,16 @@ static uint8_t SH1106_init_seq[] = {
   0x0c8,          /* c0: scan dir normal, c8: reverse */
   #endif
   0x0da, 0x012,   /* com pin HW config, sequential com pin config (bit 4), disable left/right remap (bit 5) */
-  0x081, 0x0cf,   /* [2] set contrast control */
-  0x0d9, 0x0f1,   /* [2] pre-charge period 0x022/f1*/
+  // Lower contrast compresses per-pixel brightness differences — matters
+  // for INVERT_DISPLAY builds where a mostly-lit panel shows streaking.
+#ifndef OLED_CONTRAST
+#define OLED_CONTRAST 0x0cf
+#endif
+  0x081, OLED_CONTRAST, /* [2] set contrast control */
+#ifndef OLED_PRECHARGE
+#define OLED_PRECHARGE 0x0f1
+#endif
+  0x0d9, OLED_PRECHARGE, /* [2] pre-charge period 0x022/f1 — affects row uniformity on lit fields */
   0x0db, 0x040,   /* vcomh deselect level */
 
   0x02e,        /* 2012-05-27: Deactivate scroll */
