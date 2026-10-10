@@ -23,6 +23,7 @@
 #ifdef PEWPEWPEW
 #include "../util/pewpewsplash.h"
 #endif
+#include "../PhzConfig.h"
 
 extern "C" void _reboot_Teensyduino_();
 void BootMenu(const bool show);
@@ -630,7 +631,7 @@ public:
     }
 };
 
-void AppSettings::Init() {
+FLASHMEM void AppSettings::Init() {
     BaseStart();
 }
 
@@ -642,7 +643,7 @@ void AppSettings::Process(OC::IOFrame *ioframe) {
   BaseController(ioframe);
 }
 
-void AppSettings::HandleAppEvent(OC::AppEvent event) {
+FLASHMEM void AppSettings::HandleAppEvent(OC::AppEvent event) {
   if (event == OC::APP_EVENT_RESUME) {
     Resume();
   }
@@ -662,11 +663,11 @@ void AppSettings::GetIOConfig(OC::IOConfig &ioconfig) const
 }
 void AppSettings::DrawDebugInfo() const { }
 
-void AppSettings::DrawMenu() const {
+FLASHMEM void AppSettings::DrawMenu() const {
     BaseView();
 }
 
-void AppSettings::DrawScreensaver() const {
+FLASHMEM void AppSettings::DrawScreensaver() const {
 #ifdef PEWPEWPEW
     for (int i = 0; i < (pewpew_width * pewpew_height / 64); ++i) {
       // TODO: the problem here is that one byte in XBM is a row of 8 pixels,
@@ -677,10 +678,10 @@ void AppSettings::DrawScreensaver() const {
   ZapScreensaver();
 }
 
-void AppSettings::HandleButtonEvent(const UI::Event &event) {
+FLASHMEM void AppSettings::HandleButtonEvent(const UI::Event &event) {
   HandleUiEvent(event);
 }
 
-void AppSettings::HandleEncoderEvent(const UI::Event &event) {
+FLASHMEM void AppSettings::HandleEncoderEvent(const UI::Event &event) {
   HandleUiEvent(event);
 }
