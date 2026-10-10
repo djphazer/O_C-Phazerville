@@ -1,8 +1,48 @@
 #pragma once
 
+// F32-native: source select, level VCA, and the output routing matrix run on
+// float32 blocks (AudioMixerF32 / AudioVCA_F32), so the level CV reaches the
+// VCAs at full float precision instead of q15 and the selected source is
+// never requantized between stages; peak metering reads the float blocks
+// (AudioAnalyzePeakF32). The hardware/USB int16 sources convert to float
+// once at dedicated edge adapters, and the chain still sees int16 via the
+// HemisphereAudioAppletF32 edge adapters. Params, ranges, and UI are
+// unchanged.
+
+#include "../HemisphereAudioAppletF32.h"
+#include "../Audio/AudioVCA_F32.h"
+#include "../Audio/AudioMixerF32.h"
+#include "../Audio/AudioAnalyzePeakF32.h"
+#include "../Audio/InterpolatingStreamF32.h"
+
 template <AudioChannels Channels>
-class InputApplet : public HemisphereAudioApplet {
+class InputApplet : public HemisphereAudioAppletF32<Channels> {
 public:
+  // this class template has a dependent base, so inherited names need
+  // explicit import
+  using Base = HemisphereAudioAppletF32<Channels>;
+  using Base::PatchCable;
+  using Base::PatchCableF32;
+  using Base::InputF32;
+  using Base::OutputF32;
+  using Base::AllowRestart;
+  using Base::hemisphere;
+  using Base::CONFIG_SIZE;
+  using Base::LVL_MIN_DB;
+  using Base::LVL_MAX_DB;
+  using Base::gfxPrint;
+  using Base::gfxPrintDb;
+  using Base::gfxCursor;
+  using Base::gfxInvert;
+  using Base::gfxStartCursor;
+  using Base::gfxEndCursor;
+  using Base::gfxDisplayInputMapEditor;
+  using Base::CheckEditInputMapPress;
+  using Base::CursorToggle;
+  using Base::EditMode;
+  using Base::MoveCursor;
+  using Base::EditSelectedInputMap;
+
   const uint64_t applet_id() override {
     return strhash("Input");
   }
@@ -16,25 +56,27 @@ public:
     }
 
     ForEachChannel(ch) {
-      PatchCable(OC::AudioIO::InputStream(0), ch, srcmix[ch], 0);
+      PatchCable(OC::AudioIO::InputStream(0), ch, i2s_conv, ch);
+      PatchCableF32(i2s_conv, ch, srcmix[ch], 0);
 #ifdef AUDIO_INTERFACE
-      PatchCable(OC::AudioIO::InputStream(1), ch, srcmix[ch], 1);
+      PatchCable(OC::AudioIO::InputStream(1), ch, usb_conv, ch);
+      PatchCableF32(usb_conv, ch, srcmix[ch], 1);
 #endif
 
       attenuations[ch].Method(INTERPOLATION_LINEAR);
       attenuations[ch].Acquire();
-      PatchCable(srcmix[ch], 0, vcas[ch], 0);
-      PatchCable(attenuations[ch], 0, vcas[ch], 1);
+      PatchCableF32(srcmix[ch], 0, vcas[ch], 0);
+      PatchCableF32(attenuations[ch], 0, vcas[ch], 1);
 
-      PatchCable(srcmix[ch], 0, peakmeter[ch], 0);
+      PatchCableF32(srcmix[ch], 0, peakmeter[ch], 0);
     }
 
     for (int i = 0; i < Channels; ++i) {
       ForEachChannel(ch) {
-        PatchCable(vcas[ch], 0, mixer[i], ch);
+        PatchCableF32(vcas[ch], 0, mixer[i], ch);
       }
-      PatchCable(passthru, i, mixer[i], 2);
-      PatchCable(mixer[i], 0, output, i);
+      PatchCableF32(InputF32(), i, mixer[i], 2);
+      PatchCableF32(mixer[i], 0, OutputF32(), i);
 
       mixer[i].gain(0, 0.0); // Left to i
       mixer[i].gain(1, 0.0); // Right to i
@@ -51,7 +93,7 @@ public:
   }
   void Controller() override {
     ForEachChannel(ch) {
-      attenuations[ch].Push(float_to_q15(level_cv.InF(1.0)));
+      attenuations[ch].Push(level_cv.InF(1.0));
     }
   }
   void View() override {
@@ -129,16 +171,8 @@ public:
     UpdateMix();
   }
 
-  AudioStream* InputStream() override {
-    return &passthru;
-  }
-  AudioStream* OutputStream() override {
-    return &output;
-  }
-
   void UpdateMix() {
     float lvl_scalar = level < LVL_MIN_DB ? 0.0f : dbToScalar(level); // * level_cv.InF(1.0f);
-    //q15_t lvl = float_to_q15(lvl_scalar);
 
     ForEachChannel(ch) {
       switch (modesel_) {
@@ -200,13 +234,15 @@ protected:
   void SetHelp() override {}
 
 private:
-  AudioPassthrough<Channels> passthru;
-  std::array<InterpolatingStream<>, 2> attenuations;
-  std::array<AudioVCA, 2> vcas;
-  AudioMixer<2> srcmix[2];
-  AudioMixer<3> mixer[Channels];
-  AudioPassthrough<Channels> output;
-  AudioAnalyzePeak peakmeter[2];
+  AudioConvertI16toF32Multi<2> i2s_conv;
+#ifdef AUDIO_INTERFACE
+  AudioConvertI16toF32Multi<2> usb_conv;
+#endif
+  std::array<InterpolatingStreamF32<>, 2> attenuations;
+  std::array<AudioVCA_F32, 2> vcas;
+  AudioMixerF32<2> srcmix[2];
+  AudioMixerF32<3> mixer[Channels];
+  AudioAnalyzePeakF32 peakmeter[2];
 
   int8_t modesel_ = DUAL;
   int8_t level = 0;

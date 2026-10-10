@@ -189,13 +189,15 @@ public:
         if (in) release(in);
     }
 
+public:
+    // 256-entry Q15 Hann window LUT: round(sin²(π×i/255) × 32767), i = 0..255.
+    // const static → placed in .rodata (flash) by the linker. 512 bytes, zero SRAM cost.
+    // Public so the float32 port (AudioEffectCloudsF32) shares the same table.
+    static const int16_t hann_lut_[256];
+
 private:
     // Equal-power normalisation for up to 16 grains. 1/sqrt(16) = 0.25.
     static constexpr float GRAIN_SCALE = 0.25f;
-
-    // 256-entry Q15 Hann window LUT: round(sin²(π×i/255) × 32767), i = 0..255.
-    // const static → placed in .rodata (flash) by the linker. 512 bytes, zero SRAM cost.
-    static const int16_t hann_lut_[256];
 
     struct Grain {
         bool   active        = false;

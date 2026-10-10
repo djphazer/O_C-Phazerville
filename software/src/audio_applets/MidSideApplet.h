@@ -1,6 +1,11 @@
 #pragma once
 
-class MidSideApplet : public HemisphereAudioApplet {
+#include "HemisphereAudioAppletF32.h"
+#include "extern/f32/AudioMixer_F32.h"
+
+// F32-native: the M/S gain matrix runs in float32 end to end inside the
+// applet; the chain still sees int16 via the base class edge adapters.
+class MidSideApplet : public HemisphereAudioAppletF32<STEREO> {
 public:
   const char* applet_name() {
     return "Mid/Side";
@@ -8,9 +13,9 @@ public:
 
   void Start() override {
     ForEachChannel(to) {
-      PatchCable(mixers[to], 0, output, to);
+      PatchCableF32(mixers[to], 0, OutputF32(), to);
       ForEachChannel(from) {
-        PatchCable(input, from, mixers[to], from);
+        PatchCableF32(InputF32(), from, mixers[to], from);
       }
     }
     SetGain(gain);
@@ -36,14 +41,6 @@ public:
     SetGain(gain);
   }
 
-  AudioStream* InputStream() override {
-    return &input;
-  }
-
-  AudioStream* OutputStream() override {
-    return &output;
-  }
-
   void SetGain(int8_t new_gain) {
     gain = constrain(new_gain, -90, 90);
     float scalar = dbToScalar(gain);
@@ -60,7 +57,5 @@ protected:
 private:
   int8_t gain = -6; // in dB
 
-  AudioPassthrough<2> input;
-  std::array<AudioMixer<2>, 2> mixers;
-  AudioPassthrough<2> output;
+  std::array<AudioMixer4_F32, 2> mixers;
 };

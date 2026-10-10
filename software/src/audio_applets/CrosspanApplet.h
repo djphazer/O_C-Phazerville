@@ -1,6 +1,18 @@
 #pragma once
 
-class CrosspanApplet : public HemisphereAudioApplet {
+// F32-native: the four-VCA crossfade matrix and output mix run on float32
+// blocks (AudioVCA_F32 / AudioMixerF32), so the equal-power/equal-amplitude
+// pan curves reach the VCAs at full float precision instead of q15 and the
+// crossfaded sum never requantizes to int16 between stages. The chain still
+// sees int16 via the HemisphereAudioAppletF32 edge adapters. Params, ranges,
+// and UI are unchanged.
+
+#include "../HemisphereAudioAppletF32.h"
+#include "../Audio/AudioVCA_F32.h"
+#include "../Audio/AudioMixerF32.h"
+#include "../Audio/InterpolatingStreamF32.h"
+
+class CrosspanApplet : public HemisphereAudioAppletF32<STEREO> {
 public:
   const char* applet_name() {
     return "Crosspan";
@@ -18,23 +30,23 @@ public:
       }
     }
 
-    PatchCable(input, 0, vcas[0][0], 0);
-    PatchCable(input, 0, vcas[0][1], 0);
-    PatchCable(input, 1, vcas[1][0], 0);
-    PatchCable(input, 1, vcas[1][1], 0);
+    PatchCableF32(InputF32(), 0, vcas[0][0], 0);
+    PatchCableF32(InputF32(), 0, vcas[0][1], 0);
+    PatchCableF32(InputF32(), 1, vcas[1][0], 0);
+    PatchCableF32(InputF32(), 1, vcas[1][1], 0);
 
-    PatchCable(attenuations[0], 0, vcas[0][0], 1);
-    PatchCable(attenuations[0], 0, vcas[1][1], 1);
-    PatchCable(attenuations[1], 0, vcas[0][1], 1);
-    PatchCable(attenuations[1], 0, vcas[1][0], 1);
+    PatchCableF32(attenuations[0], 0, vcas[0][0], 1);
+    PatchCableF32(attenuations[0], 0, vcas[1][1], 1);
+    PatchCableF32(attenuations[1], 0, vcas[0][1], 1);
+    PatchCableF32(attenuations[1], 0, vcas[1][0], 1);
 
-    PatchCable(vcas[0][0], 0, mixers[0], 0);
-    PatchCable(vcas[0][1], 0, mixers[1], 0);
-    PatchCable(vcas[1][0], 0, mixers[0], 1);
-    PatchCable(vcas[1][1], 0, mixers[1], 1);
+    PatchCableF32(vcas[0][0], 0, mixers[0], 0);
+    PatchCableF32(vcas[0][1], 0, mixers[1], 0);
+    PatchCableF32(vcas[1][0], 0, mixers[0], 1);
+    PatchCableF32(vcas[1][1], 0, mixers[1], 1);
 
-    PatchCable(mixers[0], 0, output, 0);
-    PatchCable(mixers[1], 0, output, 1);
+    PatchCableF32(mixers[0], 0, OutputF32(), 0);
+    PatchCableF32(mixers[1], 0, OutputF32(), 1);
 
     AllowRestart();
   }
@@ -53,8 +65,8 @@ public:
       out = 1.0f - total_crosspan;
       in = total_crosspan;
     }
-    attenuations[0].Push(float_to_q15(out));
-    attenuations[1].Push(float_to_q15(in));
+    attenuations[0].Push(out);
+    attenuations[1].Push(in);
   }
 
   void View() override {
@@ -114,14 +126,6 @@ public:
     UnpackPackables(data, crosspan, crosspan_cv, pack<1>(xfade_shape));
   }
 
-  AudioStream* InputStream() override {
-    return &input;
-  }
-
-  AudioStream* OutputStream() override {
-    return &output;
-  }
-
 protected:
   void SetHelp() override {}
 
@@ -132,9 +136,7 @@ private:
   CVInputMap crosspan_cv;
   XfadeShape xfade_shape;
 
-  AudioPassthrough<2> input;
-  std::array<InterpolatingStream<>, 2> attenuations;
-  std::array<std::array<AudioVCA, 2>, 2> vcas;
-  std::array<AudioMixer<2>, 2> mixers;
-  AudioPassthrough<2> output;
+  std::array<InterpolatingStreamF32<>, 2> attenuations;
+  std::array<std::array<AudioVCA_F32, 2>, 2> vcas;
+  std::array<AudioMixerF32<2>, 2> mixers;
 };

@@ -2,23 +2,30 @@
 // Authored by Ivan Cohen
 // modified by djphazer
 
-#include "../src/Audio/effect_phaser.h"
+// F32-native: the six TPT all-pass stages, the zero-delay feedback path, and
+// the dry/wet mix run on float32 blocks (see effect_phaser_F32.h); the chain
+// still sees int16 via the HemisphereAudioAppletF32 edge adapters.
+
+#include "../HemisphereAudioAppletF32.h"
+#include "../extern/f32/AudioMixer_F32.h"
+#include "../Audio/effect_phaser_F32.h"
 
 // MONO only... for now
-class PhazerApplet : public HemisphereAudioApplet {
+class PhazerApplet : public HemisphereAudioAppletF32<MONO> {
 public:
   const char* applet_name() {
     return "Phazer";
   }
   void Start() override {
-    if (!phaser && OC::CORE::FreeRam() > (int)sizeof(AudioEffectPhazer)) {
-      phaser = new AudioEffectPhazer();
+    if (!phaser && OC::CORE::FreeRam() > (int)sizeof(AudioEffectPhazerF32)) {
+      phaser = new AudioEffectPhazerF32();
     }
     if (!phaser) return;
 
-    PatchCable(input, 0, dry_wet_mixer, 1);
-    PatchCable(input, 0, *phaser, 0);
-    PatchCable(*phaser, 0, dry_wet_mixer, 0);
+    PatchCableF32(InputF32(), 0, dry_wet_mixer, 1);
+    PatchCableF32(InputF32(), 0, *phaser, 0);
+    PatchCableF32(*phaser, 0, dry_wet_mixer, 0);
+    PatchCableF32(dry_wet_mixer, 0, OutputF32(), 0);
 
     dry_wet_mixer.gain(1, 1.0f);
   }
@@ -147,13 +154,6 @@ public:
     }
   }
 
-  AudioStream* InputStream() override {
-    return &input;
-  }
-  AudioStream* OutputStream() override {
-    return &dry_wet_mixer;
-  }
-
 protected:
   void SetHelp() override {}
 
@@ -172,10 +172,9 @@ private:
   static constexpr int MAX_RATE = 100;
 
   int8_t cursor = DEPTH;
-  AudioPassthrough<MONO> input;
 
-  AudioEffectPhazer* phaser;
-  AudioMixer<2> dry_wet_mixer;
+  AudioEffectPhazerF32* phaser = nullptr;
+  AudioMixer4_F32 dry_wet_mixer;
 
   uint8_t mix = 50; // 0 to 100 %
   uint8_t depth = 50; // 0 to 100%

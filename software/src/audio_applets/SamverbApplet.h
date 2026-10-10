@@ -1,6 +1,16 @@
-#include "../Audio/effect_reverb_schroeder.h"
+#pragma once
 
-class BungverbApplet : public HemisphereAudioApplet {
+// F32-native: the Schroeder reverb's comb/allpass state was already float
+// internally; now the wet path, post-filter, and dry/wet mix stay float32
+// end to end inside the applet (see effect_reverb_schroeder_F32.h). The
+// chain still sees int16 via the HemisphereAudioAppletF32 edge adapters.
+
+#include "../HemisphereAudioAppletF32.h"
+#include "../extern/f32/AudioMixer_F32.h"
+#include "../Audio/effect_reverb_schroeder_F32.h"
+#include "../Audio/filter_variable2_F32.h"
+
+class BungverbApplet : public HemisphereAudioAppletF32<MONO> {
     public:
         const char* applet_name() {
             return "Bungverb";
@@ -9,11 +19,12 @@ class BungverbApplet : public HemisphereAudioApplet {
             if (!reverb) {
               reverb = GetBungverb();
             }
-            PatchCable(input, 0, dry_wet_mixer, 1);
+            PatchCableF32(InputF32(), 0, dry_wet_mixer, 1);
+            PatchCableF32(dry_wet_mixer, 0, OutputF32(), 0);
             if (!reverb) return;
-            PatchCable(input, 0, *reverb, 0);
-            PatchCable(*reverb, 0, filter, 0);
-            PatchCable(filter, 0, dry_wet_mixer, 0);
+            PatchCableF32(InputF32(), 0, *reverb, 0);
+            PatchCableF32(*reverb, 0, filter, 0);
+            PatchCableF32(filter, 0, dry_wet_mixer, 0);
         }
         void Unload() override {
           if (reverb) ReleaseBungverb(reverb);
@@ -76,10 +87,10 @@ class BungverbApplet : public HemisphereAudioApplet {
             gfxStartCursor();
             graphics.printf("%3d%%", mix);
             gfxEndCursor(cursor == MIX);
-            
+
             gfxStartCursor();
             gfxPrint(mix_cv);
-            gfxEndCursor(cursor == MIX_CV, false, mix_cv.InputName());  
+            gfxEndCursor(cursor == MIX_CV, false, mix_cv.InputName());
 
             gfxDisplayInputMapEditor();
         }
@@ -108,7 +119,7 @@ class BungverbApplet : public HemisphereAudioApplet {
             return;
           CursorToggle();
         }
-        
+
         void OnEncoderMove(int direction) override {
             if (!EditMode()) {
                 MoveCursor(cursor, direction, MIX_CV);
@@ -147,15 +158,9 @@ class BungverbApplet : public HemisphereAudioApplet {
             }
         }
 
-        AudioStream* InputStream() override {
-            return &input;
-        }
-        AudioStream* OutputStream() override {
-            return &dry_wet_mixer;
-        }
     protected:
         void SetHelp() override {}
-    
+
     private:
         enum Cursor: int8_t {
             DECAY_TIME,
@@ -169,12 +174,11 @@ class BungverbApplet : public HemisphereAudioApplet {
         };
 
         int8_t cursor = DECAY_TIME;
-        AudioPassthrough<MONO> input;
 
-        AudioEffectReverbSchroeder* reverb;
-        AudioFilterStateVariable2 filter;
+        AudioEffectReverbSchroederF32* reverb = nullptr;
+        AudioFilterStateVariable2F32 filter;
 
-        AudioMixer<2> dry_wet_mixer;
+        AudioMixer4_F32 dry_wet_mixer;
 
         int8_t mix = 50;
         float decay_time = 1.0f;

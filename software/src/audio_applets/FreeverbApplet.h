@@ -1,6 +1,15 @@
-#include <synth_waveform.h>
+#pragma once
 
-class ReverbApplet : public HemisphereAudioApplet {
+// F32-native: Freeverb's comb/allpass recirculation, the post-filter, and the
+// dry/wet mix stay float32 inside the applet (see effect_freeverb_F32.h); the
+// chain still sees int16 via the HemisphereAudioAppletF32 edge adapters.
+
+#include "../HemisphereAudioAppletF32.h"
+#include "../extern/f32/AudioMixer_F32.h"
+#include "../Audio/effect_freeverb_F32.h"
+#include "../Audio/filter_variable2_F32.h"
+
+class ReverbApplet : public HemisphereAudioAppletF32<MONO> {
     public:
         const char* applet_name() {
             return "Reverb";
@@ -9,11 +18,12 @@ class ReverbApplet : public HemisphereAudioApplet {
             if (!reverb) {
               reverb = GetFreeverb();
             }
-            PatchCable(input, 0, dry_wet_mixer, 1);
+            PatchCableF32(InputF32(), 0, dry_wet_mixer, 1);
+            PatchCableF32(dry_wet_mixer, 0, OutputF32(), 0);
             if (!reverb) return;
-            PatchCable(input, 0, *reverb, 0);
-            PatchCable(*reverb, 0, filter, 0);
-            PatchCable(filter, 0, dry_wet_mixer, 0);
+            PatchCableF32(InputF32(), 0, *reverb, 0);
+            PatchCableF32(*reverb, 0, filter, 0);
+            PatchCableF32(filter, 0, dry_wet_mixer, 0);
         }
         void Unload() override {
           if (reverb) ReleaseFreeverb(reverb);
@@ -76,10 +86,10 @@ class ReverbApplet : public HemisphereAudioApplet {
             gfxStartCursor();
             graphics.printf("%3d%%", mix);
             gfxEndCursor(cursor == MIX);
-            
+
             gfxStartCursor();
             gfxPrint(mix_cv);
-            gfxEndCursor(cursor == MIX_CV, false, mix_cv.InputName());  
+            gfxEndCursor(cursor == MIX_CV, false, mix_cv.InputName());
 
             gfxDisplayInputMapEditor();
         }
@@ -106,7 +116,7 @@ class ReverbApplet : public HemisphereAudioApplet {
             return;
           CursorToggle();
         }
-        
+
         void OnEncoderMove(int direction) override {
             if (!EditMode()) {
                 MoveCursor(cursor, direction, MIX_CV);
@@ -145,15 +155,9 @@ class ReverbApplet : public HemisphereAudioApplet {
             }
         }
 
-        AudioStream* InputStream() override {
-            return &input;
-        }
-        AudioStream* OutputStream() override {
-            return &dry_wet_mixer;
-        }
     protected:
         void SetHelp() override {}
-    
+
     private:
         enum Cursor: int8_t {
             SIZE,
@@ -167,12 +171,11 @@ class ReverbApplet : public HemisphereAudioApplet {
         };
 
         int8_t cursor = SIZE;
-        AudioPassthrough<MONO> input;
 
-        AudioEffectFreeverb* reverb;
-        AudioFilterStateVariable2 filter;
+        AudioEffectFreeverbF32* reverb = nullptr;
+        AudioFilterStateVariable2F32 filter;
 
-        AudioMixer<2> dry_wet_mixer;
+        AudioMixer4_F32 dry_wet_mixer;
 
         int8_t mix = 50;
         int8_t size = 50;

@@ -1,15 +1,43 @@
+#pragma once
+
+// F32-native: the ladder filter model (already float inside) now gets float32
+// blocks in and out, so filtered audio never quantizes to int16 within the
+// applet; the chain still sees int16 via the HemisphereAudioAppletF32 edge
+// adapters.
+
+#include "../HemisphereAudioAppletF32.h"
+#include "../Audio/filter_ladder_F32.h"
+
 template <AudioChannels Channels>
-class LadderApplet : public HemisphereAudioApplet {
+class LadderApplet : public HemisphereAudioAppletF32<Channels> {
 
 public:
+  // The base class chain is dependent on Channels, so inherited names need
+  // explicit import for unqualified use.
+  using Base = HemisphereAudioAppletF32<Channels>;
+  using Base::CONFIG_SIZE;
+  using Base::PatchCableF32;
+  using Base::InputF32;
+  using Base::OutputF32;
+  using Base::CheckEditInputMapPress;
+  using Base::CursorToggle;
+  using Base::EditMode;
+  using Base::EditSelectedInputMap;
+  using Base::MoveCursor;
+  using Base::gfxPrint;
+  using Base::gfxPrintPitchHz;
+  using Base::gfxStartCursor;
+  using Base::gfxEndCursor;
+  using Base::gfxDisplayInputMapEditor;
+
   const char* applet_name() {
     return "LadderLPF";
   }
 
   void Start() {
     for (int i = 0; i < Channels; i++) {
-      PatchCable(input, i, filters[i], 0);
-      PatchCable(filters[i], 0, output, i);
+      PatchCableF32(InputF32(), i, filters[i], 0);
+      PatchCableF32(filters[i], 0, OutputF32(), i);
     }
   }
 
@@ -114,13 +142,6 @@ public:
     UnpackPackables(data[1], pitch_cv, res_cv, gain_cv, pitch_cv2);
   }
 
-  AudioStream* InputStream() override {
-    return &input;
-  }
-  AudioStream* OutputStream() override {
-    return &output;
-  }
-
 protected:
   void SetHelp() override {}
 
@@ -135,7 +156,5 @@ private:
   CVInputMap res_cv;
   CVInputMap gain_cv;
 
-  AudioPassthrough<Channels> input;
-  std::array<AudioFilterLadder, Channels> filters;
-  AudioPassthrough<Channels> output;
+  std::array<AudioFilterLadderF32, Channels> filters;
 };
