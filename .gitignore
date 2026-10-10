@@ -16,3 +16,4 @@ builds
 compile_commands.json
 *.hex
 *.swp
+__pycache__/

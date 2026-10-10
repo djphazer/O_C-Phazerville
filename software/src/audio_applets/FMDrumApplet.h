@@ -1,15 +1,24 @@
 #pragma once
 
-#include "synth_waveform.h"
-#include "synth_whitenoise.h"
-#include "../src/Audio/filter_variable2.h"
+// F32-native: the PM drum voice (modulator -> FM-index VCA -> carrier), the
+// noise chain (white noise -> state-variable HPF -> VCA), and the output mix
+// run on float32 blocks, so the FM-index/amplitude/noise envelopes reach
+// their VCAs at full float precision instead of q15 and nothing requantizes
+// to int16 between stages. The chain still sees int16 via the
+// HemisphereAudioAppletF32 edge adapters. Params, ranges, and UI are
+// unchanged.
 
-class FMDrumApplet : public HemisphereAudioApplet {
+#include "../HemisphereAudioAppletF32.h"
+#include "../Audio/synth_waveform_F32.h"
+#include "../Audio/synth_whitenoise_F32.h"
+#include "../Audio/filter_variable2_F32.h"
+#include "../Audio/AudioMixerF32.h"
+#include "../Audio/InterpolatingStreamF32.h"
+#include "../Audio/AudioVCA_F32.h"
+
+class FMDrumApplet : public HemisphereAudioAppletF32<MONO> {
 public:
     const char* applet_name() { return "FMDrum"; }
-
-    AudioStream* InputStream()  override { return &input_stream; }
-    AudioStream* OutputStream() override { return &output_mixer; }
 
     void Start() override {
         // Acquire interpolating streams
@@ -56,28 +65,29 @@ public:
 
         // --- Cable routing ---
         // FM chain
-        PatchCable(modulator,       0, mod_vca,      0);
-        PatchCable(fm_idx_stream,   0, mod_vca,      1);
-        PatchCable(mod_vca,         0, carrier,      0);  // PM mod input
+        PatchCableF32(modulator,       0, mod_vca,      0);
+        PatchCableF32(fm_idx_stream,   0, mod_vca,      1);
+        PatchCableF32(mod_vca,         0, carrier,      0);  // PM mod input
 
         // Carrier → amp envelope → mixer ch0
-        PatchCable(carrier,         0, amp_vca,      0);
-        PatchCable(amp_env_stream,  0, amp_vca,      1);
-        PatchCable(amp_vca,         0, output_mixer, 0);
+        PatchCableF32(carrier,         0, amp_vca,      0);
+        PatchCableF32(amp_env_stream,  0, amp_vca,      1);
+        PatchCableF32(amp_vca,         0, output_mixer, 0);
 
         // Noise chain: noise → HPF → noise VCA → mixer ch1
-        PatchCable(noise_gen,       0, noise_hpf,    0);
-        PatchCable(noise_hpf,       2, noise_vca,    0);  // output 2 = HP
-        PatchCable(noise_env_stream,0, noise_vca,    1);
-        PatchCable(noise_vca,       0, output_mixer, 1);
+        PatchCableF32(noise_gen,       0, noise_hpf,    0);
+        PatchCableF32(noise_hpf,       2, noise_vca,    0);  // output 2 = HP
+        PatchCableF32(noise_env_stream,0, noise_vca,    1);
+        PatchCableF32(noise_vca,       0, output_mixer, 1);
 
         // Passthrough: audio in → mixer ch2 (level via mixer gain)
-        PatchCable(input_stream,    0, output_mixer, 2);
+        PatchCableF32(InputF32(),      0, output_mixer, 2);
+        PatchCableF32(output_mixer,    0, OutputF32(),  0);
 
         // Prime streams to silence
-        fm_idx_stream.Push(float_to_q15(0.0f));
-        amp_env_stream.Push(float_to_q15(0.0f));
-        noise_env_stream.Push(float_to_q15(0.0f));
+        fm_idx_stream.Push(0.0f);
+        amp_env_stream.Push(0.0f);
+        noise_env_stream.Push(0.0f);
     }
 
     void Unload() override {
@@ -148,12 +158,9 @@ public:
         modulator.frequency(constrain(carrier_hz * eff_rto * 0.1f, 1.f, 20000.f));
 
         // --- Push envelope values to audio streams ---
-        fm_idx_stream.Push(
-            float_to_q15(constrain(fm_env * eff_fmi * 0.01f, 0.f, 1.f)));
-        amp_env_stream.Push(
-            float_to_q15(constrain(amp_env, 0.f, 1.f)));
-        noise_env_stream.Push(
-            float_to_q15(constrain(noise_env, 0.f, 1.f)));
+        fm_idx_stream.Push(constrain(fm_env * eff_fmi * 0.01f, 0.f, 1.f));
+        amp_env_stream.Push(constrain(amp_env, 0.f, 1.f));
+        noise_env_stream.Push(constrain(noise_env, 0.f, 1.f));
 
         // --- Mixer gains: drum scales with mix, passthrough inversely ---
         float mix_gain = eff_mix * 0.01f;
@@ -327,18 +334,17 @@ private:
     uint8_t preset_idx  = 9;  // 9 = sentinel "---": params from savestate, not a named preset (NUM_PRESETS=8, Rnd=8, None=9)
 
     // --- Audio objects ---
-    AudioPassthrough<MONO>       input_stream;
-    AudioSynthWaveform           modulator;
-    InterpolatingStream<>        fm_idx_stream;
-    AudioVCA                     mod_vca;
-    AudioSynthWaveformModulated  carrier;
-    InterpolatingStream<>        amp_env_stream;
-    AudioVCA                     amp_vca;
-    AudioSynthNoiseWhite         noise_gen;
-    AudioFilterStateVariable2    noise_hpf;
-    InterpolatingStream<>        noise_env_stream;
-    AudioVCA                     noise_vca;
-    AudioMixer<3>                output_mixer;
+    AudioSynthWaveformF32           modulator;
+    InterpolatingStreamF32<>        fm_idx_stream;
+    AudioVCA_F32                    mod_vca;
+    AudioSynthWaveformModulatedF32  carrier;
+    InterpolatingStreamF32<>        amp_env_stream;
+    AudioVCA_F32                    amp_vca;
+    AudioSynthNoiseWhiteF32         noise_gen;
+    AudioFilterStateVariable2F32    noise_hpf;
+    InterpolatingStreamF32<>        noise_env_stream;
+    AudioVCA_F32                    noise_vca;
+    AudioMixerF32<3>                output_mixer;
 
     // --- Preset system ---
     struct FMDrumPreset {
