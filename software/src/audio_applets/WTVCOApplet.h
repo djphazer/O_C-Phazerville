@@ -1,6 +1,19 @@
 #pragma once
 
-class WTVCOApplet : public HemisphereAudioApplet {
+// F32-native: the wavetable oscillator, blend interpolation, VCA, and output
+// mix run on float32 blocks (see synth_waveform_F32.h). The wavetables store
+// float, so blended/held slices never truncate to int16 and the arbitrary-
+// waveform readout interpolates in full float precision. The chain still sees
+// int16 via the HemisphereAudioAppletF32 edge adapters. Params, ranges, and
+// UI are unchanged.
+
+#include "../HemisphereAudioAppletF32.h"
+#include "../extern/f32/AudioMixer_F32.h"
+#include "../Audio/synth_waveform_F32.h"
+#include "../Audio/InterpolatingStreamF32.h"
+#include "../Audio/AudioVCA_F32.h"
+
+class WTVCOApplet : public HemisphereAudioAppletF32<MONO> {
 public:
     const char* applet_name() {
         return "WTVCO";
@@ -22,11 +35,11 @@ public:
         vca_cv.Method(INTERPOLATION_LINEAR);
         vca.rectify(true);
 
-        PatchCable(input_stream, 0, mixer, 0);
-        PatchCable(vca_cv, 0, vca, 1);
-        PatchCable(synth, 0, vca, 0);
-        PatchCable(vca, 0, mixer, 1);
-        PatchCable(mixer, 0, output_stream, 0);
+        PatchCableF32(InputF32(), 0, mixer, 0);
+        PatchCableF32(vca_cv, 0, vca, 1);
+        PatchCableF32(synth, 0, vca, 0);
+        PatchCableF32(vca, 0, mixer, 1);
+        PatchCableF32(mixer, 0, OutputF32(), 0);
 
         mixer.gain(0, 1.0f);
         mixer.gain(1, 1.0f);
@@ -52,7 +65,7 @@ public:
             vca.bias(0.0f);
             vca.level(gain);
             float cv = level_cv.InF();
-            vca_cv.Push(float_to_q15(cv * cv));
+            vca_cv.Push(cv * cv);
         } else {
             vca.bias(gain);
             vca.level(0.0f);
@@ -178,13 +191,6 @@ public:
         for (int w = A; w <= C; ++w) GenerateWaveTable(w);
     }
 
-    AudioStream* InputStream() override {
-        return &input_stream;
-    }
-    AudioStream* OutputStream() override {
-        return &output_stream;
-    };
-
 protected:
     void SetHelp() override {}
 
@@ -237,12 +243,10 @@ private:
     CVInputMap level_cv;
     CVInputMap mix_cv;
 
-    AudioPassthrough<MONO> input_stream;
-    AudioSynthWaveform synth;
-    InterpolatingStream<> vca_cv;
-    AudioVCA vca;
-    AudioMixer<2> mixer;
-    AudioPassthrough<MONO> output_stream;
+    AudioSynthWaveformF32 synth;
+    InterpolatingStreamF32<> vca_cv;
+    AudioVCA_F32 vca;
+    AudioMixer4_F32 mixer;
 
     int cursor = 0;  // WTVCO_Cursor
 
@@ -265,7 +269,7 @@ private:
     int raw_wave_count = 0;
 
     WaveForms waveform[3];  // selected waveform name
-    int16_t wavetable[4][WT_SIZE];  // audio data. had to upsize to 16 bit from 8 to use the AudioSynthWaveform().arbitraryWaveform
+    float wavetable[4][WT_SIZE];  // audio data, float32 (full precision through blend/hold)
     uint8_t userwave[3] = {0, 0, 0};  // for custom waves in an SD card
 
 // GRAPHIC STUFF:
@@ -276,7 +280,7 @@ private:
 
     void gfxRenderWave(const int w) {
         for (int x = 0; x < WT_SIZE; x += 4) {
-            uint8_t y = 44 - Proportion(wavetable[w][x], 32767, 16);
+            uint8_t y = 44 - static_cast<int>(wavetable[w][x] * 16.0f);
             gfxPixel(x / 4, y);
         }
     }
@@ -422,18 +426,26 @@ private:
     }
 
 // WAVETABLE STUFF:
-    void InterpolateSample(int16_t* wt, const int blend, uint8_t sample) {
+    void InterpolateSample(float* wt, int blend, uint8_t sample) {
         uint8_t s = sample * (1 - 2 * osc_rev) + (255 * osc_rev);
-        wt[s] = (((blend <= 127) * ((127 - blend) * (int)wavetable[A][sample] + blend * (int)wavetable[B][sample]))
-                + ((blend > 127) * ((255 - blend) * (int)wavetable[B][sample] + (blend - 128) * (int)wavetable[C][sample]))) / 127;
+        // same A/B/C crossfade coefficients as the int16 original, in float;
+        // CV-pushed blend clamps instead of wrapping through int16
+        CONSTRAIN(blend, 0, 255);
+        if (blend <= 127) {
+            wt[s] = (static_cast<float>(127 - blend) * wavetable[A][sample]
+                   + static_cast<float>(blend) * wavetable[B][sample]) * (1.0f / 127.0f);
+        } else {
+            wt[s] = (static_cast<float>(255 - blend) * wavetable[B][sample]
+                   + static_cast<float>(blend - 128) * wavetable[C][sample]) * (1.0f / 127.0f);
+        }
     }
 
-    void UpdatePulseDuty(int16_t* wt, const uint8_t sample, const uint8_t duty) {
-        wt[sample] = (sample < duty) ? 32767 : -32768;
+    void UpdatePulseDuty(float* wt, const uint8_t sample, const uint8_t duty) {
+        wt[sample] = (sample < duty) ? 1.0f : -1.0f;
     }
 
-    void UpdateNoiseSample(int16_t* wt, const uint8_t sample) {  // noise sounds funny, i think this is getting called less frequently than the audio output
-        wt[sample] = static_cast<int16_t>(random(-32768, 32768));
+    void UpdateNoiseSample(float* wt, const uint8_t sample) {  // noise sounds funny, i think this is getting called less frequently than the audio output
+        wt[sample] = static_cast<float>(random(-32768, 32768)) * (1.0f / 32768.0f);
     }
 
     void GenerateWaveTable(const int w) {
@@ -475,89 +487,87 @@ private:
     }
 
 // WAVEFORM GENERATORS:
-    void GenerateWaveForm_Sine(int16_t* waveform) {
+    void GenerateWaveForm_Sine(float* waveform) {
         for (int i = 0; i < WT_SIZE; ++i) {
-            q15_t phase = static_cast<q15_t>(i * 32768 / WT_SIZE);
-            waveform[i] = arm_sin_q15(phase);
+            waveform[i] = sinf(static_cast<float>(i) * (6.283185307179586f / WT_SIZE));
         }
     }
 
-    void GenerateWaveForm_Triangle(int16_t* waveform) {
-        int value = 0;
+    void GenerateWaveForm_Triangle(float* waveform) {
         for (int i = 0; i < WT_SIZE; ++i) {  // theres probably a cleaner way to do this but i want a full wave period starting at 0
+            float value;
             if (i < (WT_SIZE >> 2))
-                value = i * 32767 / (WT_SIZE >> 2);
+                value = static_cast<float>(i) / (WT_SIZE >> 2);
             else if (i < 3 * (WT_SIZE >> 2))
-                value = 32767 - (i - (WT_SIZE >> 2)) * 65535 / (WT_SIZE >> 1);
+                value = 1.0f - static_cast<float>(i - (WT_SIZE >> 2)) * 2.0f / (WT_SIZE >> 1);
             else
-                value = -32768 + (i - 3 * (WT_SIZE >> 2)) * 32768 / (WT_SIZE >> 2);
+                value = -1.0f + static_cast<float>(i - 3 * (WT_SIZE >> 2)) / (WT_SIZE >> 2);
 
-            waveform[i] = static_cast<int16_t>(value);
+            waveform[i] = value;
         }
     }
 
-    void GenerateWaveForm_Pulse(int16_t* waveform) {
+    void GenerateWaveForm_Pulse(float* waveform) {
         int half = WT_SIZE / 2;
         for (int i = 0; i < WT_SIZE; ++i) {
-            waveform[i] = (i < half) ? 32767 : -32768;
+            waveform[i] = (i < half) ? 1.0f : -1.0f;
         }
     }
 
-    void GenerateWaveForm_Sawtooth(int16_t* waveform) {
+    void GenerateWaveForm_Sawtooth(float* waveform) {
         for (int i = 0; i < WT_SIZE; ++i) {
-            int value = ((WT_SIZE - i - 1) * 65536) / WT_SIZE;
-            waveform[i] = static_cast<int16_t>(value - 32768);
+            waveform[i] = static_cast<float>(WT_SIZE - i - 1) * (2.0f / WT_SIZE) - 1.0f;
         }
     }
 
-    void GenerateWaveForm_Ramp(int16_t* waveform) {
+    void GenerateWaveForm_Ramp(float* waveform) {
         for (int i = 0; i < WT_SIZE; ++i) {
-            int value = (i * 65536) / WT_SIZE;
-            waveform[i] = static_cast<int16_t>(value - 32768);
+            waveform[i] = static_cast<float>(i) * (2.0f / WT_SIZE) - 1.0f;
         }
     }
 
-    void GenerateWaveForm_Stepped(int16_t* waveform) {
+    void GenerateWaveForm_Stepped(float* waveform) {
         const int steps = 5;
         const int stepSize = WT_SIZE / steps;
         for (int i = 0; i < WT_SIZE; ++i) {
-            int value = (i / stepSize) * 65535 / (steps - 1);
-            waveform[i] = static_cast<int16_t>(value - 32768);
+            int step = i / stepSize;
+            if (step > steps - 1) step = steps - 1;  // int16 version wrapped on the final sample
+            waveform[i] = static_cast<float>(step) * 2.0f / (steps - 1) - 1.0f;
         }
     }
 
-    void GenerateWaveForm_RandStepped(int16_t* waveform) {
+    void GenerateWaveForm_RandStepped(float* waveform) {
         const int steps = 5;
         const int stepSize = WT_SIZE / steps;
         int currentStep = -1;
-        int16_t value = 0;
+        float value = 0.0f;
         for (int i = 0; i < WT_SIZE; ++i) {
             int step = i / stepSize;
             if (step != currentStep) {
                 currentStep = step;
-                value = static_cast<int16_t>(random(-32768, 32768));
+                value = static_cast<float>(random(-32768, 32768)) * (1.0f / 32768.0f);
             }
             waveform[i] = value;
         }
     }
 
-    void GenerateWaveForm_Noise(int16_t* waveform) {
+    void GenerateWaveForm_Noise(float* waveform) {
         for (int i = 0; i < WT_SIZE; ++i) {
-            waveform[i] = static_cast<int16_t>(random(-32768, 32768));
+            waveform[i] = static_cast<float>(random(-32768, 32768)) * (1.0f / 32768.0f);
         }
     }
 
-    void GenerateWaveForm_Silence(int16_t* waveform) {
+    void GenerateWaveForm_Silence(float* waveform) {
         for (int i = 0; i < WT_SIZE; ++i) {
-            waveform[i] = 0;
+            waveform[i] = 0.0f;
         }
     }
 
-    void GenerateWaveForm_User(int16_t* waveform, const int idx) {
+    void GenerateWaveForm_User(float* waveform, const int idx) {
         if (!ReadWaveFromSD(waveform, idx)) GenerateWaveForm_Silence(waveform);
     }
 
-    bool ReadWaveFromSD(int16_t* waveform, const int idx = 0) {
+    bool ReadWaveFromSD(float* waveform, const int idx = 0) {
         if(!sd_ready) return false;
 
         File dir = SD.open("/WTVCO");
@@ -568,7 +578,11 @@ private:
 
         bool read = false;
         if (!file.isDirectory() && isRawFile(file.name())) {
-            file.read(waveform, 2 * WT_SIZE);
+            int16_t raw[WT_SIZE];  // .raw files stay 16-bit on disk
+            file.read(raw, 2 * WT_SIZE);
+            for (int i = 0; i < WT_SIZE; ++i) {
+                waveform[i] = static_cast<float>(raw[i]) * (1.0f / 32768.0f);
+            }
             read = true;
         }
         file.close();
