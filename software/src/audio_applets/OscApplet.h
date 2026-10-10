@@ -1,6 +1,17 @@
-#include "synth_waveform.h"
+// F32-native: the oscillator core, FM/PM modulation path, VCA, and dry/wet
+// mix run on float32 blocks (see synth_waveform_F32.h); modulation CV reaches
+// the oscillator at full float precision instead of q15, and FM uses exp2f()
+// instead of the fixed-point exp2 approximation. The chain still sees int16
+// via the HemisphereAudioAppletF32 edge adapters. Params, ranges, and UI are
+// unchanged.
 
-class OscApplet : public HemisphereAudioApplet {
+#include "../HemisphereAudioAppletF32.h"
+#include "../extern/f32/AudioMixer_F32.h"
+#include "../Audio/synth_waveform_F32.h"
+#include "../Audio/InterpolatingStreamF32.h"
+#include "../Audio/AudioVCA_F32.h"
+
+class OscApplet : public HemisphereAudioAppletF32<MONO> {
 public:
   const char* applet_name() {
     return "Osc";
@@ -18,14 +29,15 @@ public:
     vca_cv.Method(INTERPOLATION_LINEAR);
     vca.rectify(true);
 
-    PatchCable(input_stream, 0, mod_vca, 0);
-    PatchCable(mod_cv_stream, 0, mod_vca, 1);
-    PatchCable(mod_vca, 0, synth, 0);
-    PatchCable(input_stream, 0, mixer, 0);
-    PatchCable(pwm_stream, 0, synth, 1);
-    PatchCable(vca_cv, 0, vca, 1);
-    PatchCable(synth, 0, vca, 0);
-    PatchCable(vca, 0, mixer, 1);
+    PatchCableF32(InputF32(), 0, mod_vca, 0);
+    PatchCableF32(mod_cv_stream, 0, mod_vca, 1);
+    PatchCableF32(mod_vca, 0, synth, 0);
+    PatchCableF32(InputF32(), 0, mixer, 0);
+    PatchCableF32(pwm_stream, 0, synth, 1);
+    PatchCableF32(vca_cv, 0, vca, 1);
+    PatchCableF32(synth, 0, vca, 0);
+    PatchCableF32(vca, 0, mixer, 1);
+    PatchCableF32(mixer, 0, OutputF32(), 0);
   }
 
   void Unload() override {
@@ -39,10 +51,8 @@ public:
     float freq = PitchToRatio(pitch + pitch_cv.In()) * C3;
     synth.frequency(freq);
     synth.amplitude(1.0f);
-    pwm_stream.Push(
-      float_to_q15(0.01f * static_cast<float>(pw * 2 - 100) + pw_cv.InF())
-    );
-    if (mod_cv.enabled()) mod_cv_stream.Push(float_to_q15(mod_cv.InF()));
+    pwm_stream.Push(0.01f * static_cast<float>(pw * 2 - 100) + pw_cv.InF());
+    if (mod_cv.enabled()) mod_cv_stream.Push(mod_cv.InF());
 
     float m
       = constrain(static_cast<float>(mix) * 0.01f + mix_cv.InF(), 0.0f, 1.0f);
@@ -51,7 +61,7 @@ public:
       vca.bias(0.0f);
       vca.level(gain);
       float cv = level_cv.InF();
-      vca_cv.Push(float_to_q15(cv * cv));
+      vca_cv.Push(cv * cv);
     } else {
       vca.bias(gain);
       vca.level(0.0f);
@@ -210,13 +220,6 @@ public:
     }
   }
 
-  AudioStream* InputStream() override {
-    return &input_stream;
-  }
-  AudioStream* OutputStream() override {
-    return &mixer;
-  }
-
   void SetWaveform(int wf) {
     waveform = constrain(wf, 0, 3);
     synth.begin(WAVEFORMS[waveform]);
@@ -286,12 +289,11 @@ private:
   CVInputMap level_cv;
   CVInputMap mix_cv;
 
-  AudioPassthrough<MONO> input_stream;
-  InterpolatingStream<> pwm_stream;
-  InterpolatingStream<> mod_cv_stream;
-  AudioVCA mod_vca;
-  AudioSynthWaveformModulated synth;
-  InterpolatingStream<> vca_cv;
-  AudioVCA vca;
-  AudioMixer<2> mixer;
+  InterpolatingStreamF32<> pwm_stream;
+  InterpolatingStreamF32<> mod_cv_stream;
+  AudioVCA_F32 mod_vca;
+  AudioSynthWaveformModulatedF32 synth;
+  InterpolatingStreamF32<> vca_cv;
+  AudioVCA_F32 vca;
+  AudioMixer4_F32 mixer;
 };

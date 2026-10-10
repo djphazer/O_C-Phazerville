@@ -1,8 +1,29 @@
-#include "../src/Audio/effect_dynamics.h"
+// F32-native: the gate/comp/limiter gain computer and the applied gain run on
+// float32 blocks (see effect_dynamics_F32.h); the chain still sees int16 via
+// the HemisphereAudioAppletF32 edge adapters.
+
+#include "../HemisphereAudioAppletF32.h"
+#include "../Audio/effect_dynamics_F32.h"
 
 template <AudioChannels Channels>
-class DynamicsApplet : public HemisphereAudioApplet {
+class DynamicsApplet : public HemisphereAudioAppletF32<Channels> {
 public:
+  // The base class chain is dependent on Channels, so inherited names need
+  // explicit import for unqualified use.
+  using Base = HemisphereAudioAppletF32<Channels>;
+  using Base::LVL_MIN_DB;
+  using Base::PatchCableF32;
+  using Base::InputF32;
+  using Base::OutputF32;
+  using Base::GetCompF32;
+  using Base::ReleaseCompF32;
+  using Base::AllowRestart;
+  using Base::EditMode;
+  using Base::MoveCursor;
+  using Base::hemisphere; // used by the gfx_offset macro
+  using Base::gfxPrint;
+  using Base::gfxStartCursor;
+  using Base::gfxEndCursor;
 
   enum DynamicsCursor {
     //IN_GAIN,
@@ -20,18 +41,18 @@ public:
 
   void Start() {
     for (int i = 0; i < Channels; i++) {
-      complimit[i] = GetComp();
+      complimit[i] = GetCompF32();
       if (!complimit[i]) return;
 
-      PatchCable(input, i, *complimit[i], 0);
-      PatchCable(*complimit[i], 0, output, i);
+      PatchCableF32(InputF32(), i, *complimit[i], 0);
+      PatchCableF32(*complimit[i], 0, OutputF32(), i);
     }
     alloc_ok = true;
     SetParams();
   }
 
   void Unload() {
-    for (auto& cl : complimit) ReleaseComp(cl);
+    for (auto& cl : complimit) ReleaseCompF32(cl);
     alloc_ok = false;
     AllowRestart();
   }
@@ -136,13 +157,6 @@ public:
     SetParams();
   }
 
-  AudioStream* InputStream() override {
-    return &input;
-  }
-  AudioStream* OutputStream() override {
-    return &output;
-  }
-
 protected:
   void SetHelp() override {}
 
@@ -164,9 +178,7 @@ private:
   //void makeupGain(float gain = 0.0f)
   //void limit(float threshold = -3.0f, float attack = MIN_T, float release = MIN_T)
 
-  AudioPassthrough<Channels> input;
-  std::array<AudioEffectDynamics*, Channels> complimit;
-  AudioPassthrough<Channels> output;
+  std::array<AudioEffectDynamicsF32*, Channels> complimit;
 };
 
 template <AudioChannels Channels>

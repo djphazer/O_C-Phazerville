@@ -1,4 +1,16 @@
-#include "synth_waveform.h"
+// F32-native: all 12 swarm oscillators render float32 (shared float sine
+// table, integer skew math for the variable-triangle saw shapes kept
+// bit-exact, no int16 magnitude requantization) and are summed in float by
+// AudioMixerF32, so the normalized swarm keeps full precision through the
+// VCA and passthru mix. The chain still sees int16 via the
+// HemisphereAudioAppletF32 edge adapters. Params, ranges, and UI are
+// unchanged.
+
+#include "../HemisphereAudioAppletF32.h"
+#include "../Audio/synth_waveform_F32.h"
+#include "../Audio/AudioMixerF32.h"
+#include "../Audio/InterpolatingStreamF32.h"
+#include "../Audio/AudioVCA_F32.h"
 
 // Per-oscillator detune and phase scale factors.
 // 12 oscillators split into 4 voices of 3 each.
@@ -8,7 +20,7 @@
 static constexpr float HANDSAW_DETUNE[12] = {  0,  3, -2,   1,  4, -5,  -1,  2, -3,   6,  5, -4 };
 static constexpr float HANDSAW_PHASE[12]  = {  1,  3,  2,   1,  4,  5,   1,  2,  3,   6,  5,  4 };
 
-class HandSawApplet : public HemisphereAudioApplet {
+class HandSawApplet : public HemisphereAudioAppletF32<MONO> {
     public:
         const char* applet_name() {
             return "HandSaw";
@@ -22,14 +34,15 @@ class HandSawApplet : public HemisphereAudioApplet {
             // Call order follows signal flow: sources before sinks,
             // so the audio scheduler can process them in one pass.
             for (int i = 0; i < 12; i++) {
-              PatchCable(synths[i], 0, outputMixer, i);
+              PatchCableF32(synths[i], 0, outputMixer, i);
             }
 
-            PatchCable(outputMixer,   0, vca,         0);
-            PatchCable(vca_level,     0, vca,         1);
+            PatchCableF32(outputMixer,   0, vca,         0);
+            PatchCableF32(vca_level,     0, vca,         1);
 
-            PatchCable(vca,           0, final_out, 0);
-            PatchCable(input_stream,  0, final_out, 1);
+            PatchCableF32(vca,           0, final_out, 0);
+            PatchCableF32(InputF32(),    0, final_out, 1);
+            PatchCableF32(final_out,     0, OutputF32(), 0);
 
             final_out.gain(0, 1.0f); // voice
             final_out.gain(1, 1.0f); // passthru
@@ -68,7 +81,7 @@ class HandSawApplet : public HemisphereAudioApplet {
 
             float m = amp < LVL_MIN_DB ? 0.0f : dbToScalar(amp);
             m += (amp_cv.InF() * amp_cv.InF());
-            vca_level.Push(float_to_q15(m));
+            vca_level.Push(m);
         }
 
         void View() override {
@@ -250,9 +263,6 @@ class HandSawApplet : public HemisphereAudioApplet {
             }
         }
 
-        AudioStream* InputStream()  override { return &input_stream; }
-        AudioStream* OutputStream() override { return &final_out; }
-
     protected:
         void SetHelp() override {}
 
@@ -307,10 +317,9 @@ class HandSawApplet : public HemisphereAudioApplet {
         CVInputMap phase_cv;
         CVInputMap amp_cv;
 
-        AudioPassthrough<MONO>  input_stream;
-        AudioSynthWaveform      synths[12];
-        AudioMixer<12>          outputMixer;
-        AudioVCA                vca;
-        InterpolatingStream<>   vca_level;
-        AudioMixer<2>           final_out;
+        AudioSynthWaveformF32   synths[12];
+        AudioMixerF32<12>       outputMixer;
+        AudioVCA_F32            vca;
+        InterpolatingStreamF32<> vca_level;
+        AudioMixerF32<2>        final_out;
 };
