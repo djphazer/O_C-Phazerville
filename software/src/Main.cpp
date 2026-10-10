@@ -652,8 +652,7 @@ void Redraw() {
 }
 
 /*  ---------    main loop  --------  */
-
-void FASTRUN loop() {
+FLASHMEM __attribute__((noinline)) void loop() {
   using namespace OC;
   CORE::app_isr_enabled = true;
   CORE::display_update_enabled = true;
