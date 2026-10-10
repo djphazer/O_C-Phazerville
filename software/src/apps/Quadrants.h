@@ -1734,7 +1734,7 @@ void AppQuadrants::GetIOConfig(OC::IOConfig &ioconfig) const
   ioconfig.outputs[7].set("Out H", OUTPUT_MODE_PITCH);
 }
 
-void AppQuadrants::HandleAppEvent(OC::AppEvent event) {
+FLASHMEM void AppQuadrants::HandleAppEvent(OC::AppEvent event) {
     switch (event) {
     case OC::APP_EVENT_RESUME:
         Resume();
@@ -1755,7 +1755,7 @@ void AppQuadrants::Loop() {
 }
 
 FLASHMEM
-void AppQuadrants::DrawMenu() const {
+FLASHMEM void AppQuadrants::DrawMenu() const {
     View();
 }
 
