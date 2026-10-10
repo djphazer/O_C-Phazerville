@@ -2,7 +2,9 @@
 
 #include "HemisphereApplet.h"
 #include "dsputils.h"
-#include "Audio/effect_reverb_schroeder.h"
+#include "Audio/effect_reverb_schroeder_F32.h"
+#include "Audio/effect_freeverb_F32.h"
+#include "Audio/effect_dynamics_F32.h"
 #include "src/Audio/effect_dynamics.h"
 #include <AudioStream.h>
 
@@ -15,9 +17,14 @@ enum AudioChannels : uint8_t {
 class HemisphereAudioApplet : public HemisphereApplet {
 public:
 
-  static Factory<AudioEffectReverbSchroeder, 8> bung_factory;
-  // static Factory<AudioEffectFreeverb, 8> verb_factory;
+  // F32 reverbs: only the F32 Reverb/Bungverb applets draw from these pools
+  static Factory<AudioEffectReverbSchroederF32, 8> bung_factory;
+  static Factory<AudioEffectFreeverbF32, 8> verb_factory;
+  // int16 pool stays for ThreeBandz; the F32 Dynamics applet has its own pool
+  // (10 = every slot running stereo Dynamics). Factory allocates lazily, so
+  // the second pool costs nothing until instances are actually used.
   static Factory<AudioEffectDynamics, 20> compressor_factory;
+  static Factory<AudioEffectDynamicsF32, 10> compressor_f32_factory;
 
   static const uint_fast8_t CONFIG_SIZE = 4;
   static const uint_fast8_t MAX_CABLES = 32;
@@ -81,19 +88,19 @@ public:
     cables[cable_count++].connect(source, s_ch, dest, d_ch);
   }
 
-  AudioEffectReverbSchroeder *GetBungverb() {
+  AudioEffectReverbSchroederF32 *GetBungverb() {
     return bung_factory.get();
   }
-  void ReleaseBungverb(AudioEffectReverbSchroeder* verb) {
+  void ReleaseBungverb(AudioEffectReverbSchroederF32* verb) {
     bung_factory.release(verb);
   }
 
-  // AudioEffectFreeverb *GetFreeverb() {
-  //   return verb_factory.get();
-  // }
-  // void ReleaseFreeverb(AudioEffectFreeverb* verb) {
-  //   verb_factory.release(verb);
-  // }
+  AudioEffectFreeverbF32 *GetFreeverb() {
+    return verb_factory.get();
+  }
+  void ReleaseFreeverb(AudioEffectFreeverbF32* verb) {
+    verb_factory.release(verb);
+  }
 
   AudioEffectDynamics *GetComp() {
     return compressor_factory.get();
@@ -102,7 +109,14 @@ public:
     compressor_factory.release(comp);
   }
 
-  void Disconnect() {
+  AudioEffectDynamicsF32 *GetCompF32() {
+    return compressor_f32_factory.get();
+  }
+  void ReleaseCompF32(AudioEffectDynamicsF32* comp) {
+    compressor_f32_factory.release(comp);
+  }
+
+  virtual void Disconnect() {
     for (size_t i = 0; i < cable_count; ++i) {
       cables[i].disconnect();
     }

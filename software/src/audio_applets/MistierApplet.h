@@ -1,6 +1,12 @@
 #pragma once
 
-#include "../Audio/AudioEffectClouds.h"
+// F32-native: the grain record buffer, Hermite grain reads, feedback path,
+// and wet/dry mix stay float32 inside the applet (see AudioEffectCloudsF32.h);
+// the chain still sees int16 via the HemisphereAudioAppletF32 edge adapters.
+
+#include "../HemisphereAudioAppletF32.h"
+#include "../Audio/AudioMixerF32.h"
+#include "../Audio/AudioEffectCloudsF32.h"
 
 extern "C" uint8_t external_psram_size;
 
@@ -13,9 +19,9 @@ extern "C" uint8_t external_psram_size;
 //   • Feedback (Fdb) — grain output fed back into the record buffer
 //   • No fixed grain shapes — shape driven by Texture
 //
-// I/O:
-//   Input → [AudioEffectClouds] → wet ──────────────────────────────┐
-//   Input →                     → dry ─────────────────────────────┤ AudioMixer<2> → Output
+// I/O (float32 throughout; int16 only at the edge adapters):
+//   Input → [AudioEffectCloudsF32] → wet ───────────────────────────┐
+//   Input →                        → dry ──────────────────────────┤ AudioMixerF32<2> → Output
 //
 // Freeze:
 //   • AuxButton: latches/unlatches manual freeze (performance use, no cable needed)
@@ -27,13 +33,34 @@ extern "C" uint8_t external_psram_size;
 //   Page 2: Pitch, Fdb, Tex, Mix, Frz
 //
 template <AudioChannels Channels>
-class MistierApplet : public HemisphereAudioApplet {
+class MistierApplet : public HemisphereAudioAppletF32<Channels> {
 public:
+    // The base class chain is dependent on Channels, so inherited names need
+    // explicit import for unqualified use.
+    using Base = HemisphereAudioAppletF32<Channels>;
+    using Base::CONFIG_SIZE;
+    using Base::PatchCableF32;
+    using Base::InputF32;
+    using Base::OutputF32;
+    using Base::AllowRestart;
+    using Base::CancelEdit;
+    using Base::CheckEditInputMapPress;
+    using Base::CursorToggle;
+    using Base::EditMode;
+    using Base::EditSelectedInputMap;
+    using Base::MoveCursor;
+    using Base::gfxPrint;
+    using Base::gfxPixel;
+    using Base::gfxInvert;
+    using Base::gfxStartCursor;
+    using Base::gfxEndCursor;
+    using Base::gfxDisplayInputMapEditor;
+
     const char* applet_name() { return "Misty"; }
 
     void Start() override {
         for (int ch = 0; ch < Channels; ch++) {
-            channels[ch].Start(this, ch, input_stream, output_stream);
+            channels[ch].Start(this, ch);
         }
     }
 
@@ -92,7 +119,7 @@ public:
 
         // ── Grain activity bar (y=7) ──────────────────────────────────────────
         uint8_t active = channels[0].grain_stream.ActiveGrainCount();
-        for (uint8_t i = 0; i < AudioEffectClouds::MAX_GRAINS; i++) {
+        for (uint8_t i = 0; i < AudioEffectCloudsF32::MAX_GRAINS; i++) {
             if (i < active) gfxPixel(1 + i, 7);
         }
 
@@ -233,9 +260,6 @@ public:
     }
 #undef MISTIER_PARAMS
 
-    AudioStream* InputStream()  override { return &input_stream; }
-    AudioStream* OutputStream() override { return &output_stream; }
-
 protected:
     void SetHelp() override {}
 
@@ -286,28 +310,24 @@ private:
         static const uint8_t DRY_CH = 0;
         static const uint8_t WET_CH = 1;
 
-        AudioEffectClouds grain_stream;
-        AudioMixer<2>     mixer;
+        AudioEffectCloudsF32 grain_stream;
+        AudioMixerF32<2>     mixer;
 
         MistierChannel()
             : grain_stream(
                 external_psram_size
-                    ? AudioEffectClouds::CLOUDS_BUFFER_SAMPLES
-                    : AudioEffectClouds::CLOUDS_BUFFER_SAMPLES / 2)
+                    ? AudioEffectCloudsF32::CLOUDS_BUFFER_SAMPLES
+                    : AudioEffectCloudsF32::CLOUDS_BUFFER_SAMPLES / 2)
         {}
 
-        void Start(HemisphereAudioApplet* owner, int ch,
-                   AudioStream& input, AudioStream& output) {
+        void Start(MistierApplet* owner, int ch) {
             grain_stream.Acquire();
-            owner->PatchCable(input,       ch, grain_stream, 0);
-            owner->PatchCable(input,       ch, mixer,        DRY_CH);
-            owner->PatchCable(grain_stream, 0, mixer,        WET_CH);
-            owner->PatchCable(mixer,        0, output,       ch);
+            owner->PatchCableF32(owner->InputF32(), ch, grain_stream, 0);
+            owner->PatchCableF32(owner->InputF32(), ch, mixer,        DRY_CH);
+            owner->PatchCableF32(grain_stream,      0,  mixer,        WET_CH);
+            owner->PatchCableF32(mixer,             0,  owner->OutputF32(), ch);
         }
 
         void Stop() { grain_stream.Release(); }
     } channels[Channels];
-
-    AudioPassthrough<Channels> input_stream;
-    AudioPassthrough<Channels> output_stream;
 };
