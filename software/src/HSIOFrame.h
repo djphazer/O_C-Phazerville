@@ -22,6 +22,7 @@
 #include "util/util_macros.h"
 #include "util/clkdivmult.h"
 #include "src/extern/bjorklund.h"
+#include "HSMIDITypes.h"
 
 #ifdef USB_GAMEPAD
 #include "HSGamepad.h"
@@ -91,13 +92,6 @@ struct MIDILogEntry {
     uint8_t data2;
 };
 */
-
-struct MIDINoteData {
-    uint8_t note; // data1
-    uint8_t vel;  // data2
-};
-// TODO: use static array instead of vector
-using NoteBuffer = std::vector<MIDINoteData>;
 
 struct PolyphonyData {
     uint8_t note;
@@ -190,6 +184,10 @@ struct MIDIMapping : protected MIDIMapSettings {
   ~MIDIMapping() {}
 
   static constexpr size_t Size = 64; // Make this compatible with Packable
+
+  // settings snapshot access for EEPROM persistence (T3 global settings)
+  const MIDIMapSettings & settings() const { return *this; }
+  void apply_settings(const MIDIMapSettings &s) { static_cast<MIDIMapSettings &>(*this) = s; }
 
   // state
   bool gate_retrig = false;
@@ -483,9 +481,22 @@ constexpr MIDIMapping& pack(MIDIMapping& input) {
   return input;
 }
 
+// MIDIOutSettings / MIDIOutPort (CV/trigger -> MIDI output ports) live in
+// HSMIDITypes.h so host-side tests can include them without Arduino deps.
+
 struct alignas(32) MIDIFrame {
     MIDIMapping mapping[MIDIMAP_MAX];
+#ifndef NO_HEMISPHERE
+    // legacy per-DAC out mapping, still used by the hMIDIOut applet and the
+    // autoMIDIOut path; superseded by outports[] + ProcessOutputs()
     MIDIMapping outmap[ADC_CHANNEL_COUNT];
+#endif
+
+    // CV/trigger -> MIDI engine: CV input ports first, then trigger ports
+    static constexpr int kCVOutPorts = ADC_CHANNEL_COUNT;
+    static constexpr int kTrigOutPorts = OC::DIGITAL_INPUT_LAST;
+    static constexpr int kOutPorts = kCVOutPorts + kTrigOutPorts;
+    MIDIOutPort outports[kOutPorts];
 
     uint32_t last_msg_tick; // Tick of last received message
     uint16_t sustain_latch; // each bit is a MIDI channel's sustain state
@@ -518,13 +529,27 @@ struct alignas(32) MIDIFrame {
         mapping[ch].Init();
         mapping[ch].AdjustVoice(ch / 2 % DAC_CHANNEL_COUNT); // each quad is a unique voice
       }
+#ifndef NO_HEMISPHERE
       for (int ch = 0; ch < ADC_CHANNEL_COUNT; ++ch) {
         outmap[ch].Init();
         if (ch & 1) outmap[ch].SetGate(0);
         else outmap[ch].SetPitch(0);
         //outmap[ch].function_cc = ch + 1; // idk why I did this
       }
+#endif
+      InitOutPorts();
       clock_count = 0;
+    }
+
+    void InitOutPorts() {
+      // default: each CV/TR pair is a mono note voice on its own MIDI channel
+      for (int i = 0; i < kOutPorts; ++i) {
+        static_cast<MIDIOutSettings &>(outports[i]) = MIDIOutSettings();
+        outports[i].ResetRuntime();
+        const bool is_trig = i >= kCVOutPorts;
+        outports[i].function = is_trig ? TRFN_NOTE : CVFN_PITCH;
+        outports[i].channel = is_trig ? (i - kCVOutPorts) : i;
+      }
     }
 
     // getters for access to mappings
@@ -541,6 +566,7 @@ struct alignas(32) MIDIFrame {
       return mapping[ch].InRange(note);
     }
 
+#ifndef NO_HEMISPHERE
     uint8_t get_out_assign(int ch) {
       return outmap[ch].get_type() | outmap[ch].get_subtype();
     }
@@ -553,6 +579,7 @@ struct alignas(32) MIDIFrame {
     bool in_out_range(int ch, int note) {
       return outmap[ch].InRange(note);
     }
+#endif
 
     void UpdateMidiChannelFilter() {
         uint16_t filter = 0;
@@ -651,74 +678,64 @@ struct alignas(32) MIDIFrame {
     }
 
     void RemoveNoteData(NoteBuffer &buffer, const uint8_t note) {
-        buffer.erase(
-            std::remove_if(buffer.begin(), buffer.end(), [&](MIDINoteData const &data) {
-                return data.note == note;
-            }),
-            buffer.end()
-        );
+        buffer.remove(note);
     }
 
     void MonoBufferPush(const uint8_t m_ch, const uint8_t note, const uint8_t vel) {
         if (CheckMidiChannelFilter(m_ch)) {
-            RemoveNoteData(note_buffer[m_ch], note); // if new note is already in buffer, promote to latest and update velocity
-            note_buffer[m_ch].push_back({note, vel}); // else just append to the end
+            // if new note is already in buffer, promote to latest and update velocity
+            note_buffer[m_ch].remove(note);
+            note_buffer[m_ch].push(note, vel);
         }
     }
 
     void MonoBufferPop(const uint8_t m_ch, const uint8_t note) {
         if (CheckMidiChannelFilter(m_ch)) {
-            RemoveNoteData(note_buffer[m_ch], note);
-            if (note_buffer[m_ch].size() == 0) note_buffer[m_ch].shrink_to_fit(); // free up memory when MIDI is not used
+            note_buffer[m_ch].remove(note);
         }
     }
 
     void ClearMonoBuffer(const int8_t m_ch = -1) {
         if (m_ch > 0) {
             note_buffer[m_ch].clear();
-            note_buffer[m_ch].shrink_to_fit();
         } else { // clear on all channels if no args passed
             for (uint8_t c = 0; c < 16; ++c) {
                 note_buffer[c].clear();
-                note_buffer[c].shrink_to_fit();
             }
         }
     }
 
-    // int GetNote(std::vector<MIDINoteData> &buffer, const int n) {
-    //     return buffer.at(buffer.size()-n).note;
-    // }
-
     int GetNoteFirst(NoteBuffer &buffer) {
-        return buffer.front().note;
+        return buffer.empty() ? 0 : buffer.front().note;
     }
 
     int GetNoteLast(NoteBuffer &buffer) {
-        return buffer.back().note;
+        return buffer.empty() ? 0 : buffer.back().note;
     }
 
     int GetNoteLastInv(NoteBuffer &buffer) {
-        return 127 - buffer.back().note;
+        return 127 - GetNoteLast(buffer);
     }
 
     int GetNoteMin(NoteBuffer &buffer) {
         uint8_t m = 127;
-        std::for_each (buffer.begin(), buffer.end(), [&](MIDINoteData const &data) {
+        for (auto const &data : buffer) {
             if (data.note < m) m = data.note;
-        });
+        }
         return m;
     }
 
     int GetNoteMax(NoteBuffer &buffer) {
         uint8_t m = 0;
-        std::for_each (buffer.begin(), buffer.end(), [&](MIDINoteData const &data) {
+        for (auto const &data : buffer) {
             if (data.note > m) m = data.note;
-        });
+        }
         return m;
     }
 
     int GetVel(NoteBuffer &buffer, const int n) {
-        return buffer.at(buffer.size()-n).vel;
+        if (buffer.size() < n || n < 1) return 0;
+        return buffer.at(buffer.size() - n).vel;
     }
 
     void ClearSustainLatch(int8_t m_ch = -1) {
@@ -762,7 +779,11 @@ struct alignas(32) MIDIFrame {
     }
 
     void ProcessMIDIMsg(const MIDIMessage msg);
-    void Send(const SlewedValue *outvals);
+#ifndef NO_HEMISPHERE
+    void Send(const SlewedValue *outvals); // legacy autoMIDIOut path
+#endif
+    void ProcessOutputs(IOFrame &f); // CV/trigger -> MIDI engine
+    void PanicOutputs();             // note-offs for all tracked engine notes
 
     void SendAfterTouch(const uint8_t midi_ch, uint8_t val) {
 #ifdef ARDUINO_TEENSY41
@@ -822,6 +843,57 @@ struct alignas(32) MIDIFrame {
 #else
       usbMIDI.sendNoteOff(note, vel, midi_ch + 1);
 #endif
+    }
+    void SendProgramChange(const uint8_t midi_ch, uint8_t program) {
+#ifdef ARDUINO_TEENSY41
+      if (~midi_msgtx_disable & mMaskUSBDev)   usbMIDI.sendProgramChange(program, midi_ch + 1);
+      if (~midi_msgtx_disable & mMaskUSBHost)  usbHostMIDI[0].sendProgramChange(program, midi_ch + 1);
+      if (~midi_msgtx_disable & mMaskUSBHost2) usbHostMIDI[1].sendProgramChange(program, midi_ch + 1);
+      if (~midi_msgtx_disable & mMaskSerial)   MIDI1.sendProgramChange(program, midi_ch + 1);
+#else
+      usbMIDI.sendProgramChange(program, midi_ch + 1);
+#endif
+    }
+    void SendRealTime(const uint8_t type) { // usbMIDI.Clock / Start / Stop / Continue
+#ifdef ARDUINO_TEENSY41
+      if (~midi_msgtx_disable & mMaskUSBDev)   usbMIDI.sendRealTime(type);
+      if (~midi_msgtx_disable & mMaskUSBHost)  usbHostMIDI[0].sendRealTime(type);
+      if (~midi_msgtx_disable & mMaskUSBHost2) usbHostMIDI[1].sendRealTime(type);
+      if (~midi_msgtx_disable & mMaskSerial)   MIDI1.sendRealTime((midi::MidiType)type);
+#else
+      usbMIDI.sendRealTime(type);
+#endif
+    }
+
+    // set by TRFN_PANIC hardware trigger; the app's Loop() drains it with a
+    // full all-notes-off sweep (too much traffic to send from the ISR)
+    bool panic_request = false;
+
+    // outgoing-message monitor: ProcessOutputs (ISR) pushes, the app's
+    // Loop() drains into its log display. Single-producer/single-consumer
+    // ring; events are dropped when full rather than blocking.
+    struct OutLogEvent {
+        uint8_t port;    // outports[] index
+        uint8_t message; // 0 NoteOn, 1 NoteOff, 2 CC, 3 Aftertouch, 4 Bend
+        uint8_t channel;
+        uint8_t data1;
+        uint8_t data2;
+    };
+    OutLogEvent outlog[8];
+    volatile uint8_t outlog_w = 0;
+    uint8_t outlog_r = 0;
+
+    void PushOutLog(uint8_t port, uint8_t message, uint8_t channel,
+                    uint8_t data1, uint8_t data2) {
+        if (uint8_t(outlog_w - outlog_r) >= 8) return; // full: drop
+        outlog[outlog_w & 7] = {port, message, channel, data1, data2};
+        ++outlog_w;
+    }
+    bool PopOutLog(OutLogEvent &e) {
+        if (outlog_r == outlog_w) return false;
+        e = outlog[outlog_r & 7];
+        ++outlog_r;
+        return true;
     }
 };
 
