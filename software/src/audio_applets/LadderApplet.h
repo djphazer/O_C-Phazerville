@@ -5,30 +5,11 @@
 // applet; the chain still sees int16 via the HemisphereAudioAppletF32 edge
 // adapters.
 
-#include "../HemisphereAudioAppletF32.h"
 #include "../Audio/filter_ladder_F32.h"
 
 template <AudioChannels Channels>
-class LadderApplet : public HemisphereAudioAppletF32<Channels> {
-
+class LadderApplet : public HemisphereAudioAppletF32 {
 public:
-  // The base class chain is dependent on Channels, so inherited names need
-  // explicit import for unqualified use.
-  using Base = HemisphereAudioAppletF32<Channels>;
-  using Base::CONFIG_SIZE;
-  using Base::PatchCableF32;
-  using Base::InputF32;
-  using Base::OutputF32;
-  using Base::CheckEditInputMapPress;
-  using Base::CursorToggle;
-  using Base::EditMode;
-  using Base::EditSelectedInputMap;
-  using Base::MoveCursor;
-  using Base::gfxPrint;
-  using Base::gfxPrintPitchHz;
-  using Base::gfxStartCursor;
-  using Base::gfxEndCursor;
-  using Base::gfxDisplayInputMapEditor;
 
   const char* applet_name() {
     return "LadderLPF";
