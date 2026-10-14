@@ -4,12 +4,11 @@
 // dry/wet mix stay float32 inside the applet (see effect_freeverb_F32.h); the
 // chain still sees int16 via the HemisphereAudioAppletF32 edge adapters.
 
-#include "../HemisphereAudioAppletF32.h"
 #include "../extern/f32/AudioMixer_F32.h"
 #include "../Audio/effect_freeverb_F32.h"
 #include "../Audio/filter_variable2_F32.h"
 
-class ReverbApplet : public HemisphereAudioAppletF32<MONO> {
+class ReverbApplet : public HemisphereAudioAppletF32 {
     public:
         const char* applet_name() {
             return "Reverb";

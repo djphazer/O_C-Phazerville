@@ -7,35 +7,12 @@
 // HemisphereAudioAppletF32 edge adapters. Params, ranges, and UI are
 // unchanged.
 
-#include "../HemisphereAudioAppletF32.h"
 #include "../Audio/AudioVCA_F32.h"
 #include "../Audio/InterpolatingStreamF32.h"
 
 template <AudioChannels Channels>
-class VcaApplet : public HemisphereAudioAppletF32<Channels> {
+class VcaApplet : public HemisphereAudioAppletF32 {
 public:
-  // this class template has a dependent base, so inherited names need
-  // explicit import
-  using Base = HemisphereAudioAppletF32<Channels>;
-  using Base::PatchCableF32;
-  using Base::InputF32;
-  using Base::OutputF32;
-  using Base::AllowRestart;
-  using Base::CONFIG_SIZE;
-  using Base::LVL_MIN_DB;
-  using Base::LVL_MAX_DB;
-  using Base::gfxPrint;
-  using Base::gfxPrintDb;
-  using Base::gfxPrintIcon;
-  using Base::gfxStartCursor;
-  using Base::gfxEndCursor;
-  using Base::gfxDisplayInputMapEditor;
-  using Base::CheckEditInputMapPress;
-  using Base::CursorToggle;
-  using Base::EditMode;
-  using Base::MoveCursor;
-  using Base::EditSelectedInputMap;
-
   const char* applet_name() {
     return "VCA";
   }

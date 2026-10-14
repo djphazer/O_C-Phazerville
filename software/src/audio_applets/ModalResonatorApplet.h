@@ -9,7 +9,6 @@
 // still sees int16 via the HemisphereAudioAppletF32 edge adapters. Params,
 // ranges, save data, and UI are unchanged.
 
-#include "../HemisphereAudioAppletF32.h"
 #include "../Audio/AudioEffectModalResonatorF32.h"
 #include "../Audio/AudioMixerF32.h"
 
@@ -35,32 +34,8 @@
 // Trg input: assignable gate trigger (rising edge). Vel CV: scales strike velocity.
 
 template <AudioChannels Channels>
-class ModalResonatorApplet : public HemisphereAudioAppletF32<Channels> {
+class ModalResonatorApplet : public HemisphereAudioAppletF32 {
 public:
-    // this class template has a dependent base, so inherited names need
-    // explicit import
-    using Base = HemisphereAudioAppletF32<Channels>;
-    using Base::PatchCableF32;
-    using Base::InputF32;
-    using Base::OutputF32;
-    using Base::AllowRestart;
-    using Base::CONFIG_SIZE;
-    using Base::gfxPrint;
-    using Base::gfxRect;
-    using Base::gfxFrame;
-    using Base::gfxInvert;
-    using Base::gfxStartCursor;
-    using Base::gfxEndCursor;
-    using Base::gfxPrintTuningIndicator;
-    using Base::gfxPrintPitchHz;
-    using Base::gfxDisplayInputMapEditor;
-    using Base::CheckEditInputMapPress;
-    using Base::CursorToggle;
-    using Base::CancelEdit;
-    using Base::EditMode;
-    using Base::MoveCursor;
-    using Base::EditSelectedInputMap;
-
     const char* applet_name() { return "ModalRes"; }
 
     // --- Lifecycle -----------------------------------------------------------
@@ -340,7 +315,7 @@ private:
         AudioEffectModalResonatorF32 resonator;
         AudioMixerF32<2>             wet_dry_mixer;
 
-        void Start(HemisphereAudioAppletF32<Channels>* owner, int ch,
+        void Start(HemisphereAudioAppletF32* owner, int ch,
                    AudioStream_F32& input, AudioStream_F32& output) {
             resonator.Acquire();
             owner->PatchCableF32(input,         ch, resonator,      0);

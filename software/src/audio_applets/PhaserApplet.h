@@ -6,12 +6,11 @@
 // the dry/wet mix run on float32 blocks (see effect_phaser_F32.h); the chain
 // still sees int16 via the HemisphereAudioAppletF32 edge adapters.
 
-#include "../HemisphereAudioAppletF32.h"
 #include "../extern/f32/AudioMixer_F32.h"
 #include "../Audio/effect_phaser_F32.h"
 
 // MONO only... for now
-class PhazerApplet : public HemisphereAudioAppletF32<MONO> {
+class PhazerApplet : public HemisphereAudioAppletF32 {
 public:
   const char* applet_name() {
     return "Phazer";

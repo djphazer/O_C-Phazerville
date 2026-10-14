@@ -1,11 +1,10 @@
 #pragma once
 
-#include "HemisphereAudioAppletF32.h"
 #include "extern/f32/AudioMixer_F32.h"
 
 // F32-native: the M/S gain matrix runs in float32 end to end inside the
 // applet; the chain still sees int16 via the base class edge adapters.
-class MidSideApplet : public HemisphereAudioAppletF32<STEREO> {
+class MidSideApplet : public HemisphereAudioAppletF32 {
 public:
   const char* applet_name() {
     return "Mid/Side";

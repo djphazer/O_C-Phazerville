@@ -5,12 +5,11 @@
 // end to end inside the applet (see effect_reverb_schroeder_F32.h). The
 // chain still sees int16 via the HemisphereAudioAppletF32 edge adapters.
 
-#include "../HemisphereAudioAppletF32.h"
 #include "../extern/f32/AudioMixer_F32.h"
 #include "../Audio/effect_reverb_schroeder_F32.h"
 #include "../Audio/filter_variable2_F32.h"
 
-class BungverbApplet : public HemisphereAudioAppletF32<MONO> {
+class BungverbApplet : public HemisphereAudioAppletF32 {
     public:
         const char* applet_name() {
             return "Bungverb";

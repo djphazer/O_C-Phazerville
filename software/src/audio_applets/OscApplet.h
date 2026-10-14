@@ -5,13 +5,12 @@
 // via the HemisphereAudioAppletF32 edge adapters. Params, ranges, and UI are
 // unchanged.
 
-#include "../HemisphereAudioAppletF32.h"
 #include "../extern/f32/AudioMixer_F32.h"
 #include "../Audio/synth_waveform_F32.h"
 #include "../Audio/InterpolatingStreamF32.h"
 #include "../Audio/AudioVCA_F32.h"
 
-class OscApplet : public HemisphereAudioAppletF32<MONO> {
+class OscApplet : public HemisphereAudioAppletF32 {
 public:
   const char* applet_name() {
     return "Osc";

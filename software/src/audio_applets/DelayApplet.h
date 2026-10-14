@@ -4,36 +4,14 @@
 // applet (no int16 truncation per recirculation); the chain still sees int16
 // via the HemisphereAudioAppletF32 edge adapters.
 
-#include "../HemisphereAudioAppletF32.h"
 #include "../extern/f32/AudioMixer_F32.h"
 #include "../Audio/AudioDelayExtF32.h"
 
 extern "C" uint8_t external_psram_size;
 
 template <AudioChannels Channels>
-class DelayApplet : public HemisphereAudioAppletF32<Channels> {
+class DelayApplet : public HemisphereAudioAppletF32 {
 public:
-  // The base class chain is dependent on Channels, so inherited names need
-  // explicit import for unqualified use.
-  using Base = HemisphereAudioAppletF32<Channels>;
-  using Base::CONFIG_SIZE;
-  using Base::PatchCableF32;
-  using Base::InputF32;
-  using Base::OutputF32;
-  using Base::AllowRestart;
-  using Base::CancelEdit;
-  using Base::CheckEditInputMapPress;
-  using Base::CursorToggle;
-  using Base::EditMode;
-  using Base::EditSelectedInputMap;
-  using Base::MoveCursor;
-  using Base::gfxPos;
-  using Base::gfxPrint;
-  using Base::gfxPrintIcon;
-  using Base::gfxStartCursor;
-  using Base::gfxEndCursor;
-  using Base::gfxDisplayInputMapEditor;
-
   const char* applet_name() {
     return "Delay";
   }
@@ -480,7 +458,7 @@ private:
     DelayChannel()
       : delaystream(external_psram_size ? DELAY_LENGTH : DELAY_LENGTH / 32) {}
 
-    void Start(HemisphereAudioAppletF32<Channels>* owner, int channel) {
+    void Start(HemisphereAudioAppletF32* owner, int channel) {
       delaystream.Acquire();
 
       auto& input = owner->InputF32();
