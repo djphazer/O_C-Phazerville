@@ -15,9 +15,21 @@ namespace OC {
     AudioOutputI2S2* output_stream = nullptr;
     AudioPassthrough<2> output_route;
 #ifdef AUDIO_INTERFACE
-    AudioInputUSB input_usb;
+    // The USB audio objects are constructed FIRST (init_priority; the slot
+    // linker scripts collect .init_array.* in priority order), so they sit at
+    // the head of the audio-library update list and update() at the fixed
+    // start of every audio pass, before any applet. The USB driver's TX
+    // rate-matching estimates ring occupancy from the time update() runs; when
+    // the USB output updated last in the pass, that time jittered with the
+    // applets' cost (Abyss: ~30 scattered arena reads/sample) and the
+    // controller lost lock -> ring under/overrun -> clicks on USB only, analog
+    // clean, CPU% unremarkable. Cost: one block (2.9 ms) of extra latency on
+    // the USB output. Diagnosis: usb-audio-glitch-diagnosis.md (2026-08-10).
+    // OCOC only: the stock X/Y slots keep upstream's order and latency.
+    AudioInputUSB input_usb __attribute__((init_priority(101)));
     AudioMixer<2> usbmix[2];
-    AudioOutputUSB output_usb;
+    AudioOutputUSB output_usb __attribute__((init_priority(101)));
+
     AudioConnection out_conn_usbL{output_route, 0, output_usb, 0};
     AudioConnection out_conn_usbR{output_route, 1, output_usb, 1};
     AudioConnection out_conn_usbL2{input_stream, 0, output_usb, 2};
