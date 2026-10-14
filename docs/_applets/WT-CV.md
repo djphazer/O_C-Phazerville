@@ -1,9 +1,12 @@
 ---
 layout: default
+published: false
 ---
-# WTVCO
+# WT-CV
 
-![WTVCO Screenshot](images/WTVCO.png)
+(TODO: screenshot for CV applet)
+
+(fka [WTVCO](WTVCO))
 
 An 8-bit wavetable voltage-controlled oscillator. The CV inputs are assignable. Digital inputs 1 & 2 shift the pitch range down and up by octave steps.
 
