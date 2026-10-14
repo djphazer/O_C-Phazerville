@@ -5,38 +5,14 @@
 // between fold, filter, and mix); the chain still sees int16 via the
 // HemisphereAudioAppletF32 edge adapters.
 
-#include "../HemisphereAudioAppletF32.h"
 #include "../extern/f32/AudioMixer_F32.h"
 #include "../Audio/effect_wavefolder_F32.h"
 #include "../Audio/filter_variable2_F32.h"
 #include "../Audio/synth_dc_F32.h"
 
 template <AudioChannels Channels>
-class FilterFolderApplet : public HemisphereAudioAppletF32<Channels> {
-
+class FilterFolderApplet : public HemisphereAudioAppletF32 {
 public:
-  // The base class chain is dependent on Channels, so inherited names need
-  // explicit import for unqualified use.
-  using Base = HemisphereAudioAppletF32<Channels>;
-  using Base::CONFIG_SIZE;
-  using Base::LVL_MIN_DB;
-  using Base::LVL_MAX_DB;
-  using Base::PatchCableF32;
-  using Base::InputF32;
-  using Base::OutputF32;
-  using Base::CheckEditInputMapPress;
-  using Base::CursorToggle;
-  using Base::EditMode;
-  using Base::EditSelectedInputMap;
-  using Base::MoveCursor;
-  using Base::gfxIcon;
-  using Base::gfxPrint;
-  using Base::gfxPrintDb;
-  using Base::gfxPrintPitchHz;
-  using Base::gfxStartCursor;
-  using Base::gfxEndCursor;
-  using Base::gfxDisplayInputMapEditor;
-
   enum FiltFoldCursor {
     FOLD_AMT,
     FOLD_CV,
@@ -284,7 +260,7 @@ private:
       }
     }
 
-    void Start(HemisphereAudioAppletF32<Channels>* owner) {
+    void Start(HemisphereAudioAppletF32* owner) {
       owner->PatchCableF32(folder, 0, filter, 0);
       owner->PatchCableF32(folder, 0, mixer, 0);
       owner->PatchCableF32(filter, 0, mixer, 1);

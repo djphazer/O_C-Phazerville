@@ -6,7 +6,6 @@
 // HemisphereAudioAppletF32 edge adapters. Params, ranges, and UI are
 // unchanged.
 
-#include "../HemisphereAudioAppletF32.h"
 #include "../Audio/synth_waveform_F32.h"
 #include "../Audio/AudioMixerF32.h"
 #include "../Audio/InterpolatingStreamF32.h"
@@ -20,7 +19,7 @@
 static constexpr float HANDSAW_DETUNE[12] = {  0,  3, -2,   1,  4, -5,  -1,  2, -3,   6,  5, -4 };
 static constexpr float HANDSAW_PHASE[12]  = {  1,  3,  2,   1,  4,  5,   1,  2,  3,   6,  5,  4 };
 
-class HandSawApplet : public HemisphereAudioAppletF32<MONO> {
+class HandSawApplet : public HemisphereAudioAppletF32 {
     public:
         const char* applet_name() {
             return "HandSaw";

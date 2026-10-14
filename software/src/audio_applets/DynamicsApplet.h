@@ -2,29 +2,11 @@
 // float32 blocks (see effect_dynamics_F32.h); the chain still sees int16 via
 // the HemisphereAudioAppletF32 edge adapters.
 
-#include "../HemisphereAudioAppletF32.h"
 #include "../Audio/effect_dynamics_F32.h"
 
 template <AudioChannels Channels>
-class DynamicsApplet : public HemisphereAudioAppletF32<Channels> {
+class DynamicsApplet : public HemisphereAudioAppletF32 {
 public:
-  // The base class chain is dependent on Channels, so inherited names need
-  // explicit import for unqualified use.
-  using Base = HemisphereAudioAppletF32<Channels>;
-  using Base::LVL_MIN_DB;
-  using Base::PatchCableF32;
-  using Base::InputF32;
-  using Base::OutputF32;
-  using Base::GetCompF32;
-  using Base::ReleaseCompF32;
-  using Base::AllowRestart;
-  using Base::EditMode;
-  using Base::MoveCursor;
-  using Base::hemisphere; // used by the gfx_offset macro
-  using Base::gfxPrint;
-  using Base::gfxStartCursor;
-  using Base::gfxEndCursor;
-
   enum DynamicsCursor {
     //IN_GAIN,
     GATE_THRESH,
