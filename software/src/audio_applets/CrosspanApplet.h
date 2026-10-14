@@ -7,12 +7,11 @@
 // sees int16 via the HemisphereAudioAppletF32 edge adapters. Params, ranges,
 // and UI are unchanged.
 
-#include "../HemisphereAudioAppletF32.h"
 #include "../Audio/AudioVCA_F32.h"
 #include "../Audio/AudioMixerF32.h"
 #include "../Audio/InterpolatingStreamF32.h"
 
-class CrosspanApplet : public HemisphereAudioAppletF32<STEREO> {
+class CrosspanApplet : public HemisphereAudioAppletF32 {
 public:
   const char* applet_name() {
     return "Crosspan";
