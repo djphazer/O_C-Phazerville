@@ -22,7 +22,6 @@
 
 #include <TeensyVariablePlayback.h>
 
-template <AudioChannels Channels>
 class OneShotPlayerApplet : public HemisphereAudioApplet {
 public:
   const char* applet_name() {
@@ -31,7 +30,7 @@ public:
 
   void Start() {
     // Setup audio connections
-    for (int i = 0; i < Channels; i++) {
+    for (int i = 0; i < Channels(); i++) {
       // Input passthrough
       PatchCable(input, i, mixer[i], 1);
       mixer[i].gain(1, 1.0);
@@ -460,13 +459,13 @@ private:
   bool prev_gate_state = false;  // For edge detection in trigger mode
 
   // Audio objects
-  AudioPassthrough<Channels> input;
+  AudioPassthrough<STEREO> input;
   AudioPlaySdResmp wavplayer;
   AudioMixer4 mixer[2];
-  AudioPassthrough<Channels> output;
+  AudioPassthrough<STEREO> output;
 
   void SetLevel(float gain) {
-    for (int ch = 0; ch < Channels; ch++) {
+    for (int ch = 0; ch < Channels(); ch++) {
       mixer[ch].gain(0, gain); // Sample channel
     }
   }

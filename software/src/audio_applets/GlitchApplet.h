@@ -34,13 +34,12 @@ extern "C" uint8_t external_psram_size;
 //   MIX        — wet/dry balance 0–100%, CV-modulatable
 //
 // AuxButton latches manual hold without a patched gate.
-template <AudioChannels Channels>
 class GlitchApplet : public HemisphereAudioAppletF32 {
 public:
     const char* applet_name() { return "Glitch"; }
 
     void Start() override {
-        for (int ch = 0; ch < Channels; ch++) {
+        for (int ch = 0; ch < Channels(); ch++) {
             channels[ch].Start(this, ch);
         }
         clock_source.SetClockSource(0); // default to CL1
@@ -88,7 +87,7 @@ public:
         EqualPowerFade(dry_gain, wet_gain,
             constrain(0.01f * mix + mix_cv.InF(), 0.0f, 1.0f));
 
-        for (int ch = 0; ch < Channels; ch++) {
+        for (int ch = 0; ch < Channels(); ch++) {
             channels[ch].glitch_stream.setHold(held);
             channels[ch].glitch_stream.setFreeze(frozen);
             channels[ch].glitch_stream.setSliceSamples(slice_samples);
@@ -380,13 +379,5 @@ private:
         }
 
         void Stop() { glitch_stream.Release(); }
-    } channels[Channels];
+    } channels[STEREO];
 };
-
-// Out-of-line definitions for static constexpr members (C++14 ODR requirement).
-template <AudioChannels Channels>
-constexpr const char* GlitchApplet<Channels>::DIV_NAMES[];
-template <AudioChannels Channels>
-constexpr float GlitchApplet<Channels>::DIV_BEATS[];
-template <AudioChannels Channels>
-constexpr const char* GlitchApplet<Channels>::MODE_NAMES[];

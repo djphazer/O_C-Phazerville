@@ -22,13 +22,12 @@
 //
 // AuxButton: cycle mode (same as encoder on Mode row).
 
-template <AudioChannels Channels>
 class GritApplet : public HemisphereAudioApplet {
 public:
     const char* applet_name() { return "Grit"; }
 
     void Start() override {
-        for (int ch = 0; ch < Channels; ch++) {
+        for (int ch = 0; ch < Channels(); ch++) {
             grit[ch].Acquire();
             PatchCable(input_stream,  ch, grit[ch], 0);
             PatchCable(grit[ch],       0, output_stream, ch);
@@ -36,7 +35,7 @@ public:
     }
 
     void Unload() override {
-        for (int ch = 0; ch < Channels; ch++) grit[ch].Release();
+        for (int ch = 0; ch < Channels(); ch++) grit[ch].Release();
         AllowRestart();
     }
 
@@ -53,7 +52,7 @@ public:
         float wet_gain, dry_gain;
         EqualPowerFade(dry_gain, wet_gain, eff_mix);
 
-        for (int ch = 0; ch < Channels; ch++) {
+        for (int ch = 0; ch < Channels(); ch++) {
             grit[ch].setMode(mode_);
             grit[ch].setDrive(eff_drive);
             grit[ch].setAmt(eff_amt);
@@ -192,7 +191,7 @@ private:
     int8_t    mix    = 100;  // 0–100% wet/dry
     CVInputMap mix_cv;
 
-    AudioEffectGrit          grit[Channels];
-    AudioPassthrough<Channels> input_stream;
-    AudioPassthrough<Channels> output_stream;
+    AudioEffectGrit          grit[STEREO];
+    AudioPassthrough<STEREO> input_stream;
+    AudioPassthrough<STEREO> output_stream;
 };

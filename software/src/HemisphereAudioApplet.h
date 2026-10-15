@@ -18,7 +18,6 @@ enum AudioChannels : uint8_t {
 
 class HemisphereAudioApplet : public HemisphereApplet {
 public:
-
   // F32 reverbs: only the F32 Reverb/Bungverb applets draw from these pools
   static Factory<AudioEffectReverbSchroederF32, 8> bung_factory;
   static Factory<AudioEffectFreeverbF32, 8> verb_factory;
@@ -34,6 +33,10 @@ public:
   // -90 = 15bits of depth so no point in going lower
   static const int LVL_MIN_DB = -90;
   static const int LVL_MAX_DB = 90;
+
+  AudioChannels channels = AudioChannels::NONE;
+  void SetChannels(AudioChannels ch) { channels = ch; }
+  const AudioChannels Channels() const { return channels; }
 
   AudioConnection* cables = nullptr;
   size_t cable_count;

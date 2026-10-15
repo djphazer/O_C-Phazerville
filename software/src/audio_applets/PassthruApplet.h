@@ -1,4 +1,4 @@
-template <AudioChannels Channels>
+template <AudioChannels chans>
 class PassthruApplet : public HemisphereAudioApplet {
 public:
   const char* applet_name() {
@@ -24,5 +24,5 @@ protected:
   void SetHelp() override {}
 
 private:
-  AudioPassthrough<Channels> passthru;
+  AudioPassthrough<chans> passthru;
 };

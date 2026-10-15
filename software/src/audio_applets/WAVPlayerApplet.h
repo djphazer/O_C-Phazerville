@@ -20,7 +20,6 @@
 
 #include <TeensyVariablePlayback.h>
 
-template <AudioChannels Channels>
 class WavPlayerApplet : public HemisphereAudioApplet {
 public:
   const uint64_t applet_id() override {
@@ -31,7 +30,7 @@ public:
   }
 
   void Start() {
-    for (int i = 0; i < Channels; i++) {
+    for (int i = 0; i < Channels(); i++) {
       PatchCable(input, i, mixer[i], 3);
       mixer[i].gain(3, 1.0);
       PatchCable(mixer[i], 0, output, i);
@@ -390,11 +389,11 @@ private:
   bool sync_trig = false;
   bool retrig = false;
 
-  AudioPassthrough<Channels> input;
+  AudioPassthrough<STEREO> input;
   AudioPlaySdResmp      wavplayer;
   AudioFilterStateVariable2 hpfilter[2];
   AudioMixer4           mixer[2];
-  AudioPassthrough<Channels> output;
+  AudioPassthrough<STEREO> output;
 
   // SD player vars, copied from other dev branch
   bool wavplayer_reload = true;
@@ -454,7 +453,7 @@ private:
   void SetFilter(int scalar) {
     lowcut = (scalar < 0);
     if (scalar < 2 && scalar > -2) {
-      for (int ch = 0; ch < Channels; ++ch) {
+      for (int ch = 0; ch < Channels(); ++ch) {
         hpfilter[ch].frequency(0);
       }
       return;
@@ -467,7 +466,7 @@ private:
       freq = abs(freq) / 64;
     freq *= freq;
 
-    for (int ch = 0; ch < Channels; ++ch) {
+    for (int ch = 0; ch < Channels(); ++ch) {
       hpfilter[ch].frequency(freq);
     }
   }
@@ -495,7 +494,7 @@ private:
   }
   void FileLevel(float lvl) {
     bool dry = (djfilter_mod < 2 && djfilter_mod > -2);
-    for (int ch = 0; ch < Channels; ++ch) {
+    for (int ch = 0; ch < Channels(); ++ch) {
       mixer[ch].gain(0, lvl * dry);
       mixer[ch].gain(1, lvl * (1-lowcut) * (1-dry));
       mixer[ch].gain(2, lvl * lowcut * (1-dry));

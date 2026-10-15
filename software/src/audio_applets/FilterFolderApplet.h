@@ -10,7 +10,6 @@
 #include "../Audio/filter_variable2_F32.h"
 #include "../Audio/synth_dc_F32.h"
 
-template <AudioChannels Channels>
 class FilterFolderApplet : public HemisphereAudioAppletF32 {
 public:
   enum FiltFoldCursor {
@@ -46,7 +45,7 @@ public:
   }
 
   void Start() {
-    for (int i = 0; i < Channels; i++) {
+    for (int i = 0; i < Channels(); i++) {
       PatchCableF32(InputF32(), i, filtfolder[i].folder, 0);
       filtfolder[i].Start(this);
       PatchCableF32(filtfolder[i].mixer, 0, OutputF32(), i);
@@ -60,7 +59,7 @@ public:
     const int bias = tiltmode ? tiltbias + res_cv.InRescaled(LVL_MAX_DB)
                               : (djmode ? cv > 0 : 0);
 
-    for (int i = 0; i < Channels; i++) {
+    for (int i = 0; i < Channels(); i++) {
       if (filtfolder[i].modesel == FILT_DJ) {
         filtfolder[i].filter.frequency(PitchToRatio((cv<0)*8*ONE_OCTAVE + cv) * C0);
       } else
@@ -218,7 +217,7 @@ public:
     UnpackPackables(data[0], pitch, res, fold, amplevel, filtfolder[0].modesel);
     UnpackPackables(data[1], pitch_cv, res_cv, fold_cv, amp_cv);
     UnpackPackables(data[2], pitch_cv2);
-    if (Channels == STEREO)
+    if (Channels() == STEREO)
       filtfolder[1].modesel = filtfolder[0].modesel;
   }
 
@@ -270,11 +269,11 @@ private:
     }
   };
 
-  std::array<FilterFolder, Channels> filtfolder;
+  std::array<FilterFolder, STEREO> filtfolder;
 
   void ChangeMode(int dir) {
     uint8_t newmode = constrain(filtfolder[0].modesel + dir, 0, FILT_MODE_COUNT - 1);
-    for (int i = 0; i < Channels; i++) {
+    for (int i = 0; i < Channels(); i++) {
       filtfolder[i].modesel = FiltMode(newmode);
     }
   }
