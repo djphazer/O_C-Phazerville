@@ -6,11 +6,9 @@
 #include "../Audio/AudioPassthrough.h"
 
 // stereo only for now
-template <AudioChannels Channels>
 class ThreeBandzApplet : public HemisphereAudioApplet {
 public:
   static constexpr int BANDZ = 3;
-  //static constexpr int Channels = 2;
 
   enum ThreeBandCursor {
     //IN_GAIN,
@@ -41,7 +39,7 @@ public:
   }
 
   void Start() {
-    for (int ch = 0; ch < Channels; ++ch) {
+    for (int ch = 0; ch < Channels(); ++ch) {
       for (int b = 0; b < BANDZ; ++b) {
         complimit[ch][b] = GetComp();
         if (!complimit[ch][b]) return;
@@ -68,7 +66,7 @@ public:
   }
 
   void Unload() {
-    for (int ch = 0; ch < Channels; ++ch) {
+    for (int ch = 0; ch < Channels(); ++ch) {
       for (int b = 0; b < BANDZ; ++b) {
         ReleaseComp(complimit[ch][b]);
       }
@@ -79,7 +77,7 @@ public:
 
   void SetParams() {
     if (!alloc_ok) return;
-    for (int ch = 0; ch < Channels; ++ch) {
+    for (int ch = 0; ch < Channels(); ++ch) {
       for (int i = 0; i < BANDZ; i++) {
         complimit[ch][i]->gate(gate_threshold[i] * 1.0f);
         complimit[ch][i]->compression(comp_threshold[i] * 1.0f);
@@ -261,21 +259,19 @@ private:
 
   bool alloc_ok = false;
 
-  AudioPassthrough<Channels> input;
-  AudioFilterStateVariable2 filter[Channels][2];
-  AudioEffectDynamics* complimit[Channels][BANDZ];
-  std::array<AudioMixer<BANDZ>, Channels> mixout;
+  AudioPassthrough<STEREO> input;
+  AudioFilterStateVariable2 filter[STEREO][2];
+  AudioEffectDynamics* complimit[STEREO][BANDZ];
+  std::array<AudioMixer<BANDZ>, STEREO> mixout;
   // TODO: maybe a final limiter after the mix?
-  AudioPassthrough<Channels> output;
+  AudioPassthrough<STEREO> output;
 };
 
-template <AudioChannels Channels>
-FLASHMEM void ThreeBandzApplet<Channels>::View() {
+FLASHMEM void ThreeBandzApplet::View() {
   MainView();
 }
 
-template <AudioChannels Channels>
-FLASHMEM void ThreeBandzApplet<Channels>::DrawFullScreen() {
+FLASHMEM void ThreeBandzApplet::DrawFullScreen() {
   if (!alloc_ok) return;
   graphics.drawLine(64 - gfx_offset, 26, 127 - gfx_offset, 26, 3);
   for (int i = 0; i < BANDZ; i++) {

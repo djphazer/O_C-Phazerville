@@ -31,13 +31,12 @@ extern "C" uint8_t external_psram_size;
 //   Page 1: Pos, Den, Sz, Spr, PSp
 //   Page 2: Pitch, Fdb, Tex, Mix, Frz
 //
-template <AudioChannels Channels>
 class MistierApplet : public HemisphereAudioAppletF32 {
 public:
     const char* applet_name() { return "Misty"; }
 
     void Start() override {
-        for (int ch = 0; ch < Channels; ch++) {
+        for (int ch = 0; ch < Channels(); ch++) {
             channels[ch].Start(this, ch);
         }
     }
@@ -74,7 +73,7 @@ public:
         float dry_gain, wet_gain;
         EqualPowerFade(dry_gain, wet_gain, eff_mix);
 
-        for (int ch = 0; ch < Channels; ch++) {
+        for (int ch = 0; ch < Channels(); ch++) {
             channels[ch].grain_stream.setPosition(eff_pos);
             channels[ch].grain_stream.setDensity(eff_density);
             channels[ch].grain_stream.setSize(eff_size);
@@ -307,5 +306,5 @@ private:
         }
 
         void Stop() { grain_stream.Release(); }
-    } channels[Channels];
+    } channels[STEREO];
 };
