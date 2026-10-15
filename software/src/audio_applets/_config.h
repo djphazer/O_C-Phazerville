@@ -64,58 +64,58 @@ Factory<AudioEffectDynamicsF32, 10> HemisphereAudioApplet::compressor_f32_factor
 // TODO: categories
 constexpr Registry mono_applets = Registry<HemisphereAudioApplet, NUM_SLOTS * 2
     , DeclareFancyApplet<PassthruApplet<MONO>>
-    , DeclareFancyApplet<InputApplet<MONO>>
-    , DeclareFancyApplet<UpsampledApplet<MONO>>
+    , DeclareFancyApplet<InputApplet>
+    , DeclareFancyApplet<UpsampledApplet>
     , DeclareFancyApplet<OscApplet>
     , DeclareFancyApplet<HandSawApplet>
     , DeclareFancyApplet<HarmOscApplet>
     , DeclareFancyApplet<FMDrumApplet>
-    , DeclareFancyApplet<WavPlayerApplet<MONO>>
-//    , DeclareFancyApplet<OneShotPlayerApplet<MONO>>
-    , DeclareFancyApplet<VcaApplet<MONO>>
-    , DeclareFancyApplet<LadderApplet<MONO>>
-    , DeclareFancyApplet<FilterFolderApplet<MONO>>
-    , DeclareFancyApplet<DelayApplet<MONO>>
-    , DeclareFancyApplet<AbyssApplet<STEREO>>
-    , DeclareFancyApplet<AnimorfApplet<MONO>>
+    , DeclareFancyApplet<WavPlayerApplet>
+//    , DeclareFancyApplet<OneShotPlayerApplet>
+    , DeclareFancyApplet<VcaApplet>
+    , DeclareFancyApplet<LadderApplet>
+    , DeclareFancyApplet<FilterFolderApplet>
+    , DeclareFancyApplet<DelayApplet>
+    , DeclareFancyApplet<AbyssApplet>
+    , DeclareFancyApplet<AnimorfApplet>
     , DeclareFancyApplet<PhazerApplet>
     // , DeclareFancyApplet<ReverbApplet>
     , DeclareFancyApplet<BungverbApplet>
-    , DeclareFancyApplet<DynamicsApplet<MONO>>
-    , DeclareFancyApplet<ThreeBandzApplet<MONO>>
-    , DeclareFancyApplet<TuneTrackerApplet<MONO>>
-    , DeclareFancyApplet<GlitchApplet<MONO>>
-    , DeclareFancyApplet<GritApplet<MONO>>
+    , DeclareFancyApplet<DynamicsApplet>
+    , DeclareFancyApplet<ThreeBandzApplet>
+    , DeclareFancyApplet<TuneTrackerApplet>
+    , DeclareFancyApplet<GlitchApplet>
+    , DeclareFancyApplet<GritApplet>
 #ifndef AUDIO_INTERFACE
-    // , DeclareFancyApplet<MistierApplet<MONO>>
+    // , DeclareFancyApplet<MistierApplet>
 #endif
     , DeclareFancyApplet<AdvKrpsStrngApplet>
     , DeclareFancyApplet<WTVCOApplet>
 #ifndef AUDIO_INTERFACE
-    , DeclareFancyApplet<ModalResonatorApplet<MONO>>
-    , DeclareFancyApplet<WavRecorderApplet<MONO>>
+    , DeclareFancyApplet<ModalResonatorApplet>
+    , DeclareFancyApplet<WavRecorderApplet>
 #endif
 >{};
 
 constexpr Registry stereo_applets = Registry<HemisphereAudioApplet, NUM_SLOTS
   , DeclareFancyApplet<PassthruApplet<STEREO>>
-  , DeclareFancyApplet<InputApplet<STEREO>>
-  , DeclareFancyApplet<UpsampledApplet<STEREO>>
+  , DeclareFancyApplet<InputApplet>
+  , DeclareFancyApplet<UpsampledApplet>
   , DeclareFancyApplet<CrosspanApplet>
   , DeclareFancyApplet<MidSideApplet>
-  , DeclareFancyApplet<VcaApplet<STEREO>>
-  , DeclareFancyApplet<DynamicsApplet<STEREO>>
-  , DeclareFancyApplet<ThreeBandzApplet<STEREO>>
-  , DeclareFancyApplet<DelayApplet<STEREO>>
-  , DeclareFancyApplet<AbyssApplet<STEREO>>
-  , DeclareFancyApplet<AnimorfApplet<STEREO>>
-  , DeclareFancyApplet<LadderApplet<STEREO>>
-  , DeclareFancyApplet<FilterFolderApplet<STEREO>>
-  , DeclareFancyApplet<WavPlayerApplet<STEREO>>
-//  , DeclareFancyApplet<OneShotPlayerApplet<STEREO>>
+  , DeclareFancyApplet<VcaApplet>
+  , DeclareFancyApplet<DynamicsApplet>
+  , DeclareFancyApplet<ThreeBandzApplet>
+  , DeclareFancyApplet<DelayApplet>
+  , DeclareFancyApplet<AbyssApplet>
+  , DeclareFancyApplet<AnimorfApplet>
+  , DeclareFancyApplet<LadderApplet>
+  , DeclareFancyApplet<FilterFolderApplet>
+  , DeclareFancyApplet<WavPlayerApplet>
+//  , DeclareFancyApplet<OneShotPlayerApplet>
 #ifndef AUDIO_INTERFACE
-  , DeclareFancyApplet<ModalResonatorApplet<STEREO>>
-  , DeclareFancyApplet<WavRecorderApplet<STEREO>>
+  , DeclareFancyApplet<ModalResonatorApplet>
+  , DeclareFancyApplet<WavRecorderApplet>
 #endif
 >{};
 
@@ -125,28 +125,6 @@ constexpr int MONO_POOL_SIZE = mono_appletIds.size();
 static constexpr auto stereo_appletIds = stereo_applets.getIds();
 constexpr int STEREO_POOL_SIZE = stereo_appletIds.size();
 
-/*DMAMEM std::tuple<*/
-/*  PassthruApplet<MONO>,*/
-/*  InputApplet<MONO>,*/
-/*  HandSawApplet,*/
-/*  HarmOscApplet,*/
-/*  UpsampledApplet<MONO>,*/
-/*  OscApplet,*/
-/*  FMDrumApplet,*/
-/*  WavPlayerApplet<MONO>,*/
-/*  OneShotPlayerApplet<MONO>,*/
-/*  AdvKrpsStrngApplet,*/
-/*  WTVCOApplet,*/
-/*  ModalResonatorApplet<MONO>,*/
-/*  >*/
-/*    mono_input_pool[2];*/
-/*DMAMEM std::tuple<*/
-/*  PassthruApplet<STEREO>,*/
-/*  InputApplet<STEREO>,*/
-/*  WavPlayerApplet<STEREO>,*/
-/*  OneShotPlayerApplet<STEREO>,*/
-/*  UpsampledApplet<STEREO>>*/
-/*    stereo_input_pool;*/
 
 // Helper to extract the tuple type from an array... thanks ChatGPT...
 template <typename ArrayType>

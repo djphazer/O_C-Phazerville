@@ -14,7 +14,6 @@
 #include "../Audio/AudioAnalyzePeakF32.h"
 #include "../Audio/InterpolatingStreamF32.h"
 
-template <AudioChannels Channels>
 class InputApplet : public HemisphereAudioAppletF32 {
 public:
   const uint64_t applet_id() override {
@@ -25,7 +24,7 @@ public:
     return "Input";
   }
   void Start() override {
-    if (MONO == Channels) {
+    if (MONO == Channels()) {
       modesel_ = hemisphere & 1;
     }
 
@@ -45,7 +44,7 @@ public:
       PatchCableF32(srcmix[ch], 0, peakmeter[ch], 0);
     }
 
-    for (int i = 0; i < Channels; ++i) {
+    for (int i = 0; i < Channels(); ++i) {
       ForEachChannel(ch) {
         PatchCableF32(vcas[ch], 0, mixer[i], ch);
       }
@@ -60,7 +59,7 @@ public:
     UpdateMix();
   }
   void Unload() override {
-    for (int i = 0; i < Channels; ++i) {
+    for (int i = 0; i < Channels(); ++i) {
       attenuations[i].Release();
     }
     AllowRestart();
@@ -135,7 +134,7 @@ public:
         break;
       case CHANNEL_MODE:
         modesel_ = constrain(modesel_ + direction, 0, MODE_COUNT - 1);
-        if (Channels == MONO && (modesel_ == DUAL
+        if (Channels() == MONO && (modesel_ == DUAL
 #ifdef AUDIO_INTERFACE
             || modesel_ == USB_DUAL
 #endif
@@ -168,7 +167,7 @@ public:
           break;
       }
     }
-    for (int ch = 0; ch < Channels; ++ch) {
+    for (int ch = 0; ch < Channels(); ++ch) {
       switch (modesel_) {
 #ifdef AUDIO_INTERFACE
         case USB_DUAL:
@@ -215,7 +214,7 @@ private:
   std::array<InterpolatingStreamF32<>, 2> attenuations;
   std::array<AudioVCA_F32, 2> vcas;
   AudioMixerF32<2> srcmix[2];
-  AudioMixerF32<3> mixer[Channels];
+  AudioMixerF32<3> mixer[STEREO];
   AudioAnalyzePeakF32 peakmeter[2];
 
   int8_t modesel_ = DUAL;

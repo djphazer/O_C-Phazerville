@@ -33,7 +33,6 @@
 // AuxButton: fires a manual noise-burst strike (test without a patched exciter).
 // Trg input: assignable gate trigger (rising edge). Vel CV: scales strike velocity.
 
-template <AudioChannels Channels>
 class ModalResonatorApplet : public HemisphereAudioAppletF32 {
 public:
     const char* applet_name() { return "ModalRes"; }
@@ -41,7 +40,7 @@ public:
     // --- Lifecycle -----------------------------------------------------------
 
     void Start() override {
-        for (int ch = 0; ch < Channels; ch++)
+        for (int ch = 0; ch < Channels(); ch++)
             channels[ch].Start(this, ch, InputF32(), OutputF32());
     }
 
@@ -72,7 +71,7 @@ public:
         bool gate_strike = cur_strike_gate && !prev_strike_gate_;
         prev_strike_gate_ = cur_strike_gate;
 
-        for (int ch = 0; ch < Channels; ch++) {
+        for (int ch = 0; ch < Channels(); ch++) {
             channels[ch].resonator.updateCoeffs(
                 freq_hz, eff_structure, eff_bright, eff_damp, eff_pos);
             channels[ch].wet_dry_mixer.gain(ResonatorChannel::DRY_CH, dry_gain);
@@ -325,10 +324,9 @@ private:
         }
 
         void Stop() { resonator.Release(); }
-    } channels[Channels];
+    } channels[STEREO];
 };
 
-template <AudioChannels Channels>
-FLASHMEM void ModalResonatorApplet<Channels>::View() {
+FLASHMEM void ModalResonatorApplet::View() {
   MainView();
 }

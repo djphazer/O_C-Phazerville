@@ -4,7 +4,6 @@
 
 #include "../Audio/effect_dynamics_F32.h"
 
-template <AudioChannels Channels>
 class DynamicsApplet : public HemisphereAudioAppletF32 {
 public:
   enum DynamicsCursor {
@@ -22,7 +21,7 @@ public:
   }
 
   void Start() {
-    for (int i = 0; i < Channels; i++) {
+    for (int i = 0; i < Channels(); i++) {
       complimit[i] = GetCompF32();
       if (!complimit[i]) return;
 
@@ -41,7 +40,7 @@ public:
 
   void SetParams() {
     if (!alloc_ok) return;
-    for (int i = 0; i < Channels; i++) {
+    for (int i = 0; i < Channels(); i++) {
       complimit[i]->gate(gate_threshold * 1.0f);
       complimit[i]->compression(comp_threshold * 1.0f);
       complimit[i]->limit(limit_threshold * 1.0f);
@@ -54,7 +53,7 @@ public:
 
   void Controller() {
     if (!alloc_ok) return;
-    for (int i = 0; i < Channels; i++) {
+    for (int i = 0; i < Channels(); i++) {
       // TODO: connect modulated param values to stuff
     }
   }
@@ -160,16 +159,14 @@ private:
   //void makeupGain(float gain = 0.0f)
   //void limit(float threshold = -3.0f, float attack = MIN_T, float release = MIN_T)
 
-  std::array<AudioEffectDynamicsF32*, Channels> complimit;
+  std::array<AudioEffectDynamicsF32*, STEREO> complimit;
 };
 
-template <AudioChannels Channels>
-FLASHMEM void DynamicsApplet<Channels>::View() {
+FLASHMEM void DynamicsApplet::View() {
   MainView();
 }
 
-template <AudioChannels Channels>
-FLASHMEM void DynamicsApplet<Channels>::DrawFullScreen() {
+FLASHMEM void DynamicsApplet::DrawFullScreen() {
   if (!alloc_ok) return;
   graphics.drawLine(64 - gfx_offset, 26, 127 - gfx_offset, 26, 3);
   const int x = 25 + (64 - gfx_offset);

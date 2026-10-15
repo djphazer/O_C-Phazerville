@@ -18,7 +18,6 @@
 
 #include "../Audio/effect_animorf.h"
 
-template <AudioChannels Channels>
 class AnimorfApplet : public HemisphereAudioApplet {
 public:
   const char* applet_name() {
@@ -27,9 +26,9 @@ public:
 
   void Start() {
     morfer.begin();
-    morfer.setMonoSum(Channels == MONO);
+    morfer.setMonoSum(Channels() == MONO);
     ForEachChannel(ch) {
-      if (Channels == STEREO || ch == 0) {
+      if (Channels() == STEREO || ch == 0) {
         PatchCable(input_stream, ch, morfer, ch);
         PatchCable(morfer, ch, wetdry[ch], WD_WET_CH);
         PatchCable(input_stream, ch, wetdry[ch], WD_DRY_CH);
@@ -73,7 +72,7 @@ public:
     float dry_gain, wet_gain;
     EqualPowerFade(dry_gain, wet_gain, mix01);
     ForEachChannel(ch) {
-      if (Channels == STEREO || ch == 0) {
+      if (Channels() == STEREO || ch == 0) {
         wetdry[ch].gain(WD_WET_CH, wet_gain);
         wetdry[ch].gain(WD_DRY_CH, send_mode ? 1.0f : dry_gain);
       }
@@ -334,8 +333,8 @@ private:
   int16_t knob_accel = 0;
   elapsedMillis millis_since_turn;
 
-  AudioPassthrough<Channels> input_stream;
+  AudioPassthrough<STEREO> input_stream;
   AudioEffectAnimorf morfer;
-  AudioMixer<2> wetdry[Channels];
-  AudioPassthrough<Channels> output_stream;
+  AudioMixer<2> wetdry[STEREO];
+  AudioPassthrough<STEREO> output_stream;
 };
