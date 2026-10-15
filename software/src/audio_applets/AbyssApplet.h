@@ -14,7 +14,6 @@
 
 #include "../Audio/effect_abyss.h"
 
-template <AudioChannels Channels>
 class AbyssApplet : public HemisphereAudioApplet {
 public:
   const char* applet_name() {
@@ -46,7 +45,7 @@ public:
     EqualPowerFade(dry_gain, wet_gain, mix01);
     reverb.setInputGain(send_mode ? wet_gain : 1.0f);
     ForEachChannel(ch) {
-      if (Channels == STEREO || ch == 0) {
+      if (Channels() == STEREO || ch == 0) {
         if (send_mode) {
           // wet & dry pass thru at unity; Mix sets how much goes into the tank.
           wetdry[ch].gain(WD_WET_CH, 1.0f);
@@ -230,14 +229,13 @@ private:
   int16_t knob_accel = 0;
   elapsedMillis millis_since_turn;
 
-  AudioPassthrough<Channels> input_stream;
+  AudioPassthrough<STEREO> input_stream;
   AudioEffectAbyssReverb reverb;
-  AudioMixer<2> wetdry[Channels];
-  AudioPassthrough<Channels> output_stream;
+  AudioMixer<2> wetdry[STEREO];
+  AudioPassthrough<STEREO> output_stream;
 };
 
-template <AudioChannels Channels>
-FLASHMEM void AbyssApplet<Channels>::View() {
+FLASHMEM void AbyssApplet::View() {
   if (!alloc_ok) {
     gfxPrint(1, 15, "Out of RAM!!");
     return;
@@ -253,12 +251,11 @@ FLASHMEM void AbyssApplet<Channels>::View() {
   gfxDisplayInputMapEditor();
 }
 
-template <AudioChannels Channels>
-FLASHMEM void AbyssApplet<Channels>::Start() {
+FLASHMEM void AbyssApplet::Start() {
   alloc_ok = reverb.begin();
-  reverb.setMonoSum(Channels == MONO);
+  reverb.setMonoSum(Channels() == MONO);
   ForEachChannel(ch) {
-    if (Channels == STEREO || ch == 0) {
+    if (Channels() == STEREO || ch == 0) {
       PatchCable(input_stream, ch, reverb, ch);
       PatchCable(reverb, ch, wetdry[ch], WD_WET_CH);
       PatchCable(input_stream, ch, wetdry[ch], WD_DRY_CH);
@@ -268,8 +265,7 @@ FLASHMEM void AbyssApplet<Channels>::Start() {
 }
 
 
-template <AudioChannels Channels>
-FLASHMEM void AbyssApplet<Channels>::OnEncoderMove(int direction) {
+FLASHMEM void AbyssApplet::OnEncoderMove(int direction) {
   if (!EditMode()) {
     MoveCursor(cursor, direction, CURSOR_LENGTH - 1);
     return;

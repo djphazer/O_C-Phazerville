@@ -9,27 +9,32 @@
 
 extern "C" uint8_t external_psram_size;
 
-template <AudioChannels Channels>
 class DelayApplet : public HemisphereAudioAppletF32 {
 public:
   const char* applet_name() {
     return "Delay";
   }
   void Start() {
-    for (int ch = 0; ch < Channels; ch++) {
-      channels[ch].Start(this, ch);
+    for (int ch = 0; ch < Channels(); ch++) {
+      channels[ch] = new DelayChannel();
+      if (!channels[ch]) {
+        HS::PokePopup(HS::ERROR_POPUP, "Delay: no channels!");
+        return;
+      }
+      channels[ch]->Start(this, ch);
     }
-    if (Channels == STEREO) {
+    if (Channels() == STEREO) {
+      // cross-channel feedback connections
       ForEachChannel(ch) {
         PatchCableF32(
-          channels[ch].taps_mixer, 0, channels[1 - ch].input_mixer, PP_CH
+          channels[ch]->taps_mixer, 0, channels[1 - ch]->input_mixer, PP_CH
         );
-        channels[1 - ch].input_mixer.gain(PP_CH, 0.0f);
+        channels[1 - ch]->input_mixer.gain(PP_CH, 0.0f);
       }
     }
     set_taps(taps);
-    MAX_DELAY_SECS = channels[0].delaystream.MAX_DELAY_SECS;
-    MIN_DELAY_SECS = channels[0].delaystream.MIN_DELAY_SECS;
+    MAX_DELAY_SECS = channels[0]->delaystream.MAX_DELAY_SECS;
+    MIN_DELAY_SECS = channels[0]->delaystream.MIN_DELAY_SECS;
     clock_source.SetClockSource(0); // CL1
   }
 
@@ -37,11 +42,15 @@ public:
     /* what if we just... kept it forever?
      * the problem is, unloading & reloading is slow when jumping presets
      */
-    for (auto& ch : channels) ch.Stop();
+    for (int ch = 0; ch < Channels(); ch++) {
+      channels[ch]->Stop();
+    }
     AllowRestart();
   }
 
   void Controller() {
+    if (!channels[0]) return;
+
     clock_count++;
     if (clock_source.Clock()) {
       clock_base_secs = clock_count / 16666.0f;
@@ -74,10 +83,14 @@ public:
       CONSTRAIN(d, 0.0f, MAX_DELAY_SECS);
       switch (delay_mod_type) {
         case CROSSFADE:
-          for (auto& ch : channels) ch.delaystream.cf_delay(tap, t);
+          for (int ch = 0; ch < Channels(); ch++) {
+            channels[ch]->delaystream.cf_delay(tap, t);
+          }
           break;
         case STRETCH:
-          for (auto& ch : channels) ch.delaystream.delay(tap, t);
+          for (int ch = 0; ch < Channels(); ch++) {
+            channels[ch]->delaystream.delay(tap, t);
+          }
           break;
       }
     }
@@ -88,7 +101,7 @@ public:
     // the equal power coefficient. Thus, need equal amplitude instead.
     float fb = constrain(total_feedback, 0.0, 2.0f) / taps;
 
-    for (auto& ch : channels) {
+    for (int i = 0; i < Channels(); ++i) { auto& ch = *channels[i];
       if (frozen) {
         ch.input_mixer.gain(0, 0.0f);
         ch.delaystream.feedback(8, 1.0f);
@@ -103,8 +116,8 @@ public:
       }
     }
 
-    if (Channels == STEREO) {
-      for (auto& ch : channels) {
+    if (Channels() == STEREO) {
+      for (int i = 0; i < Channels(); ++i) { auto& ch = *channels[i];
         // The tap mixer has already used equal power mixing on the taps. With
         // feedback, we want equal amplitude, so just multiply by one more
         // factor of equal power and voila (since equal amplitude scalars are
@@ -121,14 +134,13 @@ public:
       dry_gain, wet_gain, constrain(0.01f * wet + wet_cv.InF(), 0.0f, 1.0f)
     );
 
-    if (send_mode) {
-      for (auto& ch : channels) {
+    for (int i = 0; i < Channels(); ++i) {
+      auto& ch = *channels[i];
+      if (send_mode) {
         ch.wet_dry_mixer.gain(WD_WET_CH, 1.0f);
         ch.wet_dry_mixer.gain(WD_DRY_CH, 1.0f);
         ch.input_mixer.gain(0, wet_gain);
-      }
-    } else {
-      for (auto& ch : channels) {
+      } else {
         ch.wet_dry_mixer.gain(WD_WET_CH, wet_gain);
         ch.wet_dry_mixer.gain(WD_DRY_CH, dry_gain);
         ch.input_mixer.gain(0, 1.0f);
@@ -298,7 +310,7 @@ public:
         delay_mod_type = constrain(delay_mod_type + direction, 0, 1);
         break;
       case FEEDBACK:
-        feedback = constrain(feedback + direction, Channels == STEREO ? -100 : 0, 100);
+        feedback = constrain(feedback + direction, Channels() == STEREO ? -100 : 0, 100);
         break;
       case FEEDBACK_CV:
         feedback_cv.ChangeSource(direction);
@@ -366,7 +378,8 @@ protected:
     CONSTRAIN(t, 1, 8);
     taps = t;
     float tap_gain = EQUAL_POWER_EQUAL_MIX[taps];
-    for (auto& ch : channels) {
+    for (int i = 0; i < Channels(); ++i) {
+      auto& ch = *channels[i];
       for (int i = 0; i < taps; i++) ch.taps_mixer.gain(i, tap_gain);
       for (int i = taps; i < 8; i++) ch.taps_mixer.gain(i, 0.0f);
       ch.delaystream.taps(taps);
@@ -476,7 +489,8 @@ private:
     void Stop() {
       delaystream.Release();
     }
-  } channels[Channels];
+  };
+  DelayChannel* channels[STEREO];
 
   // [-4,-2]=>-1, [-1,1]=>0, [2,4]=>1, etc
   int16_t semitones_to_div(int16_t semis) {

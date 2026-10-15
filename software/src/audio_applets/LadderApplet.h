@@ -7,7 +7,6 @@
 
 #include "../Audio/filter_ladder_F32.h"
 
-template <AudioChannels Channels>
 class LadderApplet : public HemisphereAudioAppletF32 {
 public:
 
@@ -16,14 +15,14 @@ public:
   }
 
   void Start() {
-    for (int i = 0; i < Channels; i++) {
+    for (int i = 0; i < Channels(); i++) {
       PatchCableF32(InputF32(), i, filters[i], 0);
       PatchCableF32(filters[i], 0, OutputF32(), i);
     }
   }
 
   void Controller() {
-    for (int i = 0; i < Channels; i++) {
+    for (int i = 0; i < Channels(); i++) {
       filters[i].frequency(PitchToRatio(pitch + pitch_cv.In() + pitch_cv2.In()) * C3);
       filters[i].resonance(0.01f * res + res_cv.InF());
       filters[i].inputDrive(0.01f * gain + gain_cv.InF());
@@ -137,5 +136,5 @@ private:
   CVInputMap res_cv;
   CVInputMap gain_cv;
 
-  std::array<AudioFilterLadderF32, Channels> filters;
+  std::array<AudioFilterLadderF32, STEREO> filters;
 };
