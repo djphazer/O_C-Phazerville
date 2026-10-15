@@ -26,7 +26,6 @@ extern "C" uint8_t external_psram_size;
 // Shared across all template specialisations (C++17 inline variable).
 inline bool wav_recorder_sd_lock = false;
 
-template <AudioChannels Channels>
 class WavRecorderApplet : public HemisphereAudioApplet {
 public:
 
@@ -40,7 +39,7 @@ public:
         // Tap the passthrough into record queues.
         // passthru is used for both InputStream() and OutputStream(), so the
         // audio path is zero-copy; the queues are side-channel sinks only.
-        for (int ch = 0; ch < Channels; ch++)
+        for (int ch = 0; ch < Channels(); ch++)
             PatchCable(passthru, ch, record_queue[ch], 0);
 
         psram_buf = (int8_t*)extmem_calloc(RING_BYTES, 1);
@@ -249,8 +248,8 @@ private:
     // Audio objects
     // -----------------------------------------------------------------------
 
-    AudioPassthrough<Channels> passthru;           // shared I/O node
-    AudioRecordQueue           record_queue[Channels]; // one sink per channel
+    AudioPassthrough<STEREO> passthru;           // shared I/O node
+    AudioRecordQueue           record_queue[STEREO]; // one sink per channel
 
     // -----------------------------------------------------------------------
     // PSRAM ring buffer
@@ -313,7 +312,7 @@ private:
     // -----------------------------------------------------------------------
 
     void WriteWAVHeader(File& f) {
-        const uint16_t numCh      = (uint16_t)Channels;
+        const uint16_t numCh      = (uint16_t)Channels();
         const uint32_t byteRate   = WAV_SAMPLE_RATE * numCh * (WAV_BITS / 8);
         const uint16_t blockAlign = numCh * (WAV_BITS / 8);
 
@@ -406,7 +405,7 @@ private:
         ring_write_pos = ring_read_pos = ring_fill = 0;
         overflow_flag  = false;
 
-        for (int ch = 0; ch < Channels; ch++) {
+        for (int ch = 0; ch < Channels(); ch++) {
             record_queue[ch].clear();
             record_queue[ch].begin();
         }
@@ -454,28 +453,28 @@ private:
         while (QueuesAvailable()) {
             // Read one block from every channel simultaneously
             int16_t* bufs[2] = {nullptr, nullptr};
-            for (int ch = 0; ch < Channels; ch++)
+            for (int ch = 0; ch < Channels(); ch++)
                 bufs[ch] = record_queue[ch].readBuffer();
 
             // Interleave (or copy for mono) + track peak
             for (int i = 0; i < AUDIO_BLOCK_SAMPLES; i++) {
-                for (int ch = 0; ch < Channels; ch++) {
+                for (int ch = 0; ch < Channels(); ch++) {
                     int16_t s = bufs[ch][i];
-                    scratch[i * Channels + ch] = s;
+                    scratch[i * Channels() + ch] = s;
                     uint16_t a = (uint16_t)(s < 0 ? -s : s);
                     if (a > peak_level) peak_level = a;
                 }
             }
 
-            for (int ch = 0; ch < Channels; ch++)
+            for (int ch = 0; ch < Channels(); ch++)
                 record_queue[ch].freeBuffer();
 
-            RingWrite(scratch, (size_t)AUDIO_BLOCK_SAMPLES * Channels * sizeof(int16_t));
+            RingWrite(scratch, (size_t)AUDIO_BLOCK_SAMPLES * Channels() * sizeof(int16_t));
         }
     }
 
     bool QueuesAvailable() const {
-        for (int ch = 0; ch < Channels; ch++)
+        for (int ch = 0; ch < Channels(); ch++)
             if (!record_queue[ch].available()) return false;
         return true;
     }
@@ -516,7 +515,7 @@ private:
         PatchWAVHeader(rec_file);
         if (do_close) rec_file.close();
 
-        for (int ch = 0; ch < Channels; ch++)
+        for (int ch = 0; ch < Channels(); ch++)
             record_queue[ch].end();
 
         wav_recorder_sd_lock = false;
@@ -530,7 +529,7 @@ private:
 
     uint32_t RecMillis() const {
         // bytes_written / bytes_per_second * 1000
-        const uint32_t bps = WAV_SAMPLE_RATE * (uint32_t)Channels * sizeof(int16_t);
+        const uint32_t bps = WAV_SAMPLE_RATE * (uint32_t)Channels() * sizeof(int16_t);
         return (uint32_t)((uint64_t)bytes_written * 1000 / bps);
     }
 };

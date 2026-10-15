@@ -1,6 +1,5 @@
 #pragma once
 
-template <AudioChannels Channels>
 class UpsampledApplet : public HemisphereAudioApplet {
 public:
   const char* applet_name() {
@@ -11,7 +10,7 @@ public:
     interp_stream.Acquire();
     interp_stream.Method(static_cast<InterpolationMethod>(method));
 
-    for (int c = 0; c < Channels; c++) {
+    for (int c = 0; c < Channels(); c++) {
       PatchCable(interp_stream, 0, mixer[c], 0);
       PatchCable(input_stream, c, mixer[c], 1);
       PatchCable(mixer[c], 0, output_stream, c);
@@ -135,10 +134,10 @@ protected:
   void SetHelp() override {}
 
 private:
-  AudioPassthrough<Channels> input_stream;
+  AudioPassthrough<STEREO> input_stream;
   InterpolatingStream<> interp_stream;
-  AudioMixer<2> mixer[Channels];
-  AudioPassthrough<Channels> output_stream;
+  AudioMixer<2> mixer[STEREO];
+  AudioPassthrough<STEREO> output_stream;
 
   float lp = 0.0f;
   int cursor = 0;

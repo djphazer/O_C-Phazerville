@@ -10,7 +10,6 @@
 #include "../Audio/AudioVCA_F32.h"
 #include "../Audio/InterpolatingStreamF32.h"
 
-template <AudioChannels Channels>
 class VcaApplet : public HemisphereAudioAppletF32 {
 public:
   const char* applet_name() {
@@ -22,7 +21,7 @@ public:
     // with ZOH
     cv_stream.Method(INTERPOLATION_LINEAR);
     cv_stream.Acquire();
-    for (int i = 0; i < Channels; i++) {
+    for (int i = 0; i < Channels(); i++) {
       PatchCableF32(InputF32(), i, vcas[i], 0);
       PatchCableF32(cv_stream, 0, vcas[i], 1);
       PatchCableF32(vcas[i], 0, OutputF32(), i);
@@ -172,7 +171,7 @@ private:
   bool invert = false;
 
   InterpolatingStreamF32<> cv_stream;
-  std::array<AudioVCA_F32, Channels> vcas;
+  std::array<AudioVCA_F32, STEREO> vcas;
 
   // Gives variable curve exponent by controlling the base normalized to go from
   // 0 to 1 for powers 0 to 1.
