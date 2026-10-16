@@ -1,5 +1,6 @@
 // Icons!
-// Web editor: https://goatama.ridiculousglitch.com/bitca/ (Column major MSB Bottom)
+// Web editor: https://ardesista.github.io/bitca/ (Column major MSB Bottom)
+// Alternate: https://firmware.phazerville.com/icon_editor
 
 #ifndef HS_ICON_SET
 #define HS_ICON_SET
