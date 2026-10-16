@@ -1001,9 +1001,14 @@ public:
             // If a help screen is already selected, and the button is for
             // the opposite one, go to the other help screen
             if (zoom_slot > -1) {
-                if (zoom_slot != hemisphere) SetFullScreen(hemisphere);
-                else SetFullScreen(-1); // Exit help screen if same button is clicked
-                OC::ui.SetButtonIgnoreMask(); // ignore release
+                if (zoom_slot != hemisphere) {
+                    SetFullScreen(hemisphere);
+                    OC::ui.SetButtonIgnoreMask(); // ignore release
+                }
+                else if (!HS::get_applet(my_applet[hemisphere], hemisphere)->EditMode()) {
+                    SetFullScreen(-1); // Exit help screen if same button is clicked
+                    OC::ui.SetButtonIgnoreMask(); // ignore release
+                }
             }
 
             // mark this single click
