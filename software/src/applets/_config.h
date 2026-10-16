@@ -35,6 +35,7 @@ using namespace HS;
 #include "ClkToGate.h"
 #include "ClockSkip.h"
 #include "Combin8.h"
+#include "FrogSeq.h"
 #include "Compare.h"
 #include "CVSeq.h"
 #include "DivSeq.h"
@@ -183,6 +184,7 @@ constexpr Registry reg = Registry<HemisphereApplet, HS::APPLET_SLOTS  // unused 
 #endif
     , DeclareApplet<EuclidO, 83, CAT_SEQUENCER>
     , DeclareApplet<EuclidX, 15, CAT_SEQUENCER>
+    , DeclareApplet<FrogSeq, 95, CAT_SEQUENCER>
 #ifdef USB_GAMEPAD
     , DeclareApplet<JoyStyx, 66, CAT_MODULATOR>
 #endif
