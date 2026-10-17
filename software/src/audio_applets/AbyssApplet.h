@@ -14,7 +14,7 @@
 
 #include "../Audio/effect_abyss.h"
 
-class AbyssApplet : public HemisphereAudioApplet {
+class AbyssApplet : public HemisphereAudioAppletF32 {
 public:
   const char* applet_name() {
     return "Abyss";
@@ -92,13 +92,6 @@ public:
     UnpackPackables(data[0], BLACKHOLE_PARAMS);
     UnpackPackables(data[1], mix_cv, grav_cv, size_cv, mod_cv);
     UnpackPackables(data[2], pack<1>(send_mode));
-  }
-
-  AudioStream* InputStream() {
-    return &input_stream;
-  }
-  AudioStream* OutputStream() {
-    return &output_stream;
   }
 
 protected:
@@ -229,10 +222,8 @@ private:
   int16_t knob_accel = 0;
   elapsedMillis millis_since_turn;
 
-  AudioPassthrough<STEREO> input_stream;
   AudioEffectAbyssReverb reverb;
   AudioMixer<2> wetdry[STEREO];
-  AudioPassthrough<STEREO> output_stream;
 };
 
 FLASHMEM void AbyssApplet::View() {
@@ -256,10 +247,14 @@ FLASHMEM void AbyssApplet::Start() {
   reverb.setMonoSum(Channels() == MONO);
   ForEachChannel(ch) {
     if (Channels() == STEREO || ch == 0) {
-      PatchCable(input_stream, ch, reverb, ch);
+      PatchCableF32(InputF32(), ch, InputStream(), ch); // converter
+
+      PatchCable(InputStream(), ch, reverb, ch);
       PatchCable(reverb, ch, wetdry[ch], WD_WET_CH);
-      PatchCable(input_stream, ch, wetdry[ch], WD_DRY_CH);
-      PatchCable(wetdry[ch], 0, output_stream, ch);
+      PatchCable(InputStream(), ch, wetdry[ch], WD_DRY_CH);
+      PatchCable(wetdry[ch], 0, OutputStream(), ch);
+
+      PatchCableF32(OutputStream(), ch, OutputF32(), ch); // converter
     }
   }
 }

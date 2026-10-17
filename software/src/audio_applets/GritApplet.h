@@ -22,15 +22,18 @@
 //
 // AuxButton: cycle mode (same as encoder on Mode row).
 
-class GritApplet : public HemisphereAudioApplet {
+class GritApplet : public HemisphereAudioAppletF32 {
 public:
     const char* applet_name() { return "Grit"; }
 
     void Start() override {
         for (int ch = 0; ch < Channels(); ch++) {
             grit[ch].Acquire();
-            PatchCable(input_stream,  ch, grit[ch], 0);
-            PatchCable(grit[ch],       0, output_stream, ch);
+
+            PatchCableF32(InputF32(), ch, InputStream(), ch); // converter
+            PatchCable(InputStream(),  ch, grit[ch], 0);
+            PatchCable(grit[ch],       0, OutputStream(), ch);
+            PatchCableF32(OutputStream(), ch, OutputF32(), ch); // converter
         }
     }
 
@@ -162,9 +165,6 @@ public:
     }
 #undef GRIT_PARAMS
 
-    AudioStream* InputStream()  override { return &input_stream; }
-    AudioStream* OutputStream() override { return &output_stream; }
-
 protected:
     void SetHelp() override {}
 
@@ -192,6 +192,4 @@ private:
     CVInputMap mix_cv;
 
     AudioEffectGrit          grit[STEREO];
-    AudioPassthrough<STEREO> input_stream;
-    AudioPassthrough<STEREO> output_stream;
 };

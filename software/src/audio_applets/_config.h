@@ -63,7 +63,7 @@ Factory<AudioEffectDynamicsF32, 10> HemisphereAudioApplet::compressor_f32_factor
 
 // TODO: categories
 constexpr Registry mono_applets = Registry<HemisphereAudioApplet, NUM_SLOTS * 2
-    , DeclareFancyApplet<PassthruApplet<MONO>>
+    , DeclareFancyApplet<PassthruApplet>
     , DeclareFancyApplet<InputApplet>
     , DeclareFancyApplet<UpsampledApplet>
     , DeclareFancyApplet<OscApplet>
@@ -98,7 +98,7 @@ constexpr Registry mono_applets = Registry<HemisphereAudioApplet, NUM_SLOTS * 2
 >{};
 
 constexpr Registry stereo_applets = Registry<HemisphereAudioApplet, NUM_SLOTS
-  , DeclareFancyApplet<PassthruApplet<STEREO>>
+  , DeclareFancyApplet<PassthruApplet>
   , DeclareFancyApplet<InputApplet>
   , DeclareFancyApplet<UpsampledApplet>
   , DeclareFancyApplet<CrosspanApplet>
