@@ -50,7 +50,10 @@ public:
         strike_pending_ = false;
         strike_vel_     = 0.0f;
         strike_remain_  = 0;
-        noise_seed_     = 0xCAFEBABE;
+        excite_lp_      = 0.0f;
+        excite_bp_      = 0.0f;
+        excite_f_       = 0.0f;
+        excite_damp_    = 0.0f;
         dc_x1_ = dc_y1_ = 0.0f;
         updateCoeffs(261.63f, 0.5f, 0.7f, 0.5f, 0.25f);
     }
@@ -68,28 +71,24 @@ public:
     void updateCoeffs(float freq_hz, float structure, float brightness,
                       float damping, float position) {
 
-        // Q range calibrated for Chamberlin SVF at typical modal frequencies.
-        // For Chamberlin SVF: RT60 = 6.9 * Q / (pi * f_k)
-        // At f_k = C3 (261 Hz): RT60 = Q / 119
-        // Q_min=1.2 → RT60≈0.01s (click), Q_max=950 → RT60≈8s (long sustain).
-        // Log mapping over ~3 decades: Q = 1.2 * exp(damping * 6.67)
+        // --- Rings-Style Exciter Filter Calculation ---
+        // Cutoff tracks fundamental frequency and scales up with brightness
+        float exciter_hz = freq_hz * (1.0f + brightness * 6.0f);
+        const float FREQ_CEIL = AUDIO_SAMPLE_RATE_EXACT * 0.40f;
+        if (exciter_hz > FREQ_CEIL) exciter_hz = FREQ_CEIL;
+
+        excite_f_ = 2.0f * sinf(3.14159265f * exciter_hz / AUDIO_SAMPLE_RATE_EXACT);
+        // Rings internal exciter uses Q = 1.5. Chamberlin damp = fcoef / Q
+        excite_damp_ = excite_f_ / 1.5f;
+
+        // --- Resonator Bank Calculation ---
         const float Q_MIN  = 1.2f;
         const float Q_LOGR = 6.675f;  // log(950/1.2)
         float q_base = Q_MIN * expf(damping * Q_LOGR);
-
-        // Q-loss per mode: brightness=1 → q_loss≈1 (all modes ring equally).
-        // brightness=0 → q_loss≈0.15 (upper modes decay ~6× faster per step).
         float q_loss = brightness * (2.0f - brightness) * 0.85f + 0.15f;
-
-        // q_loss_rate: how fast q_loss changes per mode (Rings-style).
         float q_loss_rate = structure * (2.0f - structure) * 0.1f;
-
-        // Stiffness model (additive stretch, Rings-style).
-        // structure 0→1 maps to stiffness -0.05→+1.5.
         float stiffness = structure * 1.55f - 0.05f;
         float stretch   = 1.0f;
-
-        // Accumulate sum of position gains to normalise output level.
         float gain_sum = 0.0f;
 
         for (int k = 0; k < NUM_MODES; k++) {
@@ -219,12 +218,18 @@ public:
             float x = src ? src[i] * 0.125f : 0.0f;
 
             if (strike_remain_ > 0) {
+                const bool strike_sample = (strike_remain_ == AUDIO_BLOCK_SAMPLES);
                 --strike_remain_;
-                noise_seed_ ^= noise_seed_ << 13;
-                noise_seed_ ^= noise_seed_ >> 17;
-                noise_seed_ ^= noise_seed_ << 5;
-                // Unscaled: ±1 range, full amplitude strike
-                x += (float)(int32_t)noise_seed_ * (1.0f / 2147483648.0f) * vel;
+
+                // Send a single full-scale impulse into the exciter filter
+                float impulse = strike_sample ? vel : 0.0f;
+
+                float excite_notch = impulse - excite_damp_ * excite_bp_;
+                excite_lp_ += excite_f_ * excite_bp_;
+                excite_bp_ += excite_f_ * (excite_notch - excite_lp_);
+
+                // Feed the filtered impulse into the main modal bank
+                x += excite_lp_;
             }
 
             // Track excitation peak — rescale external input back to ±1 range
@@ -295,7 +300,11 @@ private:
     volatile bool  strike_pending_ = false;
     volatile float strike_vel_     = 1.0f;
     int            strike_remain_  = 0;
-    uint32_t       noise_seed_     = 0xCAFEBABE;
+    // Rings-style internal excitation filter state
+    float excite_lp_   = 0.0f;
+    float excite_bp_   = 0.0f;
+    float excite_f_    = 0.0f;
+    float excite_damp_ = 0.0f;
 
     // VU
     volatile uint16_t excite_peak_  = 0;
