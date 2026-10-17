@@ -350,91 +350,6 @@ namespace HS {
         gfxPrint(midi_poly_mode_name[frame.MIDIState.poly_mode]);
         break;
 
-      // these need to be last for exclusion in Hemisphere
-      case 8:
-        gfxPrint(1, y, "Thru MIDI:    ");
-        gfxPrint(OC::Strings::off_on[!(midi_thru_disable & mMaskSerial)]);
-        break;
-      case 9:
-        gfxPrint(1, y, "Thru USBDev:  ");
-        gfxPrint(OC::Strings::off_on[!(midi_thru_disable & mMaskUSBDev)]);
-        break;
-      case 10:
-        gfxPrint(1, y, "Thru Host1:   ");
-        gfxPrint(OC::Strings::off_on[!(midi_thru_disable & mMaskUSBHost)]);
-        break;
-      case 11:
-        gfxPrint(1, y, "Thru Host2:   ");
-        gfxPrint(OC::Strings::off_on[!(midi_thru_disable & mMaskUSBHost2)]);
-        break;
-
-      case 12:
-        gfxPrint(1, y, "ClkRx MIDI:   ");
-        gfxPrint(OC::Strings::off_on[!(midi_clkrx_disable & mMaskSerial)]);
-        break;
-      case 13:
-        gfxPrint(1, y, "ClkRx USBDev: ");
-        gfxPrint(OC::Strings::off_on[!(midi_clkrx_disable & mMaskUSBDev)]);
-        break;
-      case 14:
-        gfxPrint(1, y, "ClkRx Host1:  ");
-        gfxPrint(OC::Strings::off_on[!(midi_clkrx_disable & mMaskUSBHost)]);
-        break;
-      case 15:
-        gfxPrint(1, y, "ClkRx Host2:  ");
-        gfxPrint(OC::Strings::off_on[!(midi_clkrx_disable & mMaskUSBHost2)]);
-        break;
-
-      case 16:
-        gfxPrint(1, y, "ClkTx MIDI:   ");
-        gfxPrint(OC::Strings::off_on[!(midi_clktx_disable & mMaskSerial)]);
-        break;
-      case 17:
-        gfxPrint(1, y, "ClkTx USBDev: ");
-        gfxPrint(OC::Strings::off_on[!(midi_clktx_disable & mMaskUSBDev)]);
-        break;
-      case 18:
-        gfxPrint(1, y, "ClkTx Host1:  ");
-        gfxPrint(OC::Strings::off_on[!(midi_clktx_disable & mMaskUSBHost)]);
-        break;
-      case 19:
-        gfxPrint(1, y, "ClkTx Host2:  ");
-        gfxPrint(OC::Strings::off_on[!(midi_clktx_disable & mMaskUSBHost2)]);
-        break;
-
-      case 20:
-        gfxPrint(1, y, "MsgRx MIDI:   ");
-        gfxPrint(OC::Strings::off_on[!(midi_msgrx_disable & mMaskSerial)]);
-        break;
-      case 21:
-        gfxPrint(1, y, "MsgRx USBDev: ");
-        gfxPrint(OC::Strings::off_on[!(midi_msgrx_disable & mMaskUSBDev)]);
-        break;
-      case 22:
-        gfxPrint(1, y, "MsgRx Host1:  ");
-        gfxPrint(OC::Strings::off_on[!(midi_msgrx_disable & mMaskUSBHost)]);
-        break;
-      case 23:
-        gfxPrint(1, y, "MsgRx Host2:  ");
-        gfxPrint(OC::Strings::off_on[!(midi_msgrx_disable & mMaskUSBHost2)]);
-        break;
-
-      case 24:
-        gfxPrint(1, y, "MsgTx MIDI:   ");
-        gfxPrint(OC::Strings::off_on[!(midi_msgtx_disable & mMaskSerial)]);
-        break;
-      case 25:
-        gfxPrint(1, y, "MsgTx USBDev: ");
-        gfxPrint(OC::Strings::off_on[!(midi_msgtx_disable & mMaskUSBDev)]);
-        break;
-      case 26:
-        gfxPrint(1, y, "MsgTx Host1:  ");
-        gfxPrint(OC::Strings::off_on[!(midi_msgtx_disable & mMaskUSBHost)]);
-        break;
-      case 27:
-        gfxPrint(1, y, "MsgTx Host2:  ");
-        gfxPrint(OC::Strings::off_on[!(midi_msgtx_disable & mMaskUSBHost2)]);
-        break;
 
       default: break;
     }
@@ -444,6 +359,68 @@ namespace HS {
       if (editing) gfxInvert(82, y - 1, 45, 10);
     }
   }
+
+#ifdef ARDUINO_TEENSY41
+  void DrawMidiRouting(int cursor) {
+    static const uint8_t ports[] = {
+      mMaskSerial, mMaskUSBDev, mMaskUSBHost, mMaskUSBHost2
+    };
+    static const uint8_t *const disabled[] = {
+      &midi_thru_disable,
+      &midi_clkrx_disable,
+      &midi_clktx_disable,
+      &midi_msgrx_disable,
+      &midi_msgtx_disable
+    };
+    static const char *const row_names[] = {
+      "Thru", "ClkRx", "ClkTx", "MsgRx", "MsgTx"
+    };
+    static const char *const port_names[] = { "Ser", "USB", "H1", "H2" };
+
+    gfxHeader("<   MIDI Routing   >");
+    for (int col = 0; col < 4; ++col)
+      gfxPrint(39 + 22 * col, 12, port_names[col]);
+
+    for (int row = 0; row < 5; ++row) {
+      const int y = 20 + 9 * row;
+      gfxPrint(1, y, row_names[row]);
+      for (int col = 0; col < 4; ++col) {
+        const int x = 40 + 22 * col;
+        if (!(*disabled[row] & ports[col]))
+          gfxRect(x, y, 7, 7);
+        else
+          gfxFrame(x, y, 7, 7);
+
+        if (cursor == row * 4 + col) gfxIcon(x + 9, y, LEFT_ICON);
+      }
+    }
+  }
+
+  void ToggleMidiRouting(int cursor) {
+    static const uint8_t ports[] = {
+      mMaskSerial, mMaskUSBDev, mMaskUSBHost, mMaskUSBHost2
+    };
+    uint8_t *const disabled[] = {
+      &midi_thru_disable,
+      &midi_clkrx_disable,
+      &midi_clktx_disable,
+      &midi_msgrx_disable,
+      &midi_msgtx_disable
+    };
+
+    const int row = cursor / 4;
+    const uint8_t port = ports[cursor % 4];
+    *disabled[row] ^= port;
+
+    if (row == 0 && port == mMaskSerial) {
+      if (midi_thru_disable & mMaskSerial)
+        MIDI1.turnThruOff();
+      else
+        MIDI1.turnThruOn();
+    }
+  }
+#endif
+
   void DrawMenuPopup(const int config_cursor) {
     enum ConfigCursor {
         DELETE_PRESET,

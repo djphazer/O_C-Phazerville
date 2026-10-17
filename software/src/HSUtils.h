@@ -251,6 +251,8 @@ namespace HS {
   void Init();
   void ResetMappings();
   void DrawAppletList(bool blink = false);
+  void DrawMidiRouting(int cursor);
+  void ToggleMidiRouting(int cursor);
   uint32_t get_tick();
 
   void ProcessClock();
