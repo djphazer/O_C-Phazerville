@@ -751,8 +751,8 @@ public:
             // but still draw the applets
             break;
 
-          case MIDI_MAPS_PAGE:
-            DrawMidiMaps(config_cursor - MIDIMAP1);
+          case CONFIG_SETTINGS:
+            DrawConfigMenu();
             draw_applets = false;
             break;
 
@@ -766,8 +766,13 @@ public:
             draw_applets = false;
             break;
 
-          case CONFIG_SETTINGS:
-            DrawConfigMenu();
+          case MIDI_MAPS_PAGE:
+            DrawMidiMaps(config_cursor - MIDIMAP1);
+            draw_applets = false;
+            break;
+
+          case MIDI_ROUTING_PAGE:
+            DrawMidiRouting(config_cursor - MIDI_THRU_SERIAL);
             draw_applets = false;
             break;
 
@@ -1049,7 +1054,8 @@ public:
       else if (config_cursor < TRIGMAP1) config_page = CONFIG_SETTINGS;
       else if (config_cursor < QUANT1) config_page = INPUT_SETTINGS;
       else if (config_cursor < MIDIMAP1) config_page = QUANTIZER_SETTINGS;
-      else if (config_cursor < SHOWHIDELIST) config_page = MIDI_MAPS_PAGE;
+      else if (config_cursor < MIDI_THRU_SERIAL) config_page = MIDI_MAPS_PAGE;
+      else if (config_cursor < SHOWHIDELIST) config_page = MIDI_ROUTING_PAGE;
       else config_page = LAST_PAGE;
     }
     void ToggleConfigMenu() {
@@ -1157,6 +1163,7 @@ private:
       INPUT_SETTINGS,
       QUANTIZER_SETTINGS,
       MIDI_MAPS_PAGE,
+      MIDI_ROUTING_PAGE,
       SHOWHIDE_APPLETS,
 
       LAST_PAGE = SHOWHIDE_APPLETS
@@ -1178,26 +1185,6 @@ private:
         MIDI_PC_CHANNEL,
         AUTO_MIDI,
         MIDI_POLY_MODE,
-        MIDI_THRU_SERIAL,
-        MIDI_THRU_USBDEV,
-        MIDI_THRU_USBHOST1,
-        MIDI_THRU_USBHOST2,
-        MIDI_CLKRX_SERIAL,
-        MIDI_CLKRX_USBDEV,
-        MIDI_CLKRX_USBHOST1,
-        MIDI_CLKRX_USBHOST2,
-        MIDI_CLKTX_SERIAL,
-        MIDI_CLKTX_USBDEV,
-        MIDI_CLKTX_USBHOST1,
-        MIDI_CLKTX_USBHOST2,
-        MIDI_MSGRX_SERIAL,
-        MIDI_MSGRX_USBDEV,
-        MIDI_MSGRX_USBHOST1,
-        MIDI_MSGRX_USBHOST2,
-        MIDI_MSGTX_SERIAL,
-        MIDI_MSGTX_USBDEV,
-        MIDI_MSGTX_USBHOST1,
-        MIDI_MSGTX_USBHOST2,
 
         // Input Remapping
         TRIGMAP1, TRIGMAP2, TRIGMAP3, TRIGMAP4,
@@ -1219,10 +1206,17 @@ private:
         MIDIMAP25, MIDIMAP26, MIDIMAP27, MIDIMAP28,
         MIDIMAP29, MIDIMAP30, MIDIMAP31, MIDIMAP32,
 
+        // MIDI Routing
+        MIDI_THRU_SERIAL,  MIDI_THRU_USBDEV,  MIDI_THRU_USBHOST1,  MIDI_THRU_USBHOST2,
+        MIDI_CLKRX_SERIAL, MIDI_CLKRX_USBDEV, MIDI_CLKRX_USBHOST1, MIDI_CLKRX_USBHOST2,
+        MIDI_CLKTX_SERIAL, MIDI_CLKTX_USBDEV, MIDI_CLKTX_USBHOST1, MIDI_CLKTX_USBHOST2,
+        MIDI_MSGRX_SERIAL, MIDI_MSGRX_USBDEV, MIDI_MSGRX_USBHOST1, MIDI_MSGRX_USBHOST2,
+        MIDI_MSGTX_SERIAL, MIDI_MSGTX_USBDEV, MIDI_MSGTX_USBHOST1, MIDI_MSGTX_USBHOST2,
+
         // Applet visibility (dummy position)
         SHOWHIDELIST,
 
-        MAX_CURSOR = MIDIMAP32
+        MAX_CURSOR = MIDI_MSGTX_USBHOST2
     };
 
     void Randomizer(bool audio = false) {
@@ -1295,7 +1289,7 @@ private:
             config_page += dir;
             config_page = constrain(config_page, LOADSAVE_POPUP, LAST_PAGE);
 
-            const int cursorpos[] = { 0, LOAD_PRESET, TRIG_LENGTH, TRIGMAP1, QUANT1, MIDIMAP1, SHOWHIDELIST };
+            const int cursorpos[] = { 0, LOAD_PRESET, TRIG_LENGTH, TRIGMAP1, QUANT1, MIDIMAP1, MIDI_THRU_SERIAL, SHOWHIDELIST };
             config_cursor = cursorpos[config_page];
           } else if (config_page == SHOWHIDE_APPLETS) {
             showhide_cursor.Scroll(dir);
@@ -1414,6 +1408,11 @@ private:
             return;
         }
 
+        if (config_page == MIDI_ROUTING_PAGE) {
+          ToggleMidiRouting(config_cursor - MIDI_THRU_SERIAL);
+          return;
+        }
+
         switch (config_cursor) {
           case RANDOMIZE_PRESET:
             // reset input mappings to defaults
@@ -1505,75 +1504,6 @@ private:
 
           case AUTO_MIDI:
             HS::frame.autoMIDIOut = !HS::frame.autoMIDIOut;
-            break;
-
-          case MIDI_THRU_SERIAL:
-            HS::midi_thru_disable ^= mMaskSerial;
-            if (midi_thru_disable & mMaskSerial)
-              MIDI1.turnThruOff();
-            else
-              MIDI1.turnThruOn();
-            break;
-          case MIDI_THRU_USBDEV:
-            HS::midi_thru_disable ^= mMaskUSBDev;
-            break;
-          case MIDI_THRU_USBHOST1:
-            HS::midi_thru_disable ^= mMaskUSBHost;
-            break;
-          case MIDI_THRU_USBHOST2:
-            HS::midi_thru_disable ^= mMaskUSBHost2;
-            break;
-
-          case MIDI_CLKRX_SERIAL:
-            HS::midi_clkrx_disable ^= mMaskSerial;
-            break;
-          case MIDI_CLKRX_USBDEV:
-            HS::midi_clkrx_disable ^= mMaskUSBDev;
-            break;
-          case MIDI_CLKRX_USBHOST1:
-            HS::midi_clkrx_disable ^= mMaskUSBHost;
-            break;
-          case MIDI_CLKRX_USBHOST2:
-            HS::midi_clkrx_disable ^= mMaskUSBHost2;
-            break;
-
-          case MIDI_CLKTX_SERIAL:
-            HS::midi_clktx_disable ^= mMaskSerial;
-            break;
-          case MIDI_CLKTX_USBDEV:
-            HS::midi_clktx_disable ^= mMaskUSBDev;
-            break;
-          case MIDI_CLKTX_USBHOST1:
-            HS::midi_clktx_disable ^= mMaskUSBHost;
-            break;
-          case MIDI_CLKTX_USBHOST2:
-            HS::midi_clktx_disable ^= mMaskUSBHost2;
-            break;
-
-          case MIDI_MSGRX_SERIAL:
-            HS::midi_msgrx_disable ^= mMaskSerial;
-            break;
-          case MIDI_MSGRX_USBDEV:
-            HS::midi_msgrx_disable ^= mMaskUSBDev;
-            break;
-          case MIDI_MSGRX_USBHOST1:
-            HS::midi_msgrx_disable ^= mMaskUSBHost;
-            break;
-          case MIDI_MSGRX_USBHOST2:
-            HS::midi_msgrx_disable ^= mMaskUSBHost2;
-            break;
-
-          case MIDI_MSGTX_SERIAL:
-            HS::midi_msgtx_disable ^= mMaskSerial;
-            break;
-          case MIDI_MSGTX_USBDEV:
-            HS::midi_msgtx_disable ^= mMaskUSBDev;
-            break;
-          case MIDI_MSGTX_USBHOST1:
-            HS::midi_msgtx_disable ^= mMaskUSBHost;
-            break;
-          case MIDI_MSGTX_USBHOST2:
-            HS::midi_msgtx_disable ^= mMaskUSBHost2;
             break;
 
           case SHOWHIDELIST:
