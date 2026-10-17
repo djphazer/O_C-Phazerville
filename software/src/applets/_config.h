@@ -37,7 +37,7 @@ using namespace HS;
 #include "Combin8.h"
 #include "FrogSeq.h"
 #include "Compare.h"
-// #include "CVSeq.h"
+#include "CVSeq.h"
 #include "DivSeq.h"
 #include "DivSeq10.h"
 #include "DrumMap.h"
@@ -157,7 +157,7 @@ constexpr Registry reg = Registry<HemisphereApplet, HS::APPLET_SLOTS  // unused 
     , DeclareApplet<Compare, 30, CAT_UTILITY>
     , DeclareApplet<Cumulus, 5, CAT_LOGIC>
     , DeclareApplet<CVRecV2, 24, CAT_SEQUENCER>
-    // , DeclareApplet<CVSeq, 92, CAT_SEQUENCER>
+    , DeclareApplet<CVSeq, 92, CAT_SEQUENCER>
     , DeclareApplet<DivSeq, 68, CAT_SEQUENCER | CAT_CLOCKING>
     , DeclareApplet<DivSeq10, 80, CAT_SEQUENCER | CAT_CLOCKING>
     , DeclareApplet<DrLoFi, 16, CAT_OTHER>
