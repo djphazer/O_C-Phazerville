@@ -20,7 +20,7 @@
 
 #include <TeensyVariablePlayback.h>
 
-class WavPlayerApplet : public HemisphereAudioApplet {
+class WavPlayerApplet : public HemisphereAudioAppletF32 {
 public:
   const uint64_t applet_id() override {
     return strhash("WavPlay");
@@ -31,19 +31,15 @@ public:
 
   void Start() {
     for (int i = 0; i < Channels(); i++) {
-      PatchCable(input, i, mixer[i], 3);
+      PatchCableF32(InputF32(), i, mixer[i], 3);
       mixer[i].gain(3, 1.0);
-      PatchCable(mixer[i], 0, output, i);
+      PatchCableF32(mixer[i], 0, OutputF32(), i);
+      PatchCable(wavplayer, i, converter, i);
+      PatchCableF32(converter, i, hpfilter[i], 0);
+      PatchCableF32(converter, i, mixer[i], 0);
+      PatchCableF32(hpfilter[i], 2, mixer[i], 1);
+      PatchCableF32(hpfilter[i], 0, mixer[i], 2);
     }
-
-    PatchCable(wavplayer, 0, hpfilter[0], 0);
-    PatchCable(wavplayer, 1, hpfilter[1], 0);
-    PatchCable(wavplayer, 0, mixer[0], 0);
-    PatchCable(wavplayer, 1, mixer[1], 0);
-    PatchCable(hpfilter[0], 2, mixer[0], 1);
-    PatchCable(hpfilter[1], 2, mixer[1], 1);
-    PatchCable(hpfilter[0], 0, mixer[0], 2);
-    PatchCable(hpfilter[1], 0, mixer[1], 2);
 
     hpfilter[0].resonance(1.0);
     hpfilter[1].resonance(1.0);
@@ -340,13 +336,6 @@ public:
     ChangeToFile(oldfilenum? oldfilenum : wavplayer_select);
   }
 
-  AudioStream* InputStream() override {
-    return &input;
-  }
-  AudioStream* OutputStream() override {
-    return &output;
-  }
-
 protected:
   void SetHelp() override {}
 
@@ -389,11 +378,11 @@ private:
   bool sync_trig = false;
   bool retrig = false;
 
-  AudioPassthrough<STEREO> input;
+  // todo: the player is still int16
   AudioPlaySdResmp      wavplayer;
-  AudioFilterStateVariable2 hpfilter[2];
-  AudioMixer4           mixer[2];
-  AudioPassthrough<STEREO> output;
+  AudioConvertI16toF32Multi<STEREO> converter;
+  AudioFilterStateVariable2F32 hpfilter[2];
+  AudioMixer4_F32       mixer[2];
 
   // SD player vars, copied from other dev branch
   bool wavplayer_reload = true;

@@ -29,11 +29,9 @@ public:
     }
 
     ForEachChannel(ch) {
-      PatchCable(OC::AudioIO::InputStream(0), ch, i2s_conv, ch);
-      PatchCableF32(i2s_conv, ch, srcmix[ch], 0);
+      PatchCableF32(OC::AudioIO::InputStream(0), ch, srcmix[ch], 0);
 #ifdef AUDIO_INTERFACE
-      PatchCable(OC::AudioIO::InputStream(1), ch, usb_conv, ch);
-      PatchCableF32(usb_conv, ch, srcmix[ch], 1);
+      PatchCableF32(OC::AudioIO::InputStream(1), ch, srcmix[ch], 1);
 #endif
 
       attenuations[ch].Method(INTERPOLATION_LINEAR);
