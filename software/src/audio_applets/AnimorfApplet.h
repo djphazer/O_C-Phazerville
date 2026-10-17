@@ -18,7 +18,7 @@
 
 #include "../Audio/effect_animorf.h"
 
-class AnimorfApplet : public HemisphereAudioApplet {
+class AnimorfApplet : public HemisphereAudioAppletF32 {
 public:
   const char* applet_name() {
     return "Animorf";
@@ -29,10 +29,14 @@ public:
     morfer.setMonoSum(Channels() == MONO);
     ForEachChannel(ch) {
       if (Channels() == STEREO || ch == 0) {
-        PatchCable(input_stream, ch, morfer, ch);
+        PatchCableF32(InputF32(), ch, InputStream(), ch); // converter
+
+        PatchCable(InputStream(), ch, morfer, ch);
         PatchCable(morfer, ch, wetdry[ch], WD_WET_CH);
-        PatchCable(input_stream, ch, wetdry[ch], WD_DRY_CH);
-        PatchCable(wetdry[ch], 0, output_stream, ch);
+        PatchCable(InputStream(), ch, wetdry[ch], WD_DRY_CH);
+        PatchCable(wetdry[ch], 0, OutputStream(), ch);
+
+        PatchCableF32(OutputStream(), ch, OutputF32(), ch); // converter
       }
     }
     clock_source.Clear(); // none by default; internal rate runs free
@@ -190,13 +194,6 @@ public:
     UnpackPackables(data[3], clock_source);
   }
 
-  AudioStream* InputStream() {
-    return &input_stream;
-  }
-  AudioStream* OutputStream() {
-    return &output_stream;
-  }
-
 protected:
   void SetHelp() {}
 
@@ -333,8 +330,6 @@ private:
   int16_t knob_accel = 0;
   elapsedMillis millis_since_turn;
 
-  AudioPassthrough<STEREO> input_stream;
   AudioEffectAnimorf morfer;
   AudioMixer<2> wetdry[STEREO];
-  AudioPassthrough<STEREO> output_stream;
 };

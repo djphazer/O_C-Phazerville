@@ -3,7 +3,7 @@
 #include "../HemisphereAudioApplet.h"
 #include "../src/Audio/SafeNoteFrequencyAnalyzer.h"
 
-class TuneTrackerApplet : public HemisphereAudioApplet {
+class TuneTrackerApplet : public HemisphereAudioAppletF32 {
 public:
   const char* applet_name() {
     return "TuneTrk";
@@ -13,8 +13,9 @@ public:
     // Connect input to pitch analyzer (assuming mono input for pitch tracking)
     for (int i = 0; i < Channels(); i++) {
         // using the passthru as our input
-        PatchCable(passthru, i, note_freqs[i], 0);
+        PatchCable(InputStream(), i, note_freqs[i], 0);
         note_freqs[i].begin(0.14, 7000); // initializes the pitch tracking algo. threshold 0.1-0.2 for optimal error rates
+        PatchCableF32(InputF32(), i, OutputF32(), i);
     }
   }
   void Unload() override {
@@ -112,19 +113,10 @@ public:
 
   void OnEncoderMove(int direction) override { }
 
-  AudioStream* InputStream() override {
-    return &passthru;
-  }
-  AudioStream* OutputStream() override {
-    return &passthru;
-  };
-
 protected:
   void SetHelp() override {}
 
 private:
-  AudioPassthrough<STEREO> passthru;
-
   std::array<SafeNoteFrequencyAnalyzer, STEREO> note_freqs;
 
   float last_freq = 0.0f;

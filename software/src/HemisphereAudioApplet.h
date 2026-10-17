@@ -5,10 +5,10 @@
 #include "Audio/effect_reverb_schroeder_F32.h"
 #include "Audio/effect_freeverb_F32.h"
 #include "Audio/effect_dynamics_F32.h"
+#include "f32/AudioStream_F32.h"
 #include "src/Audio/effect_dynamics.h"
 #include <AudioStream.h>
-#include "extern/f32/AudioStream_F32.h"
-#include "extern/f32/AudioConvert_F32.h"
+#include "Audio/AudioPassthrough.h"
 
 enum AudioChannels : uint8_t {
   NONE,
@@ -38,8 +38,11 @@ public:
   void SetChannels(AudioChannels ch) { channels = ch; }
   const AudioChannels Channels() const { return channels; }
 
+  AudioConnection_F32* cables_f32 = nullptr;
+  size_t cable_f32_count = 0;
   AudioConnection* cables = nullptr;
   size_t cable_count;
+
   size_t slot_index = 0;
   void SetSlot(size_t slot) {
     slot_index = slot;
@@ -50,8 +53,12 @@ public:
   virtual const uint64_t applet_id() {
     return strhash(applet_name());
   };
-  virtual AudioStream* InputStream() = 0;
-  virtual AudioStream* OutputStream() = 0;
+
+  virtual AudioStream_F32& InputStream() = 0;
+  virtual AudioStream_F32& OutputStream() = 0;
+  virtual AudioStream_F32& InputF32() = 0;
+  virtual AudioStream_F32& OutputF32() = 0;
+
   virtual void mainloop() {}
 
   virtual void OnDataReceive(uint64_t data) {
@@ -92,6 +99,14 @@ public:
 
     cables[cable_count++].connect(source, s_ch, dest, d_ch);
   }
+  void PatchCableF32(AudioStream_F32& source, uint8_t s_ch, AudioStream_F32& dest, uint8_t d_ch) {
+    if (!cables_f32) cables_f32 = new AudioConnection_F32[MAX_CABLES];
+    if (cable_f32_count >= MAX_CABLES) {
+      HS::PokePopup(HS::MESSAGE_POPUP, "AUDIO MAXED!!");
+      return;
+    }
+    cables_f32[cable_f32_count++].connect(source, s_ch, dest, d_ch);
+  }
 
   AudioEffectReverbSchroederF32 *GetBungverb() {
     return bung_factory.get();
@@ -126,6 +141,11 @@ public:
       cables[i].disconnect();
     }
     cable_count = 0;
+
+    for (size_t i = 0; i < cable_f32_count; ++i) {
+      cables_f32[i].disconnect();
+    }
+    cable_f32_count = 0;
   }
 
   void gfxPrintTuningIndicator(int16_t pitch) {
@@ -162,95 +182,29 @@ public:
   }
 };
 
-// --- Float32 adapters below ---
-
-// N-channel int16 -> float32 edge adapter (one object, N lanes)
-template <uint8_t N>
-class AudioConvertI16toF32Multi : public AudioStream_F32 {
-public:
-  AudioConvertI16toF32Multi() : AudioStream_F32(0, nullptr, N, iq) {}
-  void update(void) override {
-    for (uint8_t i = 0; i < N; i++) {
-      audio_block_t* in = AudioStream::receiveReadOnly(i);
-      if (!in) continue;
-      audio_block_f32_t* out = AudioStream_F32::allocate_f32();
-      if (out) {
-        AudioConvert_I16toF32::convertAudio_I16toF32(in, out, out->length);
-        AudioStream_F32::transmit(out, i);
-        AudioStream_F32::release(out);
-      }
-      AudioStream::release(in);
-    }
-  }
-private:
-  audio_block_t* iq[N];
-};
-
-// N-channel float32 -> int16 edge adapter
-template <uint8_t N>
-class AudioConvertF32toI16Multi : public AudioStream_F32 {
-public:
-  AudioConvertF32toI16Multi() : AudioStream_F32(N, fq) {}
-  void update(void) override {
-    for (uint8_t i = 0; i < N; i++) {
-      audio_block_f32_t* in = receiveReadOnly_f32(i);
-      if (!in) continue;
-      audio_block_t* out = AudioStream::allocate();
-      if (out) {
-        AudioConvert_F32toI16::convertAudio_F32toI16(in, out, in->length);
-        AudioStream::transmit(out, i);
-        AudioStream::release(out);
-      }
-      AudioStream_F32::release(in);
-    }
-  }
-private:
-  audio_block_f32_t* fq[N];
-};
-
 // I'm making this always Stereo.
 // Extra channels won't be processed if not connected with PatchCable's
 class HemisphereAudioAppletF32 : public HemisphereAudioApplet {
-public:
-  // Matches the int16 base's MAX_CABLES; the stereo Delay applet alone needs
-  // 28 F32 cables. Pool is heap-allocated on first PatchCableF32().
-  static const uint_fast8_t MAX_CABLES_F32 = 32;
+private:
+  AudioPassthroughF32<STEREO> input_stream;
+  AudioPassthroughF32<STEREO> output_stream;
 
-  AudioStream* InputStream() override {
-    return &input_adapter;
-  }
-  AudioStream* OutputStream() override {
-    return &output_adapter;
-  }
-  // F32-side endpoints for the applet's internal graph: patch the internal
-  // processing from InputF32() (channels 0..Channels-1) into OutputF32().
-  AudioStream_F32& InputF32() {
+  // todo: get rid of converters when everything is refactored
+  AudioConvertI16toF32Multi<STEREO> output_adapter;
+  AudioConvertF32toI16Multi<STEREO> input_adapter;
+  // applets are responsible for connecting F32 streams to converters
+
+public:
+  AudioStream_F32& InputStream() {
     return input_adapter;
   }
-  AudioStream_F32& OutputF32() {
+  AudioStream_F32& OutputStream() {
     return output_adapter;
   }
-
-  void PatchCableF32(AudioStream_F32& source, uint8_t s_ch, AudioStream_F32& dest, uint8_t d_ch) {
-    if (!cables_f32) cables_f32 = new AudioConnection_F32[MAX_CABLES_F32];
-    if (cable_f32_count >= MAX_CABLES_F32) {
-      HS::PokePopup(HS::MESSAGE_POPUP, "AUDIO MAXED!!");
-      return;
-    }
-    cables_f32[cable_f32_count++].connect(source, s_ch, dest, d_ch);
+  AudioStream_F32& InputF32() {
+    return input_stream;
   }
-
-  void Disconnect() override {
-    HemisphereAudioApplet::Disconnect();
-    for (size_t i = 0; i < cable_f32_count; ++i) {
-      cables_f32[i].disconnect();
-    }
-    cable_f32_count = 0;
+  AudioStream_F32& OutputF32() {
+    return output_stream;
   }
-
-private:
-  AudioConvertI16toF32Multi<STEREO> input_adapter;
-  AudioConvertF32toI16Multi<STEREO> output_adapter;
-  AudioConnection_F32* cables_f32 = nullptr;
-  size_t cable_f32_count = 0;
 };

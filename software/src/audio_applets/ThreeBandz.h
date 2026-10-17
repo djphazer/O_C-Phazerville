@@ -6,7 +6,7 @@
 #include "../Audio/AudioPassthrough.h"
 
 // stereo only for now
-class ThreeBandzApplet : public HemisphereAudioApplet {
+class ThreeBandzApplet : public HemisphereAudioAppletF32 {
 public:
   static constexpr int BANDZ = 3;
 
@@ -41,22 +41,22 @@ public:
   void Start() {
     for (int ch = 0; ch < Channels(); ++ch) {
       for (int b = 0; b < BANDZ; ++b) {
-        complimit[ch][b] = GetComp();
+        complimit[ch][b] = GetCompF32();
         if (!complimit[ch][b]) return;
 
-        PatchCable(*complimit[ch][b], 0, mixout[ch], b);
+        PatchCableF32(*complimit[ch][b], 0, mixout[ch], b);
         //mixout[ch].gain(b, 1.0f);
         mixout[ch].gain(b, (b==1)?-1.0f:1.0f); // invert mid band
       }
 
-      PatchCable(input, ch, filter[ch][0], 0); // low split
-      PatchCable(filter[ch][0], 2, filter[ch][1], 0); // hi split
+      PatchCableF32(InputF32(), ch, filter[ch][0], 0); // low split
+      PatchCableF32(filter[ch][0], 2, filter[ch][1], 0); // hi split
 
-      PatchCable(filter[ch][0], 0, *complimit[ch][0], 0); // low band
-      PatchCable(filter[ch][1], 0, *complimit[ch][1], 0); // mid band
-      PatchCable(filter[ch][1], 2, *complimit[ch][2], 0); // hi band
+      PatchCableF32(filter[ch][0], 0, *complimit[ch][0], 0); // low band
+      PatchCableF32(filter[ch][1], 0, *complimit[ch][1], 0); // mid band
+      PatchCableF32(filter[ch][1], 2, *complimit[ch][2], 0); // hi band
 
-      PatchCable(mixout[ch], 0, output, ch);
+      PatchCableF32(mixout[ch], 0, OutputF32(), ch);
 
       filter[ch][0].resonance(0.70f);
       filter[ch][1].resonance(0.70f);
@@ -68,7 +68,7 @@ public:
   void Unload() {
     for (int ch = 0; ch < Channels(); ++ch) {
       for (int b = 0; b < BANDZ; ++b) {
-        ReleaseComp(complimit[ch][b]);
+        ReleaseCompF32(complimit[ch][b]);
       }
     }
     alloc_ok = false;
@@ -237,13 +237,6 @@ public:
     SetParams();
   }
 
-  AudioStream* InputStream() override {
-    return &input;
-  }
-  AudioStream* OutputStream() override {
-    return &output;
-  }
-
 protected:
   void SetHelp() override {}
 
@@ -259,12 +252,10 @@ private:
 
   bool alloc_ok = false;
 
-  AudioPassthrough<STEREO> input;
-  AudioFilterStateVariable2 filter[STEREO][2];
-  AudioEffectDynamics* complimit[STEREO][BANDZ];
-  std::array<AudioMixer<BANDZ>, STEREO> mixout;
+  AudioFilterStateVariable2F32 filter[STEREO][2];
+  AudioEffectDynamicsF32* complimit[STEREO][BANDZ];
+  std::array<AudioMixerF32<BANDZ>, STEREO> mixout;
   // TODO: maybe a final limiter after the mix?
-  AudioPassthrough<STEREO> output;
 };
 
 FLASHMEM void ThreeBandzApplet::View() {

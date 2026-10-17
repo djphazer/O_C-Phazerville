@@ -1,6 +1,6 @@
 #pragma once
 
-class UpsampledApplet : public HemisphereAudioApplet {
+class UpsampledApplet : public HemisphereAudioAppletF32 {
 public:
   const char* applet_name() {
     return "Upsampled";
@@ -12,8 +12,8 @@ public:
 
     for (int c = 0; c < Channels(); c++) {
       PatchCable(interp_stream, 0, mixer[c], 0);
-      PatchCable(input_stream, c, mixer[c], 1);
-      PatchCable(mixer[c], 0, output_stream, c);
+      PatchCable(InputStream(), c, mixer[c], 1);
+      PatchCable(mixer[c], 0, OutputStream(), c);
       mixer[c].gain(0, 1.0f);
       mixer[c].gain(1, 1.0f);
     }
@@ -123,21 +123,12 @@ public:
     CONSTRAIN(method, 0, 2);
   }
 
-  AudioStream* InputStream() override {
-    return &input_stream;
-  }
-  AudioStream* OutputStream() override {
-    return &output_stream;
-  };
-
 protected:
   void SetHelp() override {}
 
 private:
-  AudioPassthrough<STEREO> input_stream;
   InterpolatingStream<> interp_stream;
   AudioMixer<2> mixer[STEREO];
-  AudioPassthrough<STEREO> output_stream;
 
   float lp = 0.0f;
   int cursor = 0;

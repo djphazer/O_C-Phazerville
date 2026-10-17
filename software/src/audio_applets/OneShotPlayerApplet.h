@@ -22,7 +22,7 @@
 
 #include <TeensyVariablePlayback.h>
 
-class OneShotPlayerApplet : public HemisphereAudioApplet {
+class OneShotPlayerApplet : public HemisphereAudioAppletF32 {
 public:
   const char* applet_name() {
     return "OneShot";
@@ -32,14 +32,14 @@ public:
     // Setup audio connections
     for (int i = 0; i < Channels(); i++) {
       // Input passthrough
-      PatchCable(input, i, mixer[i], 1);
+      PatchCable(InputStream(), i, mixer[i], 1);
       mixer[i].gain(1, 1.0);
 
       // Sample playback direct to mixer
       PatchCable(wavplayer, i, mixer[i], 0);
 
       // Output
-      PatchCable(mixer[i], 0, output, i);
+      PatchCable(mixer[i], 0, OutputStream(), i);
     }
 
     // Initialize SD card player
@@ -393,13 +393,6 @@ public:
     sample_reload = true;
   }
 
-  AudioStream* InputStream() override {
-    return &input;
-  }
-  AudioStream* OutputStream() override {
-    return &output;
-  }
-
 protected:
   void SetHelp() override {}
 
@@ -459,10 +452,8 @@ private:
   bool prev_gate_state = false;  // For edge detection in trigger mode
 
   // Audio objects
-  AudioPassthrough<STEREO> input;
   AudioPlaySdResmp wavplayer;
   AudioMixer4 mixer[2];
-  AudioPassthrough<STEREO> output;
 
   void SetLevel(float gain) {
     for (int ch = 0; ch < Channels(); ch++) {

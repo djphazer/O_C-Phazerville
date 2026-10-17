@@ -1,4 +1,3 @@
-template <AudioChannels chans>
 class PassthruApplet : public HemisphereAudioApplet {
 public:
   const char* applet_name() {
@@ -13,16 +12,25 @@ public:
   void OnDataReceive(uint64_t data) override {}
   void OnEncoderMove(int direction) override {}
 
-  AudioStream* InputStream() override {
-    return &passthru;
+  // these won't actually work right...
+  AudioStream_F32& InputStream() override {
+    return passthru;
   }
-  AudioStream* OutputStream() override {
-    return &passthru;
+  AudioStream_F32& OutputStream() override {
+    return passthru;
+  }
+  // float only
+  AudioStream_F32& InputF32() override {
+    return passthru;
+  }
+  AudioStream_F32& OutputF32() override {
+    return passthru;
   }
 
 protected:
   void SetHelp() override {}
 
 private:
-  AudioPassthrough<chans> passthru;
+  AudioPassthrough<STEREO> passthru16;
+  AudioPassthroughF32<STEREO> passthru;
 };
