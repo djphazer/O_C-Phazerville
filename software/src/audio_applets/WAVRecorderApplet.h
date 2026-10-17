@@ -26,7 +26,7 @@ extern "C" uint8_t external_psram_size;
 // Shared across all template specialisations (C++17 inline variable).
 inline bool wav_recorder_sd_lock = false;
 
-class WavRecorderApplet : public HemisphereAudioApplet {
+class WavRecorderApplet : public HemisphereAudioAppletF32 {
 public:
 
     const char* applet_name() { return "WavRec"; }
@@ -36,14 +36,12 @@ public:
     // -----------------------------------------------------------------------
 
     void Start() override {
-        // Tap the passthrough into record queues.
-        // passthru is used for both InputStream() and OutputStream(), so the
-        // audio path is zero-copy; the queues are side-channel sinks only.
-        for (int ch = 0; ch < Channels(); ch++)
-            PatchCable(passthru, ch, record_queue[ch], 0);
+        for (int ch = 0; ch < Channels(); ch++) {
+          PatchCable(InputStream(), ch, record_queue[ch], 0);
+          PatchCableF32(InputF32(), ch, OutputF32(), ch); // passthru
+        }
 
         psram_buf = (int8_t*)extmem_calloc(RING_BYTES, 1);
-        AllowRestart();
     }
 
     void Unload() override {
@@ -224,9 +222,6 @@ public:
     // Audio routing
     // -----------------------------------------------------------------------
 
-    AudioStream* InputStream()  override { return &passthru; }
-    AudioStream* OutputStream() override { return &passthru; }
-
 protected:
     void SetHelp() override {}
 
@@ -248,7 +243,6 @@ private:
     // Audio objects
     // -----------------------------------------------------------------------
 
-    AudioPassthrough<STEREO> passthru;           // shared I/O node
     AudioRecordQueue           record_queue[STEREO]; // one sink per channel
 
     // -----------------------------------------------------------------------

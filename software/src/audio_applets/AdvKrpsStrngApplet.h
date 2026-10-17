@@ -26,7 +26,7 @@
 //   synth        ──► output_mixer[1]      (KS synthesis)
 //   output_mixer ──► OutputStream()
 
-class AdvKrpsStrngApplet : public HemisphereAudioApplet {
+class AdvKrpsStrngApplet : public HemisphereAudioAppletF32 {
 public:
   const char* applet_name() { return "KrpsStrng"; }
 
@@ -36,8 +36,13 @@ public:
     synth.Acquire();
     adc_lag_ = -1;
 
-    PatchCable(input_stream, 0, output_mixer, 0);  // dry path
+    PatchCableF32(InputF32(), 0, InputStream(), 0); // converter
+
+    PatchCable(InputStream(), 0, output_mixer, 0);  // dry path
     PatchCable(synth,        0, output_mixer, 1);  // synth path
+    PatchCable(output_mixer, 0, OutputStream(), 0);
+
+    PatchCableF32(OutputStream(), 0, OutputF32(), 0); // converter
 
     output_mixer.gain(0, 1.0f - mix * 0.01f);
     output_mixer.gain(1, mix * 0.01f);
@@ -233,11 +238,6 @@ public:
     synth.setBrightness(brightness * 0.01f);
   }
 
-  // --- Audio routing ------------------------------------------------------
-
-  AudioStream* InputStream()  override { return &input_stream;   }
-  AudioStream* OutputStream() override { return &output_mixer;   }
-
 protected:
   void SetHelp() override {}
 
@@ -280,7 +280,6 @@ private:
   CVInputMap     mix_cv;
 
   // Audio graph objects
-  AudioPassthrough<MONO>        input_stream;   // dry bypass input
   AudioSynthAdvancedKarplus     synth;          // KS engine
   AudioMixer<2>                 output_mixer;   // dry/wet blend
 };

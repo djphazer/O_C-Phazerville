@@ -102,12 +102,12 @@ public:
       AudioInterrupts(); // force usage refresh
       last_stats_update = 0;
       mem_percent = static_cast<int16_t>(
-        100 * static_cast<float>(AudioMemoryUsageMax())
+        100 * static_cast<float>(AudioMemoryUsageMax_F32())
         / OC::AudioIO::AUDIO_MEMORY
       );
       cpu_percent = static_cast<int16_t>(AudioProcessorUsageMax());
       AudioProcessorUsageMaxReset();
-      AudioMemoryUsageMaxReset();
+      AudioMemoryUsageMaxReset_F32();
     }
   }
 
@@ -345,39 +345,39 @@ public:
   }
 
   void ConnectMonoToNext(HEM_SIDE side, size_t slot) {
-    AudioStream* stream = get_selected_mono_applet(side, slot).OutputStream();
-    AudioConnection& conn = conns[side][slot];
+    AudioStream_F32& stream = get_selected_mono_applet(side, slot).OutputF32();
+    AudioConnection_F32& conn = conns[side][slot];
     conn.disconnect();
     if (slot + 1 < Slots && !IsStereo(slot + 1)) {
       conn.connect(
-        *stream, 0, *get_selected_mono_applet(side, slot + 1).InputStream(), 0
+        stream, 0, get_selected_mono_applet(side, slot + 1).InputF32(), 0
       );
     } else {
-      AudioStream* next_stream = slot + 1 < Slots
-        ? get_selected_stereo_applet(slot + 1).InputStream()
-        : &OC::AudioIO::OutputStream();
-      conn.connect(*stream, 0, *next_stream, side);
+      AudioStream_F32& next_stream = slot + 1 < Slots
+        ? get_selected_stereo_applet(slot + 1).InputF32()
+        : OC::AudioIO::OutputStream();
+      conn.connect(stream, 0, next_stream, side);
     }
     peak_conns[side][slot + 1].disconnect();
-    peak_conns[side][slot + 1].connect(*stream, 0, peaks[side][slot + 1], 0);
+    peak_conns[side][slot + 1].connect(stream, 0, peaks[side][slot + 1], 0);
   }
 
   void ConnectStereoToNext(HEM_SIDE side, size_t slot) {
-    AudioStream* stream = get_selected_stereo_applet(slot).OutputStream();
-    AudioConnection& conn = conns[side][slot];
+    AudioStream_F32& stream = get_selected_stereo_applet(slot).OutputF32();
+    AudioConnection_F32& conn = conns[side][slot];
     conn.disconnect();
     if (slot + 1 < Slots && !IsStereo(slot + 1)) {
-      AudioStream* next_stream
-        = get_selected_mono_applet(side, slot + 1).InputStream();
-      conn.connect(*stream, side, *next_stream, 0);
+      AudioStream_F32& next_stream
+        = get_selected_mono_applet(side, slot + 1).InputF32();
+      conn.connect(stream, side, next_stream, 0);
     } else {
-      AudioStream* next_stream = slot + 1 < Slots
-        ? get_selected_stereo_applet(slot + 1).InputStream()
-        : &OC::AudioIO::OutputStream();
-      conn.connect(*stream, side, *next_stream, side);
+      AudioStream_F32& next_stream = slot + 1 < Slots
+        ? get_selected_stereo_applet(slot + 1).InputF32()
+        : OC::AudioIO::OutputStream();
+      conn.connect(stream, side, next_stream, side);
     }
     peak_conns[side][slot + 1].disconnect();
-    peak_conns[side][slot + 1].connect(*stream, side, peaks[side][slot + 1], 0);
+    peak_conns[side][slot + 1].connect(stream, side, peaks[side][slot + 1], 0);
   }
 
   // 3 bits, cannot be 0
@@ -540,9 +540,9 @@ private:
   array<array<int, Slots>, 2> selected_mono_applets;
   array<int, Slots> selected_stereo_applets;
 
-  array<array<AudioConnection, Slots + 1>, 2> conns;
-  array<array<AudioAnalyzePeak, Slots + 1>, 2> peaks;
-  array<array<AudioConnection, Slots + 1>, 2> peak_conns;
+  array<array<AudioConnection_F32, Slots + 1>, 2> conns;
+  array<array<AudioAnalyzePeakF32, Slots + 1>, 2> peaks;
+  array<array<AudioConnection_F32, Slots + 1>, 2> peak_conns;
   array<array<float, Slots + 1>, 2> lpf_peak_db;
 
   bool ready_for_press = false;
@@ -575,8 +575,7 @@ private:
   // candidate applet for each side, referenced by index into applets arrays
   int candidate[2];
 
-  PassthruApplet<MONO> dummy_mono;
-  PassthruApplet<STEREO> dummy_stereo;
+  PassthruApplet dummy_passthru;
 
   HemisphereAudioApplet& get_mono_applet(
     HEM_SIDE side, size_t slot, size_t ix
@@ -589,7 +588,7 @@ private:
       ++counter;
       SERIAL_PRINTLN("nullptr from mono_applets - side: %u slot: %u ix: %u", side, slot, ix);
     }
-    return dummy_mono;
+    return dummy_passthru;
   }
 
   HemisphereAudioApplet& get_stereo_applet(size_t slot, size_t ix) {
@@ -601,7 +600,7 @@ private:
       ++counter;
       SERIAL_PRINTLN("nullptr from stereo_applets - slot: %u ix: %u", slot, ix);
     }
-    return dummy_stereo;
+    return dummy_passthru;
   }
 
   HemisphereAudioApplet& get_selected_mono_applet(HEM_SIDE side, size_t slot) {
@@ -683,7 +682,7 @@ private:
   }
 
   int peak_width(HEM_SIDE side, int slot) {
-    AudioAnalyzePeak& p = peaks[side][slot];
+    AudioAnalyzePeakF32& p = peaks[side][slot];
     float& db = lpf_peak_db[side][slot];
     if (p.available()) {
       ONE_POLE(db, scalarToDb(p.read()), 0.25f);

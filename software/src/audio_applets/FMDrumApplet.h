@@ -1,13 +1,5 @@
 #pragma once
 
-// F32-native: the PM drum voice (modulator -> FM-index VCA -> carrier), the
-// noise chain (white noise -> state-variable HPF -> VCA), and the output mix
-// run on float32 blocks, so the FM-index/amplitude/noise envelopes reach
-// their VCAs at full float precision instead of q15 and nothing requantizes
-// to int16 between stages. The chain still sees int16 via the
-// HemisphereAudioAppletF32 edge adapters. Params, ranges, and UI are
-// unchanged.
-
 #include "../Audio/synth_waveform_F32.h"
 #include "../Audio/synth_whitenoise_F32.h"
 #include "../Audio/filter_variable2_F32.h"
@@ -291,7 +283,7 @@ private:
         NUM_CURSORS  // 20
     };
 
-    static const int NUM_ROWS = 11; // TRG, PRESET, + 9 param-pair rows
+    static constexpr int NUM_ROWS = 11; // TRG, PRESET, + 9 param-pair rows
 
     int8_t cursorToRow(int8_t c) const {
         if (c <= PRESET) return c;
@@ -358,7 +350,7 @@ private:
         const char* name;
     };
 
-    static const int NUM_PRESETS = 8;
+    static constexpr int NUM_PRESETS = 8;
     static constexpr FMDrumPreset PRESETS[NUM_PRESETS] = {
         //        hz   dec  swp  rto  fmi   fmd noi  ndc  name
         {  60,   500,  80,  10,  90,  200,   5,  30, "Kick"  },
