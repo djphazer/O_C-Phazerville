@@ -86,13 +86,11 @@ constexpr Registry mono_applets = Registry<HemisphereAudioApplet, NUM_SLOTS * 2
     , DeclareFancyApplet<TuneTrackerApplet>
     , DeclareFancyApplet<GlitchApplet>
     , DeclareFancyApplet<GritApplet>
-#ifndef AUDIO_INTERFACE
-    // , DeclareFancyApplet<MistierApplet>
-#endif
+    , DeclareFancyApplet<MistierApplet>
     , DeclareFancyApplet<AdvKrpsStrngApplet>
     , DeclareFancyApplet<WTVCOApplet>
-#ifndef AUDIO_INTERFACE
     , DeclareFancyApplet<ModalResonatorApplet>
+#ifndef AUDIO_INTERFACE
     , DeclareFancyApplet<WavRecorderApplet>
 #endif
 >{};
@@ -113,8 +111,8 @@ constexpr Registry stereo_applets = Registry<HemisphereAudioApplet, NUM_SLOTS
   , DeclareFancyApplet<FilterFolderApplet>
   , DeclareFancyApplet<WavPlayerApplet>
 //  , DeclareFancyApplet<OneShotPlayerApplet>
-#ifndef AUDIO_INTERFACE
   , DeclareFancyApplet<ModalResonatorApplet>
+#ifndef AUDIO_INTERFACE
   , DeclareFancyApplet<WavRecorderApplet>
 #endif
 >{};
