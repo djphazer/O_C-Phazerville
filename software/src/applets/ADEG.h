@@ -69,11 +69,13 @@ public:
         if (Clock(0)) {
             // Trigger the envelope
             phase = 1; // Return to attack phase
+            reverse = false;
             effective_attack = attack;
             effective_decay = decay;
         } else if (Clock(1)) {
             // Trigger the envelope in reverse
             phase = 1;
+            reverse = true;
             effective_attack = decay;
             effective_decay = attack;
         }
@@ -111,6 +113,7 @@ public:
                 if (simfloat2int(signal) <= 0 && phase == 2) {
                     ClockOut(1);
                     phase = 0;
+                    reverse = false;
                 }
             //}
             Out(0, simfloat2int(signal));
@@ -158,9 +161,9 @@ protected:
     help[HELP_CV2]      = "Decay";
     help[HELP_OUT1]     = "Output";
     help[HELP_OUT2]     = "EOC";
-    help[HELP_EXTRA1] = "";
-    help[HELP_EXTRA2] = "";
-    //                  "---------------------" <-- Extra text size guide
+    help[HELP_EXTRA1]   = "";
+    help[HELP_EXTRA2]   = "";
+    //                    "---------------------" <-- Extra text size guide
   }
 
 private:
@@ -171,6 +174,7 @@ private:
     int last_change_ticks;
     int effective_attack; // Attack and decay for this particular triggering
     int effective_decay;  // of the EG, so that it can be triggered in reverse!
+    bool reverse = false;  // for indicator graphics
 
     // Settings
     int attack; // Time to reach signal level if signal < 5V
@@ -189,11 +193,13 @@ private:
         gfxLine(a_x, 33, d_x, 62, cursor == 0);
 
         // Output indicators
-        gfxRect(1, 15, ProportionCV(ViewOut(0), 62), 6);
+        int rect_x = 1 + reverse * (61 - ProportionCV(ViewOut(0), 62));
+        gfxRect(rect_x, 15, ProportionCV(ViewOut(0), 62), 6);
 
         // Change indicator, if necessary
         if (HS::get_tick() - last_change_ticks < 20000) {
             const int ms_value = last_ticks_val * 10 / 17;
+            gfxPos(1, 23);
             gfxPrint(ms_value / 10);
             gfxPrint(".");
             gfxPrint(ms_value % 10);
