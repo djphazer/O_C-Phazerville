@@ -1,0 +1,1462 @@
+<!DOCTYPE html>
+<!-- saved from url=(0042)https://ocusers.com/tools/quad-viewer/app/ -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<title>Phazerville Quad Viewer</title>
+<style>
+  html,body { margin:0; min-height:100%; background:#000; color:#ccc;
+              font-family: ui-monospace, Menlo, Consolas, monospace; }
+  #bar { position:sticky; top:0; z-index:5; display:flex; gap:8px; align-items:center;
+         padding:8px 12px; background:#0c0c0e; border-bottom:1px solid #222; flex-wrap:wrap; }
+  button { background:#1b1b20; color:#ddd; border:1px solid #333; border-radius:6px;
+           padding:6px 12px; cursor:pointer; font:inherit; }
+  button:hover { background:#26262d; }
+  button:disabled { opacity:.4; cursor:default; }
+  button.on { background:#2b3b2b; border-color:#4a7a4a; color:#dfe; }
+  select { background:#141418; color:#ddd; border:1px solid #333; border-radius:6px;
+           padding:5px; font:inherit; font-size:12px; }
+  #status { color:#888; margin-left:auto; font-size:13px; }
+  #tag { padding:2px 8px; border:1px solid #444; border-radius:10px; font-size:12px; color:#aaa; }
+  #mode { font-size:12px; color:#9c9; border:1px solid #2a3a2a; border-radius:10px; padding:2px 8px; }
+  #mode.audio { color:#fe6; border-color:#5a4a1a; }
+  #preset { color:#bbb; }
+  #preset.dirty { color:#fe6; }
+  .sep { width:1px; align-self:stretch; background:#282830; margin:0 2px; }
+
+  [hidden] { display:none !important; }   /* hidden must beat display:flex/grid */
+  #classic { display:flex; flex-direction:column; align-items:center; gap:10px; padding:20px; }
+  #grid { display:grid; grid-template-columns:repeat(2, max-content); gap:18px;
+          justify-content:center; padding:16px; }
+  .cell { display:flex; flex-direction:column; gap:6px; background:#0a0a0c;
+          border:1px solid #1d1d24; border-radius:10px; padding:10px; }
+  .chead { display:flex; gap:8px; align-items:center; }
+  .cmax { margin-left:auto; padding:4px 9px; font-size:13px; }
+  .cmax.on { background:#2b3b2b; border-color:#4a7a4a; color:#dfe; }
+  .cname { font-size:11px; color:#666; letter-spacing:.08em; width:24px; }
+  .cbody { display:flex; flex-direction:column; gap:6px; align-items:center;
+           justify-content:flex-start; }
+  canvas { image-rendering:pixelated; display:block; }
+  .quadcv { cursor:pointer; }
+
+  .qrow, .srow { display:flex; gap:5px; align-items:center; justify-content:center; }
+  .srow { flex-wrap:nowrap; }
+  .cbtn { min-width:36px; height:34px; font-size:14px; padding:4px 8px; }
+  .slbl { font-size:10px; color:#777; letter-spacing:.06em; text-transform:uppercase;
+          width:34px; text-align:right; }
+  .s-src { width:112px; } .s-vs { width:86px; } .s-win { width:76px; }
+  .s-odn,.s-oup { width:40px; padding:6px 0; } .s-oz { width:44px; padding:6px 0; }
+  .s-freeze { width:70px; padding:6px 0; margin-left:12px; }
+  .s-freeze.on, .m-pause.on { background:#3b2b2b; border-color:#7a4a4a; color:#fdd; }
+
+  .midilog { background:#000; overflow-y:auto; box-sizing:border-box; width:100%;
+             padding:3px 7px; font-size:12px; line-height:16px; color:#aaa; }
+  .midilog .mrow { white-space:pre; }
+  .midilog .min  { color:#7ed07e; }
+  .midilog .mout { color:#e8b34a; }
+  .mctl { display:flex; gap:6px; align-items:center; justify-content:center; flex-wrap:wrap; }
+  .mctl button { padding:5px 10px; font-size:12px; }
+  .m-chan { width:70px; }
+
+  #control { display:flex; flex-wrap:wrap; gap:18px; align-items:center; justify-content:center;
+             padding:12px; background:#0c0c0e; border-top:1px solid #222; }
+  .cgroup { display:flex; align-items:center; gap:6px; padding:6px 10px;
+            background:#141418; border:1px solid #262630; border-radius:10px; }
+  .clbl { font-size:11px; color:#888; letter-spacing:.05em; margin-right:2px; }
+  .jog { width:150px; height:22px; border-radius:6px; border:1px solid #2a2a34;
+         background:repeating-linear-gradient(90deg,#1a1a20 0 6px,#26262e 6px 9px);
+         cursor:ew-resize; touch-action:none; user-select:none; }
+  .jog.drag { border-color:#4a7a4a; }
+  .hint { font-size:11px; color:#555; }
+  #keys { position:fixed; inset:0; z-index:20; background:rgba(0,0,0,.75);
+          display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  #keyscard { background:#101014; border:1px solid #2a2a34; border-radius:12px;
+              padding:18px 26px; max-width:520px; max-height:88vh; overflow-y:auto; }
+  #keyscard h3 { margin:0 0 10px; font-size:14px; color:#dfe; letter-spacing:.05em; }
+  #keyscard h4 { margin:12px 0 4px; font-size:12px; color:#e8b34a; letter-spacing:.05em;
+                 text-transform:uppercase; }
+  #keyscard .khelp { max-width:46ch; font-size:13px; line-height:1.45; color:#bcc3bc; }
+  #keyscard .khelp p { margin:0 0 8px; }
+  #keyscard .khelp b { color:#dfe; font-weight:600; }
+  #keyscard table { border-collapse:collapse; font-size:13px; }
+  #keyscard td { padding:3px 8px; vertical-align:top; }
+  #keyscard td:first-child { color:#8fd08f; white-space:nowrap; text-align:right; }
+  #keyscard th { padding:10px 8px 3px; text-align:left; color:#e8b34a; font-size:12px;
+                 letter-spacing:.06em; font-weight:normal; }
+  .kdim { color:#666; font-size:11px; margin-top:8px; text-align:center; }
+  /* fullscreen = recording mode: canvases only, no chrome at all */
+  body.fs #bar, body.fs .chead, body.fs .qrow, body.fs .srow, body.fs .mctl, body.fs .hint { display:none; }
+  body.fs .cell { border:none; background:transparent; padding:4px; }
+  body.fs #grid { gap:8px; }
+  /* version tag — bottom-right, out of the way, hidden in recording mode */
+  #ver { text-align:center; color:#555; font-size:11px; padding:22px 0 14px;
+         user-select:none; }
+  body.fs #ver { display:none; }
+</style>
+</head>
+<body>
+  <div id="bar">
+    <button id="connect">Connect</button>
+    <button id="disconnect" disabled="">Disconnect</button>
+    <span id="tag">–</span>
+    <span id="mode" title="click to switch the module between Quadrants and Audio Setup" style="cursor:pointer">MODE: QUADRANTS</span>
+    <span class="sep"></span>
+    <span id="preset" title="current preset (● = unsaved remote changes)">Preset: –</span>
+    <select id="saveslot" title="preset slot — Load loads it, Save writes the current state into it"><option value="0">A</option><option value="1">B</option><option value="2">C</option><option value="3">D</option><option value="4">E</option><option value="5">F</option><option value="6">G</option><option value="7">H</option><option value="8">I</option><option value="9">J</option><option value="10">K</option><option value="11">L</option><option value="12">M</option><option value="13">N</option><option value="14">O</option><option value="15">P</option><option value="16">Q</option><option value="17">R</option><option value="18">S</option><option value="19">T</option><option value="20">U</option><option value="21">V</option><option value="22">W</option><option value="23">X</option><option value="24">Y</option><option value="25">Z</option><option value="26">a</option><option value="27">b</option><option value="28">c</option><option value="29">d</option><option value="30">e</option><option value="31">f</option></select>
+    <button id="loadbtn" disabled="">Load</button>
+    <button id="savebtn" disabled="">Save</button>
+    <button id="backupbtn" disabled="" hidden="">Backup</button><!-- hidden: firmware bank backup reads LFS but saves go to SD; re-show after Quadrants.h StreamBankBackup fix -->
+    <span class="sep"></span>
+    <button id="t-classic" title="single big live mirror of the module screen">Classic</button>
+    <button id="t-control" disabled="">Control</button>
+    <button id="color">Color</button>
+    <button id="save" disabled="">Save PNG</button>
+    <button id="full">Fullscreen</button>
+    <button id="t-keys" title="how to use the viewer + keyboard shortcuts">Help</button>
+    <span id="status">Web Serial: click Connect and pick the module's serial port.</span>
+  </div>
+
+  <div id="control" hidden="">
+    <div class="cgroup">
+      <span class="clbl">Buttons</span>
+      <button class="cbtn" data-ctl="A">A</button>
+      <button class="cbtn" data-ctl="B">B</button>
+      <button class="cbtn" data-ctl="X">X</button>
+      <button class="cbtn" data-ctl="Y">Y</button>
+      <button class="cbtn" data-ctl="Z">Z</button>
+    </div>
+    <div class="cgroup">
+      <span class="clbl">L enc</span>
+      <button class="cbtn" data-hold="(">◀</button>
+      <button class="cbtn" data-ctl="l">push</button>
+      <button class="cbtn" data-hold=")">▶</button>
+      <div class="jog" data-cw=")" data-ccw="(" title="endless jog — drag (or scroll) to turn"></div>
+    </div>
+    <div class="cgroup">
+      <span class="clbl">R enc</span>
+      <button class="cbtn" data-hold="[">◀</button>
+      <button class="cbtn" data-ctl="r">push</button>
+      <button class="cbtn" data-hold="]">▶</button>
+      <div class="jog" data-cw="]" data-ccw="[" title="endless jog — drag (or scroll) to turn"></div>
+    </div>
+  </div>
+
+  <div id="classic" hidden="">
+    <canvas width="1152" height="576"></canvas>
+    <div class="hint">live OLED — follows every screen, any app · Classic again to return to the grid</div>
+  </div>
+
+  <div id="grid" style="grid-template-columns: repeat(2, max-content);">
+    <div class="cell" data-cell="0"><div class="chead"><span class="cname">NW</span><select class="ctype"><option value="off">Off</option><option value="quad">Quadrants 4-up</option><option value="live">Live screen</option><option value="audio">Audio + levels</option><option value="maps">MIDI maps</option><option value="scopeA">Scope A</option><option value="scopeB">Scope B</option><option value="midi">MIDI monitor</option></select><button class="cmax" title="fill the screen with this panel">⛶</button></div><div class="cbody" style="min-height: 768px; min-width: 672px;">
+      <canvas class="quadcv"></canvas>
+      <div class="qrow">
+        <button class="cbtn" data-q="cursorPrev" title="cursor up">▲</button>
+        <button class="cbtn" data-q="cursorNext" title="cursor down">▼</button>
+        <button class="cbtn" data-q="edit" title="select param">edit</button>
+        <button class="cbtn" data-q="valDn" title="value −">val −</button>
+        <button class="cbtn" data-q="valUp" title="value +">val +</button>
+      </div>
+      <div class="qrow">
+        <button class="cbtn" data-q="prevApp" title="previous applet">◀ app</button>
+        <button class="cbtn" data-q="nextApp" title="next applet">app ▶</button>
+        <button class="cbtn" data-q="prevPre" title="previous preset">◀ preset</button>
+        <button class="cbtn" data-q="nextPre" title="next preset">preset ▶</button>
+      </div></div></div>
+    <div class="cell" data-cell="1"><div class="chead"><span class="cname">NE</span><select class="ctype"><option value="off">Off</option><option value="quad">Quadrants 4-up</option><option value="live">Live screen</option><option value="audio">Audio + levels</option><option value="maps">MIDI maps</option><option value="scopeA">Scope A</option><option value="scopeB">Scope B</option><option value="midi">MIDI monitor</option></select><button class="cmax" title="fill the screen with this panel">⛶</button></div><div class="cbody" style="min-height: 768px; min-width: 672px;"><canvas class="acv" width="640" height="320"></canvas>
+      <canvas class="m0" width="640" height="75"></canvas><canvas class="m1" width="640" height="75"></canvas>
+      <canvas class="m2" width="640" height="75"></canvas><canvas class="m3" width="640" height="75"></canvas></div></div>
+    <div class="cell" data-cell="2"><div class="chead"><span class="cname">SW</span><select class="ctype"><option value="off">Off</option><option value="quad">Quadrants 4-up</option><option value="live">Live screen</option><option value="audio">Audio + levels</option><option value="maps">MIDI maps</option><option value="scopeA">Scope A</option><option value="scopeB">Scope B</option><option value="midi">MIDI monitor</option></select><button class="cmax" title="fill the screen with this panel">⛶</button></div><div class="cbody" style="min-height: 768px; min-width: 672px;">
+      <canvas width="672" height="672"></canvas>
+      <div class="srow">
+        <span class="slbl">src</span><select class="s-src"><option value="">Off</option><option value="1">CV out 1</option><option value="2">CV out 2</option><option value="3">CV out 3</option><option value="4">CV out 4</option><option value="5">CV out 5</option><option value="6">CV out 6</option><option value="7">CV out 7</option><option value="8">CV out 8</option><option value="L">Audio out L</option><option value="R">Audio out R</option><option value="i">Audio in L</option><option value="j">Audio in R</option><option value="a">CV in 1</option><option value="b">CV in 2</option><option value="c">CV in 3</option><option value="d">CV in 4</option><option value="e">CV in 5</option><option value="f">CV in 6</option><option value="g">CV in 7</option><option value="h">CV in 8</option><option value="t">Trig in 1</option><option value="u">Trig in 2</option><option value="v">Trig in 3</option><option value="w">Trig in 4</option></select>
+        <span class="slbl">scale</span><select class="s-vs"><option value="0">±10 V</option><option value="1">±5 V</option><option value="2">±3 V</option><option value="3">±1 V</option><option value="4">±0.5 V</option></select>
+        <span class="slbl">time</span><select class="s-win"><option value="0">250 ms</option><option value="1">500 ms</option><option value="2">1 s</option><option value="3">2 s</option></select>
+      </div>
+      <div class="srow">
+        <span class="slbl">ofs</span>
+        <button class="s-odn" title="move trace down">▼</button>
+        <button class="s-oup" title="move trace up">▲</button>
+        <button class="s-oz" title="reset offset">rst</button>
+        <button class="s-freeze" title="freeze / resume">Freeze</button>
+      </div></div></div>
+    <div class="cell" data-cell="3"><div class="chead"><span class="cname">SE</span><select class="ctype"><option value="off">Off</option><option value="quad">Quadrants 4-up</option><option value="live">Live screen</option><option value="audio">Audio + levels</option><option value="maps">MIDI maps</option><option value="scopeA">Scope A</option><option value="scopeB">Scope B</option><option value="midi">MIDI monitor</option></select><button class="cmax" title="fill the screen with this panel">⛶</button></div><div class="cbody" style="min-height: 768px; min-width: 672px;">
+      <canvas width="672" height="672"></canvas>
+      <div class="srow">
+        <span class="slbl">src</span><select class="s-src"><option value="">Off</option><option value="1">CV out 1</option><option value="2">CV out 2</option><option value="3">CV out 3</option><option value="4">CV out 4</option><option value="5">CV out 5</option><option value="6">CV out 6</option><option value="7">CV out 7</option><option value="8">CV out 8</option><option value="L">Audio out L</option><option value="R">Audio out R</option><option value="i">Audio in L</option><option value="j">Audio in R</option><option value="a">CV in 1</option><option value="b">CV in 2</option><option value="c">CV in 3</option><option value="d">CV in 4</option><option value="e">CV in 5</option><option value="f">CV in 6</option><option value="g">CV in 7</option><option value="h">CV in 8</option><option value="t">Trig in 1</option><option value="u">Trig in 2</option><option value="v">Trig in 3</option><option value="w">Trig in 4</option></select>
+        <span class="slbl">scale</span><select class="s-vs"><option value="0">±10 V</option><option value="1">±5 V</option><option value="2">±3 V</option><option value="3">±1 V</option><option value="4">±0.5 V</option></select>
+        <span class="slbl">time</span><select class="s-win"><option value="0">250 ms</option><option value="1">500 ms</option><option value="2">1 s</option><option value="3">2 s</option></select>
+      </div>
+      <div class="srow">
+        <span class="slbl">ofs</span>
+        <button class="s-odn" title="move trace down">▼</button>
+        <button class="s-oup" title="move trace up">▲</button>
+        <button class="s-oz" title="reset offset">rst</button>
+        <button class="s-freeze" title="freeze / resume">Freeze</button>
+      </div></div></div>
+  </div>
+
+
+<div id="keys" hidden="">
+  <div id="keyscard">
+    <h3>Quad Viewer help</h3>
+    <div class="khelp">
+      <p>Connect the module to your computer — use the <b>front-panel USB-C</b>
+      where fitted (XLOC2 or other Expanded ORN8 modules), otherwise the <b>Teensy's micro-USB</b> on
+      the board — then click <b>Connect</b> and pick its serial port. The USB
+      host jack is for MIDI controllers; the viewer can't connect through it.
+      The grid shows four panels — use each panel's dropdown to choose what it shows
+      (live screen, audio levels, scopes, MIDI monitor…) and <b>⛶</b> to fill the
+      screen with one panel.</p>
+      <p><b>Classic</b> switches to a single big mirror of the module screen.
+      <b>Control</b> opens on-screen buttons and encoders so you can drive the module
+      from here. <b>Color</b> cycles the phosphor tint, <b>Save PNG</b> captures the
+      current view, and <b>Fullscreen</b> is handy for recording. Click <b>MODE</b> in
+      the toolbar to switch the module between Quadrants and Audio Setup.</p>
+      <p>The preset dropdown chooses a slot; picking one changes nothing on the
+      module. <b>Load</b> loads the chosen slot, and <b>Save</b> writes the
+      current state into it.</p>
+    </div>
+    <h4>Keyboard shortcuts</h4>
+    <table>
+      <tbody><tr><td>f</td><td>fullscreen on / off (recording mode)</td></tr>
+      <tr><td>Space</td><td>grid ⇄ classic live view</td></tr>
+      <tr><td>Esc</td><td>leave fullscreen / close this panel</td></tr>
+      <tr><th colspan="2">Quadrants mode</th></tr>
+      <tr><td>↑↓←→ / WASD</td><td>focus a quadrant</td></tr>
+      <tr><td>X</td><td>edit — select parameter</td></tr>
+      <tr><td>Z / C</td><td>value + / value −</td></tr>
+      <tr><td>Q / E</td><td>previous / next applet</td></tr>
+      <tr><td>O / P</td><td>previous / next preset</td></tr>
+      <tr><th colspan="2">Audio mode <span class="kdim">(click MODE in the toolbar)</span></th></tr>
+      <tr><td>↑↓ / W S</td><td>cursor up / down</td></tr>
+      <tr><td>Z / C · A / D</td><td>value + / −</td></tr>
+      <tr><td>Enter / X</td><td>select slot · confirm applet</td></tr>
+      <tr><td>Backspace</td><td>back to cursor mode</td></tr>
+      <tr><td>hold Shift</td><td>same keys drive the right side</td></tr>
+    </tbody></table>
+    <div class="kdim">click anywhere to close</div>
+  </div>
+</div>
+
+<div id="ver">Quad Viewer v2026-09-25a (web)</div>
+
+<script>
+"use strict";
+const OLED_W = 128;
+const BG = [8, 8, 10];
+const PHOSPHORS = [
+  { name:"amber", rgb:[255,176,0] },
+  { name:"green", rgb:[0,255,120] },
+  { name:"white", rgb:[235,235,245] },
+  { name:"blue",  rgb:[90,180,255] },
+];
+
+// ---- cell types ---------------------------------------------------------------
+const TYPES = {
+  off:    "Off",
+  quad:   "Quadrants 4-up",
+  live:   "Live screen",
+  audio:  "Audio + levels",
+  maps:   "MIDI maps",
+  scopeA: "Scope A",
+  scopeB: "Scope B",
+  midi:   "MIDI monitor",
+};
+let CELLS = ["quad", "audio", "scopeA", "scopeB"];   // NW NE SW SE defaults (Scope B = audio out L)
+let VIEW = "grid";                                 // "grid" | "classic"
+let MAXED = -1;                                    // cell index filling the screen, or -1
+
+// ---- shared state ---------------------------------------------------------------
+let colorIdx = 0;
+let activeSlots = { left:0, right:1, full:-1 };
+let focusedSlot = 0;
+let mode = "quad";
+let presetId = -1, presetDirty = false;
+let ioBusy = false;
+let levels = [0,0,0,0], peaks = [0,0,0,0], levelsSeen = false;   // inL inR outL outR
+const natives = { quad:null, live:null, audio:null, maps:null }; // last decoded frames
+
+const SCOPES = [
+  { src:"i", vs:0, win:0, off:0, frozen:false, data:null, misses:0 },   // default: audio in L
+  { src:"L", vs:0, win:0, off:0, frozen:false, data:null, misses:0 },
+];
+const SCOPE_CV_RATE = 16666.6/16, SCOPE_AUDIO_RATE = 44100/2;
+const CV_VS = [["±10 V",-10,10],["±5 V",-5,5],["±3 V",-3,3],["±1 V",-1,1],["±0.5 V",-0.5,0.5]];
+const AU_VS = [["0 dBFS",-1,1],["-6 dBFS",-0.5,0.5],["-12 dBFS",-0.25,0.25],["-20 dBFS",-0.1,0.1]];
+const isAudioSrc = src => src === "L" || src === "R" || src === "i" || src === "j";
+
+// MIDI monitor: full event history + filters
+const MIDI = { lastSeq:null, misses:0, paused:false, showIn:true, showOut:true,
+               chan:0 /* 0 = all */, events:[] };
+
+let port=null, reader=null, writer=null, running=false;
+const $ = id => document.getElementById(id);
+const enc = new TextEncoder();
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+const setStatus = t => $("status").textContent = t;
+const setTag = t => $("tag").textContent = t;
+const clamp01 = v => Math.min(1, Math.max(0, v||0));
+const cellEls = [...document.querySelectorAll("#grid .cell")];
+const cellVisible = i => MAXED < 0 || MAXED === i;
+const cellsOf = t => cellEls.filter((el,i)=>CELLS[i]===t && cellVisible(i));
+const hasType = t => CELLS.some((c,i)=>c===t && cellVisible(i));
+
+// ---- prefs ---------------------------------------------------------------------
+try {
+  const s = JSON.parse(localStorage.getItem("phaz_grid4")||"{}");
+  if (typeof s.colorIdx==="number") colorIdx = s.colorIdx;
+  if (Array.isArray(s.cells)) s.cells.forEach((t,i)=>{ if (TYPES[t] && i<4) CELLS[i]=t; });
+  if (Array.isArray(s.scopes)) s.scopes.forEach((p,i)=>{
+    if (!SCOPES[i] || !p) return;
+    if (typeof p.src==="string") SCOPES[i].src = p.src;
+    // CV scale list has changed shape twice; migrate saved indices forward.
+    //   vsv 2: "±5 V" inserted at index 1  -> pre-vsv indices >= 1 shift up by one
+    //   vsv 3: legacy "-3…+6 V" removed from index 2 (stock O_C range; XLOC2 is ±10 V)
+    //          -> vsv-2 index 2 lands on ±5 V, indices > 2 shift down by one
+    if (typeof p.vs==="number"){
+      let vs = p.vs;
+      if (s.vsv !== 2 && s.vsv !== 3 && vs >= 1) vs += 1;   // -> vsv 2 numbering
+      if (s.vsv !== 3) vs = vs === 2 ? 1 : (vs > 2 ? vs - 1 : vs);
+      SCOPES[i].vs = Math.min(CV_VS.length-1, Math.max(0, vs));
+    }
+    if (typeof p.win==="number") SCOPES[i].win = Math.min(3, Math.max(0, p.win));
+    if (typeof p.off==="number") SCOPES[i].off = Math.min(20, Math.max(-20, p.off));
+  });
+} catch(e){}
+function savePrefs(){
+  try { localStorage.setItem("phaz_grid4", JSON.stringify({ colorIdx, cells:CELLS, vsv:3,
+    scopes:SCOPES.map(sc=>({src:sc.src, vs:sc.vs, win:sc.win, off:sc.off})) })); } catch(e){}
+}
+
+// ---- scale ----------------------------------------------------------------------
+function scaleFor(){
+  if (MAXED >= 0) {
+    // one panel fills the screen
+    return Math.max(1, Math.min(10, Math.floor(Math.min(
+      (window.innerWidth - 120) / 165, (window.innerHeight - 240) / 165))));
+  }
+  if (document.fullscreenElement) {
+    // recording mode: per-panel chrome is hidden, so nearly the whole
+    // viewport is canvas — just toolbar + slim padding remain
+    const byW = Math.floor((window.innerWidth - 80) / 2 / 148);
+    const byH = Math.floor((window.innerHeight - 70) / 260);
+    return Math.max(1, Math.min(9, byW, byH));
+  }
+  // normal view: size by width only — a little vertical scrolling is fine,
+  // fullscreen (above) is the fit-everything mode
+  const w = Math.min(window.innerWidth, 1900);
+  return Math.max(1, Math.min(5, Math.floor((w - 120) / 2 / 140)));
+}
+
+// ================================================================================
+// Cell content builders
+// ================================================================================
+function buildCell(i){
+  const cell = cellEls[i], body = cell.querySelector(".cbody"), t = CELLS[i];
+  body.innerHTML = "";
+  if (t === "quad") {
+    body.innerHTML = `
+      <canvas class="quadcv"></canvas>
+      <div class="qrow">
+        <button class="cbtn" data-q="cursorPrev" title="cursor up">▲</button>
+        <button class="cbtn" data-q="cursorNext" title="cursor down">▼</button>
+        <button class="cbtn" data-q="edit" title="select param">edit</button>
+        <button class="cbtn" data-q="valDn" title="value −">val −</button>
+        <button class="cbtn" data-q="valUp" title="value +">val +</button>
+      </div>
+      <div class="qrow">
+        <button class="cbtn" data-q="prevApp" title="previous applet">◀ app</button>
+        <button class="cbtn" data-q="nextApp" title="next applet">app ▶</button>
+        <button class="cbtn" data-q="prevPre" title="previous preset">◀ preset</button>
+        <button class="cbtn" data-q="nextPre" title="next preset">preset ▶</button>
+      </div>`;
+    body.querySelectorAll("[data-q]").forEach(b=> b.addEventListener("click", ()=>quadAction(b.dataset.q)));
+    body.querySelector("canvas").addEventListener("click", (e)=>{
+      const r = e.currentTarget.getBoundingClientRect();
+      if (!r.width || !r.height) return;
+      const x = (e.clientX-r.left)/r.width, y = (e.clientY-r.top)/r.height;
+      setFocus((y<0.5?0:1)*2 + (x<0.5?0:1));
+    });
+  } else if (t === "live" || t === "maps") {
+    body.innerHTML = `<canvas></canvas>
+      <div class="hint">${t==="live" ? "live OLED — follows every screen, any app" : "MIDI map page (Quadrants)"}</div>`;
+  } else if (t === "audio") {
+    body.innerHTML = `<canvas class="acv"></canvas>
+      <canvas class="m0"></canvas><canvas class="m1"></canvas>
+      <canvas class="m2"></canvas><canvas class="m3"></canvas>`;
+  } else if (t === "scopeA" || t === "scopeB") {
+    const si = t === "scopeB" ? 1 : 0;
+    body.innerHTML = `
+      <canvas></canvas>
+      <div class="srow">
+        <span class="slbl">src</span><select class="s-src"></select>
+        <span class="slbl">scale</span><select class="s-vs"></select>
+        <span class="slbl">time</span><select class="s-win"></select>
+      </div>
+      <div class="srow">
+        <span class="slbl">ofs</span>
+        <button class="s-odn" title="move trace down">▼</button>
+        <button class="s-oup" title="move trace up">▲</button>
+        <button class="s-oz" title="reset offset">rst</button>
+        <button class="s-freeze" title="freeze / resume">Freeze</button>
+      </div>`;
+    wireScopeControls(body, si);
+  } else if (t === "midi") {
+    body.innerHTML = `
+      <div class="mctl">
+        <button class="m-pause" title="pause the display (events still collect)">Pause</button>
+        <button class="m-clear" title="clear history">Clear</button>
+        <button class="m-in on"  title="show incoming">In</button>
+        <button class="m-out on" title="show outgoing">Out</button>
+        <span class="slbl">ch</span>
+        <select class="m-chan"><option value="0">All</option>${
+          Array.from({length:16},(_,n)=>`<option value="${n+1}">${n+1}</option>`).join("")}</select>
+      </div>
+      <div class="midilog"></div>`;
+    wireMidiControls(body);
+  }
+  sizeCells();
+  redrawAll();
+}
+
+function typeSelects(){
+  cellEls.forEach((cell, i)=>{
+    const sel = cell.querySelector(".ctype");
+    sel.innerHTML = Object.entries(TYPES).map(([v,l])=>`<option value="${v}">${l}</option>`).join("");
+    sel.value = CELLS[i];
+    sel.onchange = ()=>{ CELLS[i] = sel.value; buildCell(i); savePrefs(); };
+    cell.querySelector(".cmax").onclick = ()=> setMaxed(MAXED === i ? -1 : i);
+  });
+}
+
+function setMaxed(i){
+  MAXED = i;
+  cellEls.forEach((cell, k)=>{
+    cell.style.display = cellVisible(k) ? "" : "none";
+    const b = cell.querySelector(".cmax");
+    b.classList.toggle("on", MAXED === k);
+    b.title = MAXED === k ? "back to the 2×2 grid" : "fill the screen with this panel";
+  });
+  $("grid").style.gridTemplateColumns = MAXED >= 0 ? "max-content" : "repeat(2, max-content)";
+  redrawAll();
+}
+
+function sizeCells(){
+  const s = scaleFor(), w = OLED_W * s;
+  // consistent frame footprint across all panel types
+  const fs = !!document.fullscreenElement;
+  const minH = fs ? (128*s + 32) : (128*s + 32 + 96);   // canvas + control rows
+  const minW = fs ? (128*s + 32) : Math.max(128*s + 32, 384);
+  cellEls.forEach(cell=>{
+    const b = cell.querySelector(".cbody");
+    b.style.minHeight = minH + "px";
+    b.style.minWidth = minW + "px";
+  });
+  cellEls.forEach((cell, i)=>{
+    const t = CELLS[i], body = cell.querySelector(".cbody");
+    if (t === "quad") {
+      // sized by drawQuadComposite
+    } else if (t === "live" || t === "maps") {
+      const cv = body.querySelector("canvas");
+      if (cv && (cv.width!==w || cv.height!==64*s)) { cv.width=w; cv.height=64*s; }
+    } else if (t === "audio") {
+      const acv = body.querySelector(".acv");
+      if (acv && (acv.width!==w || acv.height!==64*s)) { acv.width=w; acv.height=64*s; }
+      const mh = Math.max(24, Math.floor((64*s - 18) / 4));
+      for (let m=0; m<4; m++){
+        const cv = body.querySelector(".m"+m);
+        if (cv && (cv.width!==w || cv.height!==mh)) { cv.width=w; cv.height=mh; }
+      }
+    } else if (t === "scopeA" || t === "scopeB") {
+      const size = 128*s + 2*QPAD + QGUT;   // match the quad footprint
+      const cv = body.querySelector("canvas");
+      if (cv && (cv.width!==size || cv.height!==size)) { cv.width=size; cv.height=size; }
+    } else if (t === "midi") {
+      const log = body.querySelector(".midilog");
+      if (log) { log.style.width = (128*s + 2*QPAD + QGUT) + "px";
+                 log.style.height = (128*s + QGUT - 20) + "px"; }
+    }
+  });
+}
+
+// ================================================================================
+// Rendering (ported from phazerville_quad.html)
+// ================================================================================
+function buildNative(frame){
+  const { data, w, h } = frame, fg = PHOSPHORS[colorIdx].rgb;
+  const nat = document.createElement("canvas"); nat.width=w; nat.height=h;
+  const ctx = nat.getContext("2d");
+  const img = ctx.createImageData(w,h);
+  for (let y=0;y<h;y++){
+    const page=(y>>3)*w, bit=1<<(y&7);
+    for (let x=0;x<w;x++){
+      const on = data[page+x] & bit, k=(y*w+x)*4;
+      img.data[k]=on?fg[0]:BG[0]; img.data[k+1]=on?fg[1]:BG[1]; img.data[k+2]=on?fg[2]:BG[2]; img.data[k+3]=255;
+    }
+  }
+  ctx.putImageData(img,0,0);
+  return nat;
+}
+
+const QPAD = 8, QGUT = 16;
+function drawQuadComposite(cv, native, s){
+  const qs = 64*s, size = 128*s + 2*QPAD + QGUT;
+  cv.width = size; cv.height = size;
+  const ctx = cv.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = "#000"; ctx.fillRect(0,0,size,size);
+  const org = c => QPAD + c*(qs + QGUT);
+  for (let q=0;q<4;q++){
+    const col=q&1, row=(q>>1)&1;
+    ctx.fillStyle = `rgb(${BG.join(",")})`;
+    ctx.fillRect(org(col), org(row), qs, qs);
+    ctx.drawImage(native, col*64, row*64, 64, 64, org(col), org(row), qs, qs);
+  }
+  const ring = (q, gap) => {
+    if (q<0 || q>3) return;
+    const col=q&1, row=(q>>1)&1;
+    ctx.strokeRect(org(col)-gap+.5, org(row)-gap+.5, qs+2*gap-1, qs+2*gap-1);
+  };
+  const slots = activeSlots.full >= 0 ? [activeSlots.full] : [activeSlots.left, activeSlots.right];
+  ctx.strokeStyle = "rgba(120,220,255,.9)"; ctx.lineWidth = 2;
+  for (const q of slots) ring(q, 3);
+  ctx.strokeStyle = "rgba(255,225,80,.95)"; ctx.lineWidth = 2;
+  ring(focusedSlot, 6);
+}
+
+function drawSimple(cv, native){
+  if (!cv || !native) return;
+  const ctx = cv.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = `rgb(${BG.join(",")})`; ctx.fillRect(0,0,cv.width,cv.height);
+  ctx.drawImage(native, 0, 0, cv.width, cv.height);
+}
+
+function zoneColor(frac){
+  return frac > 0.85 ? [235,45,35] : frac > 0.60 ? [238,208,30] : [70,220,55];
+}
+function drawMeter(cv, level, peak, label){
+  if (!cv) return;
+  const w=cv.width, h=cv.height, ctx=cv.getContext("2d");
+  ctx.fillStyle="#000"; ctx.fillRect(0,0,w,h);
+  const top = 14, barH = h - top - 3;
+  const N = Math.min(46, Math.max(20, Math.round(w/12)));
+  const gap = Math.max(1, Math.round(w/(N*7)));
+  const segW = (w - gap*(N+1)) / N;
+  const lit = Math.round(clamp01(level)*N);
+  const peakIdx = Math.ceil(clamp01(peak)*N) - 1;
+  ctx.save();
+  for (let i=0;i<N;i++){
+    const on = (i < lit) || (i === peakIdx && peakIdx >= 0);
+    if (!on) continue;
+    const c = zoneColor((i+1)/N);
+    const x = gap + i*(segW+gap);
+    ctx.shadowColor = `rgb(${c.join(",")})`;
+    ctx.shadowBlur = Math.max(3, segW*0.6);
+    ctx.fillStyle = `rgb(${c.join(",")})`;
+    ctx.fillRect(x, top, segW, barH);
+  }
+  ctx.restore();
+  ctx.fillStyle="rgba(230,230,235,.8)"; ctx.font="11px ui-monospace, monospace"; ctx.textBaseline="top";
+  ctx.fillText(label, 4, 1);
+  const right = levelsSeen ? (Math.round(clamp01(level)*100)+"%") : "no data";
+  ctx.textAlign="right"; ctx.fillText(right, w-4, 1); ctx.textAlign="left";
+}
+
+// ---- scopes --------------------------------------------------------------------
+function scopeWinLabel(i, w){
+  const sc = SCOPES[i];
+  const rate = (isAudioSrc(sc.src) ? SCOPE_AUDIO_RATE : SCOPE_CV_RATE) / (1 << w);
+  const shown = isAudioSrc(sc.src) ? 128 : 256;
+  const ms = shown / rate * 1000;
+  // Display-only tidy-up: the real windows are awkward numbers (246 / 492 / 983 / 1966 ms),
+  // so anything that rounds to 250 ms or more is shown rounded to the nearest 250 ms.
+  // Short audio windows (a few ms) keep 1 ms resolution — 250 ms rounding would erase them.
+  if (ms >= 125){
+    const r = Math.round(ms/250)*250;
+    return r >= 1000 ? (r/1000).toFixed(2).replace(/\.?0+$/,"") + " s" : r + " ms";
+  }
+  return Math.round(ms) + " ms";
+}
+function scopeOffStep(i){
+  const sc = SCOPES[i];
+  const t = isAudioSrc(sc.src) ? AU_VS : CV_VS;
+  const vs = t[Math.min(sc.vs, t.length-1)];
+  return (vs[2]-vs[1]) / 8;
+}
+function rebuildScopeSelects(body, i){
+  const sc = SCOPES[i], src = body.querySelector(".s-src");
+  if (!src.options.length) {
+    let h = '<option value="">Off</option>';
+    for (let n=1; n<=8; n++) h += `<option value="${n}">CV out ${n}</option>`;
+    h += '<option value="L">Audio out L</option><option value="R">Audio out R</option>';
+    h += '<option value="i">Audio in L</option><option value="j">Audio in R</option>';
+    for (let n=1; n<=8; n++) h += `<option value="${"abcdefgh"[n-1]}">CV in ${n}</option>`;
+    for (let n=1; n<=4; n++) h += `<option value="${"tuvw"[n-1]}">Trig in ${n}</option>`;
+    src.innerHTML = h;
+  }
+  src.value = sc.src;
+  const vsTable = isAudioSrc(sc.src) ? AU_VS : CV_VS;
+  body.querySelector(".s-vs").innerHTML = vsTable.map((v,ix)=>`<option value="${ix}">${v[0]}</option>`).join("");
+  body.querySelector(".s-vs").value = String(Math.min(sc.vs, vsTable.length-1));
+  body.querySelector(".s-win").innerHTML = [0,1,2,3].map(w=>`<option value="${w}">${scopeWinLabel(i,w)}</option>`).join("");
+  body.querySelector(".s-win").value = String(sc.win);
+  const dis = !sc.src;
+  for (const c of [".s-vs",".s-win",".s-freeze",".s-odn",".s-oz",".s-oup"]) body.querySelector(c).disabled = dis;
+}
+function wireScopeControls(body, i){
+  rebuildScopeSelects(body, i);
+  body.querySelector(".s-src").onchange = ()=>{
+    const sc = SCOPES[i];
+    sc.src = body.querySelector(".s-src").value;
+    sc.data = null; sc.misses = 0; sc.off = 0;
+    rebuildScopeSelects(body, i);
+    drawScopes(); savePrefs();
+  };
+  body.querySelector(".s-vs").onchange = ()=>{ SCOPES[i].vs = +body.querySelector(".s-vs").value; drawScopes(); savePrefs(); };
+  body.querySelector(".s-win").onchange = ()=>{
+    const sc = SCOPES[i];
+    sc.win = +body.querySelector(".s-win").value;
+    sc.data = null; sc.misses = 0;
+    drawScopes(); savePrefs();
+  };
+  body.querySelector(".s-oup").onclick = ()=>{ SCOPES[i].off = Math.max(-20, SCOPES[i].off - scopeOffStep(i)); drawScopes(); savePrefs(); };
+  body.querySelector(".s-odn").onclick = ()=>{ SCOPES[i].off = Math.min(20, SCOPES[i].off + scopeOffStep(i)); drawScopes(); savePrefs(); };
+  body.querySelector(".s-oz").onclick  = ()=>{ SCOPES[i].off = 0; drawScopes(); savePrefs(); };
+  body.querySelector(".s-freeze").onclick = ()=>{
+    const sc = SCOPES[i], b = body.querySelector(".s-freeze");
+    sc.frozen = !sc.frozen;
+    b.classList.toggle("on", sc.frozen);
+    b.textContent = sc.frozen ? "Run" : "Freeze";
+    drawScopes();
+  };
+}
+
+function drawScopeInto(cv, i){
+  if (!cv) return;                 // cell not built yet
+  const sc = SCOPES[i];
+  const w=cv.width, h=cv.height, ctx=cv.getContext("2d");
+  const isAudio = isAudioSrc(sc.src);
+  ctx.fillStyle="#000"; ctx.fillRect(0,0,w,h);
+  if (!sc.src){
+    ctx.fillStyle="rgba(160,160,175,.6)"; ctx.font="11px ui-monospace, monospace"; ctx.textBaseline="top";
+    ctx.fillText("SCOPE " + (i?"B":"A") + " — off", 4, 2);
+    return;
+  }
+  const top=15, bot=4, plotH=h-top-bot;
+  const vsTable = isAudio ? AU_VS : CV_VS;
+  const vs = vsTable[Math.min(sc.vs, vsTable.length-1)];
+  const vMin = vs[1] + sc.off, vMax = vs[2] + sc.off;
+  const yOf = v => top + (vMax - v)/(vMax - vMin)*plotH;
+  ctx.strokeStyle="rgba(85,85,100,.35)"; ctx.lineWidth=1;
+  for (let g=0; g<=8; g++){
+    const y = Math.round(top + g*plotH/8)+.5;
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke();
+  }
+  for (let g=1; g<10; g++){
+    const x = Math.round(g*w/10)+.5;
+    ctx.beginPath(); ctx.moveTo(x,top); ctx.lineTo(x,h-bot); ctx.stroke();
+  }
+  if (vMin < 0 && vMax > 0){
+    ctx.strokeStyle="rgba(160,160,180,.7)";
+    ctx.beginPath(); ctx.moveTo(0, yOf(0)+.5); ctx.lineTo(w, yOf(0)+.5); ctx.stroke();
+  }
+  const d = sc.data;
+  if (d && d.length){
+    let start = 0, count = d.length;
+    if (isAudio){
+      count = d.length >> 1;
+      for (let k=1; k<=d.length-count; k++)
+        if (d[k-1] > 0 && d[k] <= 0){ start = k; break; }   // rising edge post-inversion
+    }
+    const fg = PHOSPHORS[colorIdx].rgb;
+    ctx.strokeStyle = `rgb(${fg.join(",")})`;
+    ctx.lineWidth = 2; ctx.lineJoin = "round";
+    ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = 4;
+    ctx.beginPath();
+    for (let k=0; k<count; k++){
+      // audio: PCM -> ±1, negated (output stage inverts vs the jack); CV: mV -> V
+      const v = isAudio ? -d[start+k]/32768 : d[start+k]/1000;
+      const x = k/(count-1)*w;
+      const y = Math.max(top, Math.min(h-bot, yOf(v)));
+      k ? ctx.lineTo(x,y) : ctx.moveTo(x,y);
+    }
+    ctx.stroke(); ctx.shadowBlur = 0;
+  }
+  ctx.fillStyle="rgba(230,230,235,.8)"; ctx.font="11px ui-monospace, monospace"; ctx.textBaseline="top";
+  const name = sc.src === "i" || sc.src === "j" ? ("AUDIO IN " + (sc.src==="i"?"L":"R"))
+             : isAudio                          ? ("AUDIO OUT " + sc.src)
+             : sc.src >= "a" && sc.src <= "h"   ? ("CV IN " + ("abcdefgh".indexOf(sc.src)+1))
+             : sc.src >= "t" && sc.src <= "w"   ? ("TRIG IN " + ("tuvw".indexOf(sc.src)+1))
+             :                                    ("CV OUT " + sc.src);
+  ctx.fillText("SCOPE " + (i?"B":"A") + " — " + name, 4, 2);
+  ctx.textAlign="right";
+  const offTxt = sc.off ? ("OFS " + (sc.off>0?"+":"") +
+    (Math.abs(sc.off)<1 ? sc.off.toFixed(2) : +sc.off.toFixed(2)) + (isAudio?"":"V") + "  ") : "";
+  ctx.fillText(offTxt + (sc.frozen ? "FROZEN" : d ? scopeWinLabel(i, sc.win)
+             : sc.misses >= 3 ? "no fw support" : "no data"), w-4, 2);
+  ctx.textAlign="left";
+  ctx.fillStyle="rgba(180,180,195,.55)"; ctx.font="18px ui-monospace, monospace";
+  const unit = isAudio ? "" : "V";
+  // audio is digital, so the axis is labelled in dBFS (a magnitude — both peaks read the same,
+  // centre is silence); CV knows its own volts and keeps them
+  const fmt = isAudio
+    ? v => { const a = Math.abs(v); return a < 1e-6 ? "-\u221E dB" : Math.round(20*Math.log10(a)) + " dB"; }
+    : v => (v>0?"+":"") + (Math.abs(v)<1 ? v.toFixed(2).replace("0.",".") : +v.toFixed(2)) + unit;
+  ctx.fillText(fmt(vMax), 2, top+5);
+  if (vMin < 0 && vMax > 0){
+    // punch a gap in the zero gridline so it doesn't strike through the label
+    const zt = "0"+unit, zy = yOf(0)-9, zw = ctx.measureText(zt).width;
+    const zfs = ctx.fillStyle;
+    ctx.fillStyle = "#000"; ctx.fillRect(0, zy-1, zw+6, 20);
+    ctx.fillStyle = zfs; ctx.fillText(zt, 2, zy);
+  }
+  ctx.fillText(fmt(vMin), 2, h-bot-18);
+}
+
+// ---- redraw dispatch --------------------------------------------------------------
+function drawType(t){
+  const s = scaleFor();
+  for (const cell of cellsOf(t)){
+    const body = cell.querySelector(".cbody");
+    if (t === "quad" && natives.quad){
+      const cv = body.querySelector("canvas");
+      if (cv) drawQuadComposite(cv, natives.quad, s);
+    }
+    if (t === "live")                   drawSimple(body.querySelector("canvas"), natives.live);
+    if (t === "maps")                   drawSimple(body.querySelector("canvas"), natives.maps);
+    if (t === "audio"){
+      drawSimple(body.querySelector(".acv"), natives.audio);
+      const names = ["IN L","IN R","OUT L","OUT R"];
+      for (let m=0;m<4;m++) drawMeter(body.querySelector(".m"+m), levels[m], peaks[m], names[m]);
+    }
+  }
+}
+function drawScopes(){
+  const s = scaleFor();
+  for (const i of [0,1]){
+    const t = i ? "scopeB" : "scopeA";
+    for (const cell of cellsOf(t)) drawScopeInto(cell.querySelector(".cbody canvas"), i);
+  }
+}
+function drawClassic(){
+  const cv = document.querySelector("#classic canvas");
+  const sc = Math.max(1, Math.min(9,
+    Math.floor(Math.min((window.innerWidth - 80) / 128, (window.innerHeight - 180) / 64))));
+  if (cv.width !== 128*sc || cv.height !== 64*sc) { cv.width = 128*sc; cv.height = 64*sc; }
+  if (natives.live) drawSimple(cv, natives.live);
+}
+function syncView(){
+  $("classic").hidden = VIEW !== "classic";
+  $("grid").hidden = VIEW !== "grid";
+  $("t-classic").classList.toggle("on", VIEW === "classic");
+}
+function redrawAll(){
+  sizeCells();
+  for (const t of ["quad","live","maps","audio"]) drawType(t);
+  drawScopes();
+  renderMidiLog();
+  drawClassic();
+  applyFsZoom();
+}
+// In fullscreen the canvases use the largest INTEGER pixel scale that fits;
+// a fractional CSS zoom then expands the whole grid to consume the leftover
+// band (image-rendering:pixelated keeps it crisp).
+function applyFsZoom(){
+  const g = $("grid");
+  g.style.zoom = "";
+  if (!document.fullscreenElement || VIEW !== "grid") return;
+  const h = g.offsetHeight, w = g.offsetWidth;
+  if (!h || !w) return;
+  const k = Math.min((window.innerHeight - 6) / h, (window.innerWidth - 6) / w);
+  if (k > 1.02) g.style.zoom = String(Math.min(k, 1.8));
+}
+
+// ================================================================================
+// MIDI monitor
+// ================================================================================
+const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const noteName = n => NOTE_NAMES[n%12] + (Math.floor(n/12)-1);
+function fmtMidiEv(e){
+  const dir = e.out ? "OUT" : "IN ";
+  const ch = e.chan ? String(e.chan).padStart(2,"0") : "--";
+  let body;
+  switch (e.message & 0xF0) {
+    case 0x90: body = e.d2 ? "Note On  " + noteName(e.d1).padEnd(4) + " vel " + e.d2
+                           : "Note Off " + noteName(e.d1).padEnd(4) + " (vel 0)"; break;
+    case 0x80: body = "Note Off " + noteName(e.d1).padEnd(4) + " vel " + e.d2; break;
+    case 0xB0: body = "CC " + String(e.d1).padStart(3) + " = " + e.d2; break;
+    case 0xE0: { const v = ((e.d2<<7)|e.d1) - 8192; body = "Bend " + (v>0?"+":"") + v; break; }
+    case 0xC0: body = "Program " + e.d1; break;
+    case 0xD0: body = "AfterTouch " + e.d1; break;
+    case 0xA0: body = "PolyAT " + noteName(e.d1) + " " + e.d2; break;
+    default:   body = ({0xFA:"Start",0xFB:"Continue",0xFC:"Stop",0xF2:"SongPos",0xF1:"MTC",0xF6:"TuneReq"})[e.message]
+                      || ("Status 0x" + e.message.toString(16).toUpperCase()); break;
+  }
+  return dir + " ch" + ch + "  " + body;
+}
+function midiVisible(e){
+  if (e.out ? !MIDI.showOut : !MIDI.showIn) return false;
+  if (MIDI.chan && e.chan !== MIDI.chan) return false;
+  return true;
+}
+function renderMidiLog(){
+  for (const cell of cellsOf("midi")){
+    const log = cell.querySelector(".midilog");
+    if (!log) continue;
+    const rows = MIDI.events.filter(midiVisible).slice(-250);
+    log.innerHTML = rows.map(e =>
+      `<div class="mrow ${e.out?"mout":"min"}">${fmtMidiEv(e)}</div>`).join("");
+    log.scrollTop = log.scrollHeight;
+  }
+}
+function midiIngest(evs){
+  let fresh;
+  if (MIDI.lastSeq === null) {
+    fresh = evs.slice().sort((a,b)=>a.seq-b.seq).slice(-12);
+  } else {
+    const age = e => (e.seq - MIDI.lastSeq) & 0xFFFF;
+    fresh = evs.filter(e => age(e) > 0 && age(e) <= 0x7FFF).sort((a,b)=>age(a)-age(b));
+  }
+  if (!fresh.length) return;
+  MIDI.lastSeq = fresh[fresh.length-1].seq;
+  MIDI.events.push(...fresh);
+  if (MIDI.events.length > 500) MIDI.events.splice(0, MIDI.events.length - 500);
+  if (!MIDI.paused) renderMidiLog();
+}
+function wireMidiControls(body){
+  const p = body.querySelector(".m-pause");
+  p.onclick = ()=>{ MIDI.paused = !MIDI.paused; p.classList.toggle("on", MIDI.paused);
+                    p.textContent = MIDI.paused ? "Resume" : "Pause";
+                    if (!MIDI.paused) renderMidiLog(); };
+  body.querySelector(".m-clear").onclick = ()=>{ MIDI.events = []; renderMidiLog(); };
+  const tIn = body.querySelector(".m-in"), tOut = body.querySelector(".m-out");
+  tIn.onclick  = ()=>{ MIDI.showIn  = !MIDI.showIn;  tIn.classList.toggle("on", MIDI.showIn);  renderMidiLog(); };
+  tOut.onclick = ()=>{ MIDI.showOut = !MIDI.showOut; tOut.classList.toggle("on", MIDI.showOut); renderMidiLog(); };
+  body.querySelector(".m-chan").onchange = e => { MIDI.chan = +e.target.value; renderMidiLog(); };
+}
+
+// ================================================================================
+// Serial core (ported from phazerville_quad.html)
+// ================================================================================
+let rxBuf = "";
+const inbox = [];
+async function pump(){
+  const dec = new TextDecoder();
+  while (running && reader) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    rxBuf += dec.decode(value, { stream:true });
+    let nl;
+    while ((nl = rxBuf.indexOf("\n")) >= 0) {
+      const line = rxBuf.slice(0,nl).trim();
+      rxBuf = rxBuf.slice(nl+1);
+      if (line) inbox.push(line);
+    }
+  }
+}
+function flushInput(){ inbox.length = 0; rxBuf = ""; }
+
+async function transact(cmd, expectBytes, timeoutMs=600){
+  flushInput();
+  await writer.write(enc.encode(cmd));
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() < deadline) {
+    while (inbox.length) {
+      const line = inbox.shift();
+      if (line.length % 2 === 0 && line.length/2 === expectBytes) return decodeFrame(line);
+    }
+    await sleep(1);
+  }
+  return null;
+}
+function decodeFrame(hexline){
+  const n = hexline.length/2;
+  if ((n!==1024 && n!==2048) || hexline.length % 2) return null;
+  const data = new Uint8Array(n);
+  for (let i=0;i<n;i++){ const b=parseInt(hexline.substr(i*2,2),16); if (Number.isNaN(b)) return null; data[i]=b; }
+  return { data, w:OLED_W, h:n/16 };
+}
+async function transactLevels(timeoutMs=250){
+  flushInput();
+  await writer.write(enc.encode("V"));
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() < deadline) {
+    while (inbox.length) {
+      const p = inbox.shift().split(",");
+      if (p.length >= 2) {
+        const v = p.map(parseFloat);
+        if (!v.some(isNaN)) return [v[0]||0, v[1]||0, v[2]||0, v[3]||0];
+      }
+    }
+    await sleep(1);
+  }
+  return null;
+}
+async function transactState(timeoutMs=200){
+  flushInput();
+  await writer.write(enc.encode("T"));
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() < deadline) {
+    while (inbox.length) {
+      const p = inbox.shift().split(",");
+      if (p.length === 4) {
+        const l=parseInt(p[0]), r=parseInt(p[1]), f=parseInt(p[2]), pre=parseInt(p[3]);
+        if (![l,r,f,pre].some(isNaN)) return { left:l, right:r, full:f, preset:pre };
+      }
+    }
+    await sleep(1);
+  }
+  return null;
+}
+async function transactScope(i, timeoutMs=400){
+  const sc = SCOPES[i];
+  flushInput();
+  await writer.write(enc.encode("O" + (i ? "B" : "A") + sc.src + sc.win));
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() < deadline) {
+    while (inbox.length) {
+      const line = inbox.shift();
+      if (line.length === 1024) {
+        const s = new Int16Array(256);
+        let ok = true;
+        for (let k=0;k<256;k++){
+          const v = parseInt(line.substr(k*4,4),16);
+          if (Number.isNaN(v)) { ok=false; break; }
+          s[k] = v > 32767 ? v-65536 : v;
+        }
+        if (ok) return s;
+      }
+    }
+    await sleep(1);
+  }
+  return null;
+}
+async function transactMidiLog(timeoutMs=250){
+  flushInput();
+  await writer.write(enc.encode("N"));
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() < deadline) {
+    while (inbox.length) {
+      const line = inbox.shift();
+      if (line.startsWith("N:") && line.length === 2 + 32*12) {
+        const evs = [];
+        for (let k=0;k<32;k++){
+          const o = 2 + k*12;
+          const seq = parseInt(line.substr(o,4),16);
+          if (!seq) continue;
+          const dc = parseInt(line.substr(o+6,2),16);
+          evs.push({ seq, message:parseInt(line.substr(o+4,2),16),
+                     out:!!(dc&0x80), chan:dc&0x7F,
+                     d1:parseInt(line.substr(o+8,2),16), d2:parseInt(line.substr(o+10,2),16) });
+        }
+        return evs;
+      }
+    }
+    await sleep(1);
+  }
+  return null;
+}
+
+// firmware probe + crash report (same as the main viewer)
+async function probeFirmware(context){
+  if (!writer) return;
+  flushInput();
+  try { await writer.write(enc.encode("OA?0")); } catch(e){ return; }
+  let dbg = null;
+  const deadline = performance.now() + 400;
+  while (performance.now() < deadline && !dbg) {
+    while (inbox.length) { const l = inbox.shift(); if (l.startsWith("DBG ")) { dbg = l; break; } }
+    await sleep(2);
+  }
+  if (!dbg) { console.warn("[phaz] " + context + ": no DBG reply — old firmware?"); return; }
+  console.log("[phaz] " + context + ": " + dbg);
+  if (!/crash=1/.test(dbg)) return;
+  flushInput();
+  try { await writer.write(enc.encode("OA!0")); } catch(e){ return; }
+  const rpt = [];
+  let end = performance.now() + 800, done = false;
+  while (performance.now() < end && !done) {
+    while (inbox.length) {
+      const l = inbox.shift();
+      if (l === "ENDCRASH") { done = true; break; }
+      rpt.push(l);
+    }
+    await sleep(2);
+  }
+  console.warn("[phaz] MODULE CRASH REPORT:\n" + rpt.join("\n"));
+  setStatus("Module crashed & rebooted — crash report in the console (Cmd-Opt-J).");
+}
+
+// ---- connection + recovery -----------------------------------------------------
+const OPEN_OPTS = { baudRate:115200, bufferSize:262144 };
+async function connect(){
+  if (!("serial" in navigator)) { setStatus("Web Serial not supported. Use Chrome, Edge, Arc or Firefox 151+."); return; }
+  try {
+    port = await navigator.serial.requestPort({ filters:[{ usbVendorId:0x16C0 }] });
+    await port.open(OPEN_OPTS);
+  } catch(e){
+    const busy = /open|in use|failed/i.test(e.message || "");
+    setStatus("Connect cancelled/failed: " + e.message
+      + (busy ? " — is the module connected in another tab or program? Disconnect there first." : ""));
+    return;
+  }
+  writer = port.writable.getWriter();
+  reader = port.readable.getReader();
+  running = true;
+  await writer.write(enc.encode("Pew!")); // unlock phrase
+  for (const sc of SCOPES) sc.misses = 0;
+  MIDI.misses = 0; MIDI.lastSeq = null;
+  $("connect").disabled = true;
+  $("disconnect").disabled = false;
+  $("save").disabled = false;
+  for (const id of ["t-control","loadbtn","savebtn","backupbtn"]) $(id).disabled = false;
+  setStatus("Connected.");
+  pumpPromise = pump(); pumpPromise.catch(()=>{ if (running) recover(); });
+  probeFirmware("connect").then(()=>{ loopPromise = loop(); });
+}
+let loopPromise = null, pumpPromise = null;
+async function teardown(){
+  // Orderly wind-down. Yanking the writer/port out from under an in-flight
+  // transfer stresses Chrome's serial service (browser-process CHECK crash
+  // seen on disconnect, 2026-08-30) — so cancel the reader first, give the
+  // pump a moment to finish, close (not abort) the writer with a bounded
+  // wait, and only then close the port.
+  try { if (reader) await reader.cancel(); } catch(e){}
+  if (pumpPromise) { try { await Promise.race([pumpPromise, sleep(500)]); } catch(e){} pumpPromise = null; }
+  try { if (reader) reader.releaseLock(); } catch(e){}
+  try { if (writer) await Promise.race([writer.close(), sleep(500)]); } catch(e){}
+  try { if (writer) writer.releaseLock(); } catch(e){}
+  await sleep(50);
+  try { if (port) await port.close(); } catch(e){}
+  reader = writer = null;
+  flushInput();
+}
+function uiDisconnected(){
+  $("connect").disabled=false; $("disconnect").disabled=true; $("save").disabled=true;
+  for (const id of ["t-control","loadbtn","savebtn","backupbtn"]) $(id).disabled = true;
+  setTag("–");
+}
+async function disconnect(){
+  $("disconnect").disabled = true;          // no double-fire
+  running = false;
+  // let the poll loop leave its in-flight transaction before touching the port
+  if (loopPromise) { try { await Promise.race([loopPromise, sleep(1500)]); } catch(e){} loopPromise = null; }
+  await teardown();
+  port = null;
+  uiDisconnected(); setStatus("Disconnected.");
+}
+let recoverPromise = null;
+function recover(){
+  if (!recoverPromise) recoverPromise = _recover().finally(()=>{ recoverPromise = null; });
+  return recoverPromise;
+}
+async function _recover(){
+  setStatus("Link lost — reconnecting…");
+  await teardown();
+  for (let i = 0; i < 20 && running && port; i++){
+    await sleep(500);
+    try {
+      await port.open(OPEN_OPTS);
+      writer = port.writable.getWriter();
+      reader = port.readable.getReader();
+      for (const sc of SCOPES) sc.misses = 0;
+      MIDI.misses = 0; MIDI.lastSeq = null;
+      setStatus("Reconnected.");
+      pumpPromise = pump(); pumpPromise.catch(()=>{ if (running) recover(); });
+      await probeFirmware("reconnect");
+      return;
+    } catch(e){ setStatus("Link lost — reconnecting… (" + (i+1) + "/20)"); }
+  }
+  running = false;
+  port = null;
+  uiDisconnected();
+  setStatus("Link lost — check the USB cable, then press Connect.");
+}
+
+// ---- remote control --------------------------------------------------------------
+async function sendControl(sel){
+  if (!writer) return;
+  try { await writer.write(enc.encode("~" + sel)); } catch(e){}
+}
+async function sendRaw(str){ if (!writer) return; try { await writer.write(enc.encode(str)); } catch(e){} }
+function quadAction(a){
+  const side = focusedSlot & 1;
+  const turnDn = side ? "[" : "(", turnUp = side ? "]" : ")", push = side ? "r" : "l";
+  switch (a) {
+    case "cursorPrev": sendControl(turnUp); break;   // bench 2026-08-30: this is the polarity that moves the param cursor UP
+    case "cursorNext": sendControl(turnDn); break;
+    case "edit":       sendControl(push);   break;
+    case "valDn":      sendControl(turnUp); break;   // bench 2026-08-30: injected detents run
+    case "valUp":      sendControl(turnDn); break;   // opposite to the source-derived sense
+    case "prevApp":    sendControl(String(focusedSlot)); sendControl("<"); break;
+    case "nextApp":    sendControl(String(focusedSlot)); sendControl(">"); break;
+    case "prevPre":    sendControl("o"); break;
+    case "nextPre":    sendControl("p"); break;
+  }
+  if (["edit","valDn","valUp","prevApp","nextApp"].includes(a)) markDirty();
+}
+function setFocus(slot){
+  focusedSlot = ((slot % 4) + 4) % 4;
+  sendControl(String(focusedSlot));
+}
+function setMode(m){
+  mode = m;
+  const audio = (m === "audio");
+  $("mode").textContent = "MODE: " + (audio ? "AUDIO" : "QUADRANTS");
+  $("mode").classList.toggle("audio", audio);
+  sendControl(audio ? "S" : "Q");
+}
+function wireControl(){
+  document.querySelectorAll("#control [data-ctl]").forEach(b=>{
+    b.addEventListener("click", ()=> sendControl(b.dataset.ctl));
+  });
+  document.querySelectorAll("#control [data-hold]").forEach(b=>{
+    let iv = null, tm = null;
+    const start = (e)=>{ e.preventDefault(); sendControl(b.dataset.hold);
+      // one detent per tap; auto-repeat only after a real hold (stops cursor skips)
+      tm = setTimeout(()=>{ iv = setInterval(()=>sendControl(b.dataset.hold), 110); }, 400); };
+    const stop  = ()=>{ if (tm){ clearTimeout(tm); tm = null; } if (iv){ clearInterval(iv); iv = null; } };
+    b.addEventListener("pointerdown", start);
+    for (const ev of ["pointerup","pointerleave","pointercancel"]) b.addEventListener(ev, stop);
+  });
+  // Endless jog strips: the panel encoders are continuous, so the control is a
+  // drag surface with no travel limits — every 8 px of drag = one detent, and
+  // pointer capture keeps it turning even when the cursor leaves the strip.
+  document.querySelectorAll("#control .jog").forEach(s=>{
+    const PX = 8;                 // drag pixels per detent
+    let lastX = 0, acc = 0, offset = 0;
+    const emit = d => {           // d detents, signed; cap a single burst
+      const n = Math.min(Math.abs(d), 6), sel = d > 0 ? s.dataset.cw : s.dataset.ccw;
+      for (let i=0;i<n;i++) sendControl(sel);
+    };
+    s.addEventListener("pointerdown", e=>{
+      e.preventDefault(); s.setPointerCapture(e.pointerId);
+      lastX = e.clientX; acc = 0; s.classList.add("drag");
+    });
+    s.addEventListener("pointermove", e=>{
+      if (!s.classList.contains("drag")) return;
+      const dx = e.clientX - lastX; lastX = e.clientX;
+      acc += dx; offset += dx;
+      s.style.backgroundPositionX = offset + "px";   // the ridges scroll with the drag
+      const d = Math.trunc(acc / PX);
+      if (d) { acc -= d * PX; emit(d); }
+    });
+    for (const ev of ["pointerup","pointercancel"])
+      s.addEventListener(ev, ()=>{ s.classList.remove("drag"); acc = 0; });
+    s.addEventListener("wheel", e=>{
+      e.preventDefault();
+      const d = e.deltaY < 0 ? 1 : -1;
+      offset += d * PX; s.style.backgroundPositionX = offset + "px";
+      emit(d);
+    }, { passive:false });
+  });
+}
+
+// ---- presets + backup ------------------------------------------------------------
+const presetLabel = n => n < 0 ? "–"
+  : n < 26 ? String.fromCharCode(65 + n) : String.fromCharCode(97 + n - 26);
+$("saveslot").innerHTML = Array.from({length:32}, (_,n) =>
+  `<option value="${n}">${presetLabel(n)}</option>`).join("");
+function updatePresetUI(){
+  const el = $("preset");
+  el.textContent = "Preset: " + presetLabel(presetId) + (presetDirty ? " ●" : "");
+  el.classList.toggle("dirty", presetDirty);
+}
+function markDirty(){ if (!presetDirty){ presetDirty = true; updatePresetUI(); } }
+function savePreset(){
+  const slot = Math.max(0, Math.min(31, parseInt($("saveslot").value) || 0));
+  sendRaw("W" + String.fromCharCode(33 + slot));
+  presetId = slot; presetDirty = false; updatePresetUI();
+  setStatus("Saved preset " + presetLabel(slot));
+}
+// Load a preset by stepping the module with prev/next-preset commands until the
+// state report says we landed on it. The firmware has no "load slot N" command,
+// and prev/next skip empty slots — so we step, re-read state, and detect a full
+// lap (target slot empty) via the set of presets already visited.
+async function loadPreset(slot){
+  if (!writer || slot === presetId) return;
+  ioBusy = true; await sleep(25);
+  setStatus("Loading preset " + presetLabel(slot) + "\u2026");
+  const seen = new Set();
+  let ok = false, stalled = false, st = await transactState();
+  while (st) {
+    if (st.preset === slot) { ok = true; break; }
+    if (seen.has(st.preset) || seen.size > 32) break;   // full lap — slot is empty
+    seen.add(st.preset);
+    const cur = st.preset < 0 ? slot : st.preset;
+    const fwd = (slot - cur + 32) % 32, back = (cur - slot + 32) % 32;
+    await sendControl(fwd <= back && fwd !== 0 ? "p" : "o");
+    let moved = null;
+    for (let t = 0; t < 50 && !moved; t++) {            // wait (~3 s) for the queued load — a running clock holds it to the next beat
+      await sleep(60);
+      const s2 = await transactState();
+      if (s2 && s2.preset !== st.preset) moved = s2;
+    }
+    if (!moved) { stalled = true; break; }              // module didn't step — give up
+    st = moved;
+  }
+  ioBusy = false;
+  if (ok) {
+    presetId = slot; presetDirty = false; updatePresetUI();
+    setStatus("Loaded preset " + presetLabel(slot));
+  } else if (stalled) {
+    updatePresetUI();
+    setStatus("Module didn\u2019t change preset \u2014 if the clock is running slowly or stopped, try again or stop the clock.");
+  } else {
+    updatePresetUI();
+    setStatus("Preset " + presetLabel(slot) + " is empty \u2014 click Save to store the current state there.");
+  }
+}
+// The dropdown only chooses a slot; Load and Save act on it. Blur after picking
+// so the keyboard shortcuts (O/P, A/D…) go back to the viewer, not the list.
+$("saveslot").onchange = ()=> $("saveslot").blur();
+$("loadbtn").onclick = ()=> loadPreset(Math.max(0, Math.min(31, parseInt($("saveslot").value) || 0)));
+async function backupBank(){
+  if (!writer) return;
+  setStatus("Backing up bank…");
+  ioBusy = true; await sleep(25);
+  const res = await transactBackup();
+  ioBusy = false;
+  if (!res) { setStatus("Backup failed (no bank file yet? save a preset first)"); return; }
+  const a = document.createElement("a");
+  a.download = res.name || "BANK_000.DAT";
+  a.href = URL.createObjectURL(new Blob([res.bytes]));
+  a.click(); URL.revokeObjectURL(a.href);
+  setStatus("Backed up " + res.name + " (" + res.bytes.length + " bytes)");
+}
+async function transactBackup(timeoutMs=6000){
+  flushInput();
+  await sendRaw("B");
+  const deadline = performance.now() + timeoutMs;
+  let header = null;
+  while (performance.now() < deadline) {
+    while (inbox.length) {
+      const line = inbox.shift();
+      if (!header) {
+        if (line.startsWith("BANK ")) {
+          const p = line.split(" ");
+          if (p[1] === "ERR") return null;
+          header = { name: p[1], size: parseInt(p[2]) || 0 };
+          if (header.size === 0) return { name: header.name, bytes: new Uint8Array(0) };
+        }
+      } else if (line.length >= header.size * 2) {
+        const bytes = new Uint8Array(header.size);
+        for (let i = 0; i < header.size; i++) bytes[i] = parseInt(line.substr(i*2, 2), 16);
+        return { name: header.name, bytes };
+      }
+    }
+    await sleep(3);
+  }
+  return null;
+}
+
+// ---- keyboard --------------------------------------------------------------------
+window.addEventListener("keydown", (e)=>{
+  const tt = e.target;
+  const typing = tt && (tt.tagName === "INPUT" || tt.tagName === "TEXTAREA" || tt.tagName === "SELECT");
+  if (e.key === "Escape" && !$("keys").hidden) { $("keys").hidden = true; return; }
+  if ((e.key === "f" || e.key === "F") && !typing) {
+    document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+    e.preventDefault(); return;
+  }
+  if (!running) return;
+  const t = e.target;
+  if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT")) return;
+  if (e.key === " " || e.code === "Space") {
+    VIEW = VIEW === "classic" ? "grid" : "classic";
+    syncView(); redrawAll();
+    e.preventDefault(); return;
+  }
+  let done = true;
+  if (mode === "quad") {
+    const col = focusedSlot & 1, row = (focusedSlot >> 1) & 1;
+    switch (e.key) {
+      case "ArrowUp": case "w": case "W":    setFocus(0*2 + col); break;
+      case "ArrowDown": case "s": case "S":  setFocus(1*2 + col); break;
+      case "ArrowLeft": case "a": case "A":  setFocus(row*2 + 0); break;
+      case "ArrowRight": case "d": case "D": setFocus(row*2 + 1); break;
+      case "x": case "X": quadAction("edit"); break;
+      case "z": case "Z": quadAction("valUp"); break;
+      case "c": case "C": quadAction("valDn"); break;
+      case "q": case "Q": quadAction("prevApp"); break;
+      case "e": case "E": quadAction("nextApp"); break;
+      case "o": case "O": quadAction("prevPre"); break;
+      case "p": case "P": quadAction("nextPre"); break;
+      default: done = false;
+    }
+  } else {
+    const R = e.shiftKey;   // hold Shift to drive the right side with the same keys
+    switch (e.key) {
+      case "ArrowUp": case "w": case "W":    sendControl(R ? "]" : ")"); break;
+      case "ArrowDown": case "s": case "S":  sendControl(R ? "[" : "("); break;
+      case "Enter": sendControl(R ? "r" : "l"); break;
+      case "Backspace":
+        // A/B puts that side back in cursor mode — but if it was ALREADY in
+        // cursor mode the firmware treats A/B as "leave Audio Setup". Re-assert
+        // the view a beat later so this key can never strand the module outside
+        // it (the injected button event needs a moment to be processed first).
+        sendControl(R ? "B" : "A");
+        setTimeout(()=>sendControl("S"), 150);
+        break;
+      case "x": case "X": sendControl(R ? "r" : "l"); break;
+      case "z": case "Z": sendControl(R ? "[" : "("); break;
+      case "c": case "C": sendControl(R ? "]" : ")"); break;
+      case "a": case "A": sendControl(R ? "]" : ")"); break;
+      case "d": case "D": sendControl(R ? "[" : "("); break;
+      default: done = false;
+    }
+    if (["z","Z","c","C","x","X","a","A","d","D","Enter","Backspace"].includes(e.key)) markDirty();
+  }
+  if (done) e.preventDefault();
+});
+
+// ---- polling loop ------------------------------------------------------------------
+let loopErrs = 0;   // consecutive loop exceptions; only repeated ones mean the link died
+async function loop(){
+  while (running) {
+    try {
+      if (ioBusy) { await sleep(15); continue; }
+      if (document.hidden) { await sleep(250); continue; }
+      let cycleOK = false;
+
+      if (VIEW === "classic") {
+        const f = await transact("S", 1024, 600);
+        if (f) { natives.live = buildNative(f); drawClassic(); setTag("LIVE"); cycleOK = true; }
+        if (!cycleOK) { await sleep(80); flushInput(); }
+        await sleep(2);
+        continue;
+      }
+
+      if (hasType("quad")) {
+        const st = await transactState();
+        if (st) {
+          cycleOK = true;
+          activeSlots = st;
+          // Follow the module into the dropdown only when its preset CHANGES, so a
+          // slot the user has picked (e.g. an empty one to save into) stays put.
+          if (st.preset !== presetId) {
+            presetId = st.preset; presetDirty = false;
+            if (presetId >= 0) $("saveslot").value = String(presetId);
+          }
+          updatePresetUI();
+        }
+        const f = await transact("Q", 2048, 500);
+        if (f) { natives.quad = buildNative(f); drawType("quad"); setTag("QUAD"); cycleOK = true; }
+      }
+      if (hasType("live")) {
+        const f = await transact("S", 1024, 500);
+        if (f) { natives.live = buildNative(f); drawType("live"); cycleOK = true; }
+      }
+      if (hasType("audio")) {
+        const f = await transact("A", 1024, 500);
+        if (f) { natives.audio = buildNative(f); cycleOK = true; }
+        const lv = await transactLevels();
+        if (lv) {
+          levels = lv; levelsSeen = true; cycleOK = true;
+          for (let m=0;m<4;m++) peaks[m] = (lv[m] >= peaks[m]) ? lv[m] : Math.max(lv[m], peaks[m]-0.012);
+        }
+        drawType("audio");
+      }
+      if (hasType("maps")) {
+        const f = await transact("M", 1024, 500);
+        if (f) { natives.maps = buildNative(f); drawType("maps"); cycleOK = true; }
+      }
+      for (const i of [0,1]) {
+        if (!hasType(i ? "scopeB" : "scopeA")) continue;
+        const sc = SCOPES[i];
+        if (!sc.src || sc.frozen || sc.misses >= 3) continue;
+        const s = await transactScope(i);
+        if (s) { sc.data = s; sc.misses = 0; cycleOK = true; }
+        else if (++sc.misses >= 3)
+          setStatus("Scope " + (i?"B":"A") + ": no reply — firmware needs the 4-byte 'O' command.");
+        drawScopes();
+      }
+      if (hasType("midi") && MIDI.misses < 3) {
+        const evs = await transactMidiLog();
+        if (evs) { midiIngest(evs); MIDI.misses = 0; cycleOK = true; }
+        else if (++MIDI.misses >= 3)
+          setStatus("MIDI monitor: no reply — firmware needs the 'N' command.");
+      }
+      if (!cycleOK) { await sleep(80); flushInput(); }
+      else loopErrs = 0;
+      await sleep(2);
+    } catch(e){
+      if (!running) break;
+      // A one-off exception here is usually a viewer bug, not a dead link —
+      // log it and keep going. Only repeated failures trigger reconnection.
+      console.error("[phaz] loop exception:", e);
+      if (++loopErrs < 3) {
+        setStatus("viewer hiccup: " + e.message + " (details in console)");
+        await sleep(100);
+        continue;
+      }
+      loopErrs = 0;
+      await recover();
+      if (!writer) break;
+    }
+  }
+}
+
+// ---- save PNG ---------------------------------------------------------------------
+function savePng(){
+  const canvases = [];
+  cellEls.forEach((cell,i)=>{
+    if (CELLS[i] === "off" || CELLS[i] === "midi") return;
+    const cv = cell.querySelector(".cbody canvas");
+    if (cv && cv.width) canvases.push(cv);
+  });
+  if (!canvases.length) return;
+  const gap = 12;
+  const w = Math.max(...canvases.map(c=>c.width));
+  const cols = Math.min(2, canvases.length);
+  const rows = Math.ceil(canvases.length / 2);
+  const rowH = Math.max(...canvases.map(c=>c.height));
+  const out = document.createElement("canvas");
+  out.width = cols*w + (cols+1)*gap;
+  out.height = rows*rowH + (rows+1)*gap;
+  const ctx = out.getContext("2d");
+  ctx.fillStyle = "#000"; ctx.fillRect(0,0,out.width,out.height);
+  canvases.forEach((c,k)=>{
+    ctx.drawImage(c, gap + (k%2)*(w+gap), gap + Math.floor(k/2)*(rowH+gap));
+  });
+  const a = document.createElement("a");
+  a.download = "phazerville_grid_" + new Date().toISOString().replace(/[:.]/g,"-") + ".png";
+  a.href = out.toDataURL("image/png"); a.click();
+}
+
+// ---- boot ------------------------------------------------------------------------
+$("connect").onclick = connect;
+$("disconnect").onclick = disconnect;
+$("color").onclick = ()=>{ colorIdx=(colorIdx+1)%PHOSPHORS.length; savePrefs(); redrawAll(); setStatus("color: "+PHOSPHORS[colorIdx].name); };
+$("save").onclick = savePng;
+$("full").onclick = ()=>{ document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); };
+$("t-keys").onclick = ()=>{ $("keys").hidden = !$("keys").hidden; };
+$("keys").onclick = ()=>{ $("keys").hidden = true; };
+$("mode").onclick = ()=>{ if (running) setMode(mode === "quad" ? "audio" : "quad"); };
+$("t-classic").onclick = ()=>{
+  VIEW = VIEW === "classic" ? "grid" : "classic";
+  syncView(); redrawAll(); savePrefs();
+};
+$("t-control").onclick = ()=>{
+  const show = $("control").hidden;
+  $("control").hidden = !show;
+  $("t-control").classList.toggle("on", show);
+};
+$("savebtn").onclick = savePreset;
+$("backupbtn").onclick = backupBank;
+let rT; window.addEventListener("resize", ()=>{ clearTimeout(rT); rT=setTimeout(redrawAll, 120); });
+document.addEventListener("fullscreenchange", ()=>{
+  document.body.classList.toggle("fs", !!document.fullscreenElement);
+  redrawAll();
+});
+
+wireControl();
+typeSelects();
+for (let i=0;i<4;i++) buildCell(i);
+setMaxed(-1);
+syncView();
+updatePresetUI();
+</script>
+
+
+</body></html>
