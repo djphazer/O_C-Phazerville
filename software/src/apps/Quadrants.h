@@ -534,6 +534,10 @@ public:
         /*noInterrupts();*/
         HemisphereApplet* next_ = HS::get_applet(index, hemisphere);
         HemisphereApplet* old_ = active_applet[hemisphere];
+        if (next_ == old_) {
+            next_applet_index[hemisphere] = active_applet_index[hemisphere] = index;
+            return;
+        }
         next_->BaseStart(hemisphere);
         // make sure we've called Start before changing the shared pointer
         active_applet[hemisphere] = next_;
