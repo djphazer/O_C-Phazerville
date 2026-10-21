@@ -1086,6 +1086,7 @@ public:
             // hold down X or Y to change applet with encoder
             ChangeApplet(slot, increment);
             SetApplet(slot, next_applet_index[slot]);
+            OC::ui.SetButtonIgnoreMask();
         } else {
             active_applet[slot]->OnEncoderMove(increment);
         }
@@ -1983,18 +1984,35 @@ void AppQuadrants::HandleButtonEvent(const UI::Event &event) {
         } else
           SwitchToSlot(slot);
       }
-      // fall thru here
+      // Z-button acts on release, either short or long
+      if (event.control == OC::CONTROL_BUTTON_Z) {
+        ToggleClockRun();
+      }
+      break;
     case UI::EVENT_BUTTON_LONG_RELEASE:
       // Z-button acts on release, either short or long
       if (event.control == OC::CONTROL_BUTTON_Z) {
         ToggleClockRun();
       }
 
+      // long-press corner button to enter applet full-screen
+      if (event.control == OC::CONTROL_BUTTON_A ||
+          event.control == OC::CONTROL_BUTTON_B ||
+          event.control == OC::CONTROL_BUTTON_X ||
+          event.control == OC::CONTROL_BUTTON_Y)
+      {
+        HEM_SIDE slot = ButtonToSlot(event);
+        if (view_state == APPLET_FULLSCREEN && slot == zoom_slot)
+          view_state = APPLETS;
+        else {
+          SetFullScreen(slot);
+          zoom_cursor = -1; // applet UI, not config
+        }
+      }
       // ignore all other button release events
       break;
 
     case UI::EVENT_BUTTON_LONG_PRESS:
-      if (event.control == OC::CONTROL_BUTTON_B) ToggleConfigMenu();
       if (event.control == OC::CONTROL_BUTTON_Z) {
         // TODO: show a menu when Z is held long enough
         // - encoder can change selected Z action
