@@ -45,7 +45,7 @@ public:
     }
 
     void Unload() override {
-        for (auto& ch : channels) ch.Stop();
+        for (int ch = 0; ch < Channels(); ch++) channels[ch].Stop();
         AllowRestart();
     }
 
@@ -66,10 +66,9 @@ public:
         float dry_gain, wet_gain;
         EqualPowerFade(dry_gain, wet_gain, eff_mix);
 
-        // Rising edge on strike_input gate
-        bool cur_strike_gate = strike_input.Gate();
-        bool gate_strike = cur_strike_gate && !prev_strike_gate_;
-        prev_strike_gate_ = cur_strike_gate;
+        // Rising edge on strike_input
+        bool gate_strike = strike_input.Clock();
+        prev_strike_gate_ = strike_input.Gate(); // for display
 
         for (int ch = 0; ch < Channels(); ch++) {
             channels[ch].resonator.updateCoeffs(
