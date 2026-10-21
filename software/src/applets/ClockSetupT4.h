@@ -24,6 +24,7 @@
  * only used on T41 build; T40 uses the other one
  */
 #pragma once
+#include "../PresetBus.h"
 
 class ClockSetup : public HemisphereApplet {
 public:
@@ -148,6 +149,8 @@ public:
             usbHostMIDI[1].sendRealTime(usbMIDI.Clock);
           if (~midi_clktx_disable & mMaskSerial)
             MIDI1.sendRealTime(midi::MidiType(usbMIDI.Clock));
+          if (~midi_clktx_disable & mMaskBus)
+            OC::PresetBus::QueueMidiTx(usbMIDI.Clock, 0, 0, 0);
         }
 
         // 8 internal clock flashers

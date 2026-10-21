@@ -111,7 +111,7 @@ namespace HS {
 
     ResetMappings();
   }
-  uint32_t get_tick() { return frame.current_ioframe->tick; }
+  uint32_t get_tick() { return OC::CORE::ticks; }
 
   FLASHMEM
   void ResetMappings() {
@@ -350,7 +350,6 @@ namespace HS {
         gfxPrint(midi_poly_mode_name[frame.MIDIState.poly_mode]);
         break;
 
-
       default: break;
     }
 
@@ -361,9 +360,12 @@ namespace HS {
   }
 
 #ifdef ARDUINO_TEENSY41
+  // the Buchla preset bus adds a fifth column
+  int MidiRoutingColumns() { return OC::Buchla200eHardware() ? 5 : 4; }
+
   void DrawMidiRouting(int cursor) {
     static const uint8_t ports[] = {
-      mMaskSerial, mMaskUSBDev, mMaskUSBHost, mMaskUSBHost2
+      mMaskSerial, mMaskUSBDev, mMaskUSBHost, mMaskUSBHost2, mMaskBus
     };
     static const uint8_t *const disabled[] = {
       &midi_thru_disable,
@@ -375,30 +377,33 @@ namespace HS {
     static const char *const row_names[] = {
       "Thru", "ClkRx", "ClkTx", "MsgRx", "MsgTx"
     };
-    static const char *const port_names[] = { "Ser", "USB", "H1", "H2" };
+    static const char *const port_names[] = { "Ser", "USB", "H1", "H2", "Bus" };
+    const int cols = MidiRoutingColumns();
+    const int step = (cols == 5) ? 18 : 22;
+    const int left = (cols == 5) ? 36 : 40;
 
     gfxHeader("<   MIDI Routing   >");
-    for (int col = 0; col < 4; ++col)
-      gfxPrint(39 + 22 * col, 12, port_names[col]);
+    for (int col = 0; col < cols; ++col)
+      gfxPrint(left - 1 + step * col, 12, port_names[col]);
 
     for (int row = 0; row < 5; ++row) {
       const int y = 20 + 9 * row;
       gfxPrint(1, y, row_names[row]);
-      for (int col = 0; col < 4; ++col) {
-        const int x = 40 + 22 * col;
+      for (int col = 0; col < cols; ++col) {
+        const int x = left + step * col;
         if (!(*disabled[row] & ports[col]))
           gfxRect(x, y, 7, 7);
         else
           gfxFrame(x, y, 7, 7);
 
-        if (cursor == row * 4 + col) gfxIcon(x + 9, y, LEFT_ICON);
+        if (cursor == row * cols + col) gfxIcon(x + 9, y, LEFT_ICON);
       }
     }
   }
 
   void ToggleMidiRouting(int cursor) {
     static const uint8_t ports[] = {
-      mMaskSerial, mMaskUSBDev, mMaskUSBHost, mMaskUSBHost2
+      mMaskSerial, mMaskUSBDev, mMaskUSBHost, mMaskUSBHost2, mMaskBus
     };
     uint8_t *const disabled[] = {
       &midi_thru_disable,
@@ -408,8 +413,9 @@ namespace HS {
       &midi_msgtx_disable
     };
 
-    const int row = cursor / 4;
-    const uint8_t port = ports[cursor % 4];
+    const int cols = MidiRoutingColumns();
+    const int row = cursor / cols;
+    const uint8_t port = ports[cursor % cols];
     *disabled[row] ^= port;
 
     if (row == 0 && port == mMaskSerial) {

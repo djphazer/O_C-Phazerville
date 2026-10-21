@@ -23,6 +23,8 @@
 #ifdef PEWPEWPEW
 #include "../util/pewpewsplash.h"
 #endif
+#include "../PresetBus.h"
+#include "../PresetBusUI.h"
 #include "../PhzConfig.h"
 
 extern "C" void _reboot_Teensyduino_();
@@ -327,7 +329,20 @@ public:
       gfxIcon(0, 35, PhzIcons::runglBook);
       gfxPrint(10, 35, OC::Strings::BUILD_TAG);
       gfxIcon(0, 45, PhzIcons::frontBack);
-      gfxPrint(10, 45, "github.com/djphazer");
+      if (OC::PresetBus::Enabled()) {
+        // lowercase when the 225e disabled remotes
+        gfxPrint(10, 45, OC::PresetBus::RemoteEnabled() ? "Remote" : "remote");
+        if (OC::PresetBus::Follow()) {
+          gfxPrint(52, 45, "ON");
+        } else {
+          gfxPrint(52, 45, "off");
+        }
+        // XPM = this module is the manager, else whichever manager was found
+        const char *mgr = OC::PresetBusUI::ActiveMode() ? "XPM" : OC::PresetBus::ManagerName();
+        if (mgr) gfxPrint(100, 45, mgr);
+      } else {
+        gfxPrint(10, 45, "github.com/djphazer");
+      }
 #ifdef MULTIBOOT
       gfxPrint(0, 55, reflash ? "[Reflash]  [BootMenu]"
                               : "[CALIBRATE]   [RESET]");
@@ -478,6 +493,10 @@ public:
           } else
 #endif
             FactoryReset();
+        }
+
+        if (event.control == OC::CONTROL_ENCODER_R && OC::PresetBus::Enabled()) {
+          OC::PresetBus::SetFollow(event.value > 0);
         }
 
         // dual-press UP+DOWN / A+B to flip screen
