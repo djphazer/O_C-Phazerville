@@ -597,6 +597,7 @@ void SerialHandler() {
           Serial.println("'C' = clear/reset default Config file");
           Serial.println("'F*ck' = format/erase all LittleFS files");
           Serial.println("'?' = print contents of CRASH.LOG");
+          Serial.println("'~' + [abxyzlr<^>v] = simulate button");
 #endif
           break;
 
