@@ -127,28 +127,41 @@ public:
     }
 
     void Reset() {
-        state_.reset_playhead();
+        playhead_ = 0;
     }
 
     void Controller() {
+        // CV1 adds to length, CV2 adds to fills
+        const int max = EuclidOState::MAX_LENGTH;
+        int len = constrain(state_.length()
+            + Proportion(DetentedIn(0), HEMISPHERE_MAX_INPUT_CV, max), 1, max);
+        int fills = constrain(state_.fills()
+            + Proportion(DetentedIn(1), HEMISPHERE_MAX_INPUT_CV, max), 1, len);
+        int rot = state_.rotation() % len;
+        if (len != len_ || fills != fills_ || rot != rot_) {
+            len_ = len;
+            fills_ = fills;
+            rot_ = rot;
+            pattern_ = EuclideanPattern(len_, fills_, rot_);
+            if (playhead_ >= len_) playhead_ = 0;
+        }
+
         if (Clock(1)) {
             Reset();
         }
 
         if (Clock(0)) {
             // Output trigger on current step, then advance
-            if (state_.is_playhead_step_on()) {
+            if ((pattern_ >> playhead_) & 0x01) {
                 ClockOut(0);
             } else {
                 ClockOut(1);
             }
-            state_.advance_playhead();
+            if (++playhead_ >= len_) playhead_ = 0;
         }
     }
 
-    void View() {
-        DrawRing();
-    }
+    void View();
 
     void OnButtonPress() {
         enum {
@@ -203,8 +216,8 @@ protected:
         //                    "-------" <-- Label size guide
         help[HELP_DIGITAL1] = "Clock";
         help[HELP_DIGITAL2] = "Reset";
-        help[HELP_CV1]      = "";
-        help[HELP_CV2]      = "";
+        help[HELP_CV1]      = "Length";
+        help[HELP_CV2]      = "Fills";
         help[HELP_OUT1]     = "StepOn";
         help[HELP_OUT2]     = "StepOff";
     }
@@ -212,6 +225,11 @@ protected:
 private:
     EuclidOState state_;
     uint8_t param_cursor_;
+
+    // what is playing: the settings above plus CV
+    uint32_t pattern_ = 0;
+    uint8_t len_ = 0, fills_ = 0, rot_ = 0;
+    uint8_t playhead_ = 0;
 
     // --- Ring drawing ---
     // All 16 positions are fixed on screen. Steps beyond length are hidden.
@@ -232,10 +250,10 @@ private:
     static constexpr int cy = 38;
 
     void DrawRing() {
-        const uint8_t n = state_.length();
-        const uint32_t pat = state_.pattern();
-        const uint8_t playhead = state_.playhead_cursor();
-        const uint8_t rot = state_.rotation();
+        const uint8_t n = len_;
+        const uint32_t pat = pattern_;
+        const uint8_t playhead = playhead_;
+        const uint8_t rot = rot_;
 
         for (uint8_t i = 0; i < n; i++) {
             int sx = step_x[i];
@@ -261,15 +279,15 @@ private:
         switch (param_cursor_) {
             default:
                 label = "fills";  label_w = 30;
-                val = state_.fills();
+                val = fills_;
                 break;
             case 1:
                 label = "offset"; label_w = 36;
-                val = state_.rotation();
+                val = rot_;
                 break;
             case 2:
                 label = "length"; label_w = 36;
-                val = state_.length();
+                val = len_;
                 break;
         }
         gfxPrint(cx - label_w / 2, cy - 7, label);
@@ -347,3 +365,7 @@ private:
             }
     }
 };
+
+FLASHMEM void EuclidO::View() {
+    DrawRing();
+}
