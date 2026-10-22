@@ -128,22 +128,24 @@ public:
 
     void Reset() {
         playhead_ = 0;
+        len_ = next_len_; // a new sequence starts with the new length
     }
 
     void Controller() {
-        // CV1 adds to length, CV2 adds to fills
+        // CV1 adds to length, CV2 adds to fills; 0-5V covers the whole range
         const int max = EuclidOState::MAX_LENGTH;
-        int len = constrain(state_.length()
-            + Proportion(DetentedIn(0), HEMISPHERE_MAX_INPUT_CV, max), 1, max);
+        next_len_ = constrain(state_.length()
+            + Proportion(DetentedIn(0), 5 * ONE_OCTAVE, max), 1, max);
+        // a new length waits for the sequence to end
+        if (len_ == 0) len_ = next_len_;
         int fills = constrain(state_.fills()
-            + Proportion(DetentedIn(1), HEMISPHERE_MAX_INPUT_CV, max), 1, len);
-        int rot = state_.rotation() % len;
-        if (len != len_ || fills != fills_ || rot != rot_) {
-            len_ = len;
+            + Proportion(DetentedIn(1), 5 * ONE_OCTAVE, max), 1, len_);
+        int rot = state_.rotation() % len_;
+        if (len_ != pattern_len_ || fills != fills_ || rot != rot_) {
+            pattern_len_ = len_;
             fills_ = fills;
             rot_ = rot;
             pattern_ = EuclideanPattern(len_, fills_, rot_);
-            if (playhead_ >= len_) playhead_ = 0;
         }
 
         if (Clock(1)) {
@@ -157,7 +159,10 @@ public:
             } else {
                 ClockOut(1);
             }
-            if (++playhead_ >= len_) playhead_ = 0;
+            if (++playhead_ >= len_) {
+                playhead_ = 0;
+                len_ = next_len_;
+            }
         }
     }
 
@@ -229,6 +234,8 @@ private:
     // what is playing: the settings above plus CV
     uint32_t pattern_ = 0;
     uint8_t len_ = 0, fills_ = 0, rot_ = 0;
+    uint8_t pattern_len_ = 0; // length pattern_ was made for
+    uint8_t next_len_ = 1; // length after the current sequence ends
     uint8_t playhead_ = 0;
 
     // --- Ring drawing ---
@@ -287,7 +294,7 @@ private:
                 break;
             case 2:
                 label = "length"; label_w = 36;
-                val = len_;
+                val = next_len_; // the ring shows it once the sequence ends
                 break;
         }
         gfxPrint(cx - label_w / 2, cy - 7, label);

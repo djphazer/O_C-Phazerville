@@ -66,6 +66,12 @@ public:
     }
 
     void Controller() {
+        // knob + CV, as heard and as shown
+        attack_cv = constrain(attack + Proportion(DetentedIn(0), HEMISPHERE_MAX_INPUT_CV, HEM_ADEG_MAX_VALUE),
+                              0, HEM_ADEG_MAX_VALUE);
+        decay_cv = constrain(decay + Proportion(DetentedIn(1), HEMISPHERE_MAX_INPUT_CV, HEM_ADEG_MAX_VALUE),
+                             0, HEM_ADEG_MAX_VALUE);
+
         if (Clock(0)) {
             // Trigger the envelope
             phase = 1; // Return to attack phase
@@ -170,13 +176,15 @@ private:
     // Settings
     int attack; // Time to reach signal level if signal < 5V
     int decay; // Time to reach signal level if signal > 0V
+    int attack_cv = 0; // the settings plus CV
+    int decay_cv = 0;
 
     void DrawIndicator() {
         // Peak sits in the middle; attack grows to the left, decay to the right,
         // each on a fixed scale so the line length shows the stage length
         const int mid = 31;
-        const int a_x = mid - Proportion(attack, HEM_ADEG_MAX_VALUE, 31);
-        const int d_x = mid + Proportion(decay, HEM_ADEG_MAX_VALUE, 31);
+        const int a_x = mid - Proportion(attack_cv, HEM_ADEG_MAX_VALUE, 31);
+        const int d_x = mid + Proportion(decay_cv, HEM_ADEG_MAX_VALUE, 31);
 
         gfxLine(a_x, 62, mid, 33, cursor == 1);
         gfxLine(mid, 33, d_x, 62, cursor == 0);
@@ -194,7 +202,7 @@ private:
 
         // Length of the selected stage, same as ADSR
         gfxPrint(1, 23, cursor == 0 ? "A=" : "D=");
-        const int ms_value = ScaleStageToTicks(cursor == 0 ? attack : decay) * 10 / 17;
+        const int ms_value = ScaleStageToTicks(cursor == 0 ? attack_cv : decay_cv) * 10 / 17;
         gfxPrint(ms_value / 10);
         gfxPrint(".");
         gfxPrint(ms_value % 10);

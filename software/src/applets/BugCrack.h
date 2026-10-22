@@ -28,11 +28,12 @@
 #define CH_SNARE 1
 #define CH_PUNCH_DECAY 2
 
-#define CV_MODE_ATTEN 0
-#define CV_MODE_TONE  1
-#define CV_MODE_DECAY 2
-#define CV_MODE_FM    3
-#define CV_MODE_DROP_OR_BLEND  4
+// same order as the settings
+#define CV_MODE_TONE  0
+#define CV_MODE_DECAY 1
+#define CV_MODE_FM    2 // punch / snap
+#define CV_MODE_DROP_OR_BLEND  3
+#define CV_MODE_LEVEL 4
 
 #define BNC_MAX_LEVEL 15
 
@@ -57,6 +58,9 @@ public:
 
         level_kick = BNC_MAX_LEVEL;
         level_snare = BNC_MAX_LEVEL;
+
+        cv_mode_kick = CV_MODE_LEVEL;
+        cv_mode_snare = CV_MODE_LEVEL;
 
         noise = random(0, (1<<12));
 
@@ -128,7 +132,7 @@ public:
             _decay_punch = decay_punch;
         }
         _level_kick = Proportion(level_kick, BNC_MAX_LEVEL, BNC_MAX_PARAM); // 0 = mute
-        if (cv_mode_kick == CV_MODE_ATTEN) {
+        if (cv_mode_kick == CV_MODE_LEVEL) {
             _level_kick = constrain(_level_kick - cv_kick, 0, BNC_MAX_PARAM);
         }
         if (Clock(CH_KICK, 0)) {
@@ -179,7 +183,7 @@ public:
             _blend_snare = blend_snare;
         }
         _level_snare = Proportion(level_snare, BNC_MAX_LEVEL, BNC_MAX_PARAM); // 0 = mute
-        if (cv_mode_snare == CV_MODE_ATTEN) {
+        if (cv_mode_snare == CV_MODE_LEVEL) {
             _level_snare = constrain(_level_snare - cv_snare, 0, BNC_MAX_PARAM);
         }
         if (Clock(CH_SNARE, 0)) {
@@ -300,8 +304,9 @@ public:
         Pack(data, PackLocation {36,6}, snap);
         Pack(data, PackLocation {42,6}, blend_snare);
 
-        Pack(data, PackLocation {48,4}, cv_mode_kick);
-        Pack(data, PackLocation {52,4}, cv_mode_snare);
+        Pack(data, PackLocation {48,3}, cv_mode_kick);
+        Pack(data, PackLocation {51,1}, 1); // CV modes in settings order
+        Pack(data, PackLocation {52,3}, cv_mode_snare);
 
         Pack(data, PackLocation {56, 1}, mix_outs);
 
@@ -328,6 +333,11 @@ public:
 
         cv_mode_kick = constrain(Unpack(data, PackLocation {48,3}), 0, 4);
         cv_mode_snare = constrain(Unpack(data, PackLocation {52,3}), 0, 4);
+        if (!Unpack(data, PackLocation {51,1})) {
+            // older presets had level first: atn, ton, dec, FM, dro/bln
+            cv_mode_kick = (cv_mode_kick + 4) % 5;
+            cv_mode_snare = (cv_mode_snare + 4) % 5;
+        }
 
         mix_outs = Unpack(data, PackLocation {56,1});
 
@@ -397,8 +407,9 @@ private:
 
     bool mix_outs = true;
 
-    const char *CV_MODE_NAMES_BD[5] = {"atn", "ton", "dec", "FM", "dro"};
-    const char *CV_MODE_NAMES_SN[5] = {"atn", "ton", "dec", "FM", "bln"};
+    // same names as the settings
+    const char *CV_MODE_NAMES_BD[5] = {"tone", "decay", "punch", "drop", "level"};
+    const char *CV_MODE_NAMES_SN[5] = {"tone", "decay", "snap", "blend", "level"};
 
     const char *PARAM_LABELS[13] = {
         "Kik Tone", "Kik Decay", "Kik Punch", "Kik Drop", "Kik Level", "Kik CV",
@@ -437,8 +448,9 @@ private:
                 }
                 break;
             case 5: // CV modes
-                gfxIcon(1, 57, CV_ICON);
-                gfxPrint(10, 55, CV_MODE_NAMES_BD[cv_mode_kick]);
+                // the name takes the whole column; the icon goes on top
+                gfxIcon(1, 15, CV_ICON);
+                gfxPrint(1, 55, CV_MODE_NAMES_BD[cv_mode_kick]);
                 break;
 
             // Snare drum
@@ -461,8 +473,8 @@ private:
                 }
                 break;
             case 11: // CV modes
-                gfxIcon(32, 57, CV_ICON);
-                gfxPrint(41, 55, CV_MODE_NAMES_SN[cv_mode_snare]);
+                gfxIcon(32, 15, CV_ICON);
+                gfxPrint(32, 55, CV_MODE_NAMES_SN[cv_mode_snare]);
                 break;
 
             case 12: // mix outs @ B/D
