@@ -129,15 +129,8 @@ public:
     }
 
     void OnEncoderMove(int direction) {
-        if (cursor == 0) {
-            attack = constrain(attack + direction, 0, HEM_ADEG_MAX_VALUE);
-            last_ticks_val = ScaleStageToTicks(attack);
-        }
-        else {
-            decay = constrain(decay + direction, 0, HEM_ADEG_MAX_VALUE);
-            last_ticks_val = ScaleStageToTicks(decay);
-        }
-        last_change_ticks = HS::get_tick();
+        if (cursor == 0) attack = constrain(attack + direction, 0, HEM_ADEG_MAX_VALUE);
+        else decay = constrain(decay + direction, 0, HEM_ADEG_MAX_VALUE);
     }
 
     uint64_t OnDataRequest() {
@@ -170,8 +163,6 @@ private:
     simfloat signal; // Current signal level for each channel
     int phase; // 0=Not running 1=Attack 2=Decay
     int cursor; // 0 = Attack, 1 = Decay
-    int last_ticks_val;
-    int last_change_ticks;
     int effective_attack; // Attack and decay for this particular triggering
     int effective_decay;  // of the EG, so that it can be triggered in reverse!
     bool reverse = false;  // for indicator graphics
@@ -181,30 +172,33 @@ private:
     int decay; // Time to reach signal level if signal > 0V
 
     void DrawIndicator() {
-        int a_x = Proportion(attack, HEM_ADEG_MAX_VALUE, 31);
-        int d_x = a_x + Proportion(decay, HEM_ADEG_MAX_VALUE, 31);
+        // Peak sits in the middle; attack grows to the left, decay to the right,
+        // each on a fixed scale so the line length shows the stage length
+        const int mid = 31;
+        const int a_x = mid - Proportion(attack, HEM_ADEG_MAX_VALUE, 31);
+        const int d_x = mid + Proportion(decay, HEM_ADEG_MAX_VALUE, 31);
 
-        if (d_x > 0) { // Stretch to use the whole viewport
-            a_x = Proportion(62, d_x, a_x);
-            d_x = Proportion(62, d_x, d_x);
+        gfxLine(a_x, 62, mid, 33, cursor == 1);
+        gfxLine(mid, 33, d_x, 62, cursor == 0);
+
+        // scale ticks at 10ms, 100ms, 1s on both sides
+        for (int idx : {19, 58, 181}) {
+            const int dx = Proportion(idx, HEM_ADEG_MAX_VALUE, 31);
+            gfxLine(mid - dx, 63, mid - dx, (idx == 181) ? 59 : 61);
+            gfxLine(mid + dx, 63, mid + dx, (idx == 181) ? 59 : 61);
         }
-
-        gfxLine(0, 62, a_x, 33, cursor == 1);
-        gfxLine(a_x, 33, d_x, 62, cursor == 0);
 
         // Output indicators
         int rect_x = 1 + reverse * (61 - ProportionCV(ViewOut(0), 62));
         gfxRect(rect_x, 15, ProportionCV(ViewOut(0), 62), 6);
 
-        // Change indicator, if necessary
-        if (HS::get_tick() - last_change_ticks < 20000) {
-            const int ms_value = last_ticks_val * 10 / 17;
-            gfxPos(1, 23);
-            gfxPrint(ms_value / 10);
-            gfxPrint(".");
-            gfxPrint(ms_value % 10);
-            gfxPrint("ms");
-        }
+        // Length of the selected stage, same as ADSR
+        gfxPrint(1, 23, cursor == 0 ? "A=" : "D=");
+        const int ms_value = ScaleStageToTicks(cursor == 0 ? attack : decay) * 10 / 17;
+        gfxPrint(ms_value / 10);
+        gfxPrint(".");
+        gfxPrint(ms_value % 10);
+        gfxPrint("ms");
     }
 };
 
