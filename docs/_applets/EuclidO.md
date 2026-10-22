@@ -12,7 +12,7 @@ A single-channel Euclidean pattern generator with a circular ring visualization,
 |        |       1/3        |      2/4       |
 | ------ | :--------------: | :------------: |
 | TRIG   |      Clock       |     Reset      |
-| CV INs |        —         |       —        |
+| CV INs | Length (0-5V adds 0-16) | Fills (0-5V adds 0-16) |
 | OUTs   | On-step Triggers | Off-step Triggers |
 
 ### UI Parameters
@@ -20,7 +20,7 @@ Press the encoder button to cycle through parameters, then turn the encoder to a
 
 * **Fills** — Number of active hits distributed across the pattern (1 to length)
 * **Offset** — Rotation of the pattern; wraps around in both directions
-* **Length** — Total number of steps in the pattern (1 to 16)
+* **Length** — Total number of steps in the pattern (1 to 16). A new length (from the encoder or CV) takes effect when the current sequence ends, or on Reset
 
 ### Outputs
 * **Output 1** sends a trigger pulse on each active (filled) step.
