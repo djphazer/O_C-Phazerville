@@ -48,6 +48,12 @@ public:
             29526, 29773, 30020, 30269, 30519, 30769, 31021, 31274, 31527, 31782, 32038, 32295, 32553, 32812, 33072, 33333,
         };
 
+        // CV adds to a stage like the encoder does: 0-5V covers the whole
+        // range, so 5V reaches the longest time along the same curve
+        int CVToStage(int ch) {
+            return Proportion(DetentedIn(ch), 5 * ONE_OCTAVE, HEM_ADEG_MAX_VALUE);
+        }
+
         static int ScaleStageToTicks(int setting) {
             const int p = constrain(setting, 0, HEM_ADEG_MAX_VALUE);
             return int(kStageTicks[p]);
@@ -67,10 +73,8 @@ public:
 
     void Controller() {
         // knob + CV, as heard and as shown
-        attack_cv = constrain(attack + Proportion(DetentedIn(0), HEMISPHERE_MAX_INPUT_CV, HEM_ADEG_MAX_VALUE),
-                              0, HEM_ADEG_MAX_VALUE);
-        decay_cv = constrain(decay + Proportion(DetentedIn(1), HEMISPHERE_MAX_INPUT_CV, HEM_ADEG_MAX_VALUE),
-                             0, HEM_ADEG_MAX_VALUE);
+        attack_cv = constrain(attack + CVToStage(0), 0, HEM_ADEG_MAX_VALUE);
+        decay_cv = constrain(decay + CVToStage(1), 0, HEM_ADEG_MAX_VALUE);
 
         if (Clock(0)) {
             // Trigger the envelope
@@ -93,8 +97,8 @@ public:
 
             //if (signal != target) { // Logarhythm fix 8/2020
                 int segment = phase == 1
-                    ? effective_attack + Proportion(DetentedIn(0), HEMISPHERE_MAX_INPUT_CV, HEM_ADEG_MAX_VALUE)
-                    : effective_decay + Proportion(DetentedIn(1), HEMISPHERE_MAX_INPUT_CV, HEM_ADEG_MAX_VALUE);
+                    ? effective_attack + CVToStage(0)
+                    : effective_decay + CVToStage(1);
                 segment = constrain(segment, 0, HEM_ADEG_MAX_VALUE);
                 simfloat remaining = target - signal;
 
