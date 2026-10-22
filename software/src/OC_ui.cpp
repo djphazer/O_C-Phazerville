@@ -16,6 +16,8 @@
 #include "src/drivers/display.h"
 #include "HSUtils.h"
 
+#include "PresetBusUI.h"
+
 #ifdef VOR
 #include "VBiasManager.h"
 VBiasManager *VBiasManager::instance = 0;
@@ -172,6 +174,20 @@ UiMode Ui::DispatchEvents(const RuntimeSlot &appslot) {
       continue;
 
     MENU_REDRAW = 1;
+
+#if defined(ARDUINO_TEENSY41) && defined(PRESET_BUS)
+    // both encoder buttons open the preset bus screen
+    if (OC::PresetBusUI::Active()) {
+      if (OC::PresetBusUI::HandleEvent(event)) continue;
+    } else if (UI::EVENT_BUTTON_DOWN == event.type &&
+               (CONTROL_BUTTON_L == event.control || CONTROL_BUTTON_R == event.control) &&
+               (event.mask & (CONTROL_BUTTON_L | CONTROL_BUTTON_R))
+                   == (CONTROL_BUTTON_L | CONTROL_BUTTON_R) &&
+               OC::Buchla200eHardware() && !app->OwnsEncoderChord()) {
+      OC::PresetBusUI::Enter();
+      continue;
+    }
+#endif
 
     const bool z_hold = (event.mask & CONTROL_BUTTON_Z);
     const bool a_hold = (event.mask & CONTROL_BUTTON_A);
