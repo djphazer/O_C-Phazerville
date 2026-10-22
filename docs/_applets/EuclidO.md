@@ -12,7 +12,7 @@ A single-channel Euclidean pattern generator with a circular ring visualization,
 |        |       1/3        |      2/4       |
 | ------ | :--------------: | :------------: |
 | TRIG   |      Clock       |     Reset      |
-| CV INs | Length (0-5V adds 0-16) | Fills (0-5V adds 0-16) |
+| CV INs | Length (full scale adds 0-16) | Fills (full scale adds 0-16) |
 | OUTs   | On-step Triggers | Off-step Triggers |
 
 ### UI Parameters

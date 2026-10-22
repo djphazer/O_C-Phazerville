@@ -132,14 +132,14 @@ public:
     }
 
     void Controller() {
-        // CV1 adds to length, CV2 adds to fills; 0-5V covers the whole range
+        // CV1 adds to length, CV2 adds to fills
         const int max = EuclidOState::MAX_LENGTH;
         next_len_ = constrain(state_.length()
-            + Proportion(DetentedIn(0), 5 * ONE_OCTAVE, max), 1, max);
+            + Proportion(DetentedIn(0), HEMISPHERE_MAX_INPUT_CV, max), 1, max);
         // a new length waits for the sequence to end
         if (len_ == 0) len_ = next_len_;
         int fills = constrain(state_.fills()
-            + Proportion(DetentedIn(1), 5 * ONE_OCTAVE, max), 1, len_);
+            + Proportion(DetentedIn(1), HEMISPHERE_MAX_INPUT_CV, max), 1, len_);
         int rot = state_.rotation() % len_;
         if (len_ != pattern_len_ || fills != fills_ || rot != rot_) {
             pattern_len_ = len_;
