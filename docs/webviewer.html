@@ -118,11 +118,15 @@
   <div id="control" hidden="">
     <div class="cgroup">
       <span class="clbl">Buttons</span>
-      <button class="cbtn" data-ctl="A">A</button>
-      <button class="cbtn" data-ctl="B">B</button>
-      <button class="cbtn" data-ctl="X">X</button>
-      <button class="cbtn" data-ctl="Y">Y</button>
-      <button class="cbtn" data-ctl="Z">Z</button>
+      <button class="cbtn" data-ctl="a">A</button>
+      <button class="cbtn" data-ctl="b">B</button>
+      <button class="cbtn" data-ctl="x">X</button>
+      <button class="cbtn" data-ctl="y">Y</button>
+      <button class="cbtn" data-ctl="z">Z</button>
+      <button class="cbtn" data-ctl="^">Up</button>
+      <button class="cbtn" data-ctl="v">Down</button>
+      <button class="cbtn" data-ctl="<">Left</button>
+      <button class="cbtn" data-ctl=">">Right</button>
     </div>
     <div class="cgroup">
       <span class="clbl">L enc</span>
@@ -457,7 +461,7 @@ function sizeCells(){
       // sized by drawQuadComposite
     } else if (t === "live" || t === "maps") {
       const cv = body.querySelector("canvas");
-      if (cv && (cv.width!==w || cv.height!==64*s)) { cv.width=w; cv.height=64*s; }
+      if (cv && (cv.width!==w || cv.height!==256*s)) { cv.width=w; cv.height=256*s; }
     } else if (t === "audio") {
       const acv = body.querySelector(".acv");
       if (acv && (acv.width!==w || acv.height!==64*s)) { acv.width=w; acv.height=64*s; }
@@ -742,7 +746,7 @@ function drawClassic(){
   const cv = document.querySelector("#classic canvas");
   const sc = Math.max(1, Math.min(9,
     Math.floor(Math.min((window.innerWidth - 80) / 128, (window.innerHeight - 180) / 64))));
-  if (cv.width !== 128*sc || cv.height !== 64*sc) { cv.width = 128*sc; cv.height = 64*sc; }
+  if (cv.width !== 128*sc || cv.height !== 256*sc) { cv.width = 128*sc; cv.height = 256*sc; }
   if (natives.live) drawSimple(cv, natives.live);
 }
 function syncView(){
@@ -871,7 +875,7 @@ async function transact(cmd, expectBytes, timeoutMs=600){
 }
 function decodeFrame(hexline){
   const n = hexline.length/2;
-  if ((n!==1024 && n!==2048) || hexline.length % 2) return null;
+  if ((n!==4096 && n!==2048) || hexline.length % 2) return null;
   const data = new Uint8Array(n);
   for (let i=0;i<n;i++){ const b=parseInt(hexline.substr(i*2,2),16); if (Number.isNaN(b)) return null; data[i]=b; }
   return { data, w:OLED_W, h:n/16 };
@@ -1295,7 +1299,7 @@ window.addEventListener("keydown", (e)=>{
         // cursor mode the firmware treats A/B as "leave Audio Setup". Re-assert
         // the view a beat later so this key can never strand the module outside
         // it (the injected button event needs a moment to be processed first).
-        sendControl(R ? "B" : "A");
+        sendControl(R ? "b" : "a");
         setTimeout(()=>sendControl("S"), 150);
         break;
       case "x": case "X": sendControl(R ? "r" : "l"); break;
@@ -1320,7 +1324,7 @@ async function loop(){
       let cycleOK = false;
 
       if (VIEW === "classic") {
-        const f = await transact("S", 1024, 600);
+        const f = await transact("S", 4096, 600);
         if (f) { natives.live = buildNative(f); drawClassic(); setTag("LIVE"); cycleOK = true; }
         if (!cycleOK) { await sleep(80); flushInput(); }
         await sleep(2);
@@ -1344,7 +1348,7 @@ async function loop(){
         if (f) { natives.quad = buildNative(f); drawType("quad"); setTag("QUAD"); cycleOK = true; }
       }
       if (hasType("live")) {
-        const f = await transact("S", 1024, 500);
+        const f = await transact("S", 4096, 500);
         if (f) { natives.live = buildNative(f); drawType("live"); cycleOK = true; }
       }
       if (hasType("audio")) {
