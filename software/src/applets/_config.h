@@ -194,7 +194,7 @@ constexpr Registry reg = Registry<HemisphereApplet, HS::APPLET_SLOTS  // unused 
     , DeclareApplet<Palimpsest, 20, CAT_SEQUENCER>
     , DeclareApplet<Panner, 100, CAT_UTILITY>
     , DeclareApplet<Pigeons, 71, CAT_SEQUENCER>
-    //, DeclareApplet<Piquet, 1, CAT_MODULATOR>
+    , DeclareApplet<Piquet, 1, CAT_MODULATOR>
     , DeclareApplet<PolyDiv, 72, CAT_SEQUENCER | CAT_CLOCKING>
     , DeclareApplet<Ponglet, 99, CAT_OTHER>
     , DeclareApplet<ProbabilityDivider, 59, CAT_CLOCKING>
