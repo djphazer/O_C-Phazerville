@@ -315,6 +315,7 @@ private:
     // TODO: implement destination mapping; currently hardcoded to Release stage
 
     const char* const labels[NUM_STAGES] = { "A=", "D=", "S=", "R=" };
+    const char* const stagename[NUM_STAGES] = { "Attack", "Decay", "Sustain", "Release" };
 
     void DrawIndicator() {
         ForEachChannel(ch)
@@ -338,6 +339,7 @@ private:
         const int stage = cursor % NUM_STAGES;
         auto &adsr = adsr_env[curEG];
 
+        SetLabel(stagename[stage]);
         gfxPrint(9, 22, labels[stage]);
         if (SUSTAIN_STAGE == stage) {
           int level = Proportion(adsr.setting[stage], STAGE_MAX_VALUE, 1000);
