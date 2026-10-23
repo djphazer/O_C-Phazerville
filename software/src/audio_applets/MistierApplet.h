@@ -25,6 +25,8 @@ extern "C" uint8_t external_psram_size;
 // Parameters:
 //   Page 1: Pos, Den, Sz, Spr, PSp
 //   Page 2: Pitch, Fdb, Tex, Mix, Frz
+//   Page 3: Rev, Char, Chaos  (Beads-inspired; no CV inputs — preset
+//           footprint keeps these in 8 bits: rev[1] + char[2] + chaos[5])
 //
 template <AudioChannels Channels>
 class MistierApplet : public HemisphereAudioApplet {
@@ -79,6 +81,10 @@ public:
             channels[ch].grain_stream.setTexture(eff_texture);
             channels[ch].grain_stream.setFeedback(eff_feedback);
             channels[ch].grain_stream.setFreeze(frozen);
+            // Beads-inspired extras.
+            channels[ch].grain_stream.setReverse(reverse_);
+            channels[ch].grain_stream.setCharacter(character_);
+            channels[ch].grain_stream.setChaos(chaos_ / 31.0f);
             channels[ch].mixer.gain(MistierChannel::DRY_CH, dry_gain);
             channels[ch].mixer.gain(MistierChannel::WET_CH, wet_gain);
         }
@@ -96,10 +102,10 @@ public:
             if (i < active) gfxPixel(1 + i, 7);
         }
 
-        // ── Two pages ────────────────────────────────────────────────────────
-        const bool pg2 = (cursor >= PITCH);
+        // ── Three pages ───────────────────────────────────────────────────────
+        const uint8_t page = (cursor >= REV) ? 2 : (cursor >= PITCH ? 1 : 0);
 
-        if (!pg2) {
+        if (page == 0) {
             // ── Page 1: Pos, Den, Sz, Spr, PSp (y=15/25/35/45/55) ──────────
             gfxPrint(1, 15, "Pos:");
             gfxStartCursor(); graphics.printf("%3d%%", pos); gfxEndCursor(cursor == POS);
@@ -124,7 +130,7 @@ public:
             gfxPrint(1, 55, "PSp:");
             gfxStartCursor(); graphics.printf("%3d%%", psprd); gfxEndCursor(cursor == PSPRD);
             gfxStartCursor(); gfxPrint(psprd_cv); gfxEndCursor(cursor == PSPRD_CV, false, psprd_cv.InputName());
-        } else {
+        } else if (page == 1) {
             // ── Page 2: Pitch, Fdb, Tex, Mix, Frz (y=15/25/35/45/55) ────────
 
             // Pitch
@@ -154,10 +160,31 @@ public:
             gfxPrint(1, 55, "Frz:");
             if (manual_freeze_) gfxInvert(1, 55, 20, 8);
             gfxStartCursor(); gfxPrint(freeze_input); gfxEndCursor(cursor == FREEZE, true, freeze_input.InputName());
+        } else if (page == 2) {
+            // ── Page 3: Rev, Char, Chaos (y=15/25/35) — Beads-inspired ───────
+
+            // Reverse — Beads-style backward grain playback
+            gfxPrint(1, 15, "Rev:");
+            gfxStartCursor();
+            gfxPrint(reverse_ ? "Rev" : "Fwd");
+            gfxEndCursor(cursor == REV);
+
+            // Character — Beads-style media emulation
+            static const char* const char_names[4] = {"Cln", "Tape", "Vint", "Drty"};
+            gfxPrint(1, 25, "Char:");
+            gfxStartCursor();
+            gfxPrint(char_names[character_]);
+            gfxEndCursor(cursor == CHAR);
+
+            // Chaos — Beads attenurandomizer-style per-grain size/texture spread
+            gfxPrint(1, 35, "Chaos:");
+            gfxStartCursor();
+            graphics.printf("%3d%%", (chaos_ * 100 + 15) / 31);
+            gfxEndCursor(cursor == CHAOS);
         }
 
         // Page indicator
-        gfxPrint(58, 56, pg2 ? "<" : ">");
+        gfxPrint(58, 56, page == 0 ? "1/3" : page == 1 ? "2/3" : "3/3");
 
         gfxDisplayInputMapEditor();
     }
@@ -213,6 +240,10 @@ public:
             case MIX:        mix     = constrain(mix     + direction,   0, 100); break;
             case MIX_CV:     mix_cv.ChangeSource(direction);                      break;
             case FREEZE:     freeze_input.ChangeSource(direction);                break;
+            // Page 3: Beads-inspired (no CV inputs)
+            case REV:        reverse_   = direction > 0; break;
+            case CHAR:       character_ = constrain(character_ + direction, 0, 3); break;
+            case CHAOS:      chaos_     = constrain(chaos_     + direction, 0, 31); break;
             default: break;
         }
     }
@@ -222,14 +253,24 @@ public:
         data[0] = PackPackables(MISTIER_PARAMS);
         data[1] = PackPackables(pos_cv, density_cv, size_cv, spray_cv);
         data[2] = PackPackables(pitch_cv, fdb_cv, texture_cv, mix_cv);
-        data[3] = PackPackables(freeze_input, spray, psprd_cv);
+        // Beads-inspired params share one int8 bitfield (8 bits):
+        //   bit 0: reverse, bits 1-2: character (0-3), bits 3-7: chaos (0-31).
+        // Old presets have zeros here → reverse off, clean, no chaos (old behavior).
+        int8_t beads_flags =
+            (reverse_ ? 0x01 : 0x00) | ((character_ & 0x03) << 1) | ((chaos_ & 0x1f) << 3);
+        data[3] = PackPackables(freeze_input, spray, psprd_cv, beads_flags);
     }
 
     void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
         UnpackPackables(data[0], MISTIER_PARAMS);
         UnpackPackables(data[1], pos_cv, density_cv, size_cv, spray_cv);
         UnpackPackables(data[2], pitch_cv, fdb_cv, texture_cv, mix_cv);
-        UnpackPackables(data[3], freeze_input, spray, psprd_cv);
+        int8_t beads_flags = 0;
+        UnpackPackables(data[3], freeze_input, spray, psprd_cv, beads_flags);
+        uint8_t f = static_cast<uint8_t>(beads_flags);
+        reverse_   = f & 0x01;
+        character_ = (f >> 1) & 0x03;
+        chaos_     = (f >> 3) & 0x1f;
     }
 #undef MISTIER_PARAMS
 
@@ -253,6 +294,10 @@ private:
         TEXTURE, TEXTURE_CV,
         MIX, MIX_CV,
         FREEZE,
+        // Page 3: Beads-inspired (no CV inputs — see note on preset packing)
+        REV,
+        CHAR,
+        CHAOS,
         CURSOR_LENGTH,
     };
 
@@ -280,6 +325,12 @@ private:
     DigitalInputMap freeze_input;
 
     bool manual_freeze_ = false;  // latched by AuxButton
+
+    // Page 3: Beads-inspired. Packed into a single int8 bitfield for presets:
+    //   bit 0: reverse, bits 1-2: character (0-3), bits 3-7: chaos (0-31).
+    bool   reverse_   = false; // backward grain playback
+    int8_t character_ = 0;     // 0=Clean, 1=Tape, 2=Vintage, 3=Dirty
+    int8_t chaos_     = 0;     // per-grain size/texture randomization
 
     // Per-channel DSP struct.
     struct MistierChannel {
