@@ -50,7 +50,7 @@ public:
     }
 
     void Unload() override {
-        delete lofi_pcm_buffer;
+        delete[] lofi_pcm_buffer;
     }
 
     void Controller() {
