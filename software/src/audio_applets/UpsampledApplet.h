@@ -1,5 +1,8 @@
 #pragma once
 
+#include "../Audio/AudioMixerF32.h"
+#include "../Audio/InterpolatingStreamF32.h"
+
 class UpsampledApplet : public HemisphereAudioAppletF32 {
 public:
   const char* applet_name() {
@@ -11,9 +14,9 @@ public:
     interp_stream.Method(static_cast<InterpolationMethod>(method));
 
     for (int c = 0; c < Channels(); c++) {
-      PatchCable(interp_stream, 0, mixer[c], 0);
-      PatchCable(InputStream(), c, mixer[c], 1);
-      PatchCable(mixer[c], 0, OutputStream(), c);
+      PatchCableF32(interp_stream, 0, mixer[c], 0);
+      PatchCableF32(InputF32(), c, mixer[c], 1);
+      PatchCableF32(mixer[c], 0, OutputF32(), c);
       mixer[c].gain(0, 1.0f);
       mixer[c].gain(1, 1.0f);
     }
@@ -31,8 +34,9 @@ public:
 
     if (ac_couple) in -= lp;
 
-    const float scalar = -31267.0f / HEMISPHERE_MAX_CV;
-    interp_stream.Push(Clip16((gain_cv.InF(0.0f) + dbToScalar(gain)) * scalar * in));
+    // full scale CV -> about -0.95, the stream clips to [-1, 1)
+    const float scalar = -31267.0f / 32768.0f / HEMISPHERE_MAX_CV;
+    interp_stream.Push((gain_cv.InF(0.0f) + dbToScalar(gain)) * scalar * in);
   }
 
   void View() override {
@@ -127,8 +131,8 @@ protected:
   void SetHelp() override {}
 
 private:
-  InterpolatingStream<> interp_stream;
-  AudioMixer<2> mixer[STEREO];
+  InterpolatingStreamF32<> interp_stream;
+  AudioMixerF32<2> mixer[STEREO];
 
   float lp = 0.0f;
   int cursor = 0;
