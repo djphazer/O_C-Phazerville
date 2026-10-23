@@ -147,32 +147,51 @@ public:
       gfxPrint(4, 25, "NO SD CARD!!");
       return;
     }
-    size_t y = 13;
+    int y = 13;
+
     gfxStartCursor(1, y);
     gfxPrintfn(1, y, 0, "%03u", file_select_mod);
     gfxEndCursor(cursor == FILE_NUM, "FileSel");
-    // TODO: verify layout on hardware — picker may overlap play icon at x=22
-    gfxStartCursor();
+
+    gfxStartCursor(20, y);
     gfxPrint(file_select_cv);
     gfxEndCursor(cursor == FILE_NUM_CV, false, file_select_cv.InputName(), "FileCV");
-    gfxStartCursor();
-    gfxPrint(file_select_sh ? "S&H" : "---");
+
+    gfxStartCursor(30, y);
+    gfxPrint(file_select_sh ? "S" : "-");
     gfxEndCursor(cursor == FILE_SH, "S&H");
 
-    gfxIcon(22, y, FileIsPlaying() ? PLAY_ICON : STOP_ICON);
-    gfxStartCursor(30, y-1);
+    // Play trigger input
+    gfxStartCursor(40, y-1);
     gfxPrint(playstop_cv);
     gfxEndCursor(cursor == PLAYSTOP_GATE_CV, false, playstop_cv.InputName(), "PlayTrig");
-
-    if (wavplayer_ready)
-      gfxPrint(37, y, GetFileBPM());
-    else
-      gfxPrint(37, y, "(--)");
 
     // filter mod
     gfxStartCursor(56, y);
     gfxPrint(djfilter_cv);
     gfxEndCursor(cursor == FILTER_CV, false, djfilter_cv.InputName(), "FilterCV");
+
+    if (cursor == FILTER_PARAM) {
+      if (EditMode()) {
+        SetLabel("Filter");
+        const int x = 45;
+        gfxClear(x, y, 18, 10);
+        if (djfilter > 0) gfxPrint(x, y, "HPF");
+        else if (djfilter < 0) gfxPrint(x, y, "LPF");
+        else gfxPrint(x+6, y, "X");
+      } else {
+        gfxIcon(45, y, RIGHT_ICON, true);
+        gfxIcon(52, y, (filter_on) ? SLEW_ICON : PhzIcons::tuner, true);
+      }
+    }
+
+    y += 10;
+    gfxIcon(1, y, FileIsPlaying() ? PLAY_ICON : STOP_ICON);
+
+    if (wavplayer_ready)
+      gfxPrint(32, y, GetFileBPM());
+    else
+      gfxPrint(32, y, "(--)");
 
     // filter meter at the top
     if (filter_on) {
@@ -192,44 +211,31 @@ public:
       gfxPos(1, y);
       graphics.printf("%02lu:%02lu.%03lu", tmin, tsec, tmilli);
     }
-    if (cursor == FILTER_PARAM) {
-      if (EditMode()) {
-        SetLabel("Filter");
-        const int x = 45;
-        gfxClear(x, y, 18, 10);
-        if (djfilter > 0) gfxPrint(x, y, "HPF");
-        else if (djfilter < 0) gfxPrint(x, y, "LPF");
-        else gfxPrint(x+6, y, "X");
+
+    y += 10;
+    // param pages
+    if (cursor < START_BEAT) {
+      gfxPrint(1, y, "Amp:");
+      gfxStartCursor();
+      graphics.printf("%3ddB", level);
+      gfxEndCursor(cursor == LEVEL, "Gain");
+      gfxStartCursor();
+      gfxPrint(level_cv);
+      gfxEndCursor(cursor == LEVEL_CV, false, level_cv.InputName(), "Gain CV");
+
+      y += 10;
+      if (tempo_sync) {
+        gfxPrint(1, y, "Sync:");
       } else {
-        gfxIcon(49, y, RIGHT_ICON, true);
-        gfxIcon(56, y, (filter_on) ? SLEW_ICON : PhzIcons::tuner, true);
+        gfxPrint(1, y, "Rate:");
       }
-    }
-
-    y += 10;
-    gfxStartCursor(1, y);
-    graphics.printf("%3ddB", level);
-    gfxEndCursor(cursor == LEVEL, "Gain");
-    gfxStartCursor();
-    gfxPrint(level_cv);
-    gfxEndCursor(cursor == LEVEL_CV, false, level_cv.InputName(), "Gain CV");
-
-    y += 10;
-
-    if (tempo_sync) {
-      gfxPrint(1, y, "Sync:");
-    } else {
-      gfxPrint(1, y, "Rate:");
-    }
-    gfxStartCursor();
-    graphics.printf("%3d%%", playrate);
-    gfxEndCursor(cursor == PLAYRATE, true);
-    gfxStartCursor();
-    gfxPrint(playrate_cv);
-    gfxEndCursor(cursor == PLAYRATE_CV, false, playrate_cv.InputName(), "Rate CV");
-
-    y += 10;
-    if (cursor <= START_BEAT_CV) {
+      gfxStartCursor();
+      graphics.printf("%3d%%", playrate);
+      gfxEndCursor(cursor == PLAYRATE, true);
+      gfxStartCursor();
+      gfxPrint(playrate_cv);
+      gfxEndCursor(cursor == PLAYRATE_CV, false, playrate_cv.InputName(), "Rate CV");
+    } else { // if (cursor >= START_BEAT)
       gfxIcon(1, y, PULSES_ICON);
       gfxStartCursor(11, y);
       graphics.printf("%3u", ((cursor==START_BEAT && EditMode())?start_beat:start_beat_mod) + 1);
@@ -239,7 +245,8 @@ public:
       gfxStartCursor(40, y);
       gfxPrint(start_beat_cv);
       gfxEndCursor(cursor == START_BEAT_CV, false, start_beat_cv.InputName(), "Start CV");
-    } else {
+
+      y += 10;
       gfxIcon(1, y, LOOP_ICON);
       gfxStartCursor(10, y);
       graphics.printf("%2u", loop_length);
