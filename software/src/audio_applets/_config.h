@@ -42,7 +42,7 @@
 #include "FMDrumApplet.h"
 #include "GlitchApplet.h"
 #include "GritApplet.h"
-#include "MistierApplet.h"
+#include "Misty.h"
 #include "AdvKrpsStrngApplet.h"
 #include "ModalResonatorApplet.h"
 #include "WAVRecorderApplet.h"
@@ -85,7 +85,7 @@ constexpr Registry mono_applets = Registry<HemisphereAudioApplet, NUM_SLOTS * 2
     , DeclareFancyApplet<TuneTrackerApplet<MONO>>
     , DeclareFancyApplet<GlitchApplet<MONO>>
     , DeclareFancyApplet<GritApplet<MONO>>
-    // , DeclareFancyApplet<MistierApplet<MONO>>
+    // , DeclareFancyApplet<MistyApplet<MONO>>
     , DeclareFancyApplet<AdvKrpsStrngApplet>
     , DeclareFancyApplet<WTVCOApplet>
 #ifndef AUDIO_INTERFACE
