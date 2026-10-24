@@ -284,6 +284,15 @@ namespace HS {
   util::TuringShiftRegister& GetTM(int index);
   QuantEngine& GetQEngine(int index);
 
+  extern const uint16_t kStageTicks[256]; // for AD and ADSR
+  // shape LUTs
+  extern const uint16_t kShapeExponential[256];
+  extern const uint16_t kShapeQuartic[256];
+  extern const uint16_t kShapeSine[256];
+  extern const uint16_t kShapeBigDipper[256];
+  extern const uint16_t kShapePlateau[256];
+  extern const uint16_t kShapeSinefold[256];
+
 } // namespace HS
 
 
