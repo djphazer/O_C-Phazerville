@@ -178,11 +178,15 @@ template <AudioChannels Channels>
 FLASHMEM void DynamicsApplet<Channels>::DrawFullScreen() {
   if (!alloc_ok) return;
   graphics.drawLine(64 - gfx_offset, 26, 127 - gfx_offset, 26, 3);
-  const int x = 25 + (64 - gfx_offset);
-  const int h = Proportion(int(complimit[0]->get_total_gain()), 60, 30); // 60 dB == 30 px
-  if (h > 0)
-    graphics.drawRect(x, 26 - h, 10, h);
-  else
-    graphics.drawRect(x, 26, 10, -h);
+
+  const int bwidth = 10 / Channels;
+  for (int ch = 0; ch < Channels; ++ch) {
+    const int x = 25 + ch*bwidth + (64 - gfx_offset);
+    const int h = Proportion(int(complimit[ch]->get_total_gain()), 60, 30); // 60 dB == 30 px
+    if (h > 0)
+      graphics.drawRect(x, 26 - h, bwidth, h);
+    else
+      graphics.drawRect(x, 26, bwidth, -h);
+  }
   View();
 }
