@@ -1,4 +1,4 @@
-// Copyright (c) 2026
+// Copyright (c) 2026, Hans-Henning Klos, Benjamin Mulkey, Nicholas J. Michalek
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,8 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef _HEM_PIQUET_APPLET_H_
-#define _HEM_PIQUET_APPLET_H_
+/* This was supposed to reuse the existing Peaks code, but alas... a new algorithm */
 
 class Piquet : public HemisphereApplet {
 public:
@@ -233,6 +232,41 @@ public:
         trigger_queue.Reset();
       }
 
+      uint64_t pack() {
+        uint64_t data = 0;
+        Pack(data, PackLocation {0,3}, type);
+        Pack(data, PackLocation {3,8}, stage_value[STAGE_ATTACK]);
+        Pack(data, PackLocation {11,8}, stage_value[STAGE_DECAY]);
+        Pack(data, PackLocation {19,8}, stage_value[STAGE_SUSTAIN]);
+        Pack(data, PackLocation {27,8}, stage_value[STAGE_RELEASE]);
+        Pack(data, PackLocation {35,7}, delay_index);
+        Pack(data, PackLocation {43,2}, delay_mode);
+        Pack(data, PackLocation {45,3}, cv_map);
+        Pack(data, PackLocation {48,8}, level);
+        Pack(data, PackLocation {56,1}, inverted ? 1 : 0);
+        Pack(data, PackLocation {57,1}, loop_mode);
+        Pack(data, PackLocation {58,1}, loop_enabled ? 1 : 0);
+        Pack(data, PackLocation {59,2}, length_index);
+        // 3 empty bits
+        return data;
+      }
+      void unpack(uint64_t data) {
+        type = constrain(Unpack(data, PackLocation {0,3}), 0, ENV_TYPE_LAST - 1);
+        stage_value[STAGE_ATTACK] = constrain(Unpack(data, PackLocation {3,8}), 1, STAGE_MAX_VALUE);
+        stage_value[STAGE_DECAY] = constrain(Unpack(data, PackLocation {11,8}), 1, STAGE_MAX_VALUE);
+        stage_value[STAGE_SUSTAIN] = constrain(Unpack(data, PackLocation {19,8}), 0, STAGE_MAX_VALUE);
+        stage_value[STAGE_RELEASE] = constrain(Unpack(data, PackLocation {27,8}), 1, STAGE_MAX_VALUE);
+        delay_index = constrain(Unpack(data, PackLocation {35,7}), 0, 126);
+        delay_mode = constrain(Unpack(data, PackLocation {43,2}), 0, DELAY_MODE_LAST - 1);
+        cv_map = constrain(Unpack(data, PackLocation {45,3}), 0, CVMAP_LAST - 1);
+        level = constrain(Unpack(data, PackLocation {48,8}), 0, 255);
+        inverted = Unpack(data, PackLocation {56,1});
+        loop_mode = Unpack(data, PackLocation {57,1});
+        loop_enabled = Unpack(data, PackLocation {58,1});
+        length_index = constrain(Unpack(data, PackLocation {59,2}), 0, 3);
+        // 3 empty bits
+      }
+
       bool is_looping() const {
         return type == ENV_LOOP_AD || type == ENV_LOOP_AHR;
       }
@@ -251,7 +285,7 @@ public:
         return type == ENV_ASR || type == ENV_ADSR;
       }
 
-          };
+    };
 
     const char* applet_name() {
       return "Piquet";
@@ -268,7 +302,6 @@ public:
     }
 
     void Controller();
-
 
     void View();
     void DrawFullScreen() override;
@@ -704,65 +737,29 @@ private:
       return constrain(out, 0, HEMISPHERE_MAX_CV);
     }
 
-    uint64_t PackChannel(const Channel &c) {
-      uint64_t data = 0;
-      Pack(data, PackLocation {0,3}, c.type);
-      Pack(data, PackLocation {3,8}, c.stage_value[STAGE_ATTACK]);
-      Pack(data, PackLocation {11,8}, c.stage_value[STAGE_DECAY]);
-      Pack(data, PackLocation {19,8}, c.stage_value[STAGE_SUSTAIN]);
-      Pack(data, PackLocation {27,8}, c.stage_value[STAGE_RELEASE]);
-      Pack(data, PackLocation {35,7}, c.delay_index);
-      Pack(data, PackLocation {43,2}, c.delay_mode);
-      // 1 empty bit
-      Pack(data, PackLocation {46,3}, c.cv_map);
-      Pack(data, PackLocation {49,8}, c.level);
-      Pack(data, PackLocation {57,1}, c.inverted ? 1 : 0);
-      Pack(data, PackLocation {58,1}, c.loop_mode);
-      Pack(data, PackLocation {59,1}, c.loop_enabled ? 1 : 0);
-      Pack(data, PackLocation {60,1}, 1);
-      Pack(data, PackLocation {61,2}, c.length_index);
-      return data;
-    }
-
-    void unpack_channel(Channel &c, uint64_t data);
-
     static const char* type_name(uint8_t t);
-
     static const char* dmode_name(uint8_t m);
-
     static const char* cvmap_name(uint8_t m);
-
     static const char* shape_name(uint8_t s);
 
     void DrawIndicators();
-
     // Draw the parameter row at a horizontal offset. The default of zero
     // preserves the normal Hemisphere layout.
     void DrawParamRow(int x_offset = 0);
-
     const char* cursor_display_label() const;
-
     static int numeric_text_width(int value);
-
     int cursor_value_width(const Channel &c) const;
-
     const char* cursor_label() const;
 
     void DrawEnvelope(int channel, int x_offset);
-
     void draw_curve_segment(int x, int x2, int start_level,
                             int end_level, uint8_t shape, bool draw,
                             int y_offset = 0);
-
     void draw_stage_highlight(int x, int x2, int start_level,
                               int end_level, uint8_t shape);
-
     int draw_attack(const Channel &c, int attack, int x, int length);
-
     int draw_decay(const Channel &c, int decay, int sustain, int x, int length);
-
     int draw_sustain(const Channel &c, int sustain, int x, int length);
-
     int draw_release(const Channel &c, int sustain, int release, int x, int length);
 };
 
@@ -816,7 +813,7 @@ void FLASHMEM Piquet::View() {
         gfxFrame(0, 31, 64, 32);
       DrawParamRow();
       SetAux(true);
-    }
+}
 
 // Draw both envelopes side by side, with the selected channel's controls
 // and parameter row kept on that channel's side of the fullscreen display.
@@ -927,7 +924,7 @@ void FLASHMEM Piquet::OnEncoderMove(int direction) {
         default:
           break;
       }
-    }
+}
 
 void FLASHMEM Piquet::DrawIndicators() {
       ForEachChannel(ch) {
@@ -948,7 +945,7 @@ void FLASHMEM Piquet::DrawIndicators() {
           gfxIcon(30, 22, RIGHT_ICON);
         }
       }
-    }
+}
 
 // Apply the offset to parameter text, icons, and the edit cursor.
 void FLASHMEM Piquet::DrawParamRow(int x_offset) {
@@ -1090,7 +1087,7 @@ void FLASHMEM Piquet::DrawParamRow(int x_offset) {
       if (cursor >= CURSOR_ATTACK && cursor != CURSOR_LOOP_MODE && EditMode()) {
         gfxCursor(9 + x_offset, 31, cursor_value_width(c), 9, cursor_label());
       }
-    }
+}
 
 void FLASHMEM Piquet::DrawEnvelope(int channel, int x_offset) {
       envelope_drawing_channel = channel;
@@ -1148,7 +1145,7 @@ void FLASHMEM Piquet::DrawEnvelope(int channel, int x_offset) {
         draw_release(c, release_start, release, x, length);
       }
       drawing_x_offset = 0;
-    }
+}
 
 void FLASHMEM Piquet::draw_curve_segment(int x, int x2, int start_level, int end_level, uint8_t shape, bool draw, int y_offset) {
       x += drawing_x_offset;
@@ -1197,13 +1194,13 @@ void FLASHMEM Piquet::draw_curve_segment(int x, int x2, int start_level, int end
       // Ensure the segment lands exactly on its endpoint.
       const int end_y = y_for_level(end_level);
       gfxLine(previous_x, previous_y, x2, end_y, draw);
-    }
+}
 
 void FLASHMEM Piquet::draw_stage_highlight(int x, int x2, int start_level, int end_level, uint8_t shape) {
       draw_curve_segment(x, x2, start_level, end_level, shape, false, -1);
       draw_curve_segment(x, x2, start_level, end_level, shape, false, 0);
       draw_curve_segment(x, x2, start_level, end_level, shape, false, 1);
-    }
+}
 
 int FLASHMEM Piquet::draw_attack(const Channel &c, int attack, int x, int length) {
       const int x2 = x + Proportion(attack, length, 62);
@@ -1214,7 +1211,7 @@ int FLASHMEM Piquet::draw_attack(const Channel &c, int attack, int x, int length
         draw_stage_highlight(x, x2, 0, STAGE_MAX_VALUE, c.attack_shape);
       }
       return x2;
-    }
+}
 
 int FLASHMEM Piquet::draw_decay(const Channel &c, int decay, int sustain, int x, int length) {
       const int x2 = x + Proportion(decay, length, 62);
@@ -1225,7 +1222,7 @@ int FLASHMEM Piquet::draw_decay(const Channel &c, int decay, int sustain, int x,
         draw_stage_highlight(x, x2, STAGE_MAX_VALUE, sustain, c.decay_shape);
       }
       return x2;
-    }
+}
 
 int FLASHMEM Piquet::draw_sustain(const Channel &c, int sustain, int x, int length) {
       const int x2 = x + Proportion(36, length, 62);
@@ -1238,7 +1235,7 @@ int FLASHMEM Piquet::draw_sustain(const Channel &c, int sustain, int x, int leng
         draw_stage_highlight(x, x2, sustain, sustain, 0);
       }
       return x2;
-    }
+}
 
 int FLASHMEM Piquet::draw_release(const Channel &c, int sustain, int release, int x, int length) {
       const int x2 = x + Proportion(release, length, 62);
@@ -1249,7 +1246,7 @@ int FLASHMEM Piquet::draw_release(const Channel &c, int sustain, int release, in
         draw_stage_highlight(x, x2, sustain, 0, c.release_shape);
       }
       return x2;
-    }
+}
 
 const char* FLASHMEM Piquet::cursor_display_label() const {
       switch (cursor) {
@@ -1263,7 +1260,7 @@ const char* FLASHMEM Piquet::cursor_display_label() const {
         case CURSOR_INVERT: return "Invert";
         default: return cursor_label();
       }
-    }
+}
 
 int FLASHMEM Piquet::numeric_text_width(int value) {
       int width = 6;
@@ -1272,7 +1269,7 @@ int FLASHMEM Piquet::numeric_text_width(int value) {
         width += 6;
       }
       return width;
-    }
+}
 
 int FLASHMEM Piquet::cursor_value_width(const Channel &c) const {
       switch (cursor) {
@@ -1305,7 +1302,7 @@ int FLASHMEM Piquet::cursor_value_width(const Channel &c) const {
         default:
           return 6;
       }
-    }
+}
 
 const char* FLASHMEM Piquet::cursor_label() const {
       static const char* labels[CURSOR_LAST] = {
@@ -1319,119 +1316,64 @@ const char* FLASHMEM Piquet::cursor_label() const {
         if (cursor == CURSOR_DECAY) return "Hold";
       }
       return labels[constrain(cursor, 0, CURSOR_LAST - 1)];
-    }
+}
 
 const char* FLASHMEM Piquet::type_name(uint8_t t) {
       static const char* names[ENV_TYPE_LAST] = { "AD", "AHR", "ASR", "ADSR", "L-AD", "L-AHR" };
       return names[constrain(t, 0, ENV_TYPE_LAST - 1)];
-    }
+}
 
 const char* FLASHMEM Piquet::dmode_name(uint8_t m) {
       static const char* names[DELAY_MODE_LAST] = { "Off", "Rpl", "Que" };
       return names[constrain(m, 0, DELAY_MODE_LAST - 1)];
-    }
+}
 
 const char* FLASHMEM Piquet::cvmap_name(uint8_t m) {
       static const char* names[CVMAP_LAST] = { "None", "Att", "Dec", "Sus", "Rel", "ADR", "Lvl" };
       return names[constrain(m, 0, CVMAP_LAST - 1)];
-    }
+}
 
 const char* FLASHMEM Piquet::shape_name(uint8_t s) {
       static const char* names[SHAPE_LAST] = { "Lin", "Exp", "Qua", "Sin", "Pla", "Cli", "Gat", "BD", "MD", "LD", "SF" };
       return names[constrain(s, 0, SHAPE_LAST - 1)];
-    }
+}
 
 uint64_t FLASHMEM Piquet::OnDataRequest() {
-      uint64_t data_ch0 = PackChannel(channels[0]);
-      uint64_t data_ch1 = PackChannel(channels[1]);
-      SetData(0, data_ch1);
+  uint64_t data = channels[1].pack();
+  SetData(0, data);
 
-      uint16_t shapes_ch0 = channels[0].attack_shape | (channels[0].decay_shape << 4) | (channels[0].release_shape << 8);
-      uint16_t shapes_ch1 = channels[1].attack_shape | (channels[1].decay_shape << 4) | (channels[1].release_shape << 8);
-      SetData(1, shapes_ch0);
-      SetData(2, shapes_ch1);
+  data = PackPackables(
+    channels[0].attack_shape, channels[0].decay_shape, channels[0].release_shape,
+    channels[1].attack_shape, channels[1].decay_shape, channels[1].release_shape
+  );
+  SetData(1, data);
 
-      return data_ch0;
-    }
+  return channels[0].pack();
+}
 
 void FLASHMEM Piquet::OnDataReceive(uint64_t data) {
-      if (!data) {
-        Start();
-        return;
-      }
+  if (!data) {
+    Start();
+    return;
+  }
 
-      unpack_channel(channels[0], data);
+  // reset to sane defaults first
+  ForEachChannel(ch) channels[ch].Init(ch);
 
-      uint64_t data_ch1 = 0;
-      if (GetData(0, data_ch1) && data_ch1) {
-        unpack_channel(channels[1], data_ch1);
-      } else {
-        channels[1].Init(1);
-      }
-
-      // Force deterministic defaults first; only override when aux storage exists.
-      channels[0].attack_shape = SHAPE_QUARTIC;
-      channels[0].decay_shape = SHAPE_EXPONENTIAL;
-      channels[0].release_shape = SHAPE_EXPONENTIAL;
-      channels[1].attack_shape = SHAPE_QUARTIC;
-      channels[1].decay_shape = SHAPE_EXPONENTIAL;
-      channels[1].release_shape = SHAPE_EXPONENTIAL;
-
-      uint16_t shapes_ch0 = 0;
-      PhzConfig::VALUE shapes_ch0_data = 0;
-      if (GetData(1, shapes_ch0_data)) {
-        shapes_ch0 = static_cast<uint16_t>(shapes_ch0_data & 0x0FFFu);
-        channels[0].attack_shape = constrain((shapes_ch0 & 0x0F), 0, SHAPE_LAST - 1);
-        channels[0].decay_shape = constrain(((shapes_ch0 >> 4) & 0x0F), 0, SHAPE_LAST - 1);
-        channels[0].release_shape = constrain(((shapes_ch0 >> 8) & 0x0F), 0, SHAPE_LAST - 1);
-      }
-
-      uint16_t shapes_ch1 = 0;
-      PhzConfig::VALUE shapes_ch1_data = 0;
-      if (GetData(2, shapes_ch1_data)) {
-        shapes_ch1 = static_cast<uint16_t>(shapes_ch1_data & 0x0FFFu);
-        channels[1].attack_shape = constrain((shapes_ch1 & 0x0F), 0, SHAPE_LAST - 1);
-        channels[1].decay_shape = constrain(((shapes_ch1 >> 4) & 0x0F), 0, SHAPE_LAST - 1);
-        channels[1].release_shape = constrain(((shapes_ch1 >> 8) & 0x0F), 0, SHAPE_LAST - 1);
-      }
-
-      channels[0].stage = STAGE_IDLE;
-      channels[0].stage_ticks = 0;
-      channels[0].amplitude = 0;
-      channels[0].segment_start_cv = 0;
-      channels[0].gate_prev = false;
-      channels[0].trigger_queue.Reset();
-
-      channels[1].stage = STAGE_IDLE;
-      channels[1].stage_ticks = 0;
-      channels[1].amplitude = 0;
-      channels[1].segment_start_cv = 0;
-      channels[1].gate_prev = false;
-      channels[1].trigger_queue.Reset();
+  channels[0].unpack(data);
+  if (GetData(0, data)) { channels[1].unpack(data); }
+  if (GetData(1, data)) {
+    UnpackPackables(data,
+      channels[0].attack_shape, channels[0].decay_shape, channels[0].release_shape,
+      channels[1].attack_shape, channels[1].decay_shape, channels[1].release_shape
+    );
+    ForEachChannel(ch) {
+      CONSTRAIN(channels[ch].attack_shape, 0, SHAPE_LAST - 1);
+      CONSTRAIN(channels[ch].decay_shape, 0, SHAPE_LAST - 1);
+      CONSTRAIN(channels[ch].release_shape, 0, SHAPE_LAST - 1);
     }
-
-void FLASHMEM Piquet::unpack_channel(Channel &c, uint64_t data) {
-      c.type = constrain(Unpack(data, PackLocation {0,3}), 0, ENV_TYPE_LAST - 1);
-      c.stage_value[STAGE_ATTACK] = constrain(Unpack(data, PackLocation {3,8}), 1, STAGE_MAX_VALUE);
-      c.stage_value[STAGE_DECAY] = constrain(Unpack(data, PackLocation {11,8}), 1, STAGE_MAX_VALUE);
-      c.stage_value[STAGE_SUSTAIN] = constrain(Unpack(data, PackLocation {19,8}), 0, STAGE_MAX_VALUE);
-      c.stage_value[STAGE_RELEASE] = constrain(Unpack(data, PackLocation {27,8}), 1, STAGE_MAX_VALUE);
-      c.delay_index = constrain(Unpack(data, PackLocation {35,7}), 0, 126);
-      c.delay_mode = constrain(Unpack(data, PackLocation {43,2}), 0, DELAY_MODE_LAST - 1);
-      // 1 empty bit
-      c.cv_map = constrain(Unpack(data, PackLocation {46,3}), 0, CVMAP_LAST - 1);
-      c.level = constrain(Unpack(data, PackLocation {49,8}), 0, 255);
-      c.inverted = Unpack(data, PackLocation {57,1});
-      c.length_index = constrain(Unpack(data, PackLocation {61,2}), 0, 3);
-      if (Unpack(data, PackLocation {60,1})) {
-        c.loop_mode = constrain(
-          Unpack(data, PackLocation {58,1}), 0, LOOP_MODE_LAST - 1);
-        c.loop_enabled = Unpack(data, PackLocation {59,1});
-      } else {
-        c.loop_mode = LOOP_CONT;
-        c.loop_enabled = true;
-      }
-    }
+  }
+}
 
 const uint16_t Piquet::kShapeExponential[Piquet::SHAPE_LUT_SIZE] PROGMEM = {
       0, 1, 4, 9, 16, 25, 36, 49, 65, 82, 101, 122, 145, 170, 198, 227,
@@ -1546,4 +1488,3 @@ const uint16_t Piquet::kShapeSinefold[Piquet::SHAPE_LUT_SIZE] PROGMEM = {
       54640, 54996, 55359, 55728, 56102, 56480, 56861, 57246, 57632, 58020, 58408, 58796, 59183, 59568, 59951, 60331,
       60706, 61078, 61444, 61805, 62160, 62508, 62849, 63182, 63507, 63824, 64132, 64431, 64721, 65002, 65273, 65535,
 };
-#endif
