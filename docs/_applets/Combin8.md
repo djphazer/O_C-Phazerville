@@ -29,7 +29,7 @@ The output signal can be quantized or offset using the Q-engine.
 
   ## Meters
 
-- **Input meters:** Vertical meters beside the input icons show the CV level of the main input and each AUX input. In IN mode, the main input meter shows the held CV level. Muted AUX inputs display an X instead of their source icon and meter.
+- **Input meters:** Vertical meters beside the input icons show the CV level of the main input and each AUX input.
 - **Mix meter:** The thin horizontal meter shows the combined CV level before quantization. Positive values extend from left to right, while negative values extend from right to left.
 - **Output meter:** The thicker horizontal meter shows the output CV level after quantization. Positive values extend from left to right, while negative values extend from right to left.
 
