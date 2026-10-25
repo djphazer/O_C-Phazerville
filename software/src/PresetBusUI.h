@@ -1,0 +1,37 @@
+#pragma once
+#include <stdint.h>
+
+namespace UI { struct Event; }
+
+namespace OC {
+namespace PresetBusUI {
+
+#if defined(ARDUINO_TEENSY41) && defined(PRESET_BUS)
+
+void Init();
+bool Active();
+bool ActiveMode();
+void Enter();
+void Exit();
+bool HandleEvent(const UI::Event &);
+void Draw();
+// Settings screen: Remote, Follow and the manager in one row
+void DrawSettingsLine(int x, int y);
+void Task();
+
+#else
+
+inline void Init() {}
+inline bool Active() { return false; }
+inline bool ActiveMode() { return false; }
+inline void Enter() {}
+inline void Exit() {}
+inline bool HandleEvent(const UI::Event &) { return false; }
+inline void Draw() {}
+inline void DrawSettingsLine(int, int) {}
+inline void Task() {}
+
+#endif
+
+}
+}

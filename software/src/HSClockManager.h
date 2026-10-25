@@ -29,6 +29,7 @@
 #include "OC_core.h"
 #include "HSMIDI.h"
 #include "HSUtils.h"
+#include "PresetBus.h"
 #include <functional>
 #include <queue>
 
@@ -311,6 +312,8 @@ public:
               usbHostMIDI[1].sendRealTime(usbMIDI.Start);
             if (~midi_clktx_disable & mMaskSerial)
               MIDI1.sendRealTime(midi::MidiType(usbMIDI.Start));
+            if (~midi_clktx_disable & mMaskBus)
+              OC::PresetBus::QueueMidiTx(usbMIDI.Start, 0, 0, 0);
 #else
             usbMIDI.sendRealTime(usbMIDI.Start);
 #endif
@@ -331,6 +334,8 @@ public:
               usbHostMIDI[1].sendRealTime(usbMIDI.Stop);
             if (~midi_clktx_disable & mMaskSerial)
               MIDI1.sendRealTime(midi::MidiType(usbMIDI.Stop));
+            if (~midi_clktx_disable & mMaskBus)
+              OC::PresetBus::QueueMidiTx(usbMIDI.Stop, 0, 0, 0);
 #else
             usbMIDI.sendRealTime(usbMIDI.Stop);
 #endif

@@ -8,6 +8,7 @@
 
 /*static*/
 uint32_t OC::DigitalInputs::rising_edges_;
+uint32_t OC::DigitalInputs::latched_edges_;
 /*static*/
 uint32_t OC::DigitalInputs::raised_mask_;
 
@@ -93,6 +94,7 @@ void OC::DigitalInputs::Scan()
 
 #if defined(__IMXRT1062__) // Teensy 4.0 or 4.1
 uint32_t OC::DigitalInputs::rising_edges_;
+uint32_t OC::DigitalInputs::latched_edges_;
 uint32_t OC::DigitalInputs::raised_mask_;
 IMXRT_GPIO_t * OC::DigitalInputs::port[DIGITAL_INPUT_LAST];
 uint32_t  OC::DigitalInputs::bitmask[DIGITAL_INPUT_LAST];
@@ -150,6 +152,7 @@ void OC::DigitalInputs::Scan() {
   if (mask[2]) new_clocked_mask |= 0x04;
   if (mask[3]) new_clocked_mask |= 0x08;
   rising_edges_ = new_clocked_mask;
+  latched_edges_ |= new_clocked_mask;
 
   uint32_t raised_mask = 0;
   if (read_immediate<DIGITAL_INPUT_1>()) raised_mask |= DIGITAL_INPUT_1_MASK;

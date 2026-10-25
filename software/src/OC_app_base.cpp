@@ -95,7 +95,7 @@ void AppBase::Draw(UiMode ui_mode) const
   }
 
   // Overlay popup window last
-  if (HS::get_tick() - HS::popup_tick < HS::popup_duration) {
+  if (HS::popup_now() - HS::popup_tick < HS::popup_duration) {
     HS::DrawPopup();
   }
 }
