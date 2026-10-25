@@ -62,7 +62,7 @@ The graphic updates to reflect the selected envelope's shape and parameters.
 
 L-AD and L-AHR envelopes can repeat automatically.
 
-- **CON:** Continuous looping.
+- **CON:** Continuous looping. Toggled on/off with a trigger.
 - **GTD:** Gate-controlled looping.
 
 The Loop Mode parameter is available only for L-AD and L-AHR envelope types.
