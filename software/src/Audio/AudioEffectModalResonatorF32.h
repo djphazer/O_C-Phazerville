@@ -77,9 +77,13 @@ public:
         const float FREQ_CEIL = AUDIO_SAMPLE_RATE_EXACT * 0.40f;
         if (exciter_hz > FREQ_CEIL) exciter_hz = FREQ_CEIL;
 
-        excite_f_ = 2.0f * sinf(3.14159265f * exciter_hz / AUDIO_SAMPLE_RATE_EXACT);
+        // Everything is computed into locals first and copied in one go at
+        // the end: update() runs in the audio interrupt and must never see a
+        // half-updated set (e.g. mode gains before they are normalised).
+        const float excite_f = 2.0f * sinf(3.14159265f * exciter_hz / AUDIO_SAMPLE_RATE_EXACT);
         // Rings internal exciter uses Q = 1.5. Chamberlin damp = fcoef / Q
-        excite_damp_ = excite_f_ / 1.5f;
+        const float excite_damp = excite_f / 1.5f;
+        float f[NUM_MODES], damp[NUM_MODES], gain[NUM_MODES];
 
         // --- Resonator Bank Calculation ---
         const float Q_MIN  = 1.2f;
@@ -102,7 +106,7 @@ public:
             if (f_k <      20.0f) f_k =      20.0f;
 
             // Chamberlin SVF frequency coefficient: 2*sin(π*f/fs)
-            f_[k] = 2.0f * sinf(3.14159265f * f_k / AUDIO_SAMPLE_RATE_EXACT);
+            f[k] = 2.0f * sinf(3.14159265f * f_k / AUDIO_SAMPLE_RATE_EXACT);
 
             // Chamberlin damping: damp = fcoef / Q  (not 1/Q!)
             // Chamberlin SVF is stable only for damp < 2.0; above that the
@@ -111,10 +115,10 @@ public:
             // brightness), making damp = fcoef/q_base → Inf.  Clamp both ends.
             float q_safe = q_base;
             if (q_safe < 0.01f) q_safe = 0.01f;  // prevent divide-by-zero/Inf
-            float damp_k = f_[k] / q_safe;
+            float damp_k = f[k] / q_safe;
             if (damp_k > 1.9f)  damp_k = 1.9f;   // hard stability ceiling
             if (damp_k < 1e-4f) damp_k = 1e-4f;  // max sustain floor
-            damp_[k] = damp_k;
+            damp[k] = damp_k;
 
             // Advance stiffness (self-limiting each step)
             stretch += stiffness;
@@ -128,8 +132,8 @@ public:
             // Position comb: sin²(π · pos · (k+1))
             float pos_safe = position * 0.98f + 0.01f;
             float sg = sinf(3.14159265f * pos_safe * (float)(k + 1));
-            mode_gain_[k] = sg * sg;
-            gain_sum += mode_gain_[k];
+            gain[k] = sg * sg;
+            gain_sum += gain[k];
         }
 
         // Normalise mode gains so the sum is 1.0.
@@ -137,8 +141,18 @@ public:
         // and prevents the 12 modes summing to >>1 and clipping.
         if (gain_sum > 0.0f) {
             float inv = 1.0f / gain_sum;
-            for (int k = 0; k < NUM_MODES; k++) mode_gain_[k] *= inv;
+            for (int k = 0; k < NUM_MODES; k++) gain[k] *= inv;
         }
+
+        __disable_irq();
+        excite_f_ = excite_f;
+        excite_damp_ = excite_damp;
+        for (int k = 0; k < NUM_MODES; k++) {
+            f_[k] = f[k];
+            damp_[k] = damp[k];
+            mode_gain_[k] = gain[k];
+        }
+        __enable_irq();
     }
 
     // --- Manual strike -------------------------------------------------------
