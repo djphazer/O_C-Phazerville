@@ -96,7 +96,7 @@ using namespace HS;
 #include "SequenceX.h"
 #include "Seq32.h"
 #include "SeqPlay7.h"
-// #include "ShiftArp.h"
+#include "ShiftArp.h"
 #include "ShiftGate.h"
 #ifdef PEWPEWPEW
 #include "ShiftReg.h"
@@ -187,7 +187,7 @@ constexpr Registry reg = Registry<HemisphereApplet, HS::APPLET_SLOTS  // unused 
     , DeclareApplet<MarkovPerc, 94, CAT_OTHER>
     , DeclareApplet<Metronome, 50, CAT_CLOCKING>
     , DeclareApplet<MidiLoop, 81, CAT_MIDI>
-    //, DeclareApplet<MiniArp, 97, CAT_SEQUENCER | CAT_QUANTIZER>
+    , DeclareApplet<MiniArp, 97, CAT_SEQUENCER | CAT_QUANTIZER>
     , DeclareApplet<hMIDIIn, 150, CAT_MIDI>
     , DeclareApplet<hMIDIOut, 27, CAT_MIDI>
     // , DeclareApplet<MultiScale, 73, CAT_QUANTIZER>
@@ -210,7 +210,7 @@ constexpr Registry reg = Registry<HemisphereApplet, HS::APPLET_SLOTS  // unused 
     , DeclareApplet<SeqPlay7, 76, CAT_SEQUENCER>
     , DeclareApplet<SeQuant, 86, CAT_QUANTIZER>
     , DeclareApplet<SequenceX, 14, CAT_SEQUENCER>
-    // , DeclareApplet<ShiftArp, 96, CAT_SEQUENCER>
+    , DeclareApplet<ShiftArp, 96, CAT_SEQUENCER>
     , DeclareApplet<ShiftGate, 48, CAT_LOGIC | CAT_MODULATOR | CAT_CLOCKING>
     // , DeclareApplet<ShiftReg, 77, CAT_LOGIC | CAT_MODULATOR | CAT_CLOCKING>
     , DeclareApplet<Shredder, 58, CAT_MODULATOR>
