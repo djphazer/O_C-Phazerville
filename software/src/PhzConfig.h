@@ -16,7 +16,32 @@ namespace PhzConfig {
 
   const char * const CONFIG_FILENAME = "GLOBALS.CFG";
 
-  extern LittleFS_Program myfs;
+#if defined(ARDUINO_TEENSY41) && defined(LFS_VERSION)
+#define XENOFS_OWNS_GEOMETRY 1
+#endif
+
+  class XenoFS : public LittleFS_Program {
+  public:
+#ifdef XENOFS_OWNS_GEOMETRY
+    bool begin(uint32_t size);
+#endif
+    uint32_t blockBytes() const { return config.block_size; }
+#ifdef XENOFS_OWNS_GEOMETRY
+  private:
+    static uint32_t flash_base;
+    static int flash_read(const struct lfs_config *c, lfs_block_t block,
+                          lfs_off_t off, void *buf, lfs_size_t size);
+    static int flash_prog(const struct lfs_config *c, lfs_block_t block,
+                          lfs_off_t off, const void *buf, lfs_size_t size);
+    static int flash_erase(const struct lfs_config *c, lfs_block_t block);
+    static int flash_sync(const struct lfs_config *) { return 0; }
+    void configure(uint32_t partition_bytes, uint32_t block_bytes);
+    bool migrate(uint32_t src_base, uint32_t src_size, uint32_t src_block,
+                 uint32_t dst_base, uint32_t dst_size);
+#endif
+  };
+
+  extern XenoFS myfs;
 
   // Forward Decl
   void Init();
