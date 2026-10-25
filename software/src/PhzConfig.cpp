@@ -6,8 +6,10 @@
  */
 #ifdef __IMXRT1062__
 #include <string.h>
+#include <vector>
 #include "PhzConfig.h"
 #include "OC_gpio.h"
+#include "PresetStage.h"
 #include "HSUtils.h"
 #include "util/util_misc.h"
 #include "usb_desc.h"
@@ -245,6 +247,24 @@ FLASHMEM bool XenoFS::migrate(uint32_t src_base, uint32_t src_size, uint32_t src
 ConfigMap cfg_store;
 ConfigMap data_store;
 
+static bool map_dirty = true;
+static char map_source[16] = "";
+static FS *map_source_fs = nullptr;
+
+FLASHMEM static void mark_clean(const char *filename, FS &fs) {
+  strncpy(map_source, filename, sizeof(map_source) - 1);
+  map_source[sizeof(map_source) - 1] = 0;
+  map_source_fs = &fs;
+  map_dirty = false;
+}
+static void mark_dirty() {
+  map_dirty = true;
+}
+FLASHMEM static bool is_clean_copy_of(const char *filename, FS &fs) {
+  return !map_dirty && map_source_fs == &fs && map_source[0] &&
+         strcmp(map_source, filename) == 0;
+}
+
 // Specify size to use of onboard Teensy Program Flash chip.
 // the maximum flash available for LittleFS is 960 blocks of 1024 bytes
 static constexpr uint32_t diskSize = 1024 * 512;
@@ -293,11 +313,19 @@ void Init()
 void clear_config() {
   cfg_store.clear();
   data_store.clear();
+  mark_dirty();
 }
 
 void setValue(KEY key, VALUE value)
 {
-  cfg_store[key] = value;
+  auto it = cfg_store.find(key);
+  if (it != cfg_store.end()) {
+    if (it->second == value) return;
+    it->second = value;
+  } else {
+    cfg_store.emplace(key, value);
+  }
+  mark_dirty();
 }
 
 bool getValue(KEY key, VALUE &value)
@@ -311,11 +339,18 @@ bool getValue(KEY key, VALUE &value)
 }
 
 void deleteKey(KEY key) {
-  cfg_store.erase(key);
+  if (cfg_store.erase(key)) mark_dirty();
 }
 
 void setData(KEY key, VALUE value) {
-  data_store[key] = value;
+  auto it = data_store.find(key);
+  if (it != data_store.end()) {
+    if (it->second == value) return;
+    it->second = value;
+  } else {
+    data_store.emplace(key, value);
+  }
+  mark_dirty();
 }
 bool getData(KEY key, VALUE &value) {
   auto thing = data_store.find(key);
@@ -326,54 +361,209 @@ bool getData(KEY key, VALUE &value) {
   return false;
 }
 void deleteData(KEY key) {
-  data_store.erase(key);
+  if (data_store.erase(key)) mark_dirty();
 }
 
-size_t save_chunk(const size_t offset, const char* sig, ConfigMap &store) {
-  size_t record_count = 0;
-  size_t bytes_written = 0;
+bool unsaved_changes() { return map_dirty; }
 
-  // 12-byte header:
-  char header_buf[HEADER_SIZE] = {
-    sig[0], sig[1], // signature
-    0, 0, // record count
-    0, 0, 0, 0, 0, 0, 0, 0, // checksum
-  };
-
-  dataFile.seek(offset);
-  dataFile.write(header_buf, HEADER_SIZE);
-
+FLASHMEM static void chunk_header(uint8_t *h, const char *sig, ConfigMap &store) {
+  uint16_t record_count = 0;
   uint64_t checksum = 0;
-  for (auto &i : store)
-  {
+  for (auto &i : store) {
     checksum ^= i.second;
-    int result = dataFile.write((const uint8_t*)&i.first, sizeof(i.first)) +
-                dataFile.write((const uint8_t*)&i.second, sizeof(i.second));
-    if (result != (sizeof(i.first) + sizeof(i.second))) {
+    record_count++;
+  }
+  h[0] = sig[0]; h[1] = sig[1];
+  h[2] = record_count & 0xFF; h[3] = record_count >> 8;
+  for (int i = 0; i < 8; ++i) h[4 + i] = (uint8_t)(checksum >> (8 * i));
+}
+
+FLASHMEM static std::vector<KEY> sorted_keys(const ConfigMap &store) {
+  std::vector<KEY> keys;
+  keys.reserve(store.size());
+  for (auto &i : store) keys.push_back(i.first);
+  // insertion sort: keeps std::sort's template code out of RAM1
+  for (size_t i = 1; i < keys.size(); ++i) {
+    const KEY k = keys[i];
+    size_t j = i;
+    for (; j > 0 && keys[j - 1] > k; --j) keys[j] = keys[j - 1];
+    keys[j] = k;
+  }
+  return keys;
+}
+
+FLASHMEM size_t save_chunk(const size_t offset, const char* sig, ConfigMap &store) {
+  uint8_t header_buf[HEADER_SIZE];
+  chunk_header(header_buf, sig, store);
+  if (dataFile.write(header_buf, HEADER_SIZE) != HEADER_SIZE) {
+    SERIAL_PRINTLN("!! ERROR while writing file header !!\n");
+    return 0;
+  }
+
+  size_t bytes_written = 0;
+  for (const KEY key : sorted_keys(store))
+  {
+    const VALUE value = store.find(key)->second;
+    int result = dataFile.write((const uint8_t*)&key, sizeof(key)) +
+                dataFile.write((const uint8_t*)&value, sizeof(value));
+    if (result != (sizeof(key) + sizeof(value))) {
       // something went wrong
       SERIAL_PRINTLN("!! ERROR while writing file !!\n   Result = %d\n", result);
       return 0;
     }
     bytes_written += result;
-
-    record_count += 1;
   }
 
-  if (dataFile.seek(offset + 2)) {
-    dataFile.write((const uint8_t*)&record_count, 2);
-    dataFile.write((const uint8_t*)&checksum, 8);
-  }
-
-  SERIAL_PRINTLN("Records written = %u\n", record_count);
   SERIAL_PRINTLN("Bytes written = %u\n", bytes_written);
-  SERIAL_PRINTLN("Checksum: %lx%lx\n",
-      (uint32_t)checksum, (uint32_t)(checksum >> 32));
-
   return offset + HEADER_SIZE + bytes_written;
 }
-bool save_config(const char* filename, FS &fs)
+
+FLASHMEM static size_t chunk_to_mem(uint8_t *buf, size_t cap, const char *sig,
+                           ConfigMap &store) {
+  const size_t need = HEADER_SIZE + store.size() * (sizeof(KEY) + sizeof(VALUE));
+  if (need > cap) return 0;
+  chunk_header(buf, sig, store);
+  uint8_t *p = buf + HEADER_SIZE;
+  for (const KEY key : sorted_keys(store)) {
+    const VALUE value = store.find(key)->second;
+    memcpy(p, &key, sizeof(key));     p += sizeof(key);
+    memcpy(p, &value, sizeof(value)); p += sizeof(value);
+  }
+  return need;
+}
+
+FLASHMEM size_t serialize(uint8_t *buf, size_t cap,
+                          bool (*pred)(KEY), KEY (*remap)(KEY)) {
+  ConfigMap *cfg = &cfg_store, *data = &data_store;
+  ConfigMap cfg_out, data_out;
+  if (pred || remap) {
+    for (auto &kv : cfg_store) {
+      if (pred && !pred(kv.first)) continue;
+      cfg_out[remap ? remap(kv.first) : kv.first] = kv.second;
+    }
+    for (auto &kv : data_store) {
+      if (pred && !pred(kv.first)) continue;
+      data_out[remap ? remap(kv.first) : kv.first] = kv.second;
+    }
+    cfg = &cfg_out; data = &data_out;
+  }
+  const size_t a = chunk_to_mem(buf, cap, "PZ", *cfg);
+  if (!a) return 0;
+  const size_t b = chunk_to_mem(buf + a, cap - a, "PX", *data);
+  if (!b) return 0;
+  return a + b;
+}
+
+enum ChunkResult : uint8_t { CHUNK_ABSENT, CHUNK_OK, CHUNK_CORRUPT };
+FLASHMEM static ChunkResult chunk_from_mem(const uint8_t *buf, size_t len, size_t *pos,
+                                  const char *sig, ConfigMap &store,
+                                  bool (*pred)(KEY) = nullptr,
+                                  KEY (*remap)(KEY) = nullptr) {
+  if (*pos + HEADER_SIZE > len) return CHUNK_ABSENT;
+  const uint8_t *h = buf + *pos;
+  if (h[0] != sig[0] || h[1] != sig[1]) return CHUNK_ABSENT;
+  const size_t count = (size_t)h[2] | (size_t)h[3] << 8;
+  uint64_t expected = 0;
+  for (int i = 0; i < 8; ++i) expected |= (uint64_t)h[4 + i] << (8 * i);
+  const size_t body = count * (sizeof(KEY) + sizeof(VALUE));
+  if (*pos + HEADER_SIZE + body > len) return CHUNK_CORRUPT;
+  const uint8_t *p = h + HEADER_SIZE;
+  uint64_t computed = 0;
+  for (size_t i = 0; i < count; ++i) {
+    KEY k; VALUE v;
+    memcpy(&k, p, sizeof(k)); p += sizeof(k);
+    memcpy(&v, p, sizeof(v)); p += sizeof(v);
+    computed ^= v;
+    if (!pred || pred(k)) store.insert_or_assign(remap ? remap(k) : k, v);
+  }
+  *pos += HEADER_SIZE + body;
+  return computed == expected ? CHUNK_OK : CHUNK_CORRUPT;
+}
+
+FLASHMEM bool deserialize(const uint8_t *buf, size_t len) {
+  cfg_store.clear();
+  data_store.clear();
+  mark_dirty();
+  size_t pos = 0;
+  bool any = false;
+  while (pos < len) {
+    const size_t before = pos;
+    const ChunkResult c = chunk_from_mem(buf, len, &pos, "PZ", cfg_store);
+    const ChunkResult d = chunk_from_mem(buf, len, &pos, "PX", data_store);
+    if (c == CHUNK_CORRUPT || d == CHUNK_CORRUPT ||
+        (c == CHUNK_ABSENT && d == CHUNK_ABSENT)) {
+      SERIAL_PRINTLN("PhzConfig: bad image at %u\n", (unsigned)before);
+      (void)before;
+      cfg_store.clear();
+      data_store.clear();
+      return false;
+    }
+    any = true;
+  }
+  return any;
+}
+
+FLASHMEM bool deserialize_merge(const uint8_t *buf, size_t len,
+                                bool (*pred)(KEY), KEY (*remap)(KEY)) {
+  mark_dirty();
+  size_t pos = 0;
+  bool any = false;
+  while (pos < len) {
+    const size_t before = pos;
+    const ChunkResult c = chunk_from_mem(buf, len, &pos, "PZ", cfg_store, pred, remap);
+    const ChunkResult d = chunk_from_mem(buf, len, &pos, "PX", data_store, pred, remap);
+    if (c == CHUNK_CORRUPT || d == CHUNK_CORRUPT ||
+        (c == CHUNK_ABSENT && d == CHUNK_ABSENT)) {
+      SERIAL_PRINTLN("PhzConfig: bad merge image at %u\n", (unsigned)before);
+      (void)before;
+      return false;
+    }
+    any = true;
+  }
+  return any;
+}
+
+static uint8_t *pz_find(uint8_t *buf, size_t len, KEY key) {
+  if (len < HEADER_SIZE || buf[0] != 'P' || buf[1] != 'Z') return nullptr;
+  const size_t count = (size_t)buf[2] | (size_t)buf[3] << 8;
+  const size_t body = count * (sizeof(KEY) + sizeof(VALUE));
+  if (HEADER_SIZE + body > len) return nullptr;
+  uint8_t *p = buf + HEADER_SIZE;
+  for (size_t i = 0; i < count; ++i) {
+    KEY k;
+    memcpy(&k, p, sizeof(k));
+    if (k == key) return p + sizeof(k);
+    p += sizeof(KEY) + sizeof(VALUE);
+  }
+  return nullptr;
+}
+
+FLASHMEM bool peek(const uint8_t *buf, size_t len, KEY key, VALUE &value) {
+  const uint8_t *v = pz_find(const_cast<uint8_t *>(buf), len, key);
+  if (!v) return false;
+  memcpy(&value, v, sizeof(value));
+  return true;
+}
+
+FLASHMEM bool poke(uint8_t *buf, size_t len, KEY key, VALUE value) {
+  uint8_t *v = pz_find(buf, len, key);
+  if (!v) return false;
+  VALUE old;
+  memcpy(&old, v, sizeof(old));
+  memcpy(v, &value, sizeof(value));
+  for (int i = 0; i < 8; ++i)
+    buf[4 + i] ^= (uint8_t)((old ^ value) >> (8 * i));
+  return true;
+}
+
+FLASHMEM bool save_config(const char* filename, FS &fs)
 {
     SERIAL_PRINTLN("\nSaving Config: %s\n", filename);
+
+    if (is_clean_copy_of(filename, fs) && fs.exists(filename)) {
+      SERIAL_PRINTLN("PhzConfig: %s unchanged, not rewritten\n", filename);
+      return true;
+    }
 
     const char* const TEMPFILE = "PEWPEW.TMP";
     bool success = true;
@@ -387,10 +577,11 @@ bool save_config(const char* filename, FS &fs)
     if (dataFile) {
       size_t sz  = save_chunk( 0, "PZ",  cfg_store);
       if (sz) sz = save_chunk(sz, "PX", data_store);
-      if (sz) { // success!
-        dataFile.close();
-      } else {
+      dataFile.close();
+      if (!sz) {
         HS::PokePopup(HS::ERROR_POPUP, "Write ERROR !!");
+        success = false;
+        fs.remove(TEMPFILE);
       }
     } else {
       SERIAL_PRINTLN("PhzConfig: Error opening %s\n", filename);
@@ -399,12 +590,21 @@ bool save_config(const char* filename, FS &fs)
     }
 
     if (success) {
-      fs.remove(filename);
       success = fs.rename(TEMPFILE, filename);
+      if (!success) {
+        fs.remove(filename);
+        success = fs.rename(TEMPFILE, filename);
+      }
       if (!success)
         HS::PokePopup(HS::ERROR_POPUP, "TempFile ERR !!");
     }
 
+    if (success) {
+      mark_clean(filename, fs);
+#ifdef ARDUINO_TEENSY41
+      OC::RecallStage().mark_synced(filename);
+#endif
+    }
     return success;
 }
 
@@ -447,29 +647,31 @@ FLASHMEM bool save_filtered(const char* filename, FS &fs,
     return success;
 }
 
-bool load_chunk(uint8_t *buf, const char *sig, ConfigMap &store) {
+
+FLASHMEM bool load_chunk(const uint8_t *hdr, const char *sig, ConfigMap &store) {
   // quick signature check
-  if (buf[0] != sig[0] || buf[1] != sig[1]) return false;
+  if (hdr[0] != sig[0] || hdr[1] != sig[1]) return false;
 
   size_t record_count = 0;
-  size_t expected_record_count = uint16_t(buf[2]) | uint16_t(buf[3]) << 8;
+  size_t expected_record_count = uint16_t(hdr[2]) | uint16_t(hdr[3]) << 8;
   uint64_t expected_checksum =
-          (uint64_t)buf[4] |
-          (uint64_t)buf[5] << 8 |
-          (uint64_t)buf[6] << 16 |
-          (uint64_t)buf[7] << 24 |
-          (uint64_t)buf[8] << 32 |
-          (uint64_t)buf[9] << 40 |
-          (uint64_t)buf[10] << 48 |
-          (uint64_t)buf[11] << 56;
+          (uint64_t)hdr[4] |
+          (uint64_t)hdr[5] << 8 |
+          (uint64_t)hdr[6] << 16 |
+          (uint64_t)hdr[7] << 24 |
+          (uint64_t)hdr[8] << 32 |
+          (uint64_t)hdr[9] << 40 |
+          (uint64_t)hdr[10] << 48 |
+          (uint64_t)hdr[11] << 56;
   uint64_t computed_checksum = 0;
 
+  static_assert(sizeof(KEY) + sizeof(VALUE) == 10, "config data size mismatch");
+  uint8_t buf[sizeof(KEY) + sizeof(VALUE)];
   size_t pos = 0;
-  while (dataFile.available()) {
+  while (record_count < expected_record_count && dataFile.available()) {
     uint8_t n = dataFile.read();
     buf[pos++] = n;
 
-    static_assert(sizeof(KEY) + sizeof(VALUE) == 10, "config data size mismatch");
     if (pos >= (sizeof(KEY) + sizeof(VALUE))) {
       store.insert_or_assign(
           (uint16_t)buf[0] |
@@ -497,10 +699,13 @@ bool load_chunk(uint8_t *buf, const char *sig, ConfigMap &store) {
 
       ++record_count;
       pos = 0;
-
-      // Multiple chunks can be packed in series in one file
-      if (record_count == expected_record_count) break;
     }
+  }
+  if (record_count != expected_record_count || pos != 0) {
+    SERIAL_PRINTLN("Loaded %u Records. (expected %u) -- truncated\n",
+                   record_count, expected_record_count);
+    HS::PokePopup(HS::MESSAGE_POPUP, "Corrupt File!!");
+    return false;
   }
   SERIAL_PRINTLN("Loaded %u Records. (expected %u)\n", record_count, expected_record_count);
   SERIAL_PRINTLN("Checksum: %s (actual: %lx%lx)\n",
@@ -515,10 +720,21 @@ bool load_chunk(uint8_t *buf, const char *sig, ConfigMap &store) {
   return (computed_checksum == expected_checksum);
 }
 
-bool load_config(const char* filename, FS &fs)
+FLASHMEM bool load_config(const char* filename, FS &fs)
 {
   cfg_store.clear();
   data_store.clear();
+  mark_dirty();
+
+#ifdef ARDUINO_TEENSY41
+  if (const PresetStage::Image *img = OC::RecallStage().find(filename)) {
+    const bool ok = deserialize(img->data, img->len);
+    if (ok) mark_clean(filename, fs);
+    SERIAL_PRINTLN("PhzConfig: %s served from the recall stage (%lu bytes)%s\n",
+                   filename, (unsigned long)img->len, ok ? "" : " -- BAD IMAGE");
+    return ok;
+  }
+#endif
 
   SERIAL_PRINTLN("\nLoading Config: %s\n", filename);
   dataFile = fs.open(filename);
@@ -527,7 +743,7 @@ bool load_config(const char* filename, FS &fs)
     return false;
   }
 
-  uint8_t buf[12];
+  uint8_t buf[HEADER_SIZE];
   size_t pos = 0;
 
   do {
@@ -536,6 +752,11 @@ bool load_config(const char* filename, FS &fs)
     while (dataFile.available() && pos < HEADER_SIZE) {
       uint8_t n = dataFile.read();
       buf[pos++] = n;
+    }
+    if (pos != HEADER_SIZE) {
+      SERIAL_PRINTLN("PhzConfig: short header (%u bytes)\n", (unsigned)pos);
+      dataFile.close();
+      return false;
     }
 
     // check for every chunk signature
@@ -551,6 +772,7 @@ bool load_config(const char* filename, FS &fs)
   } while (dataFile.available());
 
   dataFile.close();
+  mark_clean(filename, fs);
   return true; // everything was fine!
 }
 
