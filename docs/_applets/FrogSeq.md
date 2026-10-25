@@ -79,3 +79,7 @@ FrogSeq provides eight sequence slots. The sequence menu supports **Load**, **Wr
 ### Persistence
 
 A **System Save** is required for sequence slots to persist through a power cycle.
+
+## Credits
+
+Authored by Benjamin AM as a joke inspired by Beau-seidon’s need for a companion applet to his Joystyk.
