@@ -175,7 +175,7 @@ public:
       bool peaks_times_cached;
 
       bool gate_prev;
-      simfloat amplitude;
+      simfloat output;
       TriggerQueue trigger_queue;
 
       void Init(uint8_t ch) {
@@ -206,7 +206,7 @@ public:
         peaks_times_cached = false;
 
         gate_prev = false;
-        amplitude = 0;
+        output = 0;
         trigger_queue.Reset();
       }
 
@@ -509,11 +509,11 @@ private:
       return current;
     }
 
-    static int StageTicks(int value) {
-      return HS::kShapeExponential[constrain(value, 0, STAGE_MAX_VALUE)] >> 1;
+    static constexpr int StageTicks(uint8_t value) {
+      return HS::kShapeExponential[value] >> 1;
     }
 
-    static uint16_t PeaksTime(int ticks) {
+    static constexpr uint16_t PeaksTime(int ticks) {
       if (ticks < 1) ticks = 1;
 
       const uint64_t target =
@@ -537,15 +537,11 @@ private:
       return static_cast<uint16_t>(best_index << 8);
     }
 
-    bool read_gate_source(uint8_t source) const {
-      return Gate(constrain(source, 0, 1));
-    }
-
     void begin_attack(Channel &c) {
       c.peaks_trigger_pending = true;
     }
 
-    void process_envelope(Channel &c, bool gate, bool gate_fall, int cv_in, int ch) {
+    void process_envelope(Channel &c, bool gate, bool gate_fall, int ch) {
       peaks::MultistageEnvelope &env = c.peaks_envelope;
 
       int attack = c.stage_value[STAGE_ATTACK];
@@ -553,38 +549,44 @@ private:
       int sustain = c.stage_value[STAGE_SUSTAIN];
       int release = c.stage_value[STAGE_RELEASE];
 
-      if (c.cv_map == CVMAP_ATTACK || c.cv_map == CVMAP_ADR)
-        Modulate(attack, ch, 1, STAGE_MAX_VALUE);
-      if (c.cv_map == CVMAP_DECAY || c.cv_map == CVMAP_ADR)
-        Modulate(decay, ch, 1, STAGE_MAX_VALUE);
-      if (c.cv_map == CVMAP_SUSTAIN)
-        Modulate(sustain, ch, 0, STAGE_MAX_VALUE);
-      if (c.cv_map == CVMAP_RELEASE || c.cv_map == CVMAP_ADR)
-        Modulate(release, ch, 1, STAGE_MAX_VALUE);
+      switch (c.cv_map) {
+        case CVMAP_ATTACK:
+          Modulate(attack, ch, 1, STAGE_MAX_VALUE);
+          break;
+        case CVMAP_DECAY:
+          Modulate(decay, ch, 1, STAGE_MAX_VALUE);
+          break;
+        case CVMAP_SUSTAIN:
+          Modulate(sustain, ch, 0, STAGE_MAX_VALUE);
+          break;
 
-      const uint8_t effective_attack =
-          constrain(attack, 0, STAGE_MAX_VALUE);
-      const uint8_t effective_decay =
-          constrain(decay, 0, STAGE_MAX_VALUE);
-      const uint8_t effective_release =
-          constrain(release, 0, STAGE_MAX_VALUE);
+        case CVMAP_ADR:
+          Modulate(attack, ch, 1, STAGE_MAX_VALUE);
+          Modulate(decay, ch, 1, STAGE_MAX_VALUE);
+          // fall thru
+        case CVMAP_RELEASE:
+          Modulate(release, ch, 1, STAGE_MAX_VALUE);
+          break;
+        // case NONE:
+        default: break;
+      }
 
       // Convert Piquet's stage durations to Peaks' time LUT indices.
       // Cache the result until a parameter or its CV-modulated value changes.
       if (!c.peaks_times_cached ||
-          c.peaks_cached_attack != effective_attack ||
-          c.peaks_cached_decay != effective_decay ||
-          c.peaks_cached_release != effective_release) {
-        c.peaks_cached_attack = effective_attack;
-        c.peaks_cached_decay = effective_decay;
-        c.peaks_cached_release = effective_release;
+          c.peaks_cached_attack != attack ||
+          c.peaks_cached_decay != decay ||
+          c.peaks_cached_release != release) {
+        c.peaks_cached_attack = attack;
+        c.peaks_cached_decay = decay;
+        c.peaks_cached_release = release;
 
         c.peaks_cached_attack_time =
-            PeaksTime(StageTicks(effective_attack));
+            PeaksTime(StageTicks(attack));
         c.peaks_cached_decay_time =
-            PeaksTime(StageTicks(effective_decay));
+            PeaksTime(StageTicks(decay));
         c.peaks_cached_release_time =
-            PeaksTime(StageTicks(effective_release));
+            PeaksTime(StageTicks(release));
 
         c.peaks_times_cached = true;
       }
@@ -611,7 +613,7 @@ private:
             peaks::FALLING_GATE_BEHAVIOUR_IGNORE);
         c.peaks_configured_type = c.type;
         c.peaks_config_signature = 0xFFFFFFFFu;
-        c.amplitude = 0;
+        c.output = 0;
       }
 
       // Rebuild segment layout only when the mode, shapes, or loop layout changes.
@@ -627,7 +629,8 @@ private:
         env.set_decay_time_multiplier(c.length_index);
         env.set_release_time_multiplier(c.length_index + 1);
 
-        env.set_adsar(attack_time, decay_time, sustain_level, release_time);
+        // seems redundant?
+        //env.set_adsar(attack_time, decay_time, sustain_level, release_time);
 
         switch (c.type) {
           case ENV_AD:
@@ -655,24 +658,29 @@ private:
 
       // Update live timing and levels without rebuilding the segment layout.
       env.set_time(0, attack_time);
-      if (c.type == ENV_AD || c.type == ENV_LOOP_AD) {
-        env.set_time(1, decay_time);
-      } else if (c.type == ENV_AHR || c.type == ENV_LOOP_AHR) {
-        env.set_time(1, decay_time);
-        env.set_time(2, release_time);
-      } else if (c.type == ENV_AR) {
-        env.set_time(1, release_time);
-      } else {
-        env.set_time(1, decay_time);
-        env.set_time(2, release_time);
-        env.set_level(2, sustain_level);
+      switch (c.type) {
+        default:
+          env.set_level(2, sustain_level);
+          // and fall thru
+        case ENV_AHR:
+        case ENV_LOOP_AHR:
+          env.set_time(2, release_time);
+          // and fall thru
+        case ENV_AD:
+        case ENV_LOOP_AD:
+          env.set_time(1, decay_time);
+          break;
+
+        case ENV_AR:
+          env.set_time(1, release_time);
+          break;
       }
 
       env.set_amplitude(65535, false);
 
       // Stay inactive after a type change until a real trigger arrives.
       if (c.peaks_waiting_for_trigger && !c.peaks_trigger_pending) {
-        c.amplitude = 0;
+        c.output = 0;
         return;
       }
 
@@ -691,27 +699,9 @@ private:
 
       const uint16_t value = env.ProcessSingleSample(control);
       const int amplitude_cv = Proportion(value, 32767, HEMISPHERE_MAX_CV);
-      c.amplitude =
-          int2simfloat(constrain(amplitude_cv, 0, HEMISPHERE_MAX_CV));
+      c.output = int2simfloat(constrain(amplitude_cv, 0, HEMISPHERE_MAX_CV));
 
 
-    }
-
-
-    int effective_level(const Channel &c, int cv_in) {
-      int level = c.level;
-      if (c.cv_map == CVMAP_LEVEL) {
-        level = constrain(level + Proportion(cv_in, HEMISPHERE_MAX_INPUT_CV, STAGE_MAX_VALUE / 2), 0, 255);
-      }
-      return level;
-    }
-
-    int apply_level_and_polarity(const Channel &c, int cv_in) {
-      int out = simfloat2int(c.amplitude);
-      const int level = effective_level(c, cv_in);
-      out = Proportion(out, HEMISPHERE_MAX_CV, Proportion(level, 255, HEMISPHERE_MAX_CV));
-      if (c.inverted) out = HEMISPHERE_MAX_CV - out;
-      return constrain(out, 0, HEMISPHERE_MAX_CV);
     }
 
     static const char* type_name(uint8_t t);
@@ -741,8 +731,7 @@ void FLASHMEM Piquet::Controller() {
           c.peaks_waiting_for_trigger = true;
         }
 
-        const int cv_in = DetentedIn(ch);
-        const bool gate = read_gate_source(ch);
+        const bool gate = Gate(ch);
         const bool clock_trigger = Clock(ch);
         const bool gate_fall = !gate && c.gate_prev;
         c.gate_prev = gate;
@@ -770,8 +759,17 @@ void FLASHMEM Piquet::Controller() {
 
         if (c.trigger_queue.TickReady()) begin_attack(c);
 
-        process_envelope(c, gate, gate_fall, cv_in, ch);
-        Out(ch, apply_level_and_polarity(c, cv_in));
+        process_envelope(c, gate, gate_fall, ch);
+
+        int out = simfloat2int(c.output);
+        int level = c.level;
+        if (c.cv_map == CVMAP_LEVEL)
+          Modulate(level, ch, 0, 255);
+        out = Proportion(out, HEMISPHERE_MAX_CV, Proportion(level, 255, HEMISPHERE_MAX_CV));
+        if (c.inverted) out = HEMISPHERE_MAX_CV - out;
+        //out = constrain(out, 0, HEMISPHERE_MAX_CV);
+
+        Out(ch, out);
       }
 }
 
@@ -1005,7 +1003,7 @@ void FLASHMEM Piquet::DrawParamRow(int x_offset) {
           }
           gfxPrint("s");
         } else if (cursor == CURSOR_LEVEL) {
-          gfxPrint(value_x, 22, Proportion(effective_level(c, DetentedIn(selected_channel)), 255, 100));
+          gfxPrint(value_x, 22, Proportion(c.level, 255, 100));
           gfxPrint("%");
         } else if (value) {
           gfxPrint(value_x, 22, value);
