@@ -313,6 +313,31 @@ FLASHMEM void BuildAppData(AppData &out) {
   APPS_SERIAL_PRINTLN("App settings used: %u/%u", out.used, EEPROM_APPDATA_BINARY_SIZE);
 }
 
+// one app's chunk only (used for the preset bus slots)
+FLASHMEM bool BuildSingleAppData(uint16_t app_id, AppData &out) {
+  out.used = 0;
+  for (size_t i = 0; i < app_container.num_apps(); ++i) {
+    const AppBase *app = (AppBase *)app_container[i].instance;
+    if (!app || app->id() != app_id) continue;
+
+    size_t storage_size = app->storage_size() + sizeof(AppChunkHeader);
+    if (storage_size & 1) ++storage_size;
+    if (storage_size <= sizeof(AppChunkHeader) ||
+        storage_size > OC::AppData::kAppDataSize)
+      return false;
+
+    AppChunkHeader *chunk = reinterpret_cast<AppChunkHeader *>(out.data);
+    chunk->id = app->id();
+    chunk->length = (uint16_t)storage_size;
+    util::StreamBufferWriter stream_buffer{chunk + 1, chunk->length};
+    app->Save(stream_buffer);
+    if (stream_buffer.overflow()) return false;
+    out.used = chunk->length;
+    return true;
+  }
+  return false;
+}
+
 FLASHMEM void SaveAppData() {
   SaveGlobalSettings(); // yeah, why not
   BuildAppData(app_data);
@@ -465,7 +490,27 @@ size_t ResolveAppIndexByID(uint16_t app_id) {
   size_t idx = app_container.IndexOfAppByID(app_id);
   if (idx >= app_container.num_apps())
     idx = app_container.IndexOfAppByID(global_settings.current_app_id);
+  if (idx >= app_container.num_apps())
+    idx = DEFAULT_APP_INDEX;
   return idx;
+}
+
+// "Applet,Applet" name of a Quadrants preset in the loaded bank
+FLASHMEM
+bool QuadrantsPresetLabel(uint8_t preset_id, char *out, size_t cap) {
+#ifdef NO_HEMISPHERE
+  (void)preset_id; (void)out; (void)cap;
+  return false;
+#else
+  if (preset_id >= 32 || !cap) return false;
+  uint64_t data = 0;
+  if (!PhzConfig::getValue((PhzConfig::KEY)((unsigned)preset_id << 11), data))
+    return false;
+  const int left  = HS::get_applet_index_by_id(Unpack(data, PackLocation{0, 8}));
+  const int right = HS::get_applet_index_by_id(Unpack(data, PackLocation{8, 8}));
+  snprintf(out, cap, "%s,%s", HS::get_applet_name(left), HS::get_applet_name(right));
+  return true;
+#endif
 }
 #endif
 
