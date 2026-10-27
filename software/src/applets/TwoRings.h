@@ -442,7 +442,7 @@ private:
     void slew(int &old_val, const int new_val = 0) {
         const int s = 1 + smooth_mod;
         // more smoothing causes more ticks to be skipped
-        if (OC::CORE::ticks % s) return;
+        if (HS::get_tick() % s) return;
 
         old_val = (old_val * (s - 1) + new_val) / s;
     }

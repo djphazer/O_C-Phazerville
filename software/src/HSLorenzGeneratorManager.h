@@ -69,8 +69,8 @@ public:
     }
 
     void Process() {
-        if (OC::CORE::ticks - last_process_tick >= LORENZ_PROCESS_TICKS) {
-            last_process_tick = OC::CORE::ticks;
+        if (HS::get_tick() - last_process_tick >= LORENZ_PROCESS_TICKS) {
+            last_process_tick = HS::get_tick();
             lorenz.Process(freq[0], freq[1], reset[0], reset[1], 2, 2);
             reset[0] = 0;
             reset[1] = 0;

@@ -28,13 +28,26 @@
 
 namespace UI {
 
-enum EventType : uint8_t {
+enum EventType : uint16_t {
   EVENT_NONE,
   EVENT_BUTTON_DOWN,
-  EVENT_BUTTON_PRESS,
+  EVENT_BUTTON_RELEASE,
   EVENT_BUTTON_LONG_PRESS,
   EVENT_BUTTON_LONG_RELEASE,
-  EVENT_ENCODER
+  EVENT_ENCODER,
+  EVENT_MISC,
+
+  EVENT_BUTTON_PRESS = EVENT_BUTTON_RELEASE, // compatibility alias
+};
+
+enum MiscControl : uint16_t {
+  MISC_PRESET_LOAD,
+  MISC_PRESET_SAVE,
+  MISC_CHANGE_APPLET,
+  MISC_CLOCK_START,
+  MISC_CLOCK_STOP,
+  MISC_CLOCK_CONTINUE, // aka reset
+  MISC_CLOCK_TICK, // 24ppqn, with a timestamp
 };
 
 // UI event struct
@@ -56,7 +69,7 @@ struct Event {
 
   const bool IsEncoder() const { return type == EVENT_ENCODER; }
   const bool IsPress() const { return type == EVENT_BUTTON_DOWN; }
-  const bool IsRelease() const { return type == EVENT_BUTTON_PRESS; }
+  const bool IsRelease() const { return type == EVENT_BUTTON_RELEASE; }
   const bool IsLongPress() const { return type == EVENT_BUTTON_LONG_PRESS; }
   const bool IsLongRelease() const { return type == EVENT_BUTTON_LONG_RELEASE; }
 };

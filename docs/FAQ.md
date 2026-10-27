@@ -11,18 +11,24 @@ nav_order: 2
 
 ## Q: How do I switch Apps?
 
-A: As of v2.0, hold 'Z' or 'A' (or the UP button on O_C) and press the Right Encoder to find the main App Menu. See the [UI Gestures](Hemisphere-Gestures) page for more info.
+A: In v2.0+, hold 'Z' or 'A' (aka the UP button on O_C) and press the Right Encoder to find the main App Menu. See the [UI Gestures](Hemisphere-Gestures) page for more info.
 _(in v1.x firmwares, Long-press the Right Encoder for main menu.)_
 
-The _Applets_ can be found within **Hemispheres** App on O_C or [**Quadrants**](Quadrants) App on ORN8.
+## Q: Where are all the Applets?
+
+A: The _Applets_ can be found within the **Hemispheres** App on O_C or [**Quadrants**](Quadrants) App on ORN8. All the same CV applets are available on both, for T4.0 or T4.1. Most updates can be backported to T3.2, excluding any extra settings storage.
 
 ## Q: How do I set the default app on startup?
 
-A: Long-press the Right Encoder while on the main App Menu to save _Global Settings_, including the currently selected App.
+A: Long-press the Right Encoder while on the main App Menu to save _Global Settings_, including the currently selected App. This does not necessarily save your [Preset](https://firmware.phazerville.com/Hemisphere-Presets) within the App, unless you've turned on [Auto-Save](https://firmware.phazerville.com/Hemisphere-Presets#auto-save).
 
-## Q: How do I run it upside-down?
+## Q: Why are some Apps or Applets missing from the firmware? <a id='missing-apps'>
 
-A: There's a quick gesture to toggle it (A+B or UP+DOWN) right inside the [**Setup / About**](Setup-About) App. After saving, a power cycle is required.
+A: Technical limitations will always be there to stop you from having all the cake. If any given program or feature is documented here, that means it exists in the source code, even if it isn't included in every compiled binary release. It's easier than ever to build your own custom firmware to exclude things you don't need and make room for other things from the ever-growing library of Phazerville - that's part of the fun! Open Source, baby!!
+
+Check [the wiki](https://github.com/djphazer/O_C-Phazerville/wiki) for tips on development to get started.
+
+<hr>
 
 ## Q: What is AuxButton?
 
@@ -33,6 +39,10 @@ A: In Hemispheres/Quadrants, after pressing the encoder button to _highlight an 
 ## Q: How do I calibrate the hardware? <a id='calibration'>
 
 A: See the app [Setup/About](Setup-About)
+
+## Q: How do I run it upside-down?
+
+A: There's a quick gesture to toggle FLIP mode (A+B or UP+DOWN) right inside the [**Setup / About**](Setup-About) App. After saving, a power cycle is required.
 
 <hr>
 
@@ -104,11 +114,11 @@ You can forward internal clock pulses (or multiples / divisions thereof) to any 
 
 ## Q: What is the deal with the quantizer engines? <a id='quantizers'>
 
-A: Instead of single, individual quantizers built into each applet, applets now share access to pool of 8 quantizer engines (Q1 - Q8) which can be configured in either a pop-up window, or in the [configuration menu](Hemisphere-Quantizer-Setup). Each quantizer engine includes a root note, scale, octave adjustment, and note mask.
+A: Instead of single, individual quantizers built into each applet, applets now share access to a pool of 8 quantizer engines (Q1 - Q8) which can be configured in either a pop-up window, or in the [configuration menu](Hemisphere-Quantizer-Setup). Each Q-engine includes a root note, scale, octave adjustment, and note mask.
 
-To switch between quantizer engines in an applet, select the quantizer parameter for editing and adjust with the LEFT or RIGHT encoder, depending on hemisphere context. Some applets allow CV modulation of quantizer engine, with semitone modulation resolution. While selecting, a black pop-up window will be visible.
+Some simple quantizer applets, like **DualQuant** or **Squanch**, are hardcoded to use the Q-engine for the corresponding DAC channel - Q1 for output A, Q2 for B, etc. Many other applets have a parameter to select a Q-engine from the pool, and some allow CV modulation of the selected Q-engine. While editing the Q parameter, a dark pop-up window briefly displays the settings for that engine.
 
-To edit the active quantizer engine in an applet, select the quantizer parameter for editing and press the Aux Button: UP or DOWN depending on hemisphere context. This will open an inverted (white) pop-up window. Use the LEFT encoder to select the Quantizer parameter to edit, and adjust with the RIGHT encoder. The first parameter of the note mask is a rotation value. Press UP to raise the octave, or press DOWN to lower it.
+To edit the active Q-engine in an applet, select the Q parameter and press the Aux Button: UP or DOWN depending on context. This will open an inverted (white) pop-up editor, with context hints. Use the LEFT encoder to move the edit cursor, and adjust settings with the RIGHT encoder. The first parameter of the note mask is rotation. UP/DOWN (or A/B) for octave jump. Press either encoder to exit.
 
 Or, see the [configuration menu](Hemisphere-Quantizer-Setup) to edit all 8 engines.
 

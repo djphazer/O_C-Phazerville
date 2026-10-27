@@ -112,7 +112,7 @@ public:
     }
 
     void Controller() override {
-        const uint32_t this_tick = OC::CORE::ticks;
+        const uint32_t this_tick = HS::get_tick();
 
         transpose_amt = input2_mode == Input2Mode::CV1_TRANSPOSE ? SemitoneIn(1) : 0;
 

@@ -24,7 +24,7 @@ class RelabiManager {
   int lfo1;
   int lfo2;
   int lfo3;
-  bool gateStates[3];
+  bool gateStates[4];
   uint32_t registered[2];
 
   RelabiManager() {
@@ -32,7 +32,7 @@ class RelabiManager {
     registered[RIGHT_HEMISPHERE] = 0;
 
     // Initialize gate states
-    for (uint8_t i = 0; i < 3; i++) {
+    for (uint8_t i = 0; i < 4; i++) {
       gateStates[i] = false;
     }
   }
@@ -44,14 +44,14 @@ public:
   }
 
   void Register(int hemisphere) {
-    registered[hemisphere & 1] = OC::CORE::ticks;
+    registered[hemisphere & 1] = HS::get_tick();
   }
   void Unload(int hemisphere) {
     registered[hemisphere & 1] = 0;
   }
 
   bool IsLinked() {
-    uint32_t t = OC::CORE::ticks;
+    uint32_t t = HS::get_tick();
     return (
       (t - registered[LEFT_HEMISPHERE] < 160)
       && (t - registered[RIGHT_HEMISPHERE] < 160)
@@ -72,14 +72,14 @@ public:
     value3 = lfo3;
   }
 
-  void WriteGates(bool gates[3]) {
-    for (int i = 0; i < 3; i++) {
+  void WriteGates(bool gates[4]) {
+    for (int i = 0; i < 4; i++) {
       gateStates[i] = gates[i];
     }
   }
 
-  void ReadGates(bool gates[3]) const {
-    for (int i = 0; i < 3; i++) {
+  void ReadGates(bool gates[4]) const {
+    for (int i = 0; i < 4; i++) {
       gates[i] = gateStates[i];
     }
   }

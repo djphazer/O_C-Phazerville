@@ -21,6 +21,11 @@
 
 #pragma once
 
+#ifdef USB_GAMEPAD
+#include <USBHost_t36.h>
+#include "HSGamepad.h"
+#endif
+
 // per bank file
 static constexpr int QUAD_PRESET_COUNT = 32;
 static constexpr int PRESET_FILE_REVISION = 1;
@@ -67,8 +72,11 @@ public:
     void Resume() {
         SetBank(bank_num);
 
-        if (preset_id < 0)
-          LoadFromPreset(0);
+        if (preset_id < 0) {
+          LoadFromPreset(queued_preset < 0 ? 0 : queued_preset);
+          queued_preset = -1;
+        }
+
 
         for (auto& env : HS::env_) env.reset();
     }
@@ -147,6 +155,7 @@ public:
         // 100s = Globals
         FILTERMASK1_KEY = 100,
         FILTERMASK2_KEY = 101,
+        LAST_PRESET_KEY = 102,
 
         MIDI_GLOBALS_KEY  = 110,
         PRESET_JUMP_KEY = 111,
@@ -166,6 +175,8 @@ public:
         // 768-778
         // 1024+
         // ... check AudioAppletSubapp to be sure!
+
+        GAMEPAD_MAPS_KEY = 600,
 
         VERSION_KEY = 0xFFFF // 65535
     };
@@ -246,6 +257,7 @@ public:
         // applet filtering is actually just global
         PhzConfig::setValue(FILTERMASK1_KEY, HS::hidden_applets[0]);
         PhzConfig::setValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
+        PhzConfig::setValue(LAST_PRESET_KEY, HS::preset_id);
 
         data = PackPackables(
           HS::frame.MIDIState.pc_channel,
@@ -285,6 +297,19 @@ public:
           PhzConfig::setValue(MIDI_MAPS_KEY + midx, data);
         }
 
+#ifdef USB_GAMEPAD
+        // Global Gamepad Maps
+        for (size_t gpx = 0; gpx < GAMEPAD_MAP_MAX / 4; ++gpx) {
+          data = PackPackables(
+            frame.GamepadState.mapping[gpx * 4 + 0],
+            frame.GamepadState.mapping[gpx * 4 + 1],
+            frame.GamepadState.mapping[gpx * 4 + 2],
+            frame.GamepadState.mapping[gpx * 4 + 3]
+          );
+          PhzConfig::setValue(GAMEPAD_MAPS_KEY + gpx, data);
+        }
+#endif
+
         // User Patterns aka Sequences
         for (size_t i = 0; i < OC::Patterns::PATTERN_USER_COUNT; ++i) {
           data = 0;
@@ -306,12 +331,13 @@ public:
           success = PhzConfig::save_config(bank_filename);
 
         if (success)
-          PokePopup(HS::MESSAGE_POPUP, HS::PRESET_SAVED);
+          PokePopup(HS::MESSAGE_POPUP, "PRESET SAVED!");
     }
 
     void LoadFromPreset(int id);
     void load_from_preset(int id) {
         preset_id = id;
+        queued_preset = -1;
 
         uint16_t preset_key = id << 11;
         uint64_t data;
@@ -395,14 +421,17 @@ public:
         //LoadGlobals();
 
         audio_app.LoadPreset(id);
-        PokePopup(PRESET_POPUP);
+        PokePopup(PRESET_POPUP, OC::Strings::capital_letters[id]);
     }
     void LoadGlobals() {
         // applet filtering
         PhzConfig::getValue(FILTERMASK1_KEY, HS::hidden_applets[0]);
         PhzConfig::getValue(FILTERMASK2_KEY, HS::hidden_applets[1]);
-
         uint64_t data = 0;
+        if (PhzConfig::getValue(LAST_PRESET_KEY, data)) {
+          queued_preset = constrain(data, 0, QUAD_PRESET_COUNT - 1);
+        }
+
         if (PhzConfig::getValue(MIDI_GLOBALS_KEY, data)) {
           UnpackPackables(data,
               HS::frame.MIDIState.pc_channel,
@@ -442,6 +471,19 @@ public:
         frame.MIDIState.UpdateMidiChannelFilter();
         frame.MIDIState.UpdateMaxPolyphony();
 
+#ifdef USB_GAMEPAD
+        // Global Gamepad Maps
+        for (size_t gpx = 0; gpx < GAMEPAD_MAP_MAX / 4; ++gpx) {
+          if (!PhzConfig::getValue(GAMEPAD_MAPS_KEY + gpx, data))
+              break;
+          UnpackPackables(data,
+            frame.GamepadState.mapping[gpx * 4 + 0],
+            frame.GamepadState.mapping[gpx * 4 + 1],
+            frame.GamepadState.mapping[gpx * 4 + 2],
+            frame.GamepadState.mapping[gpx * 4 + 3]
+          );
+        }
+#endif
         // User Patterns aka Sequences
         for (size_t i = 0; i < OC::Patterns::PATTERN_USER_COUNT; ++i) {
           for (size_t step = 0; step < ARRAY_SIZE(OC::Pattern::notes); ++step) {
@@ -457,7 +499,6 @@ public:
     void ProcessQueue() {
       if (queued_preset >= 0) {
         LoadFromPreset(queued_preset);
-        queued_preset = -1;
       }
     }
     void QueuePresetLoad(int id) {
@@ -468,13 +509,24 @@ public:
       else
         LoadFromPreset(id);
     }
-    void JumpToNextPreset() {
-      int next_id = preset_id + 1;
-      while (!isValidPreset(next_id) && next_id != preset_id) {
-        ++next_id %= QUAD_PRESET_COUNT;
+
+    void ChangePreset(int dir) {
+      if (dir == 0) return;
+      int id = (preset_id < 0) ? 0 : preset_id;
+      for (int i = 0; i < QUAD_PRESET_COUNT; i++) {
+        id = (id + dir + QUAD_PRESET_COUNT) % QUAD_PRESET_COUNT;
+        if (isValidPreset(id)) {
+          QueuePresetLoad(id);
+          return;
+        }
       }
-      if (next_id != preset_id)
-        QueuePresetLoad(next_id);
+    }
+    void JumpToNextPreset() {
+      ChangePreset(1);
+    }
+
+    void SetAudioSetup(bool on) {
+      view_state = on ? AUDIO_SETUP : APPLETS;
     }
 
     // does not modify the preset, only the current state
@@ -482,6 +534,10 @@ public:
         /*noInterrupts();*/
         HemisphereApplet* next_ = HS::get_applet(index, hemisphere);
         HemisphereApplet* old_ = active_applet[hemisphere];
+        if (next_ == old_) {
+            next_applet_index[hemisphere] = active_applet_index[hemisphere] = index;
+            return;
+        }
         next_->BaseStart(hemisphere);
         // make sure we've called Start before changing the shared pointer
         active_applet[hemisphere] = next_;
@@ -497,6 +553,12 @@ public:
 
     void SendMIDIThru(const MIDIMessage &msg, uint8_t exclude_mask) {
       exclude_mask |= midi_thru_disable;
+
+      // MIDI monitor: log thru traffic as OUT (only if some port will send it)
+      if (msg.message != midi::Clock &&
+          (~exclude_mask & (mMaskUSBDev | mMaskUSBHost | mMaskUSBHost2 | mMaskSerial)))
+        MidiLog::Push(true, msg.message, msg.channel, msg.data1, msg.data2);
+
       if (~exclude_mask & mMaskUSBDev) {
         usbMIDI.send(msg.message, msg.data1, msg.data2, msg.channel, 0);
       }
@@ -535,6 +597,12 @@ public:
             device.getData2()
           };
 
+          // MIDI monitor: log everything received except the floods (Clock,
+          // Active Sensing) and SysEx (reserved for the display transport).
+          if (msg.message != midi::Clock && msg.message != midi::ActiveSensing
+              && msg.message != midi::SystemExclusive)
+            MidiLog::Push(false, msg.message, msg.channel, msg.data1, msg.data2);
+
           switch (msg.message) {
             case midi::SystemExclusive:
               QuadrantSysExHandler();
@@ -572,12 +640,11 @@ public:
         ProcessMIDI(usbHostMIDI[0]);
         ProcessMIDI(usbHostMIDI[1]);
         ProcessMIDI(MIDI1);
+#ifdef USB_GAMEPAD
+        ProcessGamepad(joystick);
+#endif
     }
     void Controller() {
-        // Clock Setup applet handles internal clock duties
-        ClockSetup_instance.Controller();
-        // ^ this will process the queue and load presets
-
         // this might be triggered by the internal clock...
         if (jump_trig_.Clock() && !HS::clock_m.auto_reset) {
           JumpToNextPreset();
@@ -711,8 +778,8 @@ public:
             // but still draw the applets
             break;
 
-          case MIDI_MAPS_PAGE:
-            DrawMidiMaps(config_cursor - MIDIMAP1);
+          case CONFIG_SETTINGS:
+            DrawConfigMenu();
             draw_applets = false;
             break;
 
@@ -726,8 +793,13 @@ public:
             draw_applets = false;
             break;
 
-          case CONFIG_SETTINGS:
-            DrawConfigMenu();
+          case MIDI_MAPS_PAGE:
+            DrawMidiMaps(config_cursor - MIDIMAP1);
+            draw_applets = false;
+            break;
+
+          case MIDI_ROUTING_PAGE:
+            DrawMidiRouting(config_cursor - MIDI_THRU_SERIAL);
             draw_applets = false;
             break;
 
@@ -778,9 +850,10 @@ public:
           ClockSetup_instance.DrawIndicator(view_state == OVERVIEW);
         }
 
-        // Overlay popup window last
-        if (OC::CORE::ticks - HS::popup_tick < HEMISPHERE_CURSOR_TICKS * 4) {
-          HS::DrawPopup(config_cursor, preset_id, CursorBlink());
+        // Overlay popup Load/Save menu last
+        if (HS::popup_type == HS::MENU_POPUP &&
+            HS::get_tick() - HS::popup_tick < HS::popup_duration) {
+          HS::DrawMenuPopup(config_cursor);
         }
     }
 
@@ -920,13 +993,7 @@ public:
     }
 
     void DelegateEncoderMovement(const UI::Event &event) {
-        int increment = event.value;
-        if (event.mask & (OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_R)) {
-          // push-and-turn for coarse adjustments
-          // XXX: hopefully nothing breaks if event.value is larger than 1 or -1...
-          OC::ui.SetButtonIgnoreMask();
-          increment *= 10;
-        }
+        const int increment = event.value;
         int h = (event.control == OC::CONTROL_ENCODER_L) ? LEFT_HEMISPHERE : RIGHT_HEMISPHERE;
         HEM_SIDE slot = HEM_SIDE(view_slot[h]*2 + h);
         if (HS::q_edit) {
@@ -1014,7 +1081,8 @@ public:
       else if (config_cursor < TRIGMAP1) config_page = CONFIG_SETTINGS;
       else if (config_cursor < QUANT1) config_page = INPUT_SETTINGS;
       else if (config_cursor < MIDIMAP1) config_page = QUANTIZER_SETTINGS;
-      else if (config_cursor < SHOWHIDELIST) config_page = MIDI_MAPS_PAGE;
+      else if (config_cursor < MIDI_THRU_SERIAL) config_page = MIDI_MAPS_PAGE;
+      else if (config_cursor < SHOWHIDELIST) config_page = MIDI_ROUTING_PAGE;
       else config_page = LAST_PAGE;
     }
     void ToggleConfigMenu() {
@@ -1122,6 +1190,7 @@ private:
       INPUT_SETTINGS,
       QUANTIZER_SETTINGS,
       MIDI_MAPS_PAGE,
+      MIDI_ROUTING_PAGE,
       SHOWHIDE_APPLETS,
 
       LAST_PAGE = SHOWHIDE_APPLETS
@@ -1143,26 +1212,6 @@ private:
         MIDI_PC_CHANNEL,
         AUTO_MIDI,
         MIDI_POLY_MODE,
-        MIDI_THRU_SERIAL,
-        MIDI_THRU_USBDEV,
-        MIDI_THRU_USBHOST1,
-        MIDI_THRU_USBHOST2,
-        MIDI_CLKRX_SERIAL,
-        MIDI_CLKRX_USBDEV,
-        MIDI_CLKRX_USBHOST1,
-        MIDI_CLKRX_USBHOST2,
-        MIDI_CLKTX_SERIAL,
-        MIDI_CLKTX_USBDEV,
-        MIDI_CLKTX_USBHOST1,
-        MIDI_CLKTX_USBHOST2,
-        MIDI_MSGRX_SERIAL,
-        MIDI_MSGRX_USBDEV,
-        MIDI_MSGRX_USBHOST1,
-        MIDI_MSGRX_USBHOST2,
-        MIDI_MSGTX_SERIAL,
-        MIDI_MSGTX_USBDEV,
-        MIDI_MSGTX_USBHOST1,
-        MIDI_MSGTX_USBHOST2,
 
         // Input Remapping
         TRIGMAP1, TRIGMAP2, TRIGMAP3, TRIGMAP4,
@@ -1184,10 +1233,17 @@ private:
         MIDIMAP25, MIDIMAP26, MIDIMAP27, MIDIMAP28,
         MIDIMAP29, MIDIMAP30, MIDIMAP31, MIDIMAP32,
 
+        // MIDI Routing
+        MIDI_THRU_SERIAL,  MIDI_THRU_USBDEV,  MIDI_THRU_USBHOST1,  MIDI_THRU_USBHOST2,
+        MIDI_CLKRX_SERIAL, MIDI_CLKRX_USBDEV, MIDI_CLKRX_USBHOST1, MIDI_CLKRX_USBHOST2,
+        MIDI_CLKTX_SERIAL, MIDI_CLKTX_USBDEV, MIDI_CLKTX_USBHOST1, MIDI_CLKTX_USBHOST2,
+        MIDI_MSGRX_SERIAL, MIDI_MSGRX_USBDEV, MIDI_MSGRX_USBHOST1, MIDI_MSGRX_USBHOST2,
+        MIDI_MSGTX_SERIAL, MIDI_MSGTX_USBDEV, MIDI_MSGTX_USBHOST1, MIDI_MSGTX_USBHOST2,
+
         // Applet visibility (dummy position)
         SHOWHIDELIST,
 
-        MAX_CURSOR = MIDIMAP32
+        MAX_CURSOR = MIDI_MSGTX_USBHOST2
     };
 
     void Randomizer(bool audio = false) {
@@ -1260,7 +1316,7 @@ private:
             config_page += dir;
             config_page = constrain(config_page, LOADSAVE_POPUP, LAST_PAGE);
 
-            const int cursorpos[] = { 0, LOAD_PRESET, TRIG_LENGTH, TRIGMAP1, QUANT1, MIDIMAP1, SHOWHIDELIST };
+            const int cursorpos[] = { 0, LOAD_PRESET, TRIG_LENGTH, TRIGMAP1, QUANT1, MIDIMAP1, MIDI_THRU_SERIAL, SHOWHIDELIST };
             config_cursor = cursorpos[config_page];
           } else if (config_page == SHOWHIDE_APPLETS) {
             showhide_cursor.Scroll(dir);
@@ -1379,6 +1435,11 @@ private:
             return;
         }
 
+        if (config_page == MIDI_ROUTING_PAGE) {
+          ToggleMidiRouting(config_cursor - MIDI_THRU_SERIAL);
+          return;
+        }
+
         switch (config_cursor) {
           case RANDOMIZE_PRESET:
             // reset input mappings to defaults
@@ -1470,75 +1531,6 @@ private:
 
           case AUTO_MIDI:
             HS::frame.autoMIDIOut = !HS::frame.autoMIDIOut;
-            break;
-
-          case MIDI_THRU_SERIAL:
-            HS::midi_thru_disable ^= mMaskSerial;
-            if (midi_thru_disable & mMaskSerial)
-              MIDI1.turnThruOff();
-            else
-              MIDI1.turnThruOn();
-            break;
-          case MIDI_THRU_USBDEV:
-            HS::midi_thru_disable ^= mMaskUSBDev;
-            break;
-          case MIDI_THRU_USBHOST1:
-            HS::midi_thru_disable ^= mMaskUSBHost;
-            break;
-          case MIDI_THRU_USBHOST2:
-            HS::midi_thru_disable ^= mMaskUSBHost2;
-            break;
-
-          case MIDI_CLKRX_SERIAL:
-            HS::midi_clkrx_disable ^= mMaskSerial;
-            break;
-          case MIDI_CLKRX_USBDEV:
-            HS::midi_clkrx_disable ^= mMaskUSBDev;
-            break;
-          case MIDI_CLKRX_USBHOST1:
-            HS::midi_clkrx_disable ^= mMaskUSBHost;
-            break;
-          case MIDI_CLKRX_USBHOST2:
-            HS::midi_clkrx_disable ^= mMaskUSBHost2;
-            break;
-
-          case MIDI_CLKTX_SERIAL:
-            HS::midi_clktx_disable ^= mMaskSerial;
-            break;
-          case MIDI_CLKTX_USBDEV:
-            HS::midi_clktx_disable ^= mMaskUSBDev;
-            break;
-          case MIDI_CLKTX_USBHOST1:
-            HS::midi_clktx_disable ^= mMaskUSBHost;
-            break;
-          case MIDI_CLKTX_USBHOST2:
-            HS::midi_clktx_disable ^= mMaskUSBHost2;
-            break;
-
-          case MIDI_MSGRX_SERIAL:
-            HS::midi_msgrx_disable ^= mMaskSerial;
-            break;
-          case MIDI_MSGRX_USBDEV:
-            HS::midi_msgrx_disable ^= mMaskUSBDev;
-            break;
-          case MIDI_MSGRX_USBHOST1:
-            HS::midi_msgrx_disable ^= mMaskUSBHost;
-            break;
-          case MIDI_MSGRX_USBHOST2:
-            HS::midi_msgrx_disable ^= mMaskUSBHost2;
-            break;
-
-          case MIDI_MSGTX_SERIAL:
-            HS::midi_msgtx_disable ^= mMaskSerial;
-            break;
-          case MIDI_MSGTX_USBDEV:
-            HS::midi_msgtx_disable ^= mMaskUSBDev;
-            break;
-          case MIDI_MSGTX_USBHOST1:
-            HS::midi_msgtx_disable ^= mMaskUSBHost;
-            break;
-          case MIDI_MSGTX_USBHOST2:
-            HS::midi_msgtx_disable ^= mMaskUSBHost2;
             break;
 
           case SHOWHIDELIST:
@@ -1769,7 +1761,7 @@ void AppQuadrants::GetIOConfig(OC::IOConfig &ioconfig) const
   ioconfig.outputs[7].set("Out H", OUTPUT_MODE_PITCH);
 }
 
-void AppQuadrants::HandleAppEvent(OC::AppEvent event) {
+FLASHMEM void AppQuadrants::HandleAppEvent(OC::AppEvent event) {
     switch (event) {
     case OC::APP_EVENT_RESUME:
         Resume();
@@ -1790,7 +1782,7 @@ void AppQuadrants::Loop() {
 }
 
 FLASHMEM
-void AppQuadrants::DrawMenu() const {
+FLASHMEM void AppQuadrants::DrawMenu() const {
     View();
 }
 
@@ -1814,7 +1806,9 @@ void AppQuadrants::DrawScreensaver() const {
     }
 }
 void AppQuadrants::DrawDebugInfo() const {
-  // TODO:
+  if (HS::error_text) {
+    gfxPrint(0, 10, HS::error_text);
+  }
 }
 
 FLASHMEM
@@ -1861,6 +1855,11 @@ void AppQuadrants::HandleButtonEvent(const UI::Event &event) {
     }
 
     switch (event.type) {
+    case UI::EVENT_MISC:
+        if (event.control == UI::MISC_PRESET_LOAD) QueuePresetLoad(event.value);
+        if (event.control == UI::MISC_PRESET_SAVE) StoreToPreset(event.value);
+        break;
+
     case UI::EVENT_BUTTON_DOWN:
 
       // Quantizer popup editor intercepts everything on-press
@@ -1919,7 +1918,7 @@ void AppQuadrants::HandleButtonEvent(const UI::Event &event) {
             OC::ui.SetButtonIgnoreMask(); // ignore release and long-press
           } else {
             HEM_SIDE slot = ButtonToSlot(event);
-            if (OC::CORE::ticks - click_tick < HEMISPHERE_DOUBLE_CLICK_TIME
+            if (HS::get_tick() - click_tick < HEMISPHERE_DOUBLE_CLICK_TIME
                 && (slot == first_click))
             {
                 // This is a double-click on one button.
@@ -1942,7 +1941,7 @@ void AppQuadrants::HandleButtonEvent(const UI::Event &event) {
             }
 
             // mark this single click
-            click_tick = OC::CORE::ticks;
+            click_tick = HS::get_tick();
             first_click = slot;
           }
       }
@@ -1996,9 +1995,11 @@ void AppQuadrants::HandleEncoderEvent(const UI::Event &event) {
 
 FLASHMEM
 void AppQuadrants::StoreToPreset(int id) {
+  if (id < 0 || id >= QUAD_PRESET_COUNT) return;
   store_to_preset(id);
 }
 FLASHMEM
 void AppQuadrants::LoadFromPreset(int id) {
+  if (id < 0 || id >= QUAD_PRESET_COUNT) return;
   load_from_preset(id);
 }

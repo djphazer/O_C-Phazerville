@@ -326,7 +326,7 @@ public:
           //OC::draw_save_message(64);
           OC::CORE::app_isr_enabled = true;
 
-          PokePopup(HS::MESSAGE_POPUP, HS::PRESET_SAVED);
+          PokePopup(HS::MESSAGE_POPUP, "PRESET SAVED!");
         }
     }
 #endif
@@ -472,7 +472,7 @@ public:
         }
 
         if (PhzConfig::save_config(PRESET_FILENAME))
-          PokePopup(HS::MESSAGE_POPUP, HS::PRESET_SAVED);
+          PokePopup(HS::MESSAGE_POPUP, "PRESET SAVED!");
 #else
         StoreToPreset( (HemispherePreset*)(hem_presets + id), skip_eeprom );
 #endif
@@ -574,7 +574,7 @@ public:
             }
         }
 #endif
-        PokePopup(PRESET_POPUP);
+        PokePopup(PRESET_POPUP, OC::Strings::capital_letters[id]);
     }
 
     void LoadGlobals() {
@@ -720,9 +720,7 @@ public:
     }
 
     void Controller() {
-        // Clock Setup applet handles internal clock duties
-        ClockSetup_instance.Controller();
-        // ^ this will process the queue and load presets
+        // Clock duties are now called from BaseController, before frame Load
 
         // this might be triggered by the internal clock...
         if (jump_trig_.Clock() && !HS::clock_m.auto_reset) {
@@ -882,9 +880,10 @@ public:
           }
         }
 
-        // Overlay popup window last
-        if (OC::CORE::ticks - HS::popup_tick < HEMISPHERE_CURSOR_TICKS * 4) {
-          HS::DrawPopup(config_cursor, preset_id, CursorBlink());
+        // Overlay popup Load/Save menu last
+        if (HS::popup_type == HS::MENU_POPUP &&
+            HS::get_tick() - HS::popup_tick < HS::popup_duration) {
+          HS::DrawMenuPopup(config_cursor);
         }
     }
 
@@ -986,7 +985,7 @@ public:
                 return;
             }
 
-            if (OC::CORE::ticks - click_tick < HEMISPHERE_DOUBLE_CLICK_TIME) {
+            if (HS::get_tick() - click_tick < HEMISPHERE_DOUBLE_CLICK_TIME) {
                 // This is a double-click on one button. Activate corresponding help screen and deactivate select mode.
                 if (hemisphere == first_click)
                     SetFullScreen(hemisphere);
@@ -1001,13 +1000,18 @@ public:
             // If a help screen is already selected, and the button is for
             // the opposite one, go to the other help screen
             if (zoom_slot > -1) {
-                if (zoom_slot != hemisphere) SetFullScreen(hemisphere);
-                else SetFullScreen(-1); // Exit help screen if same button is clicked
-                OC::ui.SetButtonIgnoreMask(); // ignore release
+                if (zoom_slot != hemisphere) {
+                    SetFullScreen(hemisphere);
+                    OC::ui.SetButtonIgnoreMask(); // ignore release
+                }
+                else if (!HS::get_applet(my_applet[hemisphere], hemisphere)->EditMode()) {
+                    SetFullScreen(-1); // Exit help screen if same button is clicked
+                    OC::ui.SetButtonIgnoreMask(); // ignore release
+                }
             }
 
             // mark this single click
-            click_tick = OC::CORE::ticks;
+            click_tick = HS::get_tick();
             first_click = hemisphere;
             return;
         }
@@ -1030,12 +1034,7 @@ public:
 
     void DelegateEncoderMovement(const UI::Event &event) {
         HEM_SIDE h = (event.control == OC::CONTROL_ENCODER_L) ? LEFT_HEMISPHERE : RIGHT_HEMISPHERE;
-        int increment = event.value;
-        if (event.mask & (OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_R)) {
-          // push-and-turn for coarse adjustments
-          OC::ui.SetButtonIgnoreMask();
-          increment *= 10;
-        }
+        const int increment = event.value;
 
         if (HS::q_edit) {
           HS::QEditEncoderMove(h, increment);

@@ -25,12 +25,6 @@
 #pragma once
 #ifdef ENABLE_APP_CALIBR8OR
 
-#ifdef ARDUINO_TEENSY41
-#include "../applets/ClockSetupT4.h"
-#else
-#include "../applets/ClockSetup.h"
-#endif
-
 static constexpr int CAL8_MAX_TRANSPOSE = 60;
 static constexpr int CAL8OR_PRECISION = 10000;
 
@@ -420,9 +414,6 @@ public:
     void Controller() {
         ProcessMIDI();
 
-        // ClockSetup applet handles internal clock duties
-        ClockSetup_instance.Controller();
-
         // -- core processing --
         for (int ch = 0; ch < DAC_CHANNEL_COUNT; ++ch) {
             bool clocked = Clock(ch);
@@ -496,11 +487,6 @@ public:
             ClockSetup_instance.View();
         } else {
             ClockSetup_instance.DrawIndicator();
-        }
-
-        // Overlay popup window last
-        if (OC::CORE::ticks - HS::popup_tick < HEMISPHERE_CURSOR_TICKS) {
-          HS::DrawPopup();
         }
     }
 
@@ -576,7 +562,7 @@ public:
               click_tick = 0;
             } else {
               first_click = hemisphere;
-              click_tick = OC::CORE::ticks;
+              click_tick = HS::get_tick();
             }
             break;
           case OC::CONTROL_BUTTON_L:

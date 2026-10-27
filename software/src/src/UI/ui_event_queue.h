@@ -24,6 +24,7 @@
 #define UI_EVENTS_QUEUE_H_
 
 #include <Arduino.h>
+#include <arm_math.h>
 #include "ui_events.h"
 #include "../../util/util_ringbuffer.h"
 
@@ -48,14 +49,18 @@ public:
     events_.Flush();
   }
 
-  inline bool available() const {
+  inline size_t available() const {
+    __DMB();
     return events_.readable();
   }
 
   template <typename... Args>
   inline void PushEvent(Args&&... args) {
-    events_.EmplaceWrite(std::forward<Args>(args)...);
-    Poke();
+    if (writable()) {
+      events_.EmplaceWrite(std::forward<Args>(args)...);
+      Poke();
+    }
+    // else, silently drop new events when queue is full
   }
 
   inline Event PullEvent() {
@@ -72,13 +77,14 @@ public:
 
   // More for debugging purposes
   inline bool writable() const {
+    __DMB();
     return events_.writable();
   }
 
 private:
 
   util::RingBuffer<Event, size> events_;
-  uint32_t last_event_time_ = 0;
+  volatile uint32_t last_event_time_ = 0;
 };
 
 }; // namespace UI
