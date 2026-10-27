@@ -160,11 +160,11 @@ bool save_config(const char* filename, FS &fs)
       if (sz) { // success!
         dataFile.close();
       } else {
-        HS::PokePopup(HS::MESSAGE_POPUP, "Write ERROR !!");
+        HS::PokePopup(HS::ERROR_POPUP, "Write ERROR !!");
       }
     } else {
       SERIAL_PRINTLN("PhzConfig: Error opening %s\n", filename);
-      HS::PokePopup(HS::MESSAGE_POPUP, "File ERROR !!");
+      HS::PokePopup(HS::ERROR_POPUP, "File ERROR !!");
       success = false;
     }
 
@@ -172,7 +172,7 @@ bool save_config(const char* filename, FS &fs)
       fs.remove(filename);
       success = fs.rename(TEMPFILE, filename);
       if (!success)
-        HS::PokePopup(HS::MESSAGE_POPUP, "TempFile ERR !!");
+        HS::PokePopup(HS::ERROR_POPUP, "TempFile ERR !!");
     }
 
     return success;
@@ -241,7 +241,7 @@ bool load_chunk(uint8_t *buf, const char *sig, ConfigMap &store) {
       (uint32_t)expected_checksum, (uint32_t)(expected_checksum >> 32));
 
   if (computed_checksum != expected_checksum)
-    HS::PokePopup(HS::MESSAGE_POPUP, "Corrupt File!!");
+    HS::PokePopup(HS::ERROR_POPUP, "Corrupt File!!");
 
   return (computed_checksum == expected_checksum);
 }
@@ -283,6 +283,26 @@ bool load_config(const char* filename, FS &fs)
 
   dataFile.close();
   return true; // everything was fine!
+}
+
+FLASHMEM
+bool backup_config()
+{
+  File src = myfs.open(CONFIG_FILENAME, FILE_READ);
+  if (!src) return false;
+  myfs.remove(BACKUP_FILENAME);
+  File dst = myfs.open(BACKUP_FILENAME, FILE_WRITE_BEGIN);
+  if (!dst) { src.close(); return false; }
+  uint8_t buf[256];
+  int n;
+  bool ok = true;
+  while ((n = src.read(buf, sizeof(buf))) > 0) {
+    if (dst.write(buf, n) != (size_t)n) { ok = false; break; }
+  }
+  src.close();
+  dst.close();
+  if (!ok) myfs.remove(BACKUP_FILENAME);  // no partial backups
+  return ok;
 }
 
 FLASHMEM

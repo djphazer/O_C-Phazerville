@@ -28,17 +28,23 @@ namespace OC {
 
 #if defined(VOR)
   const char * const NAME = "Plum Audio 1uO_c 4ROBOTS";
-  const char * const SHORT_NAME = "1uO_c";
 #elif defined(ARDUINO_TEENSY41)
   const char * const NAME = "O.R.N.8";
-  const char * const SHORT_NAME = "oC8";
-  // TODO: array of vendor names, hardware variants
+  const char * const NAMES_VENDOR[7] = { 
+    "invalid HW_ID",
+    "O_C by mxmxmx",
+    "O_C T4.1 Rev3",
+    "O.R.N.8", // pioneered by ALA Ornate Criminal
+    "Calsynth XLOC2",
+    "NLM Xenomorpher",
+    "NLM Xenomorpher",
+  };
+#elif defined(NORTHERNLIGHT)
+  const char * const NAME = "NLM cOC/hOC/2OC";
 #elif defined(__IMXRT1062__)
   const char * const NAME = "O_C T4.0";
-  const char * const SHORT_NAME = "o_C";
 #else
   const char * const NAME = "Ornaments & Crimes";
-  const char * const SHORT_NAME = "o_C";
 #endif
 
   const char * const err_msg[] = { "(missing msg)",
@@ -46,15 +52,6 @@ namespace OC {
     "PRESET SAVED!",
     "MYSTERIOUS ERROR",
   };
-
-#ifdef NORTHERNLIGHT
-  // legacy T3.2 builds
-  const char * const NAME_NLM = "NLM cOC/hOC/2OC";
-  const char * const SHORT_NAME_NLM = "xOC";
-#else
-  const char * const NAME_NLM = "NLM Xenomorpher";
-  const char * const SHORT_NAME_NLM = "XoC";
-#endif
 
   const char * const seq_playmodes[] = {" -", "SEQ+1", "SEQ+2", "SEQ+3", "TR+1", "TR+2", "TR+3", "ARP", "S+H#1", "S+H#2", "S+H#3", "S+H#4", "CV#1", "CV#2", "CV#3", "CV#4"};
 
@@ -116,6 +113,18 @@ namespace OC {
     "M21","M22","M23","M24",
     "M25","M26","M27","M28",
     "M29","M30","M31","M32"
+#ifdef USB_GAMEPAD
+    ,
+    // Gamepad Maps in GamepadFrame::mapping[]
+    "G 1","G 2","G 3","G 4",
+    "G 5","G 6","G 7","G 8",
+    "G 9","G10","G11","G12",
+    "G13","G14","G15","G16",
+    "G17","G18","G19","G20",
+    "G21","G22","G23","G24",
+    "G25","G26","G27","G28",
+    "G29","G30","G31","G32"
+#endif
   };
 
   // deprecated - use capital_letters[] instead

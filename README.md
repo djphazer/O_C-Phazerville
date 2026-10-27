@@ -1,6 +1,6 @@
 [![PlatformIO CI](https://github.com/djphazer/O_C-Phazerville/actions/workflows/firmware.yml/badge.svg)](https://github.com/djphazer/O_C-Phazerville/actions/workflows/firmware.yml) [![GitHub Release](https://img.shields.io/github/v/release/djphazer/O_C-Phazerville)](https://github.com/djphazer/O_C-Phazerville/releases/latest)
 
-Phazerville Suite - an active o_C firmware fork
+Phazerville Suite - firmware for o_C and O.R.N.8
 ===
 [![SynthDad is pretty cool ;P](http://img.youtube.com/vi/kT94mBjvVQI/0.jpg)](http://www.youtube.com/watch?v=kT94mBjvVQI "Ornament and Crime Teensy 4.1 with Phazerville. What's New and Improved?")
 
@@ -15,7 +15,7 @@ Phazerville Suite - an active o_C firmware fork
 
 Watch some **video overviews** (above) or check the [**project website**](https://firmware.phazerville.com) for more info, including commercial product links.
 
-[Download a firmware **Release**](https://github.com/djphazer/O_C-Phazerville/releases) or [Request a **Custom Build**](https://github.com/djphazer/O_C-Phazerville/discussions/38) (for Teensy 3.2).
+[Download a firmware **Release**](https://github.com/djphazer/O_C-Phazerville/releases) or [Request a **Custom Build**](https://github.com/djphazer/O_C-Phazerville/discussions/256) (for Teensy 3.2).
 
 Grab Paul's [**Screen Capture**](https://github.com/PaulStoffregen/Phazerville-Screen-Capture) program to view the screen on a PC via USB.
 
@@ -40,15 +40,15 @@ There are two distinct _microcontrollers_ aka MCU's (and each has variants) and 
 * Teensy 4.0 - compatible with O_C
 * Teensy 4.1 - compatible with O_C or ORN8
 
-Thus, the 4.x series are pin-compatible drop-in replacements for the old existing O_C hardware. They bring increased CPU, RAM, and Flash capacity, while working with the existing limitations of the design (sharing a SPI bus). Although the 4.1 can technically work with O_C (using the T40 firmware), the form factor of the 4.0 is more fitting, especially on the 8HP model.
+Thus, the 4.x series are pin-compatible drop-in replacements for existing O_C hardware. They bring increased CPU, RAM, and Flash capacity, while working with the existing limitations of the design (sharing a SPI bus). Although the 4.1 can technically work with O_C (using the T40 firmware), the form factor of the 4.0 is more fitting, especially on the 8HP model. There is not much to gain from using T4.1 instead of T4.0 on O_C hardware.
 
-The T41 firmware builds primarily target the new O.R.N.8 hardware shield, with new features that take advantage of it (lots of Audio DSP stuff), but many CV and MIDI features will still show up in the T40 builds for old hardware. T32 support is deprecated, but will remain available for Custom Builds, receiving occasional Applet updates.
+The T41 firmware builds target the new O.R.N.8 hardware shield, with new features that take advantage of it (lots of Audio DSP stuff), but many CV and MIDI features will still show up in the T40 builds for old hardware. T32 support is deprecated, but will remain available for Custom Builds, receiving occasional Applet updates.
 
 ## Stolen Ornaments
 
 Using [**Benisphere**](https://github.com/benirose/O_C-BenisphereSuite) as a starting point, this project takes the **Hemisphere** ecosystem in new directions, with many new applets and enhancements to existing ones. An effort has been made to collect all the bleeding-edge features from other developers, with the goal of cramming as much functionality and flexibility into the nifty dual-applet design as possible!
 
-I've also included **all of the stock O&C firmware apps** plus a few others, _but they don't all fit in one .hex_. As a courtesy, I provide **pre-built .hex files** with a selection of Apps in my [**Releases**](https://github.com/djphazer/O_C-Phazerville/releases). You can also tell a robot to make a [**Custom Build**](https://github.com/djphazer/O_C-Phazerville/discussions/38) for you... (T3.2 only)
+I've also included **all of the stock O&C firmware apps** plus a few others, _but they don't all fit in one .hex_. As a courtesy, I provide **pre-built .hex files** with a selection of Apps in my [**Releases**](https://github.com/djphazer/O_C-Phazerville/releases). You can also tell a robot to make a [**Custom Build**](https://github.com/djphazer/O_C-Phazerville/discussions/256) for you... (T3.2 only)
 
 ...or clone the repo, customize the `platformio.ini` file, and build it yourself! ;-)
 I think the beauty of this module is the fact that it's relatively easy to modify and build the source code to reprogram it. You are free to customize the firmware to work in your system, similar to how you've no doubt already selected a custom set of physical modules.
@@ -76,24 +76,26 @@ This fork builds paired Teensy 3.2 firmware with `software/build_custom_pair.sh`
 
 Full Hemisphere:
 ```
-PEWPEWPEW, NOWAVE, NOGAMEOFLIFE, NOPONGLET, NOTUNER
+PEWPEWPEW, NOWAVE, NOPONGLET, NOTUNER, NOENVSEQ, NOFROGSEQ
 ```
 
 Lean Hemisphere:
 ```
-MIDI, AUTOMATONNETZ
+MIDI, AUTOMATONNETZ, NOENVSEQ, NOPIQUET, NOFROGSEQ
 ```
 
 All T32 builds use `NO_DISPLAY_DMA` for display reliability on open-source Teensy 3.2 modules, and divide app ISR processing by eight to keep the non-DMA display path from starving the main loop. The full normal T32 build keeps Scope. The full VOR build additionally strips Scope with `NO_APPLET_SCOPE`. The lean builds keep Wave-Edit.
 
 | Build | Target | RAM | Flash | Flash left |
 | --- | --- | ---: | ---: | ---: |
-| Full Hemisphere | T32 | 26,920 / 65,536 bytes | 260,100 / 262,144 bytes | 2,044 bytes |
-| Full Hemisphere | T32 VOR | 27,036 / 65,536 bytes | 261,256 / 262,144 bytes | 888 bytes |
-| Lean Hemisphere | T32 | 29,324 / 65,536 bytes | 258,480 / 262,144 bytes | 3,664 bytes |
-| Lean Hemisphere | T32 VOR | 29,444 / 65,536 bytes | 261,104 / 262,144 bytes | 1,040 bytes |
+| Full Hemisphere | T32 | 24,828 / 65,536 bytes | 254,740 / 262,144 bytes | 7,404 bytes |
+| Full Hemisphere | T32 VOR | 25,040 / 65,536 bytes | 255,964 / 262,144 bytes | 6,180 bytes |
+| Lean Hemisphere | T32 | 27,288 / 65,536 bytes | 259,468 / 262,144 bytes | 2,676 bytes |
+| Lean Hemisphere | T32 VOR | 27,372 / 65,536 bytes | 261,968 / 262,144 bytes | 176 bytes |
 
-For comparison, the table below uses a VOR build with lean Hemisphere plus Captain MIDI as the baseline. Lean Hemisphere is the default `CUSTOM_BUILD` applet set, with the `PEWPEWPEW` extras left out. The build also includes the always-present utility apps: Setup/About, ScaleEdit, Wave-Edit, and Back It Up.
+Sizes above are for upstream v2.0.2. Upstream now registers EnvSeq, FrogSeq, Piquet, SeQuant, and Panner on T32, and none of the four builds fit without trimming. `NOENVSEQ`, `NOFROGSEQ`, and `NOPIQUET` remove those applets; the full builds keep Piquet, and the lean builds drop all three.
+
+For comparison, the tables below were measured on v2.0.1 and have not been re-measured for v2.0.2. They use a VOR build with lean Hemisphere plus Captain MIDI as the baseline. Lean Hemisphere is the default `CUSTOM_BUILD` applet set, with the `PEWPEWPEW` extras left out. The build also includes the always-present utility apps: Setup/About, ScaleEdit, Wave-Edit, and Back It Up.
 
 | Resource | Used | Left |
 | --- | ---: | ---: |
@@ -126,7 +128,7 @@ App and applet deltas below were measured one option at a time against that VOR 
 | Quantermain | `QUANTERMAIN` | +2,104 bytes | +12,420 bytes | Too large by 6,396 bytes |
 | Sequins | `SEQUINS` | Not measured | +17,696 bytes | Too large by 11,612 bytes |
 
-`NOWAVE` removes the Wave-Edit full-screen app. `PEWPEWPEW` enables the extra applet pack and raises the custom Hemisphere preset count from four to eight. To make the full builds fit on T32, this fork drops Game of Life, Ponglet, and Tuner on both targets; VOR also drops Scope.
+`NOWAVE` removes the Wave-Edit full-screen app. `PEWPEWPEW` enables the extra applet pack and raises the custom Hemisphere preset count from four to eight. To make the full builds fit on T32, this fork drops Ponglet, Tuner, EnvSeq, and FrogSeq on both targets; VOR also drops Scope. Upstream no longer registers Game of Life, so it needs no flag.
 
 Passencore measures as zero because `AppPassencore` is currently commented out of the custom app container.
 

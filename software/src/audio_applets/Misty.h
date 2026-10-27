@@ -1,10 +1,10 @@
 #pragma once
 
-#include "../Audio/AudioEffectClouds.h"
+#include "../Audio/AudioEffectMist.h"
 
 extern "C" uint8_t external_psram_size;
 
-// MistierApplet — Clouds-inspired live granular audio processor.
+// Misty — Clouds-inspired live granular audio processor.
 //
 // Records audio into a 1-second PSRAM circular buffer and plays it back as a
 // cloud of overlapping grains. Differences from MistApplet:
@@ -14,7 +14,7 @@ extern "C" uint8_t external_psram_size;
 //   • No fixed grain shapes — shape driven by Texture
 //
 // I/O:
-//   Input → [AudioEffectClouds] → wet ──────────────────────────────┐
+//   Input → [AudioEffectMist] → wet ──────────────────────────────┐
 //   Input →                     → dry ─────────────────────────────┤ AudioMixer<2> → Output
 //
 // Freeze:
@@ -27,7 +27,7 @@ extern "C" uint8_t external_psram_size;
 //   Page 2: Pitch, Fdb, Tex, Mix, Frz
 //
 template <AudioChannels Channels>
-class MistierApplet : public HemisphereAudioApplet {
+class MistyApplet : public HemisphereAudioApplet {
 public:
     const char* applet_name() { return "Misty"; }
 
@@ -79,8 +79,8 @@ public:
             channels[ch].grain_stream.setTexture(eff_texture);
             channels[ch].grain_stream.setFeedback(eff_feedback);
             channels[ch].grain_stream.setFreeze(frozen);
-            channels[ch].mixer.gain(MistierChannel::DRY_CH, dry_gain);
-            channels[ch].mixer.gain(MistierChannel::WET_CH, wet_gain);
+            channels[ch].mixer.gain(Channel::DRY_CH, dry_gain);
+            channels[ch].mixer.gain(Channel::WET_CH, wet_gain);
         }
     }
 
@@ -92,7 +92,7 @@ public:
 
         // ── Grain activity bar (y=7) ──────────────────────────────────────────
         uint8_t active = channels[0].grain_stream.ActiveGrainCount();
-        for (uint8_t i = 0; i < AudioEffectClouds::MAX_GRAINS; i++) {
+        for (uint8_t i = 0; i < AudioEffectMist::MAX_GRAINS; i++) {
             if (i < active) gfxPixel(1 + i, 7);
         }
 
@@ -282,18 +282,18 @@ private:
     bool manual_freeze_ = false;  // latched by AuxButton
 
     // Per-channel DSP struct.
-    struct MistierChannel {
-        static const uint8_t DRY_CH = 0;
-        static const uint8_t WET_CH = 1;
+    struct Channel {
+        static constexpr uint8_t DRY_CH = 0;
+        static constexpr uint8_t WET_CH = 1;
 
-        AudioEffectClouds grain_stream;
+        AudioEffectMist grain_stream;
         AudioMixer<2>     mixer;
 
-        MistierChannel()
+        Channel()
             : grain_stream(
                 external_psram_size
-                    ? AudioEffectClouds::CLOUDS_BUFFER_SAMPLES
-                    : AudioEffectClouds::CLOUDS_BUFFER_SAMPLES / 2)
+                    ? AudioEffectMist::BUFFER_SAMPLES
+                    : AudioEffectMist::BUFFER_SAMPLES / 2)
         {}
 
         void Start(HemisphereAudioApplet* owner, int ch,

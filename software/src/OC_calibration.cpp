@@ -71,7 +71,7 @@ const CalibrationData kCalibrationDefaults = {
 #endif
       _ADC_OFFSET, _ADC_OFFSET, _ADC_OFFSET, _ADC_OFFSET
     },
-    0,  // pitch_cv_scale
+    OC::ADC::kDefaultPitchCVScale, // pitch_cv_scale
     0   // pitch_cv_offset : unused
   },
   // display_offset
@@ -116,7 +116,7 @@ const CalibrationData kNLMCalibrationDefaults = {
 #endif
       _ADC_OFFSET_NLM, _ADC_OFFSET_NLM, _ADC_OFFSET_NLM, _ADC_OFFSET_NLM
     },
-    0,  // pitch_cv_scale
+    OC::ADC::kDefaultPitchCVScale, // pitch_cv_scale
     0   // pitch_cv_offset : unused
   },
   // display_offset

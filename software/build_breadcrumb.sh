@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BUILD_REQUEST='oc-build/1 target=T32_VOR apps=+MIDI,+AUTOMATONNETZ'
+BUILD_REQUEST='oc-build/1 target=T32_VOR apps=+MIDI,+AUTOMATONNETZ,+NOENVSEQ,+NOPIQUET,+NOFROGSEQ'
 EXTRA_BUILD_FLAGS='-DNO_DISPLAY_DMA -DPHZ_BOOT_BREADCRUMBS -DPHZ_APP_ISR_DIVIDER=8'
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -25,8 +25,12 @@ for item in flags:
         custom_defines += " -DNO_APPLET_TUNER"
     if f.startswith('NOSCOPE') or f.startswith('NO_SCOPE') or f.startswith('NO_APPLET_SCOPE'):
         custom_defines += " -DNO_APPLET_SCOPE"
-    if f.startswith('NOGAMEOFLIFE') or f.startswith('NO_GAMEOFLIFE') or f.startswith('NO_PEW_GAMEOFLIFE'):
-        custom_defines += " -DNO_PEW_GAMEOFLIFE"
+    if f.startswith('NOENVSEQ') or f.startswith('NO_ENVSEQ') or f.startswith('NO_APPLET_ENVSEQ'):
+        custom_defines += " -DNO_APPLET_ENVSEQ"
+    if f.startswith('NOFROGSEQ') or f.startswith('NO_FROGSEQ') or f.startswith('NO_APPLET_FROGSEQ'):
+        custom_defines += " -DNO_APPLET_FROGSEQ"
+    if f.startswith('NOPIQUET') or f.startswith('NO_PIQUET') or f.startswith('NO_APPLET_PIQUET'):
+        custom_defines += " -DNO_APPLET_PIQUET"
     if f.startswith('NODISPLAYDMA') or f.startswith('NO_DISPLAY_DMA'):
         custom_defines += " -DNO_DISPLAY_DMA"
     if f.startswith('VOR'):

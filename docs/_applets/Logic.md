@@ -3,7 +3,7 @@ layout: default
 ---
 # Logic
 
-![Screenshot 2024-06-13 15-06-36](https://github.com/djphazer/O_C-Phazerville/assets/109086194/40763bf9-02a5-4ea3-a42f-3ba4b55713f2)
+![Logic Screenshot](images/Logic.png)
 
 https://youtu.be/mHZCaMH_Dgk
 
@@ -27,14 +27,29 @@ CV Inputs 1 and 2 set the logical gate when the gate selected for the correspond
 The results of the logical operations are output as a high (5 volt, when True) or low (0 volt, when False) signal.
 
 Available gate types are:
-* **AND**: True when both inputs are True
-* **OR**: True when either or both inputs are True
-* **XOR**: True when both inputs are different than the other input
-* **NAND**: True when either input is False
-* **NOR**: True when both inputs are False
-* **XNOR**: True when both inputs are the same
+| Gate Name | Truth Table Pattern | Operation            | Description                                                 |
+| -         | :-:                 | -                    | -                                                           |
+| **FALS**  | 0000                | 0                    | Never True.                                                 |
+| **AND**   | 0001                | A & B                | True when both inputs are True.                             |
+| **INHA**  | 0010                | A & ~B               | "B inhibits A", True when A is True, except when B is True. |
+| **BUFA**  | 0011                | A                    | "Buffer A", True when A is True.                            |
+| **INHB**  | 0100                | ~A & B               | "A inhibits B", True when B is True, except when A is True. |
+| **BUFB**  | 0101                | B                    | "Buffer B", True when B is True.                            |
+| **XOR**   | 0110                | (A & ~B) \| (~A & B) | True when both inputs are different than the other input.   |
+| **OR**    | 0111                | A \| B               | True when either or both inputs are True.                   |
+| **NOR**   | 1000                | ~(A \| B)            | True when both inputs are False.                            |
+| **XNOR**  | 1001                | (A & B) \| (~A & ~B) | True when both inputs are the same.                         |
+| **NOTB**  | 1010                | ~B                   | True when B is False.                                       |
+| **IMPA**  | 1011                | A \| ~B              | "B implies A", True unless B is True and A is False.        |
+| **NOTA**  | 1100                | ~A                   | True when A is False.                                       |
+| **IMPB**  | 1101                | ~A \| B              | "A implies B", True unless A is True and B is False.        |
+| **NAND**  | 1110                | ~(A & B)             | True when either input is False.                            |
+| **TRUE**  | 1111                | 1                    | Always True.                                                |
+
 
 Another option, "-CV-" is available. When set to "-CV-" the logical gate type will be set via CV using the corresponding CV input.
 
 ### Credits
 Adapted from [Logic](https://github.com/Chysn/O_C-HemisphereSuite/wiki/Logic) by Chysn.
+
+Expanded by beau-seidon to include full selection of 2-input gates, using [this](https://mathcenter.oxford.emory.edu/site/cs170/gates/) reference.
