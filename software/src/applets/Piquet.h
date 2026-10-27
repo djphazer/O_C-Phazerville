@@ -38,13 +38,13 @@ public:
       ENV_ADSR,
       ENV_LOOP_AD,
       ENV_LOOP_AHR,
-      ENV_TYPE_LAST
+      ENV_TYPE_COUNT
     };
 
     enum LoopMode : uint8_t {
       LOOP_CONT,
       LOOP_GATE,
-      LOOP_MODE_LAST
+      LOOP_MODE_COUNT
     };
 
     // Stage indices are also used to index stage_value[].
@@ -59,7 +59,7 @@ public:
       DELAY_OFF,
       DELAY_REPLACE,
       DELAY_QUEUE,
-      DELAY_MODE_LAST
+      DELAY_MODE_COUNT
     };
 
     enum CVMap : uint8_t {
@@ -70,7 +70,7 @@ public:
       CVMAP_RELEASE,
       CVMAP_ADR,
       CVMAP_LEVEL,
-      CVMAP_LAST
+      CVMAP_COUNT
     };
 
     enum ShapeType : uint8_t {
@@ -85,7 +85,7 @@ public:
       SHAPE_MEDIUM_DIPPER,
       SHAPE_LITTLE_DIPPER,
       SHAPE_SINEFOLD,
-      SHAPE_LAST
+      SHAPE_COUNT
     };
 
     enum Cursor : uint8_t {
@@ -103,10 +103,11 @@ public:
       CURSOR_RELEASE_SHAPE,
       CURSOR_DELAY_MODE,
       CURSOR_DELAY,
+      CURSOR_EOC,
       CURSOR_CV_MAP,
       CURSOR_LEVEL,
       CURSOR_INVERT,
-      CURSOR_LAST
+      CURSOR_COUNT
     };
 
     struct TriggerQueue {
@@ -160,6 +161,8 @@ public:
       uint8_t loop_mode;
       bool loop_enabled;
       bool inverted;
+      bool eoc_enabled;
+      bool eoc_trigger_pending;
       uint8_t length_index;
       peaks::MultistageEnvelope peaks_envelope;
       bool peaks_trigger_pending;
@@ -194,6 +197,8 @@ public:
         loop_mode = LOOP_CONT;
         loop_enabled = false;
         inverted = false;
+        eoc_enabled = false;
+        eoc_trigger_pending = false;
         length_index = 0;
         peaks_envelope.Init();
         peaks_trigger_pending = false;
@@ -225,24 +230,26 @@ public:
         Pack(data, PackLocation {57,1}, loop_mode);
         Pack(data, PackLocation {58,1}, loop_enabled ? 1 : 0);
         Pack(data, PackLocation {59,2}, length_index);
-        // 3 empty bits
+        Pack(data, PackLocation {61,1}, eoc_enabled ? 1 : 0);
+        // 2 empty bits
         return data;
       }
       void unpack(uint64_t data) {
-        type = constrain(Unpack(data, PackLocation {0,3}), 0, ENV_TYPE_LAST - 1);
+        type = constrain(Unpack(data, PackLocation {0,3}), 0, ENV_TYPE_COUNT - 1);
         stage_value[STAGE_ATTACK] = constrain(Unpack(data, PackLocation {3,8}), 1, STAGE_MAX_VALUE);
         stage_value[STAGE_DECAY] = constrain(Unpack(data, PackLocation {11,8}), 1, STAGE_MAX_VALUE);
         stage_value[STAGE_SUSTAIN] = constrain(Unpack(data, PackLocation {19,8}), 0, STAGE_MAX_VALUE);
         stage_value[STAGE_RELEASE] = constrain(Unpack(data, PackLocation {27,8}), 1, STAGE_MAX_VALUE);
         delay_index = constrain(Unpack(data, PackLocation {35,7}), 0, 126);
-        delay_mode = constrain(Unpack(data, PackLocation {43,2}), 0, DELAY_MODE_LAST - 1);
-        cv_map = constrain(Unpack(data, PackLocation {45,3}), 0, CVMAP_LAST - 1);
+        delay_mode = constrain(Unpack(data, PackLocation {43,2}), 0, DELAY_MODE_COUNT - 1);
+        cv_map = constrain(Unpack(data, PackLocation {45,3}), 0, CVMAP_COUNT - 1);
         level = constrain(Unpack(data, PackLocation {48,8}), 0, 255);
         inverted = Unpack(data, PackLocation {56,1});
         loop_mode = Unpack(data, PackLocation {57,1});
         loop_enabled = false;
         length_index = constrain(Unpack(data, PackLocation {59,2}), 0, 3);
-        // 3 empty bits
+        eoc_enabled = Unpack(data, PackLocation {61,1});
+        // 2 empty bits
       }
 
       bool is_looping() const {
@@ -468,7 +475,7 @@ private:
           next += direction;
 
           // Stop at either end; never wrap around.
-          if (next < CURSOR_ATTACK_SHAPE || next >= CURSOR_LAST) {
+          if (next < CURSOR_ATTACK_SHAPE || next >= CURSOR_COUNT) {
             return current;
           }
 
@@ -733,33 +740,49 @@ void FLASHMEM Piquet::Controller() {
 
         const bool gate = Gate(ch);
         const bool clock_trigger = Clock(ch);
+        const bool eoc_trigger = c.eoc_trigger_pending;
+        c.eoc_trigger_pending = false;
+        const bool trigger = clock_trigger || eoc_trigger;
         const bool gate_fall = !gate && c.gate_prev;
         c.gate_prev = gate;
 
-        if (c.is_looping()) {
-          if (c.loop_mode == LOOP_CONT) {
-            if (clock_trigger) c.loop_enabled = !c.loop_enabled;
-          } else {
-            c.loop_enabled = gate;
-          }
+        if (c.is_looping() && c.loop_mode != LOOP_CONT) {
+          c.loop_enabled = gate;
         }
 
-        if (clock_trigger) {
+        if (trigger) {
           const int32_t delay_ms = c.delay_index < 100
               ? static_cast<int32_t>(c.delay_index) * 10
               : 1000 + static_cast<int32_t>(c.delay_index - 100) * 100;
           const int32_t dticks = (delay_ms * 1000L) / 60;
           if (c.delay_mode == DELAY_OFF || dticks <= 0) {
             c.trigger_queue.Reset();
-            begin_attack(c);
+            if (c.is_looping() && c.loop_mode == LOOP_CONT) {
+              c.loop_enabled = !c.loop_enabled;
+              if (c.loop_enabled) begin_attack(c);
+            } else {
+              begin_attack(c);
+            }
           } else {
             c.trigger_queue.Add(dticks, c.delay_mode == DELAY_QUEUE);
           }
         }
 
-        if (c.trigger_queue.TickReady()) begin_attack(c);
+        if (c.trigger_queue.TickReady()) {
+          if (c.is_looping() && c.loop_mode == LOOP_CONT) {
+            c.loop_enabled = !c.loop_enabled;
+            if (c.loop_enabled) begin_attack(c);
+          } else {
+            begin_attack(c);
+          }
+        }
 
         process_envelope(c, gate, gate_fall, ch);
+        const bool eoc_event =
+            !c.peaks_waiting_for_trigger &&
+            (c.peaks_envelope.get_state_mask() & peaks::ENV_EOC) != 0;
+        if (eoc_event && c.eoc_enabled)
+          channels[1 - ch].eoc_trigger_pending = true;
 
         int out = simfloat2int(c.output);
         int level = c.level;
@@ -805,23 +828,23 @@ void FLASHMEM Piquet::DrawFullScreen() {
     const int meter_x = channel_x + (ch == 0 ? 0 : 64 - w);
 
     // Output meter and channel label.
-    gfxRect(meter_x, 15, w, 2);
-    gfxPrint(channel_x, 22, OutputLabel(ch));
+    gfxRect(meter_x, 14, w, 2);
+    gfxPrint(channel_x, 20, OutputLabel(ch));
 
     if (ch == selected_channel &&
         cursor == CURSOR_CHANNEL && EditMode()) {
-      gfxFrame(channel_x, 20, 8, 11);
+      gfxFrame(channel_x, 19, 8, 11);
     } else {
-      gfxInvert(channel_x, 21, 7, 9);
+      gfxInvert(channel_x, 19, 7, 9);
     }
   }
 
   const int channel_x = selected_channel * 64 + x_offset;
 
   if (cursor == CURSOR_CHANNEL) {
-    gfxIcon(channel_x + 8, 22, LEFT_ICON);
+    gfxIcon(channel_x + 8, 20, LEFT_ICON);
   } else if (cursor == CURSOR_LENGTH) {
-    gfxIcon(channel_x + 30, 22, RIGHT_ICON);
+    gfxIcon(channel_x + 30, 20, RIGHT_ICON);
   }
 
   if (cursor == CURSOR_TYPE || cursor == CURSOR_LOOP_MODE) {
@@ -851,23 +874,23 @@ void FLASHMEM Piquet::OnEncoderMove(int direction) {
           c.length_index = constrain(c.length_index + direction, 0, 3);
           break;
         case CURSOR_TYPE:
-          c.type = constrain(c.type + direction, 0, ENV_TYPE_LAST - 1);
+          c.type = constrain(c.type + direction, 0, ENV_TYPE_COUNT - 1);
           break;
         case CURSOR_LOOP_MODE:
           c.loop_mode = constrain(
-            c.loop_mode + direction, 0, LOOP_MODE_LAST - 1);
+            c.loop_mode + direction, 0, LOOP_MODE_COUNT - 1);
           break;
         case CURSOR_ATTACK:
           c.stage_value[STAGE_ATTACK] = constrain(c.stage_value[STAGE_ATTACK] + direction, 1, STAGE_MAX_VALUE);
           break;
         case CURSOR_ATTACK_SHAPE:
-          c.attack_shape = constrain(c.attack_shape + direction, 0, SHAPE_LAST - 1);
+          c.attack_shape = constrain(c.attack_shape + direction, 0, SHAPE_COUNT - 1);
           break;
         case CURSOR_DECAY:
           c.stage_value[STAGE_DECAY] = constrain(c.stage_value[STAGE_DECAY] + direction, 1, STAGE_MAX_VALUE);
           break;
         case CURSOR_DECAY_SHAPE:
-          c.decay_shape = constrain(c.decay_shape + direction, 0, SHAPE_LAST - 1);
+          c.decay_shape = constrain(c.decay_shape + direction, 0, SHAPE_COUNT - 1);
           break;
         case CURSOR_SUSTAIN:
           c.stage_value[STAGE_SUSTAIN] = constrain(c.stage_value[STAGE_SUSTAIN] + direction, 0, STAGE_MAX_VALUE);
@@ -876,16 +899,19 @@ void FLASHMEM Piquet::OnEncoderMove(int direction) {
           c.stage_value[STAGE_RELEASE] = constrain(c.stage_value[STAGE_RELEASE] + direction, 1, STAGE_MAX_VALUE);
           break;
         case CURSOR_RELEASE_SHAPE:
-          c.release_shape = constrain(c.release_shape + direction, 0, SHAPE_LAST - 1);
+          c.release_shape = constrain(c.release_shape + direction, 0, SHAPE_COUNT - 1);
           break;
         case CURSOR_DELAY:
           c.delay_index = constrain(c.delay_index + direction, 0, 126);
           break;
         case CURSOR_DELAY_MODE:
-          c.delay_mode = constrain(c.delay_mode + direction, 0, DELAY_MODE_LAST - 1);
+          c.delay_mode = constrain(c.delay_mode + direction, 0, DELAY_MODE_COUNT - 1);
+          break;
+        case CURSOR_EOC:
+          if (direction) c.eoc_enabled = !c.eoc_enabled;
           break;
         case CURSOR_CV_MAP:
-          c.cv_map = constrain(c.cv_map + direction, 0, CVMAP_LAST - 1);
+          c.cv_map = constrain(c.cv_map + direction, 0, CVMAP_COUNT - 1);
           break;
         case CURSOR_LEVEL:
           c.level = constrain(c.level + direction, 0, 255);
@@ -901,20 +927,20 @@ void FLASHMEM Piquet::OnEncoderMove(int direction) {
 void FLASHMEM Piquet::DrawIndicators() {
       ForEachChannel(ch) {
         int w = Proportion(ViewOut(ch), HEMISPHERE_MAX_CV, 62);
-        gfxRect(0, 15 + (ch * 3), w, 2);
+        gfxRect(0, 13 + (ch * 3), w, 2);
       }
 
-      gfxPrint(0, 22, OutputLabel(selected_channel));
+      gfxPrint(0, 20, OutputLabel(selected_channel));
 
       if (cursor == CURSOR_CHANNEL && EditMode()) {
-        gfxFrame(0, 20, 8, 11);
+        gfxFrame(0, 19, 8, 11);
       } else {
-        gfxInvert(0, 21, 7, 9);
+        gfxInvert(0, 19, 7, 9);
 
         if (cursor == CURSOR_CHANNEL) {
-          gfxIcon(8, 22, LEFT_ICON);
+          gfxIcon(8, 20, LEFT_ICON);
         } else if (cursor == CURSOR_LENGTH) {
-          gfxIcon(30, 22, RIGHT_ICON);
+          gfxIcon(30, 20, RIGHT_ICON);
         }
       }
 }
@@ -929,20 +955,20 @@ void FLASHMEM Piquet::DrawParamRow(int x_offset) {
         if (cursor == CURSOR_TYPE) {
           const char* value = type_name(c.type);
           const int value_x = 9 + x_offset;
-          gfxPrint(value_x, 22, value);
-          if (EditMode()) gfxInvert(value_x, 21, strlen(value) * 6, 9);
+          gfxPrint(value_x, 20, value);
+          if (EditMode()) gfxInvert(value_x, 19, strlen(value) * 6, 9);
         } else if (cursor == CURSOR_LOOP_MODE) {
           const char* value = c.loop_mode == LOOP_GATE ? "GTD" : "CON";
-          gfxIcon(9 + x_offset, 22, LOOP_ICON);
-          gfxPrint(19 + x_offset, 22, value);
-          if (EditMode()) gfxInvert(19 + x_offset, 21, strlen(value) * 6, 9);
+          gfxIcon(9 + x_offset, 20, LOOP_ICON);
+          gfxPrint(19 + x_offset, 20, value);
+          if (EditMode()) gfxInvert(19 + x_offset, 19, strlen(value) * 6, 9);
         }
 
         static const char* length_names[] = {"x1", "x2", "x4", "x8"};
-        gfxIcon(41 + x_offset, 22, ENV_ICON);
-        gfxPrint(50 + x_offset, 22, length_names[constrain(c.length_index, 0, 3)]);
+        gfxIcon(41 + x_offset, 20, ENV_ICON);
+        gfxPrint(50 + x_offset, 20, length_names[constrain(c.length_index, 0, 3)]);
         if (cursor == CURSOR_LENGTH && EditMode())
-          gfxCursor(50 + x_offset, 31, 12, 9, cursor_label());
+          gfxCursor(50 + x_offset, 29, 12, 9, cursor_label());
         return;
       }
 
@@ -972,6 +998,10 @@ void FLASHMEM Piquet::DrawParamRow(int x_offset) {
             label = "DlyM:";
             value = dmode_name(c.delay_mode);
             break;
+          case CURSOR_EOC:
+            label = "EOC";
+            value = c.eoc_enabled ? "Yes" : "No";
+            break;
           case CURSOR_CV_MAP:
             label = "Cv:";
             value = cvmap_name(c.cv_map);
@@ -987,26 +1017,33 @@ void FLASHMEM Piquet::DrawParamRow(int x_offset) {
             break;
         }
 
-        gfxPrint(9 + x_offset, 22, label);
-        value_x = x_offset + 9 + static_cast<int>(strlen(label)) * 6;
+        if (cursor == CURSOR_EOC) {
+          gfxPrint(9 + x_offset, 20, label);
+          gfxIcon(28 + x_offset, 20, RIGHT_ICON);
+          gfxPrint(35 + x_offset, 20, ":");
+          value_x = 43 + x_offset;
+        } else {
+          gfxPrint(9 + x_offset, 20, label);
+          value_x = x_offset + 9 + static_cast<int>(strlen(label)) * 6;
+        }
 
         if (cursor == CURSOR_DELAY) {
           if (c.delay_index < 100) {
-            gfxPrint(value_x, 22, ".");
+            gfxPrint(value_x, 20, ".");
             if (c.delay_index < 10) gfxPrint("0");
             gfxPrint(c.delay_index);
           } else {
             const uint8_t tenths = c.delay_index - 90;
-            gfxPrint(value_x, 22, tenths / 10);
+            gfxPrint(value_x, 20, tenths / 10);
             gfxPrint(".");
             gfxPrint(tenths % 10);
           }
           gfxPrint("s");
         } else if (cursor == CURSOR_LEVEL) {
-          gfxPrint(value_x, 22, Proportion(c.level, 255, 100));
+          gfxPrint(value_x, 20, Proportion(c.level, 255, 100));
           gfxPrint("%");
         } else if (value) {
-          gfxPrint(value_x, 22, value);
+          gfxPrint(value_x, 20, value);
         }
 
         if (cursor == CURSOR_ATTACK_SHAPE ||
@@ -1020,37 +1057,37 @@ void FLASHMEM Piquet::DrawParamRow(int x_offset) {
         }
 
         if (EditMode()) {
-          gfxCursor(value_x, 31, value_width, 9, cursor_display_label());
+          gfxCursor(value_x, 29, value_width, 9, cursor_display_label());
         }
         return;
       }
 
       switch (cursor) {
         case CURSOR_ATTACK:
-          gfxPrint(9 + x_offset, 22, "A:");
-          gfxPrint(21 + x_offset, 22,
+          gfxPrint(9 + x_offset, 20, "A:");
+          gfxPrint(21 + x_offset, 20,
                    (StageTicks(c.stage_value[STAGE_ATTACK]) *
                     (1 << c.length_index)) / 17);
           gfxPrint("ms");
           break;
         case CURSOR_DECAY:
-          gfxPrint(9 + x_offset, 22,
+          gfxPrint(9 + x_offset, 21,
                    (c.type == ENV_AHR || c.type == ENV_LOOP_AHR) ? "H:" : "D:");
-          gfxPrint(21 + x_offset, 22,
+          gfxPrint(21 + x_offset, 20,
                    (StageTicks(c.stage_value[STAGE_DECAY]) *
                     (1 << c.length_index)) / 17);
           gfxPrint("ms");
           break;
         case CURSOR_SUSTAIN:
-          gfxPrint(9 + x_offset, 22, "S:");
-          gfxPrint(21 + x_offset, 22,
+          gfxPrint(9 + x_offset, 20, "S:");
+          gfxPrint(21 + x_offset, 20,
                    Proportion(c.stage_value[STAGE_SUSTAIN],
                               STAGE_MAX_VALUE, 100));
           gfxPrint("%");
           break;
         case CURSOR_RELEASE:
-          gfxPrint(9 + x_offset, 22, "R:");
-          gfxPrint(21 + x_offset, 22,
+          gfxPrint(9 + x_offset, 20, "R:");
+          gfxPrint(21 + x_offset, 20,
                    (StageTicks(c.stage_value[STAGE_RELEASE]) *
                     (2 << c.length_index)) / 17);
           gfxPrint("ms");
@@ -1060,7 +1097,7 @@ void FLASHMEM Piquet::DrawParamRow(int x_offset) {
       }
 
       if (cursor >= CURSOR_ATTACK && cursor != CURSOR_LOOP_MODE && EditMode()) {
-        gfxCursor(21 + x_offset, 31, cursor_value_width(c), 9, cursor_label());
+        gfxCursor(21 + x_offset, 29, cursor_value_width(c), 9, cursor_label());
       }
 }
 
@@ -1092,17 +1129,32 @@ void FLASHMEM Piquet::DrawEnvelope(int channel, int x_offset, bool absolute_coor
       };
 
       const auto preview_x = [&](uint16_t point) {
-        return x_offset + (width > 1
-            ? Proportion(point, width - 1, 62) : 0);
+        return x_offset + 1 + (width > 1
+            ? Proportion(point, width - 1, 61) : 0);
       };
 
-      // Fill the envelope up to the current playback position.
+      // Fill the envelope with interpolated vertical columns.
       for (uint16_t i = 0; i < width && i <= current_phase; ++i) {
         const int x = preview_x(i);
-        const int level = constrain(
-            static_cast<int>(values[i] >> 10), 0, DISPLAY_HEIGHT);
-        const int baseline = BottomAlign(c.inverted ? DISPLAY_HEIGHT : 0);
-        draw_line(x, baseline, x, BottomAlign(level), true);
+        const int next_x = i + 1 < width ? preview_x(i + 1) : x;
+        const int level = constrain(static_cast<int>(values[i] >> 10), 0, DISPLAY_HEIGHT);
+        const int next_level = i + 1 < width
+            ? constrain(static_cast<int>(values[i + 1] >> 10), 0, DISPLAY_HEIGHT)
+            : level;
+        const int baseline = BottomAlign(0) + 1;
+        for (int fill_x = x; fill_x <= next_x; ++fill_x) {
+          const int interpolated_level = next_x > x
+              ? level + (next_level - level) * (fill_x - x) / (next_x - x)
+              : level;
+          const int endpoint = BottomAlign(interpolated_level) + 1;
+          const int top = baseline < endpoint ? baseline : endpoint;
+          const int height = abs(endpoint - baseline) + 1;
+          if (absolute_coordinates) {
+            graphics.drawVLine(fill_x, top, height);
+          } else {
+            for (int y = top; y < top + height; ++y) gfxPixel(fill_x, y);
+          }
+        }
       }
 
       int previous_x = -1;
@@ -1112,7 +1164,7 @@ void FLASHMEM Piquet::DrawEnvelope(int channel, int x_offset, bool absolute_coor
         const int x = preview_x(i);
         const int level = constrain(
             static_cast<int>(values[i] >> 10), 0, DISPLAY_HEIGHT);
-        const int y = BottomAlign(level);
+        const int y = BottomAlign(level) + 1;
 
         if (previous_x >= 0) {
           draw_line(previous_x, previous_y, x, y, true);
@@ -1123,6 +1175,9 @@ void FLASHMEM Piquet::DrawEnvelope(int channel, int x_offset, bool absolute_coor
         previous_x = x;
         previous_y = y;
       }
+
+      // EOC marker: top-right corner of the envelope graphic.
+      draw_pixel(preview_x(width - 1), BottomAlign(DISPLAY_HEIGHT));
 
       // Mark stage boundaries along the bottom of the preview.
       for (uint8_t i = 0;
@@ -1147,8 +1202,7 @@ void FLASHMEM Piquet::DrawEnvelope(int channel, int x_offset, bool absolute_coor
 
       int start_index = stage;
       if ((c.type == ENV_AR && stage == 1) ||
-          ((c.type == ENV_AHR || c.type == ENV_LOOP_AHR) && stage == 2) ||
-          (c.type == ENV_ADSR && stage == 3)) {
+          ((c.type == ENV_AHR || c.type == ENV_LOOP_AHR) && stage == 2)) {
         ++start_index;
       }
 
@@ -1161,10 +1215,10 @@ void FLASHMEM Piquet::DrawEnvelope(int channel, int x_offset, bool absolute_coor
       const int x2 = preview_x(end_point);
 
       if (CursorBlink()) {
-        draw_line(x1, BottomAlign(DISPLAY_HEIGHT + 2),
-            x1, BottomAlign(0), false);
-        draw_line(x2, BottomAlign(DISPLAY_HEIGHT + 2),
-            x2, BottomAlign(0), false);
+        const int y = BottomAlign(DISPLAY_HEIGHT + 2);
+        draw_line(x1, y, x2, y, false);
+        draw_line(x1, y, x1, y + 1, false);
+        draw_line(x2, y, x2, y + 1, false);
       }
 }
 const char* FLASHMEM Piquet::cursor_display_label() const {
@@ -1174,6 +1228,7 @@ const char* FLASHMEM Piquet::cursor_display_label() const {
         case CURSOR_RELEASE_SHAPE: return "RelShape";
         case CURSOR_DELAY: return "TrgDelay";
         case CURSOR_DELAY_MODE: return "DlyMode";
+        case CURSOR_EOC: return "Send EOC";
         case CURSOR_CV_MAP: return "CV Map";
         case CURSOR_LEVEL: return "Level";
         case CURSOR_INVERT: return "Invert";
@@ -1218,6 +1273,8 @@ int FLASHMEM Piquet::cursor_value_width(const Channel &c) const {
           return c.delay_index < 100 ? 30 : 24;
         case CURSOR_DELAY_MODE:
           return min(static_cast<int>(strlen(dmode_name(c.delay_mode))) * 6, 52);
+        case CURSOR_EOC:
+          return 18;
         case CURSOR_CV_MAP:
           return min(static_cast<int>(strlen(cvmap_name(c.cv_map))) * 6, 52);
         case CURSOR_LEVEL:
@@ -1230,37 +1287,37 @@ int FLASHMEM Piquet::cursor_value_width(const Channel &c) const {
 }
 
 const char* FLASHMEM Piquet::cursor_label() const {
-      static const char* labels[CURSOR_LAST] = {
+      static const char* labels[CURSOR_COUNT] = {
         "Channel", "Length", "Envelope", "EnvType", "LoopMode",
         "Attack", "Decay", "Sustain", "Release",
         "AttShape", "DcyShape", "RelShape",
-        "Delay Mode", "Delay", "CV Map", "Level", "Invert"
+        "Delay Mode", "Delay", "Send EOC", "CV Map", "Level", "Invert"
       };
       if (channels[selected_channel].type == ENV_AHR ||
           channels[selected_channel].type == ENV_LOOP_AHR) {
         if (cursor == CURSOR_DECAY) return "Hold";
       }
-      return labels[constrain(cursor, 0, CURSOR_LAST - 1)];
+      return labels[constrain(cursor, 0, CURSOR_COUNT - 1)];
 }
 
 const char* FLASHMEM Piquet::type_name(uint8_t t) {
-      static const char* names[ENV_TYPE_LAST] = { "AD", "AHR", "AR", "ADSR", "L-AD", "L-AHR" };
-      return names[constrain(t, 0, ENV_TYPE_LAST - 1)];
+      static const char* names[ENV_TYPE_COUNT] = { "AD", "AHR", "AR", "ADSR", "L-AD", "L-AHR" };
+      return names[constrain(t, 0, ENV_TYPE_COUNT - 1)];
 }
 
 const char* FLASHMEM Piquet::dmode_name(uint8_t m) {
-      static const char* names[DELAY_MODE_LAST] = { "Off", "Rpl", "Que" };
-      return names[constrain(m, 0, DELAY_MODE_LAST - 1)];
+      static const char* names[DELAY_MODE_COUNT] = { "Off", "Rpl", "Que" };
+      return names[constrain(m, 0, DELAY_MODE_COUNT - 1)];
 }
 
 const char* FLASHMEM Piquet::cvmap_name(uint8_t m) {
-      static const char* names[CVMAP_LAST] = { "None", "Att", "Dec", "Sus", "Rel", "ADR", "Lvl" };
-      return names[constrain(m, 0, CVMAP_LAST - 1)];
+      static const char* names[CVMAP_COUNT] = { "None", "Att", "Dec", "Sus", "Rel", "ADR", "Lvl" };
+      return names[constrain(m, 0, CVMAP_COUNT - 1)];
 }
 
 const char* FLASHMEM Piquet::shape_name(uint8_t s) {
-      static const char* names[SHAPE_LAST] = { "Lin", "Exp", "Qua", "Sin", "Pla", "Cli", "Gat", "BD", "MD", "LD", "SF" };
-      return names[constrain(s, 0, SHAPE_LAST - 1)];
+      static const char* names[SHAPE_COUNT] = { "Lin", "Exp", "Qua", "Sin", "Pla", "Cli", "Gat", "BD", "MD", "LD", "SF" };
+      return names[constrain(s, 0, SHAPE_COUNT - 1)];
 }
 
 uint64_t FLASHMEM Piquet::OnDataRequest() {
@@ -1293,9 +1350,9 @@ void FLASHMEM Piquet::OnDataReceive(uint64_t data) {
       channels[1].attack_shape, channels[1].decay_shape, channels[1].release_shape
     );
     ForEachChannel(ch) {
-      CONSTRAIN(channels[ch].attack_shape, 0, SHAPE_LAST - 1);
-      CONSTRAIN(channels[ch].decay_shape, 0, SHAPE_LAST - 1);
-      CONSTRAIN(channels[ch].release_shape, 0, SHAPE_LAST - 1);
+      CONSTRAIN(channels[ch].attack_shape, 0, SHAPE_COUNT - 1);
+      CONSTRAIN(channels[ch].decay_shape, 0, SHAPE_COUNT - 1);
+      CONSTRAIN(channels[ch].release_shape, 0, SHAPE_COUNT - 1);
     }
   }
 }
