@@ -15,6 +15,11 @@
 //
 // Buffer memory follows the int16 scheme (ExtAudioBuffer/extmem_calloc: PSRAM
 // when present): same sample counts, 4 bytes/sample instead of 2.
+//
+// Beads-inspired additions (Mutable Instruments Beads is MIT-licensed), same as
+// AudioEffectMist: reverse grain playback, 4-setting Character media emulation
+// (applied on the record path so only the granulated signal is degraded), and
+// Chaos per-grain size/texture randomization.
 
 #include "AudioBuffer.h"
 #include "AudioEffectMist.h" // MistCircBuffer<T> template + shared Hann LUT
@@ -49,6 +54,12 @@ public:
     // feedback ∈ [0, 1]: fraction of grain cloud fed back into record buffer
     void setFeedback(float f)        { feedback_ = f; }
     void setFreeze(bool f)           { freeze_   = f; }
+    // Beads-inspired: reverse grain playback, media character, per-grain chaos
+    void setReverse(bool r)          { reverse_   = r; }
+    // character ∈ {0,1,2,3}: 0=Clean, 1=Tape, 2=Vintage, 3=Dirty
+    void setCharacter(int c)         { character_ = c; }
+    // chaos ∈ [0, 1]: per-grain size/texture randomization amount
+    void setChaos(float c)           { chaos_     = c; }
 
     uint8_t ActiveGrainCount() const {
         uint8_t n = 0;
@@ -74,6 +85,9 @@ public:
         const float  cur_texture  = texture_;
         const float  cur_feedback = feedback_;
         const bool   cur_freeze   = freeze_;
+        const bool   cur_reverse  = reverse_;
+        const int    cur_character = character_;
+        const float  cur_chaos    = chaos_;
         const size_t buf_size     = g_buffer.NumSamples;
 
         if (!g_buffer.IsReady()) {
@@ -92,24 +106,30 @@ public:
         float* buf = g_buffer.RawBuffer();
 
         // ── Write incoming audio (+ feedback from previous block) unless frozen ─
-        if (!cur_freeze) {
-            if (cur_feedback > 0.0f && in) {
-                // Mix live input with previous block's feedback, then write.
+        // Character (Beads-style media emulation) is applied here so only the
+        // granulated signal is degraded — the dry path stays pristine.
+        if (!cur_freeze && in) {
+            if (cur_feedback > 0.0f || cur_character > 0) {
+                // Mix live input with previous block's feedback, degrade, write.
                 // Same double saturation as the int16 version (which clipped
                 // the feedback term to the int16 rails, then clipped the sum
                 // again on storage): keeps the feedback loop bounded.
                 float tmp[AUDIO_BLOCK_SAMPLES];
                 for (int i = 0; i < AUDIO_BLOCK_SAMPLES; i++) {
-                    float fb = feedback_buf_[i];
-                    if (fb > 1.0f)  fb = 1.0f;
-                    if (fb < -1.0f) fb = -1.0f;
-                    float s = in->data[i] + fb;
+                    float s = in->data[i];
+                    if (cur_feedback > 0.0f) {
+                        float fb = feedback_buf_[i];
+                        if (fb > 1.0f)  fb = 1.0f;
+                        if (fb < -1.0f) fb = -1.0f;
+                        s += fb;
+                    }
                     if (s > 1.0f)  s = 1.0f;
                     if (s < -1.0f) s = -1.0f;
+                    if (cur_character > 0) s = DegradeCharacter(s, cur_character);
                     tmp[i] = s;
                 }
                 g_buffer.Write(tmp);
-            } else if (in) {
+            } else {
                 g_buffer.Write(in->data, AUDIO_BLOCK_SAMPLES);
             }
         }
@@ -134,7 +154,8 @@ public:
                 if (spawn_phase_ >= 1.0f) {
                     spawn_phase_ -= 1.0f;
                     spawnGrain(cur_pos, cur_size, cur_spray, cur_pitch,
-                               cur_psprd, cur_texture, buf_size);
+                               cur_psprd, cur_texture, cur_reverse, cur_chaos,
+                               buf_size);
                 }
             }
         }
@@ -229,9 +250,29 @@ private:
     volatile float texture_  = 0.5f;  // 0=rect, 0.5=tri, 1.0=Hann
     volatile float feedback_ = 0.0f;  // 0..1
     volatile bool  freeze_   = false;
+    volatile bool  reverse_  = false;  // Beads-style reverse grain playback
+    volatile int   character_ = 0;     // 0=Clean, 1=Tape, 2=Vintage, 3=Dirty
+    volatile float chaos_    = 0.0f;   // per-grain size/texture randomization
+
+    // Beads-style media emulation for the record path (float domain).
+    // 0=Clean (bypass), 1=Tape (soft saturation), 2=Vintage (12-bit + drive),
+    // 3=Dirty (8-bit + heavy saturation).
+    static float DegradeCharacter(float f, int character) {
+        switch (character) {
+            case 1: // Tape
+                return f / (1.0f + 0.8f * fabsf(f));
+            case 2: // Vintage
+                f = f / (1.0f + 1.5f * fabsf(f));
+                return (float)((int)(f * 2047.0f)) * (1.0f / 2047.0f);
+            default: // Dirty (3)
+                f = f / (1.0f + 3.0f * fabsf(f));
+                return (float)((int)(f * 127.0f)) * (1.0f / 127.0f);
+        }
+    }
 
     void spawnGrain(float cur_pos, float cur_size, float cur_spray,
                     float cur_pitch, float cur_psprd, float cur_texture,
+                    bool cur_reverse, float cur_chaos,
                     size_t buf_size) {
         Grain* g = nullptr;
         for (auto& gr : grains) {
@@ -247,15 +288,27 @@ private:
         if (eff_pos < 0.0f) eff_pos = 0.0f;
         if (eff_pos > 1.0f) eff_pos = 1.0f;
 
+        // Chaos (Beads attenurandomizer-style): per-grain size (±75%) and
+        // texture (±50%) randomization.
+        float eff_size = cur_size;
+        float eff_tex  = cur_texture;
+        if (cur_chaos > 0.0f) {
+            eff_size *= 1.0f + cur_chaos * (stmlib::Random::GetFloat() * 2.0f - 1.0f) * 0.75f;
+            if (eff_size < 0.01f) eff_size = 0.01f;
+            eff_tex += cur_chaos * (stmlib::Random::GetFloat() * 2.0f - 1.0f) * 0.5f;
+            if (eff_tex < 0.0f) eff_tex = 0.0f; else if (eff_tex > 1.0f) eff_tex = 1.0f;
+        }
+
         // Absolute start position: pos=0 → write head (live), pos=1 → oldest.
         float rptr = (float)g_buffer.GetWriteIx() - (float)buf_size * eff_pos;
         if (rptr < 0.0f) rptr += (float)buf_size;
 
-        size_t glen = (size_t)(cur_size * AUDIO_SAMPLE_RATE_EXACT);
+        size_t glen = (size_t)(eff_size * AUDIO_SAMPLE_RATE_EXACT);
         if (glen < (size_t)AUDIO_BLOCK_SAMPLES) glen = AUDIO_BLOCK_SAMPLES;
         if (glen > buf_size / 2)                glen = buf_size / 2;
 
-        float grain_pitch = cur_pitch;
+        // Beads-style reverse: negate the read direction.
+        float grain_pitch = cur_pitch * (cur_reverse ? -1.0f : 1.0f);
         if (cur_psprd > 0.0f) {
             float rand_semis = cur_psprd * (stmlib::Random::GetFloat() * 2.0f - 1.0f);
             grain_pitch *= SemitonesToRatio(rand_semis);
@@ -265,12 +318,12 @@ private:
         // Region 1 (texture 0→0.5): tex_lo 0→1, tex_hi stays 0. (rect→tri morph)
         // Region 2 (texture 0.5→1): tex_lo stays 1, tex_hi 0→1. (tri→Hann morph)
         float tex_lo, tex_hi;
-        if (cur_texture <= 0.5f) {
-            tex_lo = cur_texture * 2.0f;
+        if (eff_tex <= 0.5f) {
+            tex_lo = eff_tex * 2.0f;
             tex_hi = 0.0f;
         } else {
             tex_lo = 1.0f;
-            tex_hi = (cur_texture - 0.5f) * 2.0f;
+            tex_hi = (eff_tex - 0.5f) * 2.0f;
         }
 
         g->read_ptr      = rptr;
