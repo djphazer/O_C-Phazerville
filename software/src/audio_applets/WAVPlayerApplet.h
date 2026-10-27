@@ -118,6 +118,10 @@ public:
         if (wavplayer_reload) {
           FileLoad();
           wavplayer_reload = false;
+          // Re-apply the start beat: playWav() resets the player's position,
+          // and setBeatStart() from Controller() last applied to the old file,
+          // so a CV-triggered file change would otherwise start at beat 0.
+          if (wavplayer_ready) wavplayer.setBeatStart(start_beat_mod);
         }
 
         if (wavplayer_playtrig && (go_time || !tempo_sync)) {
