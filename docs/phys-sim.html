@@ -1,0 +1,217 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Physics Simulator</title>
+
+<style type="text/css">
+body { margin: 0; background-color: #C0C0C0; }
+.environment {
+	position: absolute;
+	background-color: #FFFFFF;
+	border: 5px solid #000000;
+}
+.object {
+	position: absolute;
+	width: 20px;
+	height: 20px;
+	z-index: 50;
+	text-align: center;
+	background-image: url("images/blue-circle.png");
+	background-repeat: no-repeat;
+}
+.debug {
+	position: fixed;
+	font-weight:bold;
+	padding:10px;
+	margin-right: auto;
+	margin-left: auto;
+	color: #C0C0C0;
+	top: 0px;
+}
+#buttonBox {
+	position:fixed;
+	width: 100%;
+	left: 0px;
+	bottom: 20px;
+}
+</style>
+
+<script language="javascript" type="text/javascript">
+// Simple Physics simulator
+// © 2006 Nicholas Michalek
+
+var debug, d;
+var things = [];
+
+// Settings
+var INTERVAL = 0.01;	// in seconds
+var GRAVITY = -9.81;	// Acceleration due to gravity
+var WIND = 0.0;			// Horizontal acceleration
+var SCALE = 400;			// pixels per meter
+var FRICTION = 0.02;
+var BOUNCEABSORB = 0.1;
+
+// Playing field constraints
+var Xmin = 0;
+var Xmax = 1000;
+var Ymin = -700;
+var Ymax = 0;
+
+var DISABLE = null;
+
+function setup()
+{
+	// Global vars
+	d = document;
+	
+	//populate an array of all bouncing objects
+	var temp = d.getElementsByTagName("div");
+	for (i=0; i<temp.length; i++)
+	{
+		if (temp[i].className == 'object')
+			things.push(temp[i]);
+	}
+	
+	// Set some parameters on all objects
+	for (i=0; i<things.length; i++)
+	{
+		things[i].Vx = (i+1)*5.0;	// Initial X velocity
+		things[i].Vy = 0.0;	// Initial Y velocity
+		things[i].X = 100*(i+1)%Xmax;
+		things[i].Y = 0;
+		things[i].height = 20;
+		things[i].width = 20;
+		things[i].style.height = things[i].height+"px";
+		things[i].style.width = things[i].width+"px";
+	}
+	
+	var field = d.getElementById("field");
+	field.style.height = (Ymax-Ymin)+"px";
+	field.style.width = (Xmax-Xmin)+"px";
+	
+	debug = d.getElementById("debug");
+}
+
+// Function to continuously simulate motion
+function doMotion()
+{
+	for (i=0; i<things.length; i++)
+	{
+		// Perform position and velocity adjustments
+		moveThing(things[i]);
+		
+		// Apply accelerations to velocities
+		things[i].Vy += GRAVITY * INTERVAL;
+		things[i].Vx += WIND * INTERVAL;
+	}
+	
+	// TODO: put new "debug text" code here
+}
+
+// Function to apply an object's velocity, adjusting the position appropriately
+function moveThing(obj)
+{
+	// Adjust position by velocity
+	obj.X += obj.Vx*INTERVAL*SCALE;
+	obj.Y += obj.Vy*INTERVAL*SCALE;
+	
+	// Check extremes (walls)
+	if ( (obj.Vy < 0) && (obj.Y-obj.height < Ymin) )
+	{	//Floor
+		obj.Y = Ymin + obj.height;
+		obj.Vy = -obj.Vy*(1-BOUNCEABSORB);	// Object absorbs some of the vertical motion
+		obj.Vx = obj.Vx*(1-FRICTION);		// Friction absorbs some horizontal motion
+	}
+	if ( (obj.Vy > 0) && (obj.Y > Ymax) )
+	{	//Ceiling
+		obj.Y = Ymax;
+		obj.Vy = -obj.Vy*(1-BOUNCEABSORB);	// Object absorbs some of the vertical motion
+		obj.Vx = obj.Vx*(1-FRICTION);		// Friction absorbs some horizontal motion
+	}
+	if ( (obj.Vx < 0) && (obj.X < Xmin) )
+	{	//Left wall
+		obj.X = Xmin;
+		obj.Vx = -obj.Vx*(1-BOUNCEABSORB);	// Object absorbs some of the horizontal motion
+		obj.Vy = obj.Vy*(1-FRICTION);		// Friction absorbs some vertical motion
+	}
+	if ( (obj.Vx > 0) && (obj.X+obj.width > Xmax) )
+	{	//Right wall
+		obj.X = Xmax - obj.width;
+		obj.Vx = -obj.Vx*(1-BOUNCEABSORB);	// Object absorbs some of the horizontal motion
+		obj.Vy = obj.Vy*(1-FRICTION);		// Friction absorbs some vertical motion
+	}
+	
+	// Change position
+	obj.style.left = parseInt(obj.X) + "px";	// X axis is standard (right is positive)
+	obj.style.top = -parseInt(obj.Y) + "px";	// Y axis is inverted (down is positive)
+}
+
+function toggleStart()
+{
+	var button = d.getElementById("startStop");
+	
+	if (DISABLE != null)
+	{
+		clearInterval(DISABLE);
+		DISABLE = null;
+		button.innerHTML = "RESUME";
+	}
+	else
+	{
+		DISABLE = setInterval('doMotion()', INTERVAL*1000);
+		button.innerHTML = "PAUSE";
+	}
+		
+}
+
+function freezeMotion()
+{
+	for (i=0; i<things.length; i++)
+	{
+		things[i].Vx = 0.0;
+		things[i].Vy = 0.0;
+	}
+}
+
+function bumpUp()
+{
+	for (i=0; i<things.length; i++)
+	{
+		things[i].Vy += 5;
+	}
+}
+
+window.onload = setup;
+</script>
+</head>
+
+<body>
+<div class="environment">
+    <div id="field">
+        <div class="object"></div>
+        <div class="object"></div>
+        <div class="object"></div>
+        <div class="object"></div>
+        <div class="object"></div>
+        <div class="object"></div>
+        <div class="object"></div>
+        <div class="object"></div>
+        <div class="object"></div>
+        <div class="object"></div>
+    </div>
+	<!-- <div class="debug">
+		<p>Info:</p>
+		<p id="debug">[X and Y]</p>
+	</div> -->
+	<div id="buttonBox" align="center">
+		<button onclick="bumpUp();">^Bump Up^</button><br />
+		<button onmousedown="WIND=-10;" onmouseup="WIND=0;">&lt;&lt;</button>
+		<button id="startStop" onclick="toggleStart();">START</button>
+		<button onmousedown="WIND=10;" onmouseup="WIND=0;">&gt;&gt;</button><br />
+		<button onclick="freezeMotion()">Reset Motion</button>
+	</div>
+</div>
+
+</body>
+</html>
