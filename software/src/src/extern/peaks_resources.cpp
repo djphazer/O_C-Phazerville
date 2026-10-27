@@ -32,6 +32,10 @@
 
 #include "peaks_resources.h"
 
+#ifndef PROGMEM
+#define PROGMEM __attribute__((section(".progmem")))
+#endif
+
 namespace peaks {
 
 static const char str_dummy[] = "dummy";
@@ -111,6 +115,7 @@ const uint16_t lut_delay_times[] = {
 };
 */
 
+PROGMEM
 const uint16_t lut_gravity[] = {
    33140,  31065,  29132,  27330,
    25650,  24084,  22621,  21256,
@@ -178,6 +183,7 @@ const uint16_t lut_gravity[] = {
        2,      2,      1,      1,
        1,
 };
+PROGMEM
 const uint16_t lut_env_linear[] = {
        0,    257,    514,    771,
     1028,   1285,   1542,   1799,
@@ -245,6 +251,7 @@ const uint16_t lut_env_linear[] = {
    64764,  65021,  65278,  65535,
    65535,
 };
+PROGMEM
 const uint16_t lut_env_expo[] = {
        0,   1035,   2054,   3057,
     4045,   5018,   5975,   6918,
@@ -312,6 +319,7 @@ const uint16_t lut_env_expo[] = {
    65475,  65495,  65515,  65535,
    65535,
 };
+PROGMEM
 const uint16_t lut_env_quartic[] = {
        0,      0,      0,      0,
        0,      0,      0,      0,
@@ -379,6 +387,7 @@ const uint16_t lut_env_quartic[] = {
    63010,  63843,  64685,  65535,
    65535,
 };
+PROGMEM
 const uint16_t lut_env_sine[] = {
         0,    21,    39,    79,
       121,   164,   208,   254,
@@ -446,6 +455,7 @@ const uint16_t lut_env_sine[] = {
     65413, 65455, 65495, 65535,
     65535,
 };
+PROGMEM
 const uint16_t lut_env_plateau[] = {
       0,     1,     1,     1, 
       1,     1,     2,     2, 
@@ -513,6 +523,7 @@ const uint16_t lut_env_plateau[] = {
   65535, 65535, 65535, 65535, 
   65535,
 };
+PROGMEM
 const uint16_t lut_env_cliff[] = {
       0,     0,     0,     0, 
       0,     0,     0,     0, 
@@ -581,6 +592,7 @@ const uint16_t lut_env_cliff[] = {
   65535,
 };
 
+PROGMEM
 const uint16_t lut_env_gate[] = {
       0, 65535, 65535, 65535, 
   65535, 65535, 65535, 65535, 
@@ -649,6 +661,7 @@ const uint16_t lut_env_gate[] = {
   65535,
 };
 
+PROGMEM
 const uint16_t lut_env_big_dipper[] = {
     0,    31,    89,   181, 
   276,   375,   478,   584, 
@@ -716,6 +729,7 @@ const uint16_t lut_env_big_dipper[] = {
 65258, 65353, 65445, 65535, 
 65535, 
 };
+PROGMEM
 const uint16_t lut_env_medium_dipper[] = {
     0,    31,    75,   152, 
   231,   312,   395,   481, 
@@ -783,6 +797,7 @@ const uint16_t lut_env_medium_dipper[] = {
 65303, 65382, 65459, 65535, 
 65535,   
 };
+PROGMEM
 const uint16_t lut_env_little_dipper[] = {
     0,    27,    71,   144, 
   219,   296,   374,   455, 
@@ -851,6 +866,7 @@ const uint16_t lut_env_little_dipper[] = {
 65535, 
 };
 
+PROGMEM
 const uint16_t lut_env_sinefold[] = {
           0,    31,    87,   178, 
         272,   368,   465,   563, 
@@ -1284,6 +1300,7 @@ const uint32_t lut_lfo_increments[] = {
 };
 */
 
+PROGMEM
 const uint32_t lut_env_increments[] = {
   515416692, 467165981, 424136651, 385689885,
   351273767, 320410310, 292684581, 267735574,
