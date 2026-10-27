@@ -104,6 +104,8 @@ jobs:
     - name: Merge upstream source
       if: steps.build-gate.outputs.should_build == 'true' && steps.source.outputs.ref != ''
       run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
         git remote add upstream "https://github.com/${UPSTREAM_REPOSITORY}.git"
         git fetch --tags upstream "${{ steps.source.outputs.ref }}"
         git merge --no-commit --no-ff FETCH_HEAD
