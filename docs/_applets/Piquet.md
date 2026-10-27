@@ -20,7 +20,7 @@ A compact, dual-channel envelope generator inspired by Piqued. Each channel has 
 
 - **AD:** Attack followed by decay to zero.
 - **AHR:** Attack, hold at the peak, then release.
-- **ASR:** Attack, sustain while the gate is high, then release when the gate goes low.
+- **AR:** Attack, sustain while the gate is high, then release when the gate goes low. 
 - **ADSR:** Attack, decay to the sustain level, sustain while the gate is high, then release when the gate goes low.
 - **L-AD:** Repeating attack-decay envelope.
 - **L-AHR:** Repeating attack-hold-release envelope.
