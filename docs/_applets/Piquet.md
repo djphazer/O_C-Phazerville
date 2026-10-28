@@ -2,7 +2,7 @@
 
 A compact, dual-channel envelope generator inspired by Piqued. Each channel has its own trigger input, CV modulation input, envelope settings, and output, with selectable envelope types, adjustable stage shapes, looping, trigger delays, and CV modulation.
 
-![Piquet applet screenshot — add image here]
+![Piquet applet screenshot](images/Piquet.png)
 
 ## I/O
 
