@@ -3,7 +3,7 @@ layout: default
 ---
 # Combin8
 
-![DivSeq Screenshot](images/Combin8.png)
+![Combin8 Screenshot](images/Combin8.png)
 
 Two 3:1 CV mixer channels with selectable output modes, input muting, and quantization.
 
