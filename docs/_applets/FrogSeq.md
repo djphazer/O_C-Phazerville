@@ -22,7 +22,7 @@ The main page displays the frog, a safe zone, three lanes of traffic, the curren
 
 - **Modifier Display:** The Safe zone displays temporary feedback when a collision modifies the sequence, as well as ratchet activity.
 - **Frog:** Switch between horizontal and vertical movement when controlling the frog.
-- **Note Seq Dispay:** Displays the current note. Click here to change the quantizer. Aux Button will give you access to the Q-Engine 
+- **Note Seq Dislpay:** Displays the current note. Click here to change the quantizer. Aux Button will give you access to the Q-Engine 
 - **Random icon:** Randomizes the note sequence.
 - **16-step indicators:** Show the state of each step. The highlighted step indicates the current playback step, a single pixel indicates an unmuted step, and no marker indicates a muted step.
 - Move the cursor past Random to access the Note Seq page.
