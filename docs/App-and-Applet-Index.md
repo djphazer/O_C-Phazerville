@@ -39,7 +39,6 @@ Not everything can fit at once on Teensy 3.2 hardware, but you can use the [defa
  * [Backup / Restore](Backup-and-Restore) - Transfer app and calibration data as SysEx
  * [Setup / About](Setup-About) - Check your version, change encoder directions, adjust display/DAC/ADC, screen off time
 
-
 ***
 
 ## CV Applets
@@ -81,6 +80,7 @@ Newer ORN8 hardware (T41) hosts the same set of Applets, four at a time, inside 
   - added Speed control
 * [EnvSeq](EnvSeq) - envelope sequencer
 * [EuclidX](EuclidX) - Euclidean pattern generator (replacement for [AnnularFusion](https://github.com/Chysn/O_C-HemisphereSuite/wiki/Annular-Fusion-Euclidean-Drummer))
+* [FrogSeq](FrogSeq) - Generative note sequencer inspired by Frogger
 * [GameOfLife](GameOfLife) - experimental cellular automaton modulation source
 * [GateDelay](Gate-Delay) - simple gate delay
 * [GatedVCA](Gated-VCA) - simple VCA
@@ -96,6 +96,7 @@ Newer ORN8 hardware (T41) hosts the same set of Applets, four at a time, inside 
 * [MultiScale](MultiScale) - like ScaleDuet, but with 4 scale masks
 * [Palimpsest](Palimpsest) - accent sequencer
 * [Pigeons](Pigeons) - dual Fibonacci-style melody generator
+* [Piquet](Piquet) - Dual envelope generator
 * [PolyDiv](PolyDiv) - four concurrent clock dividers with assignable outputs
 * [ProbDiv](ProbDiv) - stochastic trigger generator
 * [ProbMeloD](ProbMeloD) - stochastic melody generator
@@ -167,30 +168,30 @@ Within [Quadrants](Quadrants) on ORN8 hardware, there are sound generators and e
 
 _(note: T41 Audio Applets are not included here)_
 
-| Function                 | CV Applets         | Full Screen Apps      |
-| ------------------------ | ------------------------   | --------------------- |
-|**Accent Sequencer**       | [Palimpsest](Palimpsest)                                                                                                                                                        |                                                                                          |
-| **Analog Logic**            | [Calculate](Calculate)                                                                                                                                                         |                                                                                          |
-| **Clock Modulator**          | [ClockDivider](ClockDivider), [ClockSkip](Clock-Skipper), [DivSeq](DivSeq), [Metronome](Metronome), [PolyDiv](PolyDiv), [ProbDiv](ProbDiv), [ResetClk](Reset-Clock), [Shuffle](Shuffle)                                         |                                                                                          |
-| **CV Recorder**              | [ASR](ASR), [CVRec](CV-Recorder)                                                                                                                                                 |                                                                                          |
-| **Digital Logic**            | [Binary Counter](Binary-Counter), [Compare](Compare), [Cumulus](Cumulus), [Logic](Logic), [Schmitt](Schmitt-Trigger), [TL Neuron](Threshold-Logic-Neuron), [Trending](Trending)                                                         | [Neural Net](Neural-Net)                                                                             |
-| **Delay**                    | [Dr. LoFi](Dr.-LoFi), [GateDelay](Gate-Delay)  |   |
-| **Drums / Synth Voice**      | [BitBeat](BitBeat), [BootsNCat](BootsNCat), [BugCrack](BugCrack), [WTVCO](WTVCO)     | [Viznutcracker, sweet!](Viznutcracker-sweet)     |
-| **Effect**                   | [Dr. LoFi](Dr.-LoFi)    |                      |
-| **Envelope Follower**        | [EnvFollow](Envelope-Follower), [Slew](Slew)   |                 |
-| **Envelope Generator**       | [ADSR](ADSR-EG), [AD EG](AD-EG), [Ebb & LFO](Ebb-&-LFO), [EnvSeq](EnvSeq), [VectorEG](VectorEG)  | [Piqued](Piqued), [Dialectic Ping Pong](Dialectic-Ping-Pong) |
-| **LFO**                      | [Ebb & LFO](Ebb-&-LFO), [LowerRenz](LowerRenz), [Relabi](Relabi), [VectorLFO](VectorLFO)   | [Quadraturia](Quadraturia) |
-| **MIDI**                     | [MIDI In](MIDI-Input), [MIDI Out](MIDI-Out) _(See also: [MIDI Maps](MIDI-Maps), [Auto MIDI Output](Hemisphere-General-Settings#auto-midi-output))_   | [Captain MIDI](Captain-MIDI) |
-| **Mixer**                    | [AttenOff](AttenOff), [Calculate](Calculate), [Combin8](Combin8), [Squanch](Squanch), [Xfader](Xfader) |    |
-| **Modulation Source**        | [GameOfLife](GameOfLife), [Relabi](Relabi) [Stairs](Stairs), [VectorMorph](VectorMorph) | [Low-rents](Low-rents), [Pong](Pong) |
-| **Performance Utility**      | [Button2](Button2), [Voltage](Voltage) |  [Scenery](Scenery) |
-| **Pitch Sequencer**          | [Carpeggio](Carpeggio), [TwoRings](TwoRings), [Enigma Jr.](Enigma-Jr), [MarkoV](MarkoV), [Pigeons](Pigeons), [ProbMeloD](ProbMeloD), [Seq32](Seq32), [SeqPlay7](SeqPlay7), [SequenceX](SequenceX), [Shredder](Shredder), [Strum](Strum), [SwitchSeq](Switch-Seq), [TB-3PO](TB-3PO) | [Enigma](Enigma), [The Darkest Timeline](The-Darkest-Timeline), [Automatonnetz](Automatonnetz), [Sequins](Sequins), [Acid Curds](Acid-Curds), [Passencore](Passencore) |
-| **Quantizer**               | [Calibr8](Calibr8), [Chordinate](Chordinate), [DualQuant](Dual-Quantizer), [DuoTET](DuoTET), [MultiScale](MultiScale), [ScaleDuet](ScaleDuet), [Squanch](Squanch)         | [Calibr8or](Calibr8or), [Harrington 1200](Harrington-1200), [Quantermain](Quantermain), [Meta-Q](Meta-Q)                                  |
-| **Random / Chaos**           | [BitBeat](BitBeat), [Brancher](Brancher), [Calculate](Calculate), [LowerRenz](LowerRenz), [ProbDiv](ProbDiv), [ProbMeloD](ProbMeloD), [Relabi](Relabi), [RndWalk](Random-Walk), [Shredder](Shredder)                                                        | [Low-rents](Low-rents)                                                                              |
-| **Shift Register**           | [ASR](ASR), [TwoRings](TwoRings), [Enigma Jr.](Enigma-Jr), [RunglBook](RunglBook), [ShiftGate](ShiftGate)  | [Enigma](Enigma), [CopierMaschine](Copiermaschine)  |
-| **Switch**                   | [Switch](Switch), [SwitchSeq](Switch-Seq) | [Scenery](Scenery) |
-| **Trigger / Gate Sequencer** | [Burst](Burst), [DivSeq](DivSeq), [DrumMap](DrumMap), [EuclidX](EuclidX), [MarkovPerc](MarkovPerc), [PolyDiv](PolyDiv), [ProbDiv](ProbDiv), [Seq32](Seq32), [ShiftGate](ShiftGate), [TrigSeq](TrigSeq), [TrigSeq16](TrigSeq16)   |     |
-| **VCA**                      | [GatedVCA](Gated-VCA)        |       |
-| **Voltage Utility**          | [AttenOff](AttenOff), [Calculate](Calculate), [Calibr8](Calibr8), [Scope](Scope), [Slew](Slew), [Stairs](Stairs), [Switch](Switch), [Tuner](Tuner), [Trending](Trending), [Voltage](Voltage)                         | [Calibr8or](Calibr8or), [References](References)
+| Function | CV Applets | Full Screen Apps |
+| --- | --- | --- |
+| **Accent Sequencer** | [Palimpsest](Palimpsest) | |
+| **Analog Logic** | [Calculate](Calculate) | |
+| **Clock Modulator** | [ClockDivider](ClockDivider), [ClockSkip](Clock-Skipper), [DivSeq](DivSeq), [Metronome](Metronome), [PolyDiv](PolyDiv), [ProbDiv](ProbDiv), [ResetClk](Reset-Clock), [Shuffle](Shuffle) | |
+| **CV Recorder** | [ASR](ASR), [CVRec](CV-Recorder) | |
+| **Digital Logic** | [Binary Counter](Binary-Counter), [Compare](Compare), [Cumulus](Cumulus), [Logic](Logic), [Schmitt](Schmitt-Trigger), [TL Neuron](Threshold-Logic-Neuron), [Trending](Trending) | [Neural Net](Neural-Net) |
+| **Delay** | [Dr. LoFi](Dr.-LoFi), [GateDelay](Gate-Delay) | |
+| **Drums / Synth Voice** | [BitBeat](BitBeat), [BootsNCat](BootsNCat), [BugCrack](BugCrack), [WTVCO](WTVCO) | [Viznutcracker, sweet!](Viznutcracker-sweet) |
+| **Effect** | [Dr. LoFi](Dr.-LoFi) | |
+| **Envelope Follower** | [EnvFollow](Envelope-Follower), [Slew](Slew) | |
+| **Envelope Generator** | [ADSR](ADSR-EG), [AD EG](AD-EG), [Ebb & LFO](Ebb-&-LFO), [EnvSeq](EnvSeq), [VectorEG](VectorEG), [Piquet](Piquet) | [Piqued](Piqued), [Dialectic Ping Pong](Dialectic-Ping-Pong) |
+| **LFO** | [Ebb & LFO](Ebb-&-LFO), [LowerRenz](LowerRenz), [Relabi](Relabi), [VectorLFO](VectorLFO) | [Quadraturia](Quadraturia) |
+| **MIDI** | [MIDI In](MIDI-Input), [MIDI Out](MIDI-Out) _(See also: [MIDI Maps](MIDI-Maps), [Auto MIDI Output](Hemisphere-General-Settings#auto-midi-output))_ | [Captain MIDI](Captain-MIDI) |
+| **Mixer** | [AttenOff](AttenOff), [Calculate](Calculate), [Combin8](Combin8), [Squanch](Squanch), [Xfader](Xfader) | |
+| **Modulation Source** | [GameOfLife](GameOfLife), [Relabi](Relabi), [Stairs](Stairs), [VectorMorph](VectorMorph) | [Low-rents](Low-rents), [Pong](Pong) |
+| **Performance Utility** | [Button2](Button2), [Voltage](Voltage) | [Scenery](Scenery) |
+| **Pitch Sequencer** | [Carpeggio](Carpeggio), [TwoRings](TwoRings), [Enigma Jr.](Enigma-Jr), [FrogSeq](FrogSeq), [MarkoV](MarkoV), [Pigeons](Pigeons), [ProbMeloD](ProbMeloD), [Seq32](Seq32), [SeqPlay7](SeqPlay7), [SequenceX](SequenceX), [Shredder](Shredder), [Strum](Strum), [SwitchSeq](Switch-Seq), [TB-3PO](TB-3PO) | [Enigma](Enigma), [The Darkest Timeline](The-Darkest-Timeline), [Automatonnetz](Automatonnetz), [Sequins](Sequins), [Acid Curds](Acid-Curds), [Passencore](Passencore) |
+| **Quantizer** | [Calibr8](Calibr8), [Chordinate](Chordinate), [DualQuant](Dual-Quantizer), [DuoTET](DuoTET), [MultiScale](MultiScale), [ScaleDuet](ScaleDuet), [Squanch](Squanch) | [Calibr8or](Calibr8or), [Harrington 1200](Harrington-1200), [Quantermain](Quantermain), [Meta-Q](Meta-Q) |
+| **Random / Chaos** | [BitBeat](BitBeat), [Brancher](Brancher), [Calculate](Calculate), [LowerRenz](LowerRenz), [ProbDiv](ProbDiv), [ProbMeloD](ProbMeloD), [Relabi](Relabi), [RndWalk](Random-Walk), [Shredder](Shredder) | [Low-rents](Low-rents) |
+| **Shift Register** | [ASR](ASR), [TwoRings](TwoRings), [Enigma Jr.](Enigma-Jr), [RunglBook](RunglBook), [ShiftGate](ShiftGate) | [Enigma](Enigma), [CopierMaschine](Copiermaschine) |
+| **Switch** | [Switch](Switch), [SwitchSeq](Switch-Seq) | [Scenery](Scenery) |
+| **Trigger / Gate Sequencer** | [Burst](Burst), [DivSeq](DivSeq), [DrumMap](DrumMap), [EuclidX](EuclidX), [MarkovPerc](MarkovPerc), [PolyDiv](PolyDiv), [ProbDiv](ProbDiv), [Seq32](Seq32), [ShiftGate](ShiftGate), [TrigSeq](TrigSeq), [TrigSeq16](TrigSeq16) | |
+| **VCA** | [GatedVCA](Gated-VCA) | |
+| **Voltage Utility** | [AttenOff](AttenOff), [Calculate](Calculate), [Calibr8](Calibr8), [Scope](Scope), [Slew](Slew), [Stairs](Stairs), [Switch](Switch), [Tuner](Tuner), [Trending](Trending), [Voltage](Voltage) | [Calibr8or](Calibr8or), [References](References) |
 
 If something is missing, please help us out by making edits and sending a PR (link in footer). Remember, T32 is very limited, so you won't necessarily have every App or Applet on this page in your module!
