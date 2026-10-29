@@ -41,14 +41,23 @@ public:
     static constexpr int SUSTAIN_CONST = 35;
     static constexpr int DISPLAY_HEIGHT = 30;
 
-    // About four seconds
-    static constexpr int MAX_TICKS_AD = 33333;
-
-    // About eight seconds
-    static constexpr int MAX_TICKS_R = 133333;
+    // Release time multiplier (MAX_TICKS_R / MAX_TICKS_AD ≈ 4)
+    static constexpr int RELEASE_TIME_MULTIPLIER = 4;
 
     static constexpr int STAGE_MAX_VALUE = 255;
     static constexpr int NUM_CHANNELS = 2;
+
+    static int ScaleStageToTicksAD(int setting) {
+      const int p = constrain(setting, 1, STAGE_MAX_VALUE);
+      return int(HS::kStageTicks[p]);
+    }
+
+    static int ScaleStageToTicksR(int setting) {
+      const int p = constrain(setting, 0, STAGE_MAX_VALUE);
+      if (p == 0) return 0;
+      return int(HS::kStageTicks[p]) * RELEASE_TIME_MULTIPLIER;
+    }
+
     enum ADSRStage {
       ATTACK_STAGE = 0,
       DECAY_STAGE = 1,
@@ -93,7 +102,7 @@ public:
       // TODO: shaping math (exp -> lin -> log)
       void AttackAmplitude() {
           int effective_attack = constrain(setting[ATTACK_STAGE], 1, STAGE_MAX_VALUE);
-          int total_stage_ticks = Proportion(effective_attack, STAGE_MAX_VALUE, MAX_TICKS_AD);
+          int total_stage_ticks = ScaleStageToTicksAD(effective_attack);
           int ticks_remaining = total_stage_ticks - stage_ticks;
           if (effective_attack == 1) ticks_remaining = 0;
           if (ticks_remaining <= 0) { // End of attack; move to decay
@@ -108,7 +117,7 @@ public:
       }
 
       void DecayAmplitude() {
-          int total_stage_ticks = Proportion(setting[DECAY_STAGE], STAGE_MAX_VALUE, MAX_TICKS_AD);
+          int total_stage_ticks = ScaleStageToTicksAD(setting[DECAY_STAGE]);
           int ticks_remaining = total_stage_ticks - stage_ticks;
           simfloat amplitude_remaining = amplitude
             - int2simfloat(Proportion(setting[SUSTAIN_STAGE], STAGE_MAX_VALUE, HEMISPHERE_MAX_CV));
@@ -129,7 +138,7 @@ public:
 
       void ReleaseAmplitude() {
           int effective_release = constrain(setting[RELEASE_STAGE] + cv_mod, 1, STAGE_MAX_VALUE) - 1;
-          int total_stage_ticks = Proportion(effective_release, STAGE_MAX_VALUE, MAX_TICKS_R);
+          int total_stage_ticks = ScaleStageToTicksR(effective_release);
           int ticks_remaining = total_stage_ticks - stage_ticks;
           if (effective_release == 0) ticks_remaining = 0;
           if (ticks_remaining <= 0 || amplitude <= 0) { // End of release; turn off envelope
@@ -282,6 +291,7 @@ private:
     // TODO: implement destination mapping; currently hardcoded to Release stage
 
     const char* const labels[NUM_STAGES] = { "A=", "D=", "S=", "R=" };
+    const char* const stagename[NUM_STAGES] = { "Attack", "Decay", "Sustain", "Release" };
 
     void DrawIndicator() {
         ForEachChannel(ch)
@@ -305,6 +315,7 @@ private:
         const int stage = cursor % NUM_STAGES;
         auto &adsr = adsr_env[curEG];
 
+        SetLabel(stagename[stage]);
         gfxPrint(9, 22, labels[stage]);
         if (SUSTAIN_STAGE == stage) {
           int level = Proportion(adsr.setting[stage], STAGE_MAX_VALUE, 1000);
@@ -313,10 +324,19 @@ private:
           gfxPrint(level % 10);
           gfxPrint("%");
         } else {
-          int ms_value = adsr.setting[stage]
-                       * ((stage == RELEASE_STAGE)? MAX_TICKS_R : MAX_TICKS_AD)
-                       / STAGE_MAX_VALUE / 17;
-          gfxPrint(ms_value);
+          int total_stage_ticks;
+          if (stage == RELEASE_STAGE) {
+            // setting[stage] is already clamped to 1..255 by OnEncoderMove/OnDataReceive
+            // const int effective_release = constrain(adsr.setting[stage], 1, STAGE_MAX_VALUE) - 1;
+            const int effective_release = adsr.setting[stage] - 1;
+            total_stage_ticks = ScaleStageToTicksR(effective_release);
+          } else {
+            total_stage_ticks = ScaleStageToTicksAD(adsr.setting[stage]);
+          }
+          const int ms_value = total_stage_ticks * 10 / 17;
+          gfxPrint(ms_value / 10);
+          gfxPrint(".");
+          gfxPrint(ms_value % 10);
           gfxPrint("ms");
         }
     }

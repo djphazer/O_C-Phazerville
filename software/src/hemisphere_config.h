@@ -59,6 +59,7 @@
 #include "applets/MidiLoop.h"
 #include "applets/MultiScale.h"
 #include "applets/Palimpsest.h"
+#include "applets/Panner.h"
 #include "applets/Pigeons.h"
 #include "applets/PolyDiv.h"
 #include "applets/ProbabilityDivider.h"
@@ -68,6 +69,7 @@
 #include "applets/RndWalk.h"
 #include "applets/RunglBook.h"
 #include "applets/ScaleDuet.h"
+#include "applets/SeQuant.h"
 #include "applets/Schmitt.h"
 #include "applets/Scope.h"
 #include "applets/SequenceX.h"
@@ -243,6 +245,7 @@ AppletRegistry reg{
     DeclareApplet<EnsOscKey>{35, 0x08},
     DeclareApplet<MultiScale>{73, 0x08},
     DeclareApplet<ScaleDuet>{26, 0x08},
+    DeclareApplet<SeQuant>{86, 0x08},
     DeclareApplet<Squanch>{46, 0x08},
 #endif
 #ifdef APPLETS_MODULATION
@@ -286,6 +289,7 @@ AppletRegistry reg{
     DeclareApplet<Tuner>{39, 0x80},
     DeclareApplet<Voltage>{43, 0x10},
     DeclareApplet<Xfader>{33, 0x10},
+    DeclareApplet<Panner>{100, 0x10},
 #endif
 #ifdef APPLETS_WEIRDSTUFF
     DeclareApplet<BitBeat>{79, 0x01},

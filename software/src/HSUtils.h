@@ -241,6 +241,15 @@ namespace HS {
   void PokePopup(PopupType pop, ErrMsgIndex err = NO_ERROR);
   void PokePopup(PopupType pop, const char* msg);
 
+  extern const uint16_t kStageTicks[256]; // for AD and ADSR
+  // shape LUTs
+  extern const uint16_t kShapeExponential[256];
+  extern const uint16_t kShapeQuartic[256];
+  extern const uint16_t kShapeSine[256];
+  extern const uint16_t kShapeBigDipper[256];
+  extern const uint16_t kShapePlateau[256];
+  extern const uint16_t kShapeSinefold[256];
+
 } // namespace HS
 
 

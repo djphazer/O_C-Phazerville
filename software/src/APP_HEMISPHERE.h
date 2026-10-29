@@ -386,11 +386,14 @@ public:
 
     // does not modify the preset, only the manager
     void SetApplet(HEM_SIDE hemisphere, int index) {
-        // special case guard for first load
-        if (my_applet[hemisphere] >= 0 && my_applet[hemisphere] < HEMISPHERE_AVAILABLE_APPLETS)
-          HS::available_applets[my_applet[hemisphere]].instance[hemisphere]->Unload();
-        next_applet[hemisphere] = my_applet[hemisphere] = index;
+        if (index == my_applet[hemisphere]) return;
+        /*noInterrupts();*/
+        int oldidx = my_applet[hemisphere];
         HS::available_applets[index].instance[hemisphere]->BaseStart(hemisphere);
+        next_applet[hemisphere] = my_applet[hemisphere] = index;
+        if (oldidx >= 0 && oldidx < HEMISPHERE_AVAILABLE_APPLETS)
+          HS::available_applets[oldidx].instance[hemisphere]->Unload();
+        /*interrupts();*/
     }
     void ChangeApplet(HEM_SIDE h, int dir) {
         int index = HS::get_next_applet_index(next_applet[h], dir);
