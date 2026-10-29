@@ -55,6 +55,8 @@ public:
     freqKnobMul = 1; //
     freqKnobDiv = 0; //
 
+    FillFModTable();
+
     for (int i = 0; i < 3; i++) {
       xmodKnob[i] = 1; // 20%
       phaseKnob[i] = 0; // 0%
@@ -107,13 +109,10 @@ public:
         manager.ReadGates(gateState);
       } else {
 
-        // hmmmmmm
-        float normalizedCV = InF(0); // (cvIn / 3.0f); // -1..1 incoming fm amount
         float normalizedCV2 = InF(1); // (cvIn2 / 3.0f); // -1..1 incoming xmod amount
-        normalizedCV = hmmmmmm(normalizedCV); // powf(10.0f, normalizedCV * 2); // 0.01..100
-        float fModCV = constrain(normalizedCV, 0.01f, 100.0f);
+        const float fModCV = FModAmount(In(0)); // 0.01..100
         float xModCV = constrain(normalizedCV2, 0.0f, 1.0f);
-        // hmmmmmm
+        const float mulDiv = static_cast<float>(freqMulMap[freqKnobMul]) / freqDivMap[freqKnobDiv];
 
         // frequency modulation:
         for (uint8_t lfo = 0; lfo < 3; lfo++) {
@@ -132,15 +131,15 @@ public:
           // float xmodCombo = xmod(lfo) +  (cvIn2 / 100) - 50; //???!
 
           // Calculate cross-frequency modulation factor
-          float crossFreqMod = (xmodCombo / 100.0)
-            * (static_cast<float>(sample[(lfo + 2) % 3]) / HEMISPHERE_3V_CV);
+          float crossFreqMod = xmodCombo * (0.01f / HEMISPHERE_3V_CV)
+            * static_cast<float>(sample[(lfo + 2) % 3]);
 
           // Combine base frequency, cross-modulation, and CV input
           float freq = DecodeFreq(freqKnob[lfo]);
           freq = fModCV * (freq + (freq * crossFreqMod));
 
           // Scale frequency by global freqMul and freqDiv amounts.
-          freq = freq * freqMulMap[freqKnobMul] / freqDivMap[freqKnobDiv];
+          freq *= mulDiv;
 
           // Ensure the frequency stays within valid bounds
           // freq = constrain(freq, 0.01, 15000.0);
@@ -176,8 +175,26 @@ public:
     }
   }
 
-  constexpr float hmmmmmm(float lin) {
-    return powf(10.0f, lin * 2); // 0.01..100
+  // FM amount 10^(2x) for x = CV / max input CV, clamped to -1..1, so 0.01..100.
+  // Looked up from a table: powf() is too slow for the ISR without an FPU.
+  static constexpr int FMOD_STEPS = 64; // table steps per unit of x
+  static float *FModTable() {
+    static float table[2 * FMOD_STEPS + 1];
+    return table;
+  }
+  static void FillFModTable() {
+    float *table = FModTable();
+    if (table[0] != 0.0f) return;
+    for (int i = 0; i <= 2 * FMOD_STEPS; ++i)
+      table[i] = powf(10.0f, 2.0f * (i - FMOD_STEPS) / FMOD_STEPS);
+  }
+  static float FModAmount(int cv) {
+    const float *table = FModTable();
+    int32_t pos = cv * (FMOD_STEPS * 256) / HEMISPHERE_MAX_INPUT_CV; // 1/256 table steps
+    pos = constrain(pos, -FMOD_STEPS * 256, FMOD_STEPS * 256) + FMOD_STEPS * 256;
+    const int i = pos >> 8;
+    if (i >= 2 * FMOD_STEPS) return table[2 * FMOD_STEPS];
+    return table[i] + (table[i + 1] - table[i]) * (pos & 0xff) * (1.0f / 256);
   }
 
   void View() {
