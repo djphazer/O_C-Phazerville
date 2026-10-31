@@ -669,6 +669,14 @@ public:
     }
 
     void DrawFullScreen() const {
+      // applet UI view, fullscreen and parked
+      active_applet[zoom_slot]->BaseView(true, true);
+      // Applets 3 and 4 get inverted titles
+      if (zoom_slot > 1) gfxInvert(0 + (zoom_slot%2)*64, 0, 63, 10);
+      // a helpful arrow
+      gfxIcon(64 - 8*(zoom_slot & 1), 1, DOWN_ICON, true);
+    }
+    void DrawAppletConfig() const {
       if (select_mode == zoom_slot) {
         showhide_cursor.Scroll(next_applet_index[zoom_slot] - showhide_cursor.cursor_pos());
         DrawAppletList(CursorBlink());
@@ -677,14 +685,13 @@ public:
         return;
       }
 
-      active_applet[zoom_slot]->BaseView(true, zoom_cursor < 0);
+      // applet UI view, fullscreen, not parked
+      active_applet[zoom_slot]->BaseView(true, false);
       // Applets 3 and 4 get inverted titles
       if (zoom_slot > 1) gfxInvert(0 + (zoom_slot%2)*64, 0, 63, 10);
 
       // draw cursors for editing applet select and input maps
-      if (zoom_cursor < 0) {
-        gfxIcon(64 - 8*(zoom_slot & 1), 1, DOWN_ICON, true);
-      } else if (0 == zoom_cursor) {
+      if (0 == zoom_cursor) {
         if (select_mode != zoom_slot && CursorBlink())
           gfxIcon(64 - 8*(zoom_slot & 1), 1, (zoom_slot & 1)? RIGHT_ICON : LEFT_ICON, true);
       } else if (isEditing) {
@@ -767,6 +774,8 @@ public:
       graphics.setScreen(0);
       if (view_state == APPLET_FULLSCREEN) {
         DrawFullScreen();
+      } else if (view_state == APPLET_CONFIG) {
+        DrawAppletConfig();
       } else if (view_state == OVERVIEW) {
         DrawOverview();
       } else {
@@ -840,7 +849,7 @@ public:
           screen = 3;
         } else if (view_state == AUDIO_SETUP) {
           screen = 2;
-        } else if (view_state == APPLET_FULLSCREEN) {
+        } else if (view_state == APPLET_FULLSCREEN || view_state == APPLET_CONFIG) {
           screen = 0;
         } else {
           screen = view_slot[0];
@@ -885,11 +894,11 @@ public:
           return;
         }
         if (view_state == APPLET_FULLSCREEN) {
+          active_applet[zoom_slot]->OnButtonPress();
+          return;
+        }
+        if (view_state == APPLET_CONFIG) {
           switch (zoom_cursor) {
-            case -1:
-              active_applet[zoom_slot]->OnButtonPress();
-              break;
-
             case 0:
               if (zoom_slot == select_mode) {
                 SetApplet(zoom_slot, next_applet_index[zoom_slot]);
@@ -1030,12 +1039,10 @@ public:
         }
 
         if (view_state == APPLET_FULLSCREEN) {
+          active_applet[zoom_slot]->OnEncoderMove(increment);
+        } else if (view_state == APPLET_CONFIG) {
             if (select_mode == zoom_slot)
               ChangeApplet(zoom_slot, increment);
-            else if (h == LEFT_HEMISPHERE && !isEditing)
-              zoom_cursor = (event.value > 0)? 0 : -1;
-            else if (zoom_cursor < 0)
-              active_applet[zoom_slot]->OnEncoderMove(increment);
             else if (isEditing) { // enc changes value
               switch (zoom_cursor)
               {
@@ -1138,8 +1145,12 @@ public:
       ClearEditInputMap();
       select_mode = -1;
     }
-    void ToggleFullScreen() {
-      view_state = (view_state == APPLET_FULLSCREEN) ? APPLETS : APPLET_FULLSCREEN;
+    void SetAppletConfig(HEM_SIDE hemisphere) {
+      SwitchToSlot(hemisphere);
+      view_state = APPLET_CONFIG;
+      isEditing = false;
+      ClearEditInputMap();
+      select_mode = -1;
     }
 
 protected:
@@ -1180,6 +1191,7 @@ private:
     enum QuadrantsView {
       APPLETS,
       APPLET_FULLSCREEN,
+      APPLET_CONFIG,
       OVERVIEW,
       //CONFIG_MENU,
       //PRESET_PICKER,
@@ -1942,7 +1954,7 @@ void AppQuadrants::HandleButtonEvent(const UI::Event &event) {
                 && (slot == first_click))
             {
                 // This is a double-click on one button.
-                SetFullScreen(slot);
+                SetAppletConfig(slot);
                 click_tick = 0;
                 OC::ui.SetButtonIgnoreMask(); // ignore button release
                 return;
@@ -1951,9 +1963,9 @@ void AppQuadrants::HandleButtonEvent(const UI::Event &event) {
             // -- Single click
             // If a help screen is already selected, and the button is for
             // the opposite one, go to the other help screen
-            if (view_state == APPLET_FULLSCREEN) {
-                if (zoom_slot != slot) SetFullScreen(slot);
-                else ExitFullScreen(); // Exit help screen if same button is clicked
+            if (view_state == APPLET_CONFIG) {
+                if (zoom_slot != slot) SetAppletConfig(slot);
+                else ExitFullScreen(); // Exit if same button is clicked
                 OC::ui.SetButtonIgnoreMask(); // ignore release
             }
             if (view_state == OVERVIEW) {
@@ -1976,13 +1988,12 @@ void AppQuadrants::HandleButtonEvent(const UI::Event &event) {
           event.control == OC::CONTROL_BUTTON_Y)
       {
         HEM_SIDE slot = ButtonToSlot(event);
-        if (view_state == APPLET_FULLSCREEN && slot == zoom_slot)
+        if (slot == zoom_slot && (view_state == APPLET_FULLSCREEN || view_state == APPLET_CONFIG))
           view_state = APPLETS;
 
         if (view_state == OVERVIEW) {
           // jump to applet view on release
           SetFullScreen(slot);
-          zoom_cursor = -1; // applet UI, not config
         } else
           SwitchToSlot(slot);
       }
@@ -2008,7 +2019,6 @@ void AppQuadrants::HandleButtonEvent(const UI::Event &event) {
           view_state = APPLETS;
         else {
           SetFullScreen(slot);
-          zoom_cursor = -1; // applet UI, not config
         }
       }
       // ignore all other button release events
