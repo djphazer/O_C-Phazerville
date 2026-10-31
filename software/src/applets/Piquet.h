@@ -1134,7 +1134,7 @@ void FLASHMEM Piquet::DrawEnvelope(int channel, int x_offset, bool absolute_coor
       };
 
       // Fill the envelope with interpolated vertical columns.
-      for (uint16_t i = 0; i < width && i <= current_phase; ++i) {
+      for (uint16_t i = 0; i < width && i < current_phase; ++i) {
         const int x = preview_x(i);
         const int next_x = i + 1 < width ? preview_x(i + 1) : x;
         const int level = constrain(static_cast<int>(values[i] >> 10), 0, DISPLAY_HEIGHT);
@@ -1162,12 +1162,11 @@ void FLASHMEM Piquet::DrawEnvelope(int channel, int x_offset, bool absolute_coor
 
       for (uint16_t i = 0; i < width; ++i) {
         const int x = preview_x(i);
-        const int level = constrain(
-            static_cast<int>(values[i] >> 10), 0, DISPLAY_HEIGHT);
+        const int level = constrain(int(values[i] >> 10), 0, DISPLAY_HEIGHT);
         const int y = BottomAlign(level) + 1;
 
         if (previous_x >= 0) {
-          draw_line(previous_x, previous_y, x, y, true);
+          draw_line(previous_x, previous_y, x, y, false);
         } else {
           draw_pixel(x, y);
         }
