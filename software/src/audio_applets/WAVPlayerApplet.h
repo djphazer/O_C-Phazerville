@@ -93,12 +93,15 @@ public:
       sync_trig = true;
     }
 
-    if (playstop_cv.Clock()) {
+    if (playstop_retrig && playstop_cv.Clock()) {
       if (file_select_sh) SampleFileSelect(false);
       if (FileIsPlaying())
         retrig = true;
       else
         StartPlaying();
+    }
+    if (!playstop_retrig && playstop_cv.Clock()) {
+      ToggleFilePlayer();
     }
 
     titlestat[7] = FileIsPlaying() ? '*' : ' ';
@@ -113,6 +116,7 @@ public:
         if (wavplayer_reload) {
           FileLoad();
           wavplayer_reload = false;
+          if (wavplayer_ready) wavplayer.setBeatStart(start_beat_mod);
         }
 
         if (wavplayer_playtrig && (go_time || !tempo_sync)) {
@@ -153,19 +157,25 @@ public:
     gfxPrintfn(1, y, 0, "%03u", file_select_mod);
     gfxEndCursor(cursor == FILE_NUM, "FileSel");
 
-    gfxStartCursor(20, y);
+    gfxStartCursor(20, y-1);
     gfxPrint(file_select_cv);
     gfxEndCursor(cursor == FILE_NUM_CV, false, file_select_cv.InputName(), "FileCV");
 
-    gfxStartCursor(30, y);
-    gfxPrint(file_select_sh ? "S" : "-");
-    gfxEndCursor(cursor == FILE_SH, "S&H");
+    if (file_select_sh) gfxIcon(30, y-1, LINK_ICON);
+    if (cursor == FILE_SH) {
+      gfxFrame(29, y-2, 10, 10, true);
+      gfxIcon(30, y+7, UP_BTN_ICON, true);
+    }
 
     // Play trigger input
     gfxStartCursor(40, y-1);
     gfxPrint(playstop_cv);
     gfxEndCursor(cursor == PLAYSTOP_GATE_CV, false, playstop_cv.InputName(), "PlayTrig");
 
+    gfxIcon(50, y-1, playstop_retrig ? TR_ICON : OPEN_ICON);
+    if (PLAYSTOP_RETRIG == cursor) gfxIcon(50, y+7, UP_BTN_ICON, true);
+
+    y += 10;
     // filter mod
     gfxStartCursor(56, y);
     gfxPrint(djfilter_cv);
@@ -185,13 +195,12 @@ public:
       }
     }
 
-    y += 10;
     gfxIcon(1, y, FileIsPlaying() ? PLAY_ICON : STOP_ICON);
 
     if (wavplayer_ready)
-      gfxPrint(32, y, GetFileBPM());
+      gfxPrint(10, y, GetFileBPM());
     else
-      gfxPrint(32, y, "(--)");
+      gfxPrint(10, y, "(--)");
 
     // filter meter at the top
     if (filter_on) {
@@ -265,8 +274,6 @@ public:
       filter_on = !filter_on;
     } else if (PLAYRATE == cursor) {
       tempo_sync ^= 1;
-    } else if (FILE_SH == cursor) {
-      file_select_sh = !file_select_sh;
     } else {
       if (file_select_sh) SampleFileSelect(false);
       ToggleFilePlayer();
@@ -286,6 +293,10 @@ public:
     if (LOOP_ENABLE == cursor) {
       syncloopstart = true;
       go_time = false;
+    } else if (PLAYSTOP_RETRIG == cursor) {
+      playstop_retrig = !playstop_retrig;
+    } else if (FILE_SH == cursor) {
+      file_select_sh = !file_select_sh;
     } else
       CursorToggle();
   };
@@ -302,9 +313,6 @@ public:
         break;
       case FILE_NUM_CV:
         file_select_cv.ChangeSource(direction);
-        break;
-      case FILE_SH:
-        file_select_sh = !file_select_sh;
         break;
       case PLAYSTOP_GATE_CV:
         playstop_cv.ChangeSource(direction);
@@ -337,6 +345,7 @@ public:
       case LOOP_LENGTH:
         loop_length = constrain(loop_length + direction, 0, 128);
         break;
+      default: break;
     }
   }
 
@@ -348,7 +357,7 @@ public:
     data[0] = PackPackables(level, level_cv, uint8_t(tempo_sync), playrate_cv, oldfilenum, djfilter);
     data[1] = PackPackables(playrate, djfilter_cv, dummy, loop_length);
     data[2] = PackPackables(start_beat, start_beat_cv, playstop_cv);
-    data[3] = PackPackables(wavplayer_select, file_select_cv, file_select_sh);
+    data[3] = PackPackables(wavplayer_select, file_select_cv, file_select_sh, playstop_retrig);
   }
   void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
     // jeez this is a mess... maybe let's start over soon
@@ -358,7 +367,7 @@ public:
     UnpackPackables(data[0], level, level_cv, old_playrate, playrate_cv, oldfilenum, djfilter);
     UnpackPackables(data[1], playrate, djfilter_cv, dummy, loop_length);
     UnpackPackables(data[2], start_beat, start_beat_cv, playstop_cv);
-    UnpackPackables(data[3], wavplayer_select, file_select_cv, file_select_sh);
+    UnpackPackables(data[3], wavplayer_select, file_select_cv, file_select_sh, playstop_retrig);
     if (playrate == 0) playrate = old_playrate;
     if (old_playrate) tempo_sync = true;
     if (loop_length == 0) loop_length = 8;
@@ -377,6 +386,7 @@ private:
     FILE_NUM_CV,
     FILE_SH,
     PLAYSTOP_GATE_CV,
+    PLAYSTOP_RETRIG,
     FILTER_PARAM,
     FILTER_CV,
     LEVEL,
@@ -403,6 +413,7 @@ private:
   bool filter_on = false;
   bool tempo_sync = true;
 
+  bool playstop_retrig = true;
   DigitalInputMap playstop_cv;
   CVInputMap level_cv;
   int16_t playrate = 100; // TODO: we need 9 bits for +/-200%
@@ -457,6 +468,7 @@ private:
       //wavplayer.setPlayStart(play_start_sample);
       loop_on = false;
     } else if (SDcard_Ready) {
+      if (file_select_sh) SampleFileSelect(false);
       StartPlaying();
     }
   }
