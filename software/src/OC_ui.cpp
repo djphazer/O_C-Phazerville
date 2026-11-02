@@ -133,23 +133,28 @@ void FASTRUN Ui::Poll() {
   encoder_right_.Poll();
   encoder_left_.Poll();
 
+  // grace period before we gotta go FAST
+  const uint32_t age = min(now - button_press_time_[2], now - button_press_time_[3]);
+  // hold either encoder and turn for coarse adjustments
+  const bool accelerate = button_down_ & (OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_R);
   int32_t increment;
   increment = encoder_right_.Read();
   if (increment) {
-    // grace period before we gotta go FAST
-    const uint32_t age = min(now - button_press_time_[2], now - button_press_time_[3]);
-    if (age > 10 && button_down_ & (OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_R)) {
-      // hold either encoder and turn for coarse adjustments
+    if (age > 10 && accelerate) {
       SetButtonIgnoreMask(); // prevents oopsies
       increment *= 10;
     }
-
     PushEvent(UI::EVENT_ENCODER, CONTROL_ENCODER_R, increment, button_down_);
   }
 
   increment = encoder_left_.Read();
-  if (increment)
+  if (increment) {
+    if (age > 10 && accelerate) {
+      SetButtonIgnoreMask(); // prevents oopsies
+      increment *= 10;
+    }
     PushEvent(UI::EVENT_ENCODER, CONTROL_ENCODER_L, increment, button_down_);
+  }
 
   button_state_ = button_state;
 }

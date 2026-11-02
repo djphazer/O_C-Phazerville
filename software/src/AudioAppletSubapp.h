@@ -298,16 +298,10 @@ public:
   }
 
   void HandleEncoderEvent(const UI::Event& event) {
-    int dir = event.value;
-    if (event.mask & (OC::CONTROL_BUTTON_L | OC::CONTROL_BUTTON_R)) {
-      // push-and-turn for coarse adjustments
-      dir *= 10;
-      OC::ui.SetButtonIgnoreMask();
-    }
     if (event.control == OC::CONTROL_ENCODER_L)
-      HandleEncoderEvent(LEFT_HEMISPHERE, dir);
+      HandleEncoderEvent(LEFT_HEMISPHERE, event.value);
     if (event.control == OC::CONTROL_ENCODER_R)
-      HandleEncoderEvent(RIGHT_HEMISPHERE, dir);
+      HandleEncoderEvent(RIGHT_HEMISPHERE, event.value);
   }
 
   void HandleEncoderEvent(HEM_SIDE side, int dir) {
