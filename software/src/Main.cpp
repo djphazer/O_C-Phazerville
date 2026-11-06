@@ -47,6 +47,9 @@
 #include "HSMIDI.h"
 
 #include "PhzConfig.h"
+#include "PresetEngine.h"
+#include "PresetBus.h"
+#include "PresetBusUI.h"
 
 #if defined(ARDUINO_TEENSY41)
 USBHost thisUSB;
@@ -96,6 +99,7 @@ void ScanI2C() {
 #endif // ARDUINO_TEENSY41
 
 uint_fast8_t MENU_REDRAW = true;
+volatile uint32_t loop_counter = 0; // loop rate for the preset bus stats
 static OC::UiMode ui_mode = OC::UI_MODE_MENU;
 static DMAMEM OC::IOFrame io_frames[IO_BUFFER_SIZE];
 
@@ -317,7 +321,7 @@ FLASHMEM static void watchdog_arm() {
             | WDOG_WCR_WDBG | WDOG_WCR_WDZST;
   watchdog_armed = true;
 }
-static inline void watchdog_feed() {
+void watchdog_feed() {  // also fed by long preset bus writes
   WDOG1_WSR = 0x5555;
   WDOG1_WSR = 0xAAAA;
 }
@@ -514,6 +518,11 @@ FLASHMEM void setup() {
   OC::AudioIO::OutputStream();
 #endif
 
+  OC::PresetEngine::Init();
+  OC::PresetBus::Init();
+  OC::PresetBusUI::Init();
+  OC::PresetEngine::BootRecall();
+
   // Welcome splash
   OC::ui.Splashscreen(firstrun, 1);
 
@@ -643,6 +652,10 @@ void SerialHandler() {
           Serial.println("'?' = print contents of CRASH.LOG");
           Serial.println("'~' + [abxyzlr<^>v] = simulate button");
 #endif
+#if defined(ARDUINO_TEENSY41)
+          Serial.println("'b' = preset bus status");
+          Serial.println("'v' = toggle preset bus logging");
+#endif
           break;
 
         case 'I':
@@ -666,6 +679,13 @@ void SerialHandler() {
           break;
         case 'i':
           ScanI2C();
+          break;
+        case 'b':
+          OC::PresetBus::DebugDump();
+          break;
+        case 'v':
+          OC::PresetBus::SetVerbose(!OC::PresetBus::Verbose());
+          Serial.printf("PresetBus verbose = %d\n", OC::PresetBus::Verbose());
           break;
 #endif
         case 'C':
@@ -779,6 +799,8 @@ void Redraw() {
     // Handle events and process state changes elsewhere.
     ui.AppSettings(true);
 
+  } else if (OC::PresetBusUI::Active()) {
+    OC::PresetBusUI::Draw();
   } else { // if (UI_MODE_MENU == ui_mode) {
     OC_DEBUG_RESET_CYCLES(menu_draw_count, 512, DEBUG::MENU_draw_cycles);
     OC_DEBUG_PROFILE_SCOPE(DEBUG::MENU_draw_cycles);
@@ -800,6 +822,7 @@ FLASHMEM __attribute__((noinline)) void loop() {
   uint32_t last_redraw_time = 0;
 
   while (true) {
+    ++loop_counter;
 #if defined(__IMXRT1062__)
     watchdog_feed();
 #endif
@@ -824,6 +847,9 @@ FLASHMEM __attribute__((noinline)) void loop() {
       app_switcher.current_app()->DispatchLoop();
 
     OC::CORE::FlushTasks();
+    OC::PresetEngine::Process();
+    OC::PresetBus::Task();
+    OC::PresetBusUI::Task();
 
     // UI events
     if (UI_MODE_APP_SETTINGS == ui_mode) {

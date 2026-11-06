@@ -882,7 +882,7 @@ public:
 
         // Overlay popup Load/Save menu last
         if (HS::popup_type == HS::MENU_POPUP &&
-            HS::get_tick() - HS::popup_tick < HS::popup_duration) {
+            HS::popup_now() - HS::popup_tick < HS::popup_duration) {
           HS::DrawMenuPopup(config_cursor);
         }
     }
