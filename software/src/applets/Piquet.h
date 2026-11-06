@@ -742,6 +742,13 @@ private:
 };
 
 void FLASHMEM Piquet::Controller() {
+      // Capture pending EOC triggers before processing either channel.
+      bool pending_eoc[NUM_CHANNELS];
+      ForEachChannel(ch) {
+        pending_eoc[ch] = channels[ch].eoc_trigger_pending;
+        channels[ch].eoc_trigger_pending = false;
+      }
+
       ForEachChannel(ch) {
         Channel &c = channels[ch];
 
@@ -755,8 +762,7 @@ void FLASHMEM Piquet::Controller() {
 
         const bool gate = Gate(ch);
         const bool clock_trigger = Clock(ch);
-        const bool eoc_trigger = c.eoc_trigger_pending;
-        c.eoc_trigger_pending = false;
+        const bool eoc_trigger = pending_eoc[ch];
         const bool trigger = clock_trigger || eoc_trigger;
         const bool gate_fall = !gate && c.gate_prev;
         c.gate_prev = gate;
