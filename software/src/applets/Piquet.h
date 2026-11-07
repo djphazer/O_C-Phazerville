@@ -171,6 +171,7 @@ public:
       uint8_t peaks_cached_attack;
       uint8_t peaks_cached_decay;
       uint8_t peaks_cached_release;
+      uint8_t peaks_cached_sustain;
       uint16_t peaks_cached_attack_time;
       uint16_t peaks_cached_decay_time;
       uint16_t peaks_cached_release_time;
@@ -205,6 +206,7 @@ public:
         peaks_configured_type = 0xFF;
         peaks_config_signature = 0xFFFFFFFFu;
         peaks_times_cached = false;
+        peaks_cached_sustain = stage_value[STAGE_SUSTAIN];
 
         gate_prev = false;
         output = 0;
@@ -408,8 +410,11 @@ private:
     int stage_display_value(const Channel &c, int stage) const {
       int value = c.stage_value[stage];
 
-      if (stage == STAGE_SUSTAIN)
+      if (stage == STAGE_SUSTAIN) {
+        if (c.peaks_times_cached)
+          value = c.peaks_cached_sustain;
         return Proportion(value, STAGE_MAX_VALUE, 100);
+      }
 
       // Display the effective CV-modulated stage duration.
       if (c.peaks_times_cached) {
@@ -622,6 +627,7 @@ private:
       const uint16_t attack_time = c.peaks_cached_attack_time;
       const uint16_t decay_time = c.peaks_cached_decay_time;
       const uint16_t release_time = c.peaks_cached_release_time;
+      c.peaks_cached_sustain = static_cast<uint8_t>(sustain);
       const uint16_t sustain_level =
           Proportion(sustain, STAGE_MAX_VALUE, 32767);
 
