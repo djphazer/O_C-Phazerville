@@ -387,7 +387,10 @@ private:
             item == stages[i].shape_cursor)
           return stages[i].has_shape;
       }
-      return true;
+
+      // Unmatched stages and shapes are unavailable.
+      return !((item >= CURSOR_ATTACK && item <= CURSOR_RELEASE) ||
+               (item >= CURSOR_ATTACK_SHAPE && item <= CURSOR_RELEASE_SHAPE));
     }
 
     int stage_count(EnvType type) const {
