@@ -406,10 +406,20 @@ private:
     }
 
     int stage_display_value(const Channel &c, int stage) const {
-      const int value = c.stage_value[stage];
+      int value = c.stage_value[stage];
 
       if (stage == STAGE_SUSTAIN)
         return Proportion(value, STAGE_MAX_VALUE, 100);
+
+      // Display the effective CV-modulated stage duration.
+      if (c.peaks_times_cached) {
+        if (stage == STAGE_ATTACK)
+          value = c.peaks_cached_attack;
+        else if (stage == STAGE_DECAY)
+          value = c.peaks_cached_decay;
+        else if (stage == STAGE_RELEASE)
+          value = c.peaks_cached_release;
+      }
 
       const int multiplier =
           (stage == STAGE_RELEASE ? 2 : 1) << c.length_index;
@@ -592,23 +602,22 @@ private:
 
       // Convert Piquet's stage durations to Peaks' time LUT indices.
       // Cache the result until a parameter or its CV-modulated value changes.
-      if (!c.peaks_times_cached ||
-          c.peaks_cached_attack != attack ||
-          c.peaks_cached_decay != decay ||
-          c.peaks_cached_release != release) {
+      if (!c.peaks_times_cached || c.peaks_cached_attack != attack) {
         c.peaks_cached_attack = attack;
-        c.peaks_cached_decay = decay;
-        c.peaks_cached_release = release;
-
-        c.peaks_cached_attack_time =
-            PeaksTime(StageTicks(attack));
-        c.peaks_cached_decay_time =
-            PeaksTime(StageTicks(decay));
-        c.peaks_cached_release_time =
-            PeaksTime(StageTicks(release));
-
-        c.peaks_times_cached = true;
+        c.peaks_cached_attack_time = PeaksTime(StageTicks(attack));
       }
+
+      if (!c.peaks_times_cached || c.peaks_cached_decay != decay) {
+        c.peaks_cached_decay = decay;
+        c.peaks_cached_decay_time = PeaksTime(StageTicks(decay));
+      }
+
+      if (!c.peaks_times_cached || c.peaks_cached_release != release) {
+        c.peaks_cached_release = release;
+        c.peaks_cached_release_time = PeaksTime(StageTicks(release));
+      }
+
+      c.peaks_times_cached = true;
 
       const uint16_t attack_time = c.peaks_cached_attack_time;
       const uint16_t decay_time = c.peaks_cached_decay_time;
