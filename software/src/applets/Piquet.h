@@ -807,8 +807,8 @@ void FLASHMEM Piquet::Controller() {
           }
         }
 
-        if (c.trigger_queue.TickReady())
-          ++trigger_count;
+        if (c.delay_mode == DELAY_OFF) c.trigger_queue.Reset();
+        else if (c.trigger_queue.TickReady()) ++trigger_count;
 
         while (trigger_count-- > 0) {
           if (c.is_looping() && c.loop_mode == LOOP_CONT) {
@@ -1479,5 +1479,12 @@ void FLASHMEM Piquet::OnDataReceive(uint64_t data) {
       CONSTRAIN(channels[ch].decay_shape, 0, SHAPE_COUNT - 1);
       CONSTRAIN(channels[ch].release_shape, 0, SHAPE_COUNT - 1);
     }
+  }
+
+  // Keep the cursor valid for the restored envelope type.
+  const EnvType type = static_cast<EnvType>(channels[selected_channel].type);
+  if (!cursor_visible_for_type(cursor, type)) {
+    cursor = CURSOR_ATTACK;
+    parameter_navigation = false;
   }
 }
