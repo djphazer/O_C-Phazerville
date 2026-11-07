@@ -298,16 +298,18 @@ public:
         cursor == CURSOR_RELEASE_SHAPE;
 
       selected_channel = 1 - selected_channel;
+      const EnvType new_type = static_cast<EnvType>(channels[selected_channel].type);
 
       if (cursor == CURSOR_LOOP_MODE &&
-          !cursor_visible_for_type(cursor, static_cast<EnvType>(channels[selected_channel].type))) {
+          !cursor_visible_for_type(cursor, new_type)) {
         cursor = CURSOR_ATTACK;
         parameter_navigation = false;
       }
 
-      if (stage_index >= 0) {
-        cursor = cursor_for_stage_index(
-          stage_index, static_cast<EnvType>(channels[selected_channel].type), shape_cursor);
+      // Preserve the same parameter when available.
+      // Otherwise fall back to the corresponding stage position.
+      if (stage_index >= 0 && cursor_stage_index(cursor, new_type) < 0) {
+        cursor = cursor_for_stage_index(stage_index, new_type, shape_cursor);
       }
     }
 
