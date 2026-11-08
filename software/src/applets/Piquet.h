@@ -27,6 +27,8 @@ public:
     static constexpr int NUM_CHANNELS = 2;
     static constexpr int NUM_STAGES = 4;
     static constexpr int STAGE_MAX_VALUE = 255;
+    static constexpr int LENGTH_DEFAULT = 3;
+    static constexpr int LENGTH_MAX = 6;
     static constexpr int DISPLAY_HEIGHT = 32;
     static constexpr int PARAM_X = 9;
     static constexpr int PARAM_Y = 20;
@@ -201,7 +203,7 @@ public:
         inverted = false;
         eoc_enabled = false;
         eoc_trigger_pending = false;
-        length_index = 0;
+        length_index = LENGTH_DEFAULT;
         peaks_envelope.Init();
         peaks_trigger_pending = false;
         peaks_waiting_for_trigger = false;
@@ -229,9 +231,10 @@ public:
         Pack(data, PackLocation {56,1}, inverted ? 1 : 0);
         Pack(data, PackLocation {57,1}, loop_mode);
         Pack(data, PackLocation {58,1}, loop_enabled ? 1 : 0);
-        Pack(data, PackLocation {59,2}, length_index);
+        Pack(data, PackLocation {59,2}, length_index & 3);
         Pack(data, PackLocation {61,1}, eoc_enabled ? 1 : 0);
-        // 2 empty bits
+        Pack(data, PackLocation {62,1}, length_index >> 2);
+        Pack(data, PackLocation {63,1}, 1); // New Length format
         return data;
       }
       void unpack(uint64_t data) {
@@ -248,9 +251,15 @@ public:
         loop_mode = Unpack(data, PackLocation {57,1});
         loop_enabled = loop_mode == LOOP_CONT &&
             Unpack(data, PackLocation {58,1}) != 0;
-        length_index = constrain(Unpack(data, PackLocation {59,2}), 0, 3);
+        const int old_length = Unpack(data, PackLocation {59,2});
+        if (Unpack(data, PackLocation {63,1})) {
+          const int high_bit = Unpack(data, PackLocation {62,1});
+          length_index = constrain(old_length | (high_bit << 2), 0, LENGTH_MAX);
+        } else {
+          // Old x1/x2/x4/x8 become /4,/2,x1,x2.
+          length_index = old_length + 1;
+        }
         eoc_enabled = Unpack(data, PackLocation {61,1});
-        // 2 empty bits
       }
 
       bool is_looping() const {
@@ -434,8 +443,7 @@ private:
           value = c.peaks_cached_release;
       }
 
-      const int multiplier =
-          (stage == STAGE_RELEASE ? 2 : 1) << c.length_index;
+      const int multiplier = 1 << c.length_index;
 
       return StageMilliseconds(value, multiplier);
     }
@@ -548,7 +556,7 @@ private:
       return cursor_for_stage_index(stage - 1, type, false);
     }
     static int StageTicks(uint8_t value) {
-      return HS::kShapeExponential[value] >> 1;
+      return HS::kShapeExponential[value] >> 2;
     }
 
     static int StageMilliseconds(uint8_t value, int multiplier) {
@@ -671,7 +679,7 @@ private:
         // Let Peaks apply Length multipliers when it configures each segment.
         env.set_attack_time_multiplier(c.length_index);
         env.set_decay_time_multiplier(c.length_index);
-        env.set_release_time_multiplier(c.length_index + 1);
+        env.set_release_time_multiplier(c.length_index);
 
         switch (c.type) {
           case ENV_AD:
@@ -931,7 +939,7 @@ void FLASHMEM Piquet::OnEncoderMove(int direction) {
       Channel &c = channels[selected_channel];
       switch (cursor) {
         case CURSOR_LENGTH:
-          c.length_index = constrain(c.length_index + direction, 0, 3);
+          c.length_index = constrain(c.length_index + direction, 0, LENGTH_MAX);
           break;
         case CURSOR_TYPE:
           c.type = constrain(c.type + direction, 0, ENV_TYPE_COUNT - 1);
@@ -1026,9 +1034,9 @@ void FLASHMEM Piquet::DrawParamRow(int x_offset) {
           if (EditMode()) gfxInvert(param_x + 10, PARAM_Y - 1, strlen(value) * 6, 9);
         }
 
-        static const char* length_names[] = {"x1", "x2", "x4", "x8"};
+        static const char* length_names[] = {"/8", "/4", "/2", "x1", "x2", "x4", "x8"};
         gfxIcon(param_x + 32, PARAM_Y, ENV_ICON);
-        gfxPrint(param_x + 41, PARAM_Y, length_names[constrain(c.length_index, 0, 3)]);
+        gfxPrint(param_x + 41, PARAM_Y, length_names[constrain(c.length_index, 0, LENGTH_MAX)]);
         if (cursor == CURSOR_LENGTH && EditMode())
           gfxCursor(param_x + 41, PARAM_Y + 9, 12, 9, cursor_label());
         return;
@@ -1134,8 +1142,18 @@ void FLASHMEM Piquet::DrawParamRow(int x_offset) {
         static const char* labels[] = {"A:", "D:", "S:", "R:"};
 
         gfxPrint(param_x, PARAM_Y, labels[stage]);
-        gfxPrint(param_x + 12, PARAM_Y, stage_display_value(c, stage));
-        gfxPrint(stage == STAGE_SUSTAIN ? "%" : "ms");
+        const int duration = stage_display_value(c, stage);
+        gfxPrint(param_x + 12, PARAM_Y, duration < 1000 || stage == STAGE_SUSTAIN
+            ? duration : duration / 1000);
+        if (stage == STAGE_SUSTAIN) {
+          gfxPrint("%");
+        } else if (duration < 1000) {
+          gfxPrint("ms");
+        } else {
+          gfxPrint(".");
+          gfxPrint((duration % 1000) / 100);
+          gfxPrint("s");
+        }
       }
 
       if (cursor >= CURSOR_ATTACK && cursor != CURSOR_LOOP_MODE && EditMode()) {
@@ -1422,8 +1440,12 @@ int FLASHMEM Piquet::cursor_value_width(const Channel &c) const {
         case CURSOR_SUSTAIN:
         case CURSOR_RELEASE: {
           const int stage = stage_value_index(cursor);
-          const int unit_width = stage == STAGE_SUSTAIN ? 6 : 12;
-          return numeric_text_width(stage_display_value(c, stage)) + unit_width;
+          const int duration = stage_display_value(c, stage);
+          if (stage == STAGE_SUSTAIN)
+            return numeric_text_width(duration) + 6;
+          if (duration < 1000)
+            return numeric_text_width(duration) + 12;
+          return numeric_text_width(duration / 1000) + 24;
         }
         case CURSOR_ATTACK_SHAPE:
           return text_width(shape_name(c.attack_shape), 36);
