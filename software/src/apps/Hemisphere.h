@@ -371,6 +371,7 @@ public:
     };
 
     void StoreToPreset(int id, bool skip_eeprom = false) {
+      if (id < 0 || id >= HEM_NR_OF_PRESETS) return;
 #ifdef __IMXRT1062__
         uint16_t preset_key = id << 9;
 
@@ -479,6 +480,8 @@ public:
         preset_id = id;
     }
     void LoadFromPreset(int id) {
+      if (id < 0 || id >= HEM_NR_OF_PRESETS) return;
+
         preset_id = id;
 #ifdef __IMXRT1062__
         // T4.x uses a LittleFS file via PhzConfig
@@ -1709,6 +1712,11 @@ void AppHemisphere::DrawDebugInfo() const {
 
 void AppHemisphere::HandleButtonEvent(const UI::Event &event) {
     switch (event.type) {
+      case UI::EVENT_MISC:
+        if (event.control == UI::MISC_PRESET_LOAD) QueuePresetLoad(event.value);
+        if (event.control == UI::MISC_PRESET_SAVE) StoreToPreset(event.value);
+        break;
+
       case UI::EVENT_BUTTON_DOWN:
         if (event.control == OC::CONTROL_BUTTON_M) {
             ToggleClockRun();
