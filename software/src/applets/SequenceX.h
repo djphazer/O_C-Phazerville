@@ -211,6 +211,8 @@ private:
         const int zero_pos = 20 + ((OC::DAC::kOctaveZero == 0) + 1) * 20;
         gfxDottedLine(0, zero_pos, 63, zero_pos, 3);
 
+        if (cursor < SEQX_STEPS) SetLabel("StepVal");
+
         // Sliders
         for (int s = 0; s < SEQX_STEPS; s++) {
             const int x = 3 + (8 * s);
@@ -238,9 +240,10 @@ private:
             }
 
             if (s == cursor - 2*SEQX_STEPS) {
+                gfxIcon(x - 4, y, CV_ICON, true);
                 gfxStartCursor(x - 5, y - 8);
                 gfxPrint(note_cv[s]);
-                gfxEndCursor(cursor == s, false, note_cv[s].InputName());
+                gfxEndCursor(EditMode(), false, note_cv[s].InputName(), "StepCV");
             }
 
             if (s == cursor - SEQX_STEPS)
@@ -248,7 +251,7 @@ private:
 
             if (s == cursor && EditMode()) {
                 gfxInvert(x - 2, y, 5, h + 1);
-                int8_t noteval = note_active[s] + 30*(OC::DAC::kOctaveZero == 0);
+                int8_t noteval = note[s] + 30*(OC::DAC::kOctaveZero == 0);
                 int w_ = 18 - pad(100, noteval);
                 int x_ = constrain(x - 9 + pad(10, noteval), 0, 63 - w_);
 
