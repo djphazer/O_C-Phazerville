@@ -3,7 +3,47 @@
 #include "HSUtils.h"
 #include "HSIOFrame.h"
 
-#ifdef ARDUINO_TEENSY41
+bool SystemExclusiveHandler::ListenForSysEx() {
+  bool heard_sysex = 0;
+  if (HS::frame.MIDIState.syxdata) {
+    OnReceiveSysEx();
+    heard_sysex = 1;
+    HS::frame.MIDIState.syxdata = nullptr;
+    HS::frame.MIDIState.syxlen = 0;
+  }
+  return heard_sysex;
+}
+bool SystemExclusiveHandler::ExtractSysExData(uint8_t* V, char target_id) {
+  // Get the full sysex dump from the MIDI library
+  uint8_t* sysex = HS::frame.MIDIState.syxdata;
+
+  bool verify = (sysex[1] == 0x7d && sysex[2] == 0x62 && sysex[3] == target_id);
+  if (verify) { // Does the received SysEx belong to this app?
+    // Strip the header and end-of-exclusive byte to reveal packed data
+    PackedData packed;
+    uint8_t psize = 0;
+    uint8_t data[SYSEX_DATA_MAX_SIZE];
+    for (int i = 0; i < SYSEX_DATA_MAX_SIZE; i++) {
+      uint8_t b = sysex[i + 4]; // Getting packed bytes past the header
+      if (b == 0xf7) break;
+      data[psize++] = b;
+    }
+    packed.set_data(psize, data);
+
+    // Unpack the data and set the value array
+    UnpackedData unpacked = packed.unpack();
+    for (int i = 0; i < unpacked.size; i++) {
+      V[i] = unpacked.data[i];
+    }
+    last_app_code = target_id;
+  } else {
+    if (sysex[1] == 0x7d && sysex[2] == 0x62) {
+      last_app_code = sysex[3];
+    } else last_app_code = 0; // Unknown application
+  }
+  return verify;
+}
+
 void MidiLog::Push(bool out, uint8_t message, uint8_t channel, uint8_t d1, uint8_t d2) {
   uint16_t s = (uint16_t)(seq + 1);
   if (s == 0) s = 1;             // skip 0 on wrap (0 marks empty slots)
@@ -27,7 +67,6 @@ void MidiLog::PrintLog() {
 }
 DMAMEM MidiLog::Ev MidiLog::ring[kEvents];
 volatile uint16_t MidiLog::seq = 0;
-#endif
 
 const int HS::MIDIMapping::ViewOut() const {
   if (IsPitch()) return output + (transpose * 128) + Proportion(pitch_bend, 8192, frame.MIDIState.bend_range << 7);

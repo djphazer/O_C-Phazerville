@@ -45,6 +45,7 @@
 #include "util/util_debugpins.h"
 #include "VBiasManager.h"
 #include "HSMIDI.h"
+#include "HSIOFrame.h"
 
 #include "PhzConfig.h"
 
@@ -659,11 +660,11 @@ void SerialHandler() {
           break;
 
 #if defined(__IMXRT1062__)
-#if defined(ARDUINO_TEENSY41)
         case 'N':
           // MIDI monitor: dump the in/out event ring as one "N:..." line.
           MidiLog::PrintLog();
           break;
+#if defined(ARDUINO_TEENSY41)
         case 'i':
           ScanI2C();
           break;
@@ -788,6 +789,100 @@ void Redraw() {
   GRAPHICS_END_FRAME();
 }
 
+namespace HS {
+static elapsedMicros midi_timeout = 0;
+
+#if defined(ARDUINO_TEENSY41)
+void SendMIDIThru(const MIDIMessage &msg, uint8_t exclude_mask) {
+  exclude_mask |= midi_thru_disable;
+
+  // MIDI monitor: log thru traffic as OUT (only if some port will send it)
+  if (msg.message != midi::Clock &&
+      (~exclude_mask & (mMaskUSBDev | mMaskUSBHost | mMaskUSBHost2 | mMaskSerial)))
+    MidiLog::Push(true, msg.message, msg.channel, msg.data1, msg.data2);
+
+  if (~exclude_mask & mMaskUSBDev) {
+    usbMIDI.send(msg.message, msg.data1, msg.data2, msg.channel, 0);
+  }
+  if (~exclude_mask & mMaskUSBHost) {
+    usbHostMIDI[0].send(msg.message, msg.data1, msg.data2, msg.channel);
+  }
+  if (~exclude_mask & mMaskUSBHost2) {
+    usbHostMIDI[1].send(msg.message, msg.data1, msg.data2, msg.channel);
+  }
+  if (~exclude_mask & mMaskSerial) {
+    MIDI1.send((midi::MidiType)msg.message, msg.data1, msg.data2, msg.channel);
+  }
+}
+#endif
+
+template <typename T1>
+void ProcessMIDI(T1 &device) {
+    HS::IOFrame &f = HS::frame;
+
+    uint8_t thrumask = 0;
+    // who needs types? we have pointers!
+    if ((void*)&device == (void*)&usbMIDI) thrumask = mMaskUSBDev;
+#if defined(ARDUINO_TEENSY41)
+    if ((void*)&device == (void*)&usbHostMIDI[0]) thrumask = mMaskUSBHost;
+    if ((void*)&device == (void*)&usbHostMIDI[1]) thrumask = mMaskUSBHost2;
+    if ((void*)&device == (void*)&MIDI1) thrumask = mMaskSerial;
+    // Serial-to-Serial Thru still happens in the library, if enabled
+#endif
+
+    const bool clkrx = ~midi_clkrx_disable & thrumask;
+    const bool msgrx = ~midi_msgrx_disable & thrumask;
+
+    while (midi_timeout < 60 && device.read()) {
+      const MIDIMessage msg = {
+        device.getChannel(),
+        device.getType(),
+        device.getData1(),
+        device.getData2()
+      };
+
+      // MIDI monitor: log everything received except the floods (Clock,
+      // Active Sensing) and SysEx (reserved for the display transport).
+      if (msg.message != midi::Clock
+          && msg.message != midi::ActiveSensing
+          && msg.message != midi::SystemExclusive)
+        MidiLog::Push(false, msg.message, msg.channel, msg.data1, msg.data2);
+
+      switch (msg.message) {
+        case midi::SystemExclusive:
+          // cache the pointer for apps to consume
+          f.MIDIState.syxdata = device.getSysExArray();
+          f.MIDIState.syxlen = device.getSysExArrayLength();
+          continue; // don't send to Thru
+
+        case midi::ProgramChange:
+          if (msg.channel == f.MIDIState.pc_channel || f.MIDIState.pc_channel == f.MIDIState.PC_OMNI) {
+            OC::ui.Inject(UI::EVENT_MISC, UI::MISC_PRESET_LOAD, msg.data1, 0);
+          }
+          break;
+
+        case midi::Clock:
+        case midi::Start:
+        case midi::Continue:
+        case midi::Stop:
+        case midi::SongPosition:
+          if (clkrx) f.MIDIState.ProcessMIDIMsg(msg); // receive it
+            break;
+
+        default:
+          if (msgrx && (msg.message >> 4) != 0xF) f.MIDIState.ProcessMIDIMsg(msg); // receive it
+            break;
+      }
+
+#if defined(ARDUINO_TEENSY41)
+      // send it along
+      SendMIDIThru(msg, thrumask);
+#endif
+    }
+}
+
+} // namespace HS
+
 /*  ---------    main loop  --------  */
 FLASHMEM __attribute__((noinline)) void loop() {
   using namespace OC;
@@ -822,6 +917,20 @@ FLASHMEM __attribute__((noinline)) void loop() {
     // Run current app
     if (CORE::app_loop_enabled)
       app_switcher.current_app()->DispatchLoop();
+
+    // -- Process MIDI
+    HS::midi_timeout = 0;
+    // top-level MIDI-to-CV handling - alters frame outputs
+    HS::ProcessMIDI(usbMIDI);
+#if defined(ARDUINO_TEENSY41)
+    HS::ProcessMIDI(usbHostMIDI[0]);
+    HS::ProcessMIDI(usbHostMIDI[1]);
+    HS::ProcessMIDI(MIDI1);
+#ifdef USB_GAMEPAD
+    // gamepad is a lot like midi, too
+    ProcessGamepad(joystick);
+#endif
+#endif
 
     OC::CORE::FlushTasks();
 
