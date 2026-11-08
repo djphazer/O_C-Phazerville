@@ -503,6 +503,8 @@ struct alignas(32) MIDIFrame {
     uint16_t midi_channel_filter = 0; // each bit state represents a channel. 1 means enabled. all 0's means Omni (no channel filter)
 
     uint8_t last_midi_channel = 0; // for MIDI In activity monitor
+    uint8_t *syxdata = nullptr;
+    size_t syxlen = 0;
 
     uint8_t pc_channel = 0; // program change channel filter, used for preset selection
     uint8_t bend_range = 12; // in semitones, for pitch bend

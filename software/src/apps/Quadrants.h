@@ -32,8 +32,6 @@ static constexpr int PRESET_FILE_REVISION = 1;
 
 using namespace HS;
 
-void QuadrantSysExHandler();
-
 OC_APP_CLASS(AppQuadrants, TWOCCS("QS"), "Quadrants", "4x Applets"),
   public HSApplication {
 public:
@@ -551,99 +549,6 @@ public:
         next_applet_index[h] = index;
     }
 
-    void SendMIDIThru(const MIDIMessage &msg, uint8_t exclude_mask) {
-      exclude_mask |= midi_thru_disable;
-
-      // MIDI monitor: log thru traffic as OUT (only if some port will send it)
-      if (msg.message != midi::Clock &&
-          (~exclude_mask & (mMaskUSBDev | mMaskUSBHost | mMaskUSBHost2 | mMaskSerial)))
-        MidiLog::Push(true, msg.message, msg.channel, msg.data1, msg.data2);
-
-      if (~exclude_mask & mMaskUSBDev) {
-        usbMIDI.send(msg.message, msg.data1, msg.data2, msg.channel, 0);
-      }
-      if (~exclude_mask & mMaskUSBHost) {
-        usbHostMIDI[0].send(msg.message, msg.data1, msg.data2, msg.channel);
-      }
-      if (~exclude_mask & mMaskUSBHost2) {
-        usbHostMIDI[1].send(msg.message, msg.data1, msg.data2, msg.channel);
-      }
-      if (~exclude_mask & mMaskSerial) {
-        MIDI1.send((midi::MidiType)msg.message, msg.data1, msg.data2, msg.channel);
-      }
-    }
-
-    template <typename T1>
-    void ProcessMIDI(T1 &device) {
-        HS::IOFrame &f = HS::frame;
-        int load_slot = -1;
-
-        uint8_t thrumask = 0;
-        // who needs types? we have pointers!
-        if ((void*)&device == (void*)&usbMIDI) thrumask = mMaskUSBDev;
-        if ((void*)&device == (void*)&usbHostMIDI[0]) thrumask = mMaskUSBHost;
-        if ((void*)&device == (void*)&usbHostMIDI[1]) thrumask = mMaskUSBHost2;
-        if ((void*)&device == (void*)&MIDI1) thrumask = mMaskSerial;
-        // Serial-to-Serial Thru still happens in the library, if enabled
-
-        const bool clkrx = ~midi_clkrx_disable & thrumask;
-        const bool msgrx = ~midi_msgrx_disable & thrumask;
-
-        while (timeout < 60 && device.read()) {
-          const MIDIMessage msg = {
-            device.getChannel(),
-            device.getType(),
-            device.getData1(),
-            device.getData2()
-          };
-
-          // MIDI monitor: log everything received except the floods (Clock,
-          // Active Sensing) and SysEx (reserved for the display transport).
-          if (msg.message != midi::Clock && msg.message != midi::ActiveSensing
-              && msg.message != midi::SystemExclusive)
-            MidiLog::Push(false, msg.message, msg.channel, msg.data1, msg.data2);
-
-          switch (msg.message) {
-            case midi::SystemExclusive:
-              QuadrantSysExHandler();
-              continue;
-
-            case midi::ProgramChange:
-              if (msg.channel == f.MIDIState.pc_channel || f.MIDIState.pc_channel == f.MIDIState.PC_OMNI) {
-                load_slot = msg.data1;
-              }
-              break;
-
-            case midi::Clock:
-            case midi::Start:
-            case midi::Stop:
-              if (clkrx) f.MIDIState.ProcessMIDIMsg(msg); // receive it
-                break;
-
-            default:
-              if (msgrx && (msg.message >> 4) != 0xF) f.MIDIState.ProcessMIDIMsg(msg); // receive it
-                break;
-          }
-
-          // send it along
-          SendMIDIThru(msg, thrumask);
-        }
-        if (load_slot >= 0 && load_slot < QUAD_PRESET_COUNT) {
-            QueuePresetLoad(load_slot);
-        }
-    }
-
-    void mainloop() {
-        timeout = 0;
-        // top-level MIDI-to-CV handling - alters frame outputs
-        ProcessMIDI(usbMIDI);
-        ProcessMIDI(usbHostMIDI[0]);
-        ProcessMIDI(usbHostMIDI[1]);
-        ProcessMIDI(MIDI1);
-#ifdef USB_GAMEPAD
-        ProcessGamepad(joystick);
-#endif
-    }
     void Controller() {
         // this might be triggered by the internal clock...
         if (jump_trig_.Clock() && !HS::clock_m.auto_reset) {
@@ -1198,8 +1103,6 @@ private:
     uint16_t mask = 0;
     uint16_t last_mask = 0;
 
-    elapsedMicros timeout = 0;
-
     // State machine
     enum QuadrantsView {
       APPLETS,
@@ -1742,10 +1645,6 @@ private:
     }
 };
 
-void QuadrantSysExHandler() {
-  // TODO
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 //// O_C App Functions
 ////////////////////////////////////////////////////////////////////////////////
@@ -1808,7 +1707,6 @@ FLASHMEM void AppQuadrants::HandleAppEvent(OC::AppEvent event) {
 }
 
 void AppQuadrants::Loop() {
-    mainloop();
     audio_app.mainloop();
 }
 

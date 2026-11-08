@@ -306,23 +306,11 @@ public:
     virtual void OnReceiveSysEx() = 0;
 
 protected:
-    /* ListenForSysEx() is for use by apps that don't otherwise deal with listening to MIDI input.
-     * A call to ListenForSysEx() is placed in the ISR. When SysEx is recieved, ListenForSysEx()
-     * calls OnReceiveSysEx().
-     *
-     * IMPORTANT! Do not use ListenForSysEx() in apps that use MIDI in, because ListenForSysEx()
-     * will devour most of the incoming MIDI events, and MIDI in won't work.
+    /* ListenForSysEx() now works for all apps. A pointer to the payload is cached in the global HS::frame.
+     * A call to ListenForSysEx() in the Controller() will process any waiting payload by calling OnReceiveSysEx().
      */
-    bool ListenForSysEx() {
-        bool heard_sysex = 0;
-        if (usbMIDI.read()) {
-            if (usbMIDI.getType() == midi::SystemExclusive) {
-                OnReceiveSysEx();
-                heard_sysex = 1;
-            }
-        }
-        return heard_sysex;
-    }
+    bool ListenForSysEx();
+    bool ExtractSysExData(uint8_t *V, char target_id);
 
     void SendSysEx(PackedData packed, char target_id) {
         uint8_t sysex[SYSEX_DATA_MAX_SIZE];
@@ -336,41 +324,9 @@ protected:
             sysex[size++] = packed.data[i];
         }
         sysex[size++] = 0xf7; // End of exclusive
+        // TODO: enable for more interfaces? or USB only...
         usbMIDI.sendSysEx(size, sysex);
         usbMIDI.send_now();
-    }
-
-    bool ExtractSysExData(uint8_t *V, char target_id) {
-        // Get the full sysex dump from the MIDI library
-        uint8_t *sysex = usbMIDI.getSysExArray();
-
-        bool verify = (sysex[1] == 0x7d && sysex[2] == 0x62 && sysex[3] == target_id);
-        if (verify) { // Does the received SysEx belong to this app?
-            // Strip the header and end-of-exclusive byte to reveal packed data
-            PackedData packed;
-            uint8_t psize = 0;
-            uint8_t data[SYSEX_DATA_MAX_SIZE];
-            for (int i = 0; i < SYSEX_DATA_MAX_SIZE; i++)
-            {
-                uint8_t b = sysex[i + 4]; // Getting packed bytes past the header
-                if (b == 0xf7) break;
-                data[psize++] = b;
-            }
-            packed.set_data(psize, data);
-
-            // Unpack the data and set the value array
-            UnpackedData unpacked = packed.unpack();
-            for (int i = 0; i < unpacked.size; i++)
-            {
-                V[i] = unpacked.data[i];
-            }
-            last_app_code = target_id;
-        } else {
-            if (sysex[1] == 0x7d && sysex[2] == 0x62) {
-                last_app_code = sysex[3];
-            } else last_app_code = 0; // Unknown application
-        }
-        return verify;
     }
 
     char LastSysExApplicationCode() {return last_app_code;}

@@ -688,40 +688,6 @@ public:
         next_applet[h] = index;
     }
 
-    template <typename T1>
-    void ProcessMIDI(T1 &device) {
-        HS::IOFrame &f = HS::frame;
-        int load_slot = -1;
-
-        while (timeout < 60 && device.read()) {
-            const uint8_t message = device.getType();
-            const uint8_t data1 = device.getData1();
-            const uint8_t data2 = device.getData2();
-
-            if (message == usbMIDI.SystemExclusive) {
-                ReceiveManagerSysEx();
-                continue;
-            }
-
-            if (message == usbMIDI.ProgramChange
-            && (device.getChannel() == f.MIDIState.pc_channel || f.MIDIState.pc_channel == f.MIDIState.PC_OMNI)) {
-                load_slot = device.getData1();
-                //continue;
-            }
-
-            f.MIDIState.ProcessMIDIMsg({device.getChannel(), message, data1, data2});
-        }
-        if (load_slot >= 0 && load_slot < HEM_NR_OF_PRESETS) {
-            QueuePresetLoad(load_slot);
-        }
-    }
-
-    void mainloop() {
-        timeout = 0;
-        // top-level MIDI-to-CV handling - alters frame outputs
-        ProcessMIDI(usbMIDI);
-    }
-
     void Controller() {
         // Clock duties are now called from BaseController, before frame Load
 
@@ -1151,8 +1117,6 @@ private:
     int zoom_cursor; // 0=select; 1,2=trigmap; 3,4=cvmap; 5,6=outmode
     uint32_t click_tick; // Measure time between clicks for double-click
     int first_click; // The first button pushed of a double-click set, to see if the same one is pressed
-
-    elapsedMicros timeout = 0;
 
     // State machine
     enum HEMView {
@@ -1680,7 +1644,6 @@ void AppHemisphere::HandleAppEvent(OC::AppEvent event) {
 }
 
 void AppHemisphere::Loop() {
-    mainloop();
 }
 
 void AppHemisphere::DrawMenu() const {
