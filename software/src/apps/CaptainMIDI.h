@@ -351,17 +351,7 @@ public:
 #endif
 
     void Controller() {
-        // Drain incoming MIDI traffic; cap per-tick work to bound ISR time
-        int budget = 4;
-        while (budget-- > 0 && poll_midi(usbMIDI)) {}
-#ifdef ARDUINO_TEENSY41
-        budget = 4;
-        while (budget-- > 0 && poll_midi(usbHostMIDI[0])) {}
-        budget = 4;
-        while (budget-- > 0 && poll_midi(usbHostMIDI[1])) {}
-        budget = 4;
-        while (budget-- > 0 && poll_midi(MIDI1)) {}
-#endif
+        ListenForSysEx();
 
         // Convert CV/trigger inputs to outgoing MIDI messages
         frame.MIDIState.ProcessOutputs(frame);
@@ -373,15 +363,6 @@ public:
             if (indicator_in[ch] > 0) --indicator_in[ch];
 
             MIDIMapping &map = frame.MIDIState.mapping[ch];
-
-            // ViewOut, not output: the bend term lives there. Driving the
-            // raw value meant pitch bend was received, stored and DRAWN --
-            // the row's level bar moved -- while the jack never carried it.
-            // Found by measurement: a -2.5 cent/semitone correction sent
-            // over bend changed a tuning fit by exactly nothing while the
-            // display swore it was happening (2026-08-28, tune_check
-            // --corrected). ViewOut returns raw output for non-pitch maps
-            // and is a plain multiply, safe at 16.67kHz.
             Out(ch, map.ViewOut());
         }
     }
@@ -1444,27 +1425,6 @@ private:
 
     int get_setup_number() const {
         return active_setup;
-    }
-
-    // CV/trigger -> MIDI conversion lives in HS::MIDIFrame::ProcessOutputs
-    // (HSIOFrame.cpp); the old per-app implementation is gone.
-    // read one message from the device; returns whether one was processed
-    template <typename T1>
-    bool poll_midi(T1 &device) {
-        if (!device.read()) return false;
-
-        uint8_t message = device.getType();
-        uint8_t channel = device.getChannel();
-        uint8_t data1 = device.getData1();
-        uint8_t data2 = device.getData2();
-
-        // Handle system exclusive dump for Setup data.
-        // Copy only — parsing runs from Loop() so the whole SysEx stack
-        // stays out of the ISR (and out of ITCM on Teensy 4).
-        if (message == HEM_MIDI_SYSEX) OnReceiveSysEx();
-
-        HS::frame.MIDIState.ProcessMIDIMsg({channel, message, data1, data2});
-        return true;
     }
 
     uint8_t get_in_assign(int ch) {
