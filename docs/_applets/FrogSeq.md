@@ -22,7 +22,7 @@ The main page displays the frog, a safe zone, three lanes of traffic, the curren
 
 - **Modifier Display:** The Safe zone displays temporary feedback when a collision modifies the sequence, as well as ratchet activity.
 - **Frog:** Switch between horizontal and vertical movement when controlling the frog.
-- **Note Seq Dispay:** Displays the current note. Click here to change the quantizer. Aux Button will give you access to the Q-Engine 
+- **Note Seq Display:** Displays the current note. Click here to change the quantizer. Aux Button will give you access to the Q-Engine
 - **Random icon:** Randomizes the note sequence.
 - **16-step indicators:** Show the state of each step. The highlighted step indicates the current playback step, a single pixel indicates an unmuted step, and no marker indicates a muted step.
 - Move the cursor past Random to access the Note Seq page.
@@ -32,7 +32,7 @@ The main page displays the frog, a safe zone, three lanes of traffic, the curren
 When a collision modifies a sequence step, the Safe zone briefly displays the affected step number, the modifier icon, and its value or state.
 
 - **Step number:** Identifies the sequence step affected by the collision.
-- **Note icon:** Indicates a Note modifier. The displayed number shows the semitone and octave interval. An inverted number indicates a negative interval. The Octave icon has two positions, high and low. The position represents how the octave sits relative to 0V. 
+- **Note icon:** Indicates a Note modifier. The displayed number shows the semitone and octave interval. An inverted number indicates a negative interval. The Octave icon has two positions, high and low. The position represents how the octave sits relative to 0V.
 - **Gate icon:** Indicates a Gate modifier. The checked or unchecked icon shows the resulting gate state.
 - **Ratchet display:** Small squares indicate the remaining ratchet hits. The ZAP icon marks a ratchet hit as it occurs.
 
