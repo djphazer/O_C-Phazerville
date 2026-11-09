@@ -34,6 +34,14 @@ public:
     static constexpr int PARAM_Y = 20;
     static constexpr uint8_t MAX_TRIGGER_QUEUE = 4;
 
+    // 7-bit delay index: 0..127 maps to 10..8500 ms.
+    static int32_t DelayMilliseconds(uint8_t index) {
+      if (index < 40) return (index + 1) * 10;
+      if (index < 64) return 400 + (index - 39) * 25;
+      if (index < 104) return 1000 + (index - 63) * 100;
+      return 5000 + (index - 103) * 250;
+    }
+
 
     enum EnvType : uint8_t {
       ENV_AD,
@@ -191,7 +199,7 @@ public:
         stage_value[STAGE_DECAY] = 52;
         stage_value[STAGE_SUSTAIN] = 160;
         stage_value[STAGE_RELEASE] = 44 + ch * 8;
-        delay_index = 1;
+        delay_index = 0;
         delay_mode = DELAY_OFF;
         cv_map = CVMAP_NONE;
         level = 255;
@@ -243,7 +251,7 @@ public:
         stage_value[STAGE_DECAY] = constrain(Unpack(data, PackLocation {11,8}), 1, STAGE_MAX_VALUE);
         stage_value[STAGE_SUSTAIN] = constrain(Unpack(data, PackLocation {19,8}), 0, STAGE_MAX_VALUE);
         stage_value[STAGE_RELEASE] = constrain(Unpack(data, PackLocation {27,8}), 1, STAGE_MAX_VALUE);
-        delay_index = constrain(Unpack(data, PackLocation {35,7}), 1, 127);
+        delay_index = constrain(Unpack(data, PackLocation {35,7}), 0, 127);
         delay_mode = constrain(Unpack(data, PackLocation {43,2}), 0, DELAY_MODE_COUNT - 1);
         cv_map = constrain(Unpack(data, PackLocation {45,3}), 0, CVMAP_COUNT - 1);
         level = constrain(Unpack(data, PackLocation {48,8}), 0, 255);
@@ -817,9 +825,7 @@ void FLASHMEM Piquet::Controller() {
         int trigger_count = 0;
 
         if (trigger) {
-          const int32_t delay_ms = c.delay_index < 100
-              ? static_cast<int32_t>(c.delay_index) * 10
-              : 1000 + static_cast<int32_t>(c.delay_index - 100) * 100;
+          const int32_t delay_ms = DelayMilliseconds(c.delay_index);
           const int32_t dticks = (delay_ms * 1000L) / 60;
 
           if (c.delay_mode == DELAY_OFF || dticks <= 0) {
@@ -971,7 +977,7 @@ void FLASHMEM Piquet::OnEncoderMove(int direction) {
           break;
         }
         case CURSOR_DELAY:
-          c.delay_index = constrain(c.delay_index + direction, 1, 127);
+          c.delay_index = constrain(c.delay_index + direction, 0, 127);
           break;
         case CURSOR_DELAY_MODE:
           c.delay_mode = constrain(c.delay_mode + direction, 0, DELAY_MODE_COUNT - 1);
@@ -1087,7 +1093,8 @@ void FLASHMEM Piquet::DrawParamRow(int x_offset) {
         }
 
         if (cursor == CURSOR_DELAY) {
-          gfxIcon(param_x, PARAM_Y, CLOCK_ICON);
+          if (!c.trigger_queue.count || (millis() / 250) % 2 == 0)
+            gfxIcon(param_x, PARAM_Y, CLOCK_ICON);
           gfxPrint(param_x + 9, PARAM_Y, ":");
           value_x = param_x + 15;
         } else if (cursor == CURSOR_EOC) {
@@ -1101,14 +1108,16 @@ void FLASHMEM Piquet::DrawParamRow(int x_offset) {
         }
 
         if (cursor == CURSOR_DELAY) {
-          if (c.delay_index < 100) {
-            gfxPrint(value_x, PARAM_Y, c.delay_index * 10);
+          const int32_t delay_ms = DelayMilliseconds(c.delay_index);
+          if (delay_ms < 1000) {
+            gfxPrint(value_x, PARAM_Y, delay_ms);
             gfxPrint("ms");
           } else {
-            const uint8_t tenths = c.delay_index - 90;
-            gfxPrint(value_x, PARAM_Y, tenths / 10);
+            const int hundredths = (delay_ms % 1000) / 10;
+            gfxPrint(value_x, PARAM_Y, delay_ms / 1000);
             gfxPrint(".");
-            gfxPrint(tenths % 10);
+            if (hundredths < 10) gfxPrint("0");
+            gfxPrint(hundredths);
             gfxPrint("s");
           }
         } else if (cursor == CURSOR_LEVEL) {
@@ -1453,9 +1462,12 @@ int FLASHMEM Piquet::cursor_value_width(const Channel &c) const {
           return text_width(shape_name(c.decay_shape), 36);
         case CURSOR_RELEASE_SHAPE:
           return text_width(shape_name(c.release_shape), 36);
-        case CURSOR_DELAY:
-          return c.delay_index < 100
-              ? numeric_text_width(c.delay_index * 10) + 12 : 24;
+        case CURSOR_DELAY: {
+          const int delay_ms = DelayMilliseconds(c.delay_index);
+          return delay_ms < 1000
+              ? numeric_text_width(delay_ms) + 12
+              : numeric_text_width(delay_ms / 1000) + 24;
+        }
         case CURSOR_DELAY_MODE:
           return text_width(dmode_name(c.delay_mode), 52);
         case CURSOR_EOC:
