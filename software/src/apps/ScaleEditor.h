@@ -253,12 +253,12 @@ private:
         current_note += direction;
         if (current_note < 0) {
             if (octave > -1) current_note = length - 1;
-            else current_note += 1;
+            else current_note = 0;
             octave = constrain(octave - 1, -1, 4);
         }
-        if (current_note == length) {
+        if (current_note >= length) {
             if (octave < 4) current_note = 0;
-            else current_note -= 1;
+            else current_note = length - 1;
             octave = constrain(octave + 1, -1, 4);
         }
         undo_value = OC::user_scales[current_scale].notes[current_note];
