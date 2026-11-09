@@ -743,8 +743,6 @@ public:
 
             HS::get_applet(index, h)->Controller();
         }
-        HS::clock_m.auto_reset = false;
-
         HemisphereApplet::ProcessCursors();
     }
 

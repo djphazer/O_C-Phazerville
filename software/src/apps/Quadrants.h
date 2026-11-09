@@ -666,7 +666,6 @@ public:
         }
         audio_app.Controller();
         HemisphereApplet::ProcessCursors();
-        HS::clock_m.auto_reset = false;
     }
 
     void DrawFullScreen() const {
