@@ -69,7 +69,10 @@ public:
     // The ClockSetup controller handles MIDI Clock and Transport Start/Stop
     void Controller() {
         bool midi_sync = false;
-        bool clock_sync = sync_trig.Clock();
+        static bool clock_gate_prev = false;
+        bool clock_gate = sync_trig.Gate();
+        bool clock_trig = !clock_gate_prev && clock_gate;
+        clock_gate_prev = clock_gate;
 
         hemisphere = HS::CLOCK_CURSOR;
 
@@ -86,7 +89,7 @@ public:
         // MIDI Clock is filtered to 2 PPQN
         if (frame.MIDIState.clock_q) {
             frame.MIDIState.clock_q = 0;
-            clock_sync = 1;
+            clock_trig = 1;
             midi_sync = 1;
             clock_m.DisableMIDIOut();
         }
@@ -105,7 +108,7 @@ public:
         }
 
         // Paused means wait for clock-sync to start
-        if (clock_m.IsPaused() && clock_sync) {
+        if (clock_m.IsPaused() && clock_trig) {
             clock_m.Start();
             OC::ui.Poke();
             HS::PokePopup(HS::CLOCK_POPUP);
@@ -113,7 +116,7 @@ public:
 
         // Advance internal clock, sync to external clock / reset
         if (clock_m.IsRunning())
-            clock_m.SyncTrig( clock_sync, midi_sync );
+            clock_m.SyncTrig( clock_trig, midi_sync );
 
         // ------------ //
         if (clock_m.IsRunning() && clock_m.MIDITock()) {
