@@ -147,10 +147,10 @@ public:
     void OnButtonPress() {
       CursorToggle();
 
-      if ( OC::CORE::ticks - click_tick < HEMISPHERE_DOUBLE_CLICK_TIME ) {
+      if ( HS::get_tick() - click_tick < HEMISPHERE_DOUBLE_CLICK_TIME ) {
         // double-click toggles something?
       } else {
-        click_tick = OC::CORE::ticks;
+        click_tick = HS::get_tick();
       }
     }
     void AuxButton() {

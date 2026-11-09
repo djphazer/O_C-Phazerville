@@ -115,8 +115,7 @@ public:
 
 private:
 
-  template <ADC_CHANNEL &channel>
-  static void update(uint32_t value) {
+  static void update(size_t channel, uint32_t value) {
     value = (value  >> (kAdcScanResolution - kAdcResolution)) << kAdcSmoothBits;
     raw_[channel] = value;
 #ifdef OC_DEBUG_ADC_STATS

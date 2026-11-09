@@ -37,6 +37,16 @@
   static_cast<int>(x), \
   static_cast<int>((mul) * ((x) - static_cast<int32_t>(x)))
 
+#if 1
+#define HS_ASSERT(condition, msg) \
+  if (!(condition)) { \
+    PokePopup(ERROR_POPUP, msg); \
+    return; \
+  } do {} while(0)
+#else
+#define HS_ASSERT(cond, msg)
+#endif
+
 namespace HS {
 
   enum HEM_SIDE : uint8_t {
@@ -87,15 +97,9 @@ namespace HS {
     QUANTIZER_POPUP,
     MIDI_POPUP,
     MESSAGE_POPUP,
+    ERROR_POPUP,
 
     POPUP_TYPE_COUNT
-  };
-
-  enum ErrMsgIndex {
-    NO_ERROR,
-    LFS_WRITE_ERROR,
-    PRESET_SAVED,
-    MYSTERIOUS_ERROR,
   };
 
   enum QUANT_CHANNEL {
@@ -204,11 +208,13 @@ namespace HS {
 
   extern uint32_t popup_tick; // for button feedback
   extern PopupType popup_type;
+  extern uint32_t popup_duration;
+  extern const char* error_text;
+
   extern uint8_t qview; // which quantizer's setting is shown in popup
   extern int q_edit;
   extern int midi_edit;
   extern uint8_t mview;
-  extern ErrMsgIndex msg_idx;
 
   extern peaks::MultistageEnvelope env_[DAC_CHANNEL_COUNT];
   extern util::TuringShiftRegister* turing_machine_[ADC_CHANNEL_COUNT];
@@ -245,6 +251,11 @@ namespace HS {
   void Init();
   void ResetMappings();
   void DrawAppletList(bool blink = false);
+  void DrawMidiRouting(int cursor);
+  void ToggleMidiRouting(int cursor);
+  uint32_t get_tick();
+
+  void ProcessClock();
 
   // --- Quantizer helpers
   QuantEngine& GetQuantEngine(int ch);
@@ -264,14 +275,23 @@ namespace HS {
   void MEditEncoderMove(bool rightenc, int dir);
   void DrawMidiMaps(int curpos);
   void DrawConfigRow(int row, int y, bool cur, bool editing);
-  void DrawPopup(const int config_cursor = 0, const int preset_id = 0, const bool blink = 0);
+  void DrawMenuPopup(const int config_cursor = 0);
+  void DrawPopup();
   void ToggleClockRun();
-  void PokePopup(PopupType pop, ErrMsgIndex err = NO_ERROR);
-  void PokePopup(PopupType pop, const char* msg);
+  void PokePopup(PopupType pop, const char* msg = nullptr);
 
   peaks::MultistageEnvelope& GetEnvelope(int index);
   util::TuringShiftRegister& GetTM(int index);
   QuantEngine& GetQEngine(int index);
+
+  extern const uint16_t kStageTicks[256]; // for AD and ADSR
+  // shape LUTs
+  extern const uint16_t kShapeExponential[256];
+  extern const uint16_t kShapeQuartic[256];
+  extern const uint16_t kShapeSine[256];
+  extern const uint16_t kShapeBigDipper[256];
+  extern const uint16_t kShapePlateau[256];
+  extern const uint16_t kShapeSinefold[256];
 
 } // namespace HS
 

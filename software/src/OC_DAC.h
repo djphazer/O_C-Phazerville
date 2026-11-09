@@ -182,11 +182,6 @@ public:
       values_[i] = USAT16(value);
   }
 
-  template <DAC_CHANNEL &channel>
-  static void set(uint32_t value) {
-    values_[channel] = USAT16(value);
-  }
-
   static void set(DAC_CHANNEL channel, uint32_t value) {
     values_[channel] = USAT16(value);
   }
@@ -261,7 +256,7 @@ public:
     return pitch;
   }
 
-  static int32_t GateToDAC(DAC_CHANNEL &channel, int32_t value)
+  static int32_t GateToDAC(DAC_CHANNEL channel, int32_t value)
   {
     return calibration_data_->calibrated_octaves[channel][value ? kOctaveGateHigh : kOctaveZero];
   }

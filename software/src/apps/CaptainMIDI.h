@@ -726,10 +726,10 @@ private:
 
                 // Pitch Bend
                 if (out_fn == MIDI_OUT_PITCHBEND) {
-                    int16_t bend = Proportion(In(ch) + HSAPPLICATION_3V, HSAPPLICATION_3V * 2, 16383);
-                    CONSTRAIN(bend, 0, 16383);
+                    int bend = Proportion(In(ch) + HSAPPLICATION_3V, HSAPPLICATION_3V * 2, 16383) - 8192;
+                    CONSTRAIN(bend, -8192, 8191);
                     hMIDI.SendPitchBend(out_ch, bend);
-                    UpdateLog(0, ch, 4, out_ch, 0, bend - 8192);
+                    UpdateLog(0, ch, 4, out_ch, 0, bend);
                     indicator = 1;
                 }
             }

@@ -16,7 +16,7 @@ class HemisphereAudioApplet : public HemisphereApplet {
 public:
 
   static Factory<AudioEffectReverbSchroeder, 8> bung_factory;
-  static Factory<AudioEffectFreeverb, 8> verb_factory;
+  // static Factory<AudioEffectFreeverb, 8> verb_factory;
   static Factory<AudioEffectDynamics, 20> compressor_factory;
 
   static const uint_fast8_t CONFIG_SIZE = 4;
@@ -88,12 +88,12 @@ public:
     bung_factory.release(verb);
   }
 
-  AudioEffectFreeverb *GetFreeverb() {
-    return verb_factory.get();
-  }
-  void ReleaseFreeverb(AudioEffectFreeverb* verb) {
-    verb_factory.release(verb);
-  }
+  // AudioEffectFreeverb *GetFreeverb() {
+  //   return verb_factory.get();
+  // }
+  // void ReleaseFreeverb(AudioEffectFreeverb* verb) {
+  //   verb_factory.release(verb);
+  // }
 
   AudioEffectDynamics *GetComp() {
     return compressor_factory.get();

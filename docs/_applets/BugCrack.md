@@ -23,12 +23,12 @@ layout: default
 * Kick decay
 * Kick punch
 * Kick drop
-* CV1 (Kick) assignment (attenuation, tone, decay, FM, drop)
+* CV1 (Kick) assignment (ton, dec, FM, dro, atn)
 * Snare tone (frequency)
 * Snare decay
 * Snare snap
 * Snare blend
-* CV2 (Snare) assignment (attenuation, tone, decay, FM, blend)
+* CV2 (Snare) assignment (ton, dec, FM, bln, atn)
 * MixOut - kick+snare mix on output 2/4
 
 **Frequency (ton) - Kick and Snare**
@@ -50,7 +50,7 @@ Snap is equivalent to the Punch parameter. It causes a pitch drop at the beginni
 Blend between the oscillator and noise.
 
 **CV Assignment**
-In addition to all of the parameters above, the CV inputs can also be assigned to attenuation (atn). A positive voltage increases the attenuation, meaning it gets more quiet. This is opposite to what a "volume" parameter would do, but is required due to constraints of the o_C.
+The CV inputs can be assigned to any of the parameters above, in the same order. On level (atn), a positive voltage increases the attenuation, meaning it gets more quiet. This is opposite to what a "volume" parameter would do, but is required due to constraints of the o_C.
 
 ### Credits
 Written by benirose & herrkami, with mods by djphazer.

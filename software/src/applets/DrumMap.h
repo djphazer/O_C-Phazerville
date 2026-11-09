@@ -42,7 +42,7 @@ public:
 
     void Start() {
         step = 0;
-        last_clock = OC::CORE::ticks;
+        last_clock = HS::get_tick();
     }
 
     void Controller() {
@@ -100,7 +100,7 @@ public:
             }
 
             // keep track of last clock for auto-reset
-            last_clock = OC::CORE::ticks;
+            last_clock = HS::get_tick();
             // loop back to first step
             if (++step > 31) step = 0;
         }
@@ -123,7 +123,7 @@ public:
         }
 
         // auto-reset after ~2 seconds of no clock
-        if (OC::CORE::ticks - last_clock > HEM_DRUMMAP_AUTO_RESET_TICKS && step != 0) {
+        if (HS::get_tick() - last_clock > HEM_DRUMMAP_AUTO_RESET_TICKS && step != 0) {
             Reset();
         }
 

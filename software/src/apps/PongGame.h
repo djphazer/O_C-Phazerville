@@ -424,7 +424,7 @@ public:
     }
 };
 
-void AppPong::Init() {
+FLASHMEM void AppPong::Init() {
   BaseStart();
 }
 
@@ -461,7 +461,7 @@ void AppPong::DrawScreensaver() const {
 }
 
 // Allow players to toggle between analog and digital input modes
-void AppPong::HandleButtonEvent(const UI::Event &event) {
+FLASHMEM void AppPong::HandleButtonEvent(const UI::Event &event) {
   if (UI::EVENT_BUTTON_PRESS == event.type) {
     switch (event.control) {
       case OC::CONTROL_BUTTON_UP:
@@ -490,7 +490,7 @@ void AppPong::HandleButtonEvent(const UI::Event &event) {
 /* The UI::Event has a value property, which is positive when the encoder is turned clockwise and
  * negative when it's turned widdershins. I just wanted to say "widdershins."
  */
-void AppPong::HandleEncoderEvent(const UI::Event &event) {
+FLASHMEM void AppPong::HandleEncoderEvent(const UI::Event &event) {
   if (OC::CONTROL_ENCODER_L == event.control) {
     if (event.value < 0) player1.MovePaddleUp(4);
     if (event.value > 0) player1.MovePaddleDown(4);

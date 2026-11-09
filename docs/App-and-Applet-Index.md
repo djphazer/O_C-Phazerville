@@ -95,6 +95,7 @@ Newer ORN8 hardware (T41) hosts the same set of Applets, four at a time, inside 
 * [MarkovPerc](MarkovPerc) - first-order Markov chain rhythmic generator
 * [MultiScale](MultiScale) - like ScaleDuet, but with 4 scale masks
 * [Palimpsest](Palimpsest) - accent sequencer
+* [Panner](Panner) - routes one CV signal between two outputs, with gate-controllable hard pan
 * [Pigeons](Pigeons) - dual Fibonacci-style melody generator
 * [Piquet](Piquet) - Dual envelope generator
 * [PolyDiv](PolyDiv) - four concurrent clock dividers with assignable outputs

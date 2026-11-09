@@ -162,7 +162,7 @@ public:
             }
         }
 
-        const uint32_t this_tick = OC::CORE::ticks;
+        const uint32_t this_tick = HS::get_tick();
         bool clock2 = Clock(1);
         if (!trigger2 && clock2) {
             // Trigger on TR2 as reset

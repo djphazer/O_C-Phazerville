@@ -166,7 +166,8 @@ inline coord_t Graphics::getPrintPosY()
 
 inline uint8_t *Graphics::get_frame_ptr(const coord_t x, const coord_t y)
 {
-  return frame_ + ((y >> 3) * kWidth) + x;
+  // assumes kWidth and kHeight are pow2
+  return frame_ + (((y & (kHeight - 1)) >> 3) * kWidth) + (x & (kWidth - 1));
 }
 
 }  // namespace weegfx

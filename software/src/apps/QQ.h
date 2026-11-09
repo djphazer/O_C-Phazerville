@@ -29,11 +29,8 @@
 
 #include "../src/extern/peaks_bytebeat.h"
 
-#ifdef NORTHERNLIGHT
- #define QQ_OFFSET_X 20
-#else
- #define QQ_OFFSET_X 31
-#endif
+// XXX: 8 channels is a squeeze, visually. Change this to 4 if you prefer the classic look.
+static constexpr size_t QQ_CHANNEL_COUNT = DAC_CHANNEL_COUNT;
 
 enum ChannelSetting : uint8_t {
   CHANNEL_SETTING_SCALE,
@@ -95,6 +92,12 @@ enum ChannelTriggerSource : uint8_t {
   CHANNEL_TRIGGER_TR2,
   CHANNEL_TRIGGER_TR3,
   CHANNEL_TRIGGER_TR4,
+#ifdef ARDUINO_TEENSY41
+  CHANNEL_TRIGGER_TR5,
+  CHANNEL_TRIGGER_TR6,
+  CHANNEL_TRIGGER_TR7,
+  CHANNEL_TRIGGER_TR8,
+#endif
   CHANNEL_TRIGGER_CONTINUOUS_UP,
   CHANNEL_TRIGGER_CONTINUOUS_DOWN,
   CHANNEL_TRIGGER_LAST
@@ -105,6 +108,12 @@ enum ChannelSource : uint8_t {
   CHANNEL_SOURCE_CV2,
   CHANNEL_SOURCE_CV3,
   CHANNEL_SOURCE_CV4,
+#ifdef ARDUINO_TEENSY41
+  CHANNEL_SOURCE_CV5,
+  CHANNEL_SOURCE_CV6,
+  CHANNEL_SOURCE_CV7,
+  CHANNEL_SOURCE_CV8,
+#endif
   CHANNEL_SOURCE_OUT1, // only other channels selectable
   CHANNEL_SOURCE_OUT2,
   CHANNEL_SOURCE_OUT3,
@@ -598,6 +607,7 @@ public:
                 // We dont' need a calibrated value here, really
                 int octave = get_octave();
                 CONSTRAIN(octave, 0, 6);
+                // TODO: translate channel index to DAC_CHANNEL or just don't do this here
                 sample = OC::DAC::get_octave_offset(dac_channel, octave) + (get_transpose() << 7);
                 // range is actually 120 (10 oct) but 65535 / 128 is close enough
                 sample += multiply_u32xu32_rshift32((static_cast<uint32_t>(range) * 65535U) >> 7, bb << 16);
@@ -636,6 +646,7 @@ public:
             } else {
               int octave = get_octave();
               CONSTRAIN(octave, 0, 6);
+              // TODO: translate channel index to DAC_CHANNEL or just don't do this here
               sample = OC::DAC::get_octave_offset(dac_channel, octave) + (get_transpose() << 7);
               sample += multiply_u32xu32_rshift24((static_cast<uint32_t>(range) * 65535U) >> 7, logistic_map_x);
               sample = USAT16(sample);
@@ -735,6 +746,7 @@ public:
                 // We dont' need a calibrated value here, really
                 int octave = get_octave();
                 CONSTRAIN(octave, 0, 6);
+                // TODO: translate channel index to DAC_CHANNEL or just don't do this here
                 sample = OC::DAC::get_octave_offset(dac_channel, octave) + (get_transpose() << 7);
                 // range is actually 120 (10 oct) but 65535 / 128 is close enough
                 sample += multiply_u32xu32_rshift32((static_cast<uint32_t>(range_) * 65535U) >> 7, is << 20);
@@ -951,6 +963,12 @@ public:
       case CHANNEL_SOURCE_CV2:
       case CHANNEL_SOURCE_CV3:
       case CHANNEL_SOURCE_CV4:
+#ifdef ARDUINO_TEENSY41
+      case CHANNEL_SOURCE_CV5:
+      case CHANNEL_SOURCE_CV6:
+      case CHANNEL_SOURCE_CV7:
+      case CHANNEL_SOURCE_CV8:
+#endif
         if (get_source() != get_channel_index())
          *settings++ = CHANNEL_SETTING_AUX_SOURCE_DEST;
       break;
@@ -1180,14 +1198,14 @@ namespace OC {
 
 OC_APP_CLASS(AppQuadQuantizer, TWOCCS("QQ"), "Quantermain", "4x Quantizer") {
 public:
-  OC_APP_INTERFACE_DECLARE(AppQuadQuantizer, 4 * QuantizerChannel::storageSize());
+  OC_APP_INTERFACE_DECLARE(AppQuadQuantizer, QQ_CHANNEL_COUNT * QuantizerChannel::storageSize());
 
 private:
-  int selected_channel_;
+  size_t selected_channel_;
   menu::ScreenCursor<menu::kScreenLines> cursor_;
   ScaleEditor scale_editor_;
 
-  QuantizerChannel quantizer_channels_[4];
+  QuantizerChannel quantizer_channels_[QQ_CHANNEL_COUNT];
 
   inline bool editing() const {
     return cursor_.editing();
@@ -1211,7 +1229,7 @@ void AppQuadQuantizer::Init() {
   cursor_.Init(CHANNEL_SETTING_SCALE, CHANNEL_SETTING_LAST - 1);
   scale_editor_.Init(false);
 
-  for (size_t i = 0; i < 4; ++i) {
+  for (size_t i = 0; i < QQ_CHANNEL_COUNT; ++i) {
     quantizer_channels_[i].Init(static_cast<ChannelSource>(CHANNEL_SOURCE_CV1 + i),
                                static_cast<ChannelTriggerSource>(CHANNEL_TRIGGER_TR1 + i));
   }
@@ -1220,14 +1238,14 @@ void AppQuadQuantizer::Init() {
 }
 
 size_t AppQuadQuantizer::SaveAppData(util::StreamBufferWriter &stream_buffer) const {
-  for (size_t i = 0; i < 4; ++i) {
+  for (size_t i = 0; i < QQ_CHANNEL_COUNT; ++i) {
     quantizer_channels_[i].Save(stream_buffer);
   }
   return stream_buffer.written();
 }
 
 size_t AppQuadQuantizer::RestoreAppData(util::StreamBufferReader &stream_buffer) {
-  for (size_t i = 0; i < 4; ++i) {
+  for (size_t i = 0; i < QQ_CHANNEL_COUNT; ++i) {
     quantizer_channels_[i].Restore(stream_buffer);
     quantizer_channels_[i].update_scale_mask(quantizer_channels_[i].get_scale_mask(), 0x0);
     quantizer_channels_[i].update_enabled_settings();
@@ -1250,10 +1268,9 @@ void AppQuadQuantizer::HandleAppEvent(AppEvent event) {
 }
 
 void AppQuadQuantizer::Process(IOFrame *ioframe) {
-  quantizer_channels_[0].Update(ioframe, 0);
-  quantizer_channels_[1].Update(ioframe, 1);
-  quantizer_channels_[2].Update(ioframe, 2);
-  quantizer_channels_[3].Update(ioframe, 3);
+  for (size_t i = 0; i < QQ_CHANNEL_COUNT; ++i) {
+    quantizer_channels_[i].Update(ioframe, i);
+  }
 }
 
 void AppQuadQuantizer::GetIOConfig(IOConfig &ioconfig) const
@@ -1269,11 +1286,10 @@ void AppQuadQuantizer::Loop() {
 }
 
 void AppQuadQuantizer::DrawMenu() const {
-
-  using TitleBar = menu::QuadTitleBar;
+  using TitleBar = menu::TitleBar<menu::kDefaultMenuStartX, QQ_CHANNEL_COUNT, 2>;
 
   TitleBar::Draw(io_settings_status_mask());
-  for (int i = 0, x = 0; i < 4; ++i, x += 32) {
+  for (size_t i = 0; i < QQ_CHANNEL_COUNT; ++i) {
     const QuantizerChannel &channel = quantizer_channels_[i];
     TitleBar::SetColumn(i);
     graphics.print((char)('A' + i));
@@ -1285,7 +1301,6 @@ void AppQuadQuantizer::DrawMenu() const {
     TitleBar::DrawGateIndicator(i, channel.getTriggerState());
   }
   TitleBar::Selected(selected_channel_);
-
 
   const QuantizerChannel &channel = quantizer_channels_[selected_channel_];
 
@@ -1485,7 +1500,7 @@ void AppQuadQuantizer::HandleLeftButtonLong() {
   QuantizerChannel &selected_channel = quantizer_channels_[selected_channel_];
   int scale = selected_channel.get_scale();
   int root = selected_channel.get_root();
-  for (int i = 0; i < 4; ++i) {
+  for (size_t i = 0; i < QQ_CHANNEL_COUNT; ++i) {
     if (i != selected_channel_) {
       quantizer_channels_[i].apply_value(CHANNEL_SETTING_ROOT, root);
       quantizer_channels_[i].set_scale(scale);
@@ -1504,10 +1519,9 @@ void AppQuadQuantizer::DrawScreensaver() const {
   debug::CycleMeasurement render_cycles;
 #endif
 
-  quantizer_channels_[0].RenderScreensaver(0);
-  quantizer_channels_[1].RenderScreensaver(32);
-  quantizer_channels_[2].RenderScreensaver(64);
-  quantizer_channels_[3].RenderScreensaver(96);
+  for (size_t i = 0; i < QQ_CHANNEL_COUNT; ++i) {
+    quantizer_channels_[i].RenderScreensaver(i * (menu::kDisplayWidth / QQ_CHANNEL_COUNT));
+  }
 
 #ifdef QQ_DEBUG_SCREENSAVER
   graphics.drawHLine(0, menu::kMenuLineH, menu::kDisplayWidth);
@@ -1520,7 +1534,7 @@ void AppQuadQuantizer::DrawScreensaver() const {
 
 void AppQuadQuantizer::DrawDebugInfo() const {
 #ifdef QQ_DEBUG
-  for (int i = 0; i < 4; ++i) {
+  for (size_t i = 0; i < QQ_CHANNEL_COUNT; ++i) {
     uint8_t ypos = 10*(i + 1) + 2 ;
     graphics.setPrintPos(2, ypos);
     graphics.print(quantizer_channels_[i].get_int_seq_i());
@@ -1575,15 +1589,21 @@ void QuantizerChannel::RenderScreensaver(weegfx::coord_t start_x) const {
       // menu::DrawMask<true, 8, 8, 1>(start_x + 31, 1, get_int_seq_register(), 8);
       break;
     default: {
-      graphics.setPixel(start_x + QQ_OFFSET_X - 16, 4);
+#ifdef NORTHERNLIGHT
+      const int x_off = start_x + 2;
+#else
+      const int x_off = start_x + (OC::menu::kDisplayWidth / QQ_CHANNEL_COUNT / 2);
+#endif
+      graphics.setPixel(x_off, 4);
+      // TODO: use ioframe instead of directly calling the driver
       int32_t cv = OC::ADC::value(static_cast<ADC_CHANNEL>(source));
       cv = (cv * 24 + 2047) >> 12;
       if (cv < 0)
-        graphics.drawRect(start_x + QQ_OFFSET_X - 16 + cv, 6, -cv, 2);
+        graphics.drawRect(x_off + cv, 6, -cv, 2);
       else if (cv > 0)
-        graphics.drawRect(start_x + QQ_OFFSET_X - 16, 6, cv, 2);
+        graphics.drawRect(x_off, 6, cv, 2);
       else
-        graphics.drawRect(start_x + QQ_OFFSET_X - 16, 6, 1, 2);
+        graphics.drawRect(x_off, 6, 1, 2);
     }
     break;
   }

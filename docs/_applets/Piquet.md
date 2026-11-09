@@ -19,8 +19,7 @@ A compact, dual-channel envelope generator inspired by Piqued. Each channel has 
 
 ## Controls
 
-- **Encoder:** Rotate to navigate parameters, press to enter or exit editing, and rotate while editing to change the selected value.
-- **AUX Button:** Switches between channels. The corresponding parameter remains selected where available; otherwise, Piquet selects an appropriate parameter on the other channel.
+- **AUX Button:** Switches between channels. The corresponding parameter is selected on the other channel when possible.
 
 ## Envelope Types
 

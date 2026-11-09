@@ -1,4 +1,4 @@
-ColumnLimit: 80
+ColumnLimit: 100
 ContinuationIndentWidth: 2
 IndentWidth: 2
 TabWidth: 2
@@ -6,7 +6,7 @@ ConstructorInitializerIndentWidth: 2
 IndentCaseLabels: true
 PenaltyReturnTypeOnItsOwnLine: 200
 UseTab: Never
-SortIncludes: true
+SortIncludes: false
 SortUsingDeclarations: false
 AlignConsecutiveMacros: false
 AlignEscapedNewlines: DontAlign
@@ -30,7 +30,7 @@ AllowShortIfStatementsOnASingleLine: AllIfsAndElse
 AllowAllArgumentsOnNextLine: true
 AllowShortLoopsOnASingleLine: true
 FixNamespaceComments: false
-ReflowComments: true
+ReflowComments: false
 NamespaceIndentation: All
 IncludeBlocks: Merge
 BreakStringLiterals: false

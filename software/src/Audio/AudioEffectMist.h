@@ -7,9 +7,9 @@
 #include <Audio.h>
 
 // Thin subclass of ExtAudioBuffer exposing write position and raw buffer
-// access needed by AudioEffectClouds for absolute-position grain reads.
+// access needed by AudioEffectMist for absolute-position grain reads.
 template <typename T = int16_t>
-class CloudsCircBuffer : public ExtAudioBuffer<T> {
+class MistCircBuffer : public ExtAudioBuffer<T> {
 public:
     using ExtAudioBuffer<T>::ExtAudioBuffer;
     size_t GetWriteIx() const { return this->write_ix; }
@@ -30,12 +30,12 @@ public:
 //   Hann via LUT read + one fmul: no transcendental functions in the hot path.
 //   Hermite interpolation: 6 fmul + 5 fadd — single-cycle on Cortex-M7 FPU.
 //   Feedback held in a float[128] member array (not stack) to avoid stack pressure.
-class AudioEffectClouds : public AudioStream {
+class AudioEffectMist : public AudioStream {
 public:
-    static const size_t CLOUDS_BUFFER_SAMPLES = AUDIO_SAMPLE_RATE; // ~1 sec
+    static const size_t BUFFER_SAMPLES = AUDIO_SAMPLE_RATE; // ~1 sec
     static const int    MAX_GRAINS = 12;
 
-    AudioEffectClouds(size_t buf_len = CLOUDS_BUFFER_SAMPLES)
+    AudioEffectMist(size_t buf_len = BUFFER_SAMPLES)
         : AudioStream(1, input_queue_array), g_buffer(buf_len) {}
 
     void Acquire() { g_buffer.Acquire(); }
@@ -208,7 +208,7 @@ private:
         float  tex_hi        = 0.0f; // blend weight: tri→Hann  (precomputed at spawn)
     } grains[MAX_GRAINS];
 
-    CloudsCircBuffer<int16_t> g_buffer;
+    MistCircBuffer<int16_t> g_buffer;
     audio_block_t* input_queue_array[1];
 
     // Feedback accumulator — member array (not stack) to avoid stack pressure.
@@ -284,7 +284,7 @@ private:
 
 // ── Hann LUT ──────────────────────────────────────────────────────────────────
 // round(sin²(π × i/255) × 32767) for i = 0..255. 512 bytes in .rodata (flash).
-const int16_t AudioEffectClouds::hann_lut_[256] = {
+const int16_t AudioEffectMist::hann_lut_[256] = {
        0,     5,    20,    45,    80,   124,   179,   243,
      317,   401,   495,   598,   711,   833,   965,  1106,
     1257,  1416,  1585,  1763,  1949,  2145,  2349,  2561,

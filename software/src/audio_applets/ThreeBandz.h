@@ -278,13 +278,16 @@ template <AudioChannels Channels>
 FLASHMEM void ThreeBandzApplet<Channels>::DrawFullScreen() {
   if (!alloc_ok) return;
   graphics.drawLine(64 - gfx_offset, 26, 127 - gfx_offset, 26, 3);
-  for (int i = 0; i < BANDZ; i++) {
-    const int x = 5 + i*20 + (64 - gfx_offset);
-    const int h = Proportion(int(complimit[0][i]->get_total_gain()), 60, 30); // 60 dB == 30 px
-    if (h > 0)
-      graphics.drawRect(x, 26 - h, 10, h);
-    else
-      graphics.drawRect(x, 26, 10, -h);
+  const int bwidth = 10 / Channels;
+  for (int ch = 0; ch < Channels; ++ch) {
+    for (int i = 0; i < BANDZ; i++) {
+      const int x = 5 + i*20 + ch*bwidth + (64 - gfx_offset);
+      const int h = Proportion(int(complimit[ch][i]->get_total_gain()), 60, 30); // 60 dB == 30 px
+      if (h > 0)
+        graphics.drawRect(x, 26 - h, bwidth, h);
+      else
+        graphics.drawRect(x, 26, bwidth, -h);
+    }
   }
   View();
 }

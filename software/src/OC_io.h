@@ -169,6 +169,8 @@ struct IOFrame {
 
   } outputs;
 
+  uint32_t tick;
+  uint32_t micros;
 };
 
 } // namespace OC

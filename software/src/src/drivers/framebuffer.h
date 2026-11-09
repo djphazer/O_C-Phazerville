@@ -23,9 +23,8 @@ public:
   FrameBuffer() { }
 
   void Init() {
-    memset(frame_memory_, 0, sizeof(frame_memory_));
     for (size_t f = 0; f < frames; ++f)
-      frame_buffers_[f] = frame_memory_ + kFrameSize * f;
+      memset(frame_memory_[f], 0, sizeof(frame_memory_[f]));
     write_ptr_ = read_ptr_ = 0;
     capture_on_next_write = false;
     capture_is_valid = false;
@@ -41,12 +40,12 @@ public:
 
   // @return readable frame (assumes one exists)
   const uint8_t *readable_frame() const {
-    return frame_buffers_[read_ptr_ % frames];
+    return frame_memory_[read_ptr_ % frames];
   }
 
   // @return next writeable frame (assumes one exists)
   uint8_t *writeable_frame() {
-    return frame_buffers_[write_ptr_ % frames];
+    return frame_memory_[write_ptr_ % frames];
   }
 
   void read() {
@@ -56,7 +55,7 @@ public:
   void written() {
     if (capture_on_next_write) {
       capture_on_next_write = false;
-      memcpy(capture_memory_, frame_buffers_[write_ptr_ % frames], kFrameSize);
+      memcpy(capture_memory_, frame_memory_[write_ptr_ % frames], kFrameSize);
       capture_is_valid = true;
     }
     ++write_ptr_;
@@ -73,10 +72,8 @@ public:
   }
 
 private:
-
-  uint8_t frame_memory_[kFrameSize * frames] __attribute__ ((aligned (4)));
+  uint8_t frame_memory_[frames][kFrameSize]  __attribute__ ((aligned (4)));
   uint8_t capture_memory_[kFrameSize] __attribute__ ((aligned (4)));
-  uint8_t *frame_buffers_[frames];
 
   volatile size_t write_ptr_;
   volatile size_t read_ptr_;

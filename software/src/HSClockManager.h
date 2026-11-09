@@ -61,7 +61,7 @@ public:
         NR_OF_CLOCKS
     };
 
-    uint16_t tempo; // The set tempo, for display somewhere else
+    uint16_t tempo; // effective BPM, for display somewhere else
     uint16_t tempo_setting;
     uint32_t ticks_per_beat; // Based on the selected tempo in BPM
     bool running = 0; // Specifies whether the clock is running for interprocess communication
@@ -70,6 +70,7 @@ public:
     bool midi_out_enabled = 1;
 
     bool tickno = 0;
+    bool auto_stop = true;
     bool extsync = false; // locked into an external clock; will stop after timeout
     uint32_t clock_tick[2] = {0,0}; // previous ticks when a physical clock was received on DIGITAL 1
     uint32_t beat_tick = 0; // The tick to count from
@@ -108,7 +109,7 @@ public:
      * This is approximate, because the arithmetical value is likely to be fractional, and we
      * need to live with a certain amount of imprecision here. So I'm not even rounding up.
      */
-    void SetTempoBPM(uint16_t bpm) {
+    void SetTempoBPM(int bpm) {
         bpm = constrain(bpm, CLOCK_TEMPO_MIN, CLOCK_TEMPO_MAX);
         ticks_per_beat = 1000000 / bpm;
         tempo_setting = tempo = bpm;
@@ -135,7 +136,7 @@ public:
     /* Gets the current tempo. This can be used between client processes, like two different
      * hemispheres.
      */
-    uint16_t GetTempo() {return tempo_setting;}
+    int GetTempo() {return tempo_setting;}
     float GetTempoFloat() {
       return 1000000.0f / ticks_per_beat;
     }
@@ -166,7 +167,7 @@ public:
     // Reset - Resync multipliers, optionally skipping the first tock
     void Reset(bool count_skip = 0) {
       ++beat_count;
-      beat_tick = OC::CORE::ticks;
+      beat_tick = micros() / 60; // HS::get_tick();
       if (!count_skip) {
         beat_count = 0;
         clock_tick[0] = 0;
@@ -191,7 +192,7 @@ public:
 
     // call this on every tick when clock is running, before all Controllers
     void SyncTrig(bool clocked, bool midi_sync = false) {
-        const uint32_t now = OC::CORE::ticks;
+        const uint32_t now = micros() / 60; // HS::get_tick();
         if (midi_sync) DisableMIDIOut();
         const int ppqn = (midi_sync || !midi_out_enabled) ? MIDI_CLOCK_PPQN : clock_ppqn;
 
@@ -282,11 +283,13 @@ public:
         if (clocked) {
             tickno = 1 - tickno;
             clock_tick[tickno] = now;
-        }
-        else if (extsync && ppqn && now - clock_tick[tickno] > ticks_per_beat * 2 / ppqn) {
-          // auto-stop
-          Stop();
-          Start(true); // re-arm
+        } else if (auto_stop) {
+          if (extsync && ppqn
+              && now - clock_tick[tickno] > ticks_per_beat * 2 / ppqn) {
+            // auto-stop
+            Stop();
+            Start(true); // re-arm
+          }
         }
     }
 
@@ -369,7 +372,7 @@ public:
     }
 
     bool EndOfBeat(int ch = 0) const {
-      return BeatTick() == OC::CORE::ticks;
+      return Tock(ONE_BEAT_CLOCK);
     }
 
     bool Cycle(int ch = 0) {return cycle;}

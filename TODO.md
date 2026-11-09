@@ -3,17 +3,15 @@ TODO (Roadmap)
 
 # v2.0
 * Eliminate vtable overhead
-* T4.1 - expand to 8 channels: Quantermain, Quadraturia, Sequins
+* T4.1 - expand to 8 channels: Quadraturia
 * Auto-tuner with floor/ceiling detection (fail gracefully)
 * generalized AppletParams for flexible assignment, extra virtual I/O
 * Integrate Calibr8or with DAC for global tracking adjustments
 
 # v2.1
 * Migrate to HexeFX/OpenAudio libraries for 32-bit float processing
-* USB Gamepad support
 
 # ???
-* Re-implement Piqued envelopes in an applet
 * Audio Applets for T4.1
   - add VCF+VCA to Osc
   - WAVPlay: rework looping/caching; support more metadata tags (tempo, cue points)
@@ -35,7 +33,9 @@ TODO (Roadmap)
 * Tetris
 
 # [DONE]
-* T4.1 - expanded to 8 channels: Piqued, Captain MIDI
+* Re-implement Piqued envelopes in an applet
+* USB Gamepad support
+* T4.1 - expanded to 8 channels: Piqued, Captain MIDI, Quantermain, Sequins
 * MTP Disk mode for file management over USB
 * Pong 2.0 with sound effects
 * **Fully merge "abandoned/refactoring" branch from pld**

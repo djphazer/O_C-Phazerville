@@ -83,7 +83,7 @@ class TB_3PO: public HemisphereApplet {
   }
 
   void Controller() {
-    const uint32_t this_tick = OC::CORE::ticks;
+    const uint32_t this_tick = HS::get_tick();
 
     if (Clock(1)) {
       Reset();

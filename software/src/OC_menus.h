@@ -237,7 +237,7 @@ inline static void DrawGateIndicator(weegfx::coord_t x, weegfx::coord_t y, uint8
     graphics.drawBitmap8(x, y, 4, OC::bitmap_gate_indicators_8 + (state << 2));
 }
 
-void DrawIOStatusBar(uint32_t status_mask, int col_w);
+void DrawIOStatusBar(uint32_t status_mask, int columns, int col_w);
 
 // Templated title bar that can have multiple columns
 template <weegfx::coord_t start_x, int columns, weegfx::coord_t text_dx>
@@ -258,7 +258,7 @@ public:
 
   inline static void Draw(uint32_t status_mask) {
     Draw();
-    DrawIOStatusBar(status_mask, kColumnWidth);
+    DrawIOStatusBar(status_mask, columns, kColumnWidth);
   }
 
   inline static void Selected(int column) {
