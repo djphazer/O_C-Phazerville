@@ -11,7 +11,7 @@ Each channel combines its main input with two configurable AUX inputs. The two c
 
 ## Controls
 
-- **Input mapping:** AUX input sources can be selected through the input mapping editor on the front page. The main input is accessedd through the help menu.
+- **Input mapping:** AUX input sources can be selected through the input mapping editor on the front page. The main input is accessed through the help menu.
 
 - **AUX Button:**
   - On an output selection, opens the channel's Q-engine settings.

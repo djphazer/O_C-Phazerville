@@ -39,7 +39,6 @@ Not everything can fit at once on Teensy 3.2 hardware, but you can use the [defa
  * [Backup / Restore](Backup-and-Restore) - Transfer app and calibration data as SysEx
  * [Setup / About](Setup-About) - Check your version, change encoder directions, adjust display/DAC/ADC, screen off time
 
-
 ***
 
 ## CV Applets
@@ -81,6 +80,7 @@ Newer ORN8 hardware (T41) hosts the same set of Applets, four at a time, inside 
   - added Speed control
 * [EnvSeq](EnvSeq) - envelope sequencer
 * [EuclidX](EuclidX) - Euclidean pattern generator (replacement for [AnnularFusion](https://github.com/Chysn/O_C-HemisphereSuite/wiki/Annular-Fusion-Euclidean-Drummer))
+* [FrogSeq](FrogSeq) - Generative note sequencer inspired by Frogger
 * [GameOfLife](GameOfLife) - experimental cellular automaton modulation source
 * [GateDelay](Gate-Delay) - simple gate delay
 * [GatedVCA](Gated-VCA) - simple VCA
@@ -97,6 +97,7 @@ Newer ORN8 hardware (T41) hosts the same set of Applets, four at a time, inside 
 * [Palimpsest](Palimpsest) - accent sequencer
 * [Panner](Panner) - routes one CV signal between two outputs, with gate-controllable hard pan
 * [Pigeons](Pigeons) - dual Fibonacci-style melody generator
+* [Piquet](Piquet) - Dual envelope generator
 * [PolyDiv](PolyDiv) - four concurrent clock dividers with assignable outputs
 * [ProbDiv](ProbDiv) - stochastic trigger generator
 * [ProbMeloD](ProbMeloD) - stochastic melody generator
@@ -179,13 +180,13 @@ _(note: T41 Audio Applets are not included here)_
 | **Drums / Synth Voice**      | [BitBeat](BitBeat), [BootsNCat](BootsNCat), [BugCrack](BugCrack), [WTVCO](WTVCO)     | [Viznutcracker, sweet!](Viznutcracker-sweet)     |
 | **Effect**                   | [Dr. LoFi](Dr.-LoFi)    |                      |
 | **Envelope Follower**        | [EnvFollow](Envelope-Follower), [Slew](Slew)   |                 |
-| **Envelope Generator**       | [ADSR](ADSR-EG), [AD EG](AD-EG), [Ebb & LFO](Ebb-&-LFO), [EnvSeq](EnvSeq), [VectorEG](VectorEG)  | [Piqued](Piqued), [Dialectic Ping Pong](Dialectic-Ping-Pong) |
+| **Envelope Generator**       | [ADSR](ADSR-EG), [AD EG](AD-EG), [Ebb & LFO](Ebb-&-LFO), [EnvSeq](EnvSeq), [VectorEG](VectorEG), [Piquet](Piquet) | [Piqued](Piqued), [Dialectic Ping Pong](Dialectic-Ping-Pong) |
 | **LFO**                      | [Ebb & LFO](Ebb-&-LFO), [LowerRenz](LowerRenz), [Relabi](Relabi), [VectorLFO](VectorLFO)   | [Quadraturia](Quadraturia) |
 | **MIDI**                     | [MIDI In](MIDI-Input), [MIDI Out](MIDI-Out) _(See also: [MIDI Maps](MIDI-Maps), [Auto MIDI Output](Hemisphere-General-Settings#auto-midi-output))_   | [Captain MIDI](Captain-MIDI) |
 | **Mixer**                    | [AttenOff](AttenOff), [Calculate](Calculate), [Combin8](Combin8), [Panner](Panner), [Squanch](Squanch), [Xfader](Xfader) |    |
 | **Modulation Source**        | [GameOfLife](GameOfLife), [Relabi](Relabi) [Stairs](Stairs), [VectorMorph](VectorMorph) | [Low-rents](Low-rents), [Pong](Pong) |
 | **Performance Utility**      | [Button2](Button2), [Voltage](Voltage) |  [Scenery](Scenery) |
-| **Pitch Sequencer**          | [Carpeggio](Carpeggio), [TwoRings](TwoRings), [Enigma Jr.](Enigma-Jr), [MarkoV](MarkoV), [Pigeons](Pigeons), [ProbMeloD](ProbMeloD), [Seq32](Seq32), [SeqPlay7](SeqPlay7), [SequenceX](SequenceX), [Shredder](Shredder), [Strum](Strum), [SwitchSeq](Switch-Seq), [TB-3PO](TB-3PO) | [Enigma](Enigma), [The Darkest Timeline](The-Darkest-Timeline), [Automatonnetz](Automatonnetz), [Sequins](Sequins), [Acid Curds](Acid-Curds), [Passencore](Passencore) |
+| **Pitch Sequencer**          | [Carpeggio](Carpeggio), [TwoRings](TwoRings), [Enigma Jr.](Enigma-Jr), [FrogSeq](FrogSeq), [MarkoV](MarkoV), [Pigeons](Pigeons), [ProbMeloD](ProbMeloD), [Seq32](Seq32), [SeqPlay7](SeqPlay7), [SequenceX](SequenceX), [Shredder](Shredder), [Strum](Strum), [SwitchSeq](Switch-Seq), [TB-3PO](TB-3PO) | [Enigma](Enigma), [The Darkest Timeline](The-Darkest-Timeline), [Automatonnetz](Automatonnetz), [Sequins](Sequins), [Acid Curds](Acid-Curds), [Passencore](Passencore) |
 | **Quantizer**               | [Calibr8](Calibr8), [Chordinate](Chordinate), [DualQuant](Dual-Quantizer), [DuoTET](DuoTET), [MultiScale](MultiScale), [ScaleDuet](ScaleDuet), [Squanch](Squanch)         | [Calibr8or](Calibr8or), [Harrington 1200](Harrington-1200), [Quantermain](Quantermain), [Meta-Q](Meta-Q)                                  |
 | **Random / Chaos**           | [BitBeat](BitBeat), [Brancher](Brancher), [Calculate](Calculate), [LowerRenz](LowerRenz), [ProbDiv](ProbDiv), [ProbMeloD](ProbMeloD), [Relabi](Relabi), [RndWalk](Random-Walk), [Shredder](Shredder)                                                        | [Low-rents](Low-rents)                                                                              |
 | **Shift Register**           | [ASR](ASR), [TwoRings](TwoRings), [Enigma Jr.](Enigma-Jr), [RunglBook](RunglBook), [ShiftGate](ShiftGate)  | [Enigma](Enigma), [CopierMaschine](Copiermaschine)  |
