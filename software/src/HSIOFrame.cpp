@@ -898,6 +898,8 @@ void HS::IOFrame::Load(OC::IOFrame *ioframe) {
 }
 
 void HS::IOFrame::Send(OC::IOFrame *ioframe) {
+    HS::clock_m.auto_reset = false;
+
     for (int i = 0; i < IO_CHANNEL_COUNT; ++i) {
       /*
        * envelope output!
