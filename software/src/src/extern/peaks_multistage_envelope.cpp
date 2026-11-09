@@ -176,7 +176,7 @@ uint16_t MultistageEnvelope::RenderPreview(
 
     *segment_start_points++ = current_pos;
     uint32_t w = time_[segment] * segment_width >> 16;
-    if (w < 1) w = 1;
+    if (w < 2) w = 2;
     if (segment == current_segment)
       current_phase = current_pos + (((phase >> 24) * w) / 256);
     current_pos += w;
@@ -192,6 +192,11 @@ uint16_t MultistageEnvelope::RenderPreview(
     }
     start_value = b;
   }
+
+  // The final segment has no following segment to contribute its endpoint.
+  // Replace its last preview sample with the exact final level.
+  if (current_pos) *(values - 1) = start_value;
+
   // Current setups loop at num_segments_
   if (loop_end_ && segment == loop_end_)
     *loop_points++ = current_pos;
