@@ -48,6 +48,9 @@
 #include "HSIOFrame.h"
 
 #include "PhzConfig.h"
+#include "PresetEngine.h"
+#include "PresetBus.h"
+#include "PresetBusUI.h"
 
 #if defined(ARDUINO_TEENSY41)
 USBHost thisUSB;
@@ -97,6 +100,7 @@ void ScanI2C() {
 #endif // ARDUINO_TEENSY41
 
 uint_fast8_t MENU_REDRAW = true;
+volatile uint32_t loop_counter = 0; // loop rate for the preset bus stats
 static OC::UiMode ui_mode = OC::UI_MODE_MENU;
 static DMAMEM OC::IOFrame io_frames[IO_BUFFER_SIZE];
 
@@ -318,7 +322,7 @@ FLASHMEM static void watchdog_arm() {
             | WDOG_WCR_WDBG | WDOG_WCR_WDZST;
   watchdog_armed = true;
 }
-static inline void watchdog_feed() {
+void watchdog_feed() {  // also fed by long preset bus writes
   WDOG1_WSR = 0x5555;
   WDOG1_WSR = 0xAAAA;
 }
@@ -515,6 +519,11 @@ FLASHMEM void setup() {
   OC::AudioIO::OutputStream();
 #endif
 
+  OC::PresetEngine::Init();
+  OC::PresetBus::Init();
+  OC::PresetBusUI::Init();
+  OC::PresetEngine::BootRecall();
+
   // Welcome splash
   OC::ui.Splashscreen(firstrun, 1);
 
@@ -644,6 +653,10 @@ void SerialHandler() {
           Serial.println("'?' = print contents of CRASH.LOG");
           Serial.println("'~' + [abxyzlr<^>v] = simulate button");
 #endif
+#if defined(ARDUINO_TEENSY41)
+          Serial.println("'b' = preset bus status");
+          Serial.println("'v' = toggle preset bus logging");
+#endif
           break;
 
         case 'I':
@@ -667,6 +680,13 @@ void SerialHandler() {
 #if defined(ARDUINO_TEENSY41)
         case 'i':
           ScanI2C();
+          break;
+        case 'b':
+          OC::PresetBus::DebugDump();
+          break;
+        case 'v':
+          OC::PresetBus::SetVerbose(!OC::PresetBus::Verbose());
+          Serial.printf("PresetBus verbose = %d\n", OC::PresetBus::Verbose());
           break;
 #endif
         case 'C':
@@ -780,6 +800,8 @@ void Redraw() {
     // Handle events and process state changes elsewhere.
     ui.AppSettings(true);
 
+  } else if (OC::PresetBusUI::Active()) {
+    OC::PresetBusUI::Draw();
   } else { // if (UI_MODE_MENU == ui_mode) {
     OC_DEBUG_RESET_CYCLES(menu_draw_count, 512, DEBUG::MENU_draw_cycles);
     OC_DEBUG_PROFILE_SCOPE(DEBUG::MENU_draw_cycles);
@@ -812,6 +834,33 @@ void SendMIDIThru(const MIDIMessage &msg, uint8_t exclude_mask) {
   }
   if (~exclude_mask & mMaskSerial) {
     MIDI1.send((midi::MidiType)msg.message, msg.data1, msg.data2, msg.channel);
+  }
+  if (~exclude_mask & mMaskBus) {
+    OC::PresetBus::QueueMidiTx(msg.message, msg.channel, msg.data1, msg.data2);
+  }
+}
+
+FLASHMEM void ProcessBusMIDI() {
+  HS::IOFrame &f = HS::frame;
+  const bool clkrx = ~midi_clkrx_disable & mMaskBus;
+  const bool msgrx = ~midi_msgrx_disable & mMaskBus;
+
+  uint8_t status, d1, d2;
+  while (OC::PresetBus::ReadMidiRx(status, d1, d2)) {
+    const uint8_t type = (status >= 0xF8) ? status : (status & 0xF0);
+    const uint8_t buses = (status >= 0xF8) ? 0x8 : (status & 0x0F);
+    for (uint8_t bit = 0; bit < 4; ++bit) {
+      if (!(buses & (0x8 >> bit))) continue;
+      const MIDIMessage msg = { uint8_t(bit + 1), type,
+                                uint8_t(d1 & 0x7F), uint8_t(d2 & 0x7F) };
+      if (type >= 0xF8) {
+        if (clkrx) f.MIDIState.ProcessMIDIMsg(msg);
+      } else if (msgrx) {
+        f.MIDIState.ProcessMIDIMsg(msg);
+      }
+      SendMIDIThru(msg, mMaskBus);
+      if (type >= 0xF8) break;
+    }
   }
 }
 #endif
@@ -895,6 +944,7 @@ FLASHMEM __attribute__((noinline)) void loop() {
   uint32_t last_redraw_time = 0;
 
   while (true) {
+    ++loop_counter;
 #if defined(__IMXRT1062__)
     watchdog_feed();
 #endif
@@ -926,6 +976,7 @@ FLASHMEM __attribute__((noinline)) void loop() {
     HS::ProcessMIDI(usbHostMIDI[0]);
     HS::ProcessMIDI(usbHostMIDI[1]);
     HS::ProcessMIDI(MIDI1);
+    HS::ProcessBusMIDI();
 #ifdef USB_GAMEPAD
     // gamepad is a lot like midi, too
     ProcessGamepad(joystick);
@@ -933,6 +984,9 @@ FLASHMEM __attribute__((noinline)) void loop() {
 #endif
 
     OC::CORE::FlushTasks();
+    OC::PresetEngine::Process();
+    OC::PresetBus::Task();
+    OC::PresetBusUI::Task();
 
     // UI events
     if (UI_MODE_APP_SETTINGS == ui_mode) {

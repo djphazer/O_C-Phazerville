@@ -135,7 +135,7 @@ namespace HS {
     mMaskUSBHost2 = (1 << 3),
     mMaskUSBHost3 = (1 << 4),
 
-    mMaskReserved0 = (1 << 5),
+    mMaskBus = (1 << 5),
     mMaskReserved1 = (1 << 6),
     mMaskReserved2 = (1 << 7),
   };
@@ -252,9 +252,11 @@ namespace HS {
   void Init();
   void ResetMappings();
   void DrawAppletList(bool blink = false);
+  int MidiRoutingColumns();
   void DrawMidiRouting(int cursor);
   void ToggleMidiRouting(int cursor);
   uint32_t get_tick();
+  uint32_t popup_now();
 
   void ProcessClock();
 

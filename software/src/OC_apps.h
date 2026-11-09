@@ -46,10 +46,12 @@ static inline void save_app_data() { SaveAppData(); }
 struct AppData;
 void BuildAppData(AppData &data);
 void ApplyAppData(const AppData &data);
+bool BuildSingleAppData(uint16_t app_id, AppData &out);
 void BuildGlobalSettingsValues();
 void RestoreGlobalSettingsFromConfig(uint8_t scala_loaded_mask = 0);
 // app-container index for an app id; falls back to the current app
 size_t ResolveAppIndexByID(uint16_t app_id);
+bool QuadrantsPresetLabel(uint8_t preset_id, char *out, size_t cap);
 
 enum AppEvent {
   APP_EVENT_SUSPEND,
@@ -110,6 +112,8 @@ public:
   virtual void HandleEncoderEvent(const UI::Event &) = 0;
   virtual void GetIOConfig(IOConfig &) const = 0;
   virtual void DrawDebugInfo() const = 0;
+  virtual bool OwnsEncoderChord() const { return false; }
+  virtual bool PresetModified() const { return false; }
 
 private:
   const uint16_t id_;
