@@ -26,11 +26,10 @@ struct CVInputMap {
 
 private:
   uint8_t source = 0; // 3 bits type | 5 bits index
-public:
   int8_t attenuversion = 60; // 60 is 100%
                              // max range is +/- 127 (448%)
-
-  static const int num_sources = 3 * IO_CHANNEL_COUNT;
+public:
+  constexpr CVInputMap(uint8_t s_ = 0, int8_t a_ = 60) : source(s_), attenuversion(a_) { }
 
   static constexpr size_t Size = 16; // Make this compatible with Packable
 
@@ -146,6 +145,15 @@ public:
     }
     CONSTRAIN(sidx, 0, channel_count(source_type()) - 1);
     source = source_type() | uint8_t(sidx);
+  }
+  void ChangeAtten(int dir) {
+    attenuversion = constrain(attenuversion + dir, -127, 127);
+  }
+  void SetAtten(int val) {
+    attenuversion = constrain(val, -127, 127);
+  }
+  const int8_t get_atten() const {
+    return attenuversion;
   }
 
   void SetMidiMap(uint8_t midx) {
