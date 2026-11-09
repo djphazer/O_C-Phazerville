@@ -119,7 +119,7 @@ namespace HS {
       trigmap[i].SetGateInput(i % 4);
       trigmap[i].Reset(true);
       cvmap[i].SetInput(i);
-      cvmap[i].attenuversion = 60;
+      cvmap[i].SetAtten(60);
       frame.output_slew[i] = 0;
       frame.output_atten[i] = 60;
       frame.clockoutskip[i] = 0;

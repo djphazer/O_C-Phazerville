@@ -245,9 +245,7 @@ public:
       if (IsEditingInputMap()) {
         switch (selected_input_map.index()) {
           case CV_INPUT_MAP: {
-            int8_t& att
-              = std::get<CVInputMap*>(selected_input_map)->attenuversion;
-            att = constrain(att + direction, -127, 127); // 448% range
+            std::get<CVInputMap*>(selected_input_map)->ChangeAtten(direction);
             break;
           }
           case DIGITAL_INPUT_MAP: {
@@ -267,7 +265,7 @@ public:
         graphics.clearRect(x_off, 0, 63, 11);
         switch (selected_input_map.index()) {
           case CV_INPUT_MAP: {
-            int tenths = Atten(std::get<CVInputMap*>(selected_input_map)->attenuversion);
+            int tenths = Atten(std::get<CVInputMap*>(selected_input_map)->get_atten());
             gfxPos(32 - 7 * 6 / 2 + pad(10000, tenths) - 6*(abs(tenths)<10), 2);
             if (tenths < 0) gfxPrint("-");
             graphics.printf("%d.%d%%", abs(tenths) / 10, abs(tenths) % 10);
