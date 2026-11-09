@@ -336,7 +336,8 @@ protected:
             sysex[size++] = packed.data[i];
         }
         sysex[size++] = 0xf7; // End of exclusive
-        usbMIDI.sendSysEx(size, sysex);
+        // TODO: enable for more interfaces? or USB only...
+        usbMIDI.sendSysEx(size, sysex, true);
         usbMIDI.send_now();
     }
 
