@@ -173,9 +173,11 @@ public:
     }
 
     void View() {
-        DrawMonitor();
         if (cursor == LOG_VIEW) DrawLog();
-        else DrawSelector();
+        else {
+            DrawMonitor();
+            DrawSelector();
+        }
     }
 
     void AuxButton() {
@@ -323,8 +325,8 @@ protected:
         help[HELP_CV2]      = fn_name[min(functionB, CC_CONTROL)];
         help[HELP_OUT1]     = passthru_mode ? HS::trigmap[0 + io_offset].InputName() : cvmap[0 + io_offset].InputName();
         help[HELP_OUT2]     = passthru_mode ? HS::trigmap[1 + io_offset].InputName() : cvmap[1 + io_offset].InputName();
-        help[HELP_EXTRA1]   = "Aux(Ch): Passthru md.";
-        help[HELP_EXTRA2]   = "Aux(Tr): Note/CC";
+        help[HELP_EXTRA1]   = "Passthru Mode:";
+        help[HELP_EXTRA2]   = passthru_mode ? "Trig/Gate In" : "CV In";
         //                    "---------------------" <-- Extra text size guide
     }
 
@@ -366,12 +368,8 @@ private:
     }
 
     void DrawMonitor() {
-        if (HS::get_tick() - last_tick < 4000) {
-            if (hemisphere & 1)
-                gfxIcon( 9, 1, MIDI_ICON);
-            else
-                gfxIcon(46, 1, MIDI_ICON);
-        }
+        if (HS::get_tick() - last_tick < 3200)
+            gfxIcon(53, 14, MIDI_ICON);
     }
 
     void DrawSelector() {
@@ -379,23 +377,28 @@ private:
         gfxPrint(1, 15, "Ch:");
         gfxPrint(24, 15, channel + 1);
 
-        if (functionA == NOTE) {
-            // Transpose
-            gfxPrint(1, 25, "Tr:");
-            if (transpose > -1) gfxPrint(24, 25, "+");
-            gfxPrint(30, 25, transpose);
-        } else {
-            gfxPrint(1, 25, "i1: CC#");
+        // Input 1 function
+        gfxIcon(2, 24, MIDI_ICON);
+        gfxPrint(10, 25, "1:");
+        if (functionA == NOTE) {  // Transpose
+            gfxIcon(25, 25, NOTE_ICON);
+            gfxPos(32, 25);
+            if (transpose > -1) graphics.printf("+%2d", transpose);
+            else graphics.printf("-%2d", abs(transpose));
+        } else {  // CC
+            gfxPrint(24, 25, fn_name[CC_CONTROL]);
             gfxPrint(functionA - CC_CONTROL);
         }
 
         // Input 2 function
-        gfxPrint(1, 35, "i2:");
+        gfxIcon(2, 34, MIDI_ICON);
+        gfxPrint(10, 35, "2:");
         if (functionB >= CC_CONTROL) {
             gfxPrint(24, 35, fn_name[CC_CONTROL]);
             gfxPrint(functionB - CC_CONTROL);
-        } else
+        } else {
             gfxPrint(24, 35, fn_name[functionB]);
+        }
 
         // Legato
         gfxPrint(1, 45, "Legato");
@@ -403,8 +406,9 @@ private:
 
         // Cursor
         switch (cursor) {
+            case CHANNEL:
             case TRANSPOSE:
-                gfxSpicyCursor(24, 23 + (cursor * 10), 33);
+                gfxSpicyCursor(24, 23 + (cursor * 10), 38);
                 break;
             case LEGATO:
                 gfxIcon(46, 45, RIGHT_ICON);
@@ -412,15 +416,14 @@ private:
             case LOG_VIEW:
                 break;
             default:
-                gfxCursor(24, 23 + (cursor * 10), 33);
+                gfxCursor(24, 23 + (cursor * 10), 38);
                 break;
         }
 
-        // Last note log
-        if (last_velocity) {
-            gfxIcon(1, 56, NOTE_ICON);
-            gfxPrint(10, 56, midi_note_numbers[last_note]);
-            gfxPrint(40, 56, last_velocity);
+        // Last log entry
+        if (log_index > 0) {
+            int idx = log_index - 1;
+            PrintLogEntry(56, idx - (log[idx].message == HEM_MIDI_NOTE_OFF && idx > 1));  // && idx > 1 can be deleted if HEM_MIDI_NOTE_OFF can't be the first message logged
         }
         gfxInvert(0, 55, 63, 9);
     }
@@ -428,12 +431,12 @@ private:
     void DrawLog() {
         if (log_index) {
             for (int i = 0; i < log_index; i++) {
-                log_entry(15 + (i * 8), i);
+                PrintLogEntry(15 + (i * 8), i);
             }
         }
     }
 
-    void log_entry(int y, int index) {
+    void PrintLogEntry(int y, int index) {
         switch (log[index].message) {
             case HEM_MIDI_NOTE_ON:
                 gfxIcon(1, y, NOTE_ICON);
@@ -444,6 +447,7 @@ private:
             case HEM_MIDI_NOTE_OFF:
                 gfxPrint(1, y, "-");
                 gfxPrint(10, y, midi_note_numbers[log[index].data1]);
+                gfxPrint(40, y, log[index].data2);
                 break;
 
             case HEM_MIDI_CC:
@@ -457,9 +461,18 @@ private:
                 gfxPrint(10, y, log[index].data1);
                 break;
 
-            case HEM_MIDI_PITCHBEND:
+            case HEM_MIDI_PITCHBEND: {
+                int data = (log[index].data2 << 7) + log[index].data1 - 8192;
                 gfxIcon(1, y, BEND_ICON);
+                gfxPrint(10, y, data);
+                break;
+            }
+
+            default:
+                gfxPrint(1, y, "?");
                 gfxPrint(10, y, log[index].data1);
+                gfxPrint(" ");
+                gfxPrint(log[index].data2);
                 break;
         }
     }

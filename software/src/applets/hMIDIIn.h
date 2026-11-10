@@ -232,13 +232,14 @@ private:
                 last_icon_ticks[1] = HS::get_tick();
         }
 
-        if (HS::get_tick() - last_icon_ticks[io_page] < 4000) // Ch midi activity
+        if (HS::get_tick() - last_icon_ticks[io_page] < 3200) // Ch midi activity
             gfxIcon(54, 13, MIDI_ICON);
     }
 
     void DrawChannelPage() {
         gfxPrint(1, 13, OutputLabel(io_page));
-        graphics.printf(":  M%2d", map_index[io_page] + 1);
+        graphics.printf("  M%2d", map_index[io_page] + 1);
+        gfxInvert(1, 12, 7, 9);
 
         // ------------------ //
         gfxLine(1, 22, 63, 22);
@@ -355,11 +356,13 @@ private:
             case HEM_MIDI_NOTE_OFF:
                 gfxPrint(1, y, "-");
                 gfxPrint(10, y, midi_note_numbers[log_entry_.data1]);
+                gfxPrint(40, y, log_entry_.data2);
                 break;
 
             case HEM_MIDI_CC:
                 gfxIcon(1, y, MOD_ICON);
-                gfxPrint(10, y, log_entry_.data2);
+                gfxPrint(10, y, log_entry_.data1);
+                gfxPrint(40, y, log_entry_.data2);
                 break;
 
             case HEM_MIDI_AFTERTOUCH_CHANNEL:
@@ -377,7 +380,7 @@ private:
                 gfxIcon(1, y, BEND_ICON);
                 gfxPrint(10, y, data);
                 break;
-                }
+            }
 
             default:
                 gfxPrint(1, y, "?");
