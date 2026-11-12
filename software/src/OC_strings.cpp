@@ -40,6 +40,12 @@ namespace OC {
 #else
   const char * const NAME = "Ornaments & Crimes";
 #endif
+  const char * const greetings[] = {
+    "Hello, person. Welcome to this place.",
+    "yo, dawg, welcome to the mall.",
+    "I hope you like extra Pew-Pew's...",
+    "Sup, nerd."
+  };
 
   const char * const err_msg[] = { "(missing msg)",
     "LFS WRITE ERROR!",
