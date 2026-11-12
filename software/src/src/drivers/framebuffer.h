@@ -19,6 +19,7 @@ class FrameBuffer {
 public:
 
   static constexpr size_t kFrameSize = frame_size;
+  static constexpr size_t kPageSize = frame_size / 8;
   static constexpr size_t kNumScreens = 4; // pow2
 
   FrameBuffer() { }
@@ -41,7 +42,7 @@ public:
 
   // @return readable frame (assumes one exists)
   const uint8_t *readable_frame() const {
-    return frame_memory_[read_ptr_ % frames] + screen_ * kFrameSize;
+    return frame_memory_[read_ptr_ % frames] + page_ * kPageSize;
   }
 
   // @return next writeable frame (assumes one exists)
@@ -55,15 +56,19 @@ public:
 
   void written() {
     if (capture_on_next_write) {
-      capture_on_next_write = false;
-      memcpy(capture_memory_, frame_memory_[write_ptr_ % frames], kFrameSize * kNumScreens);
+      memcpy(capture_memory_,
+        frame_memory_[write_ptr_ % frames] + (capture_on_next_write - 1) * kFrameSize,
+        kFrameSize
+      );
+      capture_on_next_write = 0;
       capture_is_valid = true;
     }
     ++write_ptr_;
   }
 
-  void capture_request() {
-    capture_on_next_write = true;
+  void capture_request(uint8_t screen = 0) {
+    if (screen == 0xff) screen = page_ / 8;
+    capture_on_next_write = (screen & (kNumScreens - 1)) + 1;
   }
   const uint8_t * captured() {
     return (capture_is_valid) ? capture_memory_ : NULL;
@@ -73,19 +78,23 @@ public:
   }
 
   // select viewport offset within framebuffer
-  // XXX: it's possible to do half-screen vertical offsets...
   void set_screen_view(size_t s) {
-    screen_ = s & (kNumScreens - 1);
+    page_ = 8 * (s & (kNumScreens - 1));
+  }
+  // I think this offers 8px row offsets...
+  void set_page_view(size_t p) {
+    CONSTRAIN(p, 0, (kNumScreens - 1) * 8);
+    page_ = p;
   }
 
 private:
   uint8_t frame_memory_[frames][kFrameSize * kNumScreens]  __attribute__ ((aligned (4)));
-  uint8_t capture_memory_[kFrameSize * kNumScreens] __attribute__ ((aligned (4)));
+  uint8_t capture_memory_[kFrameSize] __attribute__ ((aligned (4)));
 
   volatile size_t write_ptr_;
   volatile size_t read_ptr_;
-  volatile size_t screen_;
-  volatile bool capture_on_next_write;
+  volatile uint8_t page_;
+  volatile uint8_t capture_on_next_write; // value is which screen
   volatile bool capture_is_valid;
 
   DISALLOW_COPY_AND_ASSIGN(FrameBuffer);

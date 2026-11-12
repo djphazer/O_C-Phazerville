@@ -678,48 +678,59 @@ public:
       }
     }
 
-    void RenderAll() const {
-      // Screen 0 - northern CV applets, or full-screen or Overview
+    // Fullscreen of all 4 CV applets
+    void RenderQuadApplets() const {
       graphics.setScreen(0);
-      if (view_state == APPLET_FULLSCREEN) {
+      active_applet[0]->BaseView(true, true);
+
+      graphics.setScreen(1);
+      active_applet[1]->BaseView(true, true);
+
+      // Applets 3 and 4 get inverted titles
+      graphics.setScreen(2);
+      active_applet[2]->BaseView(true, true);
+      gfxInvert(0, 0, 63, 10);
+
+      graphics.setScreen(3);
+      active_applet[3]->BaseView(true, true);
+      gfxInvert(64, 0, 63, 10); // inverted titles
+    }
+    // Compact default views
+    void RenderAll() const {
+      // Screen 0 - two visible applets
+      graphics.setScreen(0);
+      for (int h = 0; h < 2; h++) {
+        HEM_SIDE slot = HEM_SIDE(h + view_slot[h]*2);
+        active_applet[slot]->BaseView();
+        // Applets 3 and 4 get inverted titles
+        if (slot > 1) gfxInvert(0 + h*64, 0, 63, 10);
+      }
+      graphics.drawLine(63, 0, 63, 63, 2); // vertical separator
+
+      // Screen 1 - Overview
+      graphics.setScreen(1);
+      DrawOverview();
+
+      // Screen 2 - MISC: Fullscreen, or Config menus
+      graphics.setScreen(2);
+      if (preset_cursor) {
+        DrawPresetSelector();
+      } else if (view_state == APPLET_FULLSCREEN) {
         DrawFullScreen();
       } else if (view_state == APPLET_CONFIG) {
         DrawAppletConfig();
-      } else if (view_state == OVERVIEW) {
-        DrawOverview();
-      } else {
-        active_applet[0]->BaseView();
-        active_applet[1]->BaseView();
-        graphics.drawLine(63, 0, 63, 63, 2); // vertical separator
-      }
+      } else
+        DrawConfig();
 
-      // Screen 1 - southern CV applets
-      graphics.setScreen(1);
-      active_applet[2]->BaseView();
-      active_applet[3]->BaseView();
-      graphics.drawLine(63, 0, 63, 63, 2); // vertical separator
-      gfxInvert(0, 0, 127, 10); // inverted titles
-
-      // Screen 2 - Audio view
-      graphics.setScreen(2);
-      audio_app.View();
-
-      // Screen 3 - Config menus
+      // Screen 3 - Audio view
+      // XXX: I kinda want this to fill 2 screens
       graphics.setScreen(3);
-      DrawConfig();
+      audio_app.View();
     }
 
+    // Config menus, or Preset picker or Overview
     void DrawConfig() const {
-      if (preset_cursor) {
-        DrawPresetSelector();
-        return;
-      }
-
       switch (config_page) {
-        default:
-          DrawOverview();
-          break;
-
         case LOADSAVE_POPUP:
           PokePopup(MENU_POPUP);
           break;
@@ -736,6 +747,7 @@ public:
           DrawQuantizerConfig();
           break;
 
+        default:
         case MIDI_MAPS_PAGE:
           DrawMidiMaps(config_cursor - MIDIMAP1);
           break;
@@ -751,17 +763,29 @@ public:
     }
 
     void View() const {
-        RenderAll();
-
         int screen = 0;
-        if (preset_cursor || config_page > LOADSAVE_POPUP || view_state == OVERVIEW) {
-          screen = 3;
-        } else if (view_state == AUDIO_SETUP) {
+        if (preset_cursor || config_page > LOADSAVE_POPUP) {
           screen = 2;
-        } else if (view_state == APPLET_FULLSCREEN || view_state == APPLET_CONFIG) {
-          screen = 0;
+          RenderAll();
+        } else if (APPLET_FULLSCREEN == view_state) {
+          RenderQuadApplets();
+          screen = zoom_slot;
         } else {
-          screen = view_slot[0];
+          RenderAll();
+          switch (view_state) {
+            case AUDIO_SETUP:
+              screen = 3;
+              break;
+            case APPLET_CONFIG:
+              screen = 2;
+              break;
+            case OVERVIEW:
+              screen = 1;
+              break;
+            default:
+              screen = 0;
+              break;
+          }
         }
         display::frame_buffer.set_screen_view(screen);
         graphics.setScreen(screen);
@@ -1021,8 +1045,7 @@ public:
       // h should be 0 or 1 (left or right)
       //h %= 2;
 
-      view_slot[0] = 1 - view_slot[0];
-      view_slot[1] = view_slot[0];
+      view_slot[h] = 1 - view_slot[h];
 
       // also switch fullscreen to corresponding side/slot
       zoom_slot = HEM_SIDE(view_slot[h]*2 + h);
@@ -1036,8 +1059,7 @@ public:
     }
     // this brings a specific applet into view on the appropriate side
     void SwitchToSlot(HEM_SIDE h) {
-      view_slot[0] = h / 2;
-      view_slot[1] = h / 2;
+      view_slot[h % 2] = h / 2;
       zoom_slot = h;
     }
 

@@ -597,34 +597,65 @@ void SerialHandler() {
 
   if (Serial && Serial.available() > 0) {
     bool capreq = !unlocked;
+    uint8_t capscreen = 0xff;
 
     if (unlocked) do {
       static uint32_t cmd = 0;
       char c = Serial.read();
       cmd = (cmd << 8) | c;
 
-      // static uint8_t *cmd_bytes = (uint8_t*)&cmd;
-      // handle the top byte of a 4-byte command
-      // switch (cmd_bytes[0]) {
-      //   case 'O': // scope request
-      //     break;
-      //   default: break;
-      // }
-
-      // handle full 4-byte commands
+      // handle full 4-byte commands - more destructive commands go here
       switch (cmd) {
         case FOURCCS("hey."):
-          Serial.println("Hello, person. Welcome to this place.");
+          Serial.println(OC::Strings::greetings[random(4)]);
+          //Serial.println("Hello, person. Welcome to this place.");
           continue;
         case FOURCCS("F*ck"):
           Serial.println("!! ERASING ALL FILES on LittleFS !!");
           watchdog_feed_during([] { PhzConfig::eraseFiles(); });
           break;
+        case FOURCCS("CLR!"):
+          Serial.println("Resetting Config File!!");
+          PhzConfig::clear_config();
+          PhzConfig::save_config();
         default:
           break;
       }
 
-      // immediate one-character handlers
+      // 2-byte commands for injecting button/encoder events
+      if ((cmd >> 8) & 0xff == '~') {
+        RemoteControl(c);
+        continue;
+      }
+
+      // 2-byte preset load
+      if ((cmd >> 8) & 0xff == 'p') {
+        OC::ui.Inject( UI::EVENT_MISC, UI::MISC_PRESET_LOAD, c - 33, 0);
+        continue;
+      }
+      // 2-byte preset save
+      if ((cmd >> 8) & 0xff == 'P') {
+        OC::ui.Inject( UI::EVENT_MISC, UI::MISC_PRESET_SAVE, c - 33, 0);
+        continue;
+      }
+
+      // handle 2-byte commands - requests for framebuffers, preset dumps, and other large payloads
+      switch (cmd & 0xFFFF) {
+        // specific framebuffer capture requests
+        case TWOCCS("S0"):
+        case TWOCCS("S1"):
+        case TWOCCS("S2"):
+        case TWOCCS("S3"):
+          capscreen = c - '0';
+          capreq = true;
+          break;
+
+        // TODO: full array of applet names, current config data, etc.
+      }
+
+      // immediate one-character handlers - lightweight status requests/commands
+      // XXX: take care to avoid overlap with longer commands...
+      // if it overlaps, just make it a 2 or 4-char cmd instead
       switch (c) {
         case 'z':
           Serial.println("-=[ PEW PEW NERDS! ]=-");
@@ -632,18 +663,18 @@ void SerialHandler() {
           Serial.printf("'I' = Toggle App ISR [%s]\n", OC::CORE::app_isr_enabled ? "ON" : "OFF");
           Serial.printf("'D' = Toggle Display Redraw [%s]\n", OC::CORE::display_update_enabled ? "ON" : "OFF");
           Serial.printf("'L' = Toggle App Loop [%s]\n", OC::CORE::app_loop_enabled ? "ON" : "OFF");
-#if defined(__IMXRT1062__)
 #if defined(ARDUINO_TEENSY41)
           Serial.println("'N' = print Midi Log");
           Serial.println("'i' = scan all i2c addresses");
 #endif
           Serial.println("'l' = list all files in flash (LittleFS)");
           Serial.println("'s' = list all files on SD card");
-          Serial.println("'C' = clear/reset default Config file");
+          Serial.println("'CLR!' = clear/reset default Config file");
           Serial.println("'F*ck' = format/erase all LittleFS files");
           Serial.println("'?' = print contents of CRASH.LOG");
           Serial.println("'~' + [abxyzlr<^>v] = simulate button");
-#endif
+          Serial.println("'p', slot + 33 = Preset Load");
+          Serial.println("'P', slot + 33 = Preset Save");
           break;
 
         case 'I':
@@ -659,7 +690,6 @@ void SerialHandler() {
           Serial.printf("App Loop = %s\n", OC::CORE::app_loop_enabled ? "ON" : "OFF");
           break;
 
-#if defined(__IMXRT1062__)
         case 'N':
           // MIDI monitor: dump the in/out event ring as one "N:..." line.
           MidiLog::PrintLog();
@@ -669,10 +699,6 @@ void SerialHandler() {
           ScanI2C();
           break;
 #endif
-        case 'C':
-          Serial.println("Resetting Config File!!");
-          PhzConfig::clear_config();
-          PhzConfig::save_config();
         case 'l':
           Serial.println(" -=- LittleFS -=- ");
           PhzConfig::listFiles();
@@ -695,34 +721,11 @@ void SerialHandler() {
             Serial.println("*** no CRASH.LOG found ***");
           break;
         }
-#endif
 
-        case '~': {
-          // Remote control: the next byte selects a button/encoder to inject.
-          uint32_t t0 = millis();
-          while (!Serial.available() && (millis() - t0) < 5) { /* await selector */ }
-          if (Serial.available()) RemoteControl(Serial.read());
-          break;
-        }
-
-        case 'p': // preset load
-        case 'P': // Preset Save
-        {
-          // next byte = slot + 33.
-          uint32_t t0 = millis();
-          while (!Serial.available() && (millis() - t0) < 5) { /* await slot */ }
-          if (Serial.available())
-            OC::ui.Inject(
-              UI::EVENT_MISC,
-              c == 'p' ? UI::MISC_PRESET_LOAD : UI::MISC_PRESET_SAVE,
-              Serial.read() - 33,
-              0
-            );
-
-          break;
-        }
-        default:
+        // main framebuffer capture request
+        case ' ':
           capreq = true;
+        default: // no wildcards
           break;
       }
     } while (Serial.available() > 0); // todo: yield after a limit
@@ -738,7 +741,7 @@ void SerialHandler() {
     };
 
     if (capreq) {
-      display::frame_buffer.capture_request();
+      display::frame_buffer.capture_request(capscreen);
       cap_idx = 0;
     }
   }
@@ -756,8 +759,8 @@ void SerialHandler() {
       if (n < 16) Serial.print("0");
       Serial.print(n, HEX);
 
-      // 128x256 - 4 screens stacked vertically, 4096 bytes
-      if (++cap_idx >= display::frame_buffer.kFrameSize * display::frame_buffer.kNumScreens) {
+      // 128x64 - 1 screenful, 1024 bytes
+      if (++cap_idx >= display::frame_buffer.kFrameSize) {
         // we're done sending this one
         Serial.println();
         Serial.flush();
