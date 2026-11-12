@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <title>Phazerville Connect</title>
+
+<style>
+  html,body { margin:0; min-height:100%; background:#000; color:#ccc;
+              font-family: ui-monospace, Menlo, Consolas, monospace; }
+  #bar { position:sticky; top:0; z-index:5; display:flex; gap:8px; align-items:center;
+         padding:8px 12px; background:#0c0c0e; border-bottom:1px solid #222; flex-wrap:wrap; }
+  button { background:#1b1b20; color:#ddd; border:1px solid #333; border-radius:6px;
+           padding:6px 12px; cursor:pointer; font:inherit; }
+  button:hover { background:#26262d; }
+  button:disabled { opacity:.4; cursor:default; }
+  button.on { background:#2b3b2b; border-color:#4a7a4a; color:#dfe; }
+  select { background:#141418; color:#ddd; border:1px solid #333; border-radius:6px;
+           padding:5px; font:inherit; font-size:12px; }
+  #status { color:#888; margin-left:auto; font-size:13px; }
+  #tag { padding:2px 8px; border:1px solid #444; border-radius:10px; font-size:12px; color:#aaa; }
+  .sep { width:1px; align-self:stretch; background:#282830; margin:0 2px; }
+
+  [hidden] { display:none !important; }   /* hidden must beat display:flex/grid */
+
+  #serial { display:grid; justify-content:center; }
+  .grid { display:grid; grid-template-columns:repeat(2, max-content); gap:10px;
+          justify-content:center; padding:20px; }
+  .grid-col { display:flex; flex-direction:column; align-items:center; gap:10px; padding:0px; }
+  .cell { display:flex; flex-direction:column; gap:10px; background:#0a0a0c;
+          border:1px solid #1d1d24; border-radius:10px; padding:20px; }
+
+  canvas { image-rendering:pixelated; display:block;
+            /* Black stays black; white shifts to a vibrant blue */
+            filter: sepia(100%) saturate(500%) hue-rotate(190deg);
+  }
+  .clickable { cursor:pointer; }
+
+  #consoleview { white-space:pre; display:block;
+                 gap:18px; align-items:center; justify-content:center;
+                 padding:12px; background:#0c0c0e; border:1px solid #222; }
+
+  #control { display:flex; flex-wrap:wrap; gap:18px; align-items:center; justify-content:center;
+             padding:12px; background:#0c0c0e; border-top:1px solid #222; }
+  .hint { text-align:center; align-items:center; font-size:11px; color:#555; }
+  .frozen { opacity:50%; }
+
+  /* for native F11 fullscreen */
+  @media (display-mode: fullscreen) {
+    #bar { display: none; }
+    .cell { border:none; background:transparent; padding:4px; }
+    .grid { gap:8px; }
+    .grid-col { gap:0px; padding:0px; }
+    .frozen { display: none; }
+  }
+  /* for programmatic fullscreen, just in case */
+  html:fullscreen #bar { display: none; }
+
+</style>
+</head>
+<body>
+  <div id="bar">
+    <button id="connect">Connect</button>
+    <button id="disconnect" disabled="">Disconnect</button>
+    <span id="tag">...</span>
+    <span class="sep"></span>
+    <button id="mainbtn" title="mirror of the module screen">Main</button>
+    <button id="quadbtn" title="four views at once">Quad</button>
+    <button id="serialcon">Console</button>
+    <span class="sep"></span>
+    <button id="t-control">Control</button>
+    <button id="save" disabled="">Save PNG</button>
+    <span class="sep"></span>
+    <button id="hey" disabled="">hey.</button>
+    <span id="status">Web Serial: click Connect and pick the module's serial port.</span>
+  </div>
+
+  <div id="mainview" class="grid">
+    <div id="control"></div>
+    <div id="screenX" class="oled clickable cell">
+      <canvas></canvas>
+      <div class="hint">Live UI</div>
+    </div>
+  </div>
+
+  <div class="grid" id="quadview" hidden="">
+    <div class="grid-col">
+      <div id="screen0" class="oled clickable cell">
+        <canvas></canvas>
+        <div class="hint">Northern Applets</div>
+      </div>
+      <div id="screen2" class="oled clickable cell">
+        <canvas></canvas>
+        <div class="hint">Southern Applets</div>
+      </div>
+    </div>
+
+    <div class="grid-col">
+      <div id="screen1" class="oled clickable cell">
+        <canvas></canvas>
+        <div class="hint">Misc Views</div>
+      </div>
+      <div id="screen3" class="oled clickable cell">
+        <canvas></canvas>
+        <div class="hint">Audio DSP</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="serial" hidden="">
+    <div class="hint">Serial Console Log</div>
+    <div id="consoleview"></div>
+  </div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const enc = new TextEncoder();
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+const setStatus = t => $("status").textContent = t;
+const setTag = t => $("tag").textContent = t;
+const appendConsole = t => $("consoleview").textContent += t + "\n";
+const clearConsole = ()=> $("consoleview").textContent = "";
+
+// dimensions of a standard framebuffer in firmware v2.1+
+const OLED_W = 128;
+const OLED_H = 64;
+const BG = [8, 8, 10];
+
+let live_view = []; // decoded frame data
+let live_freeze = [false, false, false, false];
+
+// ---- Canvas Graphics stuff
+function drawSimple(cv, source, frozen){
+  if (!cv || !source) return;
+  const ctx = cv.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = `rgb(${BG.join(",")})`;
+  ctx.fillRect(0,0,cv.width,cv.height);
+  ctx.drawImage(source, 0, 0, cv.width, cv.height);
+  if (frozen) {
+    ctx.fillStyle = `rgba(0,0,0,0.5)`; // dimmer layer
+    ctx.fillRect(0,0,cv.width,cv.height);
+  }
+}
+
+function drawFrame(screen){
+  const cv = document.querySelector("#screen"+screen+" canvas");
+  const sc = Math.max(1, Math.min(12, Math.floor(Math.min((window.innerWidth - 80) / OLED_W, (window.innerHeight - 200) / OLED_H)))) / 2;
+  if (cv.width !== OLED_W*sc || cv.height !== OLED_H*sc) { cv.width = OLED_W*sc; cv.height = OLED_H*sc; }
+  if (live_view[screen]) drawSimple(cv, live_view[screen], live_freeze[screen]);
+}
+function freezeScreen(screen){
+  if (!running) return;
+  if (live_freeze[screen]) {
+    live_freeze[screen] = false;
+    $("screen"+screen).classList.toggle("frozen", false);
+    return;
+  }
+  live_freeze[screen] = true;
+  drawFrame(screen);
+  $("screen"+screen).classList.toggle("frozen", true);
+}
+
+function buildScreen(frame){
+  const { data, w, h } = frame, fg = [235,235,245];
+  const cv = document.createElement("canvas");
+  cv.width=w;
+  cv.height=h;
+  const ctx = cv.getContext("2d");
+  const img = ctx.createImageData(w,h);
+  for (let y=0;y<h;y++){
+    const page=(y>>3)*w, bit=1<<(y&7);
+    for (let x=0;x<w;x++){
+      const on = data[page+x] & bit, k=(y*w+x)*4;
+      img.data[k]=on?fg[0]:BG[0];
+      img.data[k+1]=on?fg[1]:BG[1];
+      img.data[k+2]=on?fg[2]:BG[2];
+      img.data[k+3]=255;
+    }
+  }
+  ctx.putImageData(img,0,0);
+  return cv;
+}
+
+// ---- Main polling loop ----
+let pause_loop = false; // a way to make it wait
+let loop_err_count = 0; // to detect a dead link
+let sayhey = false;
+let viewmode = 0; // 0 = Main, 1 = Quad, 2 = console
+
+async function loop(){
+  let loop_phase = 0;
+
+  while (running) {
+    try {
+      if (pause_loop) { await sleep(15); continue; }
+      if (document.hidden) { await sleep(250); continue; }
+
+      // check messages
+      while (inbox.length) {
+        appendConsole(inbox.shift());
+      }
+
+      if (sayhey) {
+        const t = await transactText("hey.");
+        if (t) {
+          appendConsole(t);
+          setStatus(t);
+        }
+        sayhey = false;
+      }
+      let cycleOK = false;
+
+      switch (viewmode){
+        case 0: // Main - one screen surrounded by controls
+          {
+            const f = await transactFrame(' ', OLED_W*OLED_H/8, 600);
+            if (f) {
+              live_view[0] = buildScreen(f);
+              const cv = document.querySelector("#screenX canvas");
+              const sc = Math.max(1, Math.min(12, Math.floor(Math.min((window.innerWidth - 80) / OLED_W, (window.innerHeight - 200) / OLED_H))));
+              if (cv.width !== OLED_W*sc || cv.height !== OLED_H*sc) { cv.width = OLED_W*sc; cv.height = OLED_H*sc; }
+              drawSimple(cv, live_view[0], false);
+              setTag("LIVE");
+              cycleOK = true;
+            }
+            break;
+          }
+        case 1: // Quad view - four screens
+          {
+            // Framebuffer refresh - one of 4 screens - 128x64 px
+            const screen = loop_phase % 4;
+            if (!live_freeze[screen]) {
+              const f = await transactFrame("S" + screen, OLED_W*OLED_H/8, 600);
+              if (f) {
+                live_view[screen] = buildScreen(f);
+                drawFrame(screen);
+                setTag("LIVE");
+                cycleOK = true;
+              }
+            } else {
+              cycleOK = true;
+            }
+            break;
+          }
+        case 2: // Console only, for messages and debugging
+        default:
+          cycleOK = true;
+          break;
+      }
+
+      if (!cycleOK) { await sleep(80); flushInput(); }
+      else loop_err_count = 0;
+
+      await sleep(2);
+    } catch(e){
+      if (!running) break;
+      // A one-off exception is usually a viewer bug, and not a dead link
+      console.error("yo, check this exception i caught:", e);
+      if (++loop_err_count < 3) {
+        setStatus("Warning: " + e.message + " (details in console)");
+        await sleep(100);
+        continue; // keep going
+      }
+
+      setStatus("Error: " + e.message + " (details in console)");
+
+      // ok it's really dead, reset and try to reconnect
+      loop_err_count = 0;
+      await recover();
+      if (!writer) break;
+    }
+
+    ++loop_phase;
+  }
+}
+
+// ==== Web Serial core ====
+let rxBuf = "";
+const inbox = [];
+async function pump(){
+  const dec = new TextDecoder();
+  while (running && reader) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    rxBuf += dec.decode(value, { stream:true });
+    let nl;
+    while ((nl = rxBuf.indexOf("\n")) >= 0) {
+      const line = rxBuf.slice(0,nl).trim();
+      rxBuf = rxBuf.slice(nl+1);
+      if (line) inbox.push(line);
+    }
+  }
+}
+function flushInput(){ inbox.length = 0; rxBuf = ""; }
+
+async function transactText(cmd, timeoutMs=100){
+  flushInput();
+  await writer.write(enc.encode(cmd));
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() < deadline) {
+    if (inbox.length) {
+      const line = inbox.shift();
+      return line;
+    }
+    await sleep(1);
+  }
+  return null;
+}
+
+async function transactFrame(cmd, expectBytes, timeoutMs=600){
+  flushInput();
+  await writer.write(enc.encode(cmd));
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() < deadline) {
+    while (inbox.length) {
+      const line = inbox.shift();
+      if (line.length % 2 === 0 && line.length/2 === expectBytes) return decodeFrame(line);
+    }
+    await sleep(1);
+  }
+  return null;
+}
+// HEX to binary frame data
+function decodeFrame(hexline){
+  const n = hexline.length/2;
+  if ((n % 16) || (hexline.length % 2)) return null;
+  const data = new Uint8Array(n);
+  for (let i=0;i<n;i++){ const b=parseInt(hexline.substr(i*2,2),16); if (Number.isNaN(b)) return null; data[i]=b; }
+  return { data, w:OLED_W, h:n/16 };
+}
+
+// TODO:
+async function transactMidiLog(timeoutMs=250){
+  flushInput();
+  await writer.write(enc.encode("N"));
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() < deadline) {
+    while (inbox.length) {
+      const line = inbox.shift();
+      if (line.startsWith("N:") && line.length === 2 + 32*12) {
+        const evs = [];
+        for (let k=0;k<32;k++){
+          const o = 2 + k*12;
+          const seq = parseInt(line.substr(o,4),16);
+          if (!seq) continue;
+          const dc = parseInt(line.substr(o+6,2),16);
+          evs.push({ seq, message:parseInt(line.substr(o+4,2),16),
+                     out:!!(dc&0x80), chan:dc&0x7F,
+                     d1:parseInt(line.substr(o+8,2),16), d2:parseInt(line.substr(o+10,2),16) });
+        }
+        return evs;
+      }
+    }
+    await sleep(1);
+  }
+  return null;
+}
+
+let loopPromise = null, pumpPromise = null;
+let port=null, reader=null, writer=null, running=false;
+const OPEN_OPTS = { baudRate:115200, bufferSize:262144 };
+
+async function connect(){
+  if (!("serial" in navigator)) { setStatus("Web Serial not supported. :("); return; }
+  try {
+    port = await navigator.serial.requestPort({ filters:[{ usbVendorId:0x16C0 }] });
+    await port.open(OPEN_OPTS);
+  } catch(e){
+    const busy = /open|in use|failed/i.test(e.message || "");
+    setStatus("Connect failed: " + e.message
+      + (busy ? " (Is the module already connected in another tab?)" : ""));
+    return;
+  }
+  writer = port.writable.getWriter();
+  reader = port.readable.getReader();
+  running = true;
+  await writer.write(enc.encode("Pew!")); // unlock phrase
+
+  uiConnected();
+  setStatus("Connected.");
+
+  pumpPromise = pump();
+  pumpPromise.catch(()=>{ if (running) recover(); });
+  loopPromise = loop();
+}
+async function shutdown(){
+  // give things a chance to finish, close the port last
+  try { if (reader) await reader.cancel(); } catch(e){}
+  if (pumpPromise) { try { await Promise.race([pumpPromise, sleep(500)]); } catch(e){} pumpPromise = null; }
+  try { if (reader) reader.releaseLock(); } catch(e){}
+  try { if (writer) await Promise.race([writer.close(), sleep(500)]); } catch(e){}
+  try { if (writer) writer.releaseLock(); } catch(e){}
+  await sleep(50);
+  try { if (port) await port.close(); } catch(e){}
+  reader = writer = null;
+  flushInput();
+}
+function uiConnected(){
+  $("connect").disabled=true;
+  $("disconnect").disabled=false;
+  $("save").disabled=false;
+  $("hey").disabled=false;
+  setTag("---");
+}
+function uiDisconnected(){
+  $("connect").disabled=false;
+  $("disconnect").disabled=true;
+  $("save").disabled=true;
+  $("hey").disabled=true;
+  setTag("---");
+}
+async function disconnect(){
+  $("disconnect").disabled = true;          // no double-fire
+  running = false;
+  // let the poll loop leave its in-flight transaction before touching the port
+  if (loopPromise) { try { await Promise.race([loopPromise, sleep(1500)]); } catch(e){} loopPromise = null; }
+  await shutdown();
+  port = null;
+  uiDisconnected();
+  setStatus("Disconnected.");
+}
+let recoverPromise = null;
+function recover(){
+  if (!recoverPromise) recoverPromise = _recover().finally(()=>{ recoverPromise = null; });
+  return recoverPromise;
+}
+async function _recover(){
+  setStatus("Link lost, retrying...");
+  await shutdown();
+  for (let i = 0; i < 20 && running && port; i++){
+    await sleep(500);
+    try {
+      await port.open(OPEN_OPTS);
+      writer = port.writable.getWriter();
+      reader = port.readable.getReader();
+
+      setStatus("Reconnected.");
+      pumpPromise = pump();
+      pumpPromise.catch(()=>{ if (running) recover(); });
+      return;
+    } catch(e){ setStatus("Link lost, retrying... (" + (i+1) + "/20)"); }
+  }
+  running = false;
+  port = null;
+  uiDisconnected();
+  setStatus("Link lost. Press Connect to retry.");
+}
+
+function switchTo(v){
+  if (0 == v) {
+    $("mainview").hidden = false;
+    $("quadview").hidden = true;
+    $("serial").hidden = true;
+  } else if (1 == v) {
+    $("mainview").hidden = true;
+    $("quadview").hidden = false;
+    $("serial").hidden = true;
+  } else if (2 == v) {
+    $("mainview").hidden = true;
+    $("quadview").hidden = true;
+    $("serial").hidden = false;
+  }
+  viewmode = v;
+}
+function toggle_controls(){
+  $("control").hidden = !$("control").hidden;
+}
+
+// ---- remote control ----
+async function sendControl(sel){
+  if (!writer) return;
+  try { await writer.write(enc.encode("~" + sel)); } catch(e){}
+}
+
+// ---- save PNG ---------------------------------------------------------------------
+function savePng(){
+  // TODO: Main vs. Quad view mode
+  const canvases = [];
+  const cvs = document.querySelectorAll(".oled canvas");
+  if (cvs) cvs.forEach((cv)=>{ canvases.push(cv); });
+  if (!canvases.length) return;
+  const gap = 12;
+  const w = Math.max(...canvases.map(c=>c.width));
+  const cols = Math.min(2, canvases.length);
+  const rows = Math.ceil(canvases.length / 2);
+  const rowH = Math.max(...canvases.map(c=>c.height));
+  const out = document.createElement("canvas");
+  out.width = cols*w + (cols+1)*gap;
+  out.height = rows*rowH + (rows+1)*gap;
+  const ctx = out.getContext("2d");
+  ctx.fillStyle = "#000"; ctx.fillRect(0,0,out.width,out.height);
+  canvases.forEach((c,k)=>{
+    ctx.drawImage(c, gap + Math.floor(k/2)*(w+gap), gap + (k%2)*(rowH+gap));
+  });
+  const a = document.createElement("a");
+  a.download = "ORN8_screencap_" + new Date().toISOString().replace(/[:.]/g,"-") + ".png";
+  a.href = out.toDataURL("image/png");
+  a.click();
+}
+
+// --- OK READY LETS GO
+$("connect").onclick = connect;
+$("disconnect").onclick = disconnect;
+$("hey").onclick = ()=>{ sayhey = true; };
+$("save").onclick = savePng;
+$("t-control").onclick = toggle_controls;
+$("mainbtn").onclick = ()=>switchTo(0);
+$("quadbtn").onclick = ()=>switchTo(1);
+$("serialcon").onclick = ()=>switchTo(2);
+
+$("screen0").onclick = ()=>{ freezeScreen(0); };
+$("screen1").onclick = ()=>{ freezeScreen(1); };
+$("screen2").onclick = ()=>{ freezeScreen(2); };
+$("screen3").onclick = ()=>{ freezeScreen(3); };
+
+
+</script>
+
+</body>
+</html>
