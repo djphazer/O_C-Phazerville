@@ -57,13 +57,13 @@ public:
       } else if (output_mode[ch] == MODE_IN) {
         if (Clock(ch)) StartADCLag(ch);
         if (EndOfADCLag(ch)) held_cv[ch] = main_cv;
-        signal = MixerInputSum(ch, held_cv[ch], aux1, aux2);
+        signal = MixerInputSum(ch, Quantize(ch, held_cv[ch]), aux1, aux2);
       } else {
         signal = MixerInputSum(ch, main_cv, aux1, aux2);
       }
 
       CONSTRAIN(signal, HEMISPHERE_MIN_CV, HEMISPHERE_MAX_CV);
-      signal = Quantize(ch, signal);
+      if (output_mode[ch] != MODE_IN) signal = Quantize(ch, signal);
       Out(ch, signal);
     }
   }
@@ -235,7 +235,7 @@ private:
       gfxPrintIcon(map.Icon());
     }
 
-    const int xpos = gfxGetPrintPosX() - 1;
+    const int xpos = gfxGetPrintPosX();
     const int icon_y = gfxGetPrintPosY();
     const int ypos = icon_y + (is_dac ? 2 : 4);
     const int height = constrain(map.InRescaled(9), -9, 9);
@@ -260,7 +260,7 @@ private:
 
       if (output_mode[ch] == MODE_IN) {
         gfxPrintIcon(CLOCK_ICON);
-        const int xpos = gfxGetPrintPosX() - 1;
+        const int xpos = gfxGetPrintPosX();
         const int ypos = gfxGetPrintPosY() + 4;
         const int height = constrain(
             Proportion(held_cv[ch], HEMISPHERE_MAX_INPUT_CV, 9), -9, 9);
