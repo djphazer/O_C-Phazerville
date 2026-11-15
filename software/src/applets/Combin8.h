@@ -278,7 +278,7 @@ private:
       gfxPos(gfxGetPrintPosX() + 2, gfxGetPrintPosY());
       gfxStartCursor();
       if (aux_muted[ch][0]) {
-        gfxPrint("X");
+        gfxPrint("x");
         gfxPos(gfxGetPrintPosX() + 2, gfxGetPrintPosY());
       } else {
         PrintCombin8Source(sources[ch][0]);
@@ -291,7 +291,7 @@ private:
       gfxPos(gfxGetPrintPosX() + 2, gfxGetPrintPosY());
       gfxStartCursor();
       if (aux_muted[ch][1]) {
-        gfxPrint("X");
+        gfxPrint("x");
         gfxPos(gfxGetPrintPosX() + 2, gfxGetPrintPosY());
       } else {
         PrintCombin8Source(sources[ch][1]);
