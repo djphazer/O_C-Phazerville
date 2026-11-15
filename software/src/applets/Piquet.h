@@ -1050,6 +1050,7 @@ void FLASHMEM Piquet::DrawParamRow(int x_offset) {
       if (cursor >= CURSOR_ATTACK_SHAPE) {
         const char *label = "";
         const char *value = nullptr;
+        char eoc_value[4] = "Ch ";
         int value_x;
         int value_width;
 
@@ -1074,7 +1075,8 @@ void FLASHMEM Piquet::DrawParamRow(int x_offset) {
             break;
           case CURSOR_EOC:
             label = "EOC";
-            value = c.eoc_enabled ? "Yes" : "No";
+            eoc_value[2] = OutputLabel(1 - selected_channel)[0];
+            value = c.eoc_enabled ? eoc_value : "Off";
             break;
           case CURSOR_CV_MAP:
             label = "Cv:";
@@ -1084,8 +1086,8 @@ void FLASHMEM Piquet::DrawParamRow(int x_offset) {
             label = "Lvl:";
             break;
           case CURSOR_INVERT:
-            label = "Inv:";
-            value = c.inverted ? "Yes" : "No";
+            label = "Out:";
+            value = c.inverted ? "Inv" : "Nrm";
             break;
           default:
             break;
@@ -1421,7 +1423,7 @@ const char* FLASHMEM Piquet::cursor_display_label() const {
         case CURSOR_EOC: return "Send EOC";
         case CURSOR_CV_MAP: return "CV Map";
         case CURSOR_LEVEL: return "Level";
-        case CURSOR_INVERT: return "Invert";
+        case CURSOR_INVERT: return "Polarity";
         default: return cursor_label();
       }
 }
@@ -1487,7 +1489,7 @@ const char* FLASHMEM Piquet::cursor_label() const {
         "Channel", "Length", "Envelope", "EnvType", "LoopMode",
         "Attack", "Decay", "Sustain", "Release",
         "AttShape", "DcyShape", "RelShape",
-        "Delay Mode", "Delay", "Send EOC", "CV Map", "Level", "Invert"
+        "Delay Mode", "Delay", "Send EOC", "CV Map", "Level", "Polarity"
       };
       return labels[constrain(cursor, 0, CURSOR_COUNT - 1)];
 }
