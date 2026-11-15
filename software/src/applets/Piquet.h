@@ -34,7 +34,7 @@ public:
     static constexpr int PARAM_Y = 20;
     static constexpr uint8_t MAX_TRIGGER_QUEUE = 4;
 
-    // 7-bit delay index: 0..127 maps to 10..8500 ms.
+    // 7-bit delay index: 0..127 maps to 10..11000 ms.
     static int32_t DelayMilliseconds(uint8_t index) {
       if (index < 40) return (index + 1) * 10;
       if (index < 64) return 400 + (index - 39) * 25;
@@ -568,7 +568,7 @@ private:
     }
 
     static int StageMilliseconds(uint8_t value, int multiplier) {
-      return (StageTicks(value) * multiplier) / 17;
+      return (StageTicks(value) * multiplier) / HEMISPHERE_CLOCK_TICKS;
     }
 
     static constexpr uint16_t PeaksTime(int ticks) {
@@ -897,8 +897,7 @@ void FLASHMEM Piquet::DrawFullScreen() {
 
   for (int ch = 0; ch < NUM_CHANNELS; ++ch) {
     const int channel_x = ch * 64 + x_offset;
-    const int w = constrain(
-      Proportion(ViewOut(ch), HEMISPHERE_MAX_CV, 62), 0, 62);
+    const int w = ProportionCV(ViewOut(ch), 62);
     const int meter_x = channel_x + (ch == 0 ? 0 : 64 - w);
 
     // Output meter and channel label.
@@ -1001,7 +1000,7 @@ void FLASHMEM Piquet::OnEncoderMove(int direction) {
 
 void FLASHMEM Piquet::DrawIndicators() {
       ForEachChannel(ch) {
-        int w = Proportion(ViewOut(ch), HEMISPHERE_MAX_CV, 62);
+        int w = ProportionCV(ViewOut(ch), 62);
         gfxRect(0, 13 + (ch * 3), w, 2);
       }
 
