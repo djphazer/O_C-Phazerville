@@ -13,8 +13,8 @@ _NB/FAQ: just updating the firmware (on a calibrated module) doesn’t require r
 There are a few ways of getting the firmware onto your module:
 
 * [Method A](#method-a): upload a pre-compiled HEX file. this is easy and quick!
-* [Method B](#method-b): install the Arduino IDE and the Teensyduino add-on and compile the code yourself.
-* [Method C](#method-c): install PlatformIO and compile the code yourself. (_recommended!_)
+* [Method B](#method-b): install PlatformIO and compile the code yourself. (_recommended!_)
+* [Method C](#method-c): install the Arduino IDE and the Teensyduino add-on and compile the code yourself.
 * Either way, you’ll need: a micro-usb cable (make sure this isn’t for charging only, but data transfer).
 * NB: the following steps assume that you have cut the usb trace. see [here](https://ornament-and-cri.me/build-it/#cut_trace) for an example of the Teensy 3.2.
 
@@ -42,26 +42,6 @@ uploading the HEX file
 Your O+C should now run the updated firmware (resp. come to life, if newly built). If this is a newly built module, proceed to [Calibration](Setup-About#calibration-routine) (just updating the firmware doesn’t require re-calibration)
 
 ## Method B
-Compiling the firmware with Arduino IDE + Teensyduino
-
-### step 1): get the IDE + teensyduino add-on
-- if you don’t have it already, you need to install the [Arduino IDE](https://www.arduino.cc/en/software) as well as the [Teensyduino](https://www.pjrc.com/teensy/td_download.html) add-on.
-- unlike past firmwares, the latest versions of each should work just fine.
-
-### step 2): clone or download the firmware source code repository to your computer
-- clone from `https://github.com/djphazer/O_C-Phazerville`
-- use the `phazerville` branch (which is the default) - this is the latest “production” released code
-- `dev/*` and other branches contain bleeding-edge code which may or may not contain bugs
-
-### step 3): compile
-- Once the libraries and source code for the firmware are in place, you should be able to compile it. Open the file called `src.ino`. Now make sure you:
-1. select "Teensy 3.2/3.1" (or Teensy 4.0, 4.1, accordingly) in `Tools > Board`
-2. select "MIDI" in `Tools > USB Type`
-3. select "120 MHz (overclock)" in `Tools > CPU Speed`
-4. select "Smallest Code" in `Tools > Optimize`
-- compile. and upload to your board (since you’ve cut the usb trace, the module needs to be powered from your eurorack PSU): the display should come to life now.
-
-## Method C
 Compiling the firmware with PlatformIO
 
 ### step 1): [install PlatformIO](https://platformio.org/install)
@@ -69,16 +49,38 @@ Compiling the firmware with PlatformIO
 - Follow one of these links to get that set up first.
 
 ### step 2): clone or download the firmware source code repository to your computer
-- (same as step 2 for Method B above)
+- clone from `https://github.com/djphazer/O_C-Phazerville`
+- use the `main` branch (which is the default) - this is the latest “production” released code for ORN8 and O_C with T4.0
+  - or use the `T32` branch for Teensy 3.2-based O_C modules (formerly the `phazerville` branch)
 
 ### step 3): compile
 - Navigate to the `software/` directory in the source code. From there, you can use PlatformIO to Build the desired configuration and Upload via USB to your module.
 - For example, in the terminal, I type:
 ```
-pio run -e T32 -t upload
+pio run -e T41_audio -t upload
 ```
 - In VSCode or other IDE plugins, you'll see commands labeled "Build" and "Upload" under "General" for the various build targets.
-- Have a look inside `platformio.ini` for alternative build configurations - VOR, flipped screen, Teensy 4.x, etc. - and to customize various app flags.
+- Have a look inside `platformio.ini` for alternative build configurations - VOR, Teensy 4.x, etc. - and to customize various app flags.
+
+## Method C
+Compiling the firmware with Arduino IDE + Teensyduino (legacy toolchain)
+
+### step 1): get the IDE + teensyduino add-on
+- if you don’t have it already, you need to install the [Arduino IDE](https://www.arduino.cc/en/software) as well as the [Teensyduino](https://www.pjrc.com/teensy/td_download.html) add-on.
+- unlike past firmwares, the latest versions of each should work just fine.
+
+### step 2): clone or download the firmware source code repository to your computer
+- (same as step 2 for Method B above)
+
+### step 3): compile
+- Once the libraries and source code for the firmware are in place, you should be able to compile it. Open the file called `src.ino`. Now make sure you:
+1. select "Teensy 3.2/3.1" (or Teensy 4.0, 4.1, accordingly) in `Tools > Board`
+2. select "MIDI" in `Tools > USB Type`
+  - or use "MIDI + Audio + Serial" for Teensy 4.1
+3. select "120 MHz (overclock)" in `Tools > CPU Speed`
+  - or use "300 MHz" for Teensy 4.0, or "600 MHz" for Teensy 4.1
+4. select "Smallest Code" in `Tools > Optimize`
+- compile. and upload to your board (since you’ve cut the usb trace, the module needs to be powered from your eurorack PSU): the display should come to life now.
 
 ## Calibrate
 
