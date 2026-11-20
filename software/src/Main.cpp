@@ -623,18 +623,18 @@ void SerialHandler() {
       }
 
       // 2-byte commands for injecting button/encoder events
-      if ((cmd >> 8) & 0xff == '~') {
+      if (((cmd >> 8) & 0xff) == '~') {
         RemoteControl(c);
         continue;
       }
 
       // 2-byte preset load
-      if ((cmd >> 8) & 0xff == 'p') {
+      if (((cmd >> 8) & 0xff) == 'p') {
         OC::ui.Inject( UI::EVENT_MISC, UI::MISC_PRESET_LOAD, c - 33, 0);
         continue;
       }
       // 2-byte preset save
-      if ((cmd >> 8) & 0xff == 'P') {
+      if (((cmd >> 8) & 0xff) == 'P') {
         OC::ui.Inject( UI::EVENT_MISC, UI::MISC_PRESET_SAVE, c - 33, 0);
         continue;
       }

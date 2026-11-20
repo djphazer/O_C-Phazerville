@@ -75,7 +75,21 @@
   </div>
 
   <div id="mainview" class="grid">
-    <div id="control"></div>
+    <div id="control">
+      <button id="a-btn">A</button>
+      <button id="ab-btn">A+B</button>
+      <button id="b-btn">B</button>
+      <button id="ax-btn">A+X</button>
+      <button id="x-btn">X</button>
+      <button id="xy-btn">X+Y</button>
+      <button id="y-btn">Y</button>
+      <button id="by-btn">B+Y</button>
+      <button id="overview-btn">A+Y</button>
+      <button id="z-btn">Z</button>
+      <button id="l-btn">L-enc</button>
+      <button id="r-btn">R-enc</button>
+    </div>
+    <br />
     <div id="screenX" class="oled clickable cell">
       <canvas></canvas>
       <div class="hint">Live UI</div>
@@ -514,6 +528,18 @@ $("screen1").onclick = ()=>{ freezeScreen(1); };
 $("screen2").onclick = ()=>{ freezeScreen(2); };
 $("screen3").onclick = ()=>{ freezeScreen(3); };
 
+$("a-btn").onclick = ()=>{ sendControl("a"); };
+$("ab-btn").onclick = ()=>{ sendControl("^"); };
+$("b-btn").onclick = ()=>{ sendControl("b"); };
+$("ax-btn").onclick = ()=>{ sendControl("<"); };
+$("x-btn").onclick = ()=>{ sendControl("x"); };
+$("xy-btn").onclick = ()=>{ sendControl("v"); };
+$("y-btn").onclick = ()=>{ sendControl("y"); };
+$("by-btn").onclick = ()=>{ sendControl(">"); };
+$("overview-btn").onclick = ()=>{ sendControl("|"); };
+$("z-btn").onclick = ()=>{ sendControl("z"); };
+$("l-btn").onclick = ()=>{ sendControl("l"); };
+$("r-btn").onclick = ()=>{ sendControl("r"); };
 
 </script>
 
