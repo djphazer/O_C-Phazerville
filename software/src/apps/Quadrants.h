@@ -976,18 +976,6 @@ public:
           return true;
         }
 
-        // cancel other view layers
-        if (view_state != APPLETS && view_state != APPLET_FULLSCREEN && view_state != OVERVIEW) {
-          view_state = APPLETS;
-          return true;
-        }
-
-        // A/B/X/Y buttons becomes aux button while editing a param
-        if (SlotIsVisible(slot) && active_applet[slot]->EditMode()) {
-          active_applet[slot]->AuxButton();
-          return true;
-        }
-
         return false;
     }
 
@@ -1820,17 +1808,17 @@ void AppQuadrants::HandleButtonEvent(const UI::Event &event) {
     /*  last_mask*/
     /*);*/
 
-    if (AUDIO_SETUP == view_state && !clock_overlay && !preset_cursor) {
-      if (CheckButtonCombo(OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_B)) {
-        clock_overlay = true;
-        //view_state = APPLETS;
+    if (AUDIO_SETUP == view_state && !clock_overlay && !preset_cursor && !config_page) {
+      // --- a few combos also work in Audio view...
+      if (CheckButtonCombos(event)) {
+        select_mode = -1;
+        isEditing = false;
+        ClearEditInputMap();
+        OC::ui.SetButtonIgnoreMask(); // ignore release and long-press
         return;
       }
-      // dual press A+X for Load Preset
-      if (CheckButtonCombo(OC::CONTROL_BUTTON_A | OC::CONTROL_BUTTON_X)) {
-        ShowPresetSelector();
-        return;
-      }
+
+      // pass thru "normal" buttons to audio subapp
       if ((event.control == OC::CONTROL_BUTTON_L
            || event.control == OC::CONTROL_BUTTON_R)) {
         audio_app.HandleEncoderButtonEvent(event);
@@ -1840,6 +1828,7 @@ void AppQuadrants::HandleButtonEvent(const UI::Event &event) {
           || event.control == OC::CONTROL_BUTTON_Y
           || event.control == OC::CONTROL_BUTTON_A
           || event.control == OC::CONTROL_BUTTON_B) {
+        // this one can return true to exit audio view
         if (audio_app.HandleButtonEvent(event))
           view_state = APPLETS;
         return;
@@ -1916,7 +1905,21 @@ void AppQuadrants::HandleButtonEvent(const UI::Event &event) {
             ClearEditInputMap();
             OC::ui.SetButtonIgnoreMask(); // ignore release and long-press
           } else {
-            HEM_SIDE slot = ButtonToSlot(event);
+            const HEM_SIDE slot = ButtonToSlot(event);
+            // cancel other view layers
+            if (view_state != APPLETS && view_state != APPLET_FULLSCREEN
+                && view_state != OVERVIEW) {
+              view_state = APPLETS;
+              OC::ui.SetButtonIgnoreMask();
+              break;
+            }
+            // A/B/X/Y buttons becomes aux button while editing a param
+            if (SlotIsVisible(slot) && active_applet[slot]->EditMode()) {
+              active_applet[slot]->AuxButton();
+              OC::ui.SetButtonIgnoreMask();
+              break;
+            }
+
             if (HS::get_tick() - click_tick < HEMISPHERE_DOUBLE_CLICK_TIME
                 && (slot == first_click))
             {
