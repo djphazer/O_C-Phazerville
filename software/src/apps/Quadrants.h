@@ -28,6 +28,7 @@
 
 // per bank file
 static constexpr int QUAD_PRESET_COUNT = 32;
+static constexpr int AUDIO_MAGIC_OFFSET = 1024; // something bigger than PRESET_COUNT, just for runtime
 static constexpr int PRESET_FILE_REVISION = 1;
 
 using namespace HS;
@@ -418,6 +419,9 @@ public:
 
         //LoadGlobals();
 
+        PokePopup(PRESET_POPUP, OC::Strings::capital_letters[id]);
+    }
+    void load_audio(int id) {
         audio_app.LoadPreset(id);
         PokePopup(PRESET_POPUP, OC::Strings::capital_letters[id]);
     }
@@ -1345,7 +1349,7 @@ private:
                 StoreToPreset(preset_cursor - 1);
                 break;
               case LOAD_PRESET:
-                QueuePresetLoad(preset_cursor - 1);
+                QueuePresetLoad(preset_cursor - 1 + (view_state==AUDIO_SETUP)*AUDIO_MAGIC_OFFSET);
                 break;
             }
 
@@ -1594,7 +1598,11 @@ private:
     void DrawPresetSelector() const {
         const char * const hdrtxt[] = { "DEL!", "Load", "Save", "???" };
         gfxHeader(hdrtxt[config_cursor]);
-        gfxPrint(30, 1, "Preset: Bank# ");
+        if (config_cursor == 1)
+          gfxPrint(30, 1, view_state == AUDIO_SETUP ? "Audio:" : "CV:");
+        else
+          gfxPrint(30, 1, "Preset:");
+        gfxPrint(78, 1, "Bank# ");
         gfxPrint(bank_num);
         if (!SDcard_Ready) gfxInvert(78, 0, 30, 9);
 
@@ -1772,7 +1780,10 @@ void AppQuadrants::HandleButtonEvent(const UI::Event &event) {
 
     switch (event.type) {
     case UI::EVENT_MISC:
-        if (event.control == UI::MISC_PRESET_LOAD) QueuePresetLoad(event.value);
+        if (event.control == UI::MISC_PRESET_LOAD) {
+          // external events like MIDI ProgChange load both CV and Audio
+          QueuePresetLoad(event.value + AUDIO_MAGIC_OFFSET*2);
+        }
         if (event.control == UI::MISC_PRESET_SAVE) StoreToPreset(event.value);
         break;
 
@@ -1945,6 +1956,18 @@ void AppQuadrants::StoreToPreset(int id) {
 }
 FLASHMEM
 void AppQuadrants::LoadFromPreset(int id) {
+  if (id > AUDIO_MAGIC_OFFSET * 2 && id - AUDIO_MAGIC_OFFSET * 2 < QUAD_PRESET_COUNT) {
+    // load both
+    load_audio(id - AUDIO_MAGIC_OFFSET * 2);
+    load_from_preset(id - AUDIO_MAGIC_OFFSET * 2);
+    return;
+  }
+  if (id > AUDIO_MAGIC_OFFSET && id - AUDIO_MAGIC_OFFSET < QUAD_PRESET_COUNT) {
+    // audio only
+    load_audio(id - AUDIO_MAGIC_OFFSET);
+    return;
+  }
   if (id < 0 || id >= QUAD_PRESET_COUNT) return;
+  // CV only
   load_from_preset(id);
 }
