@@ -72,8 +72,8 @@ public:
     bool tickno = 0;
     bool auto_stop = true;
     bool extsync = false; // locked into an external clock; will stop after timeout
-    uint32_t clock_tick[2] = {0,0}; // previous ticks when a physical clock was received on DIGITAL 1
-    uint32_t beat_tick = 0; // The tick to count from
+    uint64_t clock_tick[2] = {0,0}; // previous ticks when a physical clock was received on DIGITAL 1
+    uint64_t beat_tick = 0; // The tick to count from
     uint32_t beat_count = 0;
     bool tock[NR_OF_CLOCKS] = {0,0,0,0,0,0,0,0,0,0,0}; // The current tock value
     int8_t tocks_per_beat[NR_OF_CLOCKS] = {0,0, 0,0, 0,0, 0,0, MIDI_OUT_PPQN, 1, 4}; // Multiplier
@@ -161,13 +161,13 @@ public:
       }
     }
 
-    const uint32_t BeatTick() const {
+    const uint64_t BeatTick() const {
       return beat_tick; // + beat_count * ticks_per_beat;
     }
     // Reset - Resync multipliers, optionally skipping the first tock
     void Reset(bool count_skip = 0) {
       ++beat_count;
-      beat_tick = micros() / 60; // HS::get_tick();
+      beat_tick = GetTick();
       if (!count_skip) {
         beat_count = 0;
         clock_tick[0] = 0;
@@ -190,9 +190,21 @@ public:
         beat_tick += diff; // hmmmm
     }
 
+    uint64_t GetTick() {
+      static uint32_t last_micros_ = 0;
+      static uint64_t micros_high_ = 0x100000000ULL; // don't start at 0
+
+      uint32_t current_micros = micros();
+      if (current_micros < last_micros_) {
+        micros_high_ += 0x100000000ULL;
+      }
+      last_micros_ = current_micros;
+      return (micros_high_ | current_micros) / 60;
+    }
+
     // call this on every tick when clock is running, before all Controllers
     void SyncTrig(bool clocked, bool midi_sync = false) {
-        const uint32_t now = micros() / 60; // HS::get_tick();
+        const uint64_t now = GetTick();
         if (midi_sync) DisableMIDIOut();
         const int ppqn = (midi_sync || !midi_out_enabled) ? MIDI_CLOCK_PPQN : clock_ppqn;
 
@@ -211,7 +223,9 @@ public:
             }
 
             if (tocks_per_beat[ch] > 0) { // multiply
-                uint32_t next_tock_tick = BeatTick() + count[ch]*ticks_per_beat / static_cast<uint32_t>(tocks_per_beat[ch]);
+                // Fast 32-bit division first, then single 64-bit addition:
+                uint32_t step_offset = (count[ch] * ticks_per_beat) / static_cast<uint32_t>(tocks_per_beat[ch]);
+                uint64_t next_tock_tick = BeatTick() + step_offset;
                 if (shuffle && MIDI_CLOCK != ch && count[ch] % 2 == 1 && count[ch] < tocks_per_beat[ch])
                     next_tock_tick += shuffle * ticks_per_beat / 100 / static_cast<uint32_t>(tocks_per_beat[ch]);
 
@@ -225,7 +239,7 @@ public:
                 reset = reset && (count[ch] > tocks_per_beat[ch]);
             } else { // division: -1 becomes /2, -2 becomes /3, etc.
                 int div = 1 - tocks_per_beat[ch];
-                uint32_t next_beat = BeatTick() + (count[ch] ? ticks_per_beat : 0);
+                uint64_t next_beat = BeatTick() + (count[ch] ? ticks_per_beat : 0);
                 bool beat_exceeded = (now >= next_beat);
                 if (beat_exceeded) {
                     ++count[ch];
