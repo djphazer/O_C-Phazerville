@@ -29,9 +29,9 @@ class Burst : public HemisphereApplet {
 public:
     enum BurstCursor {
       CLKPASSTHRU, PROB, NUMBER, RETRIG,
-      SPACING, ACCEL, JITTER, DIVISION,
+      SPACING, ACCEL, JITTER, GATE_PASSTHRU, DIVISION,
 
-      MAX_CURSOR = JITTER
+      MAX_CURSOR = GATE_PASSTHRU
     };
 
     const char* applet_name() {
@@ -53,12 +53,28 @@ public:
         bursts_to_go = 0;
         burst_countdown = 0;
         burst_count = 0;
+        burst_pending = false;
+        out_b_high = false;
+        out_b_edge_pending = false;
+        out_b_hold = false;
+        out_b_gap_ticks = 0;
+        out_b_pulse_ticks = 0;
+        out_b_thru = false;
         clocked = 0;
         skip_tick = 0;
         zap_active = false;
     }
 
     void Controller() {
+        if (out_b_gap_ticks > 0) {
+            --out_b_gap_ticks;
+        } else if (out_b_pulse_ticks > 0) {
+            --out_b_pulse_ticks;
+        }
+
+        bool burst_started = false;
+        bool burst_finished = false;
+
         number_mod = constrain(number + SemitoneIn(0) / 5, 1, HEM_BURST_NUMBER_MAX);
         if (clocked) {
             static const int div_states[] = {-8, -7, -6, -5, -4, -3, -2, 1, 2, 3, 4, 5, 6, 7, 8};
@@ -70,13 +86,20 @@ public:
             int effective_pos = constrain(base_pos + cv_steps, 0, 14);
             effective_div = div_states[effective_pos];
         }
-        if (Clock(0)) {
+        // Block passthrough while a burst or its final interval is active.
+        const bool block_passthru = retrig_mode == 2 &&
+            (bursts_to_go > 0 || burst_countdown > 0);
+
+        const bool clock_edge = Clock(0);
+        bool burst_pulse = false;
+        bool passthru_pulse = false;
+        if (clock_edge) {
             if (clocked) {
                 spacing = max(1u, ClockCycleTicks(0) / number_mod / HEMISPHERE_CLOCK_TICKS);
             } else clocked = 1;
 
-            if (passthru & 1)
-              ClockOut(0);
+            if ((passthru & 1) && !block_passthru)
+                passthru_pulse = true;
         }
 
         int effective_spacing = get_effective_spacing();
@@ -111,10 +134,10 @@ public:
                     modded_spacing += jitter_offset;
                 }
                 modded_spacing = max(1, modded_spacing);
-                ClockOut(0);
+                burst_pulse = true;
                 zap_active = true;
                 burst_count++;
-                if (--bursts_to_go <= 0) GateOut(1, 0);
+                if (--bursts_to_go <= 0) burst_finished = true;
                 burst_countdown = modded_spacing * HEMISPHERE_CLOCK_TICKS;
             }
         } else if (burst_countdown > 0) {
@@ -126,17 +149,74 @@ public:
         bool trigger = Clock(1);
         bool btrig = trigger && (random(100) >= prob);
         if (trigger && !btrig) skip_tick = HS::get_tick();
-        if ((passthru & 0x2) && trigger) ClockOut(0);
+        bool burst_ready = !burst_pending &&
+            bursts_to_go == 0 && burst_countdown <= 0;
+        bool start_burst = btrig && (retrig_mode == 0 || burst_ready);
 
-        bool burst_ready = bursts_to_go == 0 && burst_countdown <= 0;
-        if (btrig && (retrig_mode == 0 || burst_ready)) {
+        if ((passthru & 0x2) && trigger &&
+            !block_passthru && !start_burst)
+            passthru_pulse = true;
+
+        if (start_burst && clocked) {
+            burst_pending = true;
+        }
+
+        if ((start_burst && !clocked) ||
+            (burst_pending && clock_edge)) {
+            burst_pending = false;
             zap_active = true;
-            ClockOut(0);
-            GateOut(1, 1);
+            burst_pulse = true;
+            burst_started = true;
             bursts_to_go = number_mod - 1;
-            if (bursts_to_go == 0) GateOut(1, 0);
             burst_countdown = effective_spacing * HEMISPHERE_CLOCK_TICKS;
             burst_count = 1;
+        }
+
+        if (burst_pulse || passthru_pulse)
+            ClockOut(0);
+
+        // Output B: sustained burst state with quantizer-safe edges.
+        if (burst_started) {
+            if (out_b_high) {
+                GateOut(1, 0);
+                out_b_high = false;
+                out_b_gap_ticks = HEMISPHERE_CLOCK_TICKS;
+            }
+
+            out_b_hold = bursts_to_go > 0;
+            out_b_pulse_ticks = 0;
+            out_b_edge_pending = true;
+
+        } else if (burst_finished) {
+            // Release at the final hit.
+            out_b_hold = false;
+            out_b_pulse_ticks = 0;
+        }
+
+        // Allowed passthrough pulses B only when its gate is low.
+        // Blk-mode suppression is handled upstream.
+        if (out_b_thru && passthru_pulse &&
+            !out_b_high && !out_b_hold &&
+            !out_b_edge_pending &&
+            out_b_gap_ticks == 0 &&
+            !burst_started && !burst_finished) {
+            out_b_pulse_ticks = HEMISPHERE_CLOCK_TICKS;
+        }
+
+        // Deliver the burst's rising edge after any restart gap.
+        // If the burst already finished, use a minimum 1 ms pulse.
+        if (out_b_edge_pending && out_b_gap_ticks == 0) {
+            out_b_edge_pending = false;
+            if (!out_b_hold)
+                out_b_pulse_ticks = HEMISPHERE_CLOCK_TICKS;
+        }
+
+        const bool b_should_be_high = out_b_gap_ticks == 0 &&
+            (out_b_hold || out_b_pulse_ticks > 0);
+
+        if (b_should_be_high != out_b_high) {
+            GateOut(1, b_should_be_high ? 1 : 0);
+            out_b_high = b_should_be_high;
         }
     }
 
@@ -145,10 +225,14 @@ public:
         DrawSelector();
         DrawIndicator();
 
-    }
+}
 
     void OnButtonPress() {
-        CursorToggle();
+        if (cursor == GATE_PASSTHRU) {
+            out_b_thru = !out_b_thru;
+        } else {
+            CursorToggle();
+        }
     }
 
     void OnEncoderMove(int direction) {
@@ -162,7 +246,7 @@ public:
             passthru = constrain(int(passthru) + direction, 0, 2);
             break;
           case RETRIG:
-            retrig_mode = constrain(int(retrig_mode) + direction, 0, 1);
+            retrig_mode = constrain(int(retrig_mode) + direction, 0, 2);
             break;
           case PROB:
             prob = constrain(prob + direction, 0, 100);
@@ -200,6 +284,7 @@ public:
         Pack(data, PackLocation {40,7}, prob);
         Pack(data, PackLocation {47,2}, passthru);
         Pack(data, PackLocation {49,2}, retrig_mode);
+        Pack(data, PackLocation {51,1}, out_b_thru ? 1 : 0);
         return data;
     }
 
@@ -213,7 +298,8 @@ public:
 
         prob = Unpack(data, PackLocation {40,7});
         passthru = Unpack(data, PackLocation {47,2});
-        retrig_mode = constrain(int(Unpack(data, PackLocation {49,2})), 0, 1);
+        retrig_mode = constrain(int(Unpack(data, PackLocation {49,2})), 0, 2);
+        out_b_thru = Unpack(data, PackLocation {51,1}) != 0;
     }
 
 protected:
@@ -233,6 +319,13 @@ private:
     int burst_countdown; // Ticks until the next burst
     int bursts_to_go; // Remaining bursts in the current set
     int burst_count; // Bursts fired in the current set
+    bool burst_pending; // Waiting for the next clock edge
+    bool out_b_high;
+    bool out_b_edge_pending;
+    bool out_b_hold;
+    bool out_b_thru;
+    int out_b_gap_ticks;
+    int out_b_pulse_ticks;
     bool clocked; // True after the first clock; later clocks set spacing
     bool zap_active; // ZAP display state
 
@@ -246,7 +339,7 @@ private:
     int8_t accel; // Acceleration or deceleration
     uint8_t jitter; // Randomness
     uint8_t passthru; // Clock/burst passthrough
-    uint8_t retrig_mode; // 0=Restart, 1=Ignore
+    uint8_t retrig_mode; // 0=Restart, 1=Ignore, 2=Block
     uint8_t prob; // Skip probability
 
     void DrawSelector() {
@@ -263,7 +356,7 @@ private:
         gfxPrint(32, y, "%");
         gfxPrint(40, y, prob);
         const int prob_w = gfxGetPrintPosX() - 40;
-        if (show_skip) gfxInvert(32, y, 6, 8);
+        if (show_skip) gfxInvert(31, y, 8, 8);
 
         y += 9;
 
@@ -273,7 +366,7 @@ private:
         const int number_w = 12;
         if (number_mod != number) { gfxIcon(23, y, CV_ICON); gfxBitmap(31, y, 3, SUP_ONE); }
         gfxIcon(35, y, LOOP_ICON);
-        gfxPrint(44, y, retrig_mode == 0 ? "Rst" : "Ign");
+        gfxPrint(44, y, retrig_mode == 0 ? "Rst" : retrig_mode == 1 ? "Ign" : "Blc");
 
         y += 9;
 
@@ -297,17 +390,20 @@ private:
 
         y += 9;
 
-        // Div
+        // Gate+Passthru and clock division
+        gfxIcon(1, y, GATE_ICON);
+        gfxIcon(10, y, out_b_thru ? CHECK_ON_ICON : CHECK_OFF_ICON);
+
         int div_w = 0;
         if (clocked) {
             bool multiplying = effective_div < 0;
-            gfxBitmap(1, y, 8, CLOCK_ICON);
-            gfxPrint(10, y, multiplying ? "x" : "/");
+            gfxBitmap(28, y, 8, CLOCK_ICON);
+            gfxPrint(37, y, multiplying ? "x" : "/");
             gfxPrint(multiplying ? -effective_div : effective_div);
-            div_w = gfxGetPrintPosX() - 10;
+            div_w = gfxGetPrintPosX() - 37;
             if (effective_div != div) {
-                gfxIcon(12 + div_w, y, CV_ICON);
-                gfxBitmap(20 + div_w, y, 3, SUB_TWO);
+                gfxIcon(39 + div_w, y, CV_ICON);
+                gfxBitmap(47 + div_w, y, 3, SUB_TWO);
             }
         }
 
@@ -335,8 +431,12 @@ private:
           case JITTER:
             gfxCursor(40, 48, jitter_w, 9, "Jitter");
             break;
+          case GATE_PASSTHRU:
+            gfxIcon(19, y, LEFT_ICON);
+            SetLabel("Gate+Pass");
+            break;
           case DIVISION:
-            gfxCursor(10, 57, div_w, 9, "ClkDiv");
+            gfxCursor(37, 57, div_w, 9, "ClkDiv");
             break;
         }
     }
