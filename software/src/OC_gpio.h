@@ -57,6 +57,9 @@ namespace OC {
   void SetFlipMode(bool flip_180);
   float GetIDVoltage();
   int GetIDIndex();
+
+  inline bool Buchla200eHardware() { return NorthernLightModular; }
+
 }
 
 #endif // OC_GPIO_H_
