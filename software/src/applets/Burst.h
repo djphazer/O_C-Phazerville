@@ -28,8 +28,8 @@
 class Burst : public HemisphereApplet {
 public:
     enum BurstCursor {
-      CLKPASSTHRU, PROB,
-      NUMBER, SPACING, ACCEL, JITTER, DIVISION,
+      CLKPASSTHRU, PROB, NUMBER, RETRIG,
+      SPACING, ACCEL, JITTER, DIVISION,
 
       MAX_CURSOR = JITTER
     };
@@ -41,6 +41,7 @@ public:
 
     void Start() {
         cursor = 0;
+        retrig_mode = 0; // Restart by default
         number = 4;
         number_mod = 4;
         div = 1;
@@ -50,14 +51,14 @@ public:
         accel = 0;
         jitter = 0;
         bursts_to_go = 0;
+        burst_countdown = 0;
+        burst_count = 0;
         clocked = 0;
-        passthru_popup_tick = 0;
         skip_tick = 0;
         zap_active = false;
     }
 
     void Controller() {
-        if (CLKPASSTHRU == cursor && passthru && HS::get_tick() - passthru_popup_tick >= HEMISPHERE_CURSOR_TICKS * 4) enc_edit[hemisphere].isEditing = false;
         number_mod = constrain(number + SemitoneIn(0) / 5, 1, HEM_BURST_NUMBER_MAX);
         if (clocked) {
             static const int div_states[] = {-8, -7, -6, -5, -4, -3, -2, 1, 2, 3, 4, 5, 6, 7, 8};
@@ -124,10 +125,12 @@ public:
         //
         bool trigger = Clock(1);
         bool btrig = trigger && (random(100) >= prob);
-        if (trigger) { zap_active = btrig; if (!btrig) skip_tick = HS::get_tick(); }
+        if (trigger && !btrig) skip_tick = HS::get_tick();
         if ((passthru & 0x2) && trigger) ClockOut(0);
 
-        if (btrig) {
+        bool burst_ready = bursts_to_go == 0 && burst_countdown <= 0;
+        if (btrig && (retrig_mode == 0 || burst_ready)) {
+            zap_active = true;
             ClockOut(0);
             GateOut(1, 1);
             bursts_to_go = number_mod - 1;
@@ -145,17 +148,10 @@ public:
     }
 
     void OnButtonPress() {
-      if (CLKPASSTHRU == cursor) {
-        ++passthru %= 3;
-        passthru_popup_tick = HS::get_tick();
-        enc_edit[hemisphere].isEditing = passthru != 0;
-        ResetCursor();
-      } else
         CursorToggle();
     }
 
     void OnEncoderMove(int direction) {
-        if (passthru && cursor == CLKPASSTHRU) passthru_popup_tick = 0;
         if (!EditMode()) {
             MoveCursor(cursor, direction, MAX_CURSOR + clocked);
             return;
@@ -163,13 +159,17 @@ public:
 
         switch (cursor) {
           case CLKPASSTHRU:
-            SetLabel(passthru == 1 ? "ClockPass" : passthru == 2 ? "BurstPass" : "Burst");
+            passthru = constrain(int(passthru) + direction, 0, 2);
+            break;
+          case RETRIG:
+            retrig_mode = constrain(int(retrig_mode) + direction, 0, 1);
             break;
           case PROB:
             prob = constrain(prob + direction, 0, 100);
             break;
           case NUMBER:
             number = constrain(number + direction, 1, HEM_BURST_NUMBER_MAX);
+            number_mod = constrain(number + SemitoneIn(0) / 5, 1, HEM_BURST_NUMBER_MAX);
             break;
           case SPACING:
             spacing = constrain(spacing + direction, HEM_BURST_SPACING_MIN, HEM_BURST_SPACING_MAX);
@@ -199,6 +199,7 @@ public:
 
         Pack(data, PackLocation {40,7}, prob);
         Pack(data, PackLocation {47,2}, passthru);
+        Pack(data, PackLocation {49,2}, retrig_mode);
         return data;
     }
 
@@ -212,6 +213,7 @@ public:
 
         prob = Unpack(data, PackLocation {40,7});
         passthru = Unpack(data, PackLocation {47,2});
+        retrig_mode = constrain(int(Unpack(data, PackLocation {49,2})), 0, 1);
     }
 
 protected:
@@ -240,11 +242,11 @@ private:
     int number_mod; // CV1-modulated bursts per trigger
     uint16_t spacing; // Time between bursts in ms
     int display_spacing; // CV2-modulated spacing shown on display
-    uint32_t passthru_popup_tick; // Passthrough popup timeout
     uint32_t skip_tick; // Skipped clock indicator timeout
     int8_t accel; // Acceleration or deceleration
     uint8_t jitter; // Randomness
     uint8_t passthru; // Clock/burst passthrough
+    uint8_t retrig_mode; // 0=Restart, 1=Ignore
     uint8_t prob; // Skip probability
 
     void DrawSelector() {
@@ -257,18 +259,21 @@ private:
         gfxIcon(1, y, CLOCK_ICON);
         gfxIcon(10, y, icons[display_passthru]);
 
-        if (skip_tick && HS::get_tick() - skip_tick < HEMISPHERE_CURSOR_TICKS) gfxPrint(33, y, "*");
+        bool show_skip = skip_tick && HS::get_tick() - skip_tick < HEMISPHERE_CURSOR_TICKS;
+        gfxPrint(32, y, "%");
         gfxPrint(40, y, prob);
-        gfxPrint("%");
         const int prob_w = gfxGetPrintPosX() - 40;
+        if (show_skip) gfxInvert(32, y, 6, 8);
 
         y += 9;
 
         // Steps
-        gfxPrint(1, y, number_mod);
-        gfxPrint(18, y, "Steps");
-        const int number_w = gfxGetPrintPosX() - 1;
-        if (number_mod != number) { gfxIcon(50, y, CV_ICON); gfxBitmap(59, y, 3, SUP_ONE); }
+        gfxBitmap(1, y - 1, 8, BURST_ICON);
+        gfxPrint(10 + pad(10, number_mod), y, number_mod);
+        const int number_w = 12;
+        if (number_mod != number) { gfxIcon(23, y, CV_ICON); gfxBitmap(31, y, 3, SUP_ONE); }
+        gfxIcon(35, y, LOOP_ICON);
+        gfxPrint(44, y, retrig_mode == 0 ? "Rst" : "Ign");
 
         y += 9;
 
@@ -283,48 +288,55 @@ private:
         // Acceleration
         gfxIcon(1, y-1, GAUGE_ICON);
         gfxPrint(10, y, accel);
-        const int accel_w = gfxGetPrintPosX() - 1;
+        const int accel_w = gfxGetPrintPosX() - 10;
 
         // Jitter
         gfxIcon(32, y - 1, RANDOM_ICON);
         gfxPrint(40, y, jitter);
-        const int jitter_w = gfxGetPrintPosX() - 32;
+        const int jitter_w = gfxGetPrintPosX() - 40;
 
         y += 9;
 
         // Div
+        int div_w = 0;
         if (clocked) {
             bool multiplying = effective_div < 0;
             gfxBitmap(1, y, 8, CLOCK_ICON);
             gfxPrint(10, y, multiplying ? "x" : "/");
             gfxPrint(multiplying ? -effective_div : effective_div);
-            gfxPrint(multiplying ? " Mlt" : " Div");
-            if (effective_div != div) { gfxIcon(49, y, CV_ICON); gfxBitmap(57, y, 3, SUB_TWO); }
+            div_w = gfxGetPrintPosX() - 10;
+            if (effective_div != div) {
+                gfxIcon(12 + div_w, y, CV_ICON);
+                gfxBitmap(20 + div_w, y, 3, SUB_TWO);
+            }
         }
 
         // Cursor
         switch (cursor) {
           case CLKPASSTHRU:
             gfxIcon(19, 13, LEFT_ICON);
-            SetLabel(passthru == 1 ? "ClockPass" : passthru == 2 ? "BurstPass" : "Burst");
+            SetLabel(passthru == 1 ? "ClockPass" : passthru == 2 ? "BurstPass" : "Nrm");
+            break;
+          case RETRIG:
+            gfxCursor(44, 30, 18, 9, "Retrig");
             break;
           case PROB:
             gfxCursor(40, 21, prob_w, 9, "Skip %");
             break;
           case NUMBER:
-            gfxCursor(1, 30, number_w, 9, "Count");
+            gfxCursor(10, 30, number_w, 9, "Count");
             break;
           case SPACING:
             gfxCursor(1, 39, spacing_w, 9, "Spacing");
             break;
           case ACCEL:
-            gfxCursor(1, 48, accel_w, 9, "Accel");
+            gfxCursor(10, 48, accel_w, 9, "Accel");
             break;
           case JITTER:
-            gfxCursor(32, 48, jitter_w, 9, "Jitter");
+            gfxCursor(40, 48, jitter_w, 9, "Jitter");
             break;
           case DIVISION:
-            gfxCursor(1, 57, 47, 9, "ClkDiv");
+            gfxCursor(10, 57, div_w, 9, "ClkDiv");
             break;
         }
     }
