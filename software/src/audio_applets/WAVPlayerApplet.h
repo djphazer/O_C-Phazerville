@@ -69,6 +69,10 @@ public:
   }
 
   void Controller() {
+    // CV control for sample select (relative offset, like START_BEAT_CV).
+    // Live by default; with S&H on, CV is sampled on play trigger (CV or AuxButton).
+    if (!file_select_sh) SampleFileSelect(true);
+
     djfilter_mod = constrain(djfilter + djfilter_cv.InRescaled(128), -64, 64);
     SetFilter(filter_on * djfilter_mod);
 
@@ -95,6 +99,7 @@ public:
     }
 
     if (playstop_cv.Clock()) {
+      if (file_select_sh) SampleFileSelect(false);
       if (FileIsPlaying())
         retrig = true;
       else
@@ -113,6 +118,10 @@ public:
         if (wavplayer_reload) {
           FileLoad();
           wavplayer_reload = false;
+          // Re-apply the start beat: playWav() resets the player's position,
+          // and setBeatStart() from Controller() last applied to the old file,
+          // so a CV-triggered file change would otherwise start at beat 0.
+          if (wavplayer_ready) wavplayer.setBeatStart(start_beat_mod);
         }
 
         if (wavplayer_playtrig && (go_time || !tempo_sync)) {
@@ -149,8 +158,15 @@ public:
     }
     size_t y = 13;
     gfxStartCursor(1, y);
-    gfxPrintfn(1, y, 0, "%03u", GetFileNum());
+    gfxPrintfn(1, y, 0, "%03u", file_select_mod);
     gfxEndCursor(cursor == FILE_NUM, "FileSel");
+    // TODO: verify layout on hardware — picker may overlap play icon at x=22
+    gfxStartCursor();
+    gfxPrint(file_select_cv);
+    gfxEndCursor(cursor == FILE_NUM_CV, false, file_select_cv.InputName(), "FileCV");
+    gfxStartCursor();
+    gfxPrint(file_select_sh ? "S&H" : "---");
+    gfxEndCursor(cursor == FILE_SH, "S&H");
 
     gfxIcon(22, y, FileIsPlaying() ? PLAY_ICON : STOP_ICON);
     gfxStartCursor(30, y-1);
@@ -251,12 +267,17 @@ public:
       filter_on = !filter_on;
     } else if (PLAYRATE == cursor) {
       tempo_sync ^= 1;
-    } else
+    } else if (FILE_SH == cursor) {
+      file_select_sh = !file_select_sh;
+    } else {
+      if (file_select_sh) SampleFileSelect(false);
       ToggleFilePlayer();
+    }
   }
   void OnButtonPress() {
     if (CheckEditInputMapPress(
           cursor,
+          IndexedInput(FILE_NUM_CV, file_select_cv),
           IndexedInput(PLAYSTOP_GATE_CV, playstop_cv),
           IndexedInput(FILTER_CV, djfilter_cv),
           IndexedInput(LEVEL_CV, level_cv),
@@ -278,7 +299,14 @@ public:
     if(EditSelectedInputMap(direction)) return;
     switch (cursor) {
       case FILE_NUM:
-        ChangeToFile(GetFileNum() + direction);
+        ChangeToFile(int(wavplayer_select) + direction);
+        file_select_last = file_select_mod = wavplayer_select;
+        break;
+      case FILE_NUM_CV:
+        file_select_cv.ChangeSource(direction);
+        break;
+      case FILE_SH:
+        file_select_sh = !file_select_sh;
         break;
       case PLAYSTOP_GATE_CV:
         playstop_cv.ChangeSource(direction);
@@ -322,7 +350,7 @@ public:
     data[0] = PackPackables(level, level_cv, uint8_t(tempo_sync), playrate_cv, oldfilenum, djfilter);
     data[1] = PackPackables(playrate, djfilter_cv, dummy, loop_length);
     data[2] = PackPackables(start_beat, start_beat_cv, playstop_cv);
-    data[3] = PackPackables(wavplayer_select);
+    data[3] = PackPackables(wavplayer_select, file_select_cv, file_select_sh);
   }
   void OnDataReceive(const std::array<uint64_t, CONFIG_SIZE>& data) override {
     // jeez this is a mess... maybe let's start over soon
@@ -332,13 +360,14 @@ public:
     UnpackPackables(data[0], level, level_cv, old_playrate, playrate_cv, oldfilenum, djfilter);
     UnpackPackables(data[1], playrate, djfilter_cv, dummy, loop_length);
     UnpackPackables(data[2], start_beat, start_beat_cv, playstop_cv);
-    UnpackPackables(data[3], wavplayer_select);
+    UnpackPackables(data[3], wavplayer_select, file_select_cv, file_select_sh);
     if (playrate == 0) playrate = old_playrate;
     if (old_playrate) tempo_sync = true;
     if (loop_length == 0) loop_length = 8;
     if (dummy) playstop_cv.Unpack(dummy);
 
     ChangeToFile(oldfilenum? oldfilenum : wavplayer_select);
+    file_select_last = file_select_mod = wavplayer_select;
   }
 
   AudioStream* InputStream() override {
@@ -354,6 +383,8 @@ protected:
 private:
   enum WAVCursor {
     FILE_NUM,
+    FILE_NUM_CV,
+    FILE_SH,
     PLAYSTOP_GATE_CV,
     FILTER_PARAM,
     FILTER_CV,
@@ -409,13 +440,17 @@ private:
   bool syncloopstart = false;
 
   CVInputMap start_beat_cv;
+  CVInputMap file_select_cv;
+  uint16_t file_select_mod = 1;
+  uint16_t file_select_last = 1;
+  bool file_select_sh = false; // S&H: sample file-select CV on play trigger instead of live
 
   // SD file player functions
   void FileLoad() {
     char filename[] = "000.WAV";
-    filename[0] += wavplayer_select / 100;
-    filename[1] += wavplayer_select / 10 % 10;
-    filename[2] += wavplayer_select % 10;
+    filename[0] += file_select_mod / 100;
+    filename[1] += file_select_mod / 10 % 10;
+    filename[2] += file_select_mod % 10;
     wavplayer_ready = wavplayer.playWav(filename);
   }
   void StartPlaying() {
@@ -472,6 +507,16 @@ private:
     }
   }
 
+  // Sample file-select CV; reload only on actual change. Old presets unpack
+  // file_select_sh as false (live mode), preserving prior behavior.
+  void SampleFileSelect(bool restart_if_playing) {
+    uint16_t sampled = constrain(int(wavplayer_select) + file_select_cv.SemitoneIn(), 0, 999);
+    if (sampled != file_select_last) {
+      file_select_mod = file_select_last = sampled;
+      wavplayer_reload = true;
+      if (restart_if_playing && wavplayer.isPlaying()) StartPlaying();
+    }
+  }
   void ChangeToFile(int select) {
     wavplayer_select = (uint16_t)constrain(select, 0, 999);
     wavplayer_reload = true;
@@ -480,7 +525,7 @@ private:
     }
   }
   uint16_t GetFileNum() {
-    return wavplayer_select;
+    return file_select_mod;
   }
   uint32_t GetFileTime() {
     return wavplayer.positionMillis();
