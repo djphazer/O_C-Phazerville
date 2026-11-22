@@ -56,6 +56,7 @@ public:
         burst_pending = false;
         out_b_high = false;
         out_b_edge_pending = false;
+        gate_pass_popup_tick = 0;
         out_b_hold = false;
         out_b_gap_ticks = 0;
         out_b_pulse_ticks = 0;
@@ -66,6 +67,12 @@ public:
     }
 
     void Controller() {
+        if (cursor == GATE_PASSTHRU &&
+            EditMode() &&
+            HS::get_tick() - gate_pass_popup_tick >=
+                HEMISPHERE_CURSOR_TICKS * 4) {
+            enc_edit[hemisphere].isEditing = false;
+        }
         if (out_b_gap_ticks > 0) {
             --out_b_gap_ticks;
         } else if (out_b_pulse_ticks > 0) {
@@ -230,6 +237,9 @@ public:
     void OnButtonPress() {
         if (cursor == GATE_PASSTHRU) {
             out_b_thru = !out_b_thru;
+            gate_pass_popup_tick = HS::get_tick();
+            enc_edit[hemisphere].isEditing = true;
+            ResetCursor();
         } else {
             CursorToggle();
         }
@@ -266,9 +276,6 @@ public:
             jitter = constrain(jitter + direction, 0, HEM_BURST_JITTER_MAX);
             break;
 
-          case GATE_PASSTHRU:
-            SetLabel("Gate+Pass");
-            break;
           case DIVISION:
             div += direction;
             div_constrain(div, direction);
@@ -327,6 +334,7 @@ private:
     bool out_b_edge_pending;
     bool out_b_hold;
     bool out_b_thru;
+    uint32_t gate_pass_popup_tick;
     int out_b_gap_ticks;
     int out_b_pulse_ticks;
     bool clocked; // True after the first clock; later clocks set spacing
@@ -353,7 +361,9 @@ private:
 
         // Clock passthrough
         gfxIcon(1, y, CLOCK_ICON);
-        gfxIcon(10, y, icons[display_passthru]);
+        gfxIcon(11, y, icons[display_passthru]);
+        if (cursor == CLKPASSTHRU && EditMode())
+            gfxInvert(10, y - 1, 10, 10);
 
         bool show_skip = skip_tick && HS::get_tick() - skip_tick < HEMISPHERE_CURSOR_TICKS;
         gfxPrint(32, y, "%");
@@ -413,8 +423,8 @@ private:
         // Cursor
         switch (cursor) {
           case CLKPASSTHRU:
-            gfxIcon(19, 13, LEFT_ICON);
-            SetLabel(passthru == 1 ? "ClockPass" : passthru == 2 ? "BurstPass" : "Nrm");
+            gfxIcon(21, 13, LEFT_ICON);
+            SetLabel(passthru == 1 ? "ClockPass" : passthru == 2 ? "BurstPass" : "Nrml");
             break;
           case RETRIG:
             gfxCursor(44, 30, 18, 9, "Retrig");
