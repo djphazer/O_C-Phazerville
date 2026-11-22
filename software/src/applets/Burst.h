@@ -58,6 +58,9 @@ public:
         burst_countdown = 0;
         burst_count = 0;
         burst_pending = false;
+        burst_spacing = spacing;
+        burst_accel = accel;
+        burst_jitter = jitter;
         out_a_wait_ticks = 0;
         out_b_high = false;
         out_b_edge_pending = false;
@@ -122,26 +125,26 @@ public:
         // Handle a burst set in progress
         if (bursts_to_go > 0) {
             if (--burst_countdown <= 0) {
-                int modded_spacing = effective_spacing;
+                int modded_spacing = burst_spacing;
                 int accel_span = burst_count + bursts_to_go - 1;
-                if (accel > 0) {
-                    int accel_min = effective_spacing < HEM_BURST_SPACING_MIN
+                if (burst_accel > 0) {
+                    int accel_min = burst_spacing < HEM_BURST_SPACING_MIN
                         ? 1
                         : HEM_BURST_SPACING_MIN;
                     int amount_from_min = modded_spacing - accel_min;
-                    int spacing_accel = amount_from_min * burst_count / accel_span * accel / HEM_BURST_ACCEL_MAX;
+                    int spacing_accel = amount_from_min * burst_count / accel_span * burst_accel / HEM_BURST_ACCEL_MAX;
                     modded_spacing -= spacing_accel;
                 }
-                if (accel < 0) {
-                    int accel_max = effective_spacing > HEM_BURST_SPACING_MAX
+                if (burst_accel < 0) {
+                    int accel_max = burst_spacing > HEM_BURST_SPACING_MAX
                         ? HEM_BURST_SPACING_MAX * HEM_BURST_CLOCKDIV_MAX
                         : HEM_BURST_SPACING_MAX;
                     int amount_from_max = accel_max - modded_spacing;
-                    int spacing_accel = amount_from_max * burst_count / accel_span * abs(accel) / HEM_BURST_ACCEL_MAX;
+                    int spacing_accel = amount_from_max * burst_count / accel_span * abs(burst_accel) / HEM_BURST_ACCEL_MAX;
                     modded_spacing += spacing_accel;
                 }
-                if (jitter > 0) {
-                    int rand = random(10 * -jitter, 1 + (10 * jitter));
+                if (burst_jitter > 0) {
+                    int rand = random(10 * -burst_jitter, 1 + (10 * burst_jitter));
                     int jitter_offset = Proportion(rand, (HEM_BURST_JITTER_MAX * 10), modded_spacing);
                     modded_spacing += jitter_offset;
                 }
@@ -179,8 +182,13 @@ public:
             zap_active = true;
             burst_pulse = true;
             burst_started = true;
+            // Lock the new burst's count and timing at its actual start.
+            // Rst takes a fresh snapshot; Ign/Blc finish the existing one.
+            burst_spacing = effective_spacing;
+            burst_accel = accel;
+            burst_jitter = jitter;
             bursts_to_go = number_mod - 1;
-            burst_countdown = effective_spacing * HEMISPHERE_CLOCK_TICKS;
+            burst_countdown = burst_spacing * HEMISPHERE_CLOCK_TICKS;
             burst_count = 1;
         }
 
@@ -374,6 +382,9 @@ private:
     int burst_countdown; // Ticks until the next burst
     int bursts_to_go; // Remaining bursts in the current set
     int burst_count; // Bursts fired in the current set
+    int burst_spacing; // Spacing captured at burst start
+    int8_t burst_accel; // Acceleration captured at burst start
+    uint8_t burst_jitter; // Jitter captured at burst start
     bool burst_pending; // Waiting for the next clock edge
     bool out_b_high;
     bool out_b_edge_pending;
