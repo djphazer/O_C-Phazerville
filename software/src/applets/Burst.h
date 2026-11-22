@@ -25,13 +25,17 @@
 #define HEM_BURST_ACCEL_MAX 50
 #define HEM_BURST_JITTER_MAX 50
 
+// Two pulses separated in time: Spacing icon
+alignas(8) const uint8_t BURST_SPACING_ICON[8] =
+    {0x40, 0x7e, 0x40, 0x40, 0x40, 0x7e, 0x40, 0x00};
+
 class Burst : public HemisphereApplet {
 public:
     enum BurstCursor {
       CLKPASSTHRU, PROB, NUMBER, RETRIG,
-      SPACING, ACCEL, JITTER, GATE_PASSTHRU, DIVISION,
+      GATE_PASSTHRU, DIVISION, SPACING, ACCEL, JITTER,
 
-      MAX_CURSOR = GATE_PASSTHRU
+      MAX_CURSOR = JITTER
     };
 
     const char* applet_name() {
@@ -247,7 +251,9 @@ public:
 
     void OnEncoderMove(int direction) {
         if (!EditMode()) {
-            MoveCursor(cursor, direction, MAX_CURSOR + clocked);
+            MoveCursor(cursor, direction, MAX_CURSOR);
+            if (!clocked && cursor == DIVISION)
+                MoveCursor(cursor, direction, MAX_CURSOR);
             return;
         }
 
@@ -268,6 +274,8 @@ public:
           case SPACING:
             spacing = constrain(spacing + direction, HEM_BURST_SPACING_MIN, HEM_BURST_SPACING_MAX);
             clocked = 0;
+            display_spacing = spacing;
+            Modulate(display_spacing, 1, HEM_BURST_SPACING_MIN, HEM_BURST_SPACING_MAX);
             break;
           case ACCEL:
             accel = constrain(accel + direction, -HEM_BURST_ACCEL_MAX, HEM_BURST_ACCEL_MAX);
@@ -383,11 +391,34 @@ private:
 
         y += 9;
 
+        // Gate+Pass (left) and Clock Division (right)
+        gfxIcon(1, y, GATE_ICON);
+        gfxIcon(10, y, out_b_thru ? CHECK_ON_ICON : CHECK_OFF_ICON);
+
+        int div_w = 0;
+        if (clocked) {
+            bool multiplying = effective_div < 0;
+            gfxIcon(28, y, CLOCK_ICON);
+            gfxPrint(37, y, multiplying ? "x" : "/");
+            gfxPrint(multiplying ? -effective_div : effective_div);
+            div_w = gfxGetPrintPosX() - 37;
+            if (effective_div != div) {
+                gfxIcon(39 + div_w, y, CV_ICON);
+                gfxBitmap(47 + div_w, y, 3, SUB_TWO);
+            }
+        }
+
+        y += 9;
+
         // Spacing
-        gfxPrint(1, y, clocked ? get_effective_spacing() : display_spacing);
-        gfxPrint(28, y, "ms");
-        const int spacing_w = gfxGetPrintPosX() - 1;
-        if (!clocked && display_spacing != spacing) { gfxIcon(43, y, CV_ICON); gfxBitmap(51, y, 3, SUB_TWO); }
+        gfxIcon(1, y, BURST_SPACING_ICON);
+        gfxPrint(10, y, clocked ? get_effective_spacing() : display_spacing);
+        gfxPrint("ms");
+        const int spacing_w = gfxGetPrintPosX() - 10;
+        if (!clocked && display_spacing != spacing) {
+            gfxIcon(43, y, CV_ICON);
+            gfxBitmap(51, y, 3, SUB_TWO);
+        }
 
         y += 9;
 
@@ -401,30 +432,11 @@ private:
         gfxPrint(40, y, jitter);
         const int jitter_w = gfxGetPrintPosX() - 40;
 
-        y += 9;
-
-        // Gate+Passthru and clock division
-        gfxIcon(1, y, GATE_ICON);
-        gfxIcon(10, y, out_b_thru ? CHECK_ON_ICON : CHECK_OFF_ICON);
-
-        int div_w = 0;
-        if (clocked) {
-            bool multiplying = effective_div < 0;
-            gfxBitmap(28, y, 8, CLOCK_ICON);
-            gfxPrint(37, y, multiplying ? "x" : "/");
-            gfxPrint(multiplying ? -effective_div : effective_div);
-            div_w = gfxGetPrintPosX() - 37;
-            if (effective_div != div) {
-                gfxIcon(39 + div_w, y, CV_ICON);
-                gfxBitmap(47 + div_w, y, 3, SUB_TWO);
-            }
-        }
-
         // Cursor
         switch (cursor) {
           case CLKPASSTHRU:
             gfxIcon(21, 13, LEFT_ICON);
-            SetLabel(passthru == 1 ? "ClockPass" : passthru == 2 ? "BurstPass" : "Nrml");
+            SetLabel(passthru == 1 ? "ClockPass" : passthru == 2 ? "BurstPass" : "BurstOnly");
             break;
           case RETRIG:
             gfxCursor(44, 30, 18, 9, "Retrig");
@@ -435,21 +447,22 @@ private:
           case NUMBER:
             gfxCursor(10, 30, number_w, 9, "Count");
             break;
-          case SPACING:
-            gfxCursor(1, 39, spacing_w, 9, "Spacing");
-            break;
-          case ACCEL:
-            gfxCursor(10, 48, accel_w, 9, "Accel");
-            break;
-          case JITTER:
-            gfxCursor(40, 48, jitter_w, 9, "Jitter");
-            break;
           case GATE_PASSTHRU:
-            gfxIcon(19, y, LEFT_ICON);
+            gfxIcon(19, 31, LEFT_ICON);
             SetLabel("Gate+Pass");
+            SetAux(false);
             break;
           case DIVISION:
-            gfxCursor(37, 57, div_w, 9, "ClkDiv");
+            gfxCursor(37, 39, div_w, 9, "ClkDiv");
+            break;
+          case SPACING:
+            gfxCursor(10, 48, spacing_w, 9, "Spacing");
+            break;
+          case ACCEL:
+            gfxCursor(10, 57, accel_w, 9, "Accel");
+            break;
+          case JITTER:
+            gfxCursor(40, 57, jitter_w, 9, "Jitter");
             break;
         }
     }
