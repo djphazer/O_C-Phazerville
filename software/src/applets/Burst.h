@@ -48,6 +48,7 @@ public:
         retrig_mode = 0; // Restart by default
         number = 4;
         number_mod = 4;
+        zap_cv_offset = 0;
         div = 1;
         effective_div = 1;
         spacing = 50;
@@ -187,6 +188,7 @@ public:
             burst_spacing = effective_spacing;
             burst_accel = accel;
             burst_jitter = jitter;
+            zap_cv_offset = SemitoneIn(0) / 5;
             bursts_to_go = number_mod - 1;
             burst_countdown = burst_spacing * HEMISPHERE_CLOCK_TICKS;
             burst_count = 1;
@@ -401,6 +403,7 @@ private:
     int effective_div; // CV2-modulated divide/multiply
     uint8_t number; // Bursts per trigger
     int number_mod; // CV1-modulated bursts per trigger
+    int zap_cv_offset; // CV1 count offset captured only when a burst starts
     uint16_t spacing; // Time between bursts in ms
     int display_spacing; // CV2-modulated spacing shown on display
     uint32_t skip_tick; // Skipped clock indicator timeout
@@ -517,8 +520,10 @@ private:
     }
 
     void DrawIndicator() {
-        if (zap_active && burst_countdown > 0)
-            gfxIcon(max(0, 1 + ((number_mod - 1) * 5) - 2), 56, ZAP_ICON);
+        if (zap_active && burst_countdown > 0) {
+            const int zap_count = constrain(int(number) + zap_cv_offset, 1, HEM_BURST_NUMBER_MAX);
+            gfxIcon(max(0, 1 + ((zap_count - 1) * 5) - 2), 56, ZAP_ICON);
+        }
         // Countdown markers: 3x3 with 1 px between markers.
         int display_bursts = constrain(bursts_to_go, 0, HEM_BURST_NUMBER_MAX);
         for (int i = 0; i < display_bursts; i++)
