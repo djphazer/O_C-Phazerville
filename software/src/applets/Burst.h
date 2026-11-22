@@ -58,9 +58,10 @@ public:
         burst_countdown = 0;
         burst_count = 0;
         burst_pending = false;
+        out_a_wait_ticks = 0;
         out_b_high = false;
         out_b_edge_pending = false;
-        gate_pass_popup_tick = 0;
+        gate_thru_popup_tick = 0;
         out_b_hold = false;
         out_b_gap_ticks = 0;
         out_b_pulse_ticks = 0;
@@ -73,7 +74,7 @@ public:
     void Controller() {
         if (cursor == GATE_PASSTHRU &&
             EditMode() &&
-            HS::get_tick() - gate_pass_popup_tick >=
+            HS::get_tick() - gate_thru_popup_tick >=
                 HEMISPHERE_CURSOR_TICKS * 4) {
             enc_edit[hemisphere].isEditing = false;
         }
@@ -183,8 +184,38 @@ public:
             burst_count = 1;
         }
 
-        if (burst_pulse || passthru_pulse)
-            ClockOut(0);
+        // Output A: positive wait = pulse + low gap; negative = a queued
+        // burst edge waiting for its low gap. This keeps a single timer.
+        const int gap = HEMISPHERE_CLOCK_TICKS;
+        const int ch = io_offset;
+        const bool pending_due = out_a_wait_ticks == -1;
+        if (out_a_wait_ticks > 0) --out_a_wait_ticks;
+        else if (out_a_wait_ticks < 0) ++out_a_wait_ticks;
+
+        if (burst_pulse) {
+            if (HS::frame.clock_countdown[ch] > 0) {
+                // Restart during a high pulse: cut it now, then retrigger.
+                HS::frame.clock_countdown[ch] = 0;
+                HS::frame.Out((DAC_CHANNEL)ch, 0, true);
+                out_a_wait_ticks = -gap;
+            } else if (out_a_wait_ticks > 0) {
+                // The pulse ended; finish its remaining low gap.
+                out_a_wait_ticks = -out_a_wait_ticks;
+            }
+        }
+
+        const bool fire_burst = (burst_pulse || pending_due) && out_a_wait_ticks == 0;
+        const bool fire_thru = passthru_pulse && out_a_wait_ticks == 0 &&
+            !burst_pulse && !pending_due && HS::frame.clock_countdown[ch] == 0 &&
+            (burst_countdown <= 0 || burst_countdown > gap);
+        if (fire_burst || fire_thru) {
+            int width = HEMISPHERE_CLOCK_TICKS * HS::trig_length;
+            if (burst_countdown > 0)
+                width = min(width, max(1, burst_countdown - gap));
+            ClockOut(0, width);
+            if (HS::frame.clock_countdown[ch] > 0)
+                out_a_wait_ticks = width + gap;
+        }
 
         // Output B: sustained burst state with quantizer-safe edges.
         if (burst_started) {
@@ -241,7 +272,7 @@ public:
     void OnButtonPress() {
         if (cursor == GATE_PASSTHRU) {
             out_b_thru = !out_b_thru;
-            gate_pass_popup_tick = HS::get_tick();
+            gate_thru_popup_tick = HS::get_tick();
             enc_edit[hemisphere].isEditing = true;
             ResetCursor();
         } else {
@@ -294,7 +325,11 @@ public:
     uint64_t OnDataRequest() {
         uint64_t data = 0;
         Pack(data, PackLocation {0,8}, number);
-        Pack(data, PackLocation {8,8}, spacing);
+        // Nine bits for 8..500 ms; retain the legacy positions of other fields.
+        const uint16_t saved_spacing = constrain((int)spacing,
+                                                 HEM_BURST_SPACING_MIN, HEM_BURST_SPACING_MAX);
+        Pack(data, PackLocation {8,8}, saved_spacing & 0xff);
+        Pack(data, PackLocation {52,1}, (saved_spacing >> 8) & 0x01);
         Pack(data, PackLocation {16,8}, div + 8);
         Pack(data, PackLocation {24,8}, jitter);
         Pack(data, PackLocation {32,8}, (uint8_t)accel);
@@ -308,7 +343,9 @@ public:
 
     void OnDataReceive(uint64_t data) {
         number = constrain(Unpack(data, PackLocation {0,8}), 1, HEM_BURST_NUMBER_MAX);
-        spacing = constrain(Unpack(data, PackLocation {8,8}), HEM_BURST_SPACING_MIN, HEM_BURST_SPACING_MAX);
+        spacing = constrain(Unpack(data, PackLocation {8,8}) |
+                            (Unpack(data, PackLocation {52,1}) << 8),
+                            HEM_BURST_SPACING_MIN, HEM_BURST_SPACING_MAX);
         div = Unpack(data, PackLocation {16,8}) - 8; div_constrain(div); // special constrain for div
         jitter = constrain(Unpack(data, PackLocation {24,8}), 0, HEM_BURST_JITTER_MAX);
         accel = Unpack(data, PackLocation {32,8});
@@ -340,9 +377,10 @@ private:
     bool burst_pending; // Waiting for the next clock edge
     bool out_b_high;
     bool out_b_edge_pending;
+    int out_a_wait_ticks; // Positive: cooldown; negative: pending burst edge
     bool out_b_hold;
     bool out_b_thru;
-    uint32_t gate_pass_popup_tick;
+    uint32_t gate_thru_popup_tick;
     int out_b_gap_ticks;
     int out_b_pulse_ticks;
     bool clocked; // True after the first clock; later clocks set spacing
@@ -391,7 +429,7 @@ private:
 
         y += 9;
 
-        // Gate+Pass (left) and Clock Division (right)
+        // Gate+Thru (left) and Clock Division (right)
         gfxIcon(1, y, GATE_ICON);
         gfxIcon(10, y, out_b_thru ? CHECK_ON_ICON : CHECK_OFF_ICON);
 
@@ -436,7 +474,7 @@ private:
         switch (cursor) {
           case CLKPASSTHRU:
             gfxIcon(21, 13, LEFT_ICON);
-            SetLabel(passthru == 1 ? "ClockPass" : passthru == 2 ? "BurstPass" : "BurstOnly");
+            SetLabel(passthru == 1 ? "ClockThru" : passthru == 2 ? "BurstThru" : "BurstOnly");
             break;
           case RETRIG:
             gfxCursor(44, 30, 18, 9, "Retrig");
@@ -449,7 +487,7 @@ private:
             break;
           case GATE_PASSTHRU:
             gfxIcon(19, 31, LEFT_ICON);
-            SetLabel("Gate+Pass");
+            SetLabel("Gate+Thru");
             SetAux(false);
             break;
           case DIVISION:
