@@ -266,6 +266,9 @@ public:
             jitter = constrain(jitter + direction, 0, HEM_BURST_JITTER_MAX);
             break;
 
+          case GATE_PASSTHRU:
+            SetLabel("Gate+Pass");
+            break;
           case DIVISION:
             div += direction;
             div_constrain(div, direction);
