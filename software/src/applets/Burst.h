@@ -211,7 +211,7 @@ public:
             !out_b_edge_pending &&
             out_b_gap_ticks == 0 &&
             !burst_started && !burst_finished) {
-            out_b_pulse_ticks = HEMISPHERE_CLOCK_TICKS;
+            out_b_pulse_ticks = HEMISPHERE_CLOCK_TICKS * HS::trig_length;
         }
 
         // Deliver the burst's rising edge after any restart gap.
@@ -219,7 +219,7 @@ public:
         if (out_b_edge_pending && out_b_gap_ticks == 0) {
             out_b_edge_pending = false;
             if (!out_b_hold)
-                out_b_pulse_ticks = HEMISPHERE_CLOCK_TICKS;
+                out_b_pulse_ticks = HEMISPHERE_CLOCK_TICKS * HS::trig_length;
         }
 
         const bool b_should_be_high = out_b_gap_ticks == 0 &&
