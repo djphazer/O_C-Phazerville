@@ -806,11 +806,7 @@ void AppReferences::DrawScreensaver() const {
   int32_t freq_decicents_residual_ = ((freq_decicents_deviation_ - ((freq_octave_ - 1) * 12000)) % 1000) - 500;
 
   if (frequency_ > 0.0) {
-    #ifdef FLIP_180
-    graphics.printf("TR1 %7.3f Hz", frequency_);
-    #else
     graphics.printf("TR4 %7.3f Hz", frequency_);
-    #endif
     graphics.setPrintPos(2, 56);
     if (get_notes_or_bpm()) {
       graphics.printf("%7.2f bpm %2.0fppqn", bpm_, get_ppqn());

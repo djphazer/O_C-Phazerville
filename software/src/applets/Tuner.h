@@ -24,7 +24,6 @@
 // On Teensy 3.2 units, Tuner can only work in the right hemisphere because the
 // frequency input is on TR4. However, when the screen is flipped, Tuner can
 // only work in the left hemisphere.
-// So there are various checks for the FLIP_180 compile-time option in this code.
 
 // Teensy 4.x can use any of the trigger inputs for FreqMeasure, but 4.0 on old
 // hardware only works with TR1 or TR2...

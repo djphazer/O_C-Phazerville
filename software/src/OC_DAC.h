@@ -51,11 +51,7 @@ private:
   static void Write(uint32_t cmd, uint32_t data);
 
   static constexpr uint32_t kChannelCommand[4] = {
-#ifdef FLIP_180
-    0b00010110, 0b00010100, 0b00010010, 0b00010000 
-#else
     0b00010000, 0b00010010, 0b00010100, 0b00010110
-#endif
   };
 };
 

@@ -226,17 +226,10 @@ void ADC::Init_DMA() {
 FLASHMEM
 static void Init_Teensy4_builtin_ADC() {
   // Ornament & Crime CV inputs are 19/A5 18/A4 20/A6 17/A3
-#ifdef FLIP_180
-  const int pin4 = A5;
-  const int pin3 = A4;
-  const int pin2 = A6;
-  const int pin1 = A3;
-#else
   const int pin1 = A5;
   const int pin2 = A4;
   const int pin3 = A6;
   const int pin4 = A3;
-#endif
   pinMode(pin1, INPUT_DISABLE);
   pinMode(pin2, INPUT_DISABLE);
   pinMode(pin3, INPUT_DISABLE);
