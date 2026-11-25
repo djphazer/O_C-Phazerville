@@ -194,7 +194,7 @@ AppletRegistry reg{
     DeclareApplet<Scope>{23, 0x80},
     DeclareApplet<Slew>{19, 0x01},
     DeclareApplet<Voltage>{43, 0x10},
-    DeclareApplet<Xfader>{33, 0x10},
+
 #else
 #ifdef APPLETS_SEQUENCING
     DeclareApplet<ASR>{47, 0x09},
