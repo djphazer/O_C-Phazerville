@@ -150,13 +150,15 @@ AppletRegistry reg{
    * So pick a bundle or two.
    */
 
-#ifdef PEWPEWPEW
-    // Phazer's choice
+#ifdef PEWPEWPEWv2
+    // Phazer's choice modified
     DeclareApplet<DrLoFi>{16, 0x80},
     DeclareApplet<LowerRenz>{21, 0x01},
+    DeclareApplet<BitBeat>{79, 0x01},
     DeclareApplet<Burst>{31, 0x04},
     DeclareApplet<ClockDivider>{6, 0x04},
     DeclareApplet<ClkToGate>{78, 0x04},
+    DeclareApplet<ClockSkip>{28, 0x04},
     DeclareApplet<DivSeq>{68, 0x06},
     DeclareApplet<DivSeq10>{80, 0x06},
     DeclareApplet<DrumMap>{57, 0x02},
@@ -173,8 +175,9 @@ AppletRegistry reg{
     DeclareApplet<TwoRings>{18, 0x02},
     DeclareApplet<TB_3PO>{60, 0x02},
     DeclareApplet<Squanch>{46, 0x08},
+    DeclareApplet<Shredder>{58, 0x01},
     DeclareApplet<RunglBook>{44, 0x01},
-      
+    DeclareApplet<DualQuant>{9, 0x08},  
     DeclareApplet<ADSREG>{8, 0x01},
     DeclareApplet<ADEG>{34, 0x01},
     DeclareApplet<EbbAndLfo>{7, 0x01},
