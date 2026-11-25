@@ -175,7 +175,7 @@ AppletRegistry reg{
     DeclareApplet<TwoRings>{18, 0x02},
     DeclareApplet<TB_3PO>{60, 0x02},
     DeclareApplet<Squanch>{46, 0x08},
-    DeclareApplet<Shredder>{58, 0x01},
+    
     DeclareApplet<RunglBook>{44, 0x01},
     DeclareApplet<DualQuant>{9, 0x08},  
     DeclareApplet<ADSREG>{8, 0x01},
