@@ -150,7 +150,7 @@ AppletRegistry reg{
    * So pick a bundle or two.
    */
 
-#ifdef PEWPEWPEWv2
+#ifdef PEWPEWPEW
     // Phazer's choice modified
     DeclareApplet<DrLoFi>{16, 0x80},
     DeclareApplet<LowerRenz>{21, 0x01},
