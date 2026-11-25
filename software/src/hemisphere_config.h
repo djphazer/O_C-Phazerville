@@ -192,7 +192,7 @@ AppletRegistry reg{
     DeclareApplet<Brancher>{4, 0x14},
     DeclareApplet<Calculate>{12, 0x10},
     DeclareApplet<Cumulus>{5, 0x40},
-    DeclareApplet<EnvFollow>{42, 0x11},
+    
     DeclareApplet<Schmitt>{40, 0x40},
     DeclareApplet<Scope>{23, 0x80},
     DeclareApplet<Slew>{19, 0x01},
