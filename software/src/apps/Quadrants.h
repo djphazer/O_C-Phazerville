@@ -553,7 +553,22 @@ public:
         next_applet_index[h] = index;
     }
 
+    void HandleMIDIMessage(const HS::MIDIMessage &msg) final {
+      for (int h = 0; h < APPLET_SLOTS; h++) {
+        active_applet[h]->OnMIDIMessage(msg);
+      }
+      audio_app.OnMIDIMessage(msg);
+    }
+
     void Controller() {
+        HS::MIDIMessage int_msg;
+        while (HS::frame.MIDIState.PopInternalMsg(int_msg)) {
+          for (int h = 0; h < APPLET_SLOTS; h++) {
+            active_applet[h]->OnMIDIMessage(int_msg);
+          }
+          audio_app.OnMIDIMessage(int_msg);
+        }
+
         // this might be triggered by the internal clock...
         if (jump_trig_.Clock() && !HS::clock_m.auto_reset) {
           JumpToNextPreset();

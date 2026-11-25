@@ -111,6 +111,17 @@ public:
     }
   }
 
+  void OnMIDIMessage(const HS::MIDIMessage &msg) {
+    for (size_t i = 0; i < Slots; i++) {
+      if (IsStereo(i)) {
+        get_selected_stereo_applet(i).OnMIDIMessage(msg);
+      } else {
+        get_selected_mono_applet(LEFT_HEMISPHERE, i).OnMIDIMessage(msg);
+        get_selected_mono_applet(RIGHT_HEMISPHERE, i).OnMIDIMessage(msg);
+      }
+    }
+  }
+
   void mainloop() {
     for (size_t slot = 0; slot < Slots; slot++) {
       if (IsStereo(slot)) {

@@ -9,7 +9,6 @@
 
 #pragma once
 
-#include <vector>
 #include "OC_config.h"
 #include "OC_io.h"
 #include "HSMIDI.h"
@@ -711,6 +710,27 @@ struct alignas(32) MIDIFrame {
         UpdateLog({0, message, data1, data2});
     }
 
+    static constexpr uint8_t INTERNAL_MSG_QUEUE_SIZE = 16;
+    static inline MIDIMessage internal_msg_queue[INTERNAL_MSG_QUEUE_SIZE] = {};
+    static inline uint8_t internal_msg_head = 0;
+    static inline uint8_t internal_msg_tail = 0;
+
+    static void QueueInternalMsg(const MIDIMessage msg) {
+        uint8_t next = (internal_msg_head + 1) % INTERNAL_MSG_QUEUE_SIZE;
+        if (next != internal_msg_tail) {
+            internal_msg_queue[internal_msg_head] = msg;
+            internal_msg_head = next;
+        }
+    }
+
+    static bool PopInternalMsg(MIDIMessage &msg) {
+        if (internal_msg_tail == internal_msg_head) return false;
+        msg = internal_msg_queue[internal_msg_tail];
+        internal_msg_tail = (internal_msg_tail + 1) % INTERNAL_MSG_QUEUE_SIZE;
+        return true;
+    }
+
+
     void ProcessMIDIMsg(const MIDIMessage msg);
 #ifndef NO_HEMISPHERE
     void Send(const SlewedValue *outvals); // legacy autoMIDIOut path
@@ -825,6 +845,23 @@ struct alignas(32) MIDIFrame {
       e = outlog[outlog_r & 7];
       ++outlog_r;
       return true;
+    }
+
+    void SendAllNotesOff() {
+        for (uint8_t ch = 0; ch < 16; ++ch) {
+            SendCC(ch, 123, 0);
+            SendCC(ch, 120, 0);
+            if (current_note[ch] <= 127) {
+                SendNoteOff(ch, current_note[ch], 0);
+            }
+            for (const auto& nd : note_buffer[ch]) {
+                SendNoteOff(ch, nd.note, 0);
+            }
+            note_buffer[ch].clear();
+        }
+        for (int i = 0; i < DAC_CHANNEL_COUNT; ++i) {
+            poly_buffer[i].gate = false;
+        }
     }
 };
 

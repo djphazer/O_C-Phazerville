@@ -689,8 +689,6 @@ public:
     }
 
     void Controller() {
-        // Clock duties are now called from BaseController, before frame Load
-
         // this might be triggered by the internal clock...
         if (jump_trig_.Clock() && !HS::clock_m.auto_reset) {
           JumpToNextPreset();

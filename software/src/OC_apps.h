@@ -29,6 +29,7 @@
 #include "src/UI/ui_events.h"
 #include "util/util_turing.h"
 #include "util/util_misc.h"
+#include "HSIOFrame.h"
 
 #ifdef OC_DEBUG_APPS
 # define APPS_SERIAL_PRINTLN(msg, ...) serial_printf(msg "\n", ##__VA_ARGS__)
@@ -110,6 +111,8 @@ public:
   virtual void HandleEncoderEvent(const UI::Event &) = 0;
   virtual void GetIOConfig(IOConfig &) const = 0;
   virtual void DrawDebugInfo() const = 0;
+
+  virtual void HandleMIDIMessage(const HS::MIDIMessage &) { }
 
 private:
   const uint16_t id_;

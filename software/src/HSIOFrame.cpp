@@ -110,6 +110,7 @@ void HS::MIDIFrame::ProcessMIDIMsg(const MIDIMessage msg) {
             stop_q = 1;
             clock_run = false;
             // a way to reset stuck notes
+            SendAllNotesOff();
             ClearMonoBuffer();
             ClearSustainLatch();
             ClearPolyBuffer();

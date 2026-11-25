@@ -116,6 +116,12 @@ public:
       graphics.drawBitmap8(96 - (hemisphere & 1)*64, 28, 8, (hemisphere & 1) ? RIGHT_ICON : LEFT_ICON);
     }
     virtual void AuxButton() { CancelEdit(); }
+    virtual void OnMIDINote(uint8_t channel, uint8_t note, uint8_t velocity) { }
+    virtual void OnMIDIMessage(const MIDIMessage &msg) {
+        if ((msg.message & 0xF0) == 0x90 && msg.data2 > 0) {
+            OnMIDINote(msg.channel, msg.data1, msg.data2);
+        }
+    }
 
     // Arbitrary applet data blobs, key format:
     // 5-bit preset ID

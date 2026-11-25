@@ -104,7 +104,11 @@ struct Registry {
             Serial.printf("Free RAM: %d\n", OC::CORE::FreeRam());
             Serial.printf("AppletRegistry: new - ID: %u Index: %d Slot: %u\n", id, idx, slot);
             instances[slot][idx] = factories[idx]();
-            Serial.println(instances[slot][idx]->applet_name());
+            if (instances[slot][idx]) {
+                Serial.println(instances[slot][idx]->applet_name());
+            } else {
+                Serial.println("AppletRegistry: allocation failed!");
+            }
         }
         return instances[slot][idx];
     }

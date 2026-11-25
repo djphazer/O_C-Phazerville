@@ -884,6 +884,7 @@ void ProcessMIDI(T1 &device) {
       // send it along
       SendMIDIThru(msg, thrumask);
 #endif
+      OC::app_switcher.current_app()->HandleMIDIMessage(msg);
     }
 }
 
@@ -931,7 +932,7 @@ FLASHMEM __attribute__((noinline)) void loop() {
 #if defined(ARDUINO_TEENSY41)
     HS::ProcessMIDI(usbHostMIDI[0]);
     HS::ProcessMIDI(usbHostMIDI[1]);
-    HS::ProcessMIDI(MIDI1);
+    if (MIDI_Uses_Serial8) HS::ProcessMIDI(MIDI1);
 #ifdef USB_GAMEPAD
     // gamepad is a lot like midi, too
     ProcessGamepad(joystick);
