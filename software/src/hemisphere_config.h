@@ -191,7 +191,7 @@ AppletRegistry reg{
     DeclareApplet<AttenuateOffset>{56, 0x10},
         
     DeclareApplet<Cumulus>{5, 0x40},
-    DeclareApplet<WTVCO>{67, 0x80},
+    
     DeclareApplet<Voltage>{43, 0x10},
 
 #else
