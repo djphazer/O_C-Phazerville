@@ -181,7 +181,7 @@ AppletRegistry reg{
     DeclareApplet<ADSREG>{8, 0x01},
     DeclareApplet<ADEG>{34, 0x01},
     DeclareApplet<EbbAndLfo>{7, 0x01},
-    DeclareApplet<EnvSeq>{91, 0x02},
+    
     DeclareApplet<Relabi>{89, 0x01},
     DeclareApplet<RunglBook>{44, 0x01},
     DeclareApplet<VectorEG>{52, 0x01},
@@ -189,11 +189,11 @@ AppletRegistry reg{
     DeclareApplet<TrigSeq>{11, 0x06},
     DeclareApplet<TrigSeq16>{25, 0x06},
     DeclareApplet<AttenuateOffset>{56, 0x10},
-    DeclareApplet<Brancher>{4, 0x14},
+    
     
     DeclareApplet<Cumulus>{5, 0x40},
     DeclareApplet<WTVCO>{67, 0x80},
-    DeclareApplet<Scope>{23, 0x80},
+    
     DeclareApplet<Voltage>{43, 0x10},
 
 #else
