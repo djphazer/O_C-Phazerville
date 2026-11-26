@@ -157,7 +157,7 @@ AppletRegistry reg{
     DeclareApplet<BitBeat>{79, 0x01},
     DeclareApplet<Burst>{31, 0x04},
     DeclareApplet<ASR>{47, 0x09},
-    DeclareApplet<CVRecV2>{24, 0x02},
+    
     DeclareApplet<ClockSkip>{28, 0x04},
     DeclareApplet<DivSeq>{68, 0x06},
     DeclareApplet<ShiftGate>{48, 0x45},
@@ -189,11 +189,9 @@ AppletRegistry reg{
     DeclareApplet<TrigSeq>{11, 0x06},
     DeclareApplet<TrigSeq16>{25, 0x06},
     DeclareApplet<AttenuateOffset>{56, 0x10},
-    
-    
+        
     DeclareApplet<Cumulus>{5, 0x40},
     DeclareApplet<WTVCO>{67, 0x80},
-    
     DeclareApplet<Voltage>{43, 0x10},
 
 #else
