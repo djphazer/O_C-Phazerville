@@ -181,6 +181,7 @@ AppletRegistry reg{
     DeclareApplet<SequenceX>{14, 0x02},
     DeclareApplet<Shredder>{58, 0x01},
     DeclareApplet<ShiftGate>{48, 0x45},
+    DeclareApplet<ShiftReg>{77, 0x45},
     DeclareApplet<Squanch>{46, 0x08},
     DeclareApplet<Strum>{74, 0x08},
     DeclareApplet<TB_3PO>{60, 0x02},
