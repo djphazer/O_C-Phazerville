@@ -187,6 +187,8 @@ AppletRegistry reg{
     DeclareApplet<TB_3PO>{60, 0x02},
     DeclareApplet<TrigSeq>{11, 0x06},
     DeclareApplet<TrigSeq16>{25, 0x06},
+    DeclareApplet<TruthCat3>{94, 0x00},
+    DeclareApplet<TruthCat4>{93, 0x00},
     DeclareApplet<TwoRings>{18, 0x02},
     DeclareApplet<VectorEG>{52, 0x01},
     DeclareApplet<VectorLFO>{49, 0x01}, 
