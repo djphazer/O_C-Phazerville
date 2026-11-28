@@ -76,21 +76,7 @@ public:
     const char* applet_name() { return "MiniArp"; }
     const uint8_t* applet_icon() { return PhzIcons::miniArp; }
 
-    void Start() {
-        root = 48;  // C3
-        chord = 0;
-        mode = 0;
-        oct_shift = 0;  // default: 1 octave, no expansion
-        gate_pct = 50;
-        step = 0;
-        brownian_pos = 0;
-        eff_root = root;
-        eff_chord = 0;
-        cur_idx = 0;
-        cur_total = 3;
-        last_midi = root;
-        last_clip = 0;
-    }
+    void Start();
 
     void Controller() {
         if (Clock(1)) { step = 0; brownian_pos = 0; }
@@ -166,104 +152,16 @@ public:
         }
     }
 
-    void View() {
-        // While a parameter is being edited, show its base value (not the CV-modulated one)
-        // so the display matches what the encoder actually changes. CV still affects audio.
-        const bool editing_root  = (cursor == ROOT)  && EditMode();
-        const bool editing_chord = (cursor == CHORD) && EditMode();
-        const uint8_t show_root  = editing_root  ? root  : eff_root;
-        const uint8_t show_chord = editing_chord ? chord : eff_chord;
+    void View();
 
-        // Row 1: Root (note-name) + CV mod indicator
-        gfxPrint(1, 15, midi_note_numbers[show_root]);
-        if (eff_root != root) gfxIcon(54, 15, CV_ICON);
-        if (cursor == ROOT) gfxCursor(0, 23, 27, 9, "Root");
+    void OnEncoderMove(int direction);
 
-        // Row 2: Chord name + CV mod indicator
-        gfxPrint(1, 26, miniarp::kChords[show_chord].name);
-        if (eff_chord != chord) gfxIcon(54, 26, CV_ICON);
-        if (cursor == CHORD) gfxCursor(0, 34, 33, 9, "Chord");
+    uint64_t OnDataRequest();
 
-        // Row 3: Mode (2ch) + Octave (2ch) + gate icon + gate%
-        gfxPrint(1, 39, miniarp::kModeNames[mode]);
-        if (cursor == MODE) gfxCursor(0, 47, 13, 9, "Mode");
-
-        gfxPrint(16, 39, miniarp::kOctNames[oct_shift - miniarp::kOctMin]);
-        if (cursor == OCTAVE) gfxCursor(15, 47, 13, 9, "Oct");
-
-        gfxIcon(30, 39, GATE_ICON);
-        gfxPrint(40, 39, gate_pct);
-        gfxPrint("%");
-        {
-            const int digits = (gate_pct < 10) ? 1 : 2;
-            const int width = digits * 6 + 6; // digits + '%'
-            if (cursor == GATE_PCT) gfxCursor(39, 47, width + 1, 9, "Gt.len");
-        }
-
-        gfxLine(0, 50, 62, 50);
-
-        // Row 4: current playing note + clip indicator + step counter (right-aligned)
-        gfxPrint(1, 54, midi_note_numbers[last_midi]);
-        if (last_clip > 0)      gfxIcon(25, 54, UP_ICON);
-        else if (last_clip < 0) gfxIcon(25, 54, DOWN_ICON);
-
-        {
-            const int digits_idx = (cur_idx + 1 < 10) ? 1 : 2;
-            const int digits_tot = (cur_total < 10) ? 1 : 2;
-            const int width = (digits_idx + 1 + digits_tot) * 6; // N/M
-            const int right = 61;
-            const int x = right - width;
-            gfxPrint(x, 54, cur_idx + 1);
-            gfxPrint("/");
-            gfxPrint(cur_total);
-        }
-    }
-
-    void OnEncoderMove(int direction) {
-        if (!EditMode()) {
-            MoveCursor(cursor, direction, CURSOR_LAST);
-            return;
-        }
-        switch ((MiniArpCursor)cursor) {
-            case ROOT:      root      = constrain((int)root + direction, 0, 127); break;
-            case CHORD:     chord     = constrain((int)chord + direction, 0, miniarp::kNumChords - 1); break;
-            case MODE:      mode      = constrain((int)mode + direction, 0, miniarp::kNumModes - 1); break;
-            case OCTAVE:    oct_shift = constrain((int)oct_shift + direction, miniarp::kOctMin, miniarp::kOctMax); break;
-            case GATE_PCT:  gate_pct  = constrain((int)gate_pct + direction, 1, 99); break;
-        }
-    }
-
-    uint64_t OnDataRequest() {
-        uint64_t data = 0;
-        Pack(data, PackLocation{0, 7},  root);
-        Pack(data, PackLocation{7, 5},  chord);
-        Pack(data, PackLocation{12, 3}, mode);
-        // oct_shift is signed (-1..+3); store as unsigned offset (0..4)
-        Pack(data, PackLocation{15, 3}, (uint8_t)(oct_shift - miniarp::kOctMin));
-        Pack(data, PackLocation{18, 7}, gate_pct);
-        return data;
-    }
-
-    void OnDataReceive(uint64_t data) {
-        root      = constrain((int)Unpack(data, PackLocation{0, 7}),  0, 127);
-        chord     = constrain((int)Unpack(data, PackLocation{7, 5}),  0, miniarp::kNumChords - 1);
-        mode      = constrain((int)Unpack(data, PackLocation{12, 3}), 0, miniarp::kNumModes - 1);
-        const int oct_stored = Unpack(data, PackLocation{15, 3});
-        oct_shift = constrain(oct_stored + miniarp::kOctMin, (int)miniarp::kOctMin, (int)miniarp::kOctMax);
-        gate_pct  = constrain((int)Unpack(data, PackLocation{18, 7}), 1, 99);
-    }
+    void OnDataReceive(uint64_t data);
 
 protected:
-    void SetHelp() {
-        help[HELP_DIGITAL1] = "Clock";
-        help[HELP_DIGITAL2] = "Reset";
-        help[HELP_CV1]      = "Root +";
-        help[HELP_CV2]      = "Chord +";
-        help[HELP_OUT1]     = "Pitch";
-        help[HELP_OUT2]     = "Gate";
-        help[HELP_EXTRA1]   = "";
-        help[HELP_EXTRA2]   = "";
-    }
+    void SetHelp();
 
 private:
     int cursor;
@@ -283,3 +181,123 @@ private:
     uint8_t last_midi;
     int8_t  last_clip;  // 0 = none, +1 = clipped up (>127), -1 = clipped down (<0)
 };
+
+/* -- Function bodies --
+ * Non-realtime methods live in FLASHMEM so they stay out of ITCM/RAM1
+ * (see Boilerplate.h). Controller() is the only method that must stay
+ * in ITCM, because it runs from the clock ISR.
+ */
+
+FLASHMEM void MiniArp::Start() {
+    root = 48;  // C3
+    chord = 0;
+    mode = 0;
+    oct_shift = 0;  // default: 1 octave, no expansion
+    gate_pct = 50;
+    step = 0;
+    brownian_pos = 0;
+    eff_root = root;
+    eff_chord = 0;
+    cur_idx = 0;
+    cur_total = 3;
+    last_midi = root;
+    last_clip = 0;
+}
+
+FLASHMEM void MiniArp::View() {
+    // While a parameter is being edited, show its base value (not the CV-modulated one)
+    // so the display matches what the encoder actually changes. CV still affects audio.
+    const bool editing_root  = (cursor == ROOT)  && EditMode();
+    const bool editing_chord = (cursor == CHORD) && EditMode();
+    const uint8_t show_root  = editing_root  ? root  : eff_root;
+    const uint8_t show_chord = editing_chord ? chord : eff_chord;
+
+    // Row 1: Root (note-name) + CV mod indicator
+    gfxPrint(1, 15, midi_note_numbers[show_root]);
+    if (eff_root != root) gfxIcon(54, 15, CV_ICON);
+    if (cursor == ROOT) gfxCursor(0, 23, 27, 9, "Root");
+
+    // Row 2: Chord name + CV mod indicator
+    gfxPrint(1, 26, miniarp::kChords[show_chord].name);
+    if (eff_chord != chord) gfxIcon(54, 26, CV_ICON);
+    if (cursor == CHORD) gfxCursor(0, 34, 33, 9, "Chord");
+
+    // Row 3: Mode (2ch) + Octave (2ch) + gate icon + gate%
+    gfxPrint(1, 39, miniarp::kModeNames[mode]);
+    if (cursor == MODE) gfxCursor(0, 47, 13, 9, "Mode");
+
+    gfxPrint(16, 39, miniarp::kOctNames[oct_shift - miniarp::kOctMin]);
+    if (cursor == OCTAVE) gfxCursor(15, 47, 13, 9, "Oct");
+
+    gfxIcon(30, 39, GATE_ICON);
+    gfxPrint(40, 39, gate_pct);
+    gfxPrint("%");
+    {
+        const int digits = (gate_pct < 10) ? 1 : 2;
+        const int width = digits * 6 + 6; // digits + '%'
+        if (cursor == GATE_PCT) gfxCursor(39, 47, width + 1, 9, "Gt.len");
+    }
+
+    gfxLine(0, 50, 62, 50);
+
+    // Row 4: current playing note + clip indicator + step counter (right-aligned)
+    gfxPrint(1, 54, midi_note_numbers[last_midi]);
+    if (last_clip > 0)      gfxIcon(25, 54, UP_ICON);
+    else if (last_clip < 0) gfxIcon(25, 54, DOWN_ICON);
+
+    {
+        const int digits_idx = (cur_idx + 1 < 10) ? 1 : 2;
+        const int digits_tot = (cur_total < 10) ? 1 : 2;
+        const int width = (digits_idx + 1 + digits_tot) * 6; // N/M
+        const int right = 61;
+        const int x = right - width;
+        gfxPrint(x, 54, cur_idx + 1);
+        gfxPrint("/");
+        gfxPrint(cur_total);
+    }
+}
+
+FLASHMEM void MiniArp::OnEncoderMove(int direction) {
+    if (!EditMode()) {
+        MoveCursor(cursor, direction, CURSOR_LAST);
+        return;
+    }
+    switch ((MiniArpCursor)cursor) {
+        case ROOT:      root      = constrain((int)root + direction, 0, 127); break;
+        case CHORD:     chord     = constrain((int)chord + direction, 0, miniarp::kNumChords - 1); break;
+        case MODE:      mode      = constrain((int)mode + direction, 0, miniarp::kNumModes - 1); break;
+        case OCTAVE:    oct_shift = constrain((int)oct_shift + direction, miniarp::kOctMin, miniarp::kOctMax); break;
+        case GATE_PCT:  gate_pct  = constrain((int)gate_pct + direction, 1, 99); break;
+    }
+}
+
+FLASHMEM uint64_t MiniArp::OnDataRequest() {
+    uint64_t data = 0;
+    Pack(data, PackLocation{0, 7},  root);
+    Pack(data, PackLocation{7, 5},  chord);
+    Pack(data, PackLocation{12, 3}, mode);
+    // oct_shift is signed (-1..+3); store as unsigned offset (0..4)
+    Pack(data, PackLocation{15, 3}, (uint8_t)(oct_shift - miniarp::kOctMin));
+    Pack(data, PackLocation{18, 7}, gate_pct);
+    return data;
+}
+
+FLASHMEM void MiniArp::OnDataReceive(uint64_t data) {
+    root      = constrain((int)Unpack(data, PackLocation{0, 7}),  0, 127);
+    chord     = constrain((int)Unpack(data, PackLocation{7, 5}),  0, miniarp::kNumChords - 1);
+    mode      = constrain((int)Unpack(data, PackLocation{12, 3}), 0, miniarp::kNumModes - 1);
+    const int oct_stored = Unpack(data, PackLocation{15, 3});
+    oct_shift = constrain(oct_stored + miniarp::kOctMin, (int)miniarp::kOctMin, (int)miniarp::kOctMax);
+    gate_pct  = constrain((int)Unpack(data, PackLocation{18, 7}), 1, 99);
+}
+
+FLASHMEM void MiniArp::SetHelp() {
+    help[HELP_DIGITAL1] = "Clock";
+    help[HELP_DIGITAL2] = "Reset";
+    help[HELP_CV1]      = "Root +";
+    help[HELP_CV2]      = "Chord +";
+    help[HELP_OUT1]     = "Pitch";
+    help[HELP_OUT2]     = "Gate";
+    help[HELP_EXTRA1]   = "";
+    help[HELP_EXTRA2]   = "";
+}
