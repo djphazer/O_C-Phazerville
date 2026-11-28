@@ -157,6 +157,7 @@ AppletRegistry reg{
     DeclareApplet<ASR>{47, 0x09},
     DeclareApplet<AttenuateOffset>{56, 0x10},  
     DeclareApplet<BitBeat>{79, 0x01},
+    DeclareApplet<BugCrack>{51, 0x80},  
     DeclareApplet<Burst>{31, 0x04},
     DeclareApplet<Calculate>{12, 0x10},
     DeclareApplet<ClockSkip>{28, 0x04},  
