@@ -151,54 +151,52 @@ AppletRegistry reg{
    */
 
 #ifdef PEWPEWPEW
-    // Phazer's choice
-    DeclareApplet<BugCrack>{51, 0x80},
-    DeclareApplet<DrLoFi>{16, 0x80},
-
+    // Phazer's choice modified
+    DeclareApplet<ADEG>{34, 0x01},
+    DeclareApplet<ADSREG>{8, 0x01},
+    DeclareApplet<ASR>{47, 0x09},
+    DeclareApplet<AttenuateOffset>{56, 0x10},  
+    DeclareApplet<BitBeat>{79, 0x01},
+    DeclareApplet<BugCrack>{51, 0x80},  
     DeclareApplet<Burst>{31, 0x04},
-    DeclareApplet<ClockDivider>{6, 0x04},
-    DeclareApplet<ClkToGate>{78, 0x04},
+    DeclareApplet<Calculate>{12, 0x10},
+    DeclareApplet<ClockSkip>{28, 0x04},  
+    DeclareApplet<Cumulus>{5, 0x40},
+    DeclareApplet<CVSeq>{95, 0x00},  
     DeclareApplet<DivSeq>{68, 0x06},
     DeclareApplet<DivSeq10>{80, 0x06},
+    DeclareApplet<DrLoFi>{16, 0x80},
     DeclareApplet<DrumMap>{57, 0x02},
-    DeclareApplet<EuclidX>{15, 0x02},
+    DeclareApplet<DualQuant>{9, 0x08},
+    DeclareApplet<EbbAndLfo>{7, 0x01},
+    DeclareApplet<EuclidO>{96, 0x00},
+    DeclareApplet<EuclidX>{15, 0x02},  
+    DeclareApplet<LowerRenz>{21, 0x01},
     DeclareApplet<MarkoV>{98, 0x00},
     DeclareApplet<MarkovPerc>{97, 0x00},
-    DeclareApplet<MiniArp>{92, 0x00},
     DeclareApplet<Pigeons>{71, 0x02},
     DeclareApplet<PolyDiv>{72, 0x06},
     DeclareApplet<ProbabilityDivider>{59, 0x04},
     DeclareApplet<ProbabilityMelody>{62, 0x04},
+    DeclareApplet<Relabi>{89, 0x01},
+    DeclareApplet<RunglBook>{44, 0x01},  
+    DeclareApplet<ScaleDuet>{26, 0x08},
     DeclareApplet<SequenceX>{14, 0x02},
     DeclareApplet<Shredder>{58, 0x01},
-    DeclareApplet<Strum>{74, 0x08},
-    DeclareApplet<TwoRings>{18, 0x02},
-    DeclareApplet<TB_3PO>{60, 0x02},
+    DeclareApplet<ShiftGate>{48, 0x45},
+    DeclareApplet<ShiftReg>{77, 0x45},
     DeclareApplet<Squanch>{46, 0x08},
-
-    DeclareApplet<ADSREG>{8, 0x01},
-    DeclareApplet<ADEG>{34, 0x01},
-    DeclareApplet<EbbAndLfo>{7, 0x01},
-    DeclareApplet<EnvSeq>{91, 0x02},
-    DeclareApplet<Relabi>{89, 0x01},
-    DeclareApplet<RndWalk>{69, 0x01},
-    DeclareApplet<Stairs>{61, 0x01},
+    DeclareApplet<Strum>{74, 0x08},
+    DeclareApplet<TB_3PO>{60, 0x02},
+    DeclareApplet<TrigSeq>{11, 0x06},
+    DeclareApplet<TrigSeq16>{25, 0x06},
+    DeclareApplet<TruthCat3>{94, 0x00},
+    DeclareApplet<TruthCat4>{93, 0x00},
+    DeclareApplet<TwoRings>{18, 0x02},
     DeclareApplet<VectorEG>{52, 0x01},
-    DeclareApplet<VectorLFO>{49, 0x01},
-    DeclareApplet<VectorMorph>{54, 0x01},
-
-    DeclareApplet<AttenuateOffset>{56, 0x10},
-    DeclareApplet<Brancher>{4, 0x14},
-    DeclareApplet<Button>{65, 0x10},
-    DeclareApplet<Calculate>{12, 0x10},
-    DeclareApplet<Cumulus>{5, 0x40},
-    DeclareApplet<EnvFollow>{42, 0x11},
-    DeclareApplet<Metronome>{50, 0x04},
-    DeclareApplet<Schmitt>{40, 0x40},
-    DeclareApplet<Scope>{23, 0x80},
-    DeclareApplet<Slew>{19, 0x01},
+    DeclareApplet<VectorLFO>{49, 0x01}, 
     DeclareApplet<Voltage>{43, 0x10},
-    DeclareApplet<Xfader>{33, 0x10},
+
 #else
 #ifdef APPLETS_SEQUENCING
     DeclareApplet<ASR>{47, 0x09},
@@ -254,14 +252,12 @@ AppletRegistry reg{
     DeclareApplet<CVRecV2>{24, 0x02},
     DeclareApplet<EbbAndLfo>{7, 0x01},
     DeclareApplet<EnvSeq>{91, 0x02},
-    DeclareApplet<LowerRenz>{21, 0x01},
-    DeclareApplet<Relabi>{89, 0x01},
+    
     DeclareApplet<RndWalk>{69, 0x01},
     DeclareApplet<Stairs>{61, 0x01},
     DeclareApplet<VectorEG>{52, 0x01},
     DeclareApplet<VectorLFO>{49, 0x01},
-    //DeclareApplet<VectorMod>{53, 0x01}, // awkward middle child
-    DeclareApplet<VectorMorph>{54, 0x01},
+       
 #endif
 #ifdef APPLETS_LOGIC_UTILITY
     DeclareApplet<AttenuateOffset>{56, 0x10},
@@ -299,7 +295,7 @@ AppletRegistry reg{
     DeclareApplet<DrLoFi>{16, 0x80},
     DeclareApplet<Palimpsest>{20, 0x02},
     //DeclareApplet<Ponglet>{99, 0x00},
-    DeclareApplet<RunglBook>{44, 0x01},
+    
 #endif
 #ifdef APPLETS_CRAZYTOWN
     DeclareApplet<MidiLoop>{81, 0x20},
